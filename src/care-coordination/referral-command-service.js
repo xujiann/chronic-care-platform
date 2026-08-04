@@ -212,10 +212,15 @@ function createStateRepositoryAdapter({ readState, writeState }) {
           if (working.referralSystem[OUTBOX_COLLECTION].some((item) => item.id === event.id)) {
             throw new ReferralCommandError("REFERRAL_OUTBOX_DUPLICATE", "referral outbox event already exists", 409);
           }
+          const relaySequence = working.referralSystem[OUTBOX_COLLECTION].reduce(
+            (maximum, item) => Math.max(maximum, Number(item.relaySequence) || 0),
+            working.referralSystem[OUTBOX_COLLECTION].length
+          ) + 1;
           working.referralSystem[OUTBOX_COLLECTION] = [
             {
               ...structuredClone(event),
               contractId: CONTRACT_ID,
+              relaySequence,
               status: "pending",
               attempts: 0,
               nextAttemptAt: event.occurredAt,

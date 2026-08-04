@@ -89,6 +89,7 @@ test("referral command inbox and outbox survive the real JSON persistence bounda
   assert.equal(persisted.referralSystem.referralOutbox.length, 1);
   assert.equal(persisted.referralSystem.referralCommandInbox.length, 1);
   assert.equal(persisted.referralSystem.referralOutbox[0].id, eventId);
+  assert.equal(persisted.referralSystem.referralOutbox[0].relaySequence, 1);
 
   const secondRuntime = await startAndLogin();
   const replay = await request(

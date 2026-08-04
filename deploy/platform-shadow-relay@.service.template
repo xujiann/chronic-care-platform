@@ -1,0 +1,28 @@
+[Unit]
+Description=Health platform %i PostgreSQL shadow outbox relay
+After=network-online.target chronic-care-platform.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=health-platform
+Group=health-platform
+WorkingDirectory=__APP_DIR__
+EnvironmentFile=__ENV_FILE__
+ExecStart=__NODE_BINARY__ scripts/platform-shadow-relay.js --domain=%i --run --verify-schema
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+ReadWritePaths=__DATA_DIR__
+
+[Install]
+WantedBy=multi-user.target

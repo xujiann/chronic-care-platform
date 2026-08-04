@@ -122,6 +122,17 @@ function createFakePool() {
         });
         return { rowCount: rows.length, rows: structuredClone(rows) };
       }
+      if (statement.startsWith("SELECT event_id, payload_sha256, created_at")) {
+        const rows = [...events.values()]
+          .sort((left, right) => left.created_at.localeCompare(right.created_at)
+            || left.event_id.localeCompare(right.event_id))
+          .map((row) => ({
+            event_id: row.event_id,
+            payload_sha256: row.payload_sha256,
+            created_at: row.created_at
+          }));
+        return { rowCount: rows.length, rows };
+      }
       throw new Error(`unexpected query: ${statement}`);
     },
     release() { queries.push({ sql: "RELEASE", params: [] }); }
@@ -220,6 +231,19 @@ test("enqueue is durable and idempotent while payload digest drift conflicts", a
     (error) => error.code === "REFERRAL_DELIVERY_ENQUEUE_CONFLICT" && error.statusCode === 409
   );
   assert.equal(fake.queries.some((item) => /BEGIN TRANSACTION ISOLATION LEVEL SERIALIZABLE/.test(item.sql)), true);
+});
+
+test("shadow snapshot exposes ordered event identity and digest only", async () => {
+  const fake = createFakePool();
+  const repo = repository(fake);
+  await repo.enqueue(event());
+  const snapshot = await repo.shadowSnapshot();
+  assert.deepEqual(snapshot, [{
+    id: "referral-event-001",
+    sequence: 1,
+    payloadDigest: sha256(referralPayload())
+  }]);
+  assert.doesNotMatch(JSON.stringify(snapshot), /residentId|commandId/);
 });
 
 test("injected production pools require matching TLS probe evidence", async () => {

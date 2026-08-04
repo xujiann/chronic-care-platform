@@ -246,6 +246,31 @@ test("enqueue is one serializable insert and rejects event-id payload drift", as
   assert.equal(mock.queries.filter((item) => item.sql === "ROLLBACK").length, 1);
 });
 
+test("shadow snapshot returns only ordered identity and immutable digest", async () => {
+  const outbox = outboxEvent();
+  const row = databaseRow(outbox);
+  const fake = fakePool((sql) => {
+    if (sql.startsWith("SELECT event_id, event_payload_sha256, created_at")) {
+      return {
+        rowCount: 1,
+        rows: [{
+          event_id: row.event_id,
+          event_payload_sha256: row.event_payload_sha256,
+          created_at: row.created_at
+        }]
+      };
+    }
+    throw new Error(`unexpected query: ${sql}`);
+  });
+  const snapshot = await repository(fake.pool).shadowSnapshot();
+  assert.deepEqual(snapshot, [{
+    id: outbox.id,
+    sequence: 1,
+    payloadDigest: row.event_payload_sha256
+  }]);
+  assert.doesNotMatch(JSON.stringify(snapshot), /signalId|correlationId/);
+});
+
 test("claim uses SKIP LOCKED and exact acknowledgement is persisted once", async () => {
   let current = databaseRow(outboxEvent());
   const mock = fakePool((sql, params) => {

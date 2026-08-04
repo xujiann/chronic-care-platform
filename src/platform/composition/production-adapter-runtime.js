@@ -206,6 +206,45 @@ function createProductionAdapterRuntime(options = {}) {
     });
   }
 
+  async function shadowRelayReadiness(id, input = {}) {
+    if (!["referral", "emergency"].includes(id)) {
+      throw runtimeError(
+        "PLATFORM_SHADOW_RELAY_ADAPTER_UNKNOWN",
+        "only referral and emergency adapters support domain shadow relay",
+        400
+      );
+    }
+    if (input.verifySchema === true) {
+      const current = repository(id);
+      const report = await current.verifySchema();
+      schemaReports.set(id, Object.freeze({
+        ok: report?.ok === true,
+        checks: Object.freeze(Object.fromEntries(
+          Object.entries(report?.checks || {}).map(([key, value]) => [key, value === true])
+        )),
+        migrationSha256: clean(report?.migrationSha256 || report?.migration?.sha256, 80),
+        productionReady: false
+      }));
+    }
+    const adapter = adapterProjection(adapterConfigs[id]);
+    const checks = Object.freeze({
+      shadowMode: config.mode === "shadow" || config.mode === "cutover-gated",
+      adapterConfigured: adapter.configured,
+      adapterWriteEnabled: adapter.writeEnabled,
+      schemaVerified: schemaReports.get(id)?.ok === true
+    });
+    return Object.freeze({
+      adapter: id,
+      eligible: Object.values(checks).every(Boolean),
+      checks,
+      schema: schemaReports.get(id) || null,
+      externalAuthorizationRequired: false,
+      productionPrimary: false,
+      productionReady: false,
+      boundary: "Eligibility permits only an idempotent PostgreSQL shadow copy. It does not authorize worker delivery, primary reads, migration completion, or production cutover."
+    });
+  }
+
   async function runWorkerOnce(id, workerOptions = {}) {
     const report = await readiness();
     if (!report.workersEligible || !options.activateWorkers) {
@@ -253,6 +292,7 @@ function createProductionAdapterRuntime(options = {}) {
     repository,
     verifySchemas,
     readiness,
+    shadowRelayReadiness,
     runWorkerOnce,
     close
   });

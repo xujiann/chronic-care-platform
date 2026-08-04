@@ -129,7 +129,12 @@ function evaluatePilotCutover(input = {}, now = new Date().toISOString()) {
     adapterRuntime: input.reports?.adapterRuntime?.localChecks?.schemaVerified === true
       && input.reports?.adapterRuntime?.localChecks?.adaptersConfigured === true
       && input.reports?.adapterRuntime?.localChecks?.adapterWritesEvidenceGated === true,
-    reconciliation: input.reports?.reconciliation?.ok === true,
+    reconciliation: input.reports?.reconciliation?.ok === true
+      && input.reports?.reconciliation?.domains?.referral?.ok === true
+      && input.reports?.reconciliation?.domains?.emergency?.ok === true
+      && input.reports?.reconciliation?.durableCheckpointVerified === true
+      && input.reports?.reconciliation?.faultRecoveryVerified === true
+      && input.reports?.reconciliation?.payloadsExposed === false,
     businessLoop: input.reports?.businessLoop?.ok === true,
     operations: input.reports?.operations?.localReady === true
   });

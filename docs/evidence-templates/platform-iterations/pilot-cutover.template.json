@@ -16,6 +16,18 @@
     "rollback": "sha256:<64-hex>",
     "disasterRecovery": "sha256:<64-hex>"
   },
+  "reports": {
+    "reconciliation": {
+      "ok": false,
+      "domains": {
+        "referral": { "ok": false },
+        "emergency": { "ok": false }
+      },
+      "durableCheckpointVerified": false,
+      "faultRecoveryVerified": false,
+      "payloadsExposed": false
+    }
+  },
   "authorization": {
     "decision": "NO-GO",
     "confirmation": "",
