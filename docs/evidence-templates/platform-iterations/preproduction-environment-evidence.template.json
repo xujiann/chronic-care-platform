@@ -1,0 +1,117 @@
+{
+  "schemaVersion": "preproduction-environment-evidence-v1",
+  "environment": "pre-production",
+  "environmentId": "<controlled-environment-id>",
+  "releaseId": "<release-id>",
+  "packageFingerprint": "sha256:<64-lowercase-hex>",
+  "components": [
+    {
+      "id": "postgres",
+      "status": "verified",
+      "evidenceRef": "evidence://<controlled-reference>",
+      "evidenceDigest": "sha256:<64-lowercase-hex>",
+      "operatorAccount": "<operator-account>",
+      "verifierAccount": "<independent-verifier-account>",
+      "verifiedAt": "<ISO-8601>",
+      "expiresAt": "<ISO-8601>"
+    },
+    {
+      "id": "object-storage",
+      "status": "verified",
+      "evidenceRef": "evidence://<controlled-reference>",
+      "evidenceDigest": "sha256:<64-lowercase-hex>",
+      "operatorAccount": "<operator-account>",
+      "verifierAccount": "<independent-verifier-account>",
+      "verifiedAt": "<ISO-8601>",
+      "expiresAt": "<ISO-8601>"
+    },
+    {
+      "id": "central-session",
+      "status": "verified",
+      "evidenceRef": "evidence://<controlled-reference>",
+      "evidenceDigest": "sha256:<64-lowercase-hex>",
+      "operatorAccount": "<operator-account>",
+      "verifierAccount": "<independent-verifier-account>",
+      "verifiedAt": "<ISO-8601>",
+      "expiresAt": "<ISO-8601>"
+    },
+    {
+      "id": "durable-messaging",
+      "status": "verified",
+      "evidenceRef": "evidence://<controlled-reference>",
+      "evidenceDigest": "sha256:<64-lowercase-hex>",
+      "operatorAccount": "<operator-account>",
+      "verifierAccount": "<independent-verifier-account>",
+      "verifiedAt": "<ISO-8601>",
+      "expiresAt": "<ISO-8601>"
+    },
+    {
+      "id": "audit-retention",
+      "status": "verified",
+      "evidenceRef": "evidence://<controlled-reference>",
+      "evidenceDigest": "sha256:<64-lowercase-hex>",
+      "operatorAccount": "<operator-account>",
+      "verifierAccount": "<independent-verifier-account>",
+      "verifiedAt": "<ISO-8601>",
+      "expiresAt": "<ISO-8601>"
+    }
+  ],
+  "recoveryScenarios": [
+    {
+      "id": "application-restart",
+      "passed": true,
+      "evidenceRef": "evidence://<controlled-reference>",
+      "evidenceDigest": "sha256:<64-lowercase-hex>",
+      "operatorAccount": "<operator-account>",
+      "verifierAccount": "<independent-verifier-account>",
+      "startedAt": "<ISO-8601>",
+      "completedAt": "<ISO-8601>",
+      "rpoTargetMinutes": 15,
+      "rpoActualMinutes": "<measured-number>",
+      "rtoTargetMinutes": 30,
+      "rtoActualMinutes": "<measured-number>"
+    },
+    {
+      "id": "worker-interruption",
+      "passed": true,
+      "evidenceRef": "evidence://<controlled-reference>",
+      "evidenceDigest": "sha256:<64-lowercase-hex>",
+      "operatorAccount": "<operator-account>",
+      "verifierAccount": "<independent-verifier-account>",
+      "startedAt": "<ISO-8601>",
+      "completedAt": "<ISO-8601>",
+      "rpoTargetMinutes": 15,
+      "rpoActualMinutes": "<measured-number>",
+      "rtoTargetMinutes": 30,
+      "rtoActualMinutes": "<measured-number>"
+    },
+    {
+      "id": "duplicate-delivery",
+      "passed": true,
+      "evidenceRef": "evidence://<controlled-reference>",
+      "evidenceDigest": "sha256:<64-lowercase-hex>",
+      "operatorAccount": "<operator-account>",
+      "verifierAccount": "<independent-verifier-account>",
+      "startedAt": "<ISO-8601>",
+      "completedAt": "<ISO-8601>",
+      "rpoTargetMinutes": 0,
+      "rpoActualMinutes": "<measured-number>",
+      "rtoTargetMinutes": 15,
+      "rtoActualMinutes": "<measured-number>"
+    },
+    {
+      "id": "database-restore",
+      "passed": true,
+      "evidenceRef": "evidence://<controlled-reference>",
+      "evidenceDigest": "sha256:<64-lowercase-hex>",
+      "operatorAccount": "<operator-account>",
+      "verifierAccount": "<independent-verifier-account>",
+      "startedAt": "<ISO-8601>",
+      "completedAt": "<ISO-8601>",
+      "rpoTargetMinutes": 15,
+      "rpoActualMinutes": "<measured-number>",
+      "rtoTargetMinutes": 60,
+      "rtoActualMinutes": "<measured-number>"
+    }
+  ]
+}
