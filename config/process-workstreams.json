@@ -1,7 +1,16 @@
 {
   "schemaVersion": "process-workstreams-v1",
   "integrationBranch": "main",
-  "baselineTag": "baseline/governance-20260803-four-class-closure-v1",
+  "baselineTag": "baseline/governance-20260804-production-adapters-v1",
+  "developmentPolicy": {
+    "singleIntegrationBaseline": true,
+    "integrationOwner": "T00",
+    "mergeDirection": "process-branch-to-integration-branch",
+    "routeOwnershipRequired": true,
+    "crossProcessChangesRequireT00": true,
+    "externalEvidenceCannotBeInferred": true,
+    "productionDefaultDecision": "NO-GO"
+  },
   "branchPattern": "process/tNN-<topic>-YYYYMMDD",
   "processes": {
     "T00": {
@@ -91,6 +100,18 @@
     { "pattern": "test/release-registry.test.js", "owner": "T00" },
     { "pattern": "test/production-preflight.test.js", "owner": "T00" },
     { "pattern": "config/process-workstreams.json", "owner": "T00" },
+    { "pattern": "config/platform-iteration-program.json", "owner": "T00" },
+    { "pattern": "config/platform-operational-controls.json", "owner": "T00" },
+    { "pattern": "config/regional-integration-contracts.json", "owner": "T00" },
+    { "pattern": "src/platform/composition/production-adapter-runtime.js", "owner": "T00" },
+    { "pattern": "src/platform/operations/shadow-outbox-relay.js", "owner": "T00" },
+    { "pattern": "src/platform/integration/regional-joint-test.js", "owner": "T00" },
+    { "pattern": "src/platform/orchestration/regional-business-loop.js", "owner": "T00" },
+    { "pattern": "src/platform/governance/operational-control-plane.js", "owner": "T00" },
+    { "pattern": "src/platform/cutover/pilot-cutover-orchestrator.js", "owner": "T00" },
+    { "pattern": "scripts/production-adapter-runtime.js", "owner": "T00" },
+    { "pattern": "scripts/regional-joint-test.js", "owner": "T00" },
+    { "pattern": "scripts/platform-iteration-control.js", "owner": "T00" },
     { "pattern": "package.json", "owner": "T00" },
     { "pattern": ".github/**", "owner": "T00" },
     { "pattern": "AGENTS.md", "owner": "T00" },

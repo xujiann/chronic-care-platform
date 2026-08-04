@@ -1,0 +1,21 @@
+{
+  "schemaVersion": "platform-operational-controls-v1",
+  "security": {
+    "requiredRoles": ["runtime-reader", "delivery-worker", "audit-writer", "security-reviewer"],
+    "maximumKeyAgeDays": 90,
+    "maximumOpenCriticalFindings": 0,
+    "externalGates": ["security-assessment", "commercial-crypto-assessment"]
+  },
+  "monitoring": {
+    "requiredSignals": ["worker-lag", "dead-letter-count", "delivery-failure-rate", "database-pool-saturation", "audit-write-failure"],
+    "maximumSignalAgeSeconds": 300,
+    "requiredDrillScenarios": ["delivery", "retry", "escalation", "recovery"],
+    "externalGates": ["verified-alert-routes", "on-call-acceptance"]
+  },
+  "dataGovernance": {
+    "requiredChecks": ["identity-uniqueness", "referral-integrity", "clinical-receipt-integrity", "retention-execution"],
+    "maximumReportAgeHours": 24,
+    "auditRetentionDays": 365,
+    "externalGates": ["retention-approval", "data-owner-signoff"]
+  }
+}

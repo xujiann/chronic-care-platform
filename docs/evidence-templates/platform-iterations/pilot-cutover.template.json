@@ -1,0 +1,29 @@
+{
+  "schemaVersion": "pilot-cutover-input-v1",
+  "status": "pending-external",
+  "release": {
+    "releaseId": "<immutable-release-id>",
+    "sourceCommit": "<40-character-commit>",
+    "artifactDigest": "sha256:<64-hex>"
+  },
+  "evidenceDigests": {
+    "adapterRuntime": "sha256:<64-hex>",
+    "reconciliation": "sha256:<64-hex>",
+    "jointTests": "sha256:<64-hex>",
+    "businessLoop": "sha256:<64-hex>",
+    "operations": "sha256:<64-hex>",
+    "externalReleaseEvidence": "sha256:<64-hex>",
+    "rollback": "sha256:<64-hex>",
+    "disasterRecovery": "sha256:<64-hex>"
+  },
+  "authorization": {
+    "decision": "NO-GO",
+    "confirmation": "",
+    "evidenceFingerprint": "",
+    "approvedAt": "",
+    "expiresAt": "",
+    "rollbackOwner": "",
+    "approvals": []
+  },
+  "boundary": "Replace placeholders only with controlled references and digests. Never place credentials, private keys, tokens, patient data or raw provider messages in this file."
+}

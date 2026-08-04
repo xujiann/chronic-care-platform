@@ -3,7 +3,7 @@
 This repository uses one integration line:
 
 - integration and release branch: `main`
-- process baseline: `baseline/governance-20260803-four-class-closure-v1`
+- process baseline: `baseline/governance-20260804-production-adapters-v1`
 - ownership manifest: `config/process-workstreams.json`
 
 Before changing a protected runtime file, identify the process from the current
@@ -30,6 +30,23 @@ Before changing a protected runtime file, identify the process from the current
    Feature and process branches are short-lived and target `main`; release
    promotion uses immutable tags and environment approvals instead of a
    long-lived integration branch.
+10. Create process worktrees through `npm run process:plan` / `npm run process:create`
+    and use branch names in the form `process/tNN-<topic>-YYYYMMDD`.
+
+## Production safety
+
+- Default to `NO-GO`, `productionReady: false` and `productionPrimary: false`.
+- Environment flags and automated tests cannot prove external migration, joint testing, security assessment, monitoring delivery, disaster recovery, site acceptance or approval.
+- Store only controlled evidence references and SHA-256 digests. Never commit credentials, tokens, private keys, patient data or raw provider messages.
+- Production worker activation requires verified schemas, idempotent reconciliation, current external evidence, independent approvals and an explicit runtime activation.
+- Do not perform request-path dual writes. Relay committed local outbox events to idempotent sinks and persist a recoverable checkpoint.
+
+## Verification
+
+- Add deterministic unit tests for every new state transition, failure path and evidence gate.
+- Run the narrow test set while developing and `npm run test:all` before integration.
+- Run `npm run routes:check`, `npm run architecture:test`, `npm run process:test`, and `npm run platform:iterations:test` for central changes.
+- Do not weaken checks to make a merge pass. Any temporary branch-protection exception must be recorded and restored immediately after the authorized merge.
 
 The detailed Chinese workflow is in
 `docs/路由模块化与并行开发边界-2026-08-03.md`.

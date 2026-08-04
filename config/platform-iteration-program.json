@@ -1,0 +1,87 @@
+{
+  "schemaVersion": "platform-iteration-program-v1",
+  "programId": "production-adapter-composition-20260804",
+  "integrationBranch": "main",
+  "baselineTag": "baseline/governance-20260804-production-adapters-v1",
+  "policy": {
+    "integrationOwner": "T00",
+    "orderedExecution": true,
+    "defaultDecision": "NO-GO",
+    "externalEvidenceCannotBeInferred": true,
+    "secretsAndPatientDataForbidden": true,
+    "productionCutoverRequiresIndependentApproval": true
+  },
+  "iterations": [
+    {
+      "id": "iteration-1",
+      "name": "统一装配与迁移演练",
+      "deliverables": [
+        "统一开发规则",
+        "生产适配器组合根",
+        "运行时与工作进程入口",
+        "数据库迁移只读校验"
+      ],
+      "requiredLocalGates": ["rules", "composition", "schema-rehearsal"],
+      "requiredExternalGates": []
+    },
+    {
+      "id": "iteration-2",
+      "name": "影子转发与一致性恢复",
+      "deliverables": [
+        "本地事务发件箱到PostgreSQL的幂等影子转发",
+        "摘要级对账",
+        "故障注入与恢复游标"
+      ],
+      "requiredLocalGates": ["shadow-relay", "digest-reconciliation", "fault-recovery"],
+      "requiredExternalGates": []
+    },
+    {
+      "id": "iteration-3",
+      "name": "真实集成准备",
+      "deliverables": [
+        "HIS/EMR/LIS/PACS契约清单",
+        "联调执行包",
+        "受控证据引用校验"
+      ],
+      "requiredLocalGates": ["integration-contracts", "joint-test-tooling"],
+      "requiredExternalGates": ["signed-joint-test-receipts"]
+    },
+    {
+      "id": "iteration-4",
+      "name": "区域业务闭环",
+      "deliverables": [
+        "居民授权闭环",
+        "转诊交付闭环",
+        "临床急救回执闭环"
+      ],
+      "requiredLocalGates": ["resident-loop", "referral-loop", "clinical-loop"],
+      "requiredExternalGates": ["pilot-institution-acceptance"]
+    },
+    {
+      "id": "iteration-5",
+      "name": "安全与运营治理",
+      "deliverables": [
+        "最小权限与审计门禁",
+        "监控告警演练矩阵",
+        "数据质量与保留策略"
+      ],
+      "requiredLocalGates": ["security-controls", "monitoring-controls", "data-governance"],
+      "requiredExternalGates": ["security-assessment", "verified-alert-routes"]
+    },
+    {
+      "id": "iteration-6",
+      "name": "试点切换与发布判定",
+      "deliverables": [
+        "试点切换清单",
+        "容灾与回滚演练包",
+        "证据指纹绑定的GO/NO-GO判定"
+      ],
+      "requiredLocalGates": ["cutover-package", "rollback-package", "go-no-go-validator"],
+      "requiredExternalGates": [
+        "dr-rehearsal",
+        "site-acceptance",
+        "four-party-go-no-go"
+      ]
+    }
+  ]
+}

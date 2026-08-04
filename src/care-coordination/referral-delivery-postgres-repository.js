@@ -698,6 +698,28 @@ function createReferralDeliveryPostgresRepository(options = {}) {
     });
   }
 
+  async function verifySchema() {
+    return withClient(pool(), "BEGIN READ ONLY", async (client) => {
+      const result = await client.query(`
+        SELECT
+          to_regclass('health_platform.referral_delivery_outbox') AS outbox,
+          to_regclass('health_platform.referral_delivery_replays') AS replays
+      `);
+      const row = result.rows[0] || {};
+      const checks = {
+        outbox: Boolean(row.outbox),
+        replays: Boolean(row.replays)
+      };
+      return Object.freeze({
+        ok: Object.values(checks).every(Boolean),
+        checks: Object.freeze(checks),
+        migration: config.migration,
+        productionReady: false,
+        productionPrimary: false
+      });
+    });
+  }
+
   async function close() {
     if (ownedPool) {
       await ownedPool.end();
@@ -705,7 +727,17 @@ function createReferralDeliveryPostgresRepository(options = {}) {
     }
   }
 
-  return Object.freeze({ acknowledge, claim, close, config, enqueue, fail, operations, replayDeadLetter });
+  return Object.freeze({
+    acknowledge,
+    claim,
+    close,
+    config,
+    enqueue,
+    fail,
+    operations,
+    replayDeadLetter,
+    verifySchema
+  });
 }
 
 module.exports = {
