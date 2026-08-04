@@ -1,12 +1,22 @@
 "use strict";
 
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const os = require("node:os");
+const path = require("node:path");
 const test = require("node:test");
 
 const {
   evaluateOperationalControlPlane,
   loadOperationalControls
 } = require("../src/platform/governance/operational-control-plane");
+const {
+  evaluateOperationalControlRuntime,
+  readOperationalControlInput
+} = require("../src/platform/governance/operational-control-runtime");
+const {
+  run: runOperationalControl
+} = require("../scripts/platform-operational-control");
 
 const NOW = "2030-08-04T12:00:00.000Z";
 
@@ -63,7 +73,34 @@ test("complete local controls remain blocked while external operational evidence
   assert.equal(report.localReady, true);
   assert.equal(report.externalReady, false);
   assert.equal(report.operationalReady, false);
+  assert.match(report.technicalEvidenceFingerprint, /^sha256:[a-f0-9]{64}$/);
   assert.equal(report.productionReady, false);
+});
+
+test("operational control runtime accepts only bounded absolute metadata files", () => {
+  const config = loadOperationalControls();
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "platform-operational-control-"));
+  const file = path.join(directory, "input.json");
+  fs.writeFileSync(file, JSON.stringify({
+    schemaVersion: "platform-operational-control-input-v1",
+    snapshot: localSnapshot(config),
+    externalEvidence: []
+  }));
+  const input = readOperationalControlInput(file);
+  assert.equal(input.externalEvidence.length, 0);
+  const report = evaluateOperationalControlRuntime({ file, config, now: NOW });
+  assert.equal(report.localReady, true);
+  assert.equal(report.operationalReady, false);
+  const cli = runOperationalControl(
+    { input: file, now: NOW, "require-operational-ready": true },
+    {}
+  );
+  assert.equal(cli.exitCode, 2);
+  assert.throws(
+    () => readOperationalControlInput("relative-operational-input.json"),
+    (error) => error.code === "OPERATIONAL_CONTROL_INPUT_PATH_INVALID"
+  );
+  fs.rmSync(directory, { recursive: true, force: true });
 });
 
 test("controlled external references can satisfy the operational report without exposing contents", () => {
@@ -86,6 +123,15 @@ test("operational snapshots reject patient and secret-bearing fields", () => {
   snapshot.security.password = "must-not-enter-evidence";
   assert.throws(
     () => evaluateOperationalControlPlane({ config, snapshot, now: NOW }),
+    (error) => error.code === "OPERATIONAL_CONTROL_SENSITIVE_FIELD"
+  );
+  assert.throws(
+    () => evaluateOperationalControlPlane({
+      config,
+      snapshot: localSnapshot(config),
+      externalEvidence: [{ id: "security-assessment", secret: "forbidden" }],
+      now: NOW
+    }),
     (error) => error.code === "OPERATIONAL_CONTROL_SENSITIVE_FIELD"
   );
 });

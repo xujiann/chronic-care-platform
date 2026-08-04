@@ -17,6 +17,15 @@
     "disasterRecovery": "sha256:<64-hex>"
   },
   "reports": {
+    "adapterRuntime": {
+      "schema": "platform-production-adapter-runtime-v1",
+      "technicalEvidenceFingerprint": "sha256:<must-equal-evidenceDigests.adapterRuntime>",
+      "localChecks": {
+        "schemaVerified": false,
+        "adaptersConfigured": false,
+        "adapterWritesEvidenceGated": false
+      }
+    },
     "reconciliation": {
       "schema": "shadow-relay-control-plane-v1",
       "ok": false,
@@ -31,6 +40,28 @@
       "payloadsExposed": false,
       "externalEvidenceVerified": false,
       "productionReady": false
+    },
+    "jointTests": {
+      "schema": "regional-joint-test-evidence-v1",
+      "technicalEvidenceFingerprint": "sha256:<must-equal-evidenceDigests.jointTests>",
+      "externalEvidenceVerified": false
+    },
+    "businessLoop": {
+      "schema": "regional-business-loop-report-v1",
+      "technicalEvidenceFingerprint": "sha256:<must-equal-evidenceDigests.businessLoop>",
+      "ok": false
+    },
+    "operations": {
+      "schema": "platform-operational-control-report-v1",
+      "technicalEvidenceFingerprint": "sha256:<must-equal-evidenceDigests.operations>",
+      "localReady": false,
+      "externalReady": false,
+      "operationalReady": false,
+      "productionReady": false
+    },
+    "externalReleaseEvidence": {
+      "ok": false,
+      "evidenceFingerprint": "sha256:<must-equal-evidenceDigests.externalReleaseEvidence>"
     }
   },
   "authorization": {

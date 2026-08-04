@@ -2,6 +2,9 @@
 
 const fs = require("node:fs");
 const path = require("node:path");
+const {
+  createTechnicalEvidenceFingerprint
+} = require("./technical-evidence");
 
 const CONTROL_FILE = path.resolve(__dirname, "..", "..", "..", "config", "platform-operational-controls.json");
 const CONTROLLED_REFERENCE = /^(?:vault|evidence|artifact|cmdb|ticket):\/\/[A-Za-z0-9._~:/?#@!$&'()*+,;=%-]+$/;
@@ -131,6 +134,7 @@ function evaluateOperationalControlPlane(options = {}) {
   const snapshot = options.snapshot || {};
   assertMetadataOnly(snapshot);
   const external = Array.isArray(options.externalEvidence) ? options.externalEvidence : [];
+  assertMetadataOnly(external, "externalEvidence");
   const security = evaluateSecurity(config.security, snapshot.security, external);
   const monitoring = evaluateMonitoring(config.monitoring, snapshot.monitoring, external);
   const dataGovernance = evaluateDataGovernance(
@@ -140,14 +144,21 @@ function evaluateOperationalControlPlane(options = {}) {
     options.now || new Date().toISOString()
   );
   const domains = Object.freeze({ security, monitoring, dataGovernance });
-  return Object.freeze({
+  const projection = Object.freeze({
     schema: "platform-operational-control-report-v1",
     domains,
     localReady: Object.values(domains).every((item) => item.localReady),
     externalReady: Object.values(domains).every((item) => item.externalReady),
     operationalReady: Object.values(domains).every((item) => item.localReady && item.externalReady),
     externalEvidenceInferred: false,
-    sensitiveDataExposed: false,
+    sensitiveDataExposed: false
+  });
+  return Object.freeze({
+    ...projection,
+    technicalEvidenceFingerprint: createTechnicalEvidenceFingerprint(
+      projection.schema,
+      projection
+    ),
     productionReady: false,
     boundary: "Operational readiness is metadata-only. External assessments, alert-route verification, retention approval, and data-owner signoff must be supplied as controlled evidence."
   });

@@ -34,7 +34,11 @@ const ARTIFACTS = Object.freeze({
   ],
   "iteration-5": [
     "config/platform-operational-controls.json",
-    "src/platform/governance/operational-control-plane.js"
+    "src/platform/governance/technical-evidence.js",
+    "src/platform/governance/operational-control-plane.js",
+    "src/platform/governance/operational-control-runtime.js",
+    "scripts/platform-operational-control.js",
+    "docs/evidence-templates/platform-iterations/operational-control-input.template.json"
   ],
   "iteration-6": [
     "src/platform/cutover/pilot-cutover-orchestrator.js",

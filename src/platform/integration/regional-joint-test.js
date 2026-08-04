@@ -3,6 +3,9 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const { createHash } = require("node:crypto");
+const {
+  createTechnicalEvidenceFingerprint
+} = require("../governance/technical-evidence");
 
 const REGISTRY_FILE = path.resolve(__dirname, "..", "..", "..", "config", "regional-integration-contracts.json");
 const SYSTEMS = new Set(["HIS", "EMR", "LIS", "PACS"]);
@@ -142,12 +145,19 @@ function evaluateRegionalJointTestEvidence(records = [], registry = loadRegional
       checks
     });
   });
-  return Object.freeze({
+  const projection = Object.freeze({
     schema: "regional-joint-test-evidence-v1",
     registryDigest: registry.registryDigest,
     contracts: Object.freeze(contracts),
     externalEvidenceVerified: contracts.every((item) => item.verified),
-    evidenceInferred: false,
+    evidenceInferred: false
+  });
+  return Object.freeze({
+    ...projection,
+    technicalEvidenceFingerprint: createTechnicalEvidenceFingerprint(
+      projection.schema,
+      projection
+    ),
     productionReady: false
   });
 }

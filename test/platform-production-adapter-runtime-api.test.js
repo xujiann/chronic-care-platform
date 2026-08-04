@@ -7,6 +7,7 @@ const {
   createRouteSegment
 } = require("../src/http/routes/platform-governance/production-operations");
 const {
+  operationalControlPlaneReadiness,
   shadowRelayControlPlaneReadiness
 } = require("../server");
 
@@ -26,6 +27,14 @@ test("production adapter runtime API is commission-only, read-only and payload-s
       ok: false,
       receipts: 0,
       payloadsExposed: false,
+      productionReady: false
+    }),
+    operationalControlPlaneReadiness: async () => ({
+      schema: "platform-operational-control-report-v1",
+      localReady: false,
+      externalReady: false,
+      operationalReady: false,
+      sensitiveDataExposed: false,
       productionReady: false
     }),
     requireApiRole: () => ({ name: "commission-user", role: "commission" }),
@@ -54,6 +63,36 @@ test("production adapter runtime API is commission-only, read-only and payload-s
   assert.equal(response.payload.ok, false);
   assert.equal(events[1].action, "shadow-relay-control-plane-read");
   assert.doesNotMatch(JSON.stringify(response), /password|secret|patient/i);
+
+  const operationsHandled = await segment.handle(
+    { method: "GET" },
+    {},
+    new URL("http://localhost/api/production-adapters/operational-control")
+  );
+  assert.equal(operationsHandled, true);
+  assert.equal(response.status, 200);
+  assert.equal(response.payload.schema, "platform-operational-control-report-v1");
+  assert.equal(response.payload.operationalReady, false);
+  assert.equal(events[2].action, "operational-control-plane-read");
+  assert.doesNotMatch(JSON.stringify(response), /password|secret|patient/i);
+});
+
+test("server operational control plane fails closed without an input file", async () => {
+  const previousFile = process.env.PLATFORM_OPERATIONAL_CONTROL_INPUT_FILE;
+  delete process.env.PLATFORM_OPERATIONAL_CONTROL_INPUT_FILE;
+  try {
+    const report = await operationalControlPlaneReadiness();
+    assert.equal(report.schema, "platform-operational-control-report-v1");
+    assert.equal(report.localReady, false);
+    assert.equal(report.externalReady, false);
+    assert.equal(report.operationalReady, false);
+    assert.equal(report.sensitiveDataExposed, false);
+    assert.equal(report.productionReady, false);
+    assert.equal(report.technicalEvidenceFingerprint, "");
+  } finally {
+    if (previousFile === undefined) delete process.env.PLATFORM_OPERATIONAL_CONTROL_INPUT_FILE;
+    else process.env.PLATFORM_OPERATIONAL_CONTROL_INPUT_FILE = previousFile;
+  }
 });
 
 test("server control plane fails closed without an operations ledger", async () => {

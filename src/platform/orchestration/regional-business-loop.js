@@ -1,6 +1,9 @@
 "use strict";
 
 const { createHash } = require("node:crypto");
+const {
+  createTechnicalEvidenceFingerprint
+} = require("../governance/technical-evidence");
 
 const SHA256 = /^sha256:[a-f0-9]{64}$/;
 const TRANSITIONS = Object.freeze({
@@ -150,13 +153,21 @@ function evaluateRegionalBusinessLoop(state = {}) {
     closed: state.phase === "closed" && eventTypes.has("loop-closed"),
     uncompensated: state.phase !== "compensating"
   });
-  return Object.freeze({
+  const projection = Object.freeze({
+    schema: "regional-business-loop-report-v1",
     ok: Object.values(checks).every(Boolean),
     loopId: clean(state.loopId, 200),
     phase: clean(state.phase, 80),
     version: Number(state.version) || 0,
     checks,
-    eventChainDigest: sha256(state.events || []),
+    eventChainDigest: sha256(state.events || [])
+  });
+  return Object.freeze({
+    ...projection,
+    technicalEvidenceFingerprint: createTechnicalEvidenceFingerprint(
+      projection.schema,
+      projection
+    ),
     residentDataExposed: false,
     clinicalDataExposed: false,
     productionReady: false
