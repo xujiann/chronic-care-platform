@@ -45,9 +45,14 @@ const ARTIFACTS = Object.freeze({
   "iteration-6": [
     "src/platform/cutover/pilot-cutover-orchestrator.js",
     "src/platform/cutover/pilot-cutover-package.js",
+    "src/platform/cutover/pilot-cutover-authorization-ledger.js",
     "scripts/platform-cutover-package.js",
+    "scripts/platform-cutover-authorization.js",
     "docs/evidence-templates/platform-iterations/pilot-cutover.template.json",
-    "docs/evidence-templates/platform-iterations/pilot-cutover-package-manifest.template.json"
+    "docs/evidence-templates/platform-iterations/pilot-cutover-package-manifest.template.json",
+    "docs/evidence-templates/platform-iterations/pilot-cutover-register-evidence.template.json",
+    "docs/evidence-templates/platform-iterations/pilot-cutover-record-approval.template.json",
+    "docs/evidence-templates/platform-iterations/pilot-cutover-revoke.template.json"
   ]
 });
 

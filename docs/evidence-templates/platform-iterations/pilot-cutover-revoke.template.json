@@ -1,0 +1,11 @@
+{
+  "schemaVersion": "pilot-cutover-revoke-v1",
+  "actorAccount": "<ledger-writer-account>",
+  "recordedAt": "<ISO-8601-timestamp>",
+  "payload": {
+    "targetEventId": "<active-evidence-or-approval-event-id>",
+    "reasonRef": "evidence://<controlled-revocation-reference>",
+    "reasonDigest": "sha256:<revocation-evidence-digest>"
+  },
+  "boundary": "Revocation is append-only. The target event remains in the ledger but is excluded from the current projection."
+}

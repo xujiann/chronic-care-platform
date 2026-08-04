@@ -24,8 +24,8 @@ const {
   evaluateOperationalControlRuntime
 } = require("./src/platform/governance/operational-control-runtime");
 const {
-  evaluatePilotCutoverFile
-} = require("./src/platform/cutover/pilot-cutover-package");
+  evaluatePilotCutoverAuthorizationLedger
+} = require("./src/platform/cutover/pilot-cutover-authorization-ledger");
 const { createHash, createHmac, pbkdf2Sync, randomUUID, timingSafeEqual } = require("crypto");
 const { MemorySessionStore, PostgresSessionStore, SqliteSessionStore, createSqliteSessionSchema } = require("./session-store");
 const {
@@ -622,7 +622,7 @@ async function operationalControlPlaneReadiness() {
 
 function blockedPilotCutoverControlPlane(error) {
   return Object.freeze({
-    schema: "pilot-cutover-decision-v1",
+    schema: "pilot-cutover-authorization-control-v1",
     evaluatedAt: new Date().toISOString(),
     decision: "NO-GO",
     evidenceFingerprint: "",
@@ -633,7 +633,9 @@ function blockedPilotCutoverControlPlane(error) {
       externalGates: false,
       rollback: false,
       disasterRecovery: false,
-      approvals: false
+      approvals: false,
+      authorizationLedger: false,
+      externalEvidenceRegistry: false
     }),
     error: Object.freeze({
       code: String(error?.code || "PILOT_CUTOVER_CONTROL_UNAVAILABLE").slice(0, 120),
@@ -650,8 +652,9 @@ function blockedPilotCutoverControlPlane(error) {
 
 async function pilotCutoverControlPlaneReadiness() {
   try {
-    return evaluatePilotCutoverFile({
-      file: process.env.PLATFORM_PILOT_CUTOVER_INPUT_FILE
+    return evaluatePilotCutoverAuthorizationLedger({
+      packageFile: process.env.PLATFORM_PILOT_CUTOVER_INPUT_FILE,
+      ledgerFile: process.env.PLATFORM_PILOT_CUTOVER_AUTHORIZATION_LEDGER_FILE
     });
   } catch (error) {
     return blockedPilotCutoverControlPlane(error);

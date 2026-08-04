@@ -1,0 +1,17 @@
+{
+  "schemaVersion": "pilot-cutover-register-evidence-v1",
+  "actorAccount": "<ledger-writer-account>",
+  "recordedAt": "<ISO-8601-timestamp>",
+  "payload": {
+    "gateId": "<security-assessment|monitoring-drill|dr-rehearsal|site-acceptance>",
+    "releaseId": "<release-id>",
+    "packageFingerprint": "sha256:<pilot-package-fingerprint>",
+    "evidenceRef": "evidence://<controlled-reference>",
+    "evidenceDigest": "sha256:<evidence-digest>",
+    "issuedAt": "<ISO-8601-timestamp>",
+    "expiresAt": "<ISO-8601-timestamp>",
+    "issuerAccount": "<external-issuer-account>",
+    "verifierAccount": "<independent-verifier-account>"
+  },
+  "boundary": "Metadata only. Do not include credentials, private keys, tokens, patient data or raw provider messages."
+}
