@@ -46,7 +46,12 @@ const REPORT_CARD_PATCH_FIELDS = new Set([
   "targetPlatform",
   "reportedAt",
   "dueAt",
-  "riskLevel"
+  "riskLevel",
+  "sourceInstitutionCode",
+  "testCode",
+  "resultFlag",
+  "reportType",
+  "occurredAt"
 ]);
 
 const TRUSTED_CALLBACK_FIELDS = new Set([

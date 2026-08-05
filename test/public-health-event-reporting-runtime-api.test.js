@@ -1,6 +1,8 @@
 "use strict";
 
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const path = require("node:path");
 const test = require("node:test");
 const sourceData = require("../data/db.json");
 const {
@@ -15,15 +17,34 @@ const {
   verifyDirectReportCallback
 } = require("../public-health-connectors");
 const {
+  claimDirectReportDeliveryToState,
+  enqueueDirectReportDeliveryToState,
+  projectDirectReportDelivery,
+  recordDirectReportDeliveryOutcomeToState,
+  recordTrustedDirectReportCallbackToState,
+  requeueDirectReportDeadLetterToState
+} = require("../public-health-direct-report-outbox-service");
+const {
   createRouteSegment
 } = require("../src/http/routes/public-health/infectious-reporting");
 
 const CALLBACK_SECRET = "runtime-direct-report-callback-secret-32-characters";
 const CALLBACK_NOW = Date.parse("2026-08-05T08:00:00.000Z");
 
+test("central state schema preserves infectious reporting delivery commands", () => {
+  const serverSource = fs.readFileSync(path.resolve(__dirname, "../server.js"), "utf8");
+  const occurrences = serverSource.match(/publicHealthInfectiousReportingDeliveries/g) || [];
+  assert.equal(occurrences.length >= 2, true);
+  assert.match(
+    serverSource,
+    /publicHealthInfectiousReportingDeliveries:\s*Array\.isArray\(data\.publicHealthInfectiousReportingDeliveries\)/
+  );
+});
+
 function fixture() {
   let data = structuredClone(sourceData);
   data.publicHealthInfectiousReportingCases = [];
+  data.publicHealthInfectiousReportingDeliveries = [];
   data.securityEvents = [];
   data.dataAccessLogs = [];
   let payload = {};
@@ -46,11 +67,15 @@ function fixture() {
     applyInfectiousReportingAction,
     buildInfectiousReportingCaseFromSources,
     collectJson: async () => structuredClone(payload),
+    enqueueDirectReportDeliveryToState,
+    projectDirectReportDelivery,
     randomUUID: () => `runtime-${++sequence}`,
     readDatabase: () => structuredClone(data),
     requireApiRole: () => ({ name: "commission-user", role: "commission" }),
     sealAuditTrail: (rows) => rows,
     sendJson: (_res, status, body) => { response = { status, body }; },
+    recordTrustedDirectReportCallbackToState,
+    requeueDirectReportDeadLetterToState,
     upsertInfectiousReportingCase,
     verifyDirectReportCallback: (body, options) => verifyDirectReportCallback(body, {
       ...options,
@@ -228,6 +253,86 @@ test("action API requires versions, preserves idempotency and rejects unsigned r
   assert.equal(unsignedReceipt.body.productionReady, false);
 });
 
+test("submit action atomically enqueues one minimized delivery and dead letters can be requeued", async () => {
+  const row = fixture();
+  const { caseId, actionPath } = await createSubmittedCase(row);
+  assert.equal(row.data.publicHealthInfectiousReportingDeliveries.length, 1);
+  const queued = row.data.publicHealthInfectiousReportingDeliveries[0];
+  assert.equal(queued.caseId, caseId);
+  assert.equal(queued.state, "queued");
+  assert.equal(queued.payloadPersisted, false);
+  assert.equal(Object.hasOwn(queued, "payload"), false);
+  assert.equal(Object.hasOwn(queued, "residentId"), false);
+
+  const replay = await request(row, "POST", actionPath, {
+    action: "submit-report",
+    idempotencyKey: "callback-submit",
+    expectedVersion: 3,
+    note: "submitted to direct-report platform"
+  });
+  assert.equal(replay.status, 200);
+  assert.equal(replay.body.idempotent, true);
+  assert.equal(replay.body.delivery.id, queued.id);
+  assert.equal(row.data.publicHealthInfectiousReportingDeliveries.length, 1);
+
+  const list = await request(
+    row,
+    "GET",
+    "/api/public-health/infectious-reporting-deliveries"
+  );
+  assert.equal(list.status, 200);
+  assert.equal(list.body.summary.total, 1);
+  assert.equal(list.body.summary.queued, 1);
+  assert.equal(list.body.payloadsExposed, false);
+  assert.equal(list.body.subjectDataExposed, false);
+  assert.doesNotMatch(
+    JSON.stringify(list.body),
+    /submissionKeyDigest|bindingDigest|tokenDigest|workerIdDigest|residentId|sampleNo/
+  );
+
+  const claimed = claimDirectReportDeliveryToState(row.data, queued.id, {
+    expectedVersion: 1,
+    workerId: "runtime-worker",
+    now: "2026-08-05T07:55:00.000Z"
+  }, { randomUUID: () => "runtime-worker-lease" });
+  const dead = recordDirectReportDeliveryOutcomeToState(claimed.nextData, queued.id, {
+    accepted: false,
+    code: "DIRECT_REPORT_CONTRACT_REJECTED",
+    retryable: false
+  }, {
+    expectedVersion: 2,
+    leaseToken: claimed.leaseToken,
+    now: "2026-08-05T07:55:10.000Z"
+  });
+  row.replaceData(dead.nextData);
+  const retried = await request(
+    row,
+    "POST",
+    `/api/public-health/infectious-reporting-deliveries/${encodeURIComponent(queued.id)}/retry`,
+    {
+      expectedVersion: dead.delivery.version,
+      idempotencyKey: "runtime-dead-letter-retry",
+      at: "2026-08-05T07:56:00.000Z"
+    }
+  );
+  assert.equal(retried.status, 200);
+  assert.equal(retried.body.delivery.state, "queued");
+  assert.equal(retried.body.delivery.replayCount, 1);
+
+  const retryReplay = await request(
+    row,
+    "POST",
+    `/api/public-health/infectious-reporting-deliveries/${encodeURIComponent(queued.id)}/retry`,
+    {
+      expectedVersion: dead.delivery.version,
+      idempotencyKey: "runtime-dead-letter-retry",
+      at: "2026-08-05T07:57:00.000Z"
+    }
+  );
+  assert.equal(retryReplay.status, 200);
+  assert.equal(retryReplay.body.idempotent, true);
+});
+
 test("signed direct-report callback persists one trusted receipt and exposes a minimized timeline", async () => {
   const row = fixture();
   const { caseId } = await createSubmittedCase(row);
@@ -239,6 +344,30 @@ test("signed direct-report callback persists one trusted receipt and exposes a m
     occurredAt: "2026-08-05T07:59:00.000Z",
     providerCode: "CDC-RUNTIME-001"
   };
+  const queued = row.data.publicHealthInfectiousReportingDeliveries[0];
+  const claimed = claimDirectReportDeliveryToState(row.data, queued.id, {
+    expectedVersion: queued.version,
+    workerId: "runtime-worker",
+    now: "2026-08-05T07:58:00.000Z"
+  }, { randomUUID: () => "runtime-worker-lease" });
+  const acknowledged = recordDirectReportDeliveryOutcomeToState(
+    claimed.nextData,
+    queued.id,
+    {
+      accepted: true,
+      receiptId: payload.receiptId,
+      requestId: queued.id,
+      providerStatus: "accepted",
+      acceptedAt: "2026-08-05T07:58:30.000Z",
+      transportAttempts: 1
+    },
+    {
+      expectedVersion: claimed.delivery.version,
+      leaseToken: claimed.leaseToken,
+      now: "2026-08-05T07:58:30.000Z"
+    }
+  );
+  row.replaceData(acknowledged.nextData);
   const timestamp = String(CALLBACK_NOW);
   const nonce = "cdc-runtime-nonce-001";
   const signature = signDirectReportCallback(payload, {
@@ -264,6 +393,8 @@ test("signed direct-report callback persists one trusted receipt and exposes a m
   assert.equal(accepted.body.idempotent, false);
   assert.equal(accepted.body.case.state, "receipt-confirmed");
   assert.equal(accepted.body.case.receipt.trusted, true);
+  assert.equal(accepted.body.case.delivery.state, "callback-accepted");
+  assert.equal(accepted.body.deliveryMatched, true);
   assert.equal(accepted.body.callback.signatureVerified, true);
   assert.equal(accepted.body.productionReady, false);
   assert.equal("nonceDigest" in accepted.body.callback, false);
