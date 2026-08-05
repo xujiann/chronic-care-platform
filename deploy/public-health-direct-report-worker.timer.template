@@ -1,0 +1,12 @@
+[Unit]
+Description=Schedule the public health direct-report transactional worker
+
+[Timer]
+OnBootSec=60s
+OnUnitActiveSec=20s
+RandomizedDelaySec=5s
+Persistent=false
+Unit=public-health-direct-report-worker.service
+
+[Install]
+WantedBy=timers.target
