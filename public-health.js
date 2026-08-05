@@ -2,6 +2,7 @@ const PUBLIC_HEALTH_API_BASE = location.protocol === "file:" ? "" : "/api";
 const PUBLIC_HEALTH_ROUTE = "/api/public-health/system";
 const PUBLIC_HEALTH_PATH = PUBLIC_HEALTH_ROUTE.replace(/^\/api/, "");
 let currentPublicHealthSystem = null;
+let currentPublicHealthInfectiousReportingCases = [];
 let currentPublicHealthModernization = {
   foundation: null,
   sourceOperations: null,
@@ -63,6 +64,7 @@ const PUBLIC_HEALTH_SITE_EVIDENCE_LINKS = [
 document.addEventListener("DOMContentLoaded", async () => {
   void loadPublicHealthConnectivitySummaries();
   void loadPublicHealthModernizationWorkbenches();
+  void loadPublicHealthInfectiousReportingCases();
   const system = await loadPublicHealthSystem();
   renderPublicHealthSystem(system);
 });
@@ -113,6 +115,159 @@ async function loadPublicHealthSystem() {
   }
   const state = await loadPlatformState({});
   return buildStaticPublicHealthSystem(state);
+}
+
+const INFECTIOUS_REPORTING_STATE_LABELS = Object.freeze({
+  detected: "事件已发现",
+  validated: "来源已校验",
+  "card-created": "报告卡已生成",
+  submitted: "已提交直报",
+  rejected: "直报拒收待补偿",
+  "receipt-confirmed": "可信回执已确认",
+  "cdc-reviewed": "疾控已复核",
+  "followup-closed": "随访已关闭"
+});
+
+const INFECTIOUS_REPORTING_ACTION_LABELS = Object.freeze({
+  "detect-event": "发现事件",
+  "validate-event": "校验事件",
+  "review-standard-mapping": "复核标准映射",
+  "create-report-card": "生成报告卡",
+  "submit-report": "提交直报",
+  "record-receipt": "写入可信回执",
+  "review-by-cdc": "疾控复核",
+  "close-followup": "关闭随访"
+});
+
+function infectiousReportingTime(value) {
+  const parsed = Date.parse(value || "");
+  if (!Number.isFinite(parsed)) return String(value || "时间待记录");
+  return new Date(parsed).toLocaleString("zh-CN", { hour12: false });
+}
+
+function normalizeInfectiousReportingCase(item = {}) {
+  const receipt = item.receipt || null;
+  const trustedCallback = receipt?.trustedCallback || null;
+  return {
+    id: String(item.id || ""),
+    version: Number(item.version || 0),
+    state: String(item.state || "detected"),
+    externalEventId: String(item.externalEventId || ""),
+    publicHealthEventId: String(item.publicHealthEventId || ""),
+    reportId: String(item.reportId || ""),
+    reportCardNo: String(item.reportCardNo || item.reportCard?.reportCardNo || item.draftReport?.reportCardNo || ""),
+    receipt: receipt ? {
+      id: String(receipt.id || ""),
+      status: String(receipt.status || receipt.receiptStatus || ""),
+      code: String(receipt.code || receipt.receiptCode || ""),
+      receivedAt: String(receipt.receivedAt || ""),
+      trusted: receipt.trusted === true || trustedCallback?.signatureVerified === true,
+      contractId: String(receipt.contractId || trustedCallback?.contractId || ""),
+      providerStatus: String(receipt.providerStatus || trustedCallback?.providerStatus || "")
+    } : null,
+    timeline: (Array.isArray(item.timeline) ? item.timeline : []).map((entry) => ({
+      sequence: Number(entry.sequence || 0),
+      action: String(entry.action || ""),
+      from: String(entry.from || ""),
+      to: String(entry.to || ""),
+      at: String(entry.at || ""),
+      actor: String(entry.actor || ""),
+      role: String(entry.role || ""),
+      note: String(entry.note || ""),
+      evidenceRefs: (Array.isArray(entry.evidenceRefs) ? entry.evidenceRefs : []).map(String)
+    })),
+    businessClosureComplete: item.businessClosureComplete === true,
+    productionReady: false
+  };
+}
+
+function renderPublicHealthInfectiousReportingCases(payload = {}) {
+  const target = document.querySelector("#public-health-infectious-reporting-timeline");
+  const metricsTarget = document.querySelector("#public-health-infectious-reporting-metrics");
+  const statusTarget = document.querySelector("#public-health-infectious-reporting-status");
+  if (!target || !metricsTarget || !statusTarget) return;
+  const cases = (Array.isArray(payload.cases) ? payload.cases : [])
+    .map(normalizeInfectiousReportingCase);
+  currentPublicHealthInfectiousReportingCases = cases;
+  const summary = {
+    total: Number(payload.summary?.total ?? cases.length),
+    open: Number(payload.summary?.open ?? cases.filter((item) => !item.businessClosureComplete).length),
+    trustedReceipts: Number(payload.summary?.trustedReceipts ?? cases.filter((item) => item.receipt?.trusted).length),
+    closed: Number(payload.summary?.closed ?? cases.filter((item) => item.businessClosureComplete).length)
+  };
+  metricsTarget.innerHTML = [
+    modernizationMetric("报告案件", summary.total),
+    modernizationMetric("开放案件", summary.open),
+    modernizationMetric("可信回执", summary.trustedReceipts),
+    modernizationMetric("闭环案件", summary.closed)
+  ].join("");
+  statusTarget.className = `badge ${summary.total > 0 && summary.open === 0 ? "ok" : "warn"}`;
+  statusTarget.textContent = summary.total
+    ? `${summary.trustedReceipts}/${summary.total} 已有可信回执`
+    : "暂无运行时案件";
+  if (!cases.length) {
+    target.innerHTML = `<article class="priority-row">
+      <div class="priority-rank warn">0</div>
+      <div>
+        <strong>尚无传染病报告案件</strong>
+        <p>由委级工作台基于既有公共卫生事件和疾病报告队列创建案件后，此处将展示全过程时间线。</p>
+        <small>正式回执只接受服务端 HMAC 验签回调；仓库状态不代表生产联调或上线验收完成。</small>
+      </div>
+    </article>`;
+    return;
+  }
+  target.innerHTML = cases.map((item, index) => {
+    const stateLabel = INFECTIOUS_REPORTING_STATE_LABELS[item.state] || item.state;
+    const stateClass = item.businessClosureComplete
+      ? "ok"
+      : item.state === "rejected"
+        ? "danger"
+        : "warn";
+    const receiptLabel = item.receipt?.trusted
+      ? `可信签名回执 ${item.receipt.code || item.receipt.id}`
+      : item.receipt
+        ? "回执尚未通过可信签名边界"
+        : "等待直报平台可信回执";
+    const timeline = item.timeline.map((entry) => `<div>
+      <strong>${escapeHtml(`${entry.sequence}. ${INFECTIOUS_REPORTING_ACTION_LABELS[entry.action] || entry.action}`)}</strong>
+      <span>${escapeHtml(`${infectiousReportingTime(entry.at)} / ${entry.actor || entry.role || "系统"}`)}</span>
+      <small>${escapeHtml(`${entry.from || "开始"} → ${entry.to || item.state}${entry.note ? `；${entry.note}` : ""}`)}</small>
+    </div>`).join("");
+    return `<article class="priority-row" data-public-health-infectious-reporting-case="${escapeHtml(item.id)}">
+      <div class="priority-rank ${stateClass}">${escapeHtml(index + 1)}</div>
+      <div>
+        <strong>${escapeHtml(item.reportCardNo || item.reportId || item.id)}</strong>
+        <p>${escapeHtml(stateLabel)}；版本 ${escapeHtml(item.version)}；${escapeHtml(receiptLabel)}</p>
+        <small>事件 ${escapeHtml(item.externalEventId || item.publicHealthEventId)} / 报告 ${escapeHtml(item.reportId)}；生产就绪：否</small>
+        <div class="modernization-list" data-public-health-infectious-reporting-case-timeline="${escapeHtml(item.id)}">${timeline}</div>
+      </div>
+    </article>`;
+  }).join("");
+}
+
+async function loadPublicHealthInfectiousReportingCases() {
+  if (PUBLIC_HEALTH_API_BASE) {
+    try {
+      const request = window.HealthCityAuth?.authFetch || fetch;
+      const response = await request(`${PUBLIC_HEALTH_API_BASE}/public-health/infectious-reporting-cases`);
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.message || "传染病报告案件加载失败");
+      renderPublicHealthInfectiousReportingCases(result);
+      return result;
+    } catch (error) {
+      const statusTarget = document.querySelector("#public-health-infectious-reporting-status");
+      if (statusTarget) statusTarget.textContent = "运行时案件暂不可用";
+    }
+  }
+  const state = await loadPlatformState({});
+  const fallback = {
+    cases: Array.isArray(state.publicHealthInfectiousReportingCases)
+      ? state.publicHealthInfectiousReportingCases
+      : [],
+    productionReady: false
+  };
+  renderPublicHealthInfectiousReportingCases(fallback);
+  return fallback;
 }
 
 const PUBLIC_HEALTH_CONNECTIVITY_ENDPOINTS = Object.freeze({
