@@ -360,6 +360,16 @@ test("audit summary forms a continuous hash chain and tampering blocks actions a
     ),
     (error) => error.code === "PUBLIC_HEALTH_DIRECT_REPORT_RECONCILIATION_AUDIT_INTEGRITY_INVALID"
   );
+
+  const stateTampered = structuredClone(state);
+  stateTampered.publicHealthDirectReportReconciliationCases[0].assignment.assigneeRole =
+    "provider-operations";
+  assert.throws(
+    () => projectDirectReportReconciliationCase(
+      stateTampered.publicHealthDirectReportReconciliationCases[0]
+    ),
+    (error) => error.code === "PUBLIC_HEALTH_DIRECT_REPORT_RECONCILIATION_AUDIT_INTEGRITY_INVALID"
+  );
 });
 
 test("workflow closes only after evidence-backed compensation and independent review", () => {

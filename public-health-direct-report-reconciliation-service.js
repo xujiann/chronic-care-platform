@@ -370,6 +370,29 @@ function stateFor(data = {}) {
   return nextData;
 }
 
+function reconciliationStateDigest(item = {}) {
+  return sha256(stable({
+    id: item.id,
+    findingId: item.findingId,
+    findingType: item.findingType,
+    severity: item.severity,
+    caseRef: item.caseRef,
+    deliveryRef: item.deliveryRef,
+    findingDigest: item.findingDigest,
+    sourceDigest: item.sourceDigest,
+    status: item.status,
+    version: item.version,
+    assignment: item.assignment,
+    acknowledgement: item.acknowledgement,
+    compensation: item.compensation,
+    independentReview: item.independentReview,
+    closure: item.closure,
+    createdAt: item.createdAt,
+    updatedAt: item.updatedAt,
+    productionReady: item.productionReady
+  }));
+}
+
 function auditEventDigest(entry = {}) {
   return sha256(stable({
     sequence: Number(entry.sequence || 0),
@@ -380,6 +403,7 @@ function auditEventDigest(entry = {}) {
     idempotencyKeyDigest: clean(entry.idempotencyKeyDigest, 64),
     intentDigest: clean(entry.intentDigest, 64),
     actionDigest: clean(entry.actionDigest, 64),
+    stateDigest: clean(entry.stateDigest, 64),
     previousDigest: clean(entry.previousDigest, 64)
   }));
 }
@@ -408,6 +432,7 @@ function verifyDirectReportReconciliationAudit(item = {}) {
       Number(entry.sequence) !== index + 1
       || clean(entry.previousDigest, 64) !== previousDigest
       || !SHA256.test(clean(entry.eventDigest, 64))
+      || !SHA256.test(clean(entry.stateDigest, 64))
       || entry.eventDigest !== auditEventDigest(entry)
     ) {
       throw reconciliationError(
@@ -418,6 +443,13 @@ function verifyDirectReportReconciliationAudit(item = {}) {
     }
     previousDigest = entry.eventDigest;
   });
+  if (entries.at(-1).stateDigest !== reconciliationStateDigest(item)) {
+    throw reconciliationError(
+      "PUBLIC_HEALTH_DIRECT_REPORT_RECONCILIATION_AUDIT_INTEGRITY_INVALID",
+      "reconciliation current state does not match the audit chain head",
+      409
+    );
+  }
   return {
     valid: true,
     entries: entries.length,
@@ -425,7 +457,7 @@ function verifyDirectReportReconciliationAudit(item = {}) {
   };
 }
 
-function discoveryAudit(finding, at) {
+function discoveryAudit(finding, at, stateDigest) {
   return chainedAuditEntry({
     sequence: 1,
     action: "discover",
@@ -436,7 +468,8 @@ function discoveryAudit(finding, at) {
       action: "discover",
       findingDigest: finding.findingDigest,
       sourceDigest: finding.sourceDigest
-    }))
+    })),
+    stateDigest
   });
 }
 
@@ -487,7 +520,7 @@ function discoverDirectReportReconciliationCases(data = {}, scan = {}) {
       compensation: null,
       independentReview: null,
       closure: null,
-      auditSummary: [discoveryAudit(finding, at)],
+      auditSummary: [],
       createdAt: at,
       updatedAt: at,
       rawPayloadPersisted: false,
@@ -496,6 +529,9 @@ function discoverDirectReportReconciliationCases(data = {}, scan = {}) {
       signaturesPersisted: false,
       productionReady: false
     };
+    reconciliationCase.auditSummary = [
+      discoveryAudit(finding, at, reconciliationStateDigest(reconciliationCase))
+    ];
     nextData.publicHealthDirectReportReconciliationCases.push(reconciliationCase);
     discovered.push({ reconciliationCase: clone(reconciliationCase), idempotent: false });
   });
@@ -755,7 +791,8 @@ function applyDirectReportReconciliationActionToState(data = {}, id, input = {})
       nextVersion: updated.version,
       action,
       intentDigest
-    }))
+    })),
+    stateDigest: reconciliationStateDigest(updated)
   }, previousDigest));
   verifyDirectReportReconciliationAudit(updated);
   nextData.publicHealthDirectReportReconciliationCases[index] = updated;
