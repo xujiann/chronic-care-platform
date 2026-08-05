@@ -1,0 +1,24 @@
+{
+  "schemaVersion": "public-health-direct-report-trust-registry-v1",
+  "registryId": "REPLACE_WITH_CONTROLLED_REGISTRY_ID",
+  "keys": [
+    {
+      "keyId": "REPLACE_WITH_DISEASE_CONTROL_KEY_ID",
+      "role": "disease-control-office",
+      "algorithm": "Ed25519",
+      "status": "active",
+      "validFrom": "REPLACE_WITH_ISO_DATE_TIME",
+      "validUntil": "REPLACE_WITH_ISO_DATE_TIME",
+      "publicKeyPem": "REPLACE_WITH_ED25519_PUBLIC_KEY_PEM"
+    },
+    {
+      "keyId": "REPLACE_WITH_HOSPITAL_INFORMATION_KEY_ID",
+      "role": "hospital-information-center",
+      "algorithm": "Ed25519",
+      "status": "active",
+      "validFrom": "REPLACE_WITH_ISO_DATE_TIME",
+      "validUntil": "REPLACE_WITH_ISO_DATE_TIME",
+      "publicKeyPem": "REPLACE_WITH_ED25519_PUBLIC_KEY_PEM"
+    }
+  ]
+}

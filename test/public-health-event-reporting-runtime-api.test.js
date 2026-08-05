@@ -69,6 +69,17 @@ function fixture() {
     collectJson: async () => structuredClone(payload),
     enqueueDirectReportDeliveryToState,
     projectDirectReportDelivery,
+    publicDirectReportControlStatus: () => ({
+      activationReady: false,
+      codeReady: true,
+      scenariosPassed: 0,
+      scenariosRequired: 8,
+      signerRoles: [],
+      blockerCode: "PUBLIC_HEALTH_DIRECT_REPORT_CONTROL_FILES_REQUIRED",
+      credentialsExposed: false,
+      payloadsExposed: false,
+      productionReady: false
+    }),
     randomUUID: () => `runtime-${++sequence}`,
     readDatabase: () => structuredClone(data),
     requireApiRole: () => ({ name: "commission-user", role: "commission" }),
@@ -95,6 +106,25 @@ function fixture() {
     setPayload(value) { payload = structuredClone(value); }
   };
 }
+
+test("commission can read only the minimized direct-report control package projection", async () => {
+  const row = fixture();
+  const response = await request(
+    row,
+    "GET",
+    "/api/public-health/infectious-reporting-control-package"
+  );
+  assert.equal(response.status, 200);
+  assert.equal(response.body.controlPackage.activationReady, false);
+  assert.equal(
+    response.body.controlPackage.blockerCode,
+    "PUBLIC_HEALTH_DIRECT_REPORT_CONTROL_FILES_REQUIRED"
+  );
+  assert.equal(response.body.credentialsExposed, false);
+  assert.equal(response.body.payloadsExposed, false);
+  assert.equal(response.body.productionReady, false);
+  assert.doesNotMatch(JSON.stringify(response.body), /publicKeyPem|signature|secret|codes/i);
+});
 
 async function request(row, method, pathname, payload, headers = {}) {
   row.setPayload(payload || {});

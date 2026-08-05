@@ -193,7 +193,7 @@ function callbackDueAt(occurredAt) {
 }
 
 function createRouteSegment(runtime) {
-  const { DIRECT_REPORT_CONTRACT_ID, appendDataAccessLog, appendSecurityEvent, applyInfectiousReportingAction, buildInfectiousReportingCaseFromSources, collectJson, enqueueDirectReportDeliveryToState, projectDirectReportDelivery, randomUUID, readDatabase, recordTrustedDirectReportCallbackToState, requeueDirectReportDeadLetterToState, requireApiRole, sealAuditTrail, sendJson, upsertInfectiousReportingCase, verifyDirectReportCallback, writeDatabase } = runtime;
+  const { DIRECT_REPORT_CONTRACT_ID, appendDataAccessLog, appendSecurityEvent, applyInfectiousReportingAction, buildInfectiousReportingCaseFromSources, collectJson, enqueueDirectReportDeliveryToState, projectDirectReportDelivery, publicDirectReportControlStatus, randomUUID, readDatabase, recordTrustedDirectReportCallbackToState, requeueDirectReportDeadLetterToState, requireApiRole, sealAuditTrail, sendJson, upsertInfectiousReportingCase, verifyDirectReportCallback, writeDatabase } = runtime;
   return {
     id: "public-health-04",
     domain: "public-health",
@@ -242,7 +242,35 @@ function createRouteSegment(runtime) {
             )).length,
             deliveryDeadLetter: cases.filter((item) => item.delivery?.state === "dead-letter").length
           },
+          controlPackage: publicDirectReportControlStatus(),
           cases,
+          productionReady: false
+        });
+        return true;
+      }
+
+      if (req.method === "GET" && url.pathname === "/api/public-health/infectious-reporting-control-package") {
+        const user = runtime.requireApiRole(
+          req,
+          res,
+          ["commission"],
+          "/api/public-health/infectious-reporting-control-package"
+        );
+        if (!user) return true;
+        const controlPackage = publicDirectReportControlStatus();
+        runtime.appendSecurityEvent({
+          actor: user.name,
+          role: user.role,
+          action: "public-health-infectious-reporting-control-package-read",
+          target: "/api/public-health/infectious-reporting-control-package",
+          result: "allowed",
+          detail: `activationReady=${controlPackage.activationReady === true}; projection=minimized; production=false`
+        });
+        runtime.sendJson(res, 200, {
+          ok: true,
+          controlPackage,
+          credentialsExposed: false,
+          payloadsExposed: false,
           productionReady: false
         });
         return true;

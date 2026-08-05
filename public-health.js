@@ -207,6 +207,7 @@ function renderPublicHealthInfectiousReportingCases(payload = {}) {
   const target = document.querySelector("#public-health-infectious-reporting-timeline");
   const metricsTarget = document.querySelector("#public-health-infectious-reporting-metrics");
   const statusTarget = document.querySelector("#public-health-infectious-reporting-status");
+  renderPublicHealthDirectReportControl(payload.controlPackage);
   if (!target || !metricsTarget || !statusTarget) return;
   const cases = (Array.isArray(payload.cases) ? payload.cases : [])
     .map(normalizeInfectiousReportingCase);
@@ -281,6 +282,31 @@ function renderPublicHealthInfectiousReportingCases(payload = {}) {
       </div>
     </article>`;
   }).join("");
+}
+
+function renderPublicHealthDirectReportControl(control = {}) {
+  const target = document.querySelector("#public-health-infectious-reporting-control");
+  if (!target) return;
+  const ready = control.activationReady === true;
+  const scenariosPassed = Number(control.scenariosPassed || 0);
+  const scenariosRequired = Number(control.scenariosRequired || 8);
+  const signers = (Array.isArray(control.signerRoles) ? control.signerRoles : [])
+    .map((item) => String(item || ""))
+    .filter(Boolean);
+  const dictionary = control.dictionaryId
+    ? `${String(control.dictionaryId)} / ${String(control.dictionaryVersion || "未标注版本")}`
+    : "尚未注入有效官方字段字典";
+  const detail = ready
+    ? `联合测试 ${scenariosPassed}/${scenariosRequired}；独立签署 ${signers.length} 方`
+    : `门禁阻断：${String(control.blockerCode || "PUBLIC_HEALTH_DIRECT_REPORT_CONTROL_UNAVAILABLE")}`;
+  target.innerHTML = `<article class="priority-row" data-public-health-direct-report-control-status="${ready ? "ready" : "blocked"}">
+    <div class="priority-rank ${ready ? "ok" : "warn"}">${ready ? "✓" : "!"}</div>
+    <div>
+      <strong>官方字段字典与联合测试控制包</strong>
+      <p>${escapeHtml(dictionary)}</p>
+      <small>${escapeHtml(detail)}；只读展示，不代表生产切换授权。</small>
+    </div>
+  </article>`;
 }
 
 async function loadPublicHealthInfectiousReportingCases() {

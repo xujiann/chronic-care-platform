@@ -1,0 +1,42 @@
+{
+  "schemaVersion": "public-health-direct-report-control-contract-v1",
+  "contractId": "public-health-direct-report-v1",
+  "maximumEvidenceAgeHours": 168,
+  "requiredFields": [
+    "externalId",
+    "subjectReference",
+    "institutionCode",
+    "reportType",
+    "diseaseCode",
+    "testCode",
+    "resultFlag",
+    "occurredAt",
+    "reportedAt"
+  ],
+  "optionalFields": [
+    "specimenReference",
+    "sourceSystem",
+    "reportCardNo"
+  ],
+  "requiredCodeSystems": [
+    "institution",
+    "report-type",
+    "disease",
+    "laboratory-test",
+    "result-flag"
+  ],
+  "requiredScenarios": [
+    "schema-acceptance",
+    "invalid-code-rejection",
+    "payload-minimization",
+    "idempotent-replay",
+    "timeout-retry",
+    "rejection-dead-letter",
+    "signed-callback",
+    "reconciliation"
+  ],
+  "requiredSignerRoles": [
+    "disease-control-office",
+    "hospital-information-center"
+  ]
+}

@@ -22,7 +22,7 @@ test("public-health subdomains declare distinct least-privilege contexts", () =>
       "surveillance-foundation": 97,
       "public-health-operations": 59,
       "vital-records": 15,
-      "infectious-reporting": 18
+      "infectious-reporting": 19
     }
   );
   assert.equal(new Set(Object.values(SUBDOMAIN_DEPENDENCIES).map((dependencies) => dependencies.join(","))).size, 4);
