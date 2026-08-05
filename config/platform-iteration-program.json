@@ -2,7 +2,7 @@
   "schemaVersion": "platform-iteration-program-v1",
   "programId": "preproduction-six-iteration-control-20260804",
   "integrationBranch": "main",
-  "baselineTag": "baseline/governance-20260805-public-health-reporting-runtime-v1",
+  "baselineTag": "baseline/governance-20260805-public-health-receipt-timeline-v1",
   "policy": {
     "integrationOwner": "T00",
     "orderedExecution": true,
