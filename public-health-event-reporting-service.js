@@ -49,6 +49,17 @@ const REPORT_CARD_PATCH_FIELDS = new Set([
   "riskLevel"
 ]);
 
+const TRUSTED_CALLBACK_FIELDS = new Set([
+  "contractId",
+  "eventId",
+  "receiptId",
+  "providerStatus",
+  "nonceDigest",
+  "signatureVerified",
+  "payloadsExposed",
+  "credentialsPersisted"
+]);
+
 const DEFAULT_INFECTIOUS_EVENT_LINK = {
   id: "pherl-infectious-001",
   externalEventId: "EMR-LIS-CLUSTER-20260708-001",
@@ -121,6 +132,35 @@ function normalizedReportCardPatch(value) {
   return Object.fromEntries(
     Object.entries(value).map(([field, fieldValue]) => [field, clean(fieldValue)])
   );
+}
+
+function normalizedTrustedCallback(value) {
+  if (value === undefined || value === null) return null;
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("trustedCallback must be an object");
+  }
+  const unknown = Object.keys(value).filter((field) => !TRUSTED_CALLBACK_FIELDS.has(field));
+  if (unknown.length) {
+    throw new Error(`trustedCallback contains unsupported fields: ${unknown.join(", ")}`);
+  }
+  if (value.signatureVerified !== true) {
+    throw new Error("trustedCallback requires a verified signature");
+  }
+  const callback = {
+    contractId: clean(value.contractId, 120),
+    eventId: clean(value.eventId, 160),
+    receiptId: clean(value.receiptId, 200),
+    providerStatus: clean(value.providerStatus, 40).toLowerCase(),
+    nonceDigest: clean(value.nonceDigest, 80).toLowerCase().replace(/^sha256:/, ""),
+    signatureVerified: true,
+    payloadsExposed: false,
+    credentialsPersisted: false
+  };
+  requireFields(callback, ["contractId", "eventId", "receiptId", "providerStatus", "nonceDigest"], "trusted callback");
+  if (!/^[a-f0-9]{64}$/.test(callback.nonceDigest)) {
+    throw new Error("trustedCallback nonceDigest must be SHA-256");
+  }
+  return callback;
 }
 
 function actionIntentDigest(action, payload = {}, user = {}) {
@@ -315,6 +355,7 @@ function applyInfectiousReportingAction(current, payload = {}, user = {}) {
     const receiptStatus = clean(payload.receiptStatus).toLowerCase();
     if (!['accepted', 'rejected'].includes(receiptStatus)) throw new Error("receiptStatus must be accepted or rejected");
     requireFields(payload, ["receiptCode", "receivedAt"], "direct-report receipt");
+    const trustedCallback = normalizedTrustedCallback(payload.trustedCallback);
     workflow.receipt = {
       id: clean(payload.receiptId || `${workflow.reportId}-receipt-${(workflow.reportCard?.retryCount || 0) + 1}`),
       reportId: workflow.reportId,
@@ -323,7 +364,14 @@ function applyInfectiousReportingAction(current, payload = {}, user = {}) {
       receivedAt: clean(payload.receivedAt),
       detail: clean(payload.detail || payload.reason),
       retryCount: Number(workflow.reportCard?.retryCount || 0),
-      auditHash: auditHash({ reportId: workflow.reportId, receiptStatus, receiptCode: payload.receiptCode, receivedAt: payload.receivedAt })
+      trustedCallback,
+      auditHash: auditHash({
+        reportId: workflow.reportId,
+        receiptStatus,
+        receiptCode: payload.receiptCode,
+        receivedAt: payload.receivedAt,
+        trustedCallback
+      })
     };
     if (receiptStatus === "accepted") {
       nextState = "receipt-confirmed";

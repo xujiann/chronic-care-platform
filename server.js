@@ -107,6 +107,10 @@ const {
   upsertInfectiousReportingCase
 } = require("./public-health-event-reporting-service");
 const {
+  DIRECT_REPORT_CONTRACT_ID,
+  verifyDirectReportCallback
+} = require("./public-health-connectors");
+const {
   claimPublicHealthExternalDispatchToState,
   enqueuePublicHealthExternalDispatchToState,
   listDuePublicHealthExternalDispatches,
@@ -27894,6 +27898,7 @@ function buildProductionReleaseEvidencePublicSummary() {
 function createRuntimeCapabilitySource() {
   return Object.freeze({
     APPOINTMENT_CONTRACT_ID,
+  DIRECT_REPORT_CONTRACT_ID,
   BloodBusinessService,
   BloodClinicalProduction,
   BloodEventHub,
@@ -28499,6 +28504,7 @@ function createRuntimeCapabilitySource() {
   validateQualitySafetyInterfaceMessage,
   verifyAuditTrail,
   verifyDoctorElectronicRegistration,
+  verifyDirectReportCallback,
   verifyFinancialCallback,
   verifyIntegrationSignature,
   verifyPassword,

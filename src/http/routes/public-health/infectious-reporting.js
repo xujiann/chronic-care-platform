@@ -16,6 +16,14 @@ const STANDARD_ITEMS = Object.freeze([
   "report-quality-control"
 ]);
 
+const TERMINAL_CALLBACK_STATUSES = Object.freeze({
+  accepted: "accepted",
+  succeeded: "accepted",
+  failed: "rejected",
+  rejected: "rejected",
+  cancelled: "rejected"
+});
+
 function clean(value, maximum = 240) {
   return String(value ?? "").trim().replace(/[\r\n\t]+/g, " ").slice(0, maximum);
 }
@@ -83,7 +91,17 @@ function appendAudit(runtime, data, user, workflow, action, detail) {
 function sendCommandError(runtime, res, error) {
   const status = statusFor(error);
   runtime.sendJson(res, status, {
-    error: status === 404 ? "Not Found" : status === 409 ? "Conflict" : "Bad Request",
+    error: status === 401
+      ? "Unauthorized"
+      : status === 403
+        ? "Forbidden"
+        : status === 404
+          ? "Not Found"
+          : status === 409
+            ? "Conflict"
+            : status === 503
+              ? "Service Unavailable"
+              : "Bad Request",
     code: clean(error?.code || "PUBLIC_HEALTH_INFECTIOUS_REPORTING_COMMAND_REJECTED", 120),
     message: clean(error?.message || "infectious reporting command was rejected", 300),
     businessClosureComplete: false,
@@ -102,12 +120,114 @@ function auditDenial(runtime, user, target, action, error) {
   });
 }
 
+function auditCallbackDenial(runtime, target, error) {
+  runtime.appendSecurityEvent({
+    actor: "public-health-direct-report-adapter",
+    role: "system",
+    action: "public-health-infectious-reporting-direct-report-callback",
+    target: clean(target, 200),
+    result: "denied",
+    detail: clean(error?.code || "PUBLIC_HEALTH_DIRECT_REPORT_CALLBACK_REJECTED", 120)
+  });
+}
+
+function projectTimeline(workflow) {
+  return (Array.isArray(workflow?.timeline) ? workflow.timeline : []).map((item) => ({
+    sequence: Number(item.sequence || 0),
+    action: clean(item.action, 80),
+    from: clean(item.from, 80),
+    to: clean(item.to, 80),
+    at: clean(item.at, 80),
+    actor: clean(item.actor, 120),
+    role: clean(item.role, 80),
+    note: clean(item.note, 300)
+  }));
+}
+
+function projectCaseSummary(workflow) {
+  const trustedCallback = workflow?.receipt?.trustedCallback;
+  return {
+    id: clean(workflow?.id, 160),
+    version: Number(workflow?.version || 0),
+    state: clean(workflow?.state, 80),
+    externalEventId: clean(workflow?.externalEventId, 160),
+    publicHealthEventId: clean(workflow?.publicHealthEventId, 160),
+    reportId: clean(workflow?.reportId, 160),
+    reportCardNo: clean(workflow?.reportCard?.reportCardNo || workflow?.draftReport?.reportCardNo, 160),
+    receipt: workflow?.receipt ? {
+      id: clean(workflow.receipt.id, 200),
+      status: clean(workflow.receipt.receiptStatus, 40),
+      code: clean(workflow.receipt.receiptCode, 120),
+      receivedAt: clean(workflow.receipt.receivedAt, 80),
+      trusted: trustedCallback?.signatureVerified === true,
+      contractId: clean(trustedCallback?.contractId, 120),
+      providerStatus: clean(trustedCallback?.providerStatus, 40)
+    } : null,
+    standardMappingStatus: clean(workflow?.standardMapping?.status, 80),
+    followupStatus: clean(workflow?.followup?.status, 80),
+    timeline: projectTimeline(workflow),
+    businessClosureComplete: workflow?.businessClosureComplete === true,
+    productionReady: false
+  };
+}
+
+function callbackHeader(req, name) {
+  const headers = req?.headers || {};
+  return clean(headers[name] || headers[name.toLowerCase()], 200);
+}
+
+function callbackDueAt(occurredAt) {
+  const dueAt = new Date(occurredAt);
+  dueAt.setUTCDate(dueAt.getUTCDate() + 1);
+  return dueAt.toISOString();
+}
+
 function createRouteSegment(runtime) {
-  const { appendDataAccessLog, appendSecurityEvent, applyInfectiousReportingAction, buildInfectiousReportingCaseFromSources, collectJson, randomUUID, readDatabase, requireApiRole, sealAuditTrail, sendJson, upsertInfectiousReportingCase, writeDatabase } = runtime;
+  const { DIRECT_REPORT_CONTRACT_ID, appendDataAccessLog, appendSecurityEvent, applyInfectiousReportingAction, buildInfectiousReportingCaseFromSources, collectJson, randomUUID, readDatabase, requireApiRole, sealAuditTrail, sendJson, upsertInfectiousReportingCase, verifyDirectReportCallback, writeDatabase } = runtime;
   return {
     id: "public-health-04",
     domain: "public-health",
     async handle(req, res, url) {
+      if (req.method === "GET" && url.pathname === "/api/public-health/infectious-reporting-cases") {
+        const user = runtime.requireApiRole(
+          req,
+          res,
+          ["commission"],
+          "/api/public-health/infectious-reporting-cases"
+        );
+        if (!user) return true;
+        const data = runtime.readDatabase();
+        const cases = (Array.isArray(data.publicHealthInfectiousReportingCases)
+          ? data.publicHealthInfectiousReportingCases
+          : [])
+          .map(projectCaseSummary)
+          .sort((left, right) => {
+            const leftAt = clean(left.timeline.at(-1)?.at, 80);
+            const rightAt = clean(right.timeline.at(-1)?.at, 80);
+            return rightAt.localeCompare(leftAt);
+          });
+        runtime.appendSecurityEvent({
+          actor: user.name,
+          role: user.role,
+          action: "public-health-infectious-reporting-list",
+          target: "/api/public-health/infectious-reporting-cases",
+          result: "allowed",
+          detail: `cases=${cases.length}; projection=minimized; production=false`
+        });
+        runtime.sendJson(res, 200, {
+          ok: true,
+          summary: {
+            total: cases.length,
+            open: cases.filter((item) => item.businessClosureComplete !== true).length,
+            trustedReceipts: cases.filter((item) => item.receipt?.trusted === true).length,
+            closed: cases.filter((item) => item.businessClosureComplete === true).length
+          },
+          cases,
+          productionReady: false
+        });
+        return true;
+      }
+
       if (req.method === "POST" && url.pathname === "/api/public-health/infectious-reporting-cases") {
         const user = runtime.requireApiRole(
           req,
@@ -237,6 +357,127 @@ function createRouteSegment(runtime) {
         return true;
       }
 
+      const callbackMatch = url.pathname.match(
+        /^\/api\/public-health\/infectious-reporting-cases\/([^/]+)\/direct-report-callback$/
+      );
+      if (req.method === "POST" && callbackMatch) {
+        const target = "/api/public-health/infectious-reporting-cases/:id/direct-report-callback";
+        try {
+          const caseId = safeId(decodeURIComponent(callbackMatch[1]), "caseId");
+          const payload = await runtime.collectJson(req);
+          const verified = runtime.verifyDirectReportCallback(payload, {
+            timestamp: callbackHeader(req, "x-public-health-direct-report-timestamp"),
+            nonce: callbackHeader(req, "x-public-health-direct-report-nonce"),
+            signature: callbackHeader(req, "x-public-health-direct-report-signature")
+          });
+          const receiptStatus = TERMINAL_CALLBACK_STATUSES[verified.status];
+          if (!receiptStatus) {
+            throw commandError(
+              "PUBLIC_HEALTH_DIRECT_REPORT_CALLBACK_NOT_TERMINAL",
+              "direct-report callback status is not terminal",
+              409
+            );
+          }
+          const data = runtime.readDatabase();
+          const cases = Array.isArray(data.publicHealthInfectiousReportingCases)
+            ? data.publicHealthInfectiousReportingCases
+            : [];
+          const index = cases.findIndex((item) => item.id === caseId);
+          if (index < 0) throw commandError(
+            "PUBLIC_HEALTH_INFECTIOUS_REPORTING_NOT_FOUND",
+            "infectious reporting case was not found",
+            404
+          );
+          const workflow = cases[index];
+          if (verified.eventId !== workflow.externalEventId) {
+            throw commandError(
+              "PUBLIC_HEALTH_DIRECT_REPORT_CALLBACK_BINDING_MISMATCH",
+              "direct-report callback event does not match the reporting case",
+              409
+            );
+          }
+          const nonceOwner = cases.find((item) => (
+            item.receipt?.trustedCallback?.nonceDigest === verified.nonceDigest
+          ));
+          if (nonceOwner && nonceOwner.id !== workflow.id) {
+            throw commandError(
+              "PUBLIC_HEALTH_DIRECT_REPORT_CALLBACK_NONCE_REPLAY",
+              "direct-report callback nonce is already bound to another case",
+              409
+            );
+          }
+          const actor = {
+            name: "public-health-direct-report-adapter",
+            role: "system"
+          };
+          const result = runtime.applyInfectiousReportingAction(
+            workflow,
+            {
+              action: "record-receipt",
+              expectedVersion: workflow.version,
+              idempotencyKey: `direct-report-callback:${verified.receiptId}`,
+              receiptId: verified.receiptId,
+              receiptStatus,
+              receiptCode: verified.providerCode || verified.receiptId,
+              receivedAt: verified.occurredAt,
+              at: verified.occurredAt,
+              detail: receiptStatus === "accepted"
+                ? "direct-report platform confirmed receipt"
+                : "direct-report platform rejected the submission",
+              ...(receiptStatus === "rejected" ? {
+                reason: "direct-report platform rejected the submission",
+                exceptionOwner: "public-health-direct-report-operations",
+                dueAt: callbackDueAt(verified.occurredAt)
+              } : {}),
+              evidenceRefs: [`direct-report-receipt:${verified.receiptId}`],
+              trustedCallback: {
+                contractId: runtime.DIRECT_REPORT_CONTRACT_ID,
+                eventId: verified.eventId,
+                receiptId: verified.receiptId,
+                providerStatus: verified.status,
+                nonceDigest: verified.nonceDigest,
+                signatureVerified: true,
+                payloadsExposed: false,
+                credentialsPersisted: false
+              }
+            },
+            actor
+          );
+          const nextCases = [...cases];
+          nextCases[index] = result.case;
+          data.publicHealthInfectiousReportingCases = nextCases.slice(-500);
+          appendAudit(
+            runtime,
+            data,
+            actor,
+            result.case,
+            "public-health-infectious-reporting-direct-report-callback",
+            `${result.idempotent ? "idempotent" : "applied"}; status=${receiptStatus}; version=${result.case.version}; signature=verified; production=false`
+          );
+          runtime.writeDatabase(data);
+          runtime.sendJson(res, 200, {
+            ok: true,
+            idempotent: result.idempotent,
+            case: projectCaseSummary(result.case),
+            callback: {
+              contractId: runtime.DIRECT_REPORT_CONTRACT_ID,
+              eventId: verified.eventId,
+              receiptId: verified.receiptId,
+              providerStatus: verified.status,
+              signatureVerified: true,
+              payloadsExposed: false,
+              credentialsPersisted: false
+            },
+            businessClosureComplete: result.case.businessClosureComplete === true,
+            productionReady: false
+          });
+        } catch (error) {
+          auditCallbackDenial(runtime, target, error);
+          sendCommandError(runtime, res, error);
+        }
+        return true;
+      }
+
       const actionMatch = url.pathname.match(
         /^\/api\/public-health\/infectious-reporting-cases\/([^/]+)\/actions$/
       );
@@ -330,5 +571,6 @@ module.exports = {
   ROUTE_SEGMENT_ID: "public-health-04",
   STANDARD_ITEMS,
   SUBDOMAIN: "infectious-reporting",
-  createRouteSegment
+  createRouteSegment,
+  projectCaseSummary
 };

@@ -127,6 +127,59 @@ test("report card patch is allowlisted and cannot rebind protected fields", () =
   );
 });
 
+test("trusted callback metadata is allowlisted minimized and audit-bound", () => {
+  const institution = { name: "institution-reporter", role: "institution" };
+  const adapter = { name: "direct-report-adapter", role: "system" };
+  let workflow = buildInitialCase();
+  workflow = apply(workflow, { action: "validate-event", idempotencyKey: "trusted-validate" }, institution);
+  workflow = apply(workflow, { action: "create-report-card", idempotencyKey: "trusted-card" }, institution);
+  workflow = apply(workflow, { action: "submit-report", idempotencyKey: "trusted-submit" }, institution);
+
+  assert.throws(
+    () => apply(workflow, {
+      action: "record-receipt",
+      idempotencyKey: "trusted-receipt-secret",
+      receiptStatus: "accepted",
+      receiptCode: "CDC-TRUSTED-001",
+      receivedAt: "2026-08-05T08:00:00.000Z",
+      trustedCallback: {
+        contractId: "public-health-direct-report-v1",
+        eventId: workflow.externalEventId,
+        receiptId: "cdc-trusted-receipt-001",
+        providerStatus: "accepted",
+        nonceDigest: "a".repeat(64),
+        signatureVerified: true,
+        signingSecret: "must-not-persist"
+      }
+    }, adapter),
+    /unsupported fields: signingSecret/
+  );
+
+  const accepted = apply(workflow, {
+    action: "record-receipt",
+    idempotencyKey: "trusted-receipt",
+    receiptId: "cdc-trusted-receipt-001",
+    receiptStatus: "accepted",
+    receiptCode: "CDC-TRUSTED-001",
+    receivedAt: "2026-08-05T08:00:00.000Z",
+    trustedCallback: {
+      contractId: "public-health-direct-report-v1",
+      eventId: workflow.externalEventId,
+      receiptId: "cdc-trusted-receipt-001",
+      providerStatus: "accepted",
+      nonceDigest: "a".repeat(64),
+      signatureVerified: true,
+      payloadsExposed: true,
+      credentialsPersisted: true
+    }
+  }, adapter);
+  assert.equal(accepted.receipt.trustedCallback.signatureVerified, true);
+  assert.equal(accepted.receipt.trustedCallback.payloadsExposed, false);
+  assert.equal(accepted.receipt.trustedCallback.credentialsPersisted, false);
+  assert.match(accepted.receipt.auditHash, /^sha256:[a-f0-9]{64}$/);
+  assert.doesNotMatch(JSON.stringify(accepted.receipt), /must-not-persist|signingSecret/);
+});
+
 test("rejected direct-report receipt opens an assigned exception and supports retry", () => {
   const institution = { name: "医院报告员", role: "institution" };
   const adapter = { name: "回执适配器", role: "system" };
