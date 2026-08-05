@@ -8,7 +8,8 @@ const {
   projectDirectReportReconciliationCase,
   scanDirectReportReconciliation,
   sha256,
-  summarizeDirectReportReconciliations
+  summarizeDirectReportReconciliations,
+  verifyDirectReportReconciliationAudit
 } = require("../public-health-direct-report-reconciliation-service");
 
 const NOW = "2026-08-05T10:00:00.000Z";
@@ -287,6 +288,77 @@ test("CAS and idempotency protect assignment while only the assigned role can ac
       actorId: "operator-a"
     }),
     (error) => error.code === "PUBLIC_HEALTH_DIRECT_REPORT_RECONCILIATION_ASSIGNEE_MISMATCH"
+  );
+});
+
+test("every action rejects unregistered actors and assignment rejects unregistered roles", () => {
+  const scan = scanDirectReportReconciliation(projections(), { now: NOW });
+  const state = discoverDirectReportReconciliationCases({}, scan).nextData;
+  const item = state.publicHealthDirectReportReconciliationCases[0];
+  ["assign", "acknowledge", "compensate", "review", "close"].forEach((action) => {
+    assert.throws(
+      () => apply(state, item.id, {
+        action,
+        expectedVersion: 1,
+        idempotencyKey: `unregistered-${action}`,
+        actorRole: "arbitrary-self-authorized-role",
+        actorId: "actor-x",
+        assigneeRole: "interface-operations"
+      }),
+      (error) => error.code === "PUBLIC_HEALTH_DIRECT_REPORT_RECONCILIATION_ACTOR_ROLE_INVALID"
+    );
+  });
+  assert.throws(
+    () => apply(state, item.id, {
+      action: "assign",
+      expectedVersion: 1,
+      idempotencyKey: "unregistered-assignee",
+      actorRole: "commission-operations",
+      actorId: "operator-a",
+      assigneeRole: "arbitrary-self-authorized-role"
+    }),
+    (error) => error.code === "PUBLIC_HEALTH_DIRECT_REPORT_RECONCILIATION_ASSIGNEE_ROLE_INVALID"
+  );
+});
+
+test("audit summary forms a continuous hash chain and tampering blocks actions and projections", () => {
+  const scan = scanDirectReportReconciliation(projections(), { now: NOW });
+  let state = discoverDirectReportReconciliationCases({}, scan).nextData;
+  const item = state.publicHealthDirectReportReconciliationCases[0];
+  state = apply(state, item.id, {
+    action: "assign",
+    expectedVersion: 1,
+    idempotencyKey: "audit-assign",
+    actorRole: "commission-operations",
+    actorId: "operator-a",
+    assigneeRole: "interface-operations"
+  }).nextData;
+  const current = state.publicHealthDirectReportReconciliationCases[0];
+  const verified = verifyDirectReportReconciliationAudit(current);
+  assert.equal(verified.valid, true);
+  assert.equal(verified.entries, 2);
+  assert.equal(current.auditSummary[0].previousDigest, "0".repeat(64));
+  assert.equal(current.auditSummary[1].previousDigest, current.auditSummary[0].eventDigest);
+  assert.equal(verified.headDigest, current.auditSummary[1].eventDigest);
+
+  const tampered = structuredClone(state);
+  tampered.publicHealthDirectReportReconciliationCases[0].auditSummary[0].actorRole =
+    "security-audit";
+  assert.throws(
+    () => apply(tampered, item.id, {
+      action: "acknowledge",
+      expectedVersion: 2,
+      idempotencyKey: "audit-tampered-action",
+      actorRole: "interface-operations",
+      actorId: "operator-b"
+    }),
+    (error) => error.code === "PUBLIC_HEALTH_DIRECT_REPORT_RECONCILIATION_AUDIT_INTEGRITY_INVALID"
+  );
+  assert.throws(
+    () => projectDirectReportReconciliationCase(
+      tampered.publicHealthDirectReportReconciliationCases[0]
+    ),
+    (error) => error.code === "PUBLIC_HEALTH_DIRECT_REPORT_RECONCILIATION_AUDIT_INTEGRITY_INVALID"
   );
 });
 

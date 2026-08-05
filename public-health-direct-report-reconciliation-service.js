@@ -27,7 +27,24 @@ const COMPENSATION_STRATEGIES = Object.freeze([
   "escalate-provider"
 ]);
 
+const ACTOR_ROLES = Object.freeze([
+  "commission-operations",
+  "disease-control-office",
+  "interface-operations",
+  "hospital-information-center",
+  "provider-operations",
+  "disease-control-audit",
+  "security-audit"
+]);
+
+const ASSIGNEE_ROLES = Object.freeze([
+  "interface-operations",
+  "hospital-information-center",
+  "provider-operations"
+]);
+
 const SHA256 = /^[a-f0-9]{64}$/;
+const AUDIT_GENESIS_DIGEST = "0".repeat(64);
 const FORBIDDEN_KEYS = /(?:^|_)(?:payload|raw|body|resident|patient|subject|identity|idcard|name|phone|address|credential|token|secret|privatekey|signature)(?:$|_)/i;
 
 function clone(value) {
@@ -353,8 +370,63 @@ function stateFor(data = {}) {
   return nextData;
 }
 
-function discoveryAudit(finding, at) {
+function auditEventDigest(entry = {}) {
+  return sha256(stable({
+    sequence: Number(entry.sequence || 0),
+    action: clean(entry.action, 60),
+    at: clean(entry.at, 80),
+    actorRole: clean(entry.actorRole, 120),
+    actorDigest: clean(entry.actorDigest, 64),
+    idempotencyKeyDigest: clean(entry.idempotencyKeyDigest, 64),
+    intentDigest: clean(entry.intentDigest, 64),
+    actionDigest: clean(entry.actionDigest, 64),
+    previousDigest: clean(entry.previousDigest, 64)
+  }));
+}
+
+function chainedAuditEntry(entry = {}, previousDigest = AUDIT_GENESIS_DIGEST) {
+  const next = {
+    ...entry,
+    previousDigest
+  };
+  next.eventDigest = auditEventDigest(next);
+  return next;
+}
+
+function verifyDirectReportReconciliationAudit(item = {}) {
+  const entries = Array.isArray(item.auditSummary) ? item.auditSummary : [];
+  if (!entries.length) {
+    throw reconciliationError(
+      "PUBLIC_HEALTH_DIRECT_REPORT_RECONCILIATION_AUDIT_INTEGRITY_INVALID",
+      "reconciliation audit summary is missing",
+      409
+    );
+  }
+  let previousDigest = AUDIT_GENESIS_DIGEST;
+  entries.forEach((entry, index) => {
+    if (
+      Number(entry.sequence) !== index + 1
+      || clean(entry.previousDigest, 64) !== previousDigest
+      || !SHA256.test(clean(entry.eventDigest, 64))
+      || entry.eventDigest !== auditEventDigest(entry)
+    ) {
+      throw reconciliationError(
+        "PUBLIC_HEALTH_DIRECT_REPORT_RECONCILIATION_AUDIT_INTEGRITY_INVALID",
+        "reconciliation audit summary integrity verification failed",
+        409
+      );
+    }
+    previousDigest = entry.eventDigest;
+  });
   return {
+    valid: true,
+    entries: entries.length,
+    headDigest: previousDigest
+  };
+}
+
+function discoveryAudit(finding, at) {
+  return chainedAuditEntry({
     sequence: 1,
     action: "discover",
     at,
@@ -365,7 +437,7 @@ function discoveryAudit(finding, at) {
       findingDigest: finding.findingDigest,
       sourceDigest: finding.sourceDigest
     }))
-  };
+  });
 }
 
 function discoverDirectReportReconciliationCases(data = {}, scan = {}) {
@@ -388,6 +460,7 @@ function discoverDirectReportReconciliationCases(data = {}, scan = {}) {
     const id = `phdr-reconciliation-${clean(finding.findingDigest, 64).slice(0, 24)}`;
     const existing = nextData.publicHealthDirectReportReconciliationCases.find((item) => item.id === id);
     if (existing) {
+      verifyDirectReportReconciliationAudit(existing);
       if (existing.findingDigest !== finding.findingDigest || existing.sourceDigest !== finding.sourceDigest) {
         throw reconciliationError(
           "PUBLIC_HEALTH_DIRECT_REPORT_RECONCILIATION_FINDING_CONFLICT",
@@ -452,6 +525,13 @@ function actorBinding(input = {}) {
       "reconciliation action requires actorRole and actorId"
     );
   }
+  if (!ACTOR_ROLES.includes(actorRole)) {
+    throw reconciliationError(
+      "PUBLIC_HEALTH_DIRECT_REPORT_RECONCILIATION_ACTOR_ROLE_INVALID",
+      "reconciliation actorRole is not in the controlled role registry",
+      403
+    );
+  }
   return { actorRole, actorDigest: sha256(`${actorRole}:${actorId}`) };
 }
 
@@ -508,6 +588,7 @@ function actionIntent(action, input, actor) {
 function applyDirectReportReconciliationActionToState(data = {}, id, input = {}) {
   const nextData = stateFor(data);
   const { index, item } = findReconciliationCase(nextData, id);
+  verifyDirectReportReconciliationAudit(item);
   const action = clean(input.action, 60).toLowerCase();
   if (!expectedStatus(action)) {
     throw reconciliationError(
@@ -556,10 +637,11 @@ function applyDirectReportReconciliationActionToState(data = {}, id, input = {})
 
   if (action === "assign") {
     const assigneeRole = clean(input.assigneeRole, 120);
-    if (!assigneeRole) {
+    if (!ASSIGNEE_ROLES.includes(assigneeRole)) {
       throw reconciliationError(
-        "PUBLIC_HEALTH_DIRECT_REPORT_RECONCILIATION_ASSIGNEE_REQUIRED",
-        "reconciliation assignment requires assigneeRole"
+        "PUBLIC_HEALTH_DIRECT_REPORT_RECONCILIATION_ASSIGNEE_ROLE_INVALID",
+        "reconciliation assigneeRole is not in the controlled assignee registry",
+        403
       );
     }
     updated.assignment = {
@@ -659,7 +741,8 @@ function applyDirectReportReconciliationActionToState(data = {}, id, input = {})
   updated.version = Number(item.version) + 1;
   updated.updatedAt = at;
   updated.productionReady = false;
-  updated.auditSummary.push({
+  const previousDigest = updated.auditSummary[updated.auditSummary.length - 1].eventDigest;
+  updated.auditSummary.push(chainedAuditEntry({
     sequence: updated.auditSummary.length + 1,
     action,
     at,
@@ -673,13 +756,15 @@ function applyDirectReportReconciliationActionToState(data = {}, id, input = {})
       action,
       intentDigest
     }))
-  });
+  }, previousDigest));
+  verifyDirectReportReconciliationAudit(updated);
   nextData.publicHealthDirectReportReconciliationCases[index] = updated;
   return { nextData, reconciliationCase: clone(updated), idempotent: false };
 }
 
 function projectDirectReportReconciliationCase(item) {
   if (!item) return null;
+  verifyDirectReportReconciliationAudit(item);
   return {
     id: clean(item.id, 160),
     findingType: FINDING_TYPES.includes(item.findingType) ? item.findingType : "unknown",
@@ -721,6 +806,8 @@ function summarizeDirectReportReconciliations(data = {}) {
 }
 
 module.exports = {
+  ACTOR_ROLES,
+  ASSIGNEE_ROLES,
   COMPENSATION_STRATEGIES,
   FINDING_TYPES,
   RECONCILIATION_STATES,
@@ -730,5 +817,6 @@ module.exports = {
   reconciliationError,
   scanDirectReportReconciliation,
   sha256,
-  summarizeDirectReportReconciliations
+  summarizeDirectReportReconciliations,
+  verifyDirectReportReconciliationAudit
 };
