@@ -1,0 +1,19 @@
+{
+  "schemaVersion": "regional-dictionaries-v1",
+  "namespaces": [
+    {
+      "id": "administrative-division",
+      "owner": "state-data",
+      "source": "official-controlled-import",
+      "effectiveDateRequired": true
+    },
+    {
+      "id": "regional-organization",
+      "owner": "state-data",
+      "source": "site-controlled-import",
+      "effectiveDateRequired": true
+    }
+  ],
+  "unknownCodePolicy": "reject-and-record",
+  "rawClinicalDataIncluded": false
+}

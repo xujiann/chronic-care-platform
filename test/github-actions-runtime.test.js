@@ -19,6 +19,9 @@ test("repository workflows use Node 24 compatible GitHub Actions", () => {
   assert.match(ci, /actions\/setup-node@v7/);
   assert.match(ci, /node-version:\s*24/);
   assert.match(ci, /actions\/upload-artifact@v7/);
+  assert.match(ci, /regional-foundation:/);
+  assert.match(ci, /npm run regional:status -- --region=template/);
+  assert.match(ci, /npm run regional:status -- --region=210200/);
 
   assert.match(pages, /actions\/checkout@v7/);
   assert.match(pages, /actions\/configure-pages@v6/);

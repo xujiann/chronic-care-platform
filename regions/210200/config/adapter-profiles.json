@@ -1,0 +1,15 @@
+{
+  "schemaVersion": "regional-adapter-profiles-v1",
+  "profiles": [
+    {
+      "id": "regional-health-exchange",
+      "owner": "integration",
+      "transport": "https",
+      "endpointEnvironmentName": "DALIAN_HEALTH_EXCHANGE_URL",
+      "authenticationMode": "managed-runtime-injection",
+      "requestTimeoutMilliseconds": 8000,
+      "productionEnabled": false
+    }
+  ],
+  "persistedSensitiveValues": false
+}

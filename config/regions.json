@@ -1,0 +1,18 @@
+{
+  "schemaVersion": "regional-registry-v1",
+  "defaultRegion": "template",
+  "regions": [
+    {
+      "code": "template",
+      "name": "通用地区模板",
+      "enabled": true,
+      "purpose": "核心平台持续集成与新地区脚手架"
+    },
+    {
+      "code": "210200",
+      "name": "辽宁省大连市",
+      "enabled": true,
+      "purpose": "首个存量地区配置迁移样板"
+    }
+  ]
+}

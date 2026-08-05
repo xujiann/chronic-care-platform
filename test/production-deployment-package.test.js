@@ -29,6 +29,10 @@ test("production deployment package hashes runtime files without persisting secr
     assert.equal(manifest.artifact.files.some((item) => item.path === "session-store.js"), true);
     assert.equal(manifest.artifact.files.some((item) => item.path === "scripts/postgres-sync-worker.js"), true);
     assert.equal(manifest.artifact.files.some((item) => item.path === "scripts/postgres-shadow-reconcile.js"), true);
+    assert.equal(manifest.artifact.files.some((item) => item.path === "config/regions.json"), true);
+    assert.equal(manifest.artifact.files.some((item) => item.path === "src/platform/regional/regional-runtime.js"), true);
+    assert.equal(manifest.artifact.files.some((item) => item.path === "regions/template/manifest.json"), true);
+    assert.equal(manifest.artifact.files.some((item) => item.path === "regions/210200/manifest.json"), true);
     assert.equal(manifest.artifact.files.some((item) => item.path === ".env"), false);
     assert.equal(manifest.secretContract.variables.every((item) => item.persistedInArtifact === false && !("value" in item)), true);
     assert.equal(manifest.processContract.healthChecks.some((item) => item.route === "/api/live" && item.purpose === "process-liveness" && item.authentication === "none"), true);

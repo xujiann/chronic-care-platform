@@ -7,7 +7,7 @@ const { spawnSync } = require("node:child_process");
 const ROOT = path.resolve(__dirname, "..");
 const DEFAULT_OUTPUT = path.join(ROOT, "release", "production-deployment-package.json");
 const DEFAULT_MARKDOWN = path.join(ROOT, "release", "production-deployment-package.md");
-const ALLOWED_RUNTIME_EXTENSIONS = new Set([".js", ".html", ".css", ".svg", ".webmanifest"]);
+const ALLOWED_RUNTIME_EXTENSIONS = new Set([".js", ".json", ".html", ".css", ".svg", ".webmanifest"]);
 const REQUIRED_RUNTIME_FILES = [
   "server.js",
   "src/http/api-router.js",
@@ -20,8 +20,12 @@ const REQUIRED_RUNTIME_FILES = [
   "scripts/postgres-sync-worker.js",
   "scripts/postgres-shadow-reconcile.js"
 ];
-const ADDITIONAL_RUNTIME_FILES = ["scripts/postgres-sync-worker.js", "scripts/postgres-shadow-reconcile.js"];
-const RUNTIME_DIRECTORIES = ["src/http"];
+const ADDITIONAL_RUNTIME_FILES = [
+  "config/regions.json",
+  "scripts/postgres-sync-worker.js",
+  "scripts/postgres-shadow-reconcile.js"
+];
+const RUNTIME_DIRECTORIES = ["src/http", "src/platform/regional", "regions"];
 const EXCLUDED_RUNTIME_FILES = new Set(["playwright.config.js"]);
 
 const SECRET_CONTRACT = [
@@ -71,6 +75,7 @@ function collectRuntimeFiles(root = ROOT) {
     .filter((name) => {
       if (EXCLUDED_RUNTIME_FILES.has(name)) return false;
       if (["package.json", "package-lock.json"].includes(name)) return true;
+      if (path.extname(name).toLowerCase() === ".json") return false;
       return ALLOWED_RUNTIME_EXTENSIONS.has(path.extname(name).toLowerCase());
     })
   const directoryFiles = RUNTIME_DIRECTORIES.flatMap((directory) => collectRuntimeDirectoryFiles(root, directory));

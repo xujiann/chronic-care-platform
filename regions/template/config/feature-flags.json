@@ -1,0 +1,11 @@
+{
+  "schemaVersion": "regional-feature-flags-v1",
+  "defaults": {
+    "regional.branding": false,
+    "regional.dictionary": false,
+    "regional.integration": false,
+    "regional.policy": false,
+    "regional.workflow": false
+  },
+  "notes": "复制模板后仅启用已经完成测试和验收的地区能力。"
+}
