@@ -138,6 +138,8 @@
     "public-health:event-reporting-runtime:test": "node --test test/public-health-event-reporting-service.test.js test/public-health-event-reporting-readiness.test.js test/public-health-direct-report-control-package.test.js test/public-health-direct-report-outbox-service.test.js test/public-health-direct-report-state-repository.test.js test/public-health-direct-report-worker.test.js test/public-health-direct-report-worker-cli.test.js test/public-health-direct-report-production-runtime.test.js test/public-health-event-reporting-runtime-api.test.js test/public-health-event-reporting-ui.test.js",
     "public-health:direct-report-control:status": "node scripts/public-health-direct-report-control-package.js",
     "public-health:direct-report-control:require-ready": "node scripts/public-health-direct-report-control-package.js --require-ready",
+    "public-health:direct-report-dictionary-lifecycle:check": "node --check public-health-direct-report-dictionary-lifecycle.js",
+    "public-health:direct-report-dictionary-lifecycle:test": "node --test test/public-health-direct-report-dictionary-lifecycle.test.js",
     "public-health:direct-report-worker": "node scripts/public-health-direct-report-worker.js",
     "public-health:direct-report-worker:status": "node scripts/public-health-direct-report-worker.js --status",
     "public-health:priority-standard-review-readiness": "node scripts/public-health-priority-standard-review-readiness.js",
