@@ -20,7 +20,7 @@ const manifest = loadManifest();
 
 test("process manifest pins the unique integration baseline and evidence policy", () => {
   assert.equal(manifest.integrationBranch, "main");
-  assert.equal(manifest.baselineTag, "baseline/governance-20260805-public-health-receipt-timeline-v1");
+  assert.equal(manifest.baselineTag, "baseline/governance-20260805-public-health-direct-report-outbox-v1");
   assert.equal(manifest.developmentPolicy.singleIntegrationBaseline, true);
   assert.equal(manifest.developmentPolicy.integrationOwner, "T00");
   assert.equal(manifest.developmentPolicy.externalEvidenceCannotBeInferred, true);
