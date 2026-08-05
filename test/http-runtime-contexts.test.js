@@ -88,6 +88,25 @@ test("composition root exposes one least-privilege capability provider per domai
   assert.deepEqual(Object.keys(platform.contexts), Object.keys(CONTEXT_DEFINITIONS));
 });
 
+test("regional context is optional and remains outside domain capability projections", () => {
+  const names = [...new Set(Object.values(CONTEXT_DEFINITIONS).flatMap(({ dependencies }) => dependencies))];
+  const source = Object.fromEntries(names.map((name) => [name, Symbol(name)]));
+  const regionalContext = Object.freeze({ regionCode: "template" });
+  const regionalRuntime = Object.freeze({
+    context: regionalContext,
+    forDomain(domain) {
+      return Object.freeze({ regionCode: "template", domain });
+    }
+  });
+  const withoutRegion = createPlatformRuntimeContexts(source);
+  const withRegion = createPlatformRuntimeContexts(source, { regionalRuntime });
+  assert.equal(withoutRegion.regional, null);
+  assert.equal(withoutRegion.forRegionalDomain("runtime"), null);
+  assert.equal(withRegion.regional, regionalContext);
+  assert.deepEqual(withRegion.forRegionalDomain("integration"), { regionCode: "template", domain: "integration" });
+  assert.equal("regionCode" in withRegion.forDomain("integration"), false);
+});
+
 test("subdomain contexts are independent frozen projections", () => {
   const definition = require("../src/http/runtime-contexts/context-factory").defineRuntimeContext({
     domain: "example",

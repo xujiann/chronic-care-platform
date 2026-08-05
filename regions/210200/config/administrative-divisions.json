@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "regional-administrative-divisions-v1",
+  "source": "国家统计用区划代码及现场确认版本",
+  "root": {
+    "code": "210200",
+    "name": "大连市",
+    "parentCode": "210000"
+  },
+  "maintenance": {
+    "owner": "state-data",
+    "effectiveDateRequired": true,
+    "siteConfirmationRequired": true
+  }
+}

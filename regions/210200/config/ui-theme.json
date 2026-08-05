@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "regional-ui-theme-v1",
+  "displayName": "大连市卫生健康信息平台",
+  "shortName": "大连卫健平台",
+  "language": "zh-CN",
+  "theme": {
+    "primaryColor": "#006d77",
+    "accentColor": "#0a9396"
+  },
+  "assets": {
+    "logo": "platform-default",
+    "favicon": "platform-default"
+  }
+}

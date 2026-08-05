@@ -1,0 +1,31 @@
+{
+  "schemaVersion": "regional-manifest-v1",
+  "regionCode": "template",
+  "name": "通用地区模板",
+  "locale": "zh-CN",
+  "timezone": "Asia/Shanghai",
+  "administrativeDivision": {
+    "code": "template",
+    "level": "template",
+    "parentCode": null
+  },
+  "release": {
+    "version": "0.1.0",
+    "platformCompatibility": {
+      "minimum": "0.1.0",
+      "maximumExclusive": "1.0.0"
+    }
+  },
+  "features": {
+    "regional.branding": false,
+    "regional.dictionary": false,
+    "regional.integration": false,
+    "regional.policy": false,
+    "regional.workflow": false
+  },
+  "configRefs": [
+    "config/feature-flags.json",
+    "config/organization.json"
+  ],
+  "extensions": []
+}

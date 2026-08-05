@@ -6,6 +6,7 @@ const {
   createPlatformCapabilityProviders,
   createPlatformRuntimeContexts
 } = require("./src/http/runtime-contexts");
+const { loadRegionalRuntime } = require("./src/platform/regional/regional-runtime");
 const { ContractRegistry } = require("./src/platform/contracts/contract-registry");
 const {
   validateOwnershipManifest
@@ -28563,7 +28564,8 @@ function createRuntimeCapabilitySource() {
 }
 
 const platformCapabilityProviders = createPlatformCapabilityProviders(createRuntimeCapabilitySource());
-const platformRuntimeContexts = createPlatformRuntimeContexts(platformCapabilityProviders);
+const regionalRuntime = loadRegionalRuntime({ root: __dirname, env: process.env });
+const platformRuntimeContexts = createPlatformRuntimeContexts(platformCapabilityProviders, { regionalRuntime });
 
 function createRequestApiRouter() {
   return createPlatformApiRouter(platformRuntimeContexts);

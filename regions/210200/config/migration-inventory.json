@@ -1,0 +1,19 @@
+{
+  "schemaVersion": "regional-migration-inventory-v1",
+  "strategy": "compatibility-first",
+  "status": "foundation-established",
+  "migratedConcerns": [
+    "organization identity",
+    "administrative division metadata",
+    "regional adapter profile",
+    "regional policy declarations",
+    "regional dictionary ownership",
+    "regional UI branding",
+    "regional acceptance workflow"
+  ],
+  "legacyCompatibility": {
+    "enabled": true,
+    "remainingHardcodedReferencesRequireIncrementalMigration": true,
+    "removalGate": "all affected domain regressions and site acceptance pass"
+  }
+}

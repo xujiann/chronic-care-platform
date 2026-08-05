@@ -1,0 +1,18 @@
+{
+  "schemaVersion": "regional-policies-v1",
+  "policies": [
+    {
+      "id": "regional-data-boundary",
+      "owner": "platform-governance",
+      "mode": "deny-by-default",
+      "requiredEvidence": "approved-regional-data-boundary-reference"
+    },
+    {
+      "id": "regional-production-promotion",
+      "owner": "platform-governance",
+      "mode": "explicit-approval",
+      "requiredEvidence": "signed-site-go-no-go-reference"
+    }
+  ],
+  "productionDecision": "NO-GO"
+}

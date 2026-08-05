@@ -1,0 +1,8 @@
+{
+  "schemaVersion": "regional-organization-v1",
+  "authorityName": "大连市卫生健康委员会",
+  "platformDisplayName": "大连市卫生健康信息平台",
+  "serviceArea": "大连市",
+  "administrativeCode": "210200",
+  "contactReference": "由大连部署环境的受控运维目录提供"
+}

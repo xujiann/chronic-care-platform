@@ -1,0 +1,7 @@
+{
+  "schemaVersion": "regional-organization-v1",
+  "authorityName": "待配置地区卫生健康主管部门",
+  "platformDisplayName": "区域卫生健康信息平台",
+  "serviceArea": "待配置",
+  "contactReference": "由部署环境的受控运维目录提供"
+}

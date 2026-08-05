@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "regional-feature-flags-v1",
+  "defaults": {
+    "regional.branding": true,
+    "regional.dictionary": true,
+    "regional.integration": true,
+    "regional.policy": true,
+    "regional.workflow": true
+  },
+  "productionOverrides": {
+    "regional.integration": false
+  },
+  "notes": "生产接口必须在地区联合测试、审批和运行时显式激活后开启。"
+}

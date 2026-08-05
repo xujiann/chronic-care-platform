@@ -40,7 +40,7 @@ const CONTEXT_DEFINITIONS = Object.freeze(Object.fromEntries(
   ])
 ));
 
-function createPlatformRuntimeContexts(source) {
+function createPlatformRuntimeContexts(source, options = {}) {
   const contexts = Object.freeze(Object.fromEntries(
     Object.entries(CONTEXT_DEFINITIONS).map(([domain, definition]) => {
       const domainSource = source?.kind === "domain-capability-providers"
@@ -49,11 +49,17 @@ function createPlatformRuntimeContexts(source) {
       return [domain, definition.create(domainSource)];
     })
   ));
+  const regionalRuntime = options.regionalRuntime || null;
   return Object.freeze({
     contexts,
+    regional: regionalRuntime?.context || null,
     forDomain(domain) {
       if (!contexts[domain]) throw new TypeError(`unknown runtime context domain: ${domain}`);
       return contexts[domain];
+    },
+    forRegionalDomain(domain) {
+      if (!contexts[domain]) throw new TypeError(`unknown runtime context domain: ${domain}`);
+      return regionalRuntime ? regionalRuntime.forDomain(domain) : null;
     }
   });
 }

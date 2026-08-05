@@ -1,0 +1,104 @@
+{
+  "schemaVersion": "regional-manifest-v1",
+  "regionCode": "210200",
+  "name": "辽宁省大连市",
+  "locale": "zh-CN",
+  "timezone": "Asia/Shanghai",
+  "administrativeDivision": {
+    "code": "210200",
+    "level": "prefecture-city",
+    "parentCode": "210000"
+  },
+  "release": {
+    "version": "0.1.0",
+    "platformCompatibility": {
+      "minimum": "0.1.0",
+      "maximumExclusive": "1.0.0"
+    }
+  },
+  "features": {
+    "regional.branding": true,
+    "regional.dictionary": true,
+    "regional.integration": true,
+    "regional.policy": true,
+    "regional.workflow": true
+  },
+  "configRefs": [
+    "config/adapter-profiles.json",
+    "config/administrative-divisions.json",
+    "config/dictionaries.json",
+    "config/feature-flags.json",
+    "config/migration-inventory.json",
+    "config/organization.json",
+    "config/policies.json",
+    "config/ui-theme.json"
+  ],
+  "extensions": [
+    {
+      "kind": "adapter",
+      "id": "regional-health-exchange",
+      "version": "0.1.0",
+      "ownedDomain": "integration",
+      "permissions": [
+        "integration:regional-exchange"
+      ],
+      "dataCollections": [
+        "integration-metadata"
+      ],
+      "enabled": true
+    },
+    {
+      "kind": "policy",
+      "id": "regional-governance-policy",
+      "version": "0.1.0",
+      "ownedDomain": "platform-governance",
+      "permissions": [
+        "governance:regional-policy-read"
+      ],
+      "dataCollections": [
+        "policy-rules"
+      ],
+      "enabled": true
+    },
+    {
+      "kind": "dictionary",
+      "id": "regional-administrative-dictionary",
+      "version": "0.1.0",
+      "ownedDomain": "state-data",
+      "permissions": [
+        "state-data:regional-dictionary-read"
+      ],
+      "dataCollections": [
+        "administrative-divisions",
+        "dictionaries"
+      ],
+      "enabled": true
+    },
+    {
+      "kind": "ui",
+      "id": "regional-branding",
+      "version": "0.1.0",
+      "ownedDomain": "shared",
+      "permissions": [
+        "shared:regional-ui-read"
+      ],
+      "dataCollections": [
+        "ui-presentation"
+      ],
+      "enabled": true
+    },
+    {
+      "kind": "workflow",
+      "id": "regional-site-acceptance",
+      "version": "0.1.0",
+      "ownedDomain": "platform-governance",
+      "permissions": [
+        "governance:regional-acceptance-read"
+      ],
+      "dataCollections": [
+        "workflow-definitions"
+      ],
+      "enabled": true
+    }
+  ]
+}

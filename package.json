@@ -5,6 +5,11 @@
   "description": "慢病医防融合管理平台本地 MVP",
   "scripts": {
     "dev": "node server.js",
+    "regional:check": "node --check src/platform/regional/region-manifest.js && node --check src/platform/regional/extension-registry.js && node --check src/platform/regional/regional-runtime.js && node --check src/platform/regional/composite-release.js && node --check scripts/regional-foundation.js && node --check regions/template/extensions/index.js && node --check regions/210200/extensions/index.js",
+    "regional:test": "node --test test/regional-manifest.test.js test/regional-extension-registry.test.js test/regional-runtime.test.js test/regional-composite-release.test.js",
+    "regional:status": "node scripts/regional-foundation.js status",
+    "regional:matrix": "node scripts/regional-foundation.js matrix",
+    "regional:package": "node scripts/regional-foundation.js package",
     "routes:check": "node scripts/check-http-modules.js",
     "routes:test": "node --test test/http-route-modularization.test.js test/http-runtime-contexts.test.js test/cross-domain-foundation-contract.test.js",
     "architecture:test": "node --test test/platform-architecture-foundation.test.js test/frontend-platform-shell.test.js test/service-extraction-governance.test.js",
