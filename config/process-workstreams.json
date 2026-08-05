@@ -1,7 +1,7 @@
 {
   "schemaVersion": "process-workstreams-v1",
   "integrationBranch": "main",
-  "baselineTag": "baseline/governance-20260805-public-health-direct-report-runtime-v1",
+  "baselineTag": "baseline/governance-20260805-public-health-direct-report-control-package-v1",
   "developmentPolicy": {
     "singleIntegrationBaseline": true,
     "integrationOwner": "T00",
