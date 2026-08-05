@@ -1,0 +1,30 @@
+{
+  "schemaVersion": "regional-geography-v1",
+  "areas": {
+    "primaryDistrict": {
+      "code": "210202",
+      "name": "中山区",
+      "shortName": "中山区"
+    },
+    "secondaryDistrict": {
+      "code": "210203",
+      "name": "西岗区",
+      "shortName": "西岗区"
+    },
+    "tertiaryDistrict": {
+      "code": "210204",
+      "name": "沙河口区",
+      "shortName": "沙河口区"
+    },
+    "laboratoryDistrict": {
+      "code": "210211",
+      "name": "甘井子区",
+      "shortName": "甘井子区"
+    },
+    "peripheralDistrict": {
+      "code": "210212",
+      "name": "旅顺口区",
+      "shortName": "旅顺口区"
+    }
+  }
+}

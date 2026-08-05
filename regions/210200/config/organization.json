@@ -4,5 +4,79 @@
   "platformDisplayName": "大连市卫生健康信息平台",
   "serviceArea": "大连市",
   "administrativeCode": "210200",
-  "contactReference": "由大连部署环境的受控运维目录提供"
+  "contactReference": "由大连部署环境的受控运维目录提供",
+  "organizations": {
+    "healthAuthority": {
+      "code": "ORG-HEALTH-DL",
+      "name": "大连市卫生健康委员会",
+      "shortName": "大连市卫生健康委",
+      "type": "health_admin"
+    },
+    "insuranceAuthority": {
+      "code": "ORG-MI-DL",
+      "name": "大连市医疗保障局",
+      "shortName": "大连市医保局",
+      "type": "insurance_bureau"
+    },
+    "insuranceCenter": {
+      "code": "ORG-MI-CENTER-DL",
+      "name": "大连市医疗保障事务服务中心",
+      "shortName": "大连市医保中心",
+      "type": "insurance_center"
+    },
+    "centralHospital": {
+      "code": "MR1",
+      "name": "大连市中心医院",
+      "shortName": "大连市中心医院",
+      "type": "medical_institution"
+    },
+    "friendshipHospital": {
+      "code": "MR2",
+      "name": "大连市友谊医院",
+      "shortName": "大连市友谊医院",
+      "type": "medical_institution"
+    },
+    "universityHospital": {
+      "code": "DMU-AFFILIATED",
+      "name": "大连医科大学附属医院",
+      "shortName": "大医附属医院",
+      "type": "medical_institution"
+    },
+    "womenChildrenCenter": {
+      "code": "H000003",
+      "name": "大连市妇女儿童医疗中心",
+      "shortName": "大连市妇儿医疗中心",
+      "type": "medical_institution"
+    },
+    "bloodCenter": {
+      "code": "BLOOD-DL",
+      "name": "大连市血液中心",
+      "shortName": "大连市血液中心",
+      "type": "blood_center"
+    },
+    "healthCity": {
+      "code": "ORG-CITY-DL",
+      "name": "大连市健康城市平台",
+      "shortName": "健康大连",
+      "type": "city"
+    },
+    "examinationCenter": {
+      "code": "EXAM-DL-01",
+      "name": "大连健康体检中心",
+      "shortName": "大连体检中心",
+      "type": "medical_institution"
+    },
+    "districtHospital": {
+      "code": "PLD-CENTRAL",
+      "name": "大连市普兰店区中心医院",
+      "shortName": "普兰店区中心医院",
+      "type": "medical_institution"
+    },
+    "communityHealthCenter": {
+      "code": "MR3",
+      "name": "青泥洼桥社区卫生服务中心",
+      "shortName": "青泥洼桥社区卫生服务中心",
+      "type": "primary_care_institution"
+    }
+  }
 }

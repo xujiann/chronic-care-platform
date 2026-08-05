@@ -512,10 +512,11 @@ async function submitImagingIngest(event) {
   payload.shareEnabled = true;
   if (!IMAGING_API_BASE) {
     status.textContent = "静态预览已模拟入云。";
+    const centralHospital = window.HealthRegionalContext.organization("centralHospital");
     const study = {
       ...payload,
       id: `ics-static-${Date.now()}`,
-      institutionName: payload.institutionCode === "MR1" ? "大连市中心医院" : "接入医院",
+      institutionName: payload.institutionCode === centralHospital.code ? centralHospital.name : "接入医院",
       mainIndex: `${payload.institutionCode}#DEMO#${payload.accessionNumber}`,
       studyDate: new Date().toISOString().slice(0, 10),
       uploadMode: "前置网关",
@@ -757,15 +758,17 @@ async function reviewMutualRecognitionAppeal(studyId, decision) {
 
 function buildFallbackImagingCloud() {
   if (imagingState.fallbackData) return imagingState.fallbackData;
+  const centralHospital = window.HealthRegionalContext.organization("centralHospital");
+  const communityHealthCenter = window.HealthRegionalContext.organization("communityHealthCenter");
   imagingState.fallbackData = {
     summary: { studies: 2, institutions: 2, diagnosticLevel: 1, browserLevel: 2, qcPassed: 1, emrSynced: 1, activeShares: 1 },
     gateways: [
-      { institutionCode: "MR1", institutionName: "大连市中心医院", mode: "前置网关", status: "online", lastHeartbeat: "2026-07-07 09:20", dicomProtocols: ["C-STORE", "C-MOVE", "DICOM TLS"], encryption: "DICOM TLS + HTTPS + AES", compression: "诊断级 DICOM 无损压缩" },
-      { institutionCode: "MR3", institutionName: "青泥洼桥社区卫生服务中心", mode: "无前置采集软件", status: "warning", lastHeartbeat: "2026-07-07 08:55", dicomProtocols: ["C-STORE"], encryption: "HTTPS + AES", compression: "浏览级压缩预览" }
+      { institutionCode: centralHospital.code, institutionName: centralHospital.name, mode: "前置网关", status: "online", lastHeartbeat: "2026-07-07 09:20", dicomProtocols: ["C-STORE", "C-MOVE", "DICOM TLS"], encryption: "DICOM TLS + HTTPS + AES", compression: "诊断级 DICOM 无损压缩" },
+      { institutionCode: communityHealthCenter.code, institutionName: communityHealthCenter.name, mode: "无前置采集软件", status: "warning", lastHeartbeat: "2026-07-07 08:55", dicomProtocols: ["C-STORE"], encryption: "HTTPS + AES", compression: "浏览级压缩预览" }
     ],
     studies: [
-      { id: "ics-ct-r1-20260521", residentId: "r1", institutionCode: "MR1", institutionName: "大连市中心医院", accessionNumber: "CT-DEMO-20260521", studyInstanceUID: "1.2.156.112605.140380.20260521.1", mainIndex: "MR1#DEMO-ID-R1#CT-DEMO-20260521", modality: "CT", bodyPart: "胸部", studyDate: "2026-05-21", reportConclusion: "双肺纹理增多，未见明确急性实变影。", seriesCount: 4, imageCount: 286, diagnosticLevel: true, browserLevel: true, uploadMode: "前置网关", uploadStatus: "已入云", integrityCheck: "passed", qcStatus: "质控通过", emrSyncStatus: "已写入电子病历索引" },
-      { id: "ics-dr-r2-20260603", residentId: "r2", institutionCode: "MR3", institutionName: "青泥洼桥社区卫生服务中心", accessionNumber: "DR-DEMO-20260603", studyInstanceUID: "1.2.156.112605.140380.20260603.2", mainIndex: "MR3#DEMO-ID-R2#DR-DEMO-20260603", modality: "DR", bodyPart: "胸片", studyDate: "2026-06-03", reportConclusion: "基层初筛影像已上传，等待影像中心复核。", seriesCount: 1, imageCount: 2, diagnosticLevel: false, browserLevel: true, uploadMode: "无前置采集软件", uploadStatus: "已入云", integrityCheck: "pending", qcStatus: "待质控", emrSyncStatus: "待报告审核后写入" }
+      { id: "ics-ct-r1-20260521", residentId: "r1", institutionCode: centralHospital.code, institutionName: centralHospital.name, accessionNumber: "CT-DEMO-20260521", studyInstanceUID: "1.2.156.112605.140380.20260521.1", mainIndex: `${centralHospital.code}#DEMO-ID-R1#CT-DEMO-20260521`, modality: "CT", bodyPart: "胸部", studyDate: "2026-05-21", reportConclusion: "双肺纹理增多，未见明确急性实变影。", seriesCount: 4, imageCount: 286, diagnosticLevel: true, browserLevel: true, uploadMode: "前置网关", uploadStatus: "已入云", integrityCheck: "passed", qcStatus: "质控通过", emrSyncStatus: "已写入电子病历索引" },
+      { id: "ics-dr-r2-20260603", residentId: "r2", institutionCode: communityHealthCenter.code, institutionName: communityHealthCenter.name, accessionNumber: "DR-DEMO-20260603", studyInstanceUID: "1.2.156.112605.140380.20260603.2", mainIndex: `${communityHealthCenter.code}#DEMO-ID-R2#DR-DEMO-20260603`, modality: "DR", bodyPart: "胸片", studyDate: "2026-06-03", reportConclusion: "基层初筛影像已上传，等待影像中心复核。", seriesCount: 1, imageCount: 2, diagnosticLevel: false, browserLevel: true, uploadMode: "无前置采集软件", uploadStatus: "已入云", integrityCheck: "pending", qcStatus: "待质控", emrSyncStatus: "待报告审核后写入" }
     ],
     shares: [{ studyId: "ics-ct-r1-20260521", channel: "二维码/短信链接", expiresAt: "2026-07-31T23:59:59.000Z", status: "active" }],
     qualityReviews: [],

@@ -257,6 +257,16 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(liveBody.ok, true);
     assert.equal(liveBody.service.name, "chronic-care-platform");
 
+    const regionalResponse = await fetch(`${baseUrl}/api/regional/context`);
+    assert.equal(regionalResponse.status, 200);
+    const regionalBody = await regionalResponse.json();
+    assert.equal(regionalBody.schemaVersion, "regional-public-context-v1");
+    assert.equal(regionalBody.regionCode, "template");
+    assert.equal(regionalBody.organizations.centralHospital.name, "区域中心医院");
+    assert.equal(regionalBody.productionReady, false);
+    assert.equal("configs" in regionalBody, false);
+    assert.equal(JSON.stringify(regionalBody).includes("endpointEnvironmentName"), false);
+
     const healthResponse = await fetch(`${baseUrl}/api/health`);
     assert.match(healthResponse.headers.get("content-type") || "", /^application\/json/);
     const healthBody = await healthResponse.json();

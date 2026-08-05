@@ -1,6 +1,7 @@
 "use strict";
 
 const { randomUUID } = require("crypto");
+const { regionalOrganization } = require("./src/platform/regional/active-region");
 
 const PUBLIC_HEALTH_INCIDENT_TRANSITIONS = Object.freeze({
   "待核查": Object.freeze({
@@ -124,6 +125,7 @@ function normalizeProfessionalRefs(laneId, value = {}) {
 }
 
 function seedPublicHealthCoordination() {
+  const healthAuthorityAdministrator = `${regionalOrganization("healthAuthority").shortName}管理员`;
   return {
     schemaVersion: 3,
     migrationSource: {
@@ -259,7 +261,7 @@ function seedPublicHealthCoordination() {
         submittedByName: "市级管理员",
         submittedAt: "2026-07-28 08:42",
         reviewedBy: "u-health",
-        reviewedByName: "大连市卫生健康委管理员",
+        reviewedByName: healthAuthorityAdministrator,
         reviewedAt: "2026-07-28 08:55",
         reviewNote: "联调编号、摘要与当前事件引用一致。",
         productionEvidence: false
@@ -278,7 +280,7 @@ function seedPublicHealthCoordination() {
         submittedByName: "市级管理员",
         submittedAt: "2026-07-28 08:40",
         reviewedBy: "u-health",
-        reviewedByName: "大连市卫生健康委管理员",
+        reviewedByName: healthAuthorityAdministrator,
         reviewedAt: "2026-07-28 08:54",
         reviewNote: "回执编号和最小化摘要核验通过。",
         productionEvidence: false
@@ -297,7 +299,7 @@ function seedPublicHealthCoordination() {
         submittedByName: "市级管理员",
         submittedAt: "2026-07-27 12:35",
         reviewedBy: "u-health",
-        reviewedByName: "大连市卫生健康委管理员",
+        reviewedByName: healthAuthorityAdministrator,
         reviewedAt: "2026-07-27 12:55",
         reviewNote: "生产审批编号与事件范围一致。",
         productionEvidence: false
@@ -316,7 +318,7 @@ function seedPublicHealthCoordination() {
         submittedByName: "市级管理员",
         submittedAt: "2026-07-27 12:20",
         reviewedBy: "u-health",
-        reviewedByName: "大连市卫生健康委管理员",
+        reviewedByName: healthAuthorityAdministrator,
         reviewedAt: "2026-07-27 12:50",
         reviewNote: "现场联调范围、批次和结果摘要核验通过。",
         productionEvidence: false
@@ -335,7 +337,7 @@ function seedPublicHealthCoordination() {
         submittedByName: "市级管理员",
         submittedAt: "2026-07-27 12:18",
         reviewedBy: "u-health",
-        reviewedByName: "大连市卫生健康委管理员",
+        reviewedByName: healthAuthorityAdministrator,
         reviewedAt: "2026-07-27 12:48",
         reviewNote: "业务回执编号、摘要和证据摘要一致。",
         productionEvidence: false
@@ -343,8 +345,8 @@ function seedPublicHealthCoordination() {
     ],
     evidenceActions: [
       { id: "PHEVA-006", evidenceId: "PHEV-IMM-APPROVAL", incidentId: "PHE-20260727-006", action: "submit-evidence", actorId: "u-city", actor: "市级管理员", at: "2026-07-28 09:08", result: "登记生产审批编号，等待独立签收", revision: 1 },
-      { id: "PHEVA-005", evidenceId: "PHEV-IMM-JOINT", incidentId: "PHE-20260727-006", action: "accept-evidence", actorId: "u-health", actor: "大连市卫生健康委管理员", at: "2026-07-28 08:55", result: "联调编号、摘要与当前事件引用一致", revision: 2 },
-      { id: "PHEVA-004", evidenceId: "PHEV-IMM-RECEIPT", incidentId: "PHE-20260727-006", action: "accept-evidence", actorId: "u-health", actor: "大连市卫生健康委管理员", at: "2026-07-28 08:54", result: "回执编号和最小化摘要核验通过", revision: 2 }
+      { id: "PHEVA-005", evidenceId: "PHEV-IMM-JOINT", incidentId: "PHE-20260727-006", action: "accept-evidence", actorId: "u-health", actor: healthAuthorityAdministrator, at: "2026-07-28 08:55", result: "联调编号、摘要与当前事件引用一致", revision: 2 },
+      { id: "PHEVA-004", evidenceId: "PHEV-IMM-RECEIPT", incidentId: "PHE-20260727-006", action: "accept-evidence", actorId: "u-health", actor: healthAuthorityAdministrator, at: "2026-07-28 08:54", result: "回执编号和最小化摘要核验通过", revision: 2 }
     ],
     incidentActions: [
       { id: "PHA-004", incidentId: "PHE-20260727-004", action: "verify-close", label: "复核关闭", actorId: "u-health", actor: "妇幼健康处", at: "2026-07-27 13:05", result: "补传完成，完整性复核通过", revision: 4 },

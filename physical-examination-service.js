@@ -5,12 +5,16 @@
   const highlights = typeof module === "object" && module.exports
     ? require("./physical-examination-highlights")
     : root?.PhysicalExaminationHighlights;
-  const api = factory(standards, highlights);
+  const regional = typeof module === "object" && module.exports
+    ? require("./src/platform/regional/active-region").getActiveRegionalValues()
+    : root?.HealthRegionalContext;
+  const api = factory(standards, highlights, regional);
   if (typeof module === "object" && module.exports) module.exports = api;
   if (root) root.PhysicalExaminationService = api;
-})(typeof globalThis !== "undefined" ? globalThis : this, function (Standards, Highlights) {
+})(typeof globalThis !== "undefined" ? globalThis : this, function (Standards, Highlights, Regional) {
   if (!Standards) throw new Error("PhysicalExaminationStandards is required");
   if (!Highlights) throw new Error("PhysicalExaminationHighlights is required");
+  if (!Regional) throw new Error("HealthRegionalContext is required");
   const SOURCE_CONTRACTS = [
     {
       id: "exam-center-rest-v1",
@@ -58,6 +62,10 @@
   ]);
 
   function seedRecords() {
+    const examinationCenter = Regional.organization("examinationCenter");
+    const centralHospital = Regional.organization("centralHospital");
+    const universityHospital = Regional.organization("universityHospital");
+    const districtHospital = Regional.organization("districtHospital");
     return [
       physicalRecord({
         id: "physical-exam-r1-2026-center",
@@ -65,8 +73,8 @@
         personIndex: "DEMO-ID-R1#DEMO-MOBILE-R1",
         sourceType: "exam-center",
         externalId: "DLEXAM-2026-R1-001",
-        institutionId: "exam-center-dalian-01",
-        institutionName: "大连健康体检中心",
+        institutionId: examinationCenter.code,
+        institutionName: examinationCenter.name,
         reportNo: "TJ202605180028",
         examDate: "2026-05-18",
         summary: "年度健康体检完成，血压偏高，其余主要项目未见明显异常。",
@@ -84,8 +92,8 @@
         personIndex: "DEMO-ID-R1#DEMO-MOBILE-R1",
         sourceType: "hospital",
         externalId: "HIS-PE-2025-R1-009",
-        institutionId: "hospital-dl-central",
-        institutionName: "大连市中心医院",
+        institutionId: centralHospital.code,
+        institutionName: centralHospital.name,
         reportNo: "ZYTJ202505090119",
         examDate: "2025-05-09",
         summary: "医院体检结果已归档，血压及体重指标需持续管理。",
@@ -103,8 +111,8 @@
         personIndex: "DEMO-ID-R2#DEMO-MOBILE-R2",
         sourceType: "hospital",
         externalId: "HIS-PE-2026-R2-015",
-        institutionId: "hospital-dmu-affiliated",
-        institutionName: "大连医科大学附属医院",
+        institutionId: universityHospital.code,
+        institutionName: universityHospital.name,
         reportNo: "NFM202605120015",
         examDate: "2026-05-12",
         summary: "糖尿病年度体检完成，糖化血红蛋白偏高，建议内分泌专科复诊。",
@@ -121,8 +129,8 @@
         personIndex: "DEMO-ID-R3#DEMO-MOBILE-R3",
         sourceType: "exam-center",
         externalId: "GJZ-PE-2025-R3-008",
-        institutionId: "exam-center-ganjingzi",
-        institutionName: "甘井子区人民医院体检中心",
+        institutionId: districtHospital.code,
+        institutionName: `${districtHospital.name}体检中心`,
         reportNo: "GJZTJ202512090008",
         examDate: "2025-12-09",
         summary: "年度体检完成，主要指标未见明显异常。",
@@ -137,17 +145,20 @@
   }
 
   function seedAbnormalCases() {
+    const centralHospital = Regional.organization("centralHospital");
     return [
-      { id: "physical-exam-case-r1-2026-bp", reportId: "physical-exam-r1-2026-center", residentId: "r1", findingCodes: ["BP", "BMI"], classification: "important", level: "high", status: "followup-scheduled", confirmationStatus: "confirmed", owner: "大连市中心医院心内科/家庭医生", dueAt: "2026-05-30", notificationStatus: "delivered", latestAction: "居民已收到提醒，家庭医生复测任务已安排。", actions: [{ action: "schedule", at: "2026-05-19T09:00:00.000Z", actor: "system", note: "安排两周内血压复测" }, { action: "confirm", at: "2026-05-18T10:00:00.000Z", actor: "system", note: "异常结果已由医师确认" }] },
+      { id: "physical-exam-case-r1-2026-bp", reportId: "physical-exam-r1-2026-center", residentId: "r1", findingCodes: ["BP", "BMI"], classification: "important", level: "high", status: "followup-scheduled", confirmationStatus: "confirmed", owner: `${centralHospital.name}心内科/家庭医生`, dueAt: "2026-05-30", notificationStatus: "delivered", latestAction: "居民已收到提醒，家庭医生复测任务已安排。", actions: [{ action: "schedule", at: "2026-05-19T09:00:00.000Z", actor: "system", note: "安排两周内血压复测" }, { action: "confirm", at: "2026-05-18T10:00:00.000Z", actor: "system", note: "异常结果已由医师确认" }] },
       { id: "physical-exam-case-r2-2026-hba1c", reportId: "physical-exam-r2-2026-hospital", residentId: "r2", findingCodes: ["HBA1C"], classification: "important", level: "high", status: "specialist-review", confirmationStatus: "confirmed", owner: "内分泌科", dueAt: "2026-05-26", notificationStatus: "delivered", latestAction: "内分泌专科复诊待完成。", actions: [{ action: "assign", at: "2026-05-13T10:00:00.000Z", actor: "system", note: "分派内分泌科复诊" }, { action: "confirm", at: "2026-05-12T10:00:00.000Z", actor: "system", note: "异常结果已由医师确认" }] }
     ];
   }
 
   function seedJointTests() {
+    const examinationCenter = Regional.organization("examinationCenter");
+    const centralHospital = Regional.organization("centralHospital");
     return SOURCE_CONTRACTS.map((contract, index) => ({
       id: `physical-exam-joint-test-${contract.sourceType}`,
-      institutionId: index === 0 ? "exam-center-dalian-01" : "hospital-dl-central",
-      institutionName: index === 0 ? "大连健康体检中心" : "大连市中心医院",
+      institutionId: index === 0 ? examinationCenter.code : centralHospital.code,
+      institutionName: index === 0 ? examinationCenter.name : centralHospital.name,
       sourceType: contract.sourceType,
       contractId: contract.id,
       status: "demo-passed",

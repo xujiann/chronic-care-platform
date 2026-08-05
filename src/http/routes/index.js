@@ -11,6 +11,7 @@ const insurance_payment = require("./insurance-payment");
 const integration = require("./integration");
 const platform_governance = require("./platform-governance");
 const public_health = require("./public-health");
+const regional = require("./regional");
 const research = require("./research");
 const runtime_routes = require("./runtime");
 const shared = require("./shared");
@@ -20,6 +21,10 @@ const ROUTE_ORDER = Object.freeze([
   {
     "domain": "runtime",
     "id": "runtime-01"
+  },
+  {
+    "domain": "regional",
+    "id": "regional-01"
   },
   {
     "domain": "platform-governance",
@@ -316,6 +321,13 @@ function createPlatformApiRouter(runtimeContexts) {
     throw new TypeError(`platform router is missing runtime contexts: ${missingContexts.join(", ")}`);
   }
   const segmentsById = new Map();
+  for (const segment of regional.createRouteSegments({
+    regionalContext: runtimeContexts.regional,
+    sendJson: runtimeContexts.forDomain("runtime").sendJson
+  })) {
+    if (segmentsById.has(segment.id)) throw new TypeError(`duplicate route segment id: ${segment.id}`);
+    segmentsById.set(segment.id, segment);
+  }
   for (const segment of care_coordination.createRouteSegments(runtimeContexts.forDomain("care-coordination"))) {
     if (segmentsById.has(segment.id)) throw new TypeError(`duplicate route segment id: ${segment.id}`);
     segmentsById.set(segment.id, segment);

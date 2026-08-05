@@ -1,0 +1,27 @@
+{
+  "schemaVersion": "regional-localization-v1",
+  "terms": {
+    "platformName": "大连市卫生健康信息平台",
+    "platformShortName": "大连卫健平台",
+    "citizenPortalName": "健康大连居民服务",
+    "governmentUnifiedEntry": "辽事通/e大连统一入口",
+    "statisticsTitle": "大连市卫生健康统计提要",
+    "regionLabel": "大连市",
+    "demonstrationDistrict": "中山区"
+  },
+  "legacyReplacements": {
+    "Dalian Women and Children Medical Center": "大连市妇女儿童医疗中心",
+    "Dalian Medical University Affiliated Hospital": "大连医科大学附属医院",
+    "Dalian Medical University Hospital": "大连医科大学附属医院",
+    "Dalian Central Hospital": "大连市中心医院",
+    "Qingniwaqiao Community Health Service Center": "青泥洼桥社区卫生服务中心",
+    "Xinghaiwan Community Health Service Center": "青泥洼桥社区卫生服务中心",
+    "Ganjingzi District People's Hospital": "甘井子区人民医院",
+    "Zhongshan district demo address": "中山区示例地址",
+    "Qingniwaqiao demo home": "青泥洼桥示例家庭地址",
+    "Shahekou demo address": "沙河口区示例地址",
+    "Zhongshan": "中山区",
+    "Ganjingzi": "甘井子区",
+    "大连市卫生健康委": "大连市卫生健康委员会"
+  }
+}
