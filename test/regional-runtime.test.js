@@ -14,6 +14,8 @@ test("generic region runtime is the platform-safe default with no executable ext
   assert.equal(runtime.context.productionReady, false);
   assert.equal(runtime.extensions.length, 0);
   assert.equal(runtime.context.isFeatureEnabled("regional.integration"), false);
+  assert.equal(runtime.publicContext.organizations.centralHospital.name, "区域中心医院");
+  assert.equal("configs" in runtime.publicContext, false);
   assert.equal(Object.isFrozen(runtime.context), true);
 });
 
@@ -23,6 +25,7 @@ test("Dalian runtime activates five typed extensions without enabling production
     "adapter", "dictionary", "policy", "ui", "workflow"
   ]);
   assert.equal(runtime.resolveExtension("regional-health-exchange").productionEnabled, false);
+  assert.equal(runtime.publicContext.organizations.healthAuthority.name, "大连市卫生健康委员会");
   assert.equal(runtime.forDomain("integration").extensions.length, 1);
   assert.equal(runtime.forDomain("public-health").extensions.length, 0);
   assert.throws(() => runtime.resolveExtension("missing"), /unknown active/);

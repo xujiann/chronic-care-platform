@@ -7,6 +7,10 @@ const { FOUNDATION_CONTRACTS, validateFoundationContracts } = require("../src/ht
 const { ROUTE_SUBDOMAINS } = require("../src/http/route-subdomains");
 const { CONTEXT_DEFINITIONS, createPlatformRuntimeContexts } = require("../src/http/runtime-contexts");
 const { createPlatformApiRouter } = require("../src/http/routes");
+const { loadRegionalRuntime } = require("../src/platform/regional/regional-runtime");
+const path = require("node:path");
+
+const ROOT = path.resolve(__dirname, "..");
 
 function completeRuntimeSource() {
   const names = [...new Set(Object.values(CONTEXT_DEFINITIONS).flatMap(({ dependencies }) => dependencies))];
@@ -25,7 +29,9 @@ test("identity, payment and external integration contracts close across bounded 
 });
 
 test("runtime composition reaches the router manifest with governance, public-health and clinical subdomains", () => {
-  const router = createPlatformApiRouter(createPlatformRuntimeContexts(completeRuntimeSource()));
+  const router = createPlatformApiRouter(createPlatformRuntimeContexts(completeRuntimeSource(), {
+    regionalRuntime: loadRegionalRuntime({ root: ROOT })
+  }));
   const splitSegments = router.manifest.filter(({ subdomain }) => subdomain);
 
   assert.equal(splitSegments.length, 24);
@@ -33,7 +39,8 @@ test("runtime composition reaches the router manifest with governance, public-he
     Object.fromEntries(splitSegments.map(({ id, subdomain }) => [id, subdomain])),
     ROUTE_SUBDOMAINS
   );
-  assert.equal(router.manifest.length, 72);
+  assert.equal(router.manifest.length, 73);
+  assert.equal(router.manifest.some((item) => item.id === "regional-01" && item.domain === "regional"), true);
 });
 
 test("router entry rejects the flat global runtime source", () => {

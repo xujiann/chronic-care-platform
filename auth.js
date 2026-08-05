@@ -201,7 +201,7 @@
 
   function sanitizeUser(user) {
     const { password, ...safeUser } = user;
-    return safeUser;
+    return window.HealthRegionalContext?.localize(safeUser) || safeUser;
   }
 
   function normalizeAccountType(user = {}) {
@@ -318,7 +318,8 @@
   function getUser() {
     try {
       const saved = localStorage.getItem(SESSION_KEY);
-      return saved ? JSON.parse(saved) : null;
+      const user = saved ? JSON.parse(saved) : null;
+      return user && window.HealthRegionalContext ? window.HealthRegionalContext.localize(user) : user;
     } catch (error) {
       return null;
     }
@@ -476,7 +477,7 @@
   }
 
   function displayAuthText(value) {
-    const text = String(value || "");
+    const text = window.HealthRegionalContext?.localizeText(value) || String(value || "");
     const labels = {
       "Internet nursing demo nurse": "互联网护理演示护士",
       "Nurse workstation": "护士工作站",

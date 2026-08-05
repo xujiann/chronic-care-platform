@@ -9,6 +9,7 @@ const {
   normalizeSourceStatus,
   validateMetricCatalog
 } = require("./quality-operations-governance");
+const { getActiveRegionalValues } = require("./src/platform/regional/active-region");
 
 const SOURCE_DEFINITIONS = Object.freeze([
   Object.freeze({
@@ -63,13 +64,6 @@ const SOURCE_DEFINITIONS = Object.freeze([
 
 const SOURCE_BY_COLLECTION = new Map(SOURCE_DEFINITIONS.map((item) => [item.collection, item]));
 const SOURCE_BY_DOMAIN = new Map(SOURCE_DEFINITIONS.map((item) => [item.domain, item]));
-const INSTITUTION_ALIASES = Object.freeze({
-  "dalian central hospital": "MR1",
-  "dalian women and children medical center": "MR2",
-  "qingniwaqiao community health service center": "MR3",
-  "xinghaiwan community health service center": "MR3"
-});
-
 function clone(value) {
   return value === undefined ? undefined : JSON.parse(JSON.stringify(value));
 }
@@ -84,6 +78,7 @@ function normalizedName(value) {
 
 function organizationDirectory(data = {}) {
   const directory = new Map();
+  const regionalValues = getActiveRegionalValues();
   for (const organization of data.authOrganizations || []) {
     const orgCode = cleanText(organization.orgCode, 120);
     const name = normalizedName(organization.name);
@@ -94,7 +89,14 @@ function organizationDirectory(data = {}) {
     const name = normalizedName(user.orgName);
     if (orgCode && name) directory.set(name, orgCode);
   }
-  Object.entries(INSTITUTION_ALIASES).forEach(([name, orgCode]) => directory.set(name, orgCode));
+  Object.values(regionalValues.publicContext.organizations).forEach((organization) => {
+    directory.set(normalizedName(organization.name), organization.code);
+    directory.set(normalizedName(organization.shortName), organization.code);
+  });
+  Object.entries(regionalValues.publicContext.localization.legacyReplacements).forEach(([legacyName, localizedName]) => {
+    const orgCode = directory.get(normalizedName(localizedName));
+    if (orgCode) directory.set(normalizedName(legacyName), orgCode);
+  });
   return directory;
 }
 

@@ -1604,23 +1604,36 @@ function defaultRegulatorySubmission() {
 }
 
 function defaultNursingInstitutions() {
+  const regional = window.HealthRegionalContext;
+  const centralHospital = regional.organization("centralHospital");
+  const communityHealthCenter = regional.organization("communityHealthCenter");
+  const primaryDistrict = regional.area("primaryDistrict").name;
+  const secondaryDistrict = regional.area("secondaryDistrict").name;
+  const tertiaryDistrict = regional.area("tertiaryDistrict").name;
   return [
-    { id: "inh-mr1", institutionCode: "MR1", name: "大连市中心医院", district: "中山区", published: true, serviceArea: ["Zhongshan", "Xigang", "Shahekou"], serviceItems: ["wound care", "wound and ostomy care", "intravenous catheter maintenance", "peritoneal dialysis care", "PICC maintenance", "blood glucose measurement"], dailyCapacity: 18, admissionReview: { status: "approved" }, catalogChangeRequests: [] },
-    { id: "inh-mr3", institutionCode: "MR3", name: "青泥洼桥社区卫生服务中心", district: "中山区", published: true, serviceArea: ["Qingniwaqiao", "Renmin Road"], serviceItems: ["vital signs measurement", "tube care"], dailyCapacity: 10, admissionReview: { status: "approved" }, catalogChangeRequests: [] }
+    { id: "inh-mr1", institutionCode: centralHospital.code, name: centralHospital.name, district: primaryDistrict, published: true, serviceArea: [primaryDistrict, secondaryDistrict, tertiaryDistrict], serviceItems: ["wound care", "wound and ostomy care", "intravenous catheter maintenance", "peritoneal dialysis care", "PICC maintenance", "blood glucose measurement"], dailyCapacity: 18, admissionReview: { status: "approved" }, catalogChangeRequests: [] },
+    { id: "inh-mr3", institutionCode: communityHealthCenter.code, name: communityHealthCenter.name, district: primaryDistrict, published: true, serviceArea: [primaryDistrict], serviceItems: ["vital signs measurement", "tube care"], dailyCapacity: 10, admissionReview: { status: "approved" }, catalogChangeRequests: [] }
   ];
 }
 
 function defaultNursingNurses() {
+  const regional = window.HealthRegionalContext;
+  const centralHospital = regional.organization("centralHospital");
+  const communityHealthCenter = regional.organization("communityHealthCenter");
   return [
-    { id: "inn-001", name: "孙护士", institutionId: "inh-mr1", institutionCode: "MR1", title: "主管护师", yearsClinical: 9, registrationStatus: "verified", badPracticeRecord: "none", trainingStatus: "passed", insuranceStatus: "covered", specialties: ["wound care", "wound and ostomy care", "intravenous catheter maintenance", "peritoneal dialysis care", "PICC maintenance", "blood glucose measurement"], dailyCapacity: 6, assignedToday: 2, qualificationExpiresAt: "2026-12-31", status: "available" },
-    { id: "inn-002", name: "赵护士", institutionId: "inh-mr3", institutionCode: "MR3", title: "专科护士", yearsClinical: 6, registrationStatus: "verified", badPracticeRecord: "none", trainingStatus: "passed", insuranceStatus: "covered", specialties: ["vital signs measurement", "tube care"], dailyCapacity: 5, assignedToday: 1, qualificationExpiresAt: "2026-09-30", status: "available" }
+    { id: "inn-001", name: "孙护士", institutionId: "inh-mr1", institutionCode: centralHospital.code, title: "主管护师", yearsClinical: 9, registrationStatus: "verified", badPracticeRecord: "none", trainingStatus: "passed", insuranceStatus: "covered", specialties: ["wound care", "wound and ostomy care", "intravenous catheter maintenance", "peritoneal dialysis care", "PICC maintenance", "blood glucose measurement"], dailyCapacity: 6, assignedToday: 2, qualificationExpiresAt: "2026-12-31", status: "available" },
+    { id: "inn-002", name: "赵护士", institutionId: "inh-mr3", institutionCode: communityHealthCenter.code, title: "专科护士", yearsClinical: 6, registrationStatus: "verified", badPracticeRecord: "none", trainingStatus: "passed", insuranceStatus: "covered", specialties: ["vital signs measurement", "tube care"], dailyCapacity: 5, assignedToday: 1, qualificationExpiresAt: "2026-09-30", status: "available" }
   ];
 }
 
 function defaultNursingOrders() {
+  const regional = window.HealthRegionalContext;
+  const centralHospital = regional.organization("centralHospital");
+  const communityHealthCenter = regional.organization("communityHealthCenter");
+  const primaryDistrict = regional.area("primaryDistrict").name;
   return [
-    { id: "ino-001", residentId: "r1", residentName: "演示居民A", institutionId: "inh-mr1", institutionCode: "MR1", institutionName: "大连市中心医院", nurseId: "inn-001", nurseName: "孙护士", serviceItem: "wound care", serviceObject: "mobility-limited chronic disease patient", preferredAt: new Date(Date.now() + 86400000).toISOString().slice(0, 10), address: "中山区示例地址", firstVisitAssessment: "passed", informedConsent: "signed", riskLevel: "medium", status: "dispatched", locationTrace: "pending", serviceRecordStatus: "pending", serviceRecord: { status: "pending", attachments: [], attachmentCount: 0 }, serviceAttachments: [], notificationReceiptSummary: { status: "pending", sent: 0, queued: 0, read: 0, failed: 0 }, qualityCallback: "pending", feeEstimate: 168, settlement: { mode: "medical insurance pre-check", estimatedSelfPay: 58, insuranceEstimate: 110, paymentStatus: "pending" }, satisfaction: { score: 0, status: "pending" }, complaintStatus: "none", qualityInspection: { status: "pending" }, adverseEvent: { status: "none" } },
-    { id: "ino-002", residentId: "r2", residentName: "演示居民B", institutionId: "inh-mr3", institutionCode: "MR3", institutionName: "青泥洼桥社区卫生服务中心", nurseId: "inn-002", nurseName: "赵护士", serviceItem: "blood glucose measurement", serviceObject: "elderly or disabled people", preferredAt: new Date().toISOString().slice(0, 10), address: "青泥洼桥示例家庭地址", firstVisitAssessment: "passed", informedConsent: "signed", riskLevel: "low", status: "accepted", locationTrace: "tracking", serviceRecordStatus: "in-progress", serviceRecord: { id: "record-ino-002", status: "in-progress", nurseId: "inn-002", nurseName: "赵护士", serviceItem: "blood glucose measurement", vitalSigns: { bloodGlucose: "6.8 mmol/L" }, careActions: ["核对身份", "测量血糖", "记录用药与饮食建议"], attachments: [{ id: "attach-ino-002-1", type: "nursing-record-photo", name: "blood-glucose-meter-photo.jpg", source: "nurse-mobile", status: "stored" }], attachmentCount: 1, exceptionReport: { status: "none" } }, serviceAttachments: [{ id: "attach-ino-002-1", type: "nursing-record-photo", name: "blood-glucose-meter-photo.jpg", source: "nurse-mobile", status: "stored" }], notificationReceiptSummary: { status: "tracked", sent: 2, queued: 1, read: 1, failed: 0 }, qualityCallback: "pending", feeEstimate: 86, settlement: { mode: "medical insurance pre-check", estimatedSelfPay: 36, insuranceEstimate: 50, paymentStatus: "prechecked" }, satisfaction: { score: 0, status: "pending" }, complaintStatus: "none", qualityInspection: { status: "sampled" }, adverseEvent: { status: "none" } }
+    { id: "ino-001", residentId: "r1", residentName: "演示居民A", institutionId: "inh-mr1", institutionCode: centralHospital.code, institutionName: centralHospital.name, nurseId: "inn-001", nurseName: "孙护士", serviceItem: "wound care", serviceObject: "mobility-limited chronic disease patient", preferredAt: new Date(Date.now() + 86400000).toISOString().slice(0, 10), address: `${primaryDistrict}示例地址`, firstVisitAssessment: "passed", informedConsent: "signed", riskLevel: "medium", status: "dispatched", locationTrace: "pending", serviceRecordStatus: "pending", serviceRecord: { status: "pending", attachments: [], attachmentCount: 0 }, serviceAttachments: [], notificationReceiptSummary: { status: "pending", sent: 0, queued: 0, read: 0, failed: 0 }, qualityCallback: "pending", feeEstimate: 168, settlement: { mode: "medical insurance pre-check", estimatedSelfPay: 58, insuranceEstimate: 110, paymentStatus: "pending" }, satisfaction: { score: 0, status: "pending" }, complaintStatus: "none", qualityInspection: { status: "pending" }, adverseEvent: { status: "none" } },
+    { id: "ino-002", residentId: "r2", residentName: "演示居民B", institutionId: "inh-mr3", institutionCode: communityHealthCenter.code, institutionName: communityHealthCenter.name, nurseId: "inn-002", nurseName: "赵护士", serviceItem: "blood glucose measurement", serviceObject: "elderly or disabled people", preferredAt: new Date().toISOString().slice(0, 10), address: `${primaryDistrict}示例家庭地址`, firstVisitAssessment: "passed", informedConsent: "signed", riskLevel: "low", status: "accepted", locationTrace: "tracking", serviceRecordStatus: "in-progress", serviceRecord: { id: "record-ino-002", status: "in-progress", nurseId: "inn-002", nurseName: "赵护士", serviceItem: "blood glucose measurement", vitalSigns: { bloodGlucose: "6.8 mmol/L" }, careActions: ["核对身份", "测量血糖", "记录用药与饮食建议"], attachments: [{ id: "attach-ino-002-1", type: "nursing-record-photo", name: "blood-glucose-meter-photo.jpg", source: "nurse-mobile", status: "stored" }], attachmentCount: 1, exceptionReport: { status: "none" } }, serviceAttachments: [{ id: "attach-ino-002-1", type: "nursing-record-photo", name: "blood-glucose-meter-photo.jpg", source: "nurse-mobile", status: "stored" }], notificationReceiptSummary: { status: "tracked", sent: 2, queued: 1, read: 1, failed: 0 }, qualityCallback: "pending", feeEstimate: 86, settlement: { mode: "medical insurance pre-check", estimatedSelfPay: 36, insuranceEstimate: 50, paymentStatus: "prechecked" }, satisfaction: { score: 0, status: "pending" }, complaintStatus: "none", qualityInspection: { status: "sampled" }, adverseEvent: { status: "none" } }
   ];
 }
 
@@ -1640,23 +1653,17 @@ function statusBadge(status) {
 
 function displayText(value) {
   const text = String(value ?? "");
+  const regionalText = window.HealthRegionalContext?.localizeText(text) || text;
+  if (regionalText !== text) return regionalText;
   const labels = {
     "Liaoning Internet+ Nursing pilot implementation plan": "辽宁省互联网+护理服务试点实施方案",
     "pilot policy": "试点政策",
-    "Dalian Central Hospital": "大连市中心医院",
-    "Qingniwaqiao Community Health Service Center": "青泥洼桥社区卫生服务中心",
-    "Ganjingzi District People's Hospital": "甘井子区人民医院",
-    "Zhongshan": "中山区",
-    "Ganjingzi": "甘井子区",
     "Nurse Sun": "孙护士",
     "Nurse Zhao": "赵护士",
     "Nurse Liu": "刘护士",
     "Demo resident A": "演示居民A",
     "Demo resident B": "演示居民B",
     "Demo resident C": "演示居民C",
-    "Zhongshan district demo address": "中山区示例地址",
-    "Qingniwaqiao demo home": "青泥洼桥示例家庭地址",
-    "Shahekou demo address": "沙河口区示例地址",
     "daily living ability assessment": "日常生活能力评估",
     "vital signs measurement": "生命体征测量",
     "blood glucose measurement": "血糖测量",

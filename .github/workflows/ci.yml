@@ -22,7 +22,7 @@ jobs:
       matrix:
         include:
           - target: core
-            command: npm run regional:test
+            command: npm run regional:check && npm run regional:test
           - target: template
             command: npm run regional:status -- --region=template
           - target: dalian-210200

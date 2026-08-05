@@ -1,4 +1,5 @@
 const { randomUUID } = require("node:crypto");
+const { regionalOrganization } = require("./src/platform/regional/active-region");
 
 const capabilities = [
   ["digital-twin", "一袋血全生命周期数字孪生", "BOTH"],
@@ -38,6 +39,8 @@ function visible(user, side) {
 }
 
 function inventoryNodes(data) {
+  const bloodCenter = regionalOrganization("bloodCenter");
+  const centralHospital = regionalOrganization("centralHospital");
   const units = Array.isArray(data.bloodUnits) ? data.bloodUnits : [];
   const shipments = Array.isArray(data.bloodShipments) ? data.bloodShipments : [];
   const codes = new Set(["BLOOD-DL", "MR1", ...units.map((x) => x.hospitalCode || x.institutionCode), ...shipments.map((x) => x.destinationInstitution)].filter(Boolean));
@@ -45,7 +48,9 @@ function inventoryNodes(data) {
     const rows = units.filter((x) => (x.hospitalCode || x.institutionCode) === code && !["discarded", "transfused", "recalled"].includes(x.status));
     return {
       institutionCode: code,
-      institutionName: code === "BLOOD-DL" ? "大连市血液中心" : code === "MR1" ? "大连市中心医院" : code,
+      institutionName: code === "BLOOD-DL" || code === bloodCenter.code
+        ? bloodCenter.name
+        : code === "MR1" || code === centralHospital.code ? centralHospital.name : code,
       role: code === "BLOOD-DL" ? "blood_center" : "medical_institution",
       available: rows.length,
       inTransit: shipments.filter((x) => x.destinationInstitution === code && !["received", "cancelled"].includes(x.status)).length,

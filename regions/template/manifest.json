@@ -25,6 +25,8 @@
   },
   "configRefs": [
     "config/feature-flags.json",
+    "config/geography.json",
+    "config/localization.json",
     "config/organization.json"
   ],
   "extensions": []

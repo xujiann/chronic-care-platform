@@ -1,4 +1,5 @@
 const { createHash, randomUUID } = require("node:crypto");
+const { getActiveRegionalRuntime, regionalOrganization } = require("./src/platform/regional/active-region");
 
 const STATE_FLOW = [
   "accepted", "dispatched", "departed", "arrived-scene", "patient-contact",
@@ -19,24 +20,29 @@ function now() {
 
 function seed() {
   const createdAt = "2026-07-15T07:20:00.000Z";
+  const centralHospital = regionalOrganization("centralHospital");
+  const friendshipHospital = regionalOrganization("friendshipHospital");
+  const regionalRuntime = getActiveRegionalRuntime();
+  const regionName = regionalRuntime.values.term("regionLabel");
+  const demonstrationDistrict = regionalRuntime.values.term("demonstrationDistrict");
   return {
     emergencyResources: [
-      { id: "amb-120-01", callSign: "急救01", station: "中山急救站", status: "transporting", crew: ["急救医师 张医生", "护士 李护士", "驾驶员 王师傅"], latitude: 38.918, longitude: 121.642, deviceStatus: "online" },
-      { id: "amb-120-02", callSign: "急救02", station: "西岗急救站", status: "available", crew: ["急救医师 赵医生", "护士 周护士", "驾驶员 刘师傅"], latitude: 38.914, longitude: 121.601, deviceStatus: "online" }
+      { id: "amb-120-01", callSign: "急救01", station: `${demonstrationDistrict}急救站`, status: "transporting", crew: ["急救医师 张医生", "护士 李护士", "驾驶员 王师傅"], latitude: 38.918, longitude: 121.642, deviceStatus: "online" },
+      { id: "amb-120-02", callSign: "急救02", station: "区域第二急救站", status: "available", crew: ["急救医师 赵医生", "护士 周护士", "驾驶员 刘师傅"], latitude: 38.914, longitude: 121.601, deviceStatus: "online" }
     ],
     emergencyHospitals: [
-      { id: "hosp-central", name: "大连市中心医院", orgCode: "MR1", emergencyStatus: "available", traumaCenter: true, strokeCenter: true, chestPainCenter: true, etaMinutes: 8 },
-      { id: "hosp-friendship", name: "大连市友谊医院", orgCode: "MR2", emergencyStatus: "available", traumaCenter: true, strokeCenter: false, chestPainCenter: true, etaMinutes: 12 }
+      { id: "hosp-central", name: centralHospital.name, orgCode: centralHospital.code, emergencyStatus: "available", traumaCenter: true, strokeCenter: true, chestPainCenter: true, etaMinutes: 8 },
+      { id: "hosp-friendship", name: friendshipHospital.name, orgCode: friendshipHospital.code, emergencyStatus: "available", traumaCenter: true, strokeCenter: false, chestPainCenter: true, etaMinutes: 12 }
     ],
     emergencyAedSites: [
-      { id:"aed-zs-001", name:"People's Square AED", address:"Dalian Zhongshan District People's Road demonstration point", latitude:38.9202, longitude:121.6496, status:"available", access:"24x7", custodian:"Emergency public facility" },
-      { id:"aed-zs-002", name:"Metro interchange AED", address:"Dalian Zhongshan District metro interchange", latitude:38.9186, longitude:121.6468, status:"available", access:"station operating hours", custodian:"Metro operations" },
-      { id:"aed-zs-003", name:"Hospital entrance AED", address:"Dalian Central Hospital emergency entrance", latitude:38.9169, longitude:121.6424, status:"maintenance", access:"emergency entrance", custodian:"Hospital security" },
-      { id:"aed-zs-004", name:"Waterfront mall AED", address:"Dalian Zhongshan District waterfront mall service desk", latitude:38.9228, longitude:121.6531, status:"available", access:"mall operating hours", custodian:"Mall service desk" }
+      { id:"aed-zs-001", name:"People's Square AED", address:`${regionName}${demonstrationDistrict}人民路示范点`, latitude:38.9202, longitude:121.6496, status:"available", access:"24x7", custodian:"Emergency public facility" },
+      { id:"aed-zs-002", name:"Metro interchange AED", address:`${regionName}${demonstrationDistrict}地铁换乘站`, latitude:38.9186, longitude:121.6468, status:"available", access:"station operating hours", custodian:"Metro operations" },
+      { id:"aed-zs-003", name:"Hospital entrance AED", address:`${centralHospital.name} emergency entrance`, latitude:38.9169, longitude:121.6424, status:"maintenance", access:"emergency entrance", custodian:"Hospital security" },
+      { id:"aed-zs-004", name:"Waterfront mall AED", address:`${regionName}${demonstrationDistrict}滨水商场服务台`, latitude:38.9228, longitude:121.6531, status:"available", access:"mall operating hours", custodian:"Mall service desk" }
     ],
     emergencyEvents: [{
       id: "emg-demo-001", eventNo: "120-20260715-0001", source: "120-phone", callerName: "居民家属", callerPhoneMasked: "138****8000",
-      location: { address: "大连市中山区人民路示范点", latitude: 38.92, longitude: 121.65, confidence: 0.96 },
+      location: { address: `${regionName}${demonstrationDistrict}人民路示范点`, latitude: 38.92, longitude: 121.65, confidence: 0.96 },
       chiefComplaint: "突发胸痛伴大汗约20分钟", triageLevel: "P1", patientCount: 1, status: "hospital-confirmed", createdAt, updatedAt: createdAt,
       mission: { id: "mission-demo-001", ambulanceId: "amb-120-01", dispatchedAt: "2026-07-15T07:22:00.000Z", departedAt: "2026-07-15T07:23:00.000Z", arrivedSceneAt: "2026-07-15T07:30:00.000Z", patientContactAt: "2026-07-15T07:31:00.000Z", transportStartedAt: "2026-07-15T07:42:00.000Z", hospitalConfirmedAt: "2026-07-15T07:45:00.000Z", hospitalId: "hosp-central", etaMinutes: 8 },
       patient: { temporaryId: "tmp-120-0001", residentId: "", name: "待核实患者", gender: "男", age: 58, identityStatus: "temporary" },
@@ -49,7 +55,7 @@ function seed() {
         { status: "arrived-scene", at: "2026-07-15T07:30:00.000Z", actor: "急救01", note: "到达现场" },
         { status: "patient-contact", at: "2026-07-15T07:31:00.000Z", actor: "张医生", note: "接触患者" },
         { status: "transporting", at: "2026-07-15T07:42:00.000Z", actor: "急救01", note: "开始转运" },
-        { status: "hospital-confirmed", at: "2026-07-15T07:45:00.000Z", actor: "大连市中心医院", note: "接收并启动胸痛绿色通道" }
+        { status: "hospital-confirmed", at: "2026-07-15T07:45:00.000Z", actor: centralHospital.name, note: "接收并启动胸痛绿色通道" }
       ]
     }],
     emergencyAuditEvents: []

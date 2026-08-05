@@ -3,6 +3,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const { createRegionalExtensionRegistry } = require("./extension-registry");
+const { createRegionalValues } = require("./regional-values");
 const {
   deepFreeze,
   loadRegionManifest,
@@ -68,11 +69,14 @@ function loadRegionalRuntime(options = {}) {
       return byDomain[domain] || Object.freeze([]);
     }
   });
+  const values = createRegionalValues(context);
   return Object.freeze({
     kind: "regional-runtime",
     manifest: loadedManifest.manifest,
     registration: loadedManifest.registration,
     context,
+    publicContext: values.publicContext,
+    values,
     extensions,
     forDomain(domain) {
       return deepFreeze({

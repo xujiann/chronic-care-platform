@@ -1,3 +1,5 @@
+const { getActiveRegionalRuntime, regionalOrganization } = require("./src/platform/regional/active-region");
+
 const HIGHLIGHT_CAPABILITIES = [
   {
     id: "trigger-engine",
@@ -112,6 +114,15 @@ function seedPublicHealthTriggerRules() {
 }
 
 function seedPublicHealthSignals() {
+  const regionalValues = getActiveRegionalRuntime().values;
+  const centralHospital = regionalOrganization("centralHospital");
+  const communityHealthCenter = regionalOrganization("communityHealthCenter");
+  const districtHospital = regionalOrganization("districtHospital");
+  const primaryDistrict = regionalValues.area("primaryDistrict").name;
+  const secondaryDistrict = regionalValues.area("secondaryDistrict").name;
+  const tertiaryDistrict = regionalValues.area("tertiaryDistrict").name;
+  const laboratoryDistrict = regionalValues.area("laboratoryDistrict").name;
+  const peripheralDistrict = regionalValues.area("peripheralDistrict").name;
   return [
     {
       id: "phsig-fever-001",
@@ -122,8 +133,8 @@ function seedPublicHealthSignals() {
       value: 8,
       baseline: 3,
       unit: "例/24小时",
-      region: "中山区",
-      institution: "大连市中心医院",
+      region: primaryDistrict,
+      institution: centralHospital.name,
       observedAt: "2026-07-17T07:40:00+08:00",
       location: { x: 48, y: 32 },
       qualityStatus: "verified",
@@ -139,8 +150,8 @@ function seedPublicHealthSignals() {
       value: 6,
       baseline: 2,
       unit: "例/24小时",
-      region: "中山区",
-      institution: "青泥洼桥社区卫生服务中心",
+      region: primaryDistrict,
+      institution: communityHealthCenter.name,
       observedAt: "2026-07-17T08:05:00+08:00",
       location: { x: 54, y: 38 },
       qualityStatus: "verified",
@@ -156,8 +167,8 @@ function seedPublicHealthSignals() {
       value: 4,
       baseline: 1,
       unit: "例/48小时",
-      region: "甘井子区",
-      institution: "甘井子区人民医院",
+      region: laboratoryDistrict,
+      institution: districtHospital.name,
       observedAt: "2026-07-17T06:55:00+08:00",
       location: { x: 65, y: 53 },
       qualityStatus: "verified",
@@ -173,7 +184,7 @@ function seedPublicHealthSignals() {
       value: 162,
       baseline: 100,
       unit: "指数",
-      region: "西岗区",
+      region: secondaryDistrict,
       institution: "区域药店哨点集群",
       observedAt: "2026-07-17T08:10:00+08:00",
       location: { x: 37, y: 44 },
@@ -190,8 +201,8 @@ function seedPublicHealthSignals() {
       value: 7,
       baseline: 1,
       unit: "人/24小时",
-      region: "沙河口区",
-      institution: "沙河口区实验小学",
+      region: tertiaryDistrict,
+      institution: `${tertiaryDistrict}实验小学`,
       observedAt: "2026-07-17T07:15:00+08:00",
       location: { x: 45, y: 58 },
       qualityStatus: "verified",
@@ -207,7 +218,7 @@ function seedPublicHealthSignals() {
       value: 2,
       baseline: 0,
       unit: "条/72小时",
-      region: "旅顺口区",
+      region: peripheralDistrict,
       institution: "居民线索核验队列",
       observedAt: "2026-07-16T19:30:00+08:00",
       location: { x: 22, y: 72 },
@@ -219,14 +230,19 @@ function seedPublicHealthSignals() {
 }
 
 function seedPublicHealthAlerts() {
+  const regionalValues = getActiveRegionalRuntime().values;
+  const primaryDistrict = regionalValues.area("primaryDistrict").name;
+  const secondaryDistrict = regionalValues.area("secondaryDistrict").name;
+  const tertiaryDistrict = regionalValues.area("tertiaryDistrict").name;
+  const laboratoryDistrict = regionalValues.area("laboratoryDistrict").name;
   return [
     {
       id: "phalert-fever-zhongshan",
       ruleId: "phhr-rule-fever-cluster",
-      title: "中山区呼吸道症候群聚集预警",
+      title: `${primaryDistrict}呼吸道症候群聚集预警`,
       severity: "high",
       status: "open",
-      region: "中山区",
+      region: primaryDistrict,
       sourceTypes: ["临床症候群"],
       signalIds: ["phsig-fever-001", "phsig-fever-002"],
       triggerCount: 14,
@@ -240,10 +256,10 @@ function seedPublicHealthAlerts() {
     {
       id: "phalert-lab-ganjingzi",
       ruleId: "phhr-rule-lab-positive",
-      title: "甘井子区实验室阳性结果聚集预警",
+      title: `${laboratoryDistrict}实验室阳性结果聚集预警`,
       severity: "critical",
       status: "acknowledged",
-      region: "甘井子区",
+      region: laboratoryDistrict,
       sourceTypes: ["实验室"],
       signalIds: ["phsig-lab-001"],
       triggerCount: 4,
@@ -257,10 +273,10 @@ function seedPublicHealthAlerts() {
     {
       id: "phalert-pharmacy-xigang",
       ruleId: "phhr-rule-pharmacy-surge",
-      title: "西岗区对症药品销售异常增长",
+      title: `${secondaryDistrict}对症药品销售异常增长`,
       severity: "medium",
       status: "investigating",
-      region: "西岗区",
+      region: secondaryDistrict,
       sourceTypes: ["药店"],
       signalIds: ["phsig-pharmacy-001"],
       triggerCount: 162,
@@ -274,10 +290,10 @@ function seedPublicHealthAlerts() {
     {
       id: "phalert-school-shahekou",
       ruleId: "phhr-rule-school-cluster",
-      title: "沙河口区学校聚集性症状预警",
+      title: `${tertiaryDistrict}学校聚集性症状预警`,
       severity: "high",
       status: "dispatched",
-      region: "沙河口区",
+      region: tertiaryDistrict,
       sourceTypes: ["学校/养老"],
       signalIds: ["phsig-school-001"],
       triggerCount: 7,
@@ -292,17 +308,24 @@ function seedPublicHealthAlerts() {
 }
 
 function seedPublicHealthCommandTasks() {
+  const regionalValues = getActiveRegionalRuntime().values;
+  const centralHospital = regionalOrganization("centralHospital");
+  const communityHealthCenter = regionalOrganization("communityHealthCenter");
+  const primaryDistrict = regionalValues.area("primaryDistrict").name;
+  const secondaryDistrict = regionalValues.area("secondaryDistrict").name;
+  const tertiaryDistrict = regionalValues.area("tertiaryDistrict").name;
+  const laboratoryDistrict = regionalValues.area("laboratoryDistrict").name;
   return [
     {
       id: "phcmd-task-fever-investigation",
       alertId: "phalert-fever-zhongshan",
-      title: "中山区呼吸道聚集事件核实与流调",
+      title: `${primaryDistrict}呼吸道聚集事件核实与流调`,
       stage: "investigation",
       status: "pending-acceptance",
       priority: "high",
-      owner: "中山市疾控流调一组",
-      institution: "大连市中心医院/青泥洼桥社区卫生服务中心",
-      region: "中山区",
+      owner: `${primaryDistrict}疾控流调一组`,
+      institution: `${centralHospital.name}/${communityHealthCenter.name}`,
+      region: primaryDistrict,
       dueAt: "2026-07-18T08:12:00+08:00",
       requiredActions: ["病例清单核对", "采样复核", "密接线索登记"],
       resourceIds: ["phres-team-cdc-1", "phres-lab-rapid"],
@@ -312,13 +335,13 @@ function seedPublicHealthCommandTasks() {
     {
       id: "phcmd-task-lab-review",
       alertId: "phalert-lab-ganjingzi",
-      title: "甘井子区阳性样本实验室质量复核",
+      title: `${laboratoryDistrict}阳性样本实验室质量复核`,
       stage: "laboratory-review",
       status: "in-progress",
       priority: "critical",
       owner: "市疾控实验室质量组",
-      institution: "甘井子区人民医院",
-      region: "甘井子区",
+      institution: regionalOrganization("districtHospital").name,
+      region: laboratoryDistrict,
       dueAt: "2026-07-17T19:10:00+08:00",
       requiredActions: ["样本链核对", "复检", "关联病例核查"],
       resourceIds: ["phres-lab-rapid", "phres-ppe-stock"],
@@ -328,13 +351,13 @@ function seedPublicHealthCommandTasks() {
     {
       id: "phcmd-task-pharmacy-correlation",
       alertId: "phalert-pharmacy-xigang",
-      title: "西岗区药店异常销售交叉分析",
+      title: `${secondaryDistrict}药店异常销售交叉分析`,
       stage: "correlation",
       status: "pending-acceptance",
       priority: "medium",
       owner: "市疾控监测分析组",
-      institution: "西岗区市场监测哨点",
-      region: "西岗区",
+      institution: `${secondaryDistrict}市场监测哨点`,
+      region: secondaryDistrict,
       dueAt: "2026-07-18T08:14:00+08:00",
       requiredActions: ["销售数据质量复核", "医院症候群比对", "形成研判意见"],
       resourceIds: ["phres-analysis-1"],
@@ -344,13 +367,13 @@ function seedPublicHealthCommandTasks() {
     {
       id: "phcmd-task-school-health",
       alertId: "phalert-school-shahekou",
-      title: "沙河口区学校健康提示和重点人员随访",
+      title: `${tertiaryDistrict}学校健康提示和重点人员随访`,
       stage: "institution-response",
       status: "in-progress",
       priority: "high",
-      owner: "沙河口区卫健局联络员",
-      institution: "沙河口区实验小学",
-      region: "沙河口区",
+      owner: `${tertiaryDistrict}卫健局联络员`,
+      institution: `${tertiaryDistrict}实验小学`,
+      region: tertiaryDistrict,
       dueAt: "2026-07-17T18:00:00+08:00",
       requiredActions: ["机构核实", "家长健康提示", "重点人员随访回执"],
       resourceIds: ["phres-team-primary-2", "phres-ppe-stock"],
@@ -361,21 +384,28 @@ function seedPublicHealthCommandTasks() {
 }
 
 function seedPublicHealthResources() {
+  const regionalValues = getActiveRegionalRuntime().values;
+  const primaryDistrict = regionalValues.area("primaryDistrict").name;
+  const tertiaryDistrict = regionalValues.area("tertiaryDistrict").name;
+  const laboratoryDistrict = regionalValues.area("laboratoryDistrict").name;
   return [
-    { id: "phres-team-cdc-1", type: "流调队伍", name: "市疾控流调一组", region: "中山区", capacity: 8, available: 5, unit: "人", status: "available", lastUpdatedAt: "2026-07-17T08:00:00+08:00" },
-    { id: "phres-team-primary-2", type: "基层协同队伍", name: "沙河口区基层公卫队", region: "沙河口区", capacity: 6, available: 4, unit: "人", status: "available", lastUpdatedAt: "2026-07-17T07:50:00+08:00" },
-    { id: "phres-lab-rapid", type: "实验室能力", name: "区域快速复检能力", region: "甘井子区", capacity: 30, available: 18, unit: "样本/日", status: "available", lastUpdatedAt: "2026-07-17T07:35:00+08:00" },
+    { id: "phres-team-cdc-1", type: "流调队伍", name: "市疾控流调一组", region: primaryDistrict, capacity: 8, available: 5, unit: "人", status: "available", lastUpdatedAt: "2026-07-17T08:00:00+08:00" },
+    { id: "phres-team-primary-2", type: "基层协同队伍", name: `${tertiaryDistrict}基层公卫队`, region: tertiaryDistrict, capacity: 6, available: 4, unit: "人", status: "available", lastUpdatedAt: "2026-07-17T07:50:00+08:00" },
+    { id: "phres-lab-rapid", type: "实验室能力", name: "区域快速复检能力", region: laboratoryDistrict, capacity: 30, available: 18, unit: "样本/日", status: "available", lastUpdatedAt: "2026-07-17T07:35:00+08:00" },
     { id: "phres-ppe-stock", type: "防护物资", name: "应急防护物资储备", region: "市级储备库", capacity: 1000, available: 760, unit: "套", status: "available", lastUpdatedAt: "2026-07-17T06:30:00+08:00" },
     { id: "phres-analysis-1", type: "分析席位", name: "监测分析席位", region: "市疾控中心", capacity: 10, available: 7, unit: "席", status: "available", lastUpdatedAt: "2026-07-17T08:05:00+08:00" }
   ];
 }
 
 function seedPublicHealthAiReviews() {
+  const regionalValues = getActiveRegionalRuntime().values;
+  const primaryDistrict = regionalValues.area("primaryDistrict").name;
+  const laboratoryDistrict = regionalValues.area("laboratoryDistrict").name;
   return [
     {
       id: "phai-review-fever-zhongshan",
       alertId: "phalert-fever-zhongshan",
-      title: "建议优先核查中山区医疗机构间的共同暴露线索",
+      title: `建议优先核查${primaryDistrict}医疗机构间的共同暴露线索`,
       status: "pending-review",
       confidence: 0.88,
       modelVersion: "ph-risk-assist-demo-1.0",
@@ -390,7 +420,7 @@ function seedPublicHealthAiReviews() {
     {
       id: "phai-review-lab-ganjingzi",
       alertId: "phalert-lab-ganjingzi",
-      title: "建议对甘井子区阳性样本执行复检和样本链核验",
+      title: `建议对${laboratoryDistrict}阳性样本执行复检和样本链核验`,
       status: "approved",
       confidence: 0.94,
       modelVersion: "ph-risk-assist-demo-1.0",
@@ -472,7 +502,7 @@ function buildMapBoard(signals, alerts, tasks, resources) {
   }));
   const regionNames = [...new Set(nodes.map((item) => item.region).filter(Boolean))];
   return {
-    projection: "schematic-dalian-regional-grid",
+    projection: `schematic-${getActiveRegionalRuntime().context.regionCode}-regional-grid`,
     legend: ["signal", "alert", "resource", "task"],
     regions: regionNames.map((region, index) => ({ id: `region-${index + 1}`, name: region, signalCount: nodes.filter((item) => item.region === region && item.type === "signal").length, alertCount: nodes.filter((item) => item.region === region && item.type === "alert").length })),
     nodes,

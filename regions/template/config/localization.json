@@ -1,0 +1,42 @@
+{
+  "schemaVersion": "regional-localization-v1",
+  "terms": {
+    "platformName": "区域卫生健康信息平台",
+    "platformShortName": "区域卫健平台",
+    "citizenPortalName": "区域居民健康服务",
+    "governmentUnifiedEntry": "地区政务服务统一入口",
+    "statisticsTitle": "地区卫生健康统计提要",
+    "regionLabel": "当前地区",
+    "demonstrationDistrict": "示范区"
+  },
+  "legacyReplacements": {
+    "Dalian Women and Children Medical Center": "区域妇女儿童医疗中心",
+    "Dalian Medical University Affiliated Hospital": "区域大学附属医院",
+    "Dalian Medical University Hospital": "区域大学附属医院",
+    "Dalian Central Hospital": "区域中心医院",
+    "Qingniwaqiao Community Health Service Center": "示范社区卫生服务中心",
+    "Xinghaiwan Community Health Service Center": "示范社区卫生服务中心",
+    "Ganjingzi District People's Hospital": "区县中心医院",
+    "Zhongshan district demo address": "示范一区示例地址",
+    "Qingniwaqiao demo home": "示范社区示例家庭地址",
+    "Shahekou demo address": "示范三区示例地址",
+    "Zhongshan": "示范一区",
+    "Ganjingzi": "示范四区",
+    "大连医科大学附属医院": "区域大学附属医院",
+    "大连市妇女儿童医疗中心": "区域妇女儿童医疗中心",
+    "大连市卫生健康委员会": "地区卫生健康主管部门",
+    "大连市卫生健康委": "地区卫生健康主管部门",
+    "大连市医保中心": "地区医疗保障经办中心",
+    "大连市医保局": "地区医疗保障主管部门",
+    "大连市中心医院": "区域中心医院",
+    "大连市友谊医院": "区域第二急救医院",
+    "大连市普兰店区中心医院": "区县中心医院",
+    "普兰店区中心医院": "区县中心医院",
+    "青泥洼桥社区卫生服务中心": "示范社区卫生服务中心",
+    "大连市血液中心": "区域血液中心",
+    "大连市健康城市平台": "区域健康城市平台",
+    "大连健康体检中心": "区域健康体检中心",
+    "健康大连": "区域居民健康服务",
+    "e 大连": "地区政务服务"
+  }
+}

@@ -5,6 +5,7 @@ const DiseasePaymentIntake = require("./disease-payment-intake");
 const LocalPaymentPackage = require("./disease-payment-local-package");
 const SpecialCase = require("./disease-payment-special-case");
 const Settlement = require("./disease-payment-settlement");
+const { localizeRegionalData, regionalOrganization } = require("./src/platform/regional/active-region");
 const catalogIndexCache = new WeakMap();
 
 const POLICY = {
@@ -21,6 +22,10 @@ function round(value, digits = 2) {
 }
 
 function seedDiseasePaymentState() {
+  const centralHospital = regionalOrganization("centralHospital");
+  const districtHospital = regionalOrganization("districtHospital");
+  const insuranceCenter = regionalOrganization("insuranceCenter");
+  const insuranceAuthority = regionalOrganization("insuranceAuthority");
   return {
     policy: POLICY,
     policy2: { id: "nhsa-drg-dip-2.0-2024", name: "DRG/DIP付费2.0版分组方案落地要求", publishedAt: "2024-07-23", source: "https://www.nhsa.gov.cn/art/2024/7/23/art_105_13316.html", switchDeadline: "2024-12-31", annualClearanceDeadline: "次年6月30日", settlementSlaWorkingDays: 30 },
@@ -143,9 +148,9 @@ function seedDiseasePaymentState() {
       ,{ code: "DIP-ONCO-INNOVATION", mode: "DIP", name: "肿瘤基因/分子/免疫及放射治疗组合", diagnosisPrefixes: ["C"], treatmentTags: ["基因治疗", "分子治疗", "免疫治疗", "放射治疗"], score: 240, adjustment: 1.08, primaryCare: false }
     ],
     cases: [
-      { id: "dp-case-001", settlementListNo: "DL-2026-0001", residentId: "r1", patientName: "演示居民A", institution: "大连市中心医院", admissionDate: "2026-06-02", dischargeDate: "2026-06-09", principalDiagnosis: "I63.9", principalDiagnosisName: "脑梗死", otherDiagnoses: ["I10"], procedures: ["99.10"], totalAmount: 32860, declaredFundAmount: 25600, fundPaid: 0, status: "待测算", qualityStatus: "待质控", specialCaseStatus: "未申报" },
-      { id: "dp-case-002", settlementListNo: "DL-2026-0002", residentId: "r2", patientName: "演示居民B", institution: "大连市中心医院", admissionDate: "2026-06-12", dischargeDate: "2026-06-17", principalDiagnosis: "E11.9", principalDiagnosisName: "2型糖尿病", otherDiagnoses: ["I10"], procedures: [], totalAmount: 10680, declaredFundAmount: 8010, fundPaid: 0, status: "待测算", qualityStatus: "待质控", specialCaseStatus: "未申报" },
-      { id: "dp-case-003", settlementListNo: "DL-2026-0003", residentId: "r3", patientName: "演示居民C", institution: "大连市普兰店区中心医院", admissionDate: "2026-06-18", dischargeDate: "2026-06-21", principalDiagnosis: "I10", principalDiagnosisName: "原发性高血压", otherDiagnoses: [], procedures: [], totalAmount: 7460, declaredFundAmount: 5600, fundPaid: 0, status: "待测算", qualityStatus: "待质控", specialCaseStatus: "未申报" }
+      { id: "dp-case-001", settlementListNo: "DL-2026-0001", residentId: "r1", patientName: "演示居民A", institution: centralHospital.name, admissionDate: "2026-06-02", dischargeDate: "2026-06-09", principalDiagnosis: "I63.9", principalDiagnosisName: "脑梗死", otherDiagnoses: ["I10"], procedures: ["99.10"], totalAmount: 32860, declaredFundAmount: 25600, fundPaid: 0, status: "待测算", qualityStatus: "待质控", specialCaseStatus: "未申报" },
+      { id: "dp-case-002", settlementListNo: "DL-2026-0002", residentId: "r2", patientName: "演示居民B", institution: centralHospital.name, admissionDate: "2026-06-12", dischargeDate: "2026-06-17", principalDiagnosis: "E11.9", principalDiagnosisName: "2型糖尿病", otherDiagnoses: ["I10"], procedures: [], totalAmount: 10680, declaredFundAmount: 8010, fundPaid: 0, status: "待测算", qualityStatus: "待质控", specialCaseStatus: "未申报" },
+      { id: "dp-case-003", settlementListNo: "DL-2026-0003", residentId: "r3", patientName: "演示居民C", institution: districtHospital.name, admissionDate: "2026-06-18", dischargeDate: "2026-06-21", principalDiagnosis: "I10", principalDiagnosisName: "原发性高血压", otherDiagnoses: [], procedures: [], totalAmount: 7460, declaredFundAmount: 5600, fundPaid: 0, status: "待测算", qualityStatus: "待质控", specialCaseStatus: "未申报" }
     ],
     settlementListImports: [],
     settlementLists: [],
@@ -162,8 +167,8 @@ function seedDiseasePaymentState() {
     ],
     specialCases: [],
     specialCaseExperts: [
-      { id: "special-expert-medical-primary", name: "医保医学评审专家", displayName: "医保医学评审专家", reviewerAccount: "大连市医保中心审核员", role: "medical-insurance-review", institution: "大连市医保中心", expertise: ["复杂危重症", "DRG/DIP支付"], conflictInstitutions: [], active: true },
-      { id: "special-expert-fund-primary", name: "基金财务评审专家", displayName: "基金财务评审专家", reviewerAccount: "大连市医保局管理员", role: "fund-finance-review", institution: "大连市医保局", expertise: ["基金预算", "支付标准"], conflictInstitutions: [], active: true },
+      { id: "special-expert-medical-primary", name: "医保医学评审专家", displayName: "医保医学评审专家", reviewerAccount: `${insuranceCenter.name}审核员`, role: "medical-insurance-review", institution: insuranceCenter.name, expertise: ["复杂危重症", "DRG/DIP支付"], conflictInstitutions: [], active: true },
+      { id: "special-expert-fund-primary", name: "基金财务评审专家", displayName: "基金财务评审专家", reviewerAccount: `${insuranceAuthority.name}管理员`, role: "fund-finance-review", institution: insuranceAuthority.name, expertise: ["基金预算", "支付标准"], conflictInstitutions: [], active: true },
       { id: "special-expert-medical-backup", name: "医学评审备选专家", displayName: "医学评审备选专家", reviewerAccount: "district-medical-reviewer", role: "medical-insurance-review", institution: "区县医保经办机构", expertise: ["复杂病例", "病案编码"], conflictInstitutions: [], active: false },
       { id: "special-expert-fund-backup", name: "基金评审备选专家", displayName: "基金评审备选专家", reviewerAccount: "fund-reviewer-backup", role: "fund-finance-review", institution: "区县医保局", expertise: ["基金财务", "年度预算"], conflictInstitutions: [], active: false },
       { id: "special-expert-medical-appeal", name: "医学复议专家", displayName: "医学复议专家", reviewerAccount: "medical-appeal-reviewer", role: "medical-insurance-review", institution: "省级医保复议专家库", expertise: ["疑难重症", "复议审查"], conflictInstitutions: [], active: true, appealOnly: true },
@@ -176,10 +181,10 @@ function seedDiseasePaymentState() {
     ],
     feedbacks: [],
     prepayments: [
-      { id: "prepay-2026-001", institution: "大连市中心医院", cooperationYears: 8, creditLevel: "A", traceabilityReportingRate: 98.6, antiFraudSupport: "良好", recommendedMonths: 1, amount: 18000000, status: "待审批", rationale: "长期合作、管理规范、信用良好、追溯码上报完整" }
+      { id: "prepay-2026-001", institution: centralHospital.name, cooperationYears: 8, creditLevel: "A", traceabilityReportingRate: 98.6, antiFraudSupport: "良好", recommendedMonths: 1, amount: 18000000, status: "待审批", rationale: "长期合作、管理规范、信用良好、追溯码上报完整" }
     ],
     unpaidItems: [
-      { id: "unpaid-2023-001", institution: "大连市中心医院", serviceYear: 2023, amount: 126000, agreementDueDate: "2024-03-31", reason: "历史对账差异", status: "待清理", owner: "结算科" }
+      { id: "unpaid-2023-001", institution: centralHospital.name, serviceYear: 2023, amount: 126000, agreementDueDate: "2024-03-31", reason: "历史对账差异", status: "待清理", owner: "结算科" }
     ],
     negotiationRounds: [
       { id: "negotiation-2026-001", topic: "2026年度DRG费率与调整系数", participants: ["医保部门", "医疗机构代表", "医学会"], evidenceBasis: ["历史费用", "基金预算", "实际病种数据"], status: "待协商", meetingDate: "2026-07-25", conclusion: "" }
@@ -187,8 +192,8 @@ function seedDiseasePaymentState() {
     dataWorkingGroup: {
       id: "payment-data-group-2026", name: "按病种付费医保数据工作组", status: "已组建", members: [
         { name: "市医保中心结算科", type: "医保经办", level: "市级", role: "召集人" },
-        { name: "大连市中心医院", type: "三级综合医院", level: "三级", role: "医疗机构代表" },
-        { name: "普兰店区中心医院", type: "区级综合医院", level: "二级", role: "基层代表" }
+        { name: centralHospital.name, type: "三级综合医院", level: "三级", role: "医疗机构代表" },
+        { name: districtHospital.name, type: "区级综合医院", level: "二级", role: "基层代表" }
       ],
       disclosureItems: ["基金运行", "病例入组", "结算清算", "特例单议"], lastBriefingAt: "2026-06-30"
     },
@@ -233,6 +238,9 @@ function normalizeState(input) {
     ...seed.grouperAdapters.map((item) => ({ ...item, ...(storedAdaptersById.get(item.id) || {}) })),
     ...storedAdapters.filter((item) => !seed.grouperAdapters.some((seedItem) => seedItem.id === item.id))
   ];
+  normalized.cases = normalized.cases.map((item) => item.formalGrouping
+    ? item
+    : { ...item, institution: localizeRegionalData(item.institution) });
   return normalized;
 }
 
@@ -442,7 +450,8 @@ function calculateCase(state, item, mode = state.mode || "DRG") {
   const parameter = activeParameter(state, mode, item.dischargeDate);
   if (!parameter) return { ok: false, quality, grouping, error: "没有可用支付参数" };
   const unit = mode === "DRG" ? Number(grouping.weight || 0) : Number(grouping.score || 0);
-  const institutionCoefficientRow = (parameter.institutionCoefficients || []).find((row) => (row.institutionCode && row.institutionCode === item.institutionCode) || (row.institution && row.institution === item.institution));
+  const institutionCoefficientRow = (parameter.institutionCoefficients || []).find((row) => (row.institutionCode && row.institutionCode === item.institutionCode)
+    || (row.institution && localizeRegionalData(row.institution) === localizeRegionalData(item.institution)));
   const institutionCoefficient = Number(institutionCoefficientRow?.coefficient || 1);
   const standard = round(unit * Number(parameter.rate) * Number(grouping.adjustment || 1) * institutionCoefficient);
   const risks = detectRisks(state, item, grouping, standard, mode);
@@ -497,7 +506,8 @@ function calculateFormalCase(state, item) {
   };
   const unit = mode === "DRG" ? Number(grouping.weight || 0) : Number(grouping.score || 0);
   if (!(unit > 0)) return { ok: false, quality, grouping, error: "正式分组编码缺少有效权重或分值" };
-  const institutionCoefficientRow = (parameter.institutionCoefficients || []).find((row) => (row.institutionCode && row.institutionCode === item.institutionCode) || (row.institution && row.institution === item.institution));
+  const institutionCoefficientRow = (parameter.institutionCoefficients || []).find((row) => (row.institutionCode && row.institutionCode === item.institutionCode)
+    || (row.institution && localizeRegionalData(row.institution) === localizeRegionalData(item.institution)));
   const institutionCoefficient = Number(institutionCoefficientRow?.coefficient || 1);
   const standard = round(unit * Number(parameter.rate) * Number(grouping.adjustment || 1) * institutionCoefficient);
   const risks = detectRisks(state, item, grouping, standard, mode);
@@ -705,10 +715,11 @@ function reviewSpecialCase(input, id, payload, actor) {
   const state = normalizeState(input);
   const row = state.specialCases.find((item) => item.id === id);
   if (!row) throw new Error("特例单议不存在");
-  const reviewed = SpecialCase.reviewSpecialCaseApplication(row, payload, actor);
+  const regionalActor = localizeRegionalData(actor);
+  const reviewed = SpecialCase.reviewSpecialCaseApplication(row, payload, regionalActor);
   const target = state.cases.find((item) => item.id === row.caseId);
   if (target) target.specialCaseStatus = row.status;
-  audit(state, "特例单议评审", row.id, actor, row.status);
+  audit(state, "特例单议评审", row.id, regionalActor, row.status);
   return { state, row, review: reviewed.review };
 }
 

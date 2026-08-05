@@ -52,7 +52,7 @@ function createPlatformRuntimeContexts(source, options = {}) {
   const regionalRuntime = options.regionalRuntime || null;
   return Object.freeze({
     contexts,
-    regional: regionalRuntime?.context || null,
+    regional: regionalRuntime?.publicContext || regionalRuntime?.context || null,
     forDomain(domain) {
       if (!contexts[domain]) throw new TypeError(`unknown runtime context domain: ${domain}`);
       return contexts[domain];

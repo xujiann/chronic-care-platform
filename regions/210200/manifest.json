@@ -28,6 +28,8 @@
     "config/administrative-divisions.json",
     "config/dictionaries.json",
     "config/feature-flags.json",
+    "config/geography.json",
+    "config/localization.json",
     "config/migration-inventory.json",
     "config/organization.json",
     "config/policies.json",
