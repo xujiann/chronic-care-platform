@@ -4,6 +4,9 @@ const {
   dispatchPublicHealthDirectReport
 } = require("./public-health-connectors");
 const {
+  validatePayloadAgainstDictionary
+} = require("./public-health-direct-report-control-package");
+const {
   buildDirectReportDeliveryInput,
   claimDirectReportDeliveryToState,
   listDueDirectReportDeliveries,
@@ -119,6 +122,13 @@ async function processTransactionalDirectReportDelivery(repository, options = {}
       ...(options.dispatchOptions || {}),
       deliveryId: claim.delivery.id
     });
+    if (options.dictionaryControl) {
+      validatePayloadAgainstDictionary(
+        request.payload,
+        options.dictionaryControl,
+        options.dispatchOptions || {}
+      );
+    }
     const dispatch = options.dispatch || dispatchPublicHealthDirectReport;
     if (typeof dispatch !== "function") throw new Error("direct-report worker dispatch implementation is required");
     const result = await dispatch(request, options.dispatchOptions || {});
@@ -207,6 +217,9 @@ async function processDirectReportDelivery(options = {}) {
       ...dispatchOptions,
       deliveryId: claimed.delivery.id
     });
+    if (options.dictionaryControl) {
+      validatePayloadAgainstDictionary(request.payload, options.dictionaryControl, dispatchOptions);
+    }
     const result = await dispatch(request, dispatchOptions);
     outcome = {
       accepted: true,

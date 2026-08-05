@@ -1,0 +1,29 @@
+{
+  "schemaVersion": "public-health-direct-report-dictionary-v1",
+  "dictionaryId": "REPLACE_WITH_CONTROLLED_DICTIONARY_ID",
+  "version": "REPLACE_WITH_APPROVED_VERSION",
+  "contractId": "public-health-direct-report-v1",
+  "status": "approved",
+  "effectiveAt": "REPLACE_WITH_ISO_DATE_TIME",
+  "expiresAt": "REPLACE_WITH_ISO_DATE_TIME",
+  "sourceRef": "cmdb://REPLACE_WITH_APPROVED_DICTIONARY_RECORD",
+  "fieldMappings": [
+    {
+      "platformField": "REPLACE_WITH_EACH_CONTRACT_FIELD",
+      "officialField": "REPLACE_WITH_OFFICIAL_FIELD",
+      "required": true,
+      "codeSystem": "REPLACE_WHEN_CODED"
+    }
+  ],
+  "codeSystems": [
+    {
+      "id": "REPLACE_WITH_EACH_REQUIRED_CODE_SYSTEM",
+      "version": "REPLACE_WITH_APPROVED_VERSION",
+      "digest": "REPLACE_WITH_64_CHARACTER_SHA256",
+      "sourceRef": "cmdb://REPLACE_WITH_CODE_SYSTEM_RECORD",
+      "codes": [
+        "REPLACE_WITH_APPROVED_CODE"
+      ]
+    }
+  ]
+}

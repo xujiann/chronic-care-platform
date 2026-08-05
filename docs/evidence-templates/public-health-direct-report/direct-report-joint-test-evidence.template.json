@@ -1,0 +1,36 @@
+{
+  "schemaVersion": "public-health-direct-report-joint-test-evidence-v1",
+  "packageId": "REPLACE_WITH_JOINT_TEST_PACKAGE_ID",
+  "contractId": "public-health-direct-report-v1",
+  "dictionaryDigest": "REPLACE_WITH_64_CHARACTER_SHA256",
+  "mappingFingerprint": "REPLACE_WITH_64_CHARACTER_SHA256",
+  "executedAt": "REPLACE_WITH_ISO_DATE_TIME",
+  "expiresAt": "REPLACE_WITH_ISO_DATE_TIME_WITHIN_168_HOURS",
+  "scenarios": [
+    {
+      "id": "REPLACE_WITH_EACH_REQUIRED_SCENARIO",
+      "result": "passed",
+      "runId": "REPLACE_WITH_CONTROLLED_RUN_ID",
+      "requestDigest": "REPLACE_WITH_64_CHARACTER_SHA256",
+      "responseDigest": "REPLACE_WITH_64_CHARACTER_SHA256",
+      "traceRef": "evidence://REPLACE_WITH_TRACE_RECORD",
+      "receiptRef": "evidence://REPLACE_WITH_RECEIPT_RECORD"
+    }
+  ],
+  "attestations": [
+    {
+      "role": "disease-control-office",
+      "keyId": "REPLACE_WITH_DISEASE_CONTROL_KEY_ID",
+      "algorithm": "Ed25519",
+      "subjectDigest": "REPLACE_WITH_EVIDENCE_SUBJECT_SHA256",
+      "signature": "REPLACE_WITH_BASE64URL_ED25519_SIGNATURE"
+    },
+    {
+      "role": "hospital-information-center",
+      "keyId": "REPLACE_WITH_HOSPITAL_INFORMATION_KEY_ID",
+      "algorithm": "Ed25519",
+      "subjectDigest": "REPLACE_WITH_EVIDENCE_SUBJECT_SHA256",
+      "signature": "REPLACE_WITH_BASE64URL_ED25519_SIGNATURE"
+    }
+  ]
+}

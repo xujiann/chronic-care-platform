@@ -6,6 +6,11 @@ const { randomUUID } = require("node:crypto");
 const {
   runTransactionalDirectReportWorkerCycle
 } = require("../public-health-direct-report-worker");
+const {
+  configuredControlPaths,
+  loadDirectReportActivationControl,
+  publicDirectReportControlStatus
+} = require("../public-health-direct-report-control-package");
 
 const ROOT = path.resolve(__dirname, "..");
 
@@ -24,6 +29,7 @@ function workerError(code, message, statusCode = 503) {
 }
 
 function workerConfiguration(env = process.env) {
+  const controlPaths = configuredControlPaths(env);
   return {
     enabled: enabled(env.PUBLIC_HEALTH_DIRECT_REPORT_WORKER_ENABLED),
     workerId: String(env.PUBLIC_HEALTH_DIRECT_REPORT_WORKER_ID || "").trim(),
@@ -37,12 +43,14 @@ function workerConfiguration(env = process.env) {
     signingSecretConfigured: Boolean(String(env.PUBLIC_HEALTH_DIRECT_REPORT_SECRET || "").trim()),
     referenceSecretConfigured: Boolean(String(env.PUBLIC_HEALTH_REFERENCE_SECRET || "").trim()),
     callbackSecretConfigured: Boolean(String(env.PUBLIC_HEALTH_DIRECT_REPORT_CALLBACK_SECRET || "").trim()),
-    storageEngine: String(env.STORAGE_ENGINE || "").trim().toLowerCase()
+    storageEngine: String(env.STORAGE_ENGINE || "").trim().toLowerCase(),
+    controlFilesConfigured: Object.values(controlPaths).every(Boolean)
   };
 }
 
 function publicWorkerStatus(env = process.env) {
   const configuration = workerConfiguration(env);
+  const controlPackage = publicDirectReportControlStatus(env);
   const blockers = [
     ...(!configuration.enabled ? ["worker activation"] : []),
     ...(!configuration.workerId ? ["stable worker identity"] : []),
@@ -51,7 +59,11 @@ function publicWorkerStatus(env = process.env) {
     ...(!configuration.signingSecretConfigured ? ["request signing secret"] : []),
     ...(!configuration.referenceSecretConfigured ? ["keyed reference secret"] : []),
     ...(!configuration.callbackSecretConfigured ? ["callback signing secret"] : []),
-    "official field dictionary, network allowlist, agency credentials and signed joint-test receipt"
+    ...(!configuration.controlFilesConfigured ? ["dictionary, joint-test evidence and trust registry files"] : []),
+    ...(controlPackage.activationReady ? [] : [
+      `activation control: ${controlPackage.blockerCode}`
+    ]),
+    "network allowlist and global production Go/No-Go"
   ];
   return {
     enabled: configuration.enabled,
@@ -64,6 +76,9 @@ function publicWorkerStatus(env = process.env) {
     signingSecretConfigured: configuration.signingSecretConfigured,
     referenceSecretConfigured: configuration.referenceSecretConfigured,
     callbackSecretConfigured: configuration.callbackSecretConfigured,
+    controlFilesConfigured: configuration.controlFilesConfigured,
+    activationControlReady: controlPackage.activationReady,
+    activationControlBlockerCode: controlPackage.blockerCode || "",
     codeReady: true,
     productionReady: false,
     blockers
@@ -122,6 +137,17 @@ async function runWorkerOnce(options = {}) {
     );
   }
   const dependencies = options.dependencies || loadRuntimeModule(env);
+  const activationControl = options.activationControl
+    || dependencies.activationControl
+    || loadDirectReportActivationControl(env, {
+      nowMs: options.nowMs
+    });
+  if (activationControl.activationReady !== true) {
+    throw workerError(
+      "PUBLIC_HEALTH_DIRECT_REPORT_ACTIVATION_CONTROL_BLOCKED",
+      "direct-report worker activation control is not satisfied"
+    );
+  }
   const cycle = await runTransactionalDirectReportWorkerCycle(dependencies.repository, {
     workerId: configuration.workerId,
     limit: configuration.batchSize,
@@ -129,6 +155,7 @@ async function runWorkerOnce(options = {}) {
     randomUUID: options.randomUUID || randomUUID,
     clock: options.clock,
     dispatch: options.dispatch || dependencies.dispatch,
+    dictionaryControl: activationControl,
     dispatchOptions: {
       ...(dependencies.dispatchOptions || {}),
       env

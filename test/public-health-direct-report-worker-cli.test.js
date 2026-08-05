@@ -21,6 +21,9 @@ const {
   runWorkerOnce,
   workerConfiguration
 } = require("../scripts/public-health-direct-report-worker");
+const {
+  buildControlFixture
+} = require("./support/public-health-direct-report-control-fixture");
 
 const ROOT = path.resolve(__dirname, "..");
 
@@ -117,7 +120,7 @@ test("worker CLI remains fail-closed and reports only configuration booleans", a
   const status = publicWorkerStatus(workerEnv());
   assert.equal(status.codeReady, true);
   assert.equal(status.productionReady, false);
-  assert.equal(status.blockers.some((item) => /official field dictionary/.test(item)), true);
+  assert.equal(status.blockers.some((item) => /activation control/.test(item)), true);
   assert.doesNotMatch(JSON.stringify(status), /request-signing-secret|reference-secret|callback-secret/);
   assert.equal(workerConfiguration(workerEnv({
     PUBLIC_HEALTH_DIRECT_REPORT_WORKER_BATCH_SIZE: "500",
@@ -127,8 +130,10 @@ test("worker CLI remains fail-closed and reports only configuration booleans", a
 
 test("worker CLI runs one transactional cycle without exposing request payload or secrets", async () => {
   const env = workerEnv();
+  const control = buildControlFixture();
   const result = await runWorkerOnce({
     env,
+    activationControl: control.activationControl,
     dependencies: {
       repository: repository(queuedState()),
       dispatchOptions: {

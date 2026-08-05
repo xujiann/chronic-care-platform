@@ -120,6 +120,9 @@ const {
   verifyDirectReportCallback
 } = require("./public-health-connectors");
 const {
+  publicDirectReportControlStatus
+} = require("./public-health-direct-report-control-package");
+const {
   claimPublicHealthExternalDispatchToState,
   enqueuePublicHealthExternalDispatchToState,
   listDuePublicHealthExternalDispatches,
@@ -28543,6 +28546,7 @@ function createRuntimeCapabilitySource() {
   verifyAuditTrail,
   verifyDoctorElectronicRegistration,
   verifyDirectReportCallback,
+  publicDirectReportControlStatus,
   verifyFinancialCallback,
   verifyIntegrationSignature,
   verifyPassword,
