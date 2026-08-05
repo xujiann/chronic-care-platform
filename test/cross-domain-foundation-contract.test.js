@@ -28,12 +28,12 @@ test("runtime composition reaches the router manifest with governance, public-he
   const router = createPlatformApiRouter(createPlatformRuntimeContexts(completeRuntimeSource()));
   const splitSegments = router.manifest.filter(({ subdomain }) => subdomain);
 
-  assert.equal(splitSegments.length, 23);
+  assert.equal(splitSegments.length, 24);
   assert.deepEqual(
     Object.fromEntries(splitSegments.map(({ id, subdomain }) => [id, subdomain])),
     ROUTE_SUBDOMAINS
   );
-  assert.equal(router.manifest.length, 71);
+  assert.equal(router.manifest.length, 72);
 });
 
 test("router entry rejects the flat global runtime source", () => {

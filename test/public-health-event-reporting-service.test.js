@@ -77,6 +77,54 @@ test("infectious event intake and submission are idempotent", () => {
     () => applyInfectiousReportingAction(submitted.case, { action: "submit-report", idempotencyKey: "idem-submit" }, { name: "居民", role: "citizen" }),
     /role citizen is not allowed/
   );
+  assert.throws(
+    () => applyInfectiousReportingAction(submitted.case, {
+      action: "submit-report",
+      idempotencyKey: "idem-submit",
+      note: "changed command intent"
+    }, institution),
+    /idempotency conflict/
+  );
+  assert.throws(
+    () => applyInfectiousReportingAction(submitted.case, {
+      action: "submit-report",
+      idempotencyKey: "idem-submit",
+      at: "2026-07-08T08:44:00+08:00"
+    }, { name: "another-commission-user", role: "commission" }),
+    /idempotency conflict/
+  );
+
+  const drifted = structuredClone(initial);
+  drifted.reportId = "another-report";
+  assert.throws(
+    () => upsertInfectiousReportingCase(firstIntake.cases, drifted),
+    /reportId drift/
+  );
+});
+
+test("report card patch is allowlisted and cannot rebind protected fields", () => {
+  const institution = { name: "institution-reporter", role: "institution" };
+  const validated = apply(
+    buildInitialCase(),
+    { action: "validate-event", idempotencyKey: "patch-validate" },
+    institution
+  );
+  assert.throws(
+    () => apply(validated, {
+      action: "create-report-card",
+      idempotencyKey: "patch-secret",
+      reportCard: { signingSecret: "must-not-persist" }
+    }, institution),
+    /unsupported fields: signingSecret/
+  );
+  assert.throws(
+    () => apply(validated, {
+      action: "create-report-card",
+      idempotencyKey: "patch-resident",
+      reportCard: { residentId: "another-resident" }
+    }, institution),
+    /unsupported fields: residentId/
+  );
 });
 
 test("rejected direct-report receipt opens an assigned exception and supports retry", () => {
