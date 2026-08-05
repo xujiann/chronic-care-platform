@@ -1,7 +1,7 @@
 {
   "schemaVersion": "process-workstreams-v1",
   "integrationBranch": "main",
-  "baselineTag": "baseline/governance-20260806-regional-foundation-v1",
+  "baselineTag": "baseline/governance-20260806-regional-context-v1",
   "developmentPolicy": {
     "singleIntegrationBaseline": true,
     "integrationOwner": "T00",
