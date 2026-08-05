@@ -113,6 +113,9 @@ const {
   requeueDirectReportDeadLetterToState
 } = require("./public-health-direct-report-outbox-service");
 const {
+  createPublicHealthDirectReportStateRepository
+} = require("./public-health-direct-report-state-repository");
+const {
   DIRECT_REPORT_CONTRACT_ID,
   verifyDirectReportCallback
 } = require("./public-health-connectors");
@@ -27672,6 +27675,27 @@ function createCareServiceRuntimeDependencies(options = {}) {
   };
 }
 
+let publicHealthDirectReportRepositoryInstance = null;
+
+function publicHealthDirectReportRepository() {
+  if (!publicHealthDirectReportRepositoryInstance) {
+    publicHealthDirectReportRepositoryInstance = createPublicHealthDirectReportStateRepository({
+      readState: readDatabase,
+      writeState: (state, options) => writeDatabase(state, options)
+    });
+  }
+  return publicHealthDirectReportRepositoryInstance;
+}
+
+function createPublicHealthDirectReportRuntimeDependencies(options = {}) {
+  return {
+    repository: publicHealthDirectReportRepository(),
+    dispatchOptions: {
+      env: options.env || process.env
+    }
+  };
+}
+
 function careServicePlatformAdapter(options = {}) {
   const dependencies = createCareServiceRuntimeDependencies(options);
   return CareServicePlatform.createCareServicePlatformAdapter({
@@ -28663,6 +28687,7 @@ module.exports = {
   configureDigitalHospitalExecutionRuntime,
   configurePublicHealthEndpointProbeRuntime,
   createCareServiceRuntimeDependencies,
+  createPublicHealthDirectReportRuntimeDependencies,
   cleanupRuntimeSessions,
   digitalHospitalClientCertificate,
   digitalHospitalWorkerFingerprints,

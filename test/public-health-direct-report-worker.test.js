@@ -12,8 +12,13 @@ const {
   enqueueDirectReportDeliveryToState
 } = require("../public-health-direct-report-outbox-service");
 const {
-  processDirectReportDelivery
+  claimNextDirectReportDelivery,
+  processDirectReportDelivery,
+  runTransactionalDirectReportWorkerCycle
 } = require("../public-health-direct-report-worker");
+const {
+  createPublicHealthDirectReportStateRepository
+} = require("../public-health-direct-report-state-repository");
 
 const WORKER_ENV = {
   NODE_ENV: "production",
@@ -66,6 +71,43 @@ function queuedState(maxAttempts = 3) {
 function sequenceClock(values) {
   let index = 0;
   return () => values[Math.min(index++, values.length - 1)];
+}
+
+function durableRepository(initial) {
+  let state = structuredClone(initial);
+  state.storageMeta = {
+    engine: "sqlite",
+    collectionVersions: {
+      publicHealthInfectiousReportingCases: 1,
+      publicHealthInfectiousReportingDeliveries: 1
+    }
+  };
+  const writes = [];
+  return {
+    repository: createPublicHealthDirectReportStateRepository({
+      readState() {
+        return structuredClone(state);
+      },
+      writeState(next, metadata) {
+        writes.push({ next: structuredClone(next), metadata: structuredClone(metadata) });
+        const versions = state.storageMeta.collectionVersions;
+        state = structuredClone(next);
+        state.storageMeta = {
+          engine: "sqlite",
+          collectionVersions: {
+            publicHealthInfectiousReportingCases:
+              Number(versions.publicHealthInfectiousReportingCases) + 1,
+            publicHealthInfectiousReportingDeliveries:
+              Number(versions.publicHealthInfectiousReportingDeliveries) + 1
+          }
+        };
+      }
+    }),
+    current() {
+      return structuredClone(state);
+    },
+    writes
+  };
 }
 
 test("worker durably claims before sending and stores only minimized provider acknowledgement", async () => {
@@ -185,4 +227,68 @@ test("worker never sends if the claimed lease cannot be durably persisted", asyn
     /durable write failed/
   );
   assert.equal(sends, 0);
+});
+
+test("transactional worker commits the lease before network dispatch and settles from a fresh snapshot", async () => {
+  const queued = queuedState();
+  const durable = durableRepository(queued.nextData);
+  let writesObservedAtDispatch = 0;
+  const result = await runTransactionalDirectReportWorkerCycle(durable.repository, {
+    workerId: "transactional-worker-a",
+    limit: 5,
+    leaseSeconds: 120,
+    randomUUID: () => "transactional-lease-token",
+    clock: sequenceClock([
+      "2026-08-05T08:02:30.000Z",
+      "2026-08-05T08:03:00.000Z",
+      "2026-08-05T08:03:05.000Z",
+      "2026-08-05T08:03:06.000Z"
+    ]),
+    dispatchOptions: {
+      env: WORKER_ENV,
+      nowMs: Date.parse("2026-08-05T08:03:00.000Z")
+    },
+    dispatch: async (request) => {
+      writesObservedAtDispatch = durable.writes.length;
+      assert.equal(durable.current().publicHealthInfectiousReportingDeliveries[0].state, "leased");
+      return {
+        receiptId: "provider-transactional-receipt-1",
+        requestId: request.requestId,
+        status: "accepted",
+        acceptedAt: "2026-08-05T08:03:04.000Z",
+        attempts: 1
+      };
+    }
+  });
+  assert.equal(writesObservedAtDispatch, 1);
+  assert.equal(durable.writes.length, 2);
+  assert.equal(result.processed, 1);
+  assert.equal(result.awaitingCallback, 1);
+  assert.equal(result.deadLetters, 0);
+  assert.equal(
+    durable.current().publicHealthInfectiousReportingDeliveries[0].state,
+    "awaiting-callback"
+  );
+  assert.doesNotMatch(JSON.stringify(durable.current()), /transactional-lease-token|reference-secret/);
+});
+
+test("expired transactional lease is recoverable by another worker after a process crash", async () => {
+  const queued = queuedState();
+  const durable = durableRepository(queued.nextData);
+  const first = await claimNextDirectReportDelivery(durable.repository, {
+    workerId: "crashed-worker",
+    leaseSeconds: 15,
+    randomUUID: () => "crashed-worker-lease",
+    clock: () => "2026-08-05T08:03:00.000Z"
+  });
+  assert.equal(first.delivery.state, "leased");
+  const recovered = await claimNextDirectReportDelivery(durable.repository, {
+    workerId: "recovery-worker",
+    leaseSeconds: 30,
+    randomUUID: () => "recovery-worker-lease",
+    clock: () => "2026-08-05T08:03:16.000Z"
+  });
+  assert.equal(recovered.delivery.state, "leased");
+  assert.equal(recovered.delivery.version, first.delivery.version + 1);
+  assert.notEqual(recovered.delivery.lease.workerIdDigest, first.delivery.lease.workerIdDigest);
 });
