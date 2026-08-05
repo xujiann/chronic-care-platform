@@ -102,6 +102,11 @@ const {
   buildPublicHealthCoordinationRuntime
 } = require("./public-health-coordination-runtime");
 const {
+  applyInfectiousReportingAction,
+  buildInfectiousReportingCaseFromSources,
+  upsertInfectiousReportingCase
+} = require("./public-health-event-reporting-service");
+const {
   claimPublicHealthExternalDispatchToState,
   enqueuePublicHealthExternalDispatchToState,
   listDuePublicHealthExternalDispatches,
@@ -1573,6 +1578,7 @@ function seedState() {
     publicHealthStandardImplementationLedger: seedPublicHealthStandardImplementationLedger(),
     publicHealthInstitutionScopes: seedPublicHealthInstitutionScopes(),
     publicHealthEvents: seedPublicHealthEvents(),
+    publicHealthInfectiousReportingCases: [],
     digitalHospitalPublicHealthCoordination: seedDigitalHospitalPublicHealthCoordination(),
     publicHealthTriggerRules: seedPublicHealthTriggerRules(),
     publicHealthSignals: seedPublicHealthSignals(),
@@ -11524,6 +11530,9 @@ function normalizeState(data) {
     publicHealthStandardImplementationLedger: mergeByKey(seedPublicHealthStandardImplementationLedger(), data.publicHealthStandardImplementationLedger, "id"),
     publicHealthInstitutionScopes: mergeByKey(seedPublicHealthInstitutionScopes(), data.publicHealthInstitutionScopes, "id"),
     publicHealthEvents: mergeByKey(seedPublicHealthEvents(), data.publicHealthEvents, "id"),
+    publicHealthInfectiousReportingCases: Array.isArray(data.publicHealthInfectiousReportingCases)
+      ? data.publicHealthInfectiousReportingCases.slice(-500)
+      : [],
     digitalHospitalPublicHealthCoordination: normalizeDigitalHospitalPublicHealthCoordination(data.digitalHospitalPublicHealthCoordination),
     publicHealthTriggerRules: mergeByKey(seedPublicHealthTriggerRules(), data.publicHealthTriggerRules, "id"),
     publicHealthCoordinationHandoffs: Array.isArray(data.publicHealthCoordinationHandoffs)
@@ -27963,6 +27972,7 @@ function createRuntimeCapabilitySource() {
   applyPostgresReconciliationCaseAction,
   applyProductionDatabaseCutoverAction,
   applyProductionOperationsAction,
+  applyInfectiousReportingAction,
   applyPublicHealthCoordinationActionToState,
   applyPublicHealthMedicalPreventionTaskActionToState,
   applyPublicHealthSurveillanceAlertActionToState,
@@ -28070,6 +28080,7 @@ function createRuntimeCapabilitySource() {
   buildProductionReleaseEvidencePublicSummary,
   buildProductionSecurityAcceptanceCenter,
   buildPublicHealthCoordinationRuntime,
+  buildInfectiousReportingCaseFromSources,
   buildPublicHealthCutoverReadiness,
   buildPublicHealthDataFoundation,
   buildPublicHealthEndpointProbeCampaignSummary,
@@ -28480,6 +28491,7 @@ function createRuntimeCapabilitySource() {
   upsertReferralTeleconsultationSignoff,
   upsertResidentExperienceCheckin,
   upsertSiteLaunchEvidence,
+  upsertInfectiousReportingCase,
   validateAlert,
   validateAttachmentMetadata,
   validateChronicInteroperabilityMessage,

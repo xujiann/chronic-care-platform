@@ -282,6 +282,10 @@ const ROUTE_ORDER = Object.freeze([
     "id": "public-health-03"
   },
   {
+    "domain": "public-health",
+    "id": "public-health-04"
+  },
+  {
     "domain": "care-coordination",
     "id": "care-coordination-10"
   },

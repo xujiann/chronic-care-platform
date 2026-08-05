@@ -41,6 +41,14 @@ const REQUIRED_REPORT_FIELDS = [
   "reportedAt"
 ];
 
+const REPORT_CARD_PATCH_FIELDS = new Set([
+  "targetCounty",
+  "targetPlatform",
+  "reportedAt",
+  "dueAt",
+  "riskLevel"
+]);
+
 const DEFAULT_INFECTIOUS_EVENT_LINK = {
   id: "pherl-infectious-001",
   externalEventId: "EMR-LIS-CLUSTER-20260708-001",
@@ -57,8 +65,19 @@ function clone(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
-function clean(value) {
-  return String(value ?? "").trim();
+function clean(value, maximum = 500) {
+  return String(value ?? "").trim().replace(/[\r\n\t]+/g, " ").slice(0, maximum);
+}
+
+function stableValue(value) {
+  if (Array.isArray(value)) return value.map(stableValue);
+  if (value && typeof value === "object") {
+    return Object.keys(value).sort().reduce((result, key) => {
+      result[key] = stableValue(value[key]);
+      return result;
+    }, {});
+  }
+  return value;
 }
 
 function actorRole(user = {}) {
@@ -87,7 +106,33 @@ function requireFields(source, fields, label) {
 }
 
 function auditHash(value) {
-  return `sha256:${createHash("sha256").update(JSON.stringify(value)).digest("hex")}`;
+  return `sha256:${createHash("sha256").update(JSON.stringify(stableValue(value))).digest("hex")}`;
+}
+
+function normalizedReportCardPatch(value) {
+  if (value === undefined || value === null) return {};
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("reportCard patch must be an object");
+  }
+  const unknown = Object.keys(value).filter((field) => !REPORT_CARD_PATCH_FIELDS.has(field));
+  if (unknown.length) {
+    throw new Error(`reportCard patch contains unsupported fields: ${unknown.join(", ")}`);
+  }
+  return Object.fromEntries(
+    Object.entries(value).map(([field, fieldValue]) => [field, clean(fieldValue)])
+  );
+}
+
+function actionIntentDigest(action, payload = {}, user = {}) {
+  const intent = clone(payload);
+  delete intent.at;
+  delete intent.expectedVersion;
+  return auditHash({
+    action,
+    actorAccount: actorName(user),
+    actorRole: actorRole(user),
+    intent
+  });
 }
 
 function buildInfectiousReportingCaseFromSources({ event, report, receipt, link = DEFAULT_INFECTIOUS_EVENT_LINK } = {}) {
@@ -193,7 +238,7 @@ function existingIdempotentAction(workflow, action, payload) {
   return (workflow.timeline || []).find((item) => item.action === action && item.idempotencyKey === idempotencyKey) || null;
 }
 
-function historyEntry(workflow, action, nextState, payload, user, role) {
+function historyEntry(workflow, action, nextState, payload, user, role, intentDigest) {
   const sequence = (workflow.timeline || []).length + 1;
   return {
     id: `${workflow.id}-history-${sequence}`,
@@ -206,7 +251,10 @@ function historyEntry(workflow, action, nextState, payload, user, role) {
     role,
     note: clean(payload.note),
     idempotencyKey: clean(payload.idempotencyKey),
-    evidenceRefs: Array.isArray(payload.evidenceRefs) ? payload.evidenceRefs.map(clean).filter(Boolean).slice(0, 20) : []
+    intentDigest,
+    evidenceRefs: Array.isArray(payload.evidenceRefs)
+      ? payload.evidenceRefs.map((item) => clean(item)).filter(Boolean).slice(0, 20)
+      : []
   };
 }
 
@@ -215,7 +263,13 @@ function applyInfectiousReportingAction(current, payload = {}, user = {}) {
   const action = clean(payload.action);
   const { definition, role } = authorizeAction(action, user);
   const duplicate = existingIdempotentAction(workflow, action, payload);
-  if (duplicate) return { case: workflow, history: duplicate, idempotent: true };
+  const intentDigest = actionIntentDigest(action, payload, user);
+  if (duplicate) {
+    if (duplicate.intentDigest && duplicate.intentDigest !== intentDigest) {
+      throw new Error(`idempotency conflict for ${action}`);
+    }
+    return { case: workflow, history: duplicate, idempotent: true };
+  }
 
   validateActionState(workflow, action, payload, definition);
   let nextState = definition.to || workflow.state;
@@ -225,7 +279,9 @@ function applyInfectiousReportingAction(current, payload = {}, user = {}) {
   }
 
   if (action === "review-standard-mapping") {
-    const evidenceRefs = Array.isArray(payload.evidenceRefs) ? payload.evidenceRefs.map(clean).filter(Boolean) : [];
+    const evidenceRefs = Array.isArray(payload.evidenceRefs)
+      ? payload.evidenceRefs.map((item) => clean(item)).filter(Boolean)
+      : [];
     if (!evidenceRefs.length) throw new Error("standard mapping review requires evidenceRefs");
     workflow.standardMapping = {
       ...workflow.standardMapping,
@@ -237,7 +293,7 @@ function applyInfectiousReportingAction(current, payload = {}, user = {}) {
   }
 
   if (action === "create-report-card") {
-    const reportCard = { ...workflow.draftReport, ...(payload.reportCard || {}) };
+    const reportCard = { ...workflow.draftReport, ...normalizedReportCardPatch(payload.reportCard) };
     requireFields(reportCard, REQUIRED_REPORT_FIELDS, "infectious report card");
     workflow.reportCard = reportCard;
   }
@@ -295,13 +351,17 @@ function applyInfectiousReportingAction(current, payload = {}, user = {}) {
       reviewer: actorName(user),
       reviewedAt: clean(payload.at || new Date().toISOString()),
       conclusion: clean(payload.note),
-      evidenceRefs: Array.isArray(payload.evidenceRefs) ? payload.evidenceRefs.map(clean).filter(Boolean) : []
+      evidenceRefs: Array.isArray(payload.evidenceRefs)
+        ? payload.evidenceRefs.map((item) => clean(item)).filter(Boolean)
+        : []
     };
   }
 
   if (action === "close-followup") {
     requireFields(payload, ["followupConclusion"], "follow-up closure");
-    const evidenceRefs = Array.isArray(payload.evidenceRefs) ? payload.evidenceRefs.map(clean).filter(Boolean) : [];
+    const evidenceRefs = Array.isArray(payload.evidenceRefs)
+      ? payload.evidenceRefs.map((item) => clean(item)).filter(Boolean)
+      : [];
     if (!evidenceRefs.length) throw new Error("follow-up closure requires evidenceRefs");
     if (workflow.standardMapping.status !== "reviewed" || !(workflow.standardMapping.evidenceRefs || []).length) {
       throw new Error("standard mapping must be reviewed with evidence before follow-up closure");
@@ -315,7 +375,7 @@ function applyInfectiousReportingAction(current, payload = {}, user = {}) {
     };
   }
 
-  const history = historyEntry(workflow, action, nextState, payload, user, role);
+  const history = historyEntry(workflow, action, nextState, payload, user, role, intentDigest);
   workflow.state = nextState;
   workflow.version = Number(workflow.version || 0) + 1;
   workflow.timeline = [...(workflow.timeline || []), history].slice(-50);
@@ -331,7 +391,18 @@ function applyInfectiousReportingAction(current, payload = {}, user = {}) {
 function upsertInfectiousReportingCase(cases = [], candidate) {
   requireFields(candidate, ["externalEventId", "publicHealthEventId"], "infectious reporting case");
   const existing = cases.find((item) => item.externalEventId === candidate.externalEventId);
-  if (existing) return { cases: clone(cases), case: clone(existing), created: false, idempotent: true };
+  if (existing) {
+    const bindingFields = [
+      ["publicHealthEventId", existing.publicHealthEventId, candidate.publicHealthEventId],
+      ["reportId", existing.reportId, candidate.reportId],
+      ["residentId", existing.event?.residentId, candidate.event?.residentId],
+      ["diagnosisCode", existing.event?.diagnosisCode, candidate.event?.diagnosisCode],
+      ["sampleNo", existing.event?.sampleNo, candidate.event?.sampleNo]
+    ];
+    const drift = bindingFields.find(([, current, incoming]) => clean(current) !== clean(incoming));
+    if (drift) throw new Error(`infectious reporting intake conflict: ${drift[0]} drift`);
+    return { cases: clone(cases), case: clone(existing), created: false, idempotent: true };
+  }
   if (cases.some((item) => item.publicHealthEventId === candidate.publicHealthEventId)) {
     throw new Error(`publicHealthEventId ${candidate.publicHealthEventId} is already linked to another external event`);
   }

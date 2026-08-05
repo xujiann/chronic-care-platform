@@ -14,6 +14,7 @@ const ROUTE_SUBDOMAINS = Object.freeze({
   "public-health-01": "surveillance-foundation",
   "public-health-02": "public-health-operations",
   "public-health-03": "vital-records",
+  "public-health-04": "infectious-reporting",
   "clinical-specialties-01": "imaging-cloud",
   "clinical-specialties-02": "operations-dashboard",
   "clinical-specialties-03": "operations-command",
