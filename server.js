@@ -107,6 +107,12 @@ const {
   upsertInfectiousReportingCase
 } = require("./public-health-event-reporting-service");
 const {
+  enqueueDirectReportDeliveryToState,
+  projectDirectReportDelivery,
+  recordTrustedDirectReportCallbackToState,
+  requeueDirectReportDeadLetterToState
+} = require("./public-health-direct-report-outbox-service");
+const {
   DIRECT_REPORT_CONTRACT_ID,
   verifyDirectReportCallback
 } = require("./public-health-connectors");
@@ -1583,6 +1589,7 @@ function seedState() {
     publicHealthInstitutionScopes: seedPublicHealthInstitutionScopes(),
     publicHealthEvents: seedPublicHealthEvents(),
     publicHealthInfectiousReportingCases: [],
+    publicHealthInfectiousReportingDeliveries: [],
     digitalHospitalPublicHealthCoordination: seedDigitalHospitalPublicHealthCoordination(),
     publicHealthTriggerRules: seedPublicHealthTriggerRules(),
     publicHealthSignals: seedPublicHealthSignals(),
@@ -11536,6 +11543,9 @@ function normalizeState(data) {
     publicHealthEvents: mergeByKey(seedPublicHealthEvents(), data.publicHealthEvents, "id"),
     publicHealthInfectiousReportingCases: Array.isArray(data.publicHealthInfectiousReportingCases)
       ? data.publicHealthInfectiousReportingCases.slice(-500)
+      : [],
+    publicHealthInfectiousReportingDeliveries: Array.isArray(data.publicHealthInfectiousReportingDeliveries)
+      ? data.publicHealthInfectiousReportingDeliveries
       : [],
     digitalHospitalPublicHealthCoordination: normalizeDigitalHospitalPublicHealthCoordination(data.digitalHospitalPublicHealthCoordination),
     publicHealthTriggerRules: mergeByKey(seedPublicHealthTriggerRules(), data.publicHealthTriggerRules, "id"),
@@ -28198,6 +28208,7 @@ function createRuntimeCapabilitySource() {
   dispatchFinancialRequest,
   dispatchHospitalRequest,
   enqueuePublicHealthExternalDispatchToState,
+  enqueueDirectReportDeliveryToState,
   escalateChronicFollowupAction,
   escalateDigitalHospitalPublicHealthIncident,
   evaluatePublicHealthSurveillanceSignalToState,
@@ -28335,6 +28346,7 @@ function createRuntimeCapabilitySource() {
   publicHealthExternalPublicView,
   publicHealthExternalResult,
   publicHealthExternalWorkerId,
+  projectDirectReportDelivery,
   publicHealthModernizationCommand,
   publicHealthModernizationConflict,
   publicHealthModernizationError,
@@ -28373,6 +28385,7 @@ function createRuntimeCapabilitySource() {
   recordClaimedPublicHealthExternalAttemptToState,
   recordPhoneLoginFailure,
   recordPublicHealthExternalAttemptToState,
+  recordTrustedDirectReportCallbackToState,
   recordPublicHealthOfficialExchangeCallback,
   redactSensitiveResponse,
   refreshBirthStatistics,
@@ -28388,6 +28401,7 @@ function createRuntimeCapabilitySource() {
   renderPrometheusRuntimeMetrics,
   requestPublicHealthRespiratoryNetworkLifecycle,
   requeuePublicHealthExternalDeadLetterToState,
+  requeueDirectReportDeadLetterToState,
   requireApiRole,
   requireDatasetSandboxAccess,
   requireDigitalHospitalExecutionWorker,

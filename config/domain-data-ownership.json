@@ -180,6 +180,16 @@
       "classification": "restricted",
       "readers": ["platform-governance", "care-coordination"]
     },
+    "publicHealthInfectiousReportingCases": {
+      "owner": "public-health",
+      "classification": "restricted",
+      "readers": ["platform-governance"]
+    },
+    "publicHealthInfectiousReportingDeliveries": {
+      "owner": "public-health",
+      "classification": "internal",
+      "readers": ["platform-governance"]
+    },
     "governanceRecords": {
       "owner": "platform-governance",
       "classification": "internal",

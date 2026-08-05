@@ -139,6 +139,16 @@ const INFECTIOUS_REPORTING_ACTION_LABELS = Object.freeze({
   "close-followup": "关闭随访"
 });
 
+const INFECTIOUS_REPORTING_DELIVERY_LABELS = Object.freeze({
+  queued: "投递已排队",
+  leased: "独立 Worker 正在投递",
+  "retry-scheduled": "等待有限重试",
+  "awaiting-callback": "外发已受理，等待可信回调",
+  "callback-accepted": "可信回调已接收",
+  "callback-rejected": "可信回调已拒收",
+  "dead-letter": "投递已进入死信"
+});
+
 function infectiousReportingTime(value) {
   const parsed = Date.parse(value || "");
   if (!Number.isFinite(parsed)) return String(value || "时间待记录");
@@ -148,6 +158,7 @@ function infectiousReportingTime(value) {
 function normalizeInfectiousReportingCase(item = {}) {
   const receipt = item.receipt || null;
   const trustedCallback = receipt?.trustedCallback || null;
+  const delivery = item.delivery || null;
   return {
     id: String(item.id || ""),
     version: Number(item.version || 0),
@@ -164,6 +175,17 @@ function normalizeInfectiousReportingCase(item = {}) {
       trusted: receipt.trusted === true || trustedCallback?.signatureVerified === true,
       contractId: String(receipt.contractId || trustedCallback?.contractId || ""),
       providerStatus: String(receipt.providerStatus || trustedCallback?.providerStatus || "")
+    } : null,
+    delivery: delivery ? {
+      id: String(delivery.id || ""),
+      state: String(delivery.state || ""),
+      version: Number(delivery.version || 0),
+      attemptCount: Number(delivery.attemptCount || 0),
+      maxAttempts: Number(delivery.maxAttempts || 0),
+      nextAttemptAt: String(delivery.nextAttemptAt || ""),
+      receiptId: String(delivery.providerReceipt?.receiptId || ""),
+      failureCode: String(delivery.lastFailure?.code || ""),
+      replayCount: Number(delivery.replayCount || 0)
     } : null,
     timeline: (Array.isArray(item.timeline) ? item.timeline : []).map((entry) => ({
       sequence: Number(entry.sequence || 0),
@@ -193,13 +215,21 @@ function renderPublicHealthInfectiousReportingCases(payload = {}) {
     total: Number(payload.summary?.total ?? cases.length),
     open: Number(payload.summary?.open ?? cases.filter((item) => !item.businessClosureComplete).length),
     trustedReceipts: Number(payload.summary?.trustedReceipts ?? cases.filter((item) => item.receipt?.trusted).length),
-    closed: Number(payload.summary?.closed ?? cases.filter((item) => item.businessClosureComplete).length)
+    closed: Number(payload.summary?.closed ?? cases.filter((item) => item.businessClosureComplete).length),
+    deliveryQueued: Number(payload.summary?.deliveryQueued ?? cases.filter((item) => (
+      item.delivery && ["queued", "leased", "retry-scheduled"].includes(item.delivery.state)
+    )).length),
+    deliveryDeadLetter: Number(payload.summary?.deliveryDeadLetter ?? cases.filter((item) => (
+      item.delivery?.state === "dead-letter"
+    )).length)
   };
   metricsTarget.innerHTML = [
     modernizationMetric("报告案件", summary.total),
     modernizationMetric("开放案件", summary.open),
     modernizationMetric("可信回执", summary.trustedReceipts),
-    modernizationMetric("闭环案件", summary.closed)
+    modernizationMetric("闭环案件", summary.closed),
+    modernizationMetric("待投递/重试", summary.deliveryQueued),
+    modernizationMetric("投递死信", summary.deliveryDeadLetter)
   ].join("");
   statusTarget.className = `badge ${summary.total > 0 && summary.open === 0 ? "ok" : "warn"}`;
   statusTarget.textContent = summary.total
@@ -228,6 +258,13 @@ function renderPublicHealthInfectiousReportingCases(payload = {}) {
       : item.receipt
         ? "回执尚未通过可信签名边界"
         : "等待直报平台可信回执";
+    const deliveryLabel = item.delivery
+      ? INFECTIOUS_REPORTING_DELIVERY_LABELS[item.delivery.state] || item.delivery.state
+      : "尚未生成投递命令";
+    const deliveryDetail = item.delivery
+      ? `${deliveryLabel}；尝试 ${item.delivery.attemptCount}/${item.delivery.maxAttempts}`
+        + (item.delivery.failureCode ? `；安全错误码 ${item.delivery.failureCode}` : "")
+      : deliveryLabel;
     const timeline = item.timeline.map((entry) => `<div>
       <strong>${escapeHtml(`${entry.sequence}. ${INFECTIOUS_REPORTING_ACTION_LABELS[entry.action] || entry.action}`)}</strong>
       <span>${escapeHtml(`${infectiousReportingTime(entry.at)} / ${entry.actor || entry.role || "系统"}`)}</span>
@@ -238,6 +275,7 @@ function renderPublicHealthInfectiousReportingCases(payload = {}) {
       <div>
         <strong>${escapeHtml(item.reportCardNo || item.reportId || item.id)}</strong>
         <p>${escapeHtml(stateLabel)}；版本 ${escapeHtml(item.version)}；${escapeHtml(receiptLabel)}</p>
+        <small>${escapeHtml(deliveryDetail)}；投递箱不保存原始报文、居民身份或凭据</small>
         <small>事件 ${escapeHtml(item.externalEventId || item.publicHealthEventId)} / 报告 ${escapeHtml(item.reportId)}；生产就绪：否</small>
         <div class="modernization-list" data-public-health-infectious-reporting-case-timeline="${escapeHtml(item.id)}">${timeline}</div>
       </div>

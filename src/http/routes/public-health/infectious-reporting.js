@@ -144,7 +144,16 @@ function projectTimeline(workflow) {
   }));
 }
 
-function projectCaseSummary(workflow) {
+function latestDeliveryForCase(deliveries, caseId) {
+  return (Array.isArray(deliveries) ? deliveries : [])
+    .filter((item) => item.caseId === caseId)
+    .sort((left, right) => {
+      const versionDifference = Number(right.version || 0) - Number(left.version || 0);
+      return versionDifference || clean(right.updatedAt, 80).localeCompare(clean(left.updatedAt, 80));
+    })[0] || null;
+}
+
+function projectCaseSummary(workflow, delivery = null) {
   const trustedCallback = workflow?.receipt?.trustedCallback;
   return {
     id: clean(workflow?.id, 160),
@@ -163,6 +172,7 @@ function projectCaseSummary(workflow) {
       contractId: clean(trustedCallback?.contractId, 120),
       providerStatus: clean(trustedCallback?.providerStatus, 40)
     } : null,
+    delivery,
     standardMappingStatus: clean(workflow?.standardMapping?.status, 80),
     followupStatus: clean(workflow?.followup?.status, 80),
     timeline: projectTimeline(workflow),
@@ -183,7 +193,7 @@ function callbackDueAt(occurredAt) {
 }
 
 function createRouteSegment(runtime) {
-  const { DIRECT_REPORT_CONTRACT_ID, appendDataAccessLog, appendSecurityEvent, applyInfectiousReportingAction, buildInfectiousReportingCaseFromSources, collectJson, randomUUID, readDatabase, requireApiRole, sealAuditTrail, sendJson, upsertInfectiousReportingCase, verifyDirectReportCallback, writeDatabase } = runtime;
+  const { DIRECT_REPORT_CONTRACT_ID, appendDataAccessLog, appendSecurityEvent, applyInfectiousReportingAction, buildInfectiousReportingCaseFromSources, collectJson, enqueueDirectReportDeliveryToState, projectDirectReportDelivery, randomUUID, readDatabase, recordTrustedDirectReportCallbackToState, requeueDirectReportDeadLetterToState, requireApiRole, sealAuditTrail, sendJson, upsertInfectiousReportingCase, verifyDirectReportCallback, writeDatabase } = runtime;
   return {
     id: "public-health-04",
     domain: "public-health",
@@ -197,10 +207,16 @@ function createRouteSegment(runtime) {
         );
         if (!user) return true;
         const data = runtime.readDatabase();
+        const deliveries = Array.isArray(data.publicHealthInfectiousReportingDeliveries)
+          ? data.publicHealthInfectiousReportingDeliveries
+          : [];
         const cases = (Array.isArray(data.publicHealthInfectiousReportingCases)
           ? data.publicHealthInfectiousReportingCases
           : [])
-          .map(projectCaseSummary)
+          .map((item) => projectCaseSummary(
+            item,
+            runtime.projectDirectReportDelivery(latestDeliveryForCase(deliveries, item.id))
+          ))
           .sort((left, right) => {
             const leftAt = clean(left.timeline.at(-1)?.at, 80);
             const rightAt = clean(right.timeline.at(-1)?.at, 80);
@@ -220,9 +236,53 @@ function createRouteSegment(runtime) {
             total: cases.length,
             open: cases.filter((item) => item.businessClosureComplete !== true).length,
             trustedReceipts: cases.filter((item) => item.receipt?.trusted === true).length,
-            closed: cases.filter((item) => item.businessClosureComplete === true).length
+            closed: cases.filter((item) => item.businessClosureComplete === true).length,
+            deliveryQueued: cases.filter((item) => (
+              item.delivery && ["queued", "retry-scheduled", "leased"].includes(item.delivery.state)
+            )).length,
+            deliveryDeadLetter: cases.filter((item) => item.delivery?.state === "dead-letter").length
           },
           cases,
+          productionReady: false
+        });
+        return true;
+      }
+
+      if (req.method === "GET" && url.pathname === "/api/public-health/infectious-reporting-deliveries") {
+        const user = runtime.requireApiRole(
+          req,
+          res,
+          ["commission"],
+          "/api/public-health/infectious-reporting-deliveries"
+        );
+        if (!user) return true;
+        const data = runtime.readDatabase();
+        const deliveries = (Array.isArray(data.publicHealthInfectiousReportingDeliveries)
+          ? data.publicHealthInfectiousReportingDeliveries
+          : [])
+          .map((item) => runtime.projectDirectReportDelivery(item))
+          .sort((left, right) => clean(right.updatedAt, 80).localeCompare(clean(left.updatedAt, 80)));
+        runtime.appendSecurityEvent({
+          actor: user.name,
+          role: user.role,
+          action: "public-health-infectious-reporting-delivery-list",
+          target: "/api/public-health/infectious-reporting-deliveries",
+          result: "allowed",
+          detail: `deliveries=${deliveries.length}; projection=minimized; production=false`
+        });
+        runtime.sendJson(res, 200, {
+          ok: true,
+          summary: {
+            total: deliveries.length,
+            queued: deliveries.filter((item) => ["queued", "retry-scheduled"].includes(item.state)).length,
+            awaitingCallback: deliveries.filter((item) => item.state === "awaiting-callback").length,
+            deadLetter: deliveries.filter((item) => item.state === "dead-letter").length,
+            completed: deliveries.filter((item) => ["callback-accepted", "callback-rejected"].includes(item.state)).length
+          },
+          deliveries,
+          payloadsExposed: false,
+          subjectDataExposed: false,
+          credentialsExposed: false,
           productionReady: false
         });
         return true;
@@ -443,22 +503,32 @@ function createRouteSegment(runtime) {
             },
             actor
           );
+          const deliveryResult = runtime.recordTrustedDirectReportCallbackToState(data, {
+            caseId: workflow.id,
+            receiptId: verified.receiptId,
+            status: receiptStatus,
+            at: verified.occurredAt
+          });
+          const nextData = deliveryResult.nextData;
           const nextCases = [...cases];
           nextCases[index] = result.case;
-          data.publicHealthInfectiousReportingCases = nextCases.slice(-500);
+          nextData.publicHealthInfectiousReportingCases = nextCases.slice(-500);
           appendAudit(
             runtime,
-            data,
+            nextData,
             actor,
             result.case,
             "public-health-infectious-reporting-direct-report-callback",
             `${result.idempotent ? "idempotent" : "applied"}; status=${receiptStatus}; version=${result.case.version}; signature=verified; production=false`
           );
-          runtime.writeDatabase(data);
+          runtime.writeDatabase(nextData);
           runtime.sendJson(res, 200, {
             ok: true,
             idempotent: result.idempotent,
-            case: projectCaseSummary(result.case),
+            case: projectCaseSummary(
+              result.case,
+              runtime.projectDirectReportDelivery(deliveryResult.delivery)
+            ),
             callback: {
               contractId: runtime.DIRECT_REPORT_CONTRACT_ID,
               eventId: verified.eventId,
@@ -468,11 +538,70 @@ function createRouteSegment(runtime) {
               payloadsExposed: false,
               credentialsPersisted: false
             },
+            deliveryMatched: deliveryResult.matched,
             businessClosureComplete: result.case.businessClosureComplete === true,
             productionReady: false
           });
         } catch (error) {
           auditCallbackDenial(runtime, target, error);
+          sendCommandError(runtime, res, error);
+        }
+        return true;
+      }
+
+      const deliveryRetryMatch = url.pathname.match(
+        /^\/api\/public-health\/infectious-reporting-deliveries\/([^/]+)\/retry$/
+      );
+      if (req.method === "POST" && deliveryRetryMatch) {
+        const user = runtime.requireApiRole(
+          req,
+          res,
+          ["commission"],
+          "/api/public-health/infectious-reporting-deliveries/:id/retry"
+        );
+        if (!user) return true;
+        try {
+          const deliveryId = safeId(decodeURIComponent(deliveryRetryMatch[1]), "deliveryId");
+          const payload = await runtime.collectJson(req);
+          const expectedVersion = Number(payload.expectedVersion);
+          if (!Number.isInteger(expectedVersion) || expectedVersion < 1) {
+            throw commandError(
+              "PUBLIC_HEALTH_DIRECT_REPORT_DELIVERY_VERSION_REQUIRED",
+              "expectedVersion must be a positive integer"
+            );
+          }
+          const data = runtime.readDatabase();
+          const replayed = runtime.requeueDirectReportDeadLetterToState(data, deliveryId, {
+            expectedVersion,
+            idempotencyKey: required(payload.idempotencyKey, "idempotencyKey", 200),
+            at: payload.at || new Date().toISOString()
+          });
+          const workflow = (Array.isArray(replayed.nextData.publicHealthInfectiousReportingCases)
+            ? replayed.nextData.publicHealthInfectiousReportingCases
+            : []).find((item) => item.id === replayed.delivery.caseId);
+          appendAudit(
+            runtime,
+            replayed.nextData,
+            user,
+            workflow || { id: replayed.delivery.caseId, event: {} },
+            "public-health-infectious-reporting-delivery-retry",
+            `${replayed.idempotent ? "idempotent" : "requeued"}; delivery=${deliveryId}; version=${replayed.delivery.version}; production=false`
+          );
+          runtime.writeDatabase(replayed.nextData);
+          runtime.sendJson(res, 200, {
+            ok: true,
+            idempotent: replayed.idempotent,
+            delivery: runtime.projectDirectReportDelivery(replayed.delivery),
+            productionReady: false
+          });
+        } catch (error) {
+          auditDenial(
+            runtime,
+            user,
+            "/api/public-health/infectious-reporting-deliveries/:id/retry",
+            "public-health-infectious-reporting-delivery-retry",
+            error
+          );
           sendCommandError(runtime, res, error);
         }
         return true;
@@ -528,22 +657,33 @@ function createRouteSegment(runtime) {
             { ...payload, action, expectedVersion },
             user
           );
+          let nextData = data;
+          let deliveryResult = null;
+          if (action === "submit-report") {
+            deliveryResult = runtime.enqueueDirectReportDeliveryToState(nextData, result.case, {
+              at: result.history.at
+            });
+            nextData = deliveryResult.nextData;
+          }
           const nextCases = [...cases];
           nextCases[index] = result.case;
-          data.publicHealthInfectiousReportingCases = nextCases.slice(-500);
+          nextData.publicHealthInfectiousReportingCases = nextCases.slice(-500);
           appendAudit(
             runtime,
-            data,
+            nextData,
             user,
             result.case,
             `public-health-infectious-reporting-${action}`,
             `${result.idempotent ? "idempotent" : "applied"}; version=${result.case.version}; production=false`
           );
-          runtime.writeDatabase(data);
+          runtime.writeDatabase(nextData);
           runtime.sendJson(res, 200, {
             ok: true,
             idempotent: result.idempotent,
             case: result.case,
+            delivery: deliveryResult
+              ? runtime.projectDirectReportDelivery(deliveryResult.delivery)
+              : null,
             audit: result.history,
             businessClosureComplete: result.case.businessClosureComplete === true,
             productionReady: false
@@ -572,5 +712,6 @@ module.exports = {
   STANDARD_ITEMS,
   SUBDOMAIN: "infectious-reporting",
   createRouteSegment,
+  latestDeliveryForCase,
   projectCaseSummary
 };
