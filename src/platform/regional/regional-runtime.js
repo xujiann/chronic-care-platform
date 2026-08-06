@@ -3,13 +3,13 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const { createRegionalExtensionRegistry } = require("./extension-registry");
+const { validateRegionalConfigs } = require("./regional-config-contract");
 const { createRegionalValues } = require("./regional-values");
 const {
   deepFreeze,
   loadRegionManifest,
   loadRegionalConfigs,
   resolveWithin,
-  stableJson
 } = require("./region-manifest");
 
 function loadExtensionInstaller(loadedManifest) {
@@ -25,10 +25,7 @@ function loadExtensionInstaller(loadedManifest) {
 function loadRegionalRuntime(options = {}) {
   const loadedManifest = loadRegionManifest(options);
   const configs = loadRegionalConfigs(loadedManifest);
-  if (configs["feature-flags"]?.defaults
-    && stableJson(configs["feature-flags"].defaults) !== stableJson(loadedManifest.manifest.features)) {
-    throw new TypeError(`regional feature defaults do not match manifest for ${loadedManifest.manifest.regionCode}`);
-  }
+  validateRegionalConfigs(configs, loadedManifest.manifest);
   const registry = createRegionalExtensionRegistry();
   loadExtensionInstaller(loadedManifest)(registry);
   const baseContext = deepFreeze({
@@ -42,6 +39,7 @@ function loadRegionalRuntime(options = {}) {
     features: loadedManifest.manifest.features,
     configs,
     manifestDigest: loadedManifest.digest,
+    contentDigest: loadedManifest.contentDigest,
     productionReady: false
   });
   const extensions = registry.activate(loadedManifest.manifest.extensions, baseContext);

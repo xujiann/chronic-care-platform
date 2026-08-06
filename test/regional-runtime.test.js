@@ -12,6 +12,8 @@ test("generic region runtime is the platform-safe default with no executable ext
   const runtime = loadRegionalRuntime({ root: ROOT });
   assert.equal(runtime.context.regionCode, "template");
   assert.equal(runtime.context.deploymentClass, "template");
+  assert.match(runtime.context.contentDigest, /^[a-f0-9]{64}$/);
+  assert.equal(runtime.publicContext.contentDigest, runtime.context.contentDigest);
   assert.equal(runtime.context.productionReady, false);
   assert.equal(runtime.extensions.length, 0);
   assert.equal(runtime.context.isFeatureEnabled("regional.integration"), false);

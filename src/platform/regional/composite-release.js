@@ -1,8 +1,14 @@
 "use strict";
 
 const fs = require("node:fs");
-const path = require("node:path");
-const { deepFreeze, loadRegionManifest, resolveWithin, sha256, stableJson } = require("./region-manifest");
+const {
+  collectRegionFiles,
+  deepFreeze,
+  loadRegionManifest,
+  resolveWithin,
+  sha256,
+  stableJson
+} = require("./region-manifest");
 
 function parseVersion(value) {
   const match = String(value || "").match(/^(\d+)\.(\d+)\.(\d+)/);
@@ -19,18 +25,6 @@ function compareVersion(left, right) {
   return 0;
 }
 
-function collectRegionFiles(loadedManifest) {
-  const visit = (directory) => fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
-    const absolutePath = path.join(directory, entry.name);
-    if (entry.isDirectory()) return visit(absolutePath);
-    if (!entry.isFile() || ![".json", ".js"].includes(path.extname(entry.name).toLowerCase())) return [];
-    const relativePath = path.relative(loadedManifest.projectRoot, absolutePath).replaceAll("\\", "/");
-    const bytes = fs.readFileSync(absolutePath);
-    return [{ path: relativePath, size: bytes.length, sha256: sha256(bytes) }];
-  });
-  return visit(loadedManifest.regionRoot).sort((left, right) => left.path.localeCompare(right.path));
-}
-
 function buildCompositeRegionalRelease(options = {}) {
   const loadedManifest = loadRegionManifest(options);
   const packagePath = resolveWithin(loadedManifest.projectRoot, "package.json", "platform package");
@@ -44,6 +38,7 @@ function buildCompositeRegionalRelease(options = {}) {
     platformVersion,
     regionCode: loadedManifest.manifest.regionCode,
     regionVersion: loadedManifest.manifest.release.version,
+    regionalContentDigest: loadedManifest.contentDigest,
     files
   }));
   const checks = deepFreeze([
@@ -78,7 +73,13 @@ function buildCompositeRegionalRelease(options = {}) {
       name: loadedManifest.manifest.name,
       deploymentClass: loadedManifest.registration.deploymentClass,
       version: loadedManifest.manifest.release.version,
-      manifestDigest: loadedManifest.digest
+      manifestDigest: loadedManifest.digest,
+      contentDigest: loadedManifest.contentDigest
+    },
+    activation: {
+      REGION_CODE: loadedManifest.manifest.regionCode,
+      REGION_DEPLOYMENT_CLASS: loadedManifest.registration.deploymentClass,
+      REGION_CONTENT_DIGEST: `sha256:${loadedManifest.contentDigest}`
     },
     artifact: {
       algorithm: "sha256",
@@ -108,6 +109,7 @@ function verifyCompositeRegionalRelease(release, options = {}) {
   if (release?.releaseId !== rebuilt.releaseId) errors.push("releaseId");
   if (stableJson(release?.platform) !== stableJson(rebuilt.platform)) errors.push("platform");
   if (stableJson(release?.region) !== stableJson(rebuilt.region)) errors.push("region");
+  if (stableJson(release?.activation) !== stableJson(rebuilt.activation)) errors.push("activation");
   if (release?.artifact?.digest !== rebuilt.artifact.digest) errors.push("artifact.digest");
   if (stableJson(release?.artifact?.files) !== stableJson(rebuilt.artifact.files)) errors.push("artifact.files");
   if (stableJson(release?.checks) !== stableJson(rebuilt.checks)) errors.push("checks");

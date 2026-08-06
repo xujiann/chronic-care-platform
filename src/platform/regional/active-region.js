@@ -15,11 +15,21 @@ function getActiveRegionalRuntime(options = {}) {
   const env = options.env || process.env;
   const regionCode = options.regionCode || activeRegionCode(env);
   const root = path.resolve(options.root || PROJECT_ROOT);
-  const selection = `${root}:${regionCode || "<registry-default>"}`;
+  const expectedDeploymentClass = options.expectedDeploymentClass || env.REGION_DEPLOYMENT_CLASS || "";
+  const expectedContentDigest = options.expectedContentDigest || env.REGION_CONTENT_DIGEST || "";
+  const selection = JSON.stringify({
+    root,
+    regionCode: regionCode || "<registry-default>",
+    nodeEnv: env.NODE_ENV || "",
+    expectedDeploymentClass,
+    expectedContentDigest
+  });
   if (!cachedRuntime || cachedSelection !== selection || options.reload) {
     cachedRuntime = loadRegionalRuntime({
       root,
       env,
+      ...(expectedDeploymentClass ? { expectedDeploymentClass } : {}),
+      ...(expectedContentDigest ? { expectedContentDigest } : {}),
       ...(regionCode ? { regionCode } : {})
     });
     cachedSelection = selection;

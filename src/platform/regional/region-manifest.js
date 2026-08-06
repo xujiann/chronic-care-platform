@@ -13,6 +13,8 @@ const EXTENSION_KINDS = Object.freeze(["adapter", "policy", "dictionary", "ui", 
 const SENSITIVE_KEY_PATTERN = /(?:password|passwd|token|secret|credential|private.?key|access.?key|signature)/i;
 const MAX_JSON_BYTES = 256 * 1024;
 const DEPLOYMENT_CLASSES = Object.freeze(["template", "production", "test"]);
+const REGION_FILE_EXTENSIONS = Object.freeze([".json", ".js"]);
+const CONTENT_DIGEST_PATTERN = /^sha256:([a-f0-9]{64})$/;
 
 function stableJson(value) {
   if (Array.isArray(value)) return `[${value.map(stableJson).join(",")}]`;
@@ -75,6 +77,32 @@ function resolveWithin(root, relativePath, label) {
     }
   }
   return absolutePath;
+}
+
+function collectRegionFiles(loadedManifest) {
+  const visit = (directory) => fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const absolutePath = path.join(directory, entry.name);
+    if (entry.isSymbolicLink()) {
+      throw new TypeError(`regional package cannot contain symbolic links: ${entry.name}`);
+    }
+    if (entry.isDirectory()) return visit(absolutePath);
+    if (!entry.isFile()) throw new TypeError(`regional package contains unsupported entry: ${entry.name}`);
+    if (!REGION_FILE_EXTENSIONS.includes(path.extname(entry.name).toLowerCase())) {
+      throw new TypeError(`regional package contains unsupported file: ${entry.name}`);
+    }
+    const relativePath = path.relative(loadedManifest.projectRoot, absolutePath).replaceAll("\\", "/");
+    const bytes = fs.readFileSync(absolutePath);
+    return [{ path: relativePath, size: bytes.length, sha256: sha256(bytes) }];
+  });
+  return visit(loadedManifest.regionRoot).sort((left, right) => left.path.localeCompare(right.path));
+}
+
+function normalizeExpectedContentDigest(value) {
+  if (value === undefined || value === null || String(value).trim() === "") return null;
+  const normalized = String(value).trim();
+  const match = normalized.match(CONTENT_DIGEST_PATTERN);
+  if (!match) throw new TypeError("REGION_CONTENT_DIGEST must be sha256:<64 lowercase hex>");
+  return match[1];
 }
 
 function validateRegistry(registry) {
@@ -183,6 +211,13 @@ function loadRegionManifest(options = {}) {
   if (!REGION_CODE_PATTERN.test(regionCode)) throw new TypeError(`invalid REGION_CODE: ${regionCode}`);
   const registration = registry.regions.find((item) => item.code === regionCode);
   if (!registration || !registration.enabled) throw new TypeError(`region ${regionCode} is not enabled in regional registry`);
+  const expectedDeploymentClass = options.expectedDeploymentClass || options.env?.REGION_DEPLOYMENT_CLASS;
+  if (expectedDeploymentClass && !DEPLOYMENT_CLASSES.includes(expectedDeploymentClass)) {
+    throw new TypeError("REGION_DEPLOYMENT_CLASS is invalid");
+  }
+  if (expectedDeploymentClass && registration.deploymentClass !== expectedDeploymentClass) {
+    throw new TypeError(`regional deployment class mismatch for ${regionCode}`);
+  }
   if (registration.deploymentClass === "test" && options.env?.NODE_ENV === "production") {
     throw new TypeError(`test region ${regionCode} cannot run in production`);
   }
@@ -190,7 +225,7 @@ function loadRegionManifest(options = {}) {
   const regionRoot = resolveWithin(regionsRoot, regionCode, `region ${regionCode}`);
   const manifestPath = resolveWithin(regionRoot, "manifest.json", `region ${regionCode} manifest`);
   const manifest = validateManifest(readJsonFile(manifestPath, `region ${regionCode} manifest`), regionCode);
-  return deepFreeze({
+  const base = {
     projectRoot,
     regionsRoot,
     regionRoot,
@@ -198,6 +233,22 @@ function loadRegionManifest(options = {}) {
     registration,
     manifest,
     digest: sha256(stableJson(manifest))
+  };
+  const files = collectRegionFiles(base);
+  const contentDigest = sha256(stableJson({
+    registration,
+    files
+  }));
+  const expectedContentDigest = normalizeExpectedContentDigest(
+    options.expectedContentDigest || options.env?.REGION_CONTENT_DIGEST
+  );
+  if (expectedContentDigest && contentDigest !== expectedContentDigest) {
+    throw new TypeError(`regional content digest mismatch for ${regionCode}`);
+  }
+  return deepFreeze({
+    ...base,
+    contentDigest,
+    files
   });
 }
 
@@ -211,16 +262,20 @@ function loadRegionalConfigs(loadedManifest) {
 }
 
 module.exports = {
+  CONTENT_DIGEST_PATTERN,
   CONFIG_REF_PATTERN,
   DEPLOYMENT_CLASSES,
   EXTENSION_KINDS,
   REGION_SCHEMA_VERSION,
+  REGION_FILE_EXTENSIONS,
   REGISTRY_SCHEMA_VERSION,
   VERSION_PATTERN,
   assertNoSensitiveKeys,
+  collectRegionFiles,
   deepFreeze,
   loadRegionManifest,
   loadRegionalConfigs,
+  normalizeExpectedContentDigest,
   resolveWithin,
   sha256,
   stableJson,

@@ -21,6 +21,12 @@ test("composite release binds platform version, region version and every region 
   assert.equal(release.technicalReady, true);
   assert.equal(release.productionReady, false);
   assert.equal(release.region.deploymentClass, "production");
+  assert.match(release.region.contentDigest, /^[a-f0-9]{64}$/);
+  assert.deepEqual(release.activation, {
+    REGION_CODE: "210200",
+    REGION_DEPLOYMENT_CLASS: "production",
+    REGION_CONTENT_DIGEST: `sha256:${release.region.contentDigest}`
+  });
   assert.match(release.releaseId, /^core-0\.1\.0-region-210200-0\.1\.0-[a-f0-9]{12}$/);
   assert.ok(release.artifact.files.some((item) => item.path === "regions/210200/manifest.json"));
   assert.ok(release.artifact.files.some((item) => item.path === "regions/210200/extensions/index.js"));
@@ -38,6 +44,12 @@ test("composite release detects tampering and incompatible platform versions", (
   assert.deepEqual(
     verifyCompositeRegionalRelease(metadataTampered, { root: ROOT }).errors,
     ["region", "productionReady"]
+  );
+  const activationTampered = structuredClone(release);
+  activationTampered.activation.REGION_CONTENT_DIGEST = `sha256:${"0".repeat(64)}`;
+  assert.deepEqual(
+    verifyCompositeRegionalRelease(activationTampered, { root: ROOT }).errors,
+    ["activation"]
   );
   const incompatible = buildCompositeRegionalRelease({
     root: ROOT,

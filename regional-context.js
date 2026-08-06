@@ -8,6 +8,7 @@
     deploymentClass: "template",
     locale: "zh-CN",
     timezone: "Asia/Shanghai",
+    contentDigest: null,
     features: Object.freeze({}),
     organizations: Object.freeze({
       healthAuthority: Object.freeze({ code: "REGION-HEALTH", name: "地区卫生健康主管部门", shortName: "地区卫健主管部门", type: "health_admin" }),

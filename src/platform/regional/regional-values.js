@@ -82,6 +82,7 @@ function createRegionalValues(context) {
     administrativeDivision: context.administrativeDivision,
     features: context.features,
     manifestDigest: context.manifestDigest,
+    contentDigest: context.contentDigest,
     organizations,
     areas,
     terms,

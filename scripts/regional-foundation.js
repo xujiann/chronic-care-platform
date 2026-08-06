@@ -33,6 +33,7 @@ function regionStatus(regionCode, options = {}) {
     regionName: runtime.context.regionName,
     deploymentClass: runtime.context.deploymentClass,
     manifestDigest: runtime.context.manifestDigest,
+    contentDigest: runtime.context.contentDigest,
     activeExtensions: runtime.extensions.map((item) => ({
       id: item.id,
       kind: item.kind,
