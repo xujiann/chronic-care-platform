@@ -418,6 +418,12 @@ test("release report summarizes repository readiness and renders markdown", () =
   assert.equal(report.checks.some((item) => item.name === "regionalDataSharing:handoffRuntime" && item.passed), true);
   assert.equal(report.regionalDataSharing.summary.referralHandoffReady >= 1, true);
   assert.equal(report.regionalDataSharing.packages.every((item) => item.referralHandoff?.total === 6), true);
+  assert.equal(report.checks.some((item) => item.name === "regionalConfiguration:readiness" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.name === "regionalConfiguration:valueBoundary" && item.passed), true);
+  assert.equal(report.regionalConfigurationReadiness.productionReady, false);
+  assert.equal(report.checks.some((item) => item.name === "regionalDossier:control" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.name === "regionalDossier:productionBoundary" && item.passed), true);
+  assert.equal(report.regionalCutoverDossier.productionReady, false);
   assert.equal(report.checks.some((item) => item.name === "regionalReferralOverlap:report" && item.passed), true);
   assert.equal(report.regionalReferralOverlap.runtimeMergeAllowed, false);
   assert.equal(report.checks.some((item) => item.name === "monitoring:readiness" && item.passed), true);
@@ -653,6 +659,7 @@ test("release report summarizes repository readiness and renders markdown", () =
   assert.match(markdown, /Integration readiness report/);
   assert.match(markdown, /Interface mapping report/);
   assert.match(markdown, /Regional data sharing and referral overlap report/);
+  assert.match(markdown, /Regional configuration admission and cutover dossier/);
   assert.match(markdown, /Data quality and master index report/);
   assert.match(markdown, /Digital hospital standards readiness report/);
   assert.match(markdown, /digital-hospital-standards-readiness-report\.md/);
@@ -821,6 +828,10 @@ test("release report writes standalone production cutover and storage artifacts"
   const interfaceMappingMarkdown = fs.readFileSync(path.join(outputDir, "interface-mapping-report.md"), "utf8");
   const regionalDataSharingJson = JSON.parse(fs.readFileSync(path.join(outputDir, "regional-data-sharing-report.json"), "utf8"));
   const regionalDataSharingMarkdown = fs.readFileSync(path.join(outputDir, "regional-data-sharing-report.md"), "utf8");
+  const regionalConfigurationJson = JSON.parse(fs.readFileSync(path.join(outputDir, "regional-configuration-readiness.json"), "utf8"));
+  const regionalConfigurationMarkdown = fs.readFileSync(path.join(outputDir, "regional-configuration-readiness.md"), "utf8");
+  const regionalCutoverDossierJson = JSON.parse(fs.readFileSync(path.join(outputDir, "regional-cutover-dossier.json"), "utf8"));
+  const regionalCutoverDossierMarkdown = fs.readFileSync(path.join(outputDir, "regional-cutover-dossier.md"), "utf8");
   const regionalReferralOverlapJson = JSON.parse(fs.readFileSync(path.join(outputDir, "regional-referral-overlap-report.json"), "utf8"));
   const regionalReferralOverlapMarkdown = fs.readFileSync(path.join(outputDir, "regional-referral-overlap-report.md"), "utf8");
   const monitoringJson = JSON.parse(fs.readFileSync(path.join(outputDir, "monitoring-readiness-report.json"), "utf8"));
@@ -977,6 +988,10 @@ test("release report writes standalone production cutover and storage artifacts"
   assert.equal(regionalDataSharingJson.regionalDataSharing.summary.referralHandoffReady >= 1, true);
   assert.equal(regionalDataSharingJson.regionalDataSharing.packages.every((item) => item.referralHandoff?.total === 6), true);
   assert.match(regionalDataSharingMarkdown, /转诊会诊交接证据/);
+  assert.equal(regionalConfigurationJson.productionReady, false);
+  assert.match(regionalConfigurationMarkdown, /地区配置准入审计/);
+  assert.equal(regionalCutoverDossierJson.productionReady, false);
+  assert.match(regionalCutoverDossierMarkdown, /地区投产档案/);
   assert.equal(regionalReferralOverlapJson.regionalReferralOverlap.ok, true);
   assert.equal(regionalReferralOverlapJson.regionalReferralOverlap.runtimeMergeAllowed, false);
   assert.match(regionalReferralOverlapMarkdown, /区域诊疗数据共享与医联体转诊重合度检查报告/);

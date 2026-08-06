@@ -82,6 +82,8 @@ const { buildInsurancePaymentAcceptance, renderMarkdown: renderInsurancePaymentA
 const { buildInsurancePaymentEvidencePacket, renderMarkdown: renderInsurancePaymentEvidenceMarkdown, verifyInsurancePaymentEvidencePacket } = require("./insurance-payment-evidence-packet");
 const { renderMarkdown: renderPriorityApplicationTemplatesMarkdown } = require("./priority-application-templates");
 const { buildRegionalDataSharingReport, renderMarkdown: renderRegionalDataSharingMarkdown } = require("./regional-data-sharing");
+const { buildReport: buildRegionalConfigurationReadiness, renderMarkdown: renderRegionalConfigurationMarkdown } = require("./regional-configuration-readiness");
+const { buildReport: buildRegionalCutoverDossier, renderMarkdown: renderRegionalCutoverDossierMarkdown } = require("./regional-cutover-dossier");
 const { buildRegionalReferralOverlapReport, renderMarkdown: renderRegionalReferralOverlapMarkdown } = require("./regional-referral-overlap");
 const { buildQualitySafetyReport, renderMarkdown: renderQualitySafetyMarkdown } = require("./quality-safety-report");
 const { buildQualitySafetyInterfaceStandard, renderMarkdown: renderQualitySafetyInterfaceStandardMarkdown } = require("./quality-safety-interface-standard");
@@ -498,6 +500,49 @@ function regionalDataSharingChecks(regionalDataSharing) {
     check("regionalDataSharing:accessReviews", regionalDataSharing.summary?.accessReviews >= 1, `${regionalDataSharing.summary?.accessReviews || 0} access reviews`, "error", "regional-data-sharing"),
     check("regionalDataSharing:handoffEvidence", regionalDataSharing.summary?.referralHandoffReady >= 1 && regionalDataSharing.summary?.referralHandoffChecks >= 18, `${regionalDataSharing.summary?.referralHandoffReady || 0} handoff-ready packages`, "error", "regional-data-sharing"),
     check("regionalDataSharing:handoffRuntime", handoffReportApi && handoffReportUi, handoffReportApi && handoffReportUi ? "runtime handoff report API and UI present" : "runtime handoff report API or UI missing", "error", "regional-data-sharing")
+  ];
+}
+
+function regionalProductLineChecks(regionalConfigurationReadiness, regionalCutoverDossier) {
+  const configurationBoundary = regionalConfigurationReadiness.productionReady === false
+    && regionalConfigurationReadiness.regions?.every((item) =>
+      item.productionReady === false && item.containsConfigurationValues === false
+    );
+  const dossierBoundary = regionalCutoverDossier.productionReady === false
+    && regionalCutoverDossier.regions?.every((item) =>
+      item.productionReady === false && !Object.hasOwn(item, "endpoint")
+    );
+  return [
+    check(
+      "regionalConfiguration:readiness",
+      regionalConfigurationReadiness.ok
+        && regionalConfigurationReadiness.summary?.technicalReady === regionalConfigurationReadiness.summary?.regions,
+      `${regionalConfigurationReadiness.summary?.technicalReady || 0}/${regionalConfigurationReadiness.summary?.regions || 0} regional configurations technically ready`,
+      "error",
+      "regional-product-line"
+    ),
+    check(
+      "regionalConfiguration:valueBoundary",
+      configurationBoundary,
+      configurationBoundary ? "configuration values are excluded and production remains NO-GO" : "regional configuration output boundary failed",
+      "error",
+      "regional-product-line"
+    ),
+    check(
+      "regionalDossier:control",
+      regionalCutoverDossier.ok
+        && regionalCutoverDossier.summary?.localControlReady === regionalCutoverDossier.summary?.regions,
+      `${regionalCutoverDossier.summary?.localControlReady || 0}/${regionalCutoverDossier.summary?.regions || 0} regional cutover dossiers locally controlled`,
+      "error",
+      "regional-product-line"
+    ),
+    check(
+      "regionalDossier:productionBoundary",
+      dossierBoundary,
+      `${regionalCutoverDossier.summary?.candidateReady || 0} candidate-ready; external authorization is still required`,
+      "error",
+      "regional-product-line"
+    )
   ];
 }
 
@@ -1439,6 +1484,12 @@ function buildReleaseReport(options = {}) {
   const pilotAcceptance = buildPilotAcceptanceCenter({ data, pkg, env: { ...process.env, ...(options.env || {}) } });
   const phase2Proposal = buildPhase2ProposalReadiness({ pkg });
   const regionalDataSharing = buildRegionalDataSharingReport({ data, pkg });
+  const regionalConfigurationReadiness = buildRegionalConfigurationReadiness({ root: ROOT });
+  const regionalCutoverDossier = buildRegionalCutoverDossier({
+    root: ROOT,
+    env: options.env || {},
+    receipts: data.regionalDeploymentProbeReceipts || []
+  });
   const regionalReferralOverlap = buildRegionalReferralOverlapReport({ data, pkg });
   const hospitalOperationsReadiness = buildHospitalOperationsReadinessReport({ data, pkg });
   const hospitalOperationsRelease = buildHospitalOperationsReleaseReport({ data, pkg, readiness: hospitalOperationsReadiness });
@@ -1571,6 +1622,7 @@ function buildReleaseReport(options = {}) {
     ...financialGatewayReadinessChecks(financialGatewayReadiness),
     ...interfaceMappingChecks(interfaceMapping),
     ...regionalDataSharingChecks(regionalDataSharing),
+    ...regionalProductLineChecks(regionalConfigurationReadiness, regionalCutoverDossier),
     ...regionalReferralOverlapChecks(regionalReferralOverlap),
     ...hospitalOperationsReadinessChecks(hospitalOperationsReadiness),
     ...hospitalOperationsReleaseChecks(hospitalOperationsRelease),
@@ -1689,6 +1741,8 @@ function buildReleaseReport(options = {}) {
     financialGatewayReadiness,
     interfaceMapping,
     regionalDataSharing,
+    regionalConfigurationReadiness,
+    regionalCutoverDossier,
     regionalReferralOverlap,
     hospitalOperationsReadiness,
     hospitalOperationsRelease,
@@ -2016,6 +2070,10 @@ function renderMarkdown(report) {
     "",
     "See `regional-data-sharing-report.json`, `regional-data-sharing-report.md`, `regional-referral-overlap-report.json`, and `regional-referral-overlap-report.md` for shared clinical evidence, referral handoff readiness, ownership boundaries, and the explicit no-runtime-merge decision.",
     "",
+    "## Regional configuration admission and cutover dossier",
+    "",
+    "See `regional-configuration-readiness.json`, `regional-configuration-readiness.md`, `regional-cutover-dossier.json`, and `regional-cutover-dossier.md` for value-free configuration admission, immutable release binding, operations and storage gates, and the explicit external production authorization boundary.",
+    "",
     "## Internet nursing readiness report",
     "",
     "See `internet-nursing-readiness-report.json`, `internet-nursing-readiness-report.md`, and `docs/internet-nursing-highlight-center.md` for resident appointment, hospital assessment and dispatch, nurse acceptance, location trace, service record, quality callback, policy evidence, and the 10-highlight innovation center.",
@@ -2341,6 +2399,10 @@ function writeOutput(report, flags) {
       generatedAt: report.generatedAt,
       regionalDataSharing: report.regionalDataSharing
     }, null, 2), "utf8");
+    const regionalConfigurationJson = path.join(path.dirname(output), "regional-configuration-readiness.json");
+    fs.writeFileSync(regionalConfigurationJson, JSON.stringify(report.regionalConfigurationReadiness, null, 2), "utf8");
+    const regionalCutoverDossierJson = path.join(path.dirname(output), "regional-cutover-dossier.json");
+    fs.writeFileSync(regionalCutoverDossierJson, JSON.stringify(report.regionalCutoverDossier, null, 2), "utf8");
     const regionalReferralOverlapJson = path.join(path.dirname(output), "regional-referral-overlap-report.json");
     fs.writeFileSync(regionalReferralOverlapJson, JSON.stringify({
       project: report.project,
@@ -2717,6 +2779,10 @@ function writeOutput(report, flags) {
     fs.writeFileSync(interfaceMappingMarkdown, renderInterfaceMappingMarkdown(report.interfaceMapping), "utf8");
     const regionalDataSharingMarkdown = path.join(path.dirname(markdown), "regional-data-sharing-report.md");
     fs.writeFileSync(regionalDataSharingMarkdown, renderRegionalDataSharingMarkdown(report.regionalDataSharing), "utf8");
+    const regionalConfigurationMarkdown = path.join(path.dirname(markdown), "regional-configuration-readiness.md");
+    fs.writeFileSync(regionalConfigurationMarkdown, renderRegionalConfigurationMarkdown(report.regionalConfigurationReadiness), "utf8");
+    const regionalCutoverDossierMarkdown = path.join(path.dirname(markdown), "regional-cutover-dossier.md");
+    fs.writeFileSync(regionalCutoverDossierMarkdown, renderRegionalCutoverDossierMarkdown(report.regionalCutoverDossier), "utf8");
     const regionalReferralOverlapMarkdown = path.join(path.dirname(markdown), "regional-referral-overlap-report.md");
     fs.writeFileSync(regionalReferralOverlapMarkdown, renderRegionalReferralOverlapMarkdown(report.regionalReferralOverlap), "utf8");
     const drugConsumableMarkdown = path.join(path.dirname(markdown), "drug-consumable-readiness-report.md");

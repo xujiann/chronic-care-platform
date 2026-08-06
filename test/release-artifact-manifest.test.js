@@ -55,6 +55,8 @@ test("release artifact manifest indexes reports templates commands and evidence"
   assert.equal(report.artifacts.some((item) => item.id === "regional-site-deployment" && item.command === "regional:deploy-plan"), true);
   assert.equal(report.artifacts.some((item) => item.id === "regional-release-governance" && item.command === "regional:release-governance"), true);
   assert.equal(report.artifacts.some((item) => item.id === "regional-operations-readiness" && item.command === "regional:operations" && item.evidence === "/api/regional/deployments"), true);
+  assert.equal(report.artifacts.some((item) => item.id === "regional-configuration-readiness" && item.command === "regional:configuration"), true);
+  assert.equal(report.artifacts.some((item) => item.id === "regional-cutover-dossier" && item.command === "regional:dossier" && item.evidence === "/api/regional/deployments/:regionCode/dossier"), true);
   assert.equal(report.artifacts.some((item) => item.id === "regional-replication-exercise" && item.command === "regional:replication"), true);
   assert.equal(report.artifacts.some((item) => item.id === "postgres-primary-storage-contract" && item.command === "postgres:primary-storage-contract:check"), true);
   assert.equal(report.artifacts.some((item) => item.id === "internet-nursing-highlight-center" && item.command === "internet-nursing:readiness" && item.markdown === "docs/internet-nursing-highlight-center.md" && item.evidence === "internet-nursing.html#nursing-highlight-section"), true);

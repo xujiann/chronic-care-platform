@@ -4,6 +4,9 @@ const {
   buildFleetStatus,
   probeRegion
 } = require("../../platform/regional/multi-region-operations");
+const {
+  buildRegionalCutoverDossier
+} = require("../../platform/regional/regional-cutover-dossier");
 
 function createRouteSegments({
   appendSecurityEvent,
@@ -52,6 +55,63 @@ function createRouteSegments({
           detail: `${fleet.summary.sites} sites; ${fleet.summary.drift} drift; production gate closed`
         });
         sendJson(res, 200, fleet);
+        return true;
+      }
+
+      const dossierMatch = url.pathname.match(/^\/api\/regional\/deployments\/([^/]+)\/dossier$/);
+      if (req.method === "GET" && dossierMatch) {
+        const user = requireApiRole(req, res, ["commission"], "/api/regional/deployments/:regionCode/dossier");
+        if (!user) return true;
+        const regionCode = dossierMatch[1];
+        if (url.search || !/^\d{6}$/.test(regionCode)) {
+          appendSecurityEvent({
+            actor: user.name,
+            role: user.role,
+            action: "regional-cutover-dossier-read",
+            target: regionCode,
+            result: "denied",
+            detail: "REGIONAL_DOSSIER_CLIENT_INPUT_REJECTED"
+          });
+          sendJson(res, 400, {
+            error: "Bad Request",
+            code: "REGIONAL_DOSSIER_CLIENT_INPUT_REJECTED",
+            message: "regional dossier accepts only a registered region code",
+            productionReady: false
+          });
+          return true;
+        }
+        try {
+          const data = readDatabase();
+          const dossier = buildRegionalCutoverDossier({
+            env: environment,
+            receipts: data.regionalDeploymentProbeReceipts,
+            regionCode
+          });
+          appendSecurityEvent({
+            actor: user.name,
+            role: user.role,
+            action: "regional-cutover-dossier-read",
+            target: regionCode,
+            result: "allowed",
+            detail: `${dossier.release.governanceState}; ${dossier.operations.status}; candidate=${dossier.candidateReady}; production gate closed`
+          });
+          sendJson(res, 200, dossier);
+        } catch {
+          appendSecurityEvent({
+            actor: user.name,
+            role: user.role,
+            action: "regional-cutover-dossier-read",
+            target: regionCode,
+            result: "denied",
+            detail: "REGIONAL_DOSSIER_NOT_AVAILABLE"
+          });
+          sendJson(res, 404, {
+            error: "Not Found",
+            code: "REGIONAL_DOSSIER_NOT_AVAILABLE",
+            message: "regional cutover dossier is not available",
+            productionReady: false
+          });
+        }
         return true;
       }
 
