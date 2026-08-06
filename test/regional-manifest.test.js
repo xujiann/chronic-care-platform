@@ -86,8 +86,8 @@ test("regional registry requires unique enabled region declarations", () => {
       schemaVersion: "regional-registry-v1",
       defaultRegion: "template",
       regions: [
-        { code: "template", enabled: true, deploymentClass: "template" },
-        { code: "template", enabled: true, deploymentClass: "template" }
+        { code: "template", name: "模板", purpose: "测试", enabled: true, deploymentClass: "template" },
+        { code: "template", name: "模板", purpose: "测试", enabled: true, deploymentClass: "template" }
       ]
     }),
     /duplicate region codes/
@@ -97,7 +97,7 @@ test("regional registry requires unique enabled region declarations", () => {
       schemaVersion: "regional-registry-v1",
       defaultRegion: "template",
       regions: [
-        { code: "template", enabled: false, deploymentClass: "template" }
+        { code: "template", name: "模板", purpose: "测试", enabled: false, deploymentClass: "template" }
       ]
     }),
     /defaultRegion must be an enabled template/
@@ -107,8 +107,8 @@ test("regional registry requires unique enabled region declarations", () => {
       schemaVersion: "regional-registry-v1",
       defaultRegion: "template",
       regions: [
-        { code: "template", enabled: true, deploymentClass: "template" },
-        { code: "990001", enabled: true, deploymentClass: "template" }
+        { code: "template", name: "模板", purpose: "测试", enabled: true, deploymentClass: "template" },
+        { code: "990001", name: "测试地区", purpose: "测试", enabled: true, deploymentClass: "template" }
       ]
     }),
     /reserved for defaultRegion/

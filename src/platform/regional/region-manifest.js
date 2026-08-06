@@ -120,6 +120,12 @@ function validateRegistry(registry) {
     assertPlainObject(entry, `regional registry regions[${index}]`);
     const code = String(entry.code || "");
     if (!REGION_CODE_PATTERN.test(code)) throw new TypeError(`invalid regional registry code: ${code}`);
+    if (typeof entry.name !== "string" || entry.name.trim() === "") {
+      throw new TypeError(`regional registry ${code} name must be a non-empty string`);
+    }
+    if (typeof entry.purpose !== "string" || entry.purpose.trim() === "") {
+      throw new TypeError(`regional registry ${code} purpose must be a non-empty string`);
+    }
     if (typeof entry.enabled !== "boolean") throw new TypeError(`regional registry ${code} enabled must be boolean`);
     if (!DEPLOYMENT_CLASSES.includes(entry.deploymentClass)) {
       throw new TypeError(`regional registry ${code} deploymentClass is invalid`);
@@ -225,6 +231,9 @@ function loadRegionManifest(options = {}) {
   const regionRoot = resolveWithin(regionsRoot, regionCode, `region ${regionCode}`);
   const manifestPath = resolveWithin(regionRoot, "manifest.json", `region ${regionCode} manifest`);
   const manifest = validateManifest(readJsonFile(manifestPath, `region ${regionCode} manifest`), regionCode);
+  if (manifest.name !== registration.name) {
+    throw new TypeError(`region ${regionCode} manifest name does not match registry`);
+  }
   const base = {
     projectRoot,
     regionsRoot,
@@ -276,6 +285,7 @@ module.exports = {
   loadRegionManifest,
   loadRegionalConfigs,
   normalizeExpectedContentDigest,
+  readJsonFile,
   resolveWithin,
   sha256,
   stableJson,
