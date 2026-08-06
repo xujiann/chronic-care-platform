@@ -25,7 +25,7 @@ function clean(value) {
 
 function defaultInstitutions() {
   return [
-    { id: "p2pilot-hospital", role: "tertiary-hospital", name: "Dalian Central Hospital", sourceSystems: ["HIS", "EMR", "LIS", "PACS"], signoffStatus: "pending-site-signature", owner: "hospital-integration" },
+    { id: "p2pilot-hospital", role: "tertiary-hospital", name: "Regional Central Hospital", sourceSystems: ["HIS", "EMR", "LIS", "PACS"], signoffStatus: "pending-site-signature", owner: "hospital-integration" },
     { id: "p2pilot-district", role: "district-platform", name: "Ganjingzi district health platform", sourceSystems: ["health-archive", "public-health", "statistics"], signoffStatus: "pending-district-signature", owner: "district-platform" },
     { id: "p2pilot-primary", role: "primary-care", name: "Lingshui community health center", sourceSystems: ["primary-HIS", "family-doctor", "chronic-reporting"], signoffStatus: "pending-primary-signature", owner: "primary-care" }
   ];

@@ -84,7 +84,7 @@
       deadline: "2026-09-30",
     },
     tasks: [
-      { id: "TASK-2026-001", name: "2026数智医院试点评价", type: "试点评价", standard: "STD-2026-TRIAL", scope: "大连市二级及以上公立医院", status: "填报中", start: "2026-08-01", submitDue: "2026-09-30", reviewDue: "2026-11-15", resultAt: "2026-12-20", hospitals: ["H000001", "H000002", "H000003"], reminders: 2, extensionRequests: 1 },
+      { id: "TASK-2026-001", name: "2026数智医院试点评价", type: "试点评价", standard: "STD-2026-TRIAL", scope: "区域二级及以上公立医院", status: "填报中", start: "2026-08-01", submitDue: "2026-09-30", reviewDue: "2026-11-15", resultAt: "2026-12-20", hospitals: ["H000001", "H000002", "H000003"], reminders: 2, extensionRequests: 1 },
       { id: "TASK-2026-002", name: "安全合规专项抽查", type: "专项评价", standard: "STD-2026-TRIAL", scope: "三级医院安全合规域", status: "未开始", start: "2026-10-10", submitDue: "2026-10-30", reviewDue: "2026-11-30", resultAt: "2026-12-15", hospitals: ["H000001", "H000002"], reminders: 0, extensionRequests: 0 },
     ],
     roles: [
@@ -101,12 +101,12 @@
       { id: "U102", name: "省级管理员", role: "省级管理员", org: "辽宁省", status: "启用", lastLogin: "2026-07-27 10:15" },
       { id: "U203", name: "审核员A", role: "省级审核员", org: "辽宁省审核组", status: "启用", lastLogin: "2026-07-27 11:02" },
       { id: "U301", name: "专家B", role: "专家复核员", org: "数据互联互通专家组", status: "启用", lastLogin: "2026-07-27 12:20" },
-      { id: "U401", name: "医院填报员", role: "医院填报员", org: "大连市示例中心医院", status: "启用", lastLogin: "2026-07-27 13:10" },
+      { id: "U401", name: "医院填报员", role: "医院填报员", org: "区域示例中心医院", status: "启用", lastLogin: "2026-07-27 13:10" },
     ],
     hospitals: [
-      { code: "H000001", name: "大连市示例中心医院", level: "三级", type: "综合", city: "大连市", owner: "信息中心", contact: "王主任", systems: 18, regionConnected: "已接入", emrGrade: "5级", smartService: "3级" },
-      { code: "H000002", name: "大连市示例专科医院", level: "三级", type: "专科", city: "大连市", owner: "医务部", contact: "李主任", systems: 12, regionConnected: "部分接入", emrGrade: "4级", smartService: "2级" },
-      { code: "H000003", name: "区县示例人民医院", level: "二级", type: "综合", city: "大连市", owner: "信息科", contact: "赵科长", systems: 9, regionConnected: "待完善", emrGrade: "3级", smartService: "1级" },
+      { code: "H000001", name: "区域示例中心医院", level: "三级", type: "综合", city: "区域", owner: "信息中心", contact: "王主任", systems: 18, regionConnected: "已接入", emrGrade: "5级", smartService: "3级" },
+      { code: "H000002", name: "区域示例专科医院", level: "三级", type: "专科", city: "区域", owner: "医务部", contact: "李主任", systems: 12, regionConnected: "部分接入", emrGrade: "4级", smartService: "2级" },
+      { code: "H000003", name: "区县示例人民医院", level: "二级", type: "综合", city: "区域", owner: "信息科", contact: "赵科长", systems: 9, regionConnected: "待完善", emrGrade: "3级", smartService: "1级" },
     ],
     metrics: {
       outpatientTotal: 450000,
@@ -221,8 +221,8 @@
     ],
     rectifications: [],
     reviewAssignments: [
-      { id: "RA-H000001", hospitalCode: "H000001", hospitalName: "大连市示例中心医院", reviewer: "审核员A", status: "待审核", risk: "高", submittedAt: "2026-09-28 15:20", issueCount: 2, materialMissing: 1 },
-      { id: "RA-H000002", hospitalCode: "H000002", hospitalName: "大连市示例专科医院", reviewer: "未分派", status: "待分派", risk: "中", submittedAt: "2026-09-29 10:40", issueCount: 1, materialMissing: 2 },
+      { id: "RA-H000001", hospitalCode: "H000001", hospitalName: "区域示例中心医院", reviewer: "审核员A", status: "待审核", risk: "高", submittedAt: "2026-09-28 15:20", issueCount: 2, materialMissing: 1 },
+      { id: "RA-H000002", hospitalCode: "H000002", hospitalName: "区域示例专科医院", reviewer: "未分派", status: "待分派", risk: "中", submittedAt: "2026-09-29 10:40", issueCount: 1, materialMissing: 2 },
       { id: "RA-H000003", hospitalCode: "H000003", hospitalName: "区县示例人民医院", reviewer: "审核员B", status: "审核中", risk: "中", submittedAt: "2026-09-26 11:15", issueCount: 3, materialMissing: 1 },
     ],
     scoringRules: [
@@ -255,8 +255,8 @@
       { at: "2026-07-27 12:40", user: "医院填报员", action: "上传证据材料", target: "H1", result: "待复核" },
     ],
     spotChecks: [
-      { id: "SC-2026-001", batch: "2026第一批国家抽查", hospitalCode: "H000001", hospitalName: "大连市示例中心医院", source: "高风险自动入池", reason: "H1安全合规材料临期且存在底线项提示", sampleRate: "20%", reviewer: "国家抽查组A", status: "待复核", due: "2026-11-20", findings: 0 },
-      { id: "SC-2026-002", batch: "2026第一批国家抽查", hospitalCode: "H000002", hospitalName: "大连市示例专科医院", source: "分层随机抽样", reason: "三级专科医院分层样本", sampleRate: "15%", reviewer: "未分派", status: "待分派", due: "2026-11-22", findings: 0 },
+      { id: "SC-2026-001", batch: "2026第一批国家抽查", hospitalCode: "H000001", hospitalName: "区域示例中心医院", source: "高风险自动入池", reason: "H1安全合规材料临期且存在底线项提示", sampleRate: "20%", reviewer: "国家抽查组A", status: "待复核", due: "2026-11-20", findings: 0 },
+      { id: "SC-2026-002", batch: "2026第一批国家抽查", hospitalCode: "H000002", hospitalName: "区域示例专科医院", source: "分层随机抽样", reason: "三级专科医院分层样本", sampleRate: "15%", reviewer: "未分派", status: "待分派", due: "2026-11-22", findings: 0 },
     ],
     sandboxConfig: {
       successRateThreshold: 98,
@@ -271,12 +271,12 @@
       { id: "MC-EV-H1-001", materialId: "EV-H1-001", materialName: "等保测评报告.pdf", suggestedIndicator: "H1", category: "安全合规证明", confidence: 98, risk: "高", status: "待确认" },
     ],
     peerAnomalies: [
-      { id: "AN-2026-001", hospitalCode: "H000001", hospitalName: "大连市示例中心医院", metric: "接口调用成功率", value: "99.5%", peerMedian: "97.8%", deviation: "+1.7个百分点", level: "中", reason: "显著高于同级综合医院中位数，需核验统计口径", status: "待核验" },
-      { id: "AN-2026-002", hospitalCode: "H000002", hospitalName: "大连市示例专科医院", metric: "线上预约占比", value: "71.2%", peerMedian: "43.5%", deviation: "+27.7个百分点", level: "高", reason: "高于同类专科医院四分位上限", status: "待核验" },
+      { id: "AN-2026-001", hospitalCode: "H000001", hospitalName: "区域示例中心医院", metric: "接口调用成功率", value: "99.5%", peerMedian: "97.8%", deviation: "+1.7个百分点", level: "中", reason: "显著高于同级综合医院中位数，需核验统计口径", status: "待核验" },
+      { id: "AN-2026-002", hospitalCode: "H000002", hospitalName: "区域示例专科医院", metric: "线上预约占比", value: "71.2%", peerMedian: "43.5%", deviation: "+27.7个百分点", level: "高", reason: "高于同类专科医院四分位上限", status: "待核验" },
       { id: "AN-2026-003", hospitalCode: "H000003", hospitalName: "区县示例人民医院", metric: "数据缺失率", value: "2.8%", peerMedian: "0.9%", deviation: "+1.9个百分点", level: "高", reason: "缺失率高于同级医院预警阈值", status: "已转抽查" },
     ],
     notifications: [
-      { id: "MSG-001", title: "申报截止前7天提醒", recipient: "大连市示例中心医院", role: "医院管理员", channel: "移动端", priority: "紧急", status: "已送达", createdAt: "2026-09-23 09:00", read: false },
+      { id: "MSG-001", title: "申报截止前7天提醒", recipient: "区域示例中心医院", role: "医院管理员", channel: "移动端", priority: "紧急", status: "已送达", createdAt: "2026-09-23 09:00", read: false },
       { id: "MSG-002", title: "H1安全合规材料即将到期", recipient: "安全专员", role: "医院填报员", channel: "站内信", priority: "高", status: "已读", createdAt: "2026-07-27 13:40", read: true },
       { id: "MSG-003", title: "省级审核任务已分派", recipient: "审核员A", role: "省级审核员", channel: "短信", priority: "普通", status: "已送达", createdAt: "2026-07-27 12:20", read: false },
     ],
@@ -291,15 +291,15 @@
       { id: "IMP-20260727-002", fileName: "线上服务统计_2026Q2.csv", template: "线上服务统计模板v1.1", rows: 328, accepted: 328, rejected: 0, status: "已入库", submittedBy: "门诊部", submittedAt: "2026-07-27 10:30", report: "校验通过" },
     ],
     submissionBatches: [
-      { id: "BATCH-2026-01", name: "2026首批综合试点", region: "辽宁省大连市", standard: "STD-2026-TRIAL", hospitalLevel: "二级及以上公立医院", hospitalCount: 38, status: "填报中", start: "2026-08-01", submitDue: "2026-09-30", reviewDue: "2026-11-15", reportAt: "2026-12-20", submitted: 21, reviewed: 8, owner: "省级评价管理组" },
+      { id: "BATCH-2026-01", name: "2026首批综合试点", region: "示例省区域市", standard: "STD-2026-TRIAL", hospitalLevel: "二级及以上公立医院", hospitalCount: 38, status: "填报中", start: "2026-08-01", submitDue: "2026-09-30", reviewDue: "2026-11-15", reportAt: "2026-12-20", submitted: 21, reviewed: 8, owner: "省级评价管理组" },
       { id: "BATCH-2026-02", name: "安全合规专项试点", region: "辽宁省", standard: "STD-2026-TRIAL", hospitalLevel: "三级公立医院", hospitalCount: 16, status: "待发布", start: "2026-10-10", submitDue: "2026-10-30", reviewDue: "2026-11-30", reportAt: "2026-12-15", submitted: 0, reviewed: 0, owner: "安全合规组" },
-      { id: "BATCH-2026-03", name: "区县医院验证批次", region: "大连市区县", standard: "STD-2026-TRIAL", hospitalLevel: "二级公立医院", hospitalCount: 12, status: "草稿", start: "2026-11-01", submitDue: "2026-11-25", reviewDue: "2026-12-10", reportAt: "2026-12-28", submitted: 0, reviewed: 0, owner: "市级试点专班" },
+      { id: "BATCH-2026-03", name: "区县医院验证批次", region: "区域区县", standard: "STD-2026-TRIAL", hospitalLevel: "二级公立医院", hospitalCount: 12, status: "草稿", start: "2026-11-01", submitDue: "2026-11-25", reviewDue: "2026-12-10", reportAt: "2026-12-28", submitted: 0, reviewed: 0, owner: "市级试点专班" },
     ],
     uploadQueue: [
-      { id: "UP-20260727-001", hospitalCode: "H000001", hospitalName: "大连市示例中心医院", fileName: "数据治理制度汇编.pdf", materialType: "制度材料", size: "18.4MB", progress: 100, status: "已完成", scanStatus: "病毒扫描通过", classification: "B1/B2/B6", submittedAt: "2026-07-27 14:22", retries: 0 },
-      { id: "UP-20260727-002", hospitalCode: "H000002", hospitalName: "大连市示例专科医院", fileName: "线上服务统计附件.zip", materialType: "统计附件", size: "86.2MB", progress: 80, status: "扫描中", scanStatus: "敏感内容识别中", classification: "待识别", submittedAt: "2026-07-27 14:28", retries: 0 },
+      { id: "UP-20260727-001", hospitalCode: "H000001", hospitalName: "区域示例中心医院", fileName: "数据治理制度汇编.pdf", materialType: "制度材料", size: "18.4MB", progress: 100, status: "已完成", scanStatus: "病毒扫描通过", classification: "B1/B2/B6", submittedAt: "2026-07-27 14:22", retries: 0 },
+      { id: "UP-20260727-002", hospitalCode: "H000002", hospitalName: "区域示例专科医院", fileName: "线上服务统计附件.zip", materialType: "统计附件", size: "86.2MB", progress: 80, status: "扫描中", scanStatus: "敏感内容识别中", classification: "待识别", submittedAt: "2026-07-27 14:28", retries: 0 },
       { id: "UP-20260727-003", hospitalCode: "H000003", hospitalName: "区县示例人民医院", fileName: "电子病历评级证明.pdf", materialType: "评级证明", size: "6.8MB", progress: 35, status: "上传中", scanStatus: "等待扫描", classification: "C1", submittedAt: "2026-07-27 14:31", retries: 0 },
-      { id: "UP-20260727-004", hospitalCode: "H000001", hospitalName: "大连市示例中心医院", fileName: "脱敏日志样本.7z", materialType: "日志样本", size: "142.6MB", progress: 42, status: "失败", scanStatus: "分片校验失败", classification: "H3", submittedAt: "2026-07-27 14:35", retries: 1 },
+      { id: "UP-20260727-004", hospitalCode: "H000001", hospitalName: "区域示例中心医院", fileName: "脱敏日志样本.7z", materialType: "日志样本", size: "142.6MB", progress: 42, status: "失败", scanStatus: "分片校验失败", classification: "H3", submittedAt: "2026-07-27 14:35", retries: 1 },
     ],
     reviewerWorkloads: [
       { id: "WL-001", reviewer: "审核员A", group: "省级综合审核组", capacity: 18, assigned: 16, inProgress: 7, overdue: 2, highRisk: 4, avgHours: 5.6, status: "高负荷" },
@@ -342,19 +342,19 @@
       { id: "ALT-20260727-003", source: "STORE-LOG", level: "紧急", title: "审计日志存储使用率超过90%", status: "待确认", createdAt: "2026-07-27 15:12", owner: "安全管理组", handledAt: "" },
     ],
     hospitalReadiness: [
-      { id: "READY-H000001", hospitalCode: "H000001", hospitalName: "大连市示例中心医院", coordinator: "王主任", organization: 100, accounts: 100, network: 95, dataMapping: 88, training: 92, readiness: 95, blockers: 0, status: "已就绪", lastUpdated: "2026-07-27 16:20" },
-      { id: "READY-H000002", hospitalCode: "H000002", hospitalName: "大连市示例专科医院", coordinator: "李主任", organization: 100, accounts: 85, network: 82, dataMapping: 68, training: 75, readiness: 82, blockers: 2, status: "推进中", lastUpdated: "2026-07-27 16:10" },
+      { id: "READY-H000001", hospitalCode: "H000001", hospitalName: "区域示例中心医院", coordinator: "王主任", organization: 100, accounts: 100, network: 95, dataMapping: 88, training: 92, readiness: 95, blockers: 0, status: "已就绪", lastUpdated: "2026-07-27 16:20" },
+      { id: "READY-H000002", hospitalCode: "H000002", hospitalName: "区域示例专科医院", coordinator: "李主任", organization: 100, accounts: 85, network: 82, dataMapping: 68, training: 75, readiness: 82, blockers: 2, status: "推进中", lastUpdated: "2026-07-27 16:10" },
       { id: "READY-H000003", hospitalCode: "H000003", hospitalName: "区县示例人民医院", coordinator: "赵科长", organization: 80, accounts: 72, network: 55, dataMapping: 48, training: 60, readiness: 63, blockers: 4, status: "有阻塞", lastUpdated: "2026-07-27 15:55" },
     ],
     pilotAccessApplications: [
-      { id: "ACC-H000001", hospitalCode: "H000001", hospitalName: "大连市示例中心医院", coordinator: "王主任", sourceMode: "接口+模板", networkZone: "政务外网/VPN", targetWindow: "2026-08-05", materials: 6, requiredMaterials: 6, status: "联调中", lastUpdated: "2026-07-28 09:10" },
-      { id: "ACC-H000002", hospitalCode: "H000002", hospitalName: "大连市示例专科医院", coordinator: "李主任", sourceMode: "接口", networkZone: "专线", targetWindow: "2026-08-12", materials: 5, requiredMaterials: 6, status: "资料待补", lastUpdated: "2026-07-28 09:00" },
+      { id: "ACC-H000001", hospitalCode: "H000001", hospitalName: "区域示例中心医院", coordinator: "王主任", sourceMode: "接口+模板", networkZone: "政务外网/VPN", targetWindow: "2026-08-05", materials: 6, requiredMaterials: 6, status: "联调中", lastUpdated: "2026-07-28 09:10" },
+      { id: "ACC-H000002", hospitalCode: "H000002", hospitalName: "区域示例专科医院", coordinator: "李主任", sourceMode: "接口", networkZone: "专线", targetWindow: "2026-08-12", materials: 5, requiredMaterials: 6, status: "资料待补", lastUpdated: "2026-07-28 09:00" },
       { id: "ACC-H000003", hospitalCode: "H000003", hospitalName: "区县示例人民医院", coordinator: "赵科长", sourceMode: "模板+接口", networkZone: "政务外网", targetWindow: "2026-08-18", materials: 6, requiredMaterials: 6, status: "已受理", lastUpdated: "2026-07-28 08:50" },
     ],
     pilotConnectors: [
-      { id: "CONN-H000001-EMR", hospitalCode: "H000001", hospitalName: "大连市示例中心医院", sourceSystem: "电子病历EMR", profile: "患者、就诊、病历摘要", transport: "HTTPS/JSON", endpointAlias: "emr-gateway", authMode: "mTLS+签名", credentialStatus: "有效", credentialExpireAt: "2027-07-31", connectivityStatus: "在线", contractStatus: "契约通过", latencyMs: 168, lastProbeAt: "2026-07-28 09:12", owner: "接口管理组" },
-      { id: "CONN-H000001-LIS", hospitalCode: "H000001", hospitalName: "大连市示例中心医院", sourceSystem: "检验系统LIS", profile: "检验申请、检验结果", transport: "HTTPS/JSON", endpointAlias: "lis-gateway", authMode: "mTLS+签名", credentialStatus: "有效", credentialExpireAt: "2027-07-31", connectivityStatus: "待探测", contractStatus: "待认证", latencyMs: 0, lastProbeAt: "-", owner: "检验接口组" },
-      { id: "CONN-H000002-HIS", hospitalCode: "H000002", hospitalName: "大连市示例专科医院", sourceSystem: "医院信息系统HIS", profile: "患者、挂号、费用", transport: "HTTPS/JSON", endpointAlias: "his-adapter", authMode: "OAuth2+签名", credentialStatus: "临期", credentialExpireAt: "2026-08-05", connectivityStatus: "待探测", contractStatus: "待认证", latencyMs: 0, lastProbeAt: "-", owner: "医院信息中心" },
+      { id: "CONN-H000001-EMR", hospitalCode: "H000001", hospitalName: "区域示例中心医院", sourceSystem: "电子病历EMR", profile: "患者、就诊、病历摘要", transport: "HTTPS/JSON", endpointAlias: "emr-gateway", authMode: "mTLS+签名", credentialStatus: "有效", credentialExpireAt: "2027-07-31", connectivityStatus: "在线", contractStatus: "契约通过", latencyMs: 168, lastProbeAt: "2026-07-28 09:12", owner: "接口管理组" },
+      { id: "CONN-H000001-LIS", hospitalCode: "H000001", hospitalName: "区域示例中心医院", sourceSystem: "检验系统LIS", profile: "检验申请、检验结果", transport: "HTTPS/JSON", endpointAlias: "lis-gateway", authMode: "mTLS+签名", credentialStatus: "有效", credentialExpireAt: "2027-07-31", connectivityStatus: "待探测", contractStatus: "待认证", latencyMs: 0, lastProbeAt: "-", owner: "检验接口组" },
+      { id: "CONN-H000002-HIS", hospitalCode: "H000002", hospitalName: "区域示例专科医院", sourceSystem: "医院信息系统HIS", profile: "患者、挂号、费用", transport: "HTTPS/JSON", endpointAlias: "his-adapter", authMode: "OAuth2+签名", credentialStatus: "临期", credentialExpireAt: "2026-08-05", connectivityStatus: "待探测", contractStatus: "待认证", latencyMs: 0, lastProbeAt: "-", owner: "医院信息中心" },
       { id: "CONN-H000003-EMR", hospitalCode: "H000003", hospitalName: "区县示例人民医院", sourceSystem: "电子病历EMR", profile: "患者、就诊、病历摘要", transport: "SFTP/CSV", endpointAlias: "county-emr", authMode: "密钥+白名单", credentialStatus: "失效", credentialExpireAt: "2026-07-20", connectivityStatus: "阻断", contractStatus: "待认证", latencyMs: 0, lastProbeAt: "2026-07-28 08:40", owner: "信息科" },
     ],
     pilotDataMappings: [
@@ -373,8 +373,8 @@
       { id: "INT-ISSUE-003", hospitalCode: "H000003", connectorId: "CONN-H000003-EMR", category: "隐私保护", severity: "阻断", summary: "抽样数据中发现未脱敏的患者联系方式。", owner: "数据安全组", status: "待处理", dueAt: "2026-07-30", resolution: "", updatedAt: "2026-07-28 08:43" },
     ],
     pilotIntegrationGates: [
-      { hospitalCode: "H000001", hospitalName: "大连市示例中心医院", requiredConnectors: 2, readyConnectors: 1, requiredMappings: 2, readyMappings: 1, openCriticalIssues: 0, securityReview: "待复核", businessReview: "待复核", status: "待评估", evaluatedAt: "", approvedBy: "", approvedAt: "" },
-      { hospitalCode: "H000002", hospitalName: "大连市示例专科医院", requiredConnectors: 1, readyConnectors: 0, requiredMappings: 1, readyMappings: 0, openCriticalIssues: 1, securityReview: "待复核", businessReview: "待复核", status: "待整改", evaluatedAt: "2026-07-28 09:05", approvedBy: "", approvedAt: "" },
+      { hospitalCode: "H000001", hospitalName: "区域示例中心医院", requiredConnectors: 2, readyConnectors: 1, requiredMappings: 2, readyMappings: 1, openCriticalIssues: 0, securityReview: "待复核", businessReview: "待复核", status: "待评估", evaluatedAt: "", approvedBy: "", approvedAt: "" },
+      { hospitalCode: "H000002", hospitalName: "区域示例专科医院", requiredConnectors: 1, readyConnectors: 0, requiredMappings: 1, readyMappings: 0, openCriticalIssues: 1, securityReview: "待复核", businessReview: "待复核", status: "待整改", evaluatedAt: "2026-07-28 09:05", approvedBy: "", approvedAt: "" },
       { hospitalCode: "H000003", hospitalName: "区县示例人民医院", requiredConnectors: 1, readyConnectors: 0, requiredMappings: 1, readyMappings: 0, openCriticalIssues: 2, securityReview: "不通过", businessReview: "不通过", status: "阻断", evaluatedAt: "2026-07-28 08:48", approvedBy: "", approvedAt: "" },
     ],
     integrationEnvironments: [
@@ -414,7 +414,7 @@
       { id: "QUAR-20260728-001", connectorId: "CONN-H000003-EMR", reason: "检测到回调nonce重放", trigger: "REPLAY-20260728-001", hits: 2, status: "隔离中", owner: "运维安全组", openedAt: "2026-07-28 08:43", updatedAt: "2026-07-28 08:43", releasedAt: "", reviewNote: "" },
     ],
     integrationCutoverWindows: [
-      { id: "CUT-H000001-001", hospitalCode: "H000001", hospitalName: "大连市示例中心医院", environmentId: "ENV-PROD", connectorIds: ["CONN-H000001-EMR", "CONN-H000001-LIS"], plannedAt: "2026-08-05 21:00", windowMinutes: 90, integrationApproved: false, rollbackPlan: "切回模板上传通道并恢复上一配置版本", checks: { environment: false, vault: true, jobs: false, quarantine: true, gate: false, rollback: true }, status: "待评估", evaluatedAt: "", approvedBy: "", startedAt: "", completedAt: "", rollbackAt: "" },
+      { id: "CUT-H000001-001", hospitalCode: "H000001", hospitalName: "区域示例中心医院", environmentId: "ENV-PROD", connectorIds: ["CONN-H000001-EMR", "CONN-H000001-LIS"], plannedAt: "2026-08-05 21:00", windowMinutes: 90, integrationApproved: false, rollbackPlan: "切回模板上传通道并恢复上一配置版本", checks: { environment: false, vault: true, jobs: false, quarantine: true, gate: false, rollback: true }, status: "待评估", evaluatedAt: "", approvedBy: "", startedAt: "", completedAt: "", rollbackAt: "" },
     ],
     productionRuntimeControls: [
       { id: "RUNTIME-SQLITE-WAL", name: "持久化任务仓库", control: "SQLite WAL + BEGIN IMMEDIATE原子事务", owner: "平台技术组", evidence: "digital-hospital-execution-service.js", status: "已实现", verifiedAt: "2026-07-29 10:10" },
@@ -450,10 +450,10 @@
       evaluatedBy: "系统门禁",
     },
     pilotTickets: [
-      { id: "TKT-20260727-001", title: "接口统计模板机构代码校验失败", hospitalCode: "H000002", hospitalName: "大连市示例专科医院", category: "数据口径", priority: "高", status: "处理中", owner: "数据治理组", createdAt: "2026-07-27 10:20", dueAt: "2026-07-27 18:20", slaHours: 8, elapsedHours: 6.5, channel: "试点群", description: "导入模板中的机构代码与平台主数据不一致。" },
+      { id: "TKT-20260727-001", title: "接口统计模板机构代码校验失败", hospitalCode: "H000002", hospitalName: "区域示例专科医院", category: "数据口径", priority: "高", status: "处理中", owner: "数据治理组", createdAt: "2026-07-27 10:20", dueAt: "2026-07-27 18:20", slaHours: 8, elapsedHours: 6.5, channel: "试点群", description: "导入模板中的机构代码与平台主数据不一致。" },
       { id: "TKT-20260727-002", title: "材料分片上传在弱网环境中断", hospitalCode: "H000003", hospitalName: "区县示例人民医院", category: "材料上传", priority: "紧急", status: "待分派", owner: "未分派", createdAt: "2026-07-27 13:05", dueAt: "2026-07-27 17:05", slaHours: 4, elapsedHours: 3.2, channel: "服务热线", description: "大文件上传至42%后中断，需核验断点续传。" },
-      { id: "TKT-20260727-003", title: "H1材料有效期口径需要确认", hospitalCode: "H000001", hospitalName: "大连市示例中心医院", category: "指标口径", priority: "中", status: "待回复", owner: "标准规则组", createdAt: "2026-07-27 14:10", dueAt: "2026-07-28 14:10", slaHours: 24, elapsedHours: 2.1, channel: "在线答疑", description: "等保测评报告跨评价年度时的有效期计算口径待确认。" },
-      { id: "TKT-20260726-004", title: "医院管理员账号权限范围异常", hospitalCode: "H000002", hospitalName: "大连市示例专科医院", category: "账号权限", priority: "高", status: "已解决", owner: "平台技术组", createdAt: "2026-07-26 09:30", dueAt: "2026-07-26 17:30", slaHours: 8, elapsedHours: 3.8, channel: "工单中心", description: "已重建医院管理员数据权限并完成复核。" },
+      { id: "TKT-20260727-003", title: "H1材料有效期口径需要确认", hospitalCode: "H000001", hospitalName: "区域示例中心医院", category: "指标口径", priority: "中", status: "待回复", owner: "标准规则组", createdAt: "2026-07-27 14:10", dueAt: "2026-07-28 14:10", slaHours: 24, elapsedHours: 2.1, channel: "在线答疑", description: "等保测评报告跨评价年度时的有效期计算口径待确认。" },
+      { id: "TKT-20260726-004", title: "医院管理员账号权限范围异常", hospitalCode: "H000002", hospitalName: "区域示例专科医院", category: "账号权限", priority: "高", status: "已解决", owner: "平台技术组", createdAt: "2026-07-26 09:30", dueAt: "2026-07-26 17:30", slaHours: 8, elapsedHours: 3.8, channel: "工单中心", description: "已重建医院管理员数据权限并完成复核。" },
     ],
     trainingSessions: [
       { id: "TRN-20260728-01", title: "医院申报与证据材料实操培训", audience: "医院管理员、填报员", startAt: "2026-07-28 14:00", mode: "线上直播", capacity: 120, enrolled: 96, attended: 0, questions: 8, status: "已发布", owner: "试点培训组", materials: 4 },
@@ -466,8 +466,8 @@
     ],
     pilotFeedback: [
       { id: "FB-20260727-001", releaseId: "REL-0.7.0", hospitalCode: "H000003", hospitalName: "区县示例人民医院", title: "移动端监控标签希望一屏展示", type: "体验建议", priority: "中", status: "已解决", owner: "产品组", createdAt: "2026-07-27 21:50", resolution: "已调整为移动端四栏等分布局。" },
-      { id: "FB-20260727-002", releaseId: "REL-0.7.0", hospitalCode: "H000002", hospitalName: "大连市示例专科医院", title: "接口告警希望直接关联责任人", type: "功能建议", priority: "高", status: "处理中", owner: "平台技术组", createdAt: "2026-07-27 22:05", resolution: "" },
-      { id: "FB-20260727-003", releaseId: "REL-0.7.0", hospitalCode: "H000001", hospitalName: "大连市示例中心医院", title: "建议增加巡检结果导出", type: "功能建议", priority: "中", status: "待评估", owner: "产品组", createdAt: "2026-07-27 22:08", resolution: "" },
+      { id: "FB-20260727-002", releaseId: "REL-0.7.0", hospitalCode: "H000002", hospitalName: "区域示例专科医院", title: "接口告警希望直接关联责任人", type: "功能建议", priority: "高", status: "处理中", owner: "平台技术组", createdAt: "2026-07-27 22:05", resolution: "" },
+      { id: "FB-20260727-003", releaseId: "REL-0.7.0", hospitalCode: "H000001", hospitalName: "区域示例中心医院", title: "建议增加巡检结果导出", type: "功能建议", priority: "中", status: "待评估", owner: "产品组", createdAt: "2026-07-27 22:08", resolution: "" },
     ],
     pilotOutcomeMetrics: [
       { id: "OUTCOME-PROCESS", name: "试点流程完成率", baseline: 0, current: 85, target: 90, unit: "%", weight: 20, status: "关注", source: "医院申报与审核流程" },
@@ -477,8 +477,8 @@
       { id: "OUTCOME-SAT", name: "试点用户满意度", baseline: 0, current: 89, target: 90, unit: "%", weight: 15, status: "关注", source: "培训答疑与版本反馈" },
     ],
     pilotHospitalOutcomes: [
-      { id: "PHO-H000001", hospitalCode: "H000001", hospitalName: "大连市示例中心医院", processCompletion: 96, dataQuality: 94, auditPassRate: 92, satisfaction: 95, score: 94, status: "可推广", majorIssues: 0, evaluatedAt: "2026-07-27 22:30" },
-      { id: "PHO-H000002", hospitalCode: "H000002", hospitalName: "大连市示例专科医院", processCompletion: 86, dataQuality: 82, auditPassRate: 84, satisfaction: 88, score: 85, status: "条件通过", majorIssues: 2, evaluatedAt: "2026-07-27 22:30" },
+      { id: "PHO-H000001", hospitalCode: "H000001", hospitalName: "区域示例中心医院", processCompletion: 96, dataQuality: 94, auditPassRate: 92, satisfaction: 95, score: 94, status: "可推广", majorIssues: 0, evaluatedAt: "2026-07-27 22:30" },
+      { id: "PHO-H000002", hospitalCode: "H000002", hospitalName: "区域示例专科医院", processCompletion: 86, dataQuality: 82, auditPassRate: 84, satisfaction: 88, score: 85, status: "条件通过", majorIssues: 2, evaluatedAt: "2026-07-27 22:30" },
       { id: "PHO-H000003", hospitalCode: "H000003", hospitalName: "区县示例人民医院", processCompletion: 72, dataQuality: 68, auditPassRate: 75, satisfaction: 81, score: 74, status: "需优化", majorIssues: 4, evaluatedAt: "2026-07-27 22:30" },
     ],
     pilotIssueThemes: [
@@ -591,10 +591,10 @@
       { id: "RSG-20260728-003", sourceId: "AEX-20260728-002", hospitalCode: "H000002", indicatorCode: "D1", problem: "预约诊疗量历史波动异常", suggestion: "补充统计渠道变化和同期业务量对比，区分真实业务增长与口径扩展影响。", steps: ["核对历史统计渠道", "拆分新增渠道预约量", "补充同期业务量趋势", "提交异常波动说明"], priority: "中", owner: "门诊部", dueDays: 10, disclaimer: "智能建议仅供参考，异常说明可由医院编辑。", status: "待采纳", createdAt: "2026-07-28 09:44" },
     ],
     reviewRiskSignals: [
-      { id: "RSK-20260728-001", hospitalCode: "H000001", hospitalName: "大连市示例中心医院", indicatorCode: "B3", level: "高", signal: "得分接近规则边界且统计口径待确认", basis: "接口成功率99.5%，距候选优秀阈值不足0.5个百分点。", recommendation: "核验原始调用汇总并提交专家复核。", source: "规则边界与异常解释", status: "已转复核", owner: "数据互联互通专家组", createdAt: "2026-07-28 09:50" },
-      { id: "RSK-20260728-002", hospitalCode: "H000002", hospitalName: "大连市示例专科医院", indicatorCode: "D1", level: "中", signal: "本期数据较历史同期异常增长", basis: "线上预约量同比上升42%，超过历史波动规则阈值。", recommendation: "要求医院补充统计口径和渠道变化说明。", source: "历史波动校验", status: "待确认", owner: "省级审核组", createdAt: "2026-07-28 09:52" },
+      { id: "RSK-20260728-001", hospitalCode: "H000001", hospitalName: "区域示例中心医院", indicatorCode: "B3", level: "高", signal: "得分接近规则边界且统计口径待确认", basis: "接口成功率99.5%，距候选优秀阈值不足0.5个百分点。", recommendation: "核验原始调用汇总并提交专家复核。", source: "规则边界与异常解释", status: "已转复核", owner: "数据互联互通专家组", createdAt: "2026-07-28 09:50" },
+      { id: "RSK-20260728-002", hospitalCode: "H000002", hospitalName: "区域示例专科医院", indicatorCode: "D1", level: "中", signal: "本期数据较历史同期异常增长", basis: "线上预约量同比上升42%，超过历史波动规则阈值。", recommendation: "要求医院补充统计口径和渠道变化说明。", source: "历史波动校验", status: "待确认", owner: "省级审核组", createdAt: "2026-07-28 09:52" },
       { id: "RSK-20260728-003", hospitalCode: "H000003", hospitalName: "区县示例人民医院", indicatorCode: "H1", level: "高", signal: "关键安全材料缺失", basis: "H1已自评但未检索到有效等保测评报告。", recommendation: "阻断提交并要求补充有效材料。", source: "证据完整性校验", status: "已确认", owner: "安全合规审核组", createdAt: "2026-07-28 09:54" },
-      { id: "RSK-20260728-004", hospitalCode: "H000001", hospitalName: "大连市示例中心医院", indicatorCode: "C1", level: "中", signal: "同一材料可能重复关联多个指标", basis: "材料摘要指纹与另一指标附件高度相似。", recommendation: "人工核验材料是否能够分别支撑对应指标。", source: "材料相似性辅助识别", status: "待确认", owner: "省级审核组", createdAt: "2026-07-28 09:56" },
+      { id: "RSK-20260728-004", hospitalCode: "H000001", hospitalName: "区域示例中心医院", indicatorCode: "C1", level: "中", signal: "同一材料可能重复关联多个指标", basis: "材料摘要指纹与另一指标附件高度相似。", recommendation: "人工核验材料是否能够分别支撑对应指标。", source: "材料相似性辅助识别", status: "待确认", owner: "省级审核组", createdAt: "2026-07-28 09:56" },
     ],
     confirmed: false,
     lastValidatedAt: null,
@@ -6952,7 +6952,7 @@
       id: `EX-${Date.now()}`,
       requester: state.activeRole,
       packageType: "省域统计摘要",
-      scope: "大连市",
+      scope: "区域",
       sensitivity: "S2",
       status: "已通过",
       requestedAt: nowText(),

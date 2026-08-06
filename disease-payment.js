@@ -196,7 +196,7 @@ function renderFormalGroupingOperations(state) {
 
 async function importSample(withError) {
   const suffix = String(Date.now()).slice(-7);
-  const row = { settlementListNo: `DL-BATCH-${suffix}`, institutionCode: withError ? "" : "HOSP-DEMO", institution: "大连市示范医院", residentId: "r1", patientName: "脱敏患者", admissionDate: "2026-07-01", dischargeDate: "2026-07-05", principalDiagnosis: "I10", principalDiagnosisName: "原发性高血压", totalAmount: 1200, declaredFundAmount: 900, costItems: withError ? [{ itemCode: "TEST-001", itemName: "错误金额项目", amount: 1000 }] : [{ itemCode: "TEST-001", itemName: "诊疗项目", amount: 1200, catalogVersion: "2026" }] };
+  const row = { settlementListNo: `DL-BATCH-${suffix}`, institutionCode: withError ? "" : "HOSP-DEMO", institution: "区域示范医院", residentId: "r1", patientName: "脱敏患者", admissionDate: "2026-07-01", dischargeDate: "2026-07-05", principalDiagnosis: "I10", principalDiagnosisName: "原发性高血压", totalAmount: 1200, declaredFundAmount: 900, costItems: withError ? [{ itemCode: "TEST-001", itemName: "错误金额项目", amount: 1000 }] : [{ itemCode: "TEST-001", itemName: "诊疗项目", amount: 1200, catalogVersion: "2026" }] };
   return requestPayment("/intake/imports", { method: "POST", body: JSON.stringify({ sourceSystem: "workbench-sample", rows: [row] }) });
 }
 

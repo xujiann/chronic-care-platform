@@ -75,7 +75,7 @@ function seedDigitalHospitalSelfAssessments(options = {}) {
       cycle: "2026-pilot",
       targetLevel: "三级综合医院试点",
       institutionId: "MR1",
-      institutionName: "大连市中心医院",
+      institutionName: "区域中心医院",
       assignedTo: "医院信息中心/医务部",
       dueAt: dateOffset(10, options),
       status: "draft",

@@ -94,7 +94,7 @@ function buildEndpointProbeAcceptanceKeyring() {
 }
 
 function endpointProbeAcceptanceEndpoint(laneId) {
-  return `https://${laneId}.public-health.dalian.gov.cn/dispatch`;
+  return `https://${laneId}.public-health.regional.gov.cn/dispatch`;
 }
 
 function runExternalEndpointProbeAcceptance() {

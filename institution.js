@@ -1477,7 +1477,7 @@ function populateTeleconsultationForm(state) {
   const target = form.querySelector("input[name='targetInstitution']");
   const targetCode = form.querySelector("input[name='targetInstitutionCode']");
   const department = form.querySelector("input[name='department']");
-  if (target && !target.value) target.value = "Dalian Central Hospital";
+  if (target && !target.value) target.value = "Regional Central Hospital";
   if (targetCode && !targetCode.value) targetCode.value = "MR1";
   if (department && !department.value) department.value = "Cardiology";
 }

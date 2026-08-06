@@ -237,7 +237,7 @@ function seedCitizenHospitalServiceConfigs() {
     {
       id: "cop-hospital-mr1",
       institutionCode: "MR1",
-      institutionName: "大连市中心医院",
+      institutionName: "区域中心医院",
       enabledServices: ["appointment", "report-query", "internet-nursing", "escort"],
       orderChannels: ["citizen-web", "app-shell"],
       paymentMode: "demo-precheck",

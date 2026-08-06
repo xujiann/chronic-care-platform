@@ -5,9 +5,10 @@
   "description": "慢病医防融合管理平台本地 MVP",
   "scripts": {
     "dev": "node server.js",
-    "regional:check": "node --check src/platform/regional/region-manifest.js && node --check src/platform/regional/extension-registry.js && node --check src/platform/regional/regional-values.js && node --check src/platform/regional/regional-runtime.js && node --check src/platform/regional/active-region.js && node --check src/platform/regional/composite-release.js && node --check src/http/routes/regional.js && node --check regional-context.js && node --check scripts/regional-foundation.js && node --check scripts/regional-hardcode-audit.js && node --check regions/template/extensions/index.js && node --check regions/210200/extensions/index.js && node scripts/regional-hardcode-audit.js",
+    "regional:check": "node --check src/platform/regional/region-manifest.js && node --check src/platform/regional/extension-registry.js && node --check src/platform/regional/regional-values.js && node --check src/platform/regional/regional-runtime.js && node --check src/platform/regional/active-region.js && node --check src/platform/regional/composite-release.js && node --check src/http/routes/regional.js && node --check regional-context.js && node --check scripts/regional-foundation.js && node --check scripts/regional-hardcode-audit.js && node --check scripts/regional-core-neutralize.js && node --check regions/template/extensions/index.js && node --check regions/210200/extensions/index.js && node --check regions/990001/extensions/index.js && node scripts/regional-hardcode-audit.js",
     "regional:test": "node --test test/regional-manifest.test.js test/regional-extension-registry.test.js test/regional-values.test.js test/regional-runtime.test.js test/regional-client-context.test.js test/regional-composite-release.test.js test/regional-hardcode-audit.test.js test/active-region.test.js",
     "regional:hardcodes": "node scripts/regional-hardcode-audit.js",
+    "regional:neutralize-core": "node scripts/regional-core-neutralize.js",
     "regional:status": "node scripts/regional-foundation.js status",
     "regional:matrix": "node scripts/regional-foundation.js matrix",
     "regional:package": "node scripts/regional-foundation.js package",

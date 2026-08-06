@@ -1,0 +1,33 @@
+{
+  "schemaVersion": "regional-manifest-v1",
+  "regionCode": "990001",
+  "name": "第二地区验证夹具",
+  "locale": "zh-CN",
+  "timezone": "Asia/Shanghai",
+  "administrativeDivision": {
+    "code": "990001",
+    "level": "city",
+    "parentCode": null
+  },
+  "release": {
+    "version": "0.1.0",
+    "platformCompatibility": {
+      "minimum": "0.1.0",
+      "maximumExclusive": "1.0.0"
+    }
+  },
+  "features": {
+    "regional.branding": false,
+    "regional.dictionary": false,
+    "regional.integration": false,
+    "regional.policy": false,
+    "regional.workflow": false
+  },
+  "configRefs": [
+    "config/feature-flags.json",
+    "config/geography.json",
+    "config/localization.json",
+    "config/organization.json"
+  ],
+  "extensions": []
+}

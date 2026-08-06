@@ -45,7 +45,7 @@ const LEDGER_DEFINITIONS = [
     acceptanceCriteria: ["每条规范记录官方来源和效力层级", "记录发布日期、实施日期、复核日期和替代关系", "标准要求映射到平台控制与自动检查", "历史规划不作为当前上线硬门禁"],
     automatedChecks: ["digital-hospital:standards-readiness", "policy:coverage", "public-health:readiness"],
     evidenceRefs: ["digital-hospital-standards.html", "docs/数智医院六域规范控制矩阵-2026.md", "release/policy-coverage-report.json"],
-    onsiteBlockers: ["大连属地卫健、医保、网信和数据管理补充文件需责任部门复核"]
+    onsiteBlockers: ["区域属地卫健、医保、网信和数据管理补充文件需责任部门复核"]
   },
   {
     id: "data-standard-master-register",

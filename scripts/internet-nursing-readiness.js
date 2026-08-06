@@ -34,7 +34,7 @@ function fallbackPolicy() {
     riskControls: ["one-click alert", "medical waste recovery"],
     practiceReferences: [{
       title: "Internet plus home nursing service officially launched",
-      publisher: "The Second Affiliated Hospital of Dalian Medical University",
+      publisher: "The Second Affiliated Hospital of Regional Medical University",
       publishedAt: "2026-07-23",
       url: SPECIALIST_HOME_CARE_SOURCE,
       serviceItems: SPECIALIST_HOME_CARE_SERVICES

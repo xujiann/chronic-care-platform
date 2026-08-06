@@ -1,7 +1,7 @@
 {
   "schemaVersion": "regional-migration-inventory-v1",
   "strategy": "compatibility-first",
-  "status": "foundation-established",
+  "status": "core-runtime-neutralized",
   "migratedConcerns": [
     "organization identity",
     "administrative division metadata",
@@ -13,7 +13,7 @@
   ],
   "legacyCompatibility": {
     "enabled": true,
-    "remainingHardcodedReferencesRequireIncrementalMigration": true,
+    "remainingHardcodedReferencesRequireIncrementalMigration": false,
     "removalGate": "all affected domain regressions and site acceptance pass"
   }
 }

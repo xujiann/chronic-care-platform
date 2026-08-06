@@ -30,7 +30,7 @@ async function loadHighlights() {
 
 function buildStaticHighlights(state = {}) {
   const signals = Array.isArray(state.publicHealthSignals) && state.publicHealthSignals.length ? state.publicHealthSignals : [
-    { id: "static-signal-1", sourceType: "临床症候群", metric: "fever-respiratory-cases", value: 8, unit: "例/24小时", region: "中山区", institution: "大连市中心医院", qualityStatus: "verified", location: { x: 48, y: 32 } },
+    { id: "static-signal-1", sourceType: "临床症候群", metric: "fever-respiratory-cases", value: 8, unit: "例/24小时", region: "中山区", institution: "区域中心医院", qualityStatus: "verified", location: { x: 48, y: 32 } },
     { id: "static-signal-2", sourceType: "实验室", metric: "same-pathogen-positive", value: 4, unit: "例/48小时", region: "甘井子区", institution: "甘井子区人民医院", qualityStatus: "verified", location: { x: 65, y: 53 } },
     { id: "static-signal-3", sourceType: "学校/养老", metric: "clustered-symptoms", value: 7, unit: "人/24小时", region: "沙河口区", institution: "沙河口区实验小学", qualityStatus: "verified", location: { x: 45, y: 58 } }
   ];
@@ -39,7 +39,7 @@ function buildStaticHighlights(state = {}) {
     { id: "static-alert-2", title: "甘井子区实验室阳性结果聚集预警", severity: "critical", status: "acknowledged", region: "甘井子区", triggerCount: 4, threshold: 3, confidence: .96, signalIds: [signals[1].id], recommendedAction: "锁定阳性样本并启动关联病例核查", actionHistory: [] }
   ];
   const tasks = Array.isArray(state.publicHealthCommandTasks) && state.publicHealthCommandTasks.length ? state.publicHealthCommandTasks : [
-    { id: "static-task-1", title: "中山区呼吸道聚集事件核实与流调", status: "pending-acceptance", priority: "high", owner: "市疾控流调一组", institution: "大连市中心医院", region: "中山区", dueAt: "2026-07-18T08:12:00+08:00", requiredActions: ["病例清单核对", "采样复核"] },
+    { id: "static-task-1", title: "中山区呼吸道聚集事件核实与流调", status: "pending-acceptance", priority: "high", owner: "市疾控流调一组", institution: "区域中心医院", region: "中山区", dueAt: "2026-07-18T08:12:00+08:00", requiredActions: ["病例清单核对", "采样复核"] },
     { id: "static-task-2", title: "甘井子区阳性样本实验室质量复核", status: "in-progress", priority: "critical", owner: "市疾控实验室质量组", institution: "甘井子区人民医院", region: "甘井子区", dueAt: "2026-07-17T19:10:00+08:00", requiredActions: ["样本链核对", "复检"] }
   ];
   const resources = Array.isArray(state.publicHealthResources) && state.publicHealthResources.length ? state.publicHealthResources : [

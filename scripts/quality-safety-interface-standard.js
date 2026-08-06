@@ -92,7 +92,7 @@ function buildQualitySafetyInterfaceStandard(options = {}) {
             item: "glucose",
             value: "26.1 mmol/L",
             threshold: ">25 mmol/L",
-            targetInstitution: "Dalian Central Hospital"
+            targetInstitution: "Regional Central Hospital"
           }
         }
       },
@@ -187,7 +187,7 @@ function buildQualitySafetyInterfaceStandard(options = {}) {
           payload: {
             recognitionRecordId: "cmr-001",
             reportId: "dr-001",
-            institutionName: "Dalian Central Hospital",
+            institutionName: "Regional Central Hospital",
             item: "glucose",
             qcStatus: "manual_review_required",
             issueType: "critical_value_followup",

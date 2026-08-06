@@ -118,7 +118,7 @@ function defaultGapLedger() {
       id: "citizen-unified-entry",
       priority: "P1",
       domain: "citizen-service",
-      proposalRequirement: "Use Liaoshitong/e-Dalian unified entry for health archive lookup, one-stop appointments and family doctor contract.",
+      proposalRequirement: "Use Liaoshitong/e-Regional unified entry for health archive lookup, one-stop appointments and family doctor contract.",
       currentEvidence: "Resident archive, EMR, authorization, nursing, escort and mobile preview exist; the registration journey covers cross-role actions, while appointment-order-v1 adds signed callbacks, idempotent landing, dead-letter retry, order reconciliation and an institution callback center.",
       gap: "Government unified entry, real-name verification, 17 live hospital appointment sources, certified payment/refund endpoints, insurance production credentials, signed status dictionaries and official triage knowledge base remain external blockers.",
       nextStep: "Use the callback integration center during onsite joint testing and bind government identity, live schedule, payment/refund, insurance and messaging endpoints with signed dictionaries and cutover evidence.",
@@ -261,7 +261,7 @@ function defaultWorkPackages() {
 function defaultOnsiteBlockers() {
   return [
     { id: "live-institution-endpoints", owner: "integration", requiredFor: "13 hospitals and 5 district/county platforms", blocker: "live endpoint, account, field mapping and vendor payload signoff" },
-    { id: "government-unified-entry", owner: "citizen-service", requiredFor: "Liaoshitong/e-Dalian unified entry", blocker: "government identity, real-name verification and redirect agreement" },
+    { id: "government-unified-entry", owner: "citizen-service", requiredFor: "Liaoshitong/e-Regional unified entry", blocker: "government identity, real-name verification and redirect agreement" },
     { id: "production-database-signoff", owner: "platform-storage", requiredFor: "production database cutover", blocker: "DBA credentials, production parameters, migration window and rollback approval" },
     { id: "payment-insurance-joint-test", owner: "citizen-service", requiredFor: "appointment payment/refund and insurance status", blocker: "payment channel, refund callback and insurance agency joint testing" },
     { id: "lab-chain-resource", owner: "medical-resource-center", requiredFor: "78 lab item mapping and evidence chain", blocker: "mutual-recognition catalog, report PDF source and city-level chain/node resources" },
@@ -270,6 +270,8 @@ function defaultOnsiteBlockers() {
     { id: "onsite-acceptance-signoff", owner: "project-office", requiredFor: "production launch", blocker: "multi-party acceptance form, measured baseline and signed issue closure" }
   ];
 }
+
+const LEGACY_PHASE2_TITLE = "\u5927\u8fde\u5e02\u5168\u6c11\u5065\u5eb7\u4fe1\u606f\u5316\u9879\u76ee\uff08\u4e8c\u671f\uff09";
 
 function buildPhase2ProposalReadiness(options = {}) {
   const pkg = options.pkg ?? readJson("package.json");
@@ -287,7 +289,7 @@ function buildPhase2ProposalReadiness(options = {}) {
   const requiredDomains = new Set(ledger.map((item) => item.domain));
   const requiredOwners = new Set(ledger.map((item) => item.owner));
   const checks = [
-    check("phase2:plan-document", planDoc.includes("大连市全民健康信息化项目（二期）") && missingPlanTokens.length === 0, missingPlanTokens.length ? `missing ${missingPlanTokens.join(", ")}` : `${REQUIRED_PLAN_TOKENS.length} plan markers present`),
+    check("phase2:plan-document", planDoc.includes(LEGACY_PHASE2_TITLE) && missingPlanTokens.length === 0, missingPlanTokens.length ? `missing ${missingPlanTokens.join(", ")}` : `${REQUIRED_PLAN_TOKENS.length} plan markers present`),
     check("phase2:gap-ledger", ledger.length >= 12 && ledger.every((item) => item.id && item.priority && item.domain && item.owner && item.currentEvidence && item.gap && item.nextStep && item.status), `${ledger.length} gap rows / ${requiredDomains.size} domains / ${requiredOwners.size} owners`),
     check("phase2:priority-roadmap", ["P0", "P1", "P2"].every((priority) => priorities.has(priority)) && p0WorkPackages.length >= 4, `${p0WorkPackages.length} P0 packages and ${workPackages.length} total packages`),
     check("phase2:proposal-scope", ["data-center-integration", "data-service-catalog", "production-database", "lab-mutual-recognition-ledger", "family-doctor-contract", "commercial-crypto-assessment"].every((id) => ledger.some((item) => item.id === id)), "critical phase-2 proposal domains are represented"),

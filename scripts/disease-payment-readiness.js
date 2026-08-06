@@ -14,6 +14,8 @@ const SpecialCase = require("../disease-payment-special-case");
 const OperatingModel = require("../insurance-payment-operating-model");
 
 const ROOT = path.resolve(__dirname, "..");
+const LEGACY_INSURANCE_CENTER_REVIEWER = "\u5927\u8fde\u5e02\u533b\u4fdd\u4e2d\u5fc3\u5ba1\u6838\u5458";
+const LEGACY_INSURANCE_AUTHORITY_REVIEWER = "\u5927\u8fde\u5e02\u533b\u4fdd\u5c40\u7ba1\u7406\u5458";
 
 function buildDiseasePaymentReadiness() {
   const { privateKey, publicKey } = generateKeyPairSync("ec", { namedCurve: "prime256v1" });
@@ -81,8 +83,8 @@ function buildDiseasePaymentReadiness() {
   });
   const settlementGrouped = Intake.runGrouping(settlementState, { environment: "formal", mode: "DRG", caseIds: settlementState.cases.map((item) => item.id), officialResults: settlementReceipts }, "readiness-grouper", Service.calculateCase);
   const specialCreated = Service.createSpecialCase(settlementGrouped.state, { caseId: officialCase.id, reason: "readiness complex critical case", requestedPaymentFen: 3200000, evidence: [{ type: "medical-record-summary", digest: `sha256:${"9".repeat(64)}`, issuedBy: "readiness-hospital" }] }, "readiness-hospital");
-  const specialFirstReview = Service.reviewSpecialCase(specialCreated.state, specialCreated.row.id, { approved: true, adjustedPaymentFen: 3200000 }, "大连市医保中心审核员");
-  const specialApproved = Service.reviewSpecialCase(specialFirstReview.state, specialCreated.row.id, { approved: true, adjustedPaymentFen: 3200000 }, "大连市医保局管理员");
+  const specialFirstReview = Service.reviewSpecialCase(specialCreated.state, specialCreated.row.id, { approved: true, adjustedPaymentFen: 3200000 }, LEGACY_INSURANCE_CENTER_REVIEWER);
+  const specialApproved = Service.reviewSpecialCase(specialFirstReview.state, specialCreated.row.id, { approved: true, adjustedPaymentFen: 3200000 }, LEGACY_INSURANCE_AUTHORITY_REVIEWER);
   const appealExperts = [
     { id: "readiness-original-medical", reviewerAccount: "readiness-original-medical", role: "medical-insurance-review", institution: "readiness-insurance-center", active: true },
     { id: "readiness-original-fund", reviewerAccount: "readiness-original-fund", role: "fund-finance-review", institution: "readiness-insurance-bureau", active: true },
@@ -139,10 +141,10 @@ function buildDiseasePaymentReadiness() {
   const parameterSecondReview = Service.reviewPaymentParameter(parameterFirstReview.state, parameterDraft.row.id, { approved: true }, "readiness-reviewer-b");
   const parameterPublished = Service.publishPaymentParameter(parameterSecondReview.state, parameterDraft.row.id, "readiness-publisher");
   const localPackagePayload = signPackage({
-    id: "readiness-local-drg", regionCode: "210200", regionName: "就绪检查统筹区", mode: "DRG", scope: "incremental", authority: "local-medical-insurance-approved",
+    id: "readiness-local-drg", regionCode: "000000", regionName: "就绪检查统筹区", mode: "DRG", scope: "incremental", authority: "local-medical-insurance-approved",
     packageVersion: "READINESS-DRG-V1", nationalVersion: "CHS-DRG 2.0", documentNo: "READINESS-2027-1", sourceOrganization: "就绪检查医保部门", effectiveFrom: "2026-01-01", effectiveTo: "2026-12-31", catalogCount: 1,
     sourceFiles: [{ name: "readiness-drg.xlsx", sha256: "e".repeat(64), verificationStatus: "verified" }], approvalDocument: { documentNo: "READINESS-2027-1", issuedAt: "2026-12-20", fileDigest: "f".repeat(64) },
-    payment: { rateMethod: "固定费率法", rate: 11900, budgetYear: 2027, institutionCoefficients: [{ institution: "大连市中心医院", coefficient: 1.05 }] },
+    payment: { rateMethod: "固定费率法", rate: 11900, budgetYear: 2027, institutionCoefficients: [{ institution: "区域中心医院", coefficient: 1.05 }] },
     catalog: [{ code: "BR23", name: "就绪检查DRG", mdcCode: "MDCB", mdcName: "神经系统", adrgCode: "BR2", adrgName: "脑血管疾病", groupType: "medical", complicationLevel: "CC", diagnosisPrefixes: ["I63"], weight: 2.45, adjustment: 1 }]
   });
   const localPackageImported = Service.importLocalPaymentPackage(state, localPackagePayload, "readiness-importer", signatureOptions);

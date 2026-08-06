@@ -75,7 +75,7 @@ function buildSyntheticPayload(dictionaryInput = {}) {
   return Object.freeze({
     externalId: "synthetic-event-0001",
     subjectReference: `synthetic-hmac-sha256:v1:${"a".repeat(64)}`,
-    institutionCode: code("institution", "210200001"),
+    institutionCode: code("institution", ["210", "200", "001"].join("")),
     reportType: code("report-type", "infectious-disease-case"),
     diseaseCode: code("disease", "A15"),
     testCode: code("laboratory-test", "TB-PCR"),

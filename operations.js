@@ -3610,7 +3610,7 @@ function dispatchDraftForAlert(snapshot, alert) {
   const quantity = domain === "staff" ? Math.max(1, Number(snapshot.staff?.shortage || 1)) : domain === "outpatient" ? 2 : Math.max(1, Math.ceil(Number(snapshot.beds?.occupied || 0) * 0.04));
   return {
     sourceInstitution: zh(snapshot.institution),
-    targetInstitution: "大连市中心医院",
+    targetInstitution: "区域中心医院",
     resourceType,
     quantity,
     priority: alert.severity === "critical" ? "high" : "medium",

@@ -1,0 +1,30 @@
+{
+  "schemaVersion": "regional-geography-v1",
+  "areas": {
+    "primaryDistrict": {
+      "code": "REGION-DISTRICT-01",
+      "name": "示范一区",
+      "shortName": "示范一区"
+    },
+    "secondaryDistrict": {
+      "code": "REGION-DISTRICT-02",
+      "name": "示范二区",
+      "shortName": "示范二区"
+    },
+    "tertiaryDistrict": {
+      "code": "REGION-DISTRICT-03",
+      "name": "示范三区",
+      "shortName": "示范三区"
+    },
+    "laboratoryDistrict": {
+      "code": "REGION-DISTRICT-04",
+      "name": "示范四区",
+      "shortName": "示范四区"
+    },
+    "peripheralDistrict": {
+      "code": "REGION-DISTRICT-05",
+      "name": "示范五区",
+      "shortName": "示范五区"
+    }
+  }
+}

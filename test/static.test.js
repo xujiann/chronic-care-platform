@@ -3733,8 +3733,8 @@ test("citizen portal exposes resident service tabs and implementation states", (
   assert.match(citizenJs, /formatRegistrationDoctor/);
   assert.match(citizenJs, /formatRegistrationSource/);
   assert.match(citizenJs, /formatRegistrationTag/);
-  assert.match(citizenJs, /大连市中心医院门诊/);
-  assert.match(citizenJs, /大连医科大学附属医院门诊/);
+  assert.match(citizenJs, /区域中心医院门诊/);
+  assert.match(citizenJs, /区域医科大学附属医院门诊/);
   assert.match(citizenJs, /心内科/);
   assert.match(citizenJs, /内分泌科/);
   assert.match(citizenJs, /王医生/);

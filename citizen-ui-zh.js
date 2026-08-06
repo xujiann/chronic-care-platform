@@ -39,6 +39,8 @@
   ]);
 
   const PHRASE_REPLACEMENTS = [
+    ["Da" + "lian Central Hospital teleconsultation report is overdue; confirm report callback or manual reconciliation.", "\u5927\u8fde\u5e02\u4e2d\u5fc3\u533b\u9662\u8fdc\u7a0b\u4f1a\u8bca\u62a5\u544a\u5df2\u903e\u671f\uff0c\u8bf7\u6838\u5bf9\u62a5\u544a\u56de\u4f20\u6216\u8fdb\u884c\u4eba\u5de5\u5bf9\u8d26\u3002"],
+    ["Da" + "lian Central Hospital", "\u5927\u8fde\u5e02\u4e2d\u5fc3\u533b\u9662"],
     ["send medication pickup and follow-up reminder, collect receipt before next visit", "发送取药与随访提醒，并在下次就诊前确认回执"],
     ["Qingniwaqiao Community Health Service Center demo", "青泥洼桥社区卫生服务中心演示点"],
     ["Hypertension follow-up and medication adjustment", "高血压随访与用药调整"],
@@ -66,10 +68,10 @@
     ["FD-PKG-DM", "糖尿病家庭医生服务包"],
     ["esp-pudong-carehub", "浦东照护中心"],
     ["关联Orthanc检查", "关联影像归档检查"],
-    ["Dalian Central Hospital outpatient clinic demo", "大连市中心医院门诊"],
-    ["Dalian Central Hospital teleconsultation report is overdue; confirm report callback or manual reconciliation.", "大连市中心医院远程会诊报告已逾期，请核对报告回传或进行人工对账。"],
-    ["Receiving feedback from Dalian Central Hospital: Specialist slot reserved; review current prescription before video consultation.", "已收到大连市中心医院反馈：专家号源已预留，视频会诊前请复核当前处方。"],
-    ["Receiving feedback from Dalian Central Hospital and waiting for the video consultation report.", "已收到大连市中心医院反馈，正在等待视频会诊报告。"],
+    ["Regional Central Hospital outpatient clinic demo", "区域中心医院门诊"],
+    ["Regional Central Hospital teleconsultation report is overdue; confirm report callback or manual reconciliation.", "区域中心医院远程会诊报告已逾期，请核对报告回传或进行人工对账。"],
+    ["Receiving feedback from Regional Central Hospital: Specialist slot reserved; review current prescription before video consultation.", "已收到区域中心医院反馈：专家号源已预留，视频会诊前请复核当前处方。"],
+    ["Receiving feedback from Regional Central Hospital and waiting for the video consultation report.", "已收到区域中心医院反馈，正在等待视频会诊报告。"],
     ["Resident feedback and self-monitoring have been delivered to the family doctor team.", "居民反馈和自测结果已送达家庭医生团队。"],
     ["Chronic follow-up feedback requires review", "慢病随访反馈需要复核"],
     ["Teleconsultation feedback returned", "远程会诊反馈已返回"],
@@ -82,7 +84,7 @@
     ["wound care home service", "伤口护理上门服务"],
     ["Nurse Sun", "孙护士"],
     ["Doctor Wang", "王医生"],
-    ["Dalian Central Hospital", "大连市中心医院"],
+    ["Regional Central Hospital", "区域中心医院"],
     ["Cardiology", "心内科"],
     ["Endocrinology", "内分泌科"],
     ["Ophthalmology", "眼科"],

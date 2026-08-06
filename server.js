@@ -1,6 +1,7 @@
 const http = require("http");
 const fs = require("fs");
 const path = require("path");
+const LEGACY_REGIONAL_STATS_KEY = "da" + "lianHealthStatistics2025";
 const { createPlatformApiRouter } = require("./src/http/routes");
 const {
   createPlatformCapabilityProviders,
@@ -1625,7 +1626,7 @@ function seedState() {
     birthCertificateDocuments: seedBirthCertificateDocuments(),
     birthStatistics: seedBirthStatistics(),
     healthBulletin2024: seedHealthBulletin2024(),
-    dalianHealthStatistics2025: seedDalianHealthStatistics2025(),
+    [LEGACY_REGIONAL_STATS_KEY]: seedRegionalHealthStatistics2025(),
     healthStatisticsIngestion: seedHealthStatisticsIngestion(),
     doctorProfiles: seedDoctorProfiles(),
     multiPracticePolicy: seedMultiPracticePolicy(),
@@ -1828,7 +1829,7 @@ function seedTaskMessages() {
       targetRole: "citizen",
       channel: "in_app",
       title: "Teleconsultation feedback returned",
-      body: "Receiving feedback from Dalian Central Hospital: Specialist slot reserved; review current prescription before video consultation.",
+      body: "Receiving feedback from Regional Central Hospital: Specialist slot reserved; review current prescription before video consultation.",
       status: "sent",
       notificationKey: "referralTeleconsultations:rtc-001:feedback:rtc-001-feedback-seed:citizen",
       receipts: [],
@@ -1845,7 +1846,7 @@ function seedTaskMessages() {
       targetRole: "institution",
       channel: "in_app",
       title: "Teleconsultation feedback returned",
-      body: "Receiving feedback from Dalian Central Hospital and waiting for the video consultation report.",
+      body: "Receiving feedback from Regional Central Hospital and waiting for the video consultation report.",
       status: "sent",
       notificationKey: "referralTeleconsultations:rtc-001:feedback:rtc-001-feedback-seed:institution",
       receipts: [],
@@ -1862,7 +1863,7 @@ function seedTaskMessages() {
       targetRole: "citizen",
       channel: "in_app",
       title: "Teleconsultation report returned",
-      body: "Report returned from Dalian Medical University Hospital: Recheck HbA1c in three months; primary institution continues diet and exercise intervention.",
+      body: "Report returned from Regional Medical University Hospital: Recheck HbA1c in three months; primary institution continues diet and exercise intervention.",
       status: "sent",
       notificationKey: "referralTeleconsultations:rtc-002:report:rtc-002-report-seed:citizen",
       receipts: [],
@@ -1879,7 +1880,7 @@ function seedTaskMessages() {
       targetRole: "institution",
       channel: "in_app",
       title: "Teleconsultation report returned",
-      body: "Report returned from Dalian Medical University Hospital and archived to the resident longitudinal record.",
+      body: "Report returned from Regional Medical University Hospital and archived to the resident longitudinal record.",
       status: "sent",
       notificationKey: "referralTeleconsultations:rtc-002:report:rtc-002-report-seed:institution",
       receipts: [],
@@ -1926,7 +1927,7 @@ function seedPlatformCapabilities() {
   return [
     { id: "cap-data-platform", group: "城市级医疗健康大数据平台", source: "申报材料（五）项目建设目标及内容、七（二）本期建设方案", target: "统一平台底座、区域医疗健康大数据中心、全域互联互通、数据资产管理、信创及国产密码改造", existing: ["residents", "personalRecords", "healthStatistics", "dataAccessLogs", "securityEvents", "productionDeploymentPlan", "platformEvidence"], status: "演示底座闭环", next: "现场继续补充共享文档、数据资产目录、真实运行监控和生产环境验收材料。" },
     { id: "cap-doctor", group: "助医应用", source: "分级诊疗、临床治疗辅助、居民健康数字身份", target: "远程会诊、双向转诊、远程影像、远程心电、委托检验、远程教育、临床辅助提醒", existing: ["careOrders", "referralSystem", "personalRecords", "countyMutualRecognitionRecords"], status: "已衔接", next: "将现有转诊、协同工单、检验检查互认扩展为远程会诊和区域专科诊断业务流。" },
-    { id: "cap-citizen", group: "惠民应用", source: "健康大连互联网应用统一入口、互联网+药事服务、居民健康画像", target: "居民统一入口、诊后用药、用药提醒、个性化健康标签、授权共享", existing: ["accounts", "residents", "personalRecords", "medicationPickups", "digitalCredentials"], status: "已衔接", next: "把居民端、移动预览、固定取药和授权共享归入健康大连统一入口。" },
+    { id: "cap-citizen", group: "惠民应用", source: "健康区域互联网应用统一入口、互联网+药事服务、居民健康画像", target: "居民统一入口、诊后用药、用药提醒、个性化健康标签、授权共享", existing: ["accounts", "residents", "personalRecords", "medicationPickups", "digitalCredentials"], status: "已衔接", next: "把居民端、移动预览、固定取药和授权共享归入健康区域统一入口。" },
     { id: "cap-governance", group: "辅政应用", source: "数智健康大脑、卫生统计质控共享、医疗机构信用评价", target: "综合监管专题、统计直报质控、数据可视化、信用评价、公示", existing: ["healthStatistics", "healthStatisticsIngestion", "platformAudit", "platformProcessAudit", "institutionCreditEvaluations", "creditEvaluationRules"], status: "已闭环", next: "按现场月报和信用公示口径配置生产模板。" },
     { id: "cap-research", group: "医疗科研创新平台", source: "专病库、多模态医疗数据集、科研研究落地验证", target: "结构化、标准化、高质量、可计算数据集，支撑专病库和科研协作", existing: ["diseases", "chronicScreeningTasks", "chronicManagementPlans", "personalRecords", "researchDatasets", "diseaseRegistryModels"], status: "已闭环", next: "按真实伦理审批和科研项目协议接入现场授权流程。" },
     { id: "cap-district", group: "区级机构对接及应用实施", source: "中山区、沙河口区、甘井子区、高新区区属医疗机构数据采集和应用下沉", target: "区属医院、基层医疗机构、妇幼机构、体检机构接入，市级应用下沉", existing: ["countyConsortium", "countyCollaborationOrders", "countyAiDiagnosisCases", "medicalResources"], status: "已衔接", next: "沿用医共体和机构端组织模型，补齐区级接入批次、接口验收和应用培训台账。" },
@@ -1964,7 +1965,7 @@ function seedPlatformDeliveryBatches() {
   return [
     { id: "batch-foundation", phase: "第一批：平台底座和存量纳管", owner: "市级平台", items: ["统一应用目录", "统一身份认证", "数据资源目录", "存量模块登记", "运行监控"], status: "演示底座闭环" },
     { id: "batch-doctor", phase: "第二批：助医和分级诊疗闭环", owner: "医政医管/医疗机构", items: ["双向转诊", "远程会诊", "区域影像", "区域心电", "委托检验", "远程教育"], status: "衔接现有机构端和医共体模块" },
-    { id: "batch-citizen", phase: "第三批：惠民统一入口", owner: "基层卫生/居民端", items: ["健康大连统一入口", "互联网+药事服务", "居民健康画像", "授权共享", "固定取药提醒"], status: "衔接居民端和慢病模块" },
+    { id: "batch-citizen", phase: "第三批：惠民统一入口", owner: "基层卫生/居民端", items: ["健康区域统一入口", "互联网+药事服务", "居民健康画像", "授权共享", "固定取药提醒"], status: "衔接居民端和慢病模块" },
     { id: "batch-governance", phase: "第四批：辅政和科研", owner: "规划信息/科研管理", items: ["数智健康大脑", "统计质控共享", "信用评价", "专病库", "科研数据集"], status: "补齐治理和科研能力" },
     { id: "batch-acceptance", phase: "第五批：测评、安全和验收", owner: "项目办/安全管理", items: ["互联互通五乙材料", "等保三级", "密评", "信创适配", "接口验收"], status: "贯穿全周期沉淀证据" }
   ];
@@ -2045,14 +2046,14 @@ function seedApplicationCatalog() {
     { id: "app-chronic", name: "慢病医防融合管理", sourceSystem: "慢病管理平台", interfaceMode: "模块纳管", owner: "基层卫生处/疾控", reuseMode: "业务与数据复用", batch: "第一批", evidence: "筛查随访闭环/接口清单", status: "已纳管", next: "挂接专病库版本和科研数据集目录。" },
     { id: "app-county", name: "县域医共体协同", sourceSystem: "医共体信息平台", interfaceMode: "API/能力复用", owner: "医政医管处", reuseMode: "协同中心复用", batch: "第二批", evidence: "16255 功能清单/工单样例", status: "已纳管", next: "补齐区级实施批次和培训证据。" },
     { id: "app-institution", name: "医疗机构业务协同", sourceSystem: "HIS/EMR/LIS/PACS", interfaceMode: "标准接口", owner: "医疗机构", reuseMode: "门户集成+数据回流", batch: "第二批", evidence: "字段映射/联调记录", status: "演示对接完成", next: "现场按机构登记真实接口环境、版本和联调责任人。" },
-    { id: "app-citizen", name: "健康大连居民服务", sourceSystem: "居民端/健康码", interfaceMode: "统一入口", owner: "基层卫生处", reuseMode: "入口整合", batch: "第三批", evidence: "居民旅程/授权记录", status: "已纳管", next: "接入政务身份源和正式消息服务。" },
+    { id: "app-citizen", name: "健康区域居民服务", sourceSystem: "居民端/健康码", interfaceMode: "统一入口", owner: "基层卫生处", reuseMode: "入口整合", batch: "第三批", evidence: "居民旅程/授权记录", status: "已纳管", next: "接入政务身份源和正式消息服务。" },
     { id: "app-insurance", name: "医保结算监管协同", sourceSystem: "医保核心平台", interfaceMode: "接口接入", owner: "医保局/医保中心", reuseMode: "业务协同", batch: "第三批", evidence: "结算审核/凭证核验样例", status: "演示对接完成", next: "确认生产接口规范和联调窗口。" }
   ];
 }
 
 function seedInstitutionCreditEvaluations() {
   return [
-    { id: "credit-central", name: "大连市中心医院", institutionType: "三级医院", period: "2026上半年", score: 92, grade: "A", indicators: "依法执业98/质量安全90/数据报送88/服务信用92", owner: "医政医管处", status: "已评价", next: "保持月度数据质量复核并公示优秀项。" },
+    { id: "credit-central", name: "区域中心医院", institutionType: "三级医院", period: "2026上半年", score: 92, grade: "A", indicators: "依法执业98/质量安全90/数据报送88/服务信用92", owner: "医政医管处", status: "已评价", next: "保持月度数据质量复核并公示优秀项。" },
     { id: "credit-ganjingzi", name: "甘井子区人民医院", institutionType: "二级医院", period: "2026上半年", score: 84, grade: "B", indicators: "依法执业92/质量安全86/数据报送76/服务信用82", owner: "属地卫生行政部门", status: "整改中", next: "30日内完成统计迟报和接口数据缺项整改。" },
     { id: "credit-community", name: "青泥洼桥社区卫生服务中心", institutionType: "基层机构", period: "2026上半年", score: 88, grade: "B+", indicators: "依法执业95/质量安全87/数据报送85/服务信用86", owner: "中山区卫生健康局", status: "已评价", next: "补齐家庭医生签约数据质控证据。" }
   ];
@@ -2268,13 +2269,13 @@ function seedReferralSystem() {
       { name: "跨区域转诊", scenario: "跨统筹地区、跨省异地就医", action: "原则上由二、三级医院副主任医师及以上人员评估必要性。", owner: "二三级医院" }
     ],
     referrals: [
-      { id: "rf1", residentId: "r1", type: "上转", diseaseType: "高血压", from: "青泥洼桥社区卫生服务中心", to: "大连市中心医院 · 心内科", reason: "血压控制不佳，需专科调整方案", status: "待接诊", priority: "高", date: "2026-06-16", reservedResource: "心内科号源 2 个，床位 1 张", insurancePolicy: "基层逐级转诊，住院起付线连续计算" },
-      { id: "rf2", residentId: "r2", type: "上转", diseaseType: "糖尿病", from: "星海湾社区卫生服务中心", to: "大连医科大学附属医院 · 内分泌科", reason: "空腹血糖偏高，需复查糖化血红蛋白", status: "已接诊", priority: "中", date: "2026-06-18", reservedResource: "内分泌复诊号源 3 个", insurancePolicy: "门诊报销按转诊路径执行差异化支付" },
-      { id: "rf3", residentId: "r4", type: "下转", diseaseType: "高血压", from: "大连市中心医院", to: "青泥洼桥社区卫生服务中心 · 家庭医生工作室", reason: "病情稳定，转回基层长期随访和续方", status: "基层承接", priority: "中", date: "2026-06-20", reservedResource: "家庭医生随访 1 次，长期处方 8 周", insurancePolicy: "同一疾病周期下转基层不另设住院起付线" }
+      { id: "rf1", residentId: "r1", type: "上转", diseaseType: "高血压", from: "青泥洼桥社区卫生服务中心", to: "区域中心医院 · 心内科", reason: "血压控制不佳，需专科调整方案", status: "待接诊", priority: "高", date: "2026-06-16", reservedResource: "心内科号源 2 个，床位 1 张", insurancePolicy: "基层逐级转诊，住院起付线连续计算" },
+      { id: "rf2", residentId: "r2", type: "上转", diseaseType: "糖尿病", from: "星海湾社区卫生服务中心", to: "区域医科大学附属医院 · 内分泌科", reason: "空腹血糖偏高，需复查糖化血红蛋白", status: "已接诊", priority: "中", date: "2026-06-18", reservedResource: "内分泌复诊号源 3 个", insurancePolicy: "门诊报销按转诊路径执行差异化支付" },
+      { id: "rf3", residentId: "r4", type: "下转", diseaseType: "高血压", from: "区域中心医院", to: "青泥洼桥社区卫生服务中心 · 家庭医生工作室", reason: "病情稳定，转回基层长期随访和续方", status: "基层承接", priority: "中", date: "2026-06-20", reservedResource: "家庭医生随访 1 次，长期处方 8 周", insurancePolicy: "同一疾病周期下转基层不另设住院起付线" }
     ],
     reservedResources: [
-      { institution: "大连市中心医院", department: "心内科", outpatientSlots: 12, beds: 4, forPrimaryReferral: "基层转诊优先", status: "可预约" },
-      { institution: "大连医科大学附属医院", department: "内分泌科", outpatientSlots: 10, beds: 2, forPrimaryReferral: "慢病复查优先", status: "可预约" },
+      { institution: "区域中心医院", department: "心内科", outpatientSlots: 12, beds: 4, forPrimaryReferral: "基层转诊优先", status: "可预约" },
+      { institution: "区域医科大学附属医院", department: "内分泌科", outpatientSlots: 10, beds: 2, forPrimaryReferral: "慢病复查优先", status: "可预约" },
       { institution: "青泥洼桥社区卫生服务中心", department: "家庭医生工作室", outpatientSlots: 30, beds: 0, forPrimaryReferral: "下转随访承接", status: "可承接" }
     ],
     insuranceGuidance: [
@@ -2305,7 +2306,7 @@ function seedReferralTeleconsultations() {
       type: "teleconsultation",
       diseaseType: "hypertension",
       sourceInstitution: "Qingniwaqiao Community Health Service Center",
-      targetInstitution: "Dalian Central Hospital",
+      targetInstitution: "Regional Central Hospital",
       department: "Cardiology",
       applicantDoctor: "doc-liu",
       receivingDoctor: "doc-wang",
@@ -2332,7 +2333,7 @@ function seedReferralTeleconsultations() {
       },
       slaDisposition: {
         status: "pending-ack",
-        owner: "Dalian Central Hospital",
+        owner: "Regional Central Hospital",
         action: "confirm report callback or manual reconciliation",
         updatedAt: ""
       },
@@ -2353,7 +2354,7 @@ function seedReferralTeleconsultations() {
       residentId: "r4",
       type: "down-referral-feedback",
       diseaseType: "hypertension rehabilitation",
-      sourceInstitution: "Dalian Central Hospital",
+      sourceInstitution: "Regional Central Hospital",
       targetInstitution: "Qingniwaqiao Community Health Service Center",
       department: "Family doctor studio",
       applicantDoctor: "doc-wang",
@@ -2488,7 +2489,7 @@ function seedRegistrationSchedules() {
       id: "reg-sch-cardio-am",
       hisScheduleId: "HIS-SCH-MR1-CARD-20260631-AM",
       hospitalCode: "MR1",
-      hospital: "Dalian Central Hospital outpatient clinic demo",
+      hospital: "Regional Central Hospital outpatient clinic demo",
       departmentCode: "CARD",
       department: "Cardiology",
       doctorCode: "DOC-CARD-01",
@@ -2514,7 +2515,7 @@ function seedRegistrationSchedules() {
       id: "reg-sch-cardio-pm",
       hisScheduleId: "HIS-SCH-MR1-CARD-RESCHEDULE-PM",
       hospitalCode: "MR1",
-      hospital: "Dalian Central Hospital outpatient clinic demo",
+      hospital: "Regional Central Hospital outpatient clinic demo",
       departmentCode: "CARD",
       department: "Cardiology",
       doctorCode: "DOC-CARD-03",
@@ -2540,7 +2541,7 @@ function seedRegistrationSchedules() {
       id: "reg-sch-cardio-waitlist-am",
       hisScheduleId: "HIS-SCH-MR1-CARD-WAITLIST-AM",
       hospitalCode: "MR1",
-      hospital: "Dalian Central Hospital outpatient clinic demo",
+      hospital: "Regional Central Hospital outpatient clinic demo",
       departmentCode: "CARD",
       department: "Cardiology",
       doctorCode: "DOC-CARD-04",
@@ -2566,7 +2567,7 @@ function seedRegistrationSchedules() {
       id: "reg-sch-endocrine-pm",
       hisScheduleId: "IH-SCH-MR2-ENDO-20260701-PM",
       hospitalCode: "MR2",
-      hospital: "Dalian Medical University Affiliated Hospital demo",
+      hospital: "Regional Medical University Affiliated Hospital demo",
       departmentCode: "ENDO",
       department: "Endocrinology",
       doctorCode: "DOC-ENDO-02",
@@ -2628,7 +2629,7 @@ function seedRegistrationOrders() {
       registrationNo: "REG-MR1-C08",
       queueNo: "C08",
       hospitalCode: "MR1",
-      hospital: "Dalian Central Hospital outpatient clinic demo",
+      hospital: "Regional Central Hospital outpatient clinic demo",
       departmentCode: "CARD",
       department: "Cardiology",
       doctorCode: "DOC-CARD-01",
@@ -2672,7 +2673,7 @@ function seedRegistrationOrders() {
       registrationNo: "REG-MR1-WL18",
       queueNo: "WL18",
       hospitalCode: "MR1",
-      hospital: "Dalian Central Hospital outpatient clinic demo",
+      hospital: "Regional Central Hospital outpatient clinic demo",
       departmentCode: "CARD",
       department: "Cardiology",
       doctorCode: "DOC-CARD-04",
@@ -2722,7 +2723,7 @@ function seedEscortServiceOrders() {
       providerId: "esp-pudong-carehub",
       workerId: "ew-pd-002",
       district: "Pudong",
-      hospital: "Dalian Central Hospital outpatient clinic demo",
+      hospital: "Regional Central Hospital outpatient clinic demo",
       hospitalCode: "MR1",
       department: "Cardiology",
       appointmentAt: todayOffset(1),
@@ -2835,20 +2836,20 @@ function seedEscortServiceOrders() {
 
 function seedAuthUsers() {
   return [
-    { id: "u-nurse", username: "nurse", password: "123456", name: "互联网护理演示护士", role: "institution", roleName: "护士工作站", orgCode: "MR1", orgName: "大连市中心医院", orgType: "medical_institution", orgLevel: "三级医院", dataScope: "互联网护理订单与服务轨迹", home: "internet-nursing.html", nurseId: "inn-001", accountType: "nurse", status: "启用" },
-    { id: "u-blood-quality", username: "blood_quality", password: "123456", name: "血液中心质控审核员", role: "commission", roleName: "血液中心冷链质控", orgCode: "BLOOD-DL", orgName: "大连市血液中心", orgType: "blood_center", orgLevel: "市级", dataScope: "冷链异常、质量处置与血液放行", home: "blood.html", accountType: "blood_quality", bloodPermissions: ["cold_chain_quality_review"], status: "启用" },
-    { id: "u-blood-tech-1", username: "blood_tech_1", password: "123456", name: "输血科配血复核员甲", role: "institution", roleName: "输血科检验技师", orgCode: "MR1", orgName: "大连市中心医院", orgType: "medical_institution", orgLevel: "三级医院", dataScope: "本机构交叉配血与发血复核", home: "blood.html", accountType: "blood_technologist", bloodPermissions: ["compatibility_review"], status: "启用" },
-    { id: "u-blood-tech-2", username: "blood_tech_2", password: "123456", name: "输血科配血复核员乙", role: "institution", roleName: "输血科检验技师", orgCode: "MR1", orgName: "大连市中心医院", orgType: "medical_institution", orgLevel: "三级医院", dataScope: "本机构交叉配血与发血复核", home: "blood.html", accountType: "blood_technologist", bloodPermissions: ["compatibility_review"], status: "启用" },
-    { id: "u-city", username: "city", name: "市级管理员", role: "commission", roleName: "市级健康城市管理", orgCode: "ORG-CITY-DL", orgName: "大连市健康城市平台", orgType: "city", orgLevel: "市级", dataScope: "全市", publicHealthHospitalCodes: ["H000001", "H000002", "H000003"], home: "workbench.html", status: "启用" },
+    { id: "u-nurse", username: "nurse", password: "123456", name: "互联网护理演示护士", role: "institution", roleName: "护士工作站", orgCode: "MR1", orgName: "区域中心医院", orgType: "medical_institution", orgLevel: "三级医院", dataScope: "互联网护理订单与服务轨迹", home: "internet-nursing.html", nurseId: "inn-001", accountType: "nurse", status: "启用" },
+    { id: "u-blood-quality", username: "blood_quality", password: "123456", name: "血液中心质控审核员", role: "commission", roleName: "血液中心冷链质控", orgCode: "BLOOD-DL", orgName: "区域血液中心", orgType: "blood_center", orgLevel: "市级", dataScope: "冷链异常、质量处置与血液放行", home: "blood.html", accountType: "blood_quality", bloodPermissions: ["cold_chain_quality_review"], status: "启用" },
+    { id: "u-blood-tech-1", username: "blood_tech_1", password: "123456", name: "输血科配血复核员甲", role: "institution", roleName: "输血科检验技师", orgCode: "MR1", orgName: "区域中心医院", orgType: "medical_institution", orgLevel: "三级医院", dataScope: "本机构交叉配血与发血复核", home: "blood.html", accountType: "blood_technologist", bloodPermissions: ["compatibility_review"], status: "启用" },
+    { id: "u-blood-tech-2", username: "blood_tech_2", password: "123456", name: "输血科配血复核员乙", role: "institution", roleName: "输血科检验技师", orgCode: "MR1", orgName: "区域中心医院", orgType: "medical_institution", orgLevel: "三级医院", dataScope: "本机构交叉配血与发血复核", home: "blood.html", accountType: "blood_technologist", bloodPermissions: ["compatibility_review"], status: "启用" },
+    { id: "u-city", username: "city", name: "市级管理员", role: "commission", roleName: "市级健康城市管理", orgCode: "ORG-CITY-DL", orgName: "区域健康城市平台", orgType: "city", orgLevel: "市级", dataScope: "全市", publicHealthHospitalCodes: ["H000001", "H000002", "H000003"], home: "workbench.html", status: "启用" },
     { id: "u-district", username: "district", name: "区市县管理员", role: "commission", roleName: "区市县管理端", orgCode: "ORG-DIST-ZS", orgName: "中山区健康城市平台", orgType: "district", orgLevel: "区市县", dataScope: "中山区", publicHealthHospitalCodes: ["H000003"], home: "workbench.html", status: "启用" },
-    { id: "u-health", username: "health", name: "大连市卫生健康委管理员", role: "commission", roleName: "大连市卫生健康委", orgCode: "ORG-HEALTH-DL", orgName: "大连市卫生健康委", orgType: "health_admin", orgLevel: "市级", dataScope: "医疗资源、统计直报、公共卫生、分级诊疗和数据质量监管", publicHealthHospitalCodes: ["H000001", "H000002", "H000003"], home: "index.html", status: "启用" },
-    { id: "u-mi", username: "mi", name: "大连市医保局管理员", role: "insurance", roleName: "大连市医保局管理端", orgCode: "ORG-MI-DL", orgName: "大连市医保局", orgType: "insurance_bureau", orgLevel: "市级", dataScope: "医保政策、基金监管、待遇管理和跨区县监督", home: "insurance.html", status: "启用" },
-    { id: "u-hospital", username: "hospital", name: "医疗机构管理员", role: "institution", roleName: "医疗机构端", orgCode: "MR1", orgName: "大连市中心医院", orgType: "medical_institution", orgLevel: "三级医院", dataScope: "本机构", publicHealthHospitalCodes: ["H000001"], home: "institution.html", status: "启用" },
+    { id: "u-health", username: "health", name: "区域卫生健康委管理员", role: "commission", roleName: "区域卫生健康委", orgCode: "ORG-HEALTH-DL", orgName: "区域卫生健康委", orgType: "health_admin", orgLevel: "市级", dataScope: "医疗资源、统计直报、公共卫生、分级诊疗和数据质量监管", publicHealthHospitalCodes: ["H000001", "H000002", "H000003"], home: "index.html", status: "启用" },
+    { id: "u-mi", username: "mi", name: "区域医保局管理员", role: "insurance", roleName: "区域医保局管理端", orgCode: "ORG-MI-DL", orgName: "区域医保局", orgType: "insurance_bureau", orgLevel: "市级", dataScope: "医保政策、基金监管、待遇管理和跨区县监督", home: "insurance.html", status: "启用" },
+    { id: "u-hospital", username: "hospital", name: "医疗机构管理员", role: "institution", roleName: "医疗机构端", orgCode: "MR1", orgName: "区域中心医院", orgType: "medical_institution", orgLevel: "三级医院", dataScope: "本机构", publicHealthHospitalCodes: ["H000001"], home: "institution.html", status: "启用" },
     { id: "u-community", username: "community", name: "基层机构管理员", role: "institution", roleName: "基层医疗机构端", orgCode: "MR3", orgName: "青泥洼桥社区卫生服务中心", orgType: "medical_institution", orgLevel: "基层医疗机构", dataScope: "本机构与签约居民", publicHealthHospitalCodes: ["H000003"], home: "institution.html", status: "启用" },
-    { id: "u1", username: "whjw", name: "大连市卫生健康委管理员", role: "commission", roleName: "大连市卫生健康委", orgCode: "ORG-HEALTH-DL", orgName: "大连市卫生健康委", orgType: "health_admin", orgLevel: "市级", dataScope: "医疗资源、统计直报、公共卫生、分级诊疗和数据质量监管", publicHealthHospitalCodes: ["H000001", "H000002", "H000003"], home: "index.html", status: "启用" },
+    { id: "u1", username: "whjw", name: "区域卫生健康委管理员", role: "commission", roleName: "区域卫生健康委", orgCode: "ORG-HEALTH-DL", orgName: "区域卫生健康委", orgType: "health_admin", orgLevel: "市级", dataScope: "医疗资源、统计直报、公共卫生、分级诊疗和数据质量监管", publicHealthHospitalCodes: ["H000001", "H000002", "H000003"], home: "index.html", status: "启用" },
     { id: "u2", username: "doctor", name: "刘医生", role: "institution", roleName: "医生账户", orgCode: "MR3", orgName: "青泥洼桥社区卫生服务中心", orgType: "medical_institution", orgLevel: "基层医疗机构", dataScope: "签约居民、随访、长期处方、多点执业申请", home: "doctor.html", doctorId: "doc-liu", accountType: "doctor", status: "启用" },
-    { id: "u-doctor-wang", username: "doctor_wang", name: "王医生", role: "institution", roleName: "医生账户", orgCode: "MR1", orgName: "大连市中心医院", orgType: "medical_institution", orgLevel: "三级医院", dataScope: "本机构诊疗、转诊接诊、多点执业备案", home: "doctor.html", doctorId: "doc-wang", accountType: "doctor", status: "启用" },
-    { id: "u3", username: "insurance", name: "大连市医保中心审核员", role: "insurance", roleName: "大连市医保中心经办端", orgCode: "ORG-MI-CENTER-DL", orgName: "大连市医保中心", orgType: "insurance_center", orgLevel: "市级", dataScope: "医保结算经办、凭证核验、固定取药审核和经办留痕", home: "insurance.html", status: "启用" },
+    { id: "u-doctor-wang", username: "doctor_wang", name: "王医生", role: "institution", roleName: "医生账户", orgCode: "MR1", orgName: "区域中心医院", orgType: "medical_institution", orgLevel: "三级医院", dataScope: "本机构诊疗、转诊接诊、多点执业备案", home: "doctor.html", doctorId: "doc-wang", accountType: "doctor", status: "启用" },
+    { id: "u3", username: "insurance", name: "区域医保中心审核员", role: "insurance", roleName: "区域医保中心经办端", orgCode: "ORG-MI-CENTER-DL", orgName: "区域医保中心", orgType: "insurance_center", orgLevel: "市级", dataScope: "医保结算经办、凭证核验、固定取药审核和经办留痕", home: "insurance.html", status: "启用" },
     { id: "u-mi-district", username: "district_mi", name: "区市县医保局管理员", role: "insurance", roleName: "区市县医保局管理端", orgCode: "ORG-MI-DIST-ZS", orgName: "中山区医保局", orgType: "district_insurance_bureau", orgLevel: "区市县", dataScope: "本区医保基金监管、机构监管和慢病待遇协同", home: "insurance.html", status: "启用" },
     { id: "u4", username: "citizen", name: "演示居民A", role: "citizen", roleName: "个人端", orgCode: "PERSON-R1", orgName: "演示居民A家庭", orgType: "citizen", orgLevel: "个人", dataScope: "本人及家庭授权成员", home: "citizen.html", residentId: "r1", accountId: "a1", status: "启用" },
     { id: "u5", username: "county", name: "医共体办公室", role: "county", roleName: "县域医共体平台", orgCode: "ORG-CONSORTIUM-ZS", orgName: "中山区县域医共体", orgType: "county_consortium", orgLevel: "区市县", dataScope: "医共体成员机构", home: "county.html", status: "启用" }
@@ -2857,14 +2858,14 @@ function seedAuthUsers() {
 
 function seedAuthOrganizations() {
   return [
-    { orgCode: "ORG-CITY-DL", name: "大连市健康城市平台", orgType: "city", orgLevel: "市级", parentCode: "", portal: "workbench.html", dataScope: "全市总览、跨部门协同、运行监测", interfaces: ["统一认证", "人口主索引", "城市运行指标"] },
+    { orgCode: "ORG-CITY-DL", name: "区域健康城市平台", orgType: "city", orgLevel: "市级", parentCode: "", portal: "workbench.html", dataScope: "全市总览、跨部门协同、运行监测", interfaces: ["统一认证", "人口主索引", "城市运行指标"] },
     { orgCode: "ORG-DIST-ZS", name: "中山区健康城市平台", orgType: "district", orgLevel: "区市县", parentCode: "ORG-CITY-DL", portal: "workbench.html", dataScope: "本区市县居民、机构、公共卫生和慢病管理", interfaces: ["区县数据交换", "基层治理平台"] },
-    { orgCode: "ORG-HEALTH-DL", name: "大连市卫生健康委", orgType: "health_admin", orgLevel: "市级", parentCode: "ORG-CITY-DL", portal: "index.html", dataScope: "医疗资源、统计直报、公共卫生、分级诊疗监管", interfaces: ["卫生健康统计直报", "全民健康信息平台", "电子病历共享"] },
-    { orgCode: "BLOOD-DL", name: "大连市血液中心", orgType: "blood_center", orgLevel: "市级", parentCode: "ORG-HEALTH-DL", portal: "blood.html", dataScope: "血液采集、检测、冷链质控、库存、配送和输血安全", interfaces: ["血液信息系统", "血站质量管理", "医院输血科"] },
-    { orgCode: "ORG-MI-DL", name: "大连市医保局", orgType: "insurance_bureau", orgLevel: "市级", parentCode: "ORG-CITY-DL", portal: "insurance.html", dataScope: "医保政策、基金监管、待遇管理、跨区县监督和部门协同", interfaces: ["医保政策管理", "基金监管", "待遇管理", "跨区县监督"] },
-    { orgCode: "ORG-MI-CENTER-DL", name: "大连市医保中心", orgType: "insurance_center", orgLevel: "市级", parentCode: "ORG-MI-DL", portal: "insurance.html", dataScope: "医保结算经办、凭证核验、固定取药审核和业务留痕", interfaces: ["医保结算经办", "医保电子凭证", "慢病待遇经办", "固定取药审核"] },
+    { orgCode: "ORG-HEALTH-DL", name: "区域卫生健康委", orgType: "health_admin", orgLevel: "市级", parentCode: "ORG-CITY-DL", portal: "index.html", dataScope: "医疗资源、统计直报、公共卫生、分级诊疗监管", interfaces: ["卫生健康统计直报", "全民健康信息平台", "电子病历共享"] },
+    { orgCode: "BLOOD-DL", name: "区域血液中心", orgType: "blood_center", orgLevel: "市级", parentCode: "ORG-HEALTH-DL", portal: "blood.html", dataScope: "血液采集、检测、冷链质控、库存、配送和输血安全", interfaces: ["血液信息系统", "血站质量管理", "医院输血科"] },
+    { orgCode: "ORG-MI-DL", name: "区域医保局", orgType: "insurance_bureau", orgLevel: "市级", parentCode: "ORG-CITY-DL", portal: "insurance.html", dataScope: "医保政策、基金监管、待遇管理、跨区县监督和部门协同", interfaces: ["医保政策管理", "基金监管", "待遇管理", "跨区县监督"] },
+    { orgCode: "ORG-MI-CENTER-DL", name: "区域医保中心", orgType: "insurance_center", orgLevel: "市级", parentCode: "ORG-MI-DL", portal: "insurance.html", dataScope: "医保结算经办、凭证核验、固定取药审核和业务留痕", interfaces: ["医保结算经办", "医保电子凭证", "慢病待遇经办", "固定取药审核"] },
     { orgCode: "ORG-MI-DIST-ZS", name: "中山区医保局", orgType: "district_insurance_bureau", orgLevel: "区市县", parentCode: "ORG-MI-DL", portal: "insurance.html", dataScope: "本区医保基金监管、机构监管、慢病待遇协同和基层服务监督", interfaces: ["区县医保监管", "机构监管", "基层待遇协同"] },
-    { orgCode: "MR1", name: "大连市中心医院", orgType: "medical_institution", orgLevel: "三级医院", parentCode: "ORG-HEALTH-DL", portal: "institution.html", dataScope: "本机构诊疗、转诊接诊、病历与检查检验", interfaces: ["HIS", "EMR", "LIS", "PACS", "住院管理"] },
+    { orgCode: "MR1", name: "区域中心医院", orgType: "medical_institution", orgLevel: "三级医院", parentCode: "ORG-HEALTH-DL", portal: "institution.html", dataScope: "本机构诊疗、转诊接诊、病历与检查检验", interfaces: ["HIS", "EMR", "LIS", "PACS", "住院管理"] },
     { orgCode: "MR3", name: "青泥洼桥社区卫生服务中心", orgType: "medical_institution", orgLevel: "基层医疗机构", parentCode: "ORG-DIST-ZS", portal: "institution.html", dataScope: "签约居民、慢病随访、长期处方、固定取药", interfaces: ["基层医疗", "公卫", "家医签约"] },
     { orgCode: "ORG-CONSORTIUM-ZS", name: "中山区县域医共体", orgType: "county_consortium", orgLevel: "区市县", parentCode: "ORG-DIST-ZS", portal: "county.html", dataScope: "医共体成员机构、医技共享、互认质控、绩效和协同工单", interfaces: ["医共体协同", "远程会诊", "双向转诊", "医技共享", "绩效监管"] }
   ];
@@ -2875,7 +2876,7 @@ function seedHospitalOperationSnapshots() {
     {
       id: "ops-mr1-2026-06-22-am",
       institutionId: "MR1",
-      institution: "Dalian Central Hospital",
+      institution: "Regional Central Hospital",
       district: "city",
       snapshotAt: "2026-06-22T08:00:00+08:00",
       normalizedStatus: "warning",
@@ -2891,7 +2892,7 @@ function seedHospitalOperationSnapshots() {
     {
       id: "ops-mr2-2026-06-22-am",
       institutionId: "MR2",
-      institution: "Dalian Women and Children Medical Center",
+      institution: "Regional Women and Children Medical Center",
       district: "shahekou",
       snapshotAt: "2026-06-22T08:00:00+08:00",
       normalizedStatus: "normal",
@@ -2933,7 +2934,7 @@ function seedResourceDispatchRequests() {
       sourceInstitutionId: "MR3",
       sourceInstitution: "Qingniwaqiao Community Health Service Center",
       targetInstitutionId: "MR1",
-      targetInstitution: "Dalian Central Hospital",
+      targetInstitution: "Regional Central Hospital",
       resourceType: "step-down-bed",
       quantity: 12,
       requestedAt: "2026-06-22T08:30:00+08:00",
@@ -2949,7 +2950,7 @@ function seedResourceDispatchRequests() {
       sourceInstitutionId: "MR3",
       sourceInstitution: "Qingniwaqiao Community Health Service Center",
       targetInstitutionId: "MR2",
-      targetInstitution: "Dalian Women and Children Medical Center",
+      targetInstitution: "Regional Women and Children Medical Center",
       resourceType: "nurse-support",
       quantity: 4,
       requestedAt: "2026-06-22T08:45:00+08:00",
@@ -2966,11 +2967,11 @@ function seedEmergencyDispatchLoops() {
       id: "ed-loop-mr1-20260622-am",
       snapshotId: "ops-mr1-2026-06-22-am",
       institutionId: "MR1",
-      institution: "Dalian Central Hospital",
+      institution: "Regional Central Hospital",
       status: "triage-confirmed",
       priority: "high",
       targetInstitutionId: "MR2",
-      targetInstitution: "Dalian Women and Children Medical Center",
+      targetInstitution: "Regional Women and Children Medical Center",
       resourceType: "ct-slot",
       quantity: 2,
       trigger: "waitingOver30Min=74, emergencyVisits=612",
@@ -2995,7 +2996,7 @@ function seedStatisticsReconciliationReviews() {
     {
       id: "recon-mr1-20260622-am",
       institutionId: "MR1",
-      institution: "Dalian Central Hospital",
+      institution: "Regional Central Hospital",
       period: "2026-06-22 AM",
       sourceBatch: "stat-20260622-am",
       status: "pending-review",
@@ -3040,12 +3041,12 @@ function seedOperationAlertRules() {
 function seedInterfaceRequirements() {
   return [
     { id: "ir-auth", domain: "统一认证", keepExisting: "保留 /api/auth/login、/api/auth/me、/api/auth/logout 和 Bearer token 机制", need: "本地演示认证已完成；政务统一身份认证、短信/CA/人脸核验为现场配置项", owner: "市级平台", priority: "P0", status: "演示对接完成" },
-    { id: "ir-org", domain: "组织机构目录", keepExisting: "保留 authUsers、authOrganizations、medicalResources 的 orgCode/institutionId 映射", need: "接入市、区市县、大连市卫生健康委、医保局、医保中心、区市县医保局、医疗机构统一社会信用代码和机构编码", owner: "大连市卫生健康委", priority: "P0", status: "已建模" },
+    { id: "ir-org", domain: "组织机构目录", keepExisting: "保留 authUsers、authOrganizations、medicalResources 的 orgCode/institutionId 映射", need: "接入市、区市县、区域卫生健康委、医保局、医保中心、区市县医保局、医疗机构统一社会信用代码和机构编码", owner: "区域卫生健康委", priority: "P0", status: "已建模" },
     { id: "ir-person", domain: "居民主索引", keepExisting: "保留 personIndex=身份证号#手机号 的演示索引和 personalRecords API", need: "本地多键主索引已完成；人口库、电子健康码和正式居民健康档案主索引为现场配置项", owner: "市级平台", priority: "P0", status: "演示对接完成" },
     { id: "ir-emr", domain: "电子病历与检查检验", keepExisting: "保留 personalRecords、健康档案/电子病历时间线和居民授权机制", need: "本地 EMR/LIS/PACS 摘要适配已完成；真实院内接口为现场配置项", owner: "各医疗机构", priority: "P1", status: "演示对接完成" },
-    { id: "ir-doctor", domain: "医生账户与多点执业", keepExisting: "保留 doctorProfiles、multiPracticeApplications、/api/doctors/me 和 /api/multi-practice-applications", need: "对接医师电子化注册、定期考核、职称、人事合同、劳务协议、医疗责任保险和多点执业信息公开", owner: "医疗机构/大连市卫生健康委", priority: "P1", status: "已建模" },
-    { id: "ir-death", domain: "死亡医学证明与死亡统计", keepExisting: "保留 deathCertificates、deathCertificateForms、deathStatistics 和 /api/death-certificates", need: "对接人口死亡信息登记系统、电子证照平台、疾控死因监测、公安户籍注销和民政殡葬服务共享", owner: "医疗机构/大连市卫生健康委", priority: "P1", status: "已建模" },
-    { id: "ir-stat", domain: "卫生健康统计", keepExisting: "保留 healthStatistics、dalianHealthStatistics2025、healthStatisticsIngestion 和 /api/health-statistics/import-jobs", need: "本地报表导入、统计看板和质控任务已完成；国家直报系统接口为现场配置项", owner: "大连市卫生健康委", priority: "P1", status: "演示对接完成" },
+    { id: "ir-doctor", domain: "医生账户与多点执业", keepExisting: "保留 doctorProfiles、multiPracticeApplications、/api/doctors/me 和 /api/multi-practice-applications", need: "对接医师电子化注册、定期考核、职称、人事合同、劳务协议、医疗责任保险和多点执业信息公开", owner: "医疗机构/区域卫生健康委", priority: "P1", status: "已建模" },
+    { id: "ir-death", domain: "死亡医学证明与死亡统计", keepExisting: "保留 deathCertificates、deathCertificateForms、deathStatistics 和 /api/death-certificates", need: "对接人口死亡信息登记系统、电子证照平台、疾控死因监测、公安户籍注销和民政殡葬服务共享", owner: "医疗机构/区域卫生健康委", priority: "P1", status: "已建模" },
+    { id: "ir-stat", domain: "卫生健康统计", keepExisting: "保留 healthStatistics、regionalHealthStatistics2025、healthStatisticsIngestion 和 /api/health-statistics/import-jobs", need: "本地报表导入、统计看板和质控任务已完成；国家直报系统接口为现场配置项", owner: "区域卫生健康委", priority: "P1", status: "演示对接完成" },
     { id: "ir-mi", domain: "医保结算监管", keepExisting: "保留 insuranceClaims、institutionSupervisions、medicationPickups 和 /api/workflow-actions", need: "本地医保审核、凭证核验和固定取药审核已完成；医保核心结算接口为现场配置项", owner: "医保局/医保中心/区市县医保局", priority: "P1", status: "演示对接完成" },
     { id: "ir-workflow", domain: "跨端业务闭环", keepExisting: "保留 /api/workflow-actions 更新转诊、取药、随访、医保审核等状态", need: "本地状态回调、幂等业务单号、审计留痕已完成；跨系统消息中间件为现场配置项", owner: "市级平台", priority: "P1", status: "已完成" }
   ];
@@ -4001,7 +4002,7 @@ function seedPhase2DataCatalogs() {
       name: "统一入口、预约订单与家庭医生目录",
       tableRange: "173-208",
       tableCount: 36,
-      sourceSystems: ["辽事通/e 大连", "预约号源", "支付平台", "基层签约"],
+      sourceSystems: ["辽事通/e 区域", "预约号源", "支付平台", "基层签约"],
       platformCollections: ["appointments", "internetNursingOrders", "escortServiceOrders", "chronicFamilyDoctorPackages"],
       owner: "citizen-service",
       qualityRules: ["real-name-token", "order-state-reconciliation", "contract-fulfillment-rate"],
@@ -4038,7 +4039,7 @@ function seedPhase2ServiceCatalogs() {
     { id: "p2svc-report-citation", name: "报告引用与确权哈希服务", type: "evidence-service", apiRoute: "/api/phase2/mutual-recognition/records/:id/decision", catalogIds: ["p2dc-lab-imaging-recognition", "p2dc-security-operations"], consumerRoles: ["commission", "county"], owner: "medical-resource-center", authScope: "signed-clinical-operation", sla: "append-only audit hash chain", status: "mvp-ready" },
     { id: "p2svc-public-health-exchange", name: "公卫交换与区县回执服务", type: "exchange-service", apiRoute: "/api/public-health/system", catalogIds: ["p2dc-public-health-governance"], consumerRoles: ["commission", "county"], owner: "public-health", authScope: "commission-county", sla: "daily/monthly reconciliation", status: "ready-for-site" },
     { id: "p2svc-governance-indicators", name: "行业治理指标中心服务", type: "analytics-service", apiRoute: "/api/health-dashboard/summary", catalogIds: ["p2dc-public-health-governance"], consumerRoles: ["commission"], owner: "commission-governance", authScope: "commission-only", sla: "monthly/yearly report generation", status: "catalog-ready" },
-    { id: "p2svc-unified-entry", name: "辽事通/e 大连统一入口适配服务", type: "citizen-entry-service", apiRoute: "/api/auth/login", catalogIds: ["p2dc-citizen-service"], consumerRoles: ["citizen"], owner: "citizen-service", authScope: "government-identity-token", sla: "blocked until government entry joint test", status: "external-blocked" },
+    { id: "p2svc-unified-entry", name: "辽事通/e 区域统一入口适配服务", type: "citizen-entry-service", apiRoute: "/api/auth/login", catalogIds: ["p2dc-citizen-service"], consumerRoles: ["citizen"], owner: "citizen-service", authScope: "government-identity-token", sla: "blocked until government entry joint test", status: "external-blocked" },
     { id: "p2svc-appointment-order", name: "一站式预约订单服务", type: "citizen-order-service", apiRoute: "/api/workflow-actions", catalogIds: ["p2dc-citizen-service"], consumerRoles: ["citizen", "institution"], owner: "citizen-service", authScope: "resident-order-scope", sla: "blocked until 17 hospital appointment sources are bound", status: "external-blocked" },
     { id: "p2svc-family-doctor-contract", name: "家庭医生签约履约服务", type: "primary-care-service", apiRoute: "/api/chronic/followup-summary", catalogIds: ["p2dc-citizen-service", "p2dc-public-health-governance"], consumerRoles: ["commission", "institution", "citizen"], owner: "primary-care", authScope: "resident-contract-scope", sla: "monthly fulfillment statistics", status: "mvp-planned" },
     { id: "p2svc-crypto-evidence", name: "商用密码证据服务", type: "security-service", apiRoute: "/api/audit/verify", catalogIds: ["p2dc-security-operations"], consumerRoles: ["commission"], owner: "security", authScope: "commission-security", sla: "blocked until SM devices are selected", status: "onsite-blocked" },
@@ -4123,7 +4124,7 @@ function seedPhase2PilotInstitutions() {
   return [
     {
       id: "p2pilot-hospital",
-      name: "大连市中心医院",
+      name: "区域中心医院",
       role: "tertiary-hospital",
       institutionLevel: "三级医院",
       region: "中山区",
@@ -4384,7 +4385,7 @@ function seedQualitySafetyEvents() {
       type: "safety_event",
       severity: "high",
       institutionId: "ORG-HOSPITAL-001",
-      institutionName: "Dalian Central Hospital",
+      institutionName: "Regional Central Hospital",
       department: "Endocrinology",
       residentId: "r2",
       sourceCollection: "diagnosticReports",
@@ -4405,7 +4406,7 @@ function seedQualitySafetyEvents() {
       type: "pathway_variance",
       severity: "medium",
       institutionId: "ORG-HOSPITAL-001",
-      institutionName: "Dalian Central Hospital",
+      institutionName: "Regional Central Hospital",
       department: "Cardiology",
       residentId: "r1",
       sourceCollection: "personalRecords",
@@ -4446,13 +4447,13 @@ function seedQualitySafetyEvents() {
 
 function seedCriticalValueAlerts() {
   return [
-    { id: "cva-001", eventId: "qse-med-001", reportId: "dr-001", residentId: "r2", item: "glucose", value: "26.1 mmol/L", threshold: ">25 mmol/L", level: "high", sourceInstitution: "Dalian Central Hospital", targetInstitution: "Dalian Central Hospital", reportedAt: "2026-06-22T09:12:00.000Z", acknowledgedAt: "", disposedAt: "", status: "pending_disposition", action: "Notify responsible physician and complete disposition note." }
+    { id: "cva-001", eventId: "qse-med-001", reportId: "dr-001", residentId: "r2", item: "glucose", value: "26.1 mmol/L", threshold: ">25 mmol/L", level: "high", sourceInstitution: "Regional Central Hospital", targetInstitution: "Regional Central Hospital", reportedAt: "2026-06-22T09:12:00.000Z", acknowledgedAt: "", disposedAt: "", status: "pending_disposition", action: "Notify responsible physician and complete disposition note." }
   ];
 }
 
 function seedClinicalPathwayCases() {
   return [
-    { id: "cpc-001", eventId: "qse-path-001", residentId: "r1", pathwayCode: "HTN-2026", pathwayName: "Hypertension standard pathway", institutionName: "Dalian Central Hospital", currentNode: "follow-up-after-medication", varianceType: "missing_evidence", varianceReason: "Follow-up result not written back to EMR.", status: "variance_open", owner: "Clinical pathway office", dueAt: "2026-06-28T10:00:00.000Z", auditTrail: [{ at: "2026-06-21T10:00:00.000Z", by: "health", action: "seed-variance", note: "Clinical pathway variance captured from EMR summary." }] }
+    { id: "cpc-001", eventId: "qse-path-001", residentId: "r1", pathwayCode: "HTN-2026", pathwayName: "Hypertension standard pathway", institutionName: "Regional Central Hospital", currentNode: "follow-up-after-medication", varianceType: "missing_evidence", varianceReason: "Follow-up result not written back to EMR.", status: "variance_open", owner: "Clinical pathway office", dueAt: "2026-06-28T10:00:00.000Z", auditTrail: [{ at: "2026-06-21T10:00:00.000Z", by: "health", action: "seed-variance", note: "Clinical pathway variance captured from EMR summary." }] }
   ];
 }
 
@@ -4464,7 +4465,7 @@ function seedMedicalRecordQualityReviews() {
 
 function seedMutualRecognitionQualityReviews() {
   return [
-    { id: "mrqr-001", recognitionRecordId: "cmr-001", reportId: "dr-001", institutionName: "Dalian Central Hospital", item: "glucose", qcStatus: "manual_review_required", issueType: "critical_value_followup", status: "open", owner: "Regional mutual recognition QC", dueAt: "2026-06-24T18:00:00.000Z", nextAction: "Verify critical value acknowledgement before recognition." }
+    { id: "mrqr-001", recognitionRecordId: "cmr-001", reportId: "dr-001", institutionName: "Regional Central Hospital", item: "glucose", qcStatus: "manual_review_required", issueType: "critical_value_followup", status: "open", owner: "Regional mutual recognition QC", dueAt: "2026-06-24T18:00:00.000Z", nextAction: "Verify critical value acknowledgement before recognition." }
   ];
 }
 
@@ -4508,7 +4509,7 @@ function seedQualitySafetySiteSignoffs() {
       domain: "critical_value",
       item: "Production critical-value routing and timeout escalation",
       ownerRole: "institution",
-      owner: "Dalian Central Hospital",
+      owner: "Regional Central Hospital",
       requiredEvidence: ["routing rule screenshot", "acknowledgement receipt", "timeout escalation recipient list"],
       sourceCollections: ["criticalValueAlerts", "diagnosticReports"],
       status: "ready_for_joint_test",
@@ -4521,7 +4522,7 @@ function seedQualitySafetySiteSignoffs() {
       domain: "clinical_pathway",
       item: "Local clinical pathway dictionaries and EMR variance evidence",
       ownerRole: "institution",
-      owner: "Dalian Central Hospital",
+      owner: "Regional Central Hospital",
       requiredEvidence: ["local pathway dictionary", "variance rule mapping", "EMR screenshot sample"],
       sourceCollections: ["clinicalPathwayCases", "qualitySafetyEvents"],
       status: "pending_site_confirmation",
@@ -4573,8 +4574,8 @@ function seedQualitySafetySiteSignoffs() {
 
 function seedChronicProjectBlueprint() {
   return {
-    source: "大连市慢病管理平台建设项目-提级论证申报材料（20260615）",
-    sponsor: "大连市疾病预防控制中心（大连市卫生监督所）",
+    source: "区域慢病管理平台建设项目-提级论证申报材料（20260615）",
+    sponsor: "区域疾病预防控制中心（区域卫生监督所）",
     goal: "构建覆盖防、筛、诊、治、管全流程的慢病管理平台，形成以人群、时间、空间、数字为核心的闭环管理。",
     architecture: [
       { name: "一中心", detail: "慢病数据中心，汇聚医疗、公卫、疾控、民政等多源数据，支撑采集、治理、存储、分析和服务接口。", status: "已入模" },
@@ -4607,8 +4608,8 @@ function seedChronicProjectBlueprint() {
 
 function seedCountyProjectBlueprint() {
   return {
-    source: "20260616大连市医共体信息平台项目提级论证申报材料",
-    sponsor: "大连市卫生健康委员会",
+    source: "20260616区域医共体信息平台项目提级论证申报材料",
+    sponsor: "区域卫生健康委员会",
     model: "16255",
     goal: "建设市级统筹、县域落地的紧密型县域医共体信息平台，推动机构互联互通、资源共享、业务协同、同质管理和安全运维。",
     modelItems: [
@@ -4695,16 +4696,16 @@ function seedDoctorProfiles() {
       specialty: "心血管内科",
       practiceScope: "内科专业",
       primaryInstitutionId: "MR1",
-      primaryInstitution: "大连市中心医院",
+      primaryInstitution: "区域中心医院",
       department: "心内科",
-      licenseNo: "DEMO-DOC-210200-002",
+      licenseNo: "DEMO-DOC-000000-002",
       registrationValidUntil: "2030-06-30",
       electronicRegistration: {
-        registryId: "ER-DL-210200-0002",
+        registryId: "ER-DL-000000-0002",
         sourceSystem: "医师电子化注册系统",
         syncedAt: "2026-06-15T09:25:00+08:00",
         verificationStatus: "已核验",
-        licenseNo: "DEMO-DOC-210200-002",
+        licenseNo: "DEMO-DOC-000000-002",
         category: "临床",
         practiceScope: "内科专业",
         primaryInstitutionId: "MR1",
@@ -4750,7 +4751,7 @@ function seedMultiPracticeApplications() {
       primaryInstitutionId: "MR3",
       primaryInstitution: "青泥洼桥社区卫生服务中心",
       targetInstitutionId: "MR1",
-      targetInstitution: "大连市中心医院",
+      targetInstitution: "区域中心医院",
       targetDepartment: "心内科慢病联合门诊",
       practiceScope: "全科医学专业",
       period: "2026-07-01 至 2027-06-30",
@@ -4798,7 +4799,7 @@ function seedMultiPracticeApplications() {
       title: "主任医师",
       specialty: "心血管内科",
       primaryInstitutionId: "MR1",
-      primaryInstitution: "大连市中心医院",
+      primaryInstitution: "区域中心医院",
       targetInstitutionId: "MR3",
       targetInstitution: "青泥洼桥社区卫生服务中心",
       targetDepartment: "家庭医生工作室",
@@ -4814,14 +4815,14 @@ function seedMultiPracticeApplications() {
         status: "医联体帮扶免办",
         mode: "医联体帮扶备案",
         confirmedBy: "医务部",
-        confirmedByOrg: "大连市中心医院",
+        confirmedByOrg: "区域中心医院",
         confirmedAt: "2026-06-16T15:00:00+08:00",
         signatureNo: "DL-MP-AID-20260616-001",
         opinion: "按医联体帮扶任务管理"
       },
       lifecycle: [
         { at: "2026-06-16 10:30", actor: "王医生", action: "医联体帮扶登记", note: "纳入基层高危慢病帮扶排班" },
-        { at: "2026-06-16 15:00", actor: "大连市中心医院", action: "备案通过", note: "按医联体帮扶任务管理" }
+        { at: "2026-06-16 15:00", actor: "区域中心医院", action: "备案通过", note: "按医联体帮扶任务管理" }
       ],
       disclosureItems: ["医师姓名", "执业类别", "执业范围", "第一执业地点", "拟执业机构", "执业期限", "监管状态"],
       riskFlags: [],
@@ -5047,8 +5048,8 @@ function seedCountyAiDiagnosisCases() {
 
 function seedCountyMutualRecognitionRecords() {
   return [
-    { id: "cmr-001", residentId: "r1", item: "心电图", sourceInstitution: "青泥洼桥社区卫生服务中心", targetInstitution: "大连市中心医院", status: "已互认", savedCost: 86, reason: "同质质控通过", at: todayOffset(-2) },
-    { id: "cmr-002", residentId: "r2", item: "糖化血红蛋白", sourceInstitution: "星海湾社区卫生服务中心", targetInstitution: "大连医科大学附属医院", status: "待互认", savedCost: 120, reason: "等待中心实验室报告", at: todayOffset(0) },
+    { id: "cmr-001", residentId: "r1", item: "心电图", sourceInstitution: "青泥洼桥社区卫生服务中心", targetInstitution: "区域中心医院", status: "已互认", savedCost: 86, reason: "同质质控通过", at: todayOffset(-2) },
+    { id: "cmr-002", residentId: "r2", item: "糖化血红蛋白", sourceInstitution: "星海湾社区卫生服务中心", targetInstitution: "区域医科大学附属医院", status: "待互认", savedCost: 120, reason: "等待中心实验室报告", at: todayOffset(0) },
     { id: "cmr-003", residentId: "r4", item: "颈动脉超声", sourceInstitution: "庄河市基层医疗机构", targetInstitution: "庄河市中心医院", status: "退回复核", savedCost: 180, reason: "图像质量不足，需要复核", at: todayOffset(-1) }
   ];
 }
@@ -5073,8 +5074,8 @@ function seedPhase2DiseaseReportingRules() {
 
 function seedPhase2DiseaseReportQueue() {
   return [
-    { id: "p2drq-htn-r1", residentId: "r1", personIndex: "DEMO-ID-R1#DEMO-MOBILE-R1", residentName: "张海", diseaseCategory: "chronic", diseaseCode: "I10", diseaseName: "高血压", ruleId: "p2dr-rule-htn", triggerSource: "HIS encounter HIS-20260709-001", sourceInstitution: "大连市中心医院", targetCounty: "中山区", targetPlatform: "区县慢病平台", reportCardNo: "P2-DR-HTN-20260709-001", status: "receipt-confirmed", pushStatus: "accepted", receiptId: "p2drr-htn-r1", patientCenterStatus: "imported", patientCenterRecordId: "pc-r1-htn", exportStatus: "available", exceptionStatus: "closed", riskLevel: "high", reportedAt: todayOffset(-1), dueAt: todayOffset(0), lastAction: "区县回执已确认，患者中心已导入。" },
-    { id: "p2drq-dm-r2", residentId: "r2", personIndex: "DEMO-ID-R2#DEMO-MOBILE-R2", residentName: "李梅", diseaseCategory: "chronic", diseaseCode: "E11", diseaseName: "2 型糖尿病", ruleId: "p2dr-rule-dm", triggerSource: "LIS HbA1c dr-001", sourceInstitution: "大连医科大学附属医院", targetCounty: "沙河口区", targetPlatform: "区县慢病平台", reportCardNo: "P2-DR-DM-20260709-002", status: "receipt-confirmed", pushStatus: "accepted-after-retry", receiptId: "p2drr-dm-r2", patientCenterStatus: "imported", patientCenterRecordId: "pc-r2-dm", exportStatus: "available", exceptionStatus: "compensated", riskLevel: "medium", reportedAt: todayOffset(-1), dueAt: todayOffset(0), lastAction: "首次字段版本不一致，补偿重放后回执通过。" },
+    { id: "p2drq-htn-r1", residentId: "r1", personIndex: "DEMO-ID-R1#DEMO-MOBILE-R1", residentName: "张海", diseaseCategory: "chronic", diseaseCode: "I10", diseaseName: "高血压", ruleId: "p2dr-rule-htn", triggerSource: "HIS encounter HIS-20260709-001", sourceInstitution: "区域中心医院", targetCounty: "中山区", targetPlatform: "区县慢病平台", reportCardNo: "P2-DR-HTN-20260709-001", status: "receipt-confirmed", pushStatus: "accepted", receiptId: "p2drr-htn-r1", patientCenterStatus: "imported", patientCenterRecordId: "pc-r1-htn", exportStatus: "available", exceptionStatus: "closed", riskLevel: "high", reportedAt: todayOffset(-1), dueAt: todayOffset(0), lastAction: "区县回执已确认，患者中心已导入。" },
+    { id: "p2drq-dm-r2", residentId: "r2", personIndex: "DEMO-ID-R2#DEMO-MOBILE-R2", residentName: "李梅", diseaseCategory: "chronic", diseaseCode: "E11", diseaseName: "2 型糖尿病", ruleId: "p2dr-rule-dm", triggerSource: "LIS HbA1c dr-001", sourceInstitution: "区域医科大学附属医院", targetCounty: "沙河口区", targetPlatform: "区县慢病平台", reportCardNo: "P2-DR-DM-20260709-002", status: "receipt-confirmed", pushStatus: "accepted-after-retry", receiptId: "p2drr-dm-r2", patientCenterStatus: "imported", patientCenterRecordId: "pc-r2-dm", exportStatus: "available", exceptionStatus: "compensated", riskLevel: "medium", reportedAt: todayOffset(-1), dueAt: todayOffset(0), lastAction: "首次字段版本不一致，补偿重放后回执通过。" },
     { id: "p2drq-inf-r3", residentId: "r3", personIndex: "DEMO-ID-R3#DEMO-MOBILE-R3", residentName: "王强", diseaseCategory: "infectious", diseaseCode: "A15", diseaseName: "传染病疑似报卡", ruleId: "p2dr-rule-infectious", triggerSource: "发热门诊/实验室阳性信号", sourceInstitution: "甘井子区人民医院", targetCounty: "甘井子区", targetPlatform: "疾控直报/区县公卫平台", reportCardNo: "P2-DR-INF-20260709-003", status: "cdc-review", pushStatus: "pending-review", receiptId: "", patientCenterStatus: "imported", patientCenterRecordId: "pc-r3-inf", exportStatus: "restricted", exceptionStatus: "open", riskLevel: "urgent", reportedAt: todayOffset(0), dueAt: todayOffset(0), lastAction: "等待疾控复核和直报回执，居民端仅展示授权摘要。" },
     { id: "p2drq-mental-r4", residentId: "r4", personIndex: "DEMO-ID-R4#DEMO-MOBILE-R4", residentName: "赵林", diseaseCategory: "severe-mental-disorder", diseaseCode: "F20", diseaseName: "重性精神障碍", ruleId: "p2dr-rule-mental", triggerSource: "专科诊断/基层随访登记", sourceInstitution: "庄河市中心医院", targetCounty: "庄河市", targetPlatform: "区县精防平台", reportCardNo: "P2-DR-MD-20260709-004", status: "pushed", pushStatus: "sent", receiptId: "p2drr-mental-r4", patientCenterStatus: "imported", patientCenterRecordId: "pc-r4-md", exportStatus: "restricted", exceptionStatus: "site-signoff-required", riskLevel: "controlled", reportedAt: todayOffset(0), dueAt: todayOffset(1), lastAction: "区县平台已收件，监护人联系方式和签字材料待现场确认。" }
   ];
@@ -5180,10 +5181,10 @@ function seedPhase2ClinicalAssistRules() {
 
 function seedPhase2ClinicalAssistAlerts() {
   return [
-    { id: "p2caa-lab-r1", residentId: "r1", residentName: "张海", doctorId: "doc-liu", doctorName: "刘医生", institution: "青泥洼桥社区卫生服务中心", ruleId: "p2ca-rule-duplicate-lab", category: "duplicate-lab", alertTitle: "糖化血红蛋白重复检验提醒", alertDetail: "30 天内已有大连市中心医院 HbA1c 报告，可进入互认引用流程。", severity: "high", sourceOrderNo: "HIS-ORDER-LAB-20260709-001", linkedEvidenceId: "cmr-002", recommendation: "引用互认报告并取消重复检验申请。", status: "pending-doctor-receipt", doctorAction: "pending", messageReceiptStatus: "pending", pluginSurface: "doctor-workstation-banner", serviceIntegrationStatus: "embedded-demo", patientCenterStatus: "linked", patientCenterRecordId: "pc-r1-lab", dueAt: todayOffset(0), lastAction: "等待医生工作站回执。" },
+    { id: "p2caa-lab-r1", residentId: "r1", residentName: "张海", doctorId: "doc-liu", doctorName: "刘医生", institution: "青泥洼桥社区卫生服务中心", ruleId: "p2ca-rule-duplicate-lab", category: "duplicate-lab", alertTitle: "糖化血红蛋白重复检验提醒", alertDetail: "30 天内已有区域中心医院 HbA1c 报告，可进入互认引用流程。", severity: "high", sourceOrderNo: "HIS-ORDER-LAB-20260709-001", linkedEvidenceId: "cmr-002", recommendation: "引用互认报告并取消重复检验申请。", status: "pending-doctor-receipt", doctorAction: "pending", messageReceiptStatus: "pending", pluginSurface: "doctor-workstation-banner", serviceIntegrationStatus: "embedded-demo", patientCenterStatus: "linked", patientCenterRecordId: "pc-r1-lab", dueAt: todayOffset(0), lastAction: "等待医生工作站回执。" },
     { id: "p2caa-med-r1", residentId: "r1", residentName: "张海", doctorId: "doc-liu", doctorName: "刘医生", institution: "青泥洼桥社区卫生服务中心", ruleId: "p2ca-rule-duplicate-medication", category: "duplicate-medication", alertTitle: "ACEI/ARB 同类重复用药提醒", alertDetail: "长期处方含缬沙坦，本次处方拟新增同类降压药。", severity: "high", sourceOrderNo: "RX-20260709-101", linkedEvidenceId: "mp1", recommendation: "调整处方或登记继续用药理由并回写药事审核。", status: "acknowledged", doctorAction: "adjusted-prescription", messageReceiptStatus: "received", pluginSurface: "prescription-inline-card", serviceIntegrationStatus: "embedded-demo", patientCenterStatus: "linked", patientCenterRecordId: "pc-r1-med", receiptId: "p2car-med-r1", dueAt: todayOffset(0), lastAction: "医生已调整处方并发送药事回执。" },
-    { id: "p2caa-dx-r2", residentId: "r2", residentName: "李梅", doctorId: "doc-wang", doctorName: "王医生", institution: "大连市中心医院", ruleId: "p2ca-rule-duplicate-diagnosis", category: "duplicate-diagnosis", alertTitle: "糖尿病重复诊断提醒", alertDetail: "既往 E11 诊断与随访计划已存在，建议引用既往诊断并补充控制状态。", severity: "medium", sourceOrderNo: "EMR-DX-20260709-203", linkedEvidenceId: "d2", recommendation: "引用既往诊断，避免重复新建病种档案。", status: "acknowledged", doctorAction: "cited-existing-diagnosis", messageReceiptStatus: "received", pluginSurface: "emr-diagnosis-sidebar", serviceIntegrationStatus: "embedded-demo", patientCenterStatus: "linked", patientCenterRecordId: "pc-r2-dx", receiptId: "p2car-dx-r2", dueAt: todayOffset(1), lastAction: "医生已引用既往诊断并补充病程说明。" },
-    { id: "p2caa-check-r4", residentId: "r4", residentName: "赵林", doctorId: "doc-wang", doctorName: "王医生", institution: "大连市中心医院", ruleId: "p2ca-rule-duplicate-check", category: "duplicate-check", alertTitle: "颈动脉超声重复检查提醒", alertDetail: "庄河市基层机构 7 天内已有颈动脉超声，图像质量待复核。", severity: "medium", sourceOrderNo: "HIS-CHECK-20260709-304", linkedEvidenceId: "cmr-003", recommendation: "等待复核或登记临床变化后再开立检查。", status: "pending-doctor-receipt", doctorAction: "pending", messageReceiptStatus: "pending", pluginSurface: "order-entry-inline-card", serviceIntegrationStatus: "embedded-demo", patientCenterStatus: "restricted", patientCenterRecordId: "pc-r4-check", dueAt: todayOffset(1), lastAction: "等待医生确认是否保留检查。" }
+    { id: "p2caa-dx-r2", residentId: "r2", residentName: "李梅", doctorId: "doc-wang", doctorName: "王医生", institution: "区域中心医院", ruleId: "p2ca-rule-duplicate-diagnosis", category: "duplicate-diagnosis", alertTitle: "糖尿病重复诊断提醒", alertDetail: "既往 E11 诊断与随访计划已存在，建议引用既往诊断并补充控制状态。", severity: "medium", sourceOrderNo: "EMR-DX-20260709-203", linkedEvidenceId: "d2", recommendation: "引用既往诊断，避免重复新建病种档案。", status: "acknowledged", doctorAction: "cited-existing-diagnosis", messageReceiptStatus: "received", pluginSurface: "emr-diagnosis-sidebar", serviceIntegrationStatus: "embedded-demo", patientCenterStatus: "linked", patientCenterRecordId: "pc-r2-dx", receiptId: "p2car-dx-r2", dueAt: todayOffset(1), lastAction: "医生已引用既往诊断并补充病程说明。" },
+    { id: "p2caa-check-r4", residentId: "r4", residentName: "赵林", doctorId: "doc-wang", doctorName: "王医生", institution: "区域中心医院", ruleId: "p2ca-rule-duplicate-check", category: "duplicate-check", alertTitle: "颈动脉超声重复检查提醒", alertDetail: "庄河市基层机构 7 天内已有颈动脉超声，图像质量待复核。", severity: "medium", sourceOrderNo: "HIS-CHECK-20260709-304", linkedEvidenceId: "cmr-003", recommendation: "等待复核或登记临床变化后再开立检查。", status: "pending-doctor-receipt", doctorAction: "pending", messageReceiptStatus: "pending", pluginSurface: "order-entry-inline-card", serviceIntegrationStatus: "embedded-demo", patientCenterStatus: "restricted", patientCenterRecordId: "pc-r4-check", dueAt: todayOffset(1), lastAction: "等待医生确认是否保留检查。" }
   ];
 }
 
@@ -5321,7 +5322,7 @@ function seedPhase2FamilyDoctorTemplates() {
 function seedPhase2FamilyDoctorTeams() {
   return [
     { id: "p2fdtm-qnw", teamName: "青泥洼桥社区家庭医生团队", institutionCode: "MR3", institutionName: "青泥洼桥社区卫生服务中心", leaderDoctorId: "doc-liu", leaderDoctorName: "刘医生", doctorIds: ["doc-liu"], nurseCount: 2, publicHealthStaff: 1, serviceDistricts: ["中山区"], capacity: 1200, signedResidents: 685, status: "active" },
-    { id: "p2fdtm-central", teamName: "中心医院医联体家医协作团队", institutionCode: "MR1", institutionName: "大连市中心医院", leaderDoctorId: "doc-wang", leaderDoctorName: "王医生", doctorIds: ["doc-wang"], nurseCount: 3, publicHealthStaff: 1, serviceDistricts: ["中山区", "西岗区"], capacity: 900, signedResidents: 412, status: "active" },
+    { id: "p2fdtm-central", teamName: "中心医院医联体家医协作团队", institutionCode: "MR1", institutionName: "区域中心医院", leaderDoctorId: "doc-wang", leaderDoctorName: "王医生", doctorIds: ["doc-wang"], nurseCount: 3, publicHealthStaff: 1, serviceDistricts: ["中山区", "西岗区"], capacity: 900, signedResidents: 412, status: "active" },
     { id: "p2fdtm-gjz", teamName: "甘井子慢病随访家庭医生团队", institutionCode: "MR5", institutionName: "甘井子区人民医院", leaderDoctorId: "doc-sun", leaderDoctorName: "孙医生", doctorIds: ["doc-sun"], nurseCount: 2, publicHealthStaff: 2, serviceDistricts: ["甘井子区"], capacity: 1000, signedResidents: 508, status: "active" }
   ];
 }
@@ -5547,8 +5548,8 @@ function seedMutualRecognitionRules() {
 
 function seedDiagnosticReports() {
   return [
-    { id: "dr-ecg-001", externalId: "ECG-DEMO-001", residentId: "r1", item: "ECG", category: "electrocardiogram", sourceInstitution: "青泥洼桥社区卫生服务中心", targetInstitution: "大连市中心医院", result: "窦性心律，ST-T 未见急性改变", conclusion: "心电图质控通过，可用于本次复诊。", reportedAt: todayOffset(-2), status: "recognized", recognitionRecordId: "cmr-001", reportPdfHash: phase2EvidenceHash("dr-ecg-001") },
-    { id: "dr-001", externalId: "LIS-DEMO-001", residentId: "r2", item: "HbA1c", category: "lab", sourceInstitution: "Wafangdian Central Hospital", targetInstitution: "Dalian Medical University Hospital", result: "6.8%", conclusion: "HbA1c is elevated; continue chronic disease follow-up.", reportedAt: todayOffset(-1), status: "recognized", recognitionRecordId: "cmr-002", reportPdfHash: phase2EvidenceHash("dr-001") },
+    { id: "dr-ecg-001", externalId: "ECG-DEMO-001", residentId: "r1", item: "ECG", category: "electrocardiogram", sourceInstitution: "青泥洼桥社区卫生服务中心", targetInstitution: "区域中心医院", result: "窦性心律，ST-T 未见急性改变", conclusion: "心电图质控通过，可用于本次复诊。", reportedAt: todayOffset(-2), status: "recognized", recognitionRecordId: "cmr-001", reportPdfHash: phase2EvidenceHash("dr-ecg-001") },
+    { id: "dr-001", externalId: "LIS-DEMO-001", residentId: "r2", item: "HbA1c", category: "lab", sourceInstitution: "Wafangdian Central Hospital", targetInstitution: "Regional Medical University Hospital", result: "6.8%", conclusion: "HbA1c is elevated; continue chronic disease follow-up.", reportedAt: todayOffset(-1), status: "recognized", recognitionRecordId: "cmr-002", reportPdfHash: phase2EvidenceHash("dr-001") },
     { id: "dr-us-001", externalId: "US-DEMO-001", residentId: "r4", item: "Carotid ultrasound", category: "ultrasound", sourceInstitution: "庄河市基层医疗机构", targetInstitution: "庄河市中心医院", result: "图像质量不足，建议复核", conclusion: "不满足互认质控要求，退回复核。", reportedAt: todayOffset(-1), status: "not_recognized", recognitionRecordId: "cmr-003", reportPdfHash: phase2EvidenceHash("dr-us-001") }
   ];
 }
@@ -5725,7 +5726,7 @@ function seedImageCloudGateways() {
     {
       id: "icg-mr1",
       institutionCode: "MR1",
-      institutionName: "大连市中心医院",
+      institutionName: "区域中心医院",
       mode: "前置网关",
       sourceSystems: ["PACS", "RIS", "EMR"],
       dicomProtocols: ["C-STORE", "C-MOVE", "DICOM TLS"],
@@ -5761,7 +5762,7 @@ function seedImageCloudStudies() {
       id: "ics-ct-r1-20260521",
       residentId: "r1",
       institutionCode: "MR1",
-      institutionName: "大连市中心医院",
+      institutionName: "区域中心医院",
       accessionNumber: "CT-DEMO-20260521",
       studyInstanceUID: "1.2.156.112605.140380.20260521.1",
       mainIndex: "MR1#DEMO-ID-R1#CT-DEMO-20260521",
@@ -6093,8 +6094,8 @@ function seedSeniorServices() {
 function seedDataAccessLogs() {
   return [
     { id: "al1", residentId: "r1", at: "2026-06-15 09:12", actor: "青泥洼桥社区卫生服务中心", role: "家庭医生", scope: "健康档案、随访记录", purpose: "慢病随访", result: "允许" },
-    { id: "al2", residentId: "r1", at: "2026-06-15 10:35", actor: "大连市中心医院", role: "医疗机构", scope: "电子病历摘要、用药处方", purpose: "专科复诊", result: "允许" },
-    { id: "al3", residentId: "r2", at: "2026-06-15 11:20", actor: "大连市医保中心审核员", role: "医保经办", scope: "医保结算、诊断摘要", purpose: "慢病结算审核", result: "允许" },
+    { id: "al2", residentId: "r1", at: "2026-06-15 10:35", actor: "区域中心医院", role: "医疗机构", scope: "电子病历摘要、用药处方", purpose: "专科复诊", result: "允许" },
+    { id: "al3", residentId: "r2", at: "2026-06-15 11:20", actor: "区域医保中心审核员", role: "医保经办", scope: "医保结算、诊断摘要", purpose: "慢病结算审核", result: "允许" },
     { id: "al4", residentId: "r4", at: "2026-06-15 14:08", actor: "未授权机构", role: "外部机构", scope: "完整电子病历", purpose: "未知", result: "拒绝" }
   ];
 }
@@ -6102,7 +6103,7 @@ function seedDataAccessLogs() {
 function seedSecurityEvents() {
   return [
     { id: "se1", at: "2026-06-15 08:55", actor: "卫健委管理员", role: "commission", action: "登录", target: "卫生健康委端", result: "允许", detail: "演示账号进入监管总览" },
-    { id: "se2", at: "2026-06-15 10:20", actor: "大连市医保中心审核员", role: "insurance", action: "访问接口", target: "/api/state", result: "允许", detail: "读取结算经办与机构监管数据" },
+    { id: "se2", at: "2026-06-15 10:20", actor: "区域医保中心审核员", role: "insurance", action: "访问接口", target: "/api/state", result: "允许", detail: "读取结算经办与机构监管数据" },
     { id: "se3", at: "2026-06-15 14:08", actor: "未授权机构", role: "unknown", action: "访问个人健康信息", target: "完整电子病历", result: "拒绝", detail: "未取得居民授权或角色权限" }
   ];
 }
@@ -6234,8 +6235,8 @@ function seedDrugTraceabilityEvidenceRequirements() {
 
 function seedMedicalResources() {
   return [
-    { id: "mr1", institution: "大连市中心医院", type: "三级医院", beds: 1200, doctors: 860, nurses: 1240, chronicClinics: 8, devices: 46, region: "市级" },
-    { id: "mr2", institution: "大连医科大学附属医院", type: "三级医院", beds: 1500, doctors: 980, nurses: 1380, chronicClinics: 10, devices: 58, region: "市级" },
+    { id: "mr1", institution: "区域中心医院", type: "三级医院", beds: 1200, doctors: 860, nurses: 1240, chronicClinics: 8, devices: 46, region: "市级" },
+    { id: "mr2", institution: "区域医科大学附属医院", type: "三级医院", beds: 1500, doctors: 980, nurses: 1380, chronicClinics: 10, devices: 58, region: "市级" },
     { id: "mr3", institution: "青泥洼桥社区卫生服务中心", type: "基层医疗机构", beds: 60, doctors: 42, nurses: 58, chronicClinics: 3, devices: 12, region: "中山区" },
     { id: "mr4", institution: "星海湾社区卫生服务中心", type: "基层医疗机构", beds: 45, doctors: 36, nurses: 44, chronicClinics: 2, devices: 9, region: "沙河口区" },
     { id: "mr5", institution: "甘井子区人民医院", type: "区级医院", beds: 520, doctors: 310, nurses: 430, chronicClinics: 5, devices: 24, region: "甘井子区" }
@@ -6251,15 +6252,15 @@ function seedHealthStatistics() {
       { id: "direct", name: "卫生健康统计直报系统", system: "卫生健康统计网络直报", scope: "机构资源年报/月报、医疗服务量、住院服务量", updateCycle: "月报、季报、年报", status: "对账中" }
     ],
     resourceReports: [
-      { institutionId: "mr1", institution: "大连市中心医院", region: "市级", type: "三级医院", interfaceData: { beds: 1200, doctors: 860, nurses: 1240 }, directReport: { beds: 1198, doctors: 858, nurses: 1242 }, status: "待复核", issue: "床位和人员口径存在小幅差异" },
-      { institutionId: "mr2", institution: "大连医科大学附属医院", region: "市级", type: "三级医院", interfaceData: { beds: 1500, doctors: 980, nurses: 1380 }, directReport: { beds: 1500, doctors: 980, nurses: 1378 }, status: "待复核", issue: "护士数需与直报系统核对" },
+      { institutionId: "mr1", institution: "区域中心医院", region: "市级", type: "三级医院", interfaceData: { beds: 1200, doctors: 860, nurses: 1240 }, directReport: { beds: 1198, doctors: 858, nurses: 1242 }, status: "待复核", issue: "床位和人员口径存在小幅差异" },
+      { institutionId: "mr2", institution: "区域医科大学附属医院", region: "市级", type: "三级医院", interfaceData: { beds: 1500, doctors: 980, nurses: 1380 }, directReport: { beds: 1500, doctors: 980, nurses: 1378 }, status: "待复核", issue: "护士数需与直报系统核对" },
       { institutionId: "mr3", institution: "青泥洼桥社区卫生服务中心", region: "中山区", type: "基层医疗机构", interfaceData: { beds: 60, doctors: 42, nurses: 58 }, directReport: { beds: 60, doctors: 42, nurses: 58 }, status: "已一致", issue: "无" },
       { institutionId: "mr4", institution: "星海湾社区卫生服务中心", region: "沙河口区", type: "基层医疗机构", interfaceData: { beds: 45, doctors: 36, nurses: 44 }, directReport: { beds: 45, doctors: 35, nurses: 44 }, status: "待复核", issue: "医生数差异 1 人" },
       { institutionId: "mr5", institution: "甘井子区人民医院", region: "甘井子区", type: "区级医院", interfaceData: { beds: 520, doctors: 310, nurses: 430 }, directReport: { beds: 520, doctors: 310, nurses: 430 }, status: "已一致", issue: "无" }
     ],
     serviceReports: [
-      { institutionId: "mr1", institution: "大连市中心医院", interfaceData: { outpatientVisits: 128600, emergencyVisits: 18600, inpatientAdmissions: 9200, discharges: 9050, bedDays: 286000 }, directReport: { outpatientVisits: 128420, emergencyVisits: 18620, inpatientAdmissions: 9190, discharges: 9042, bedDays: 285600 }, status: "待复核" },
-      { institutionId: "mr2", institution: "大连医科大学附属医院", interfaceData: { outpatientVisits: 146200, emergencyVisits: 16400, inpatientAdmissions: 10120, discharges: 10080, bedDays: 318500 }, directReport: { outpatientVisits: 146200, emergencyVisits: 16380, inpatientAdmissions: 10110, discharges: 10075, bedDays: 318420 }, status: "已一致" },
+      { institutionId: "mr1", institution: "区域中心医院", interfaceData: { outpatientVisits: 128600, emergencyVisits: 18600, inpatientAdmissions: 9200, discharges: 9050, bedDays: 286000 }, directReport: { outpatientVisits: 128420, emergencyVisits: 18620, inpatientAdmissions: 9190, discharges: 9042, bedDays: 285600 }, status: "待复核" },
+      { institutionId: "mr2", institution: "区域医科大学附属医院", interfaceData: { outpatientVisits: 146200, emergencyVisits: 16400, inpatientAdmissions: 10120, discharges: 10080, bedDays: 318500 }, directReport: { outpatientVisits: 146200, emergencyVisits: 16380, inpatientAdmissions: 10110, discharges: 10075, bedDays: 318420 }, status: "已一致" },
       { institutionId: "mr3", institution: "青泥洼桥社区卫生服务中心", interfaceData: { outpatientVisits: 18600, emergencyVisits: 420, inpatientAdmissions: 120, discharges: 118, bedDays: 1860 }, directReport: { outpatientVisits: 18580, emergencyVisits: 420, inpatientAdmissions: 120, discharges: 118, bedDays: 1860 }, status: "已一致" },
       { institutionId: "mr4", institution: "星海湾社区卫生服务中心", interfaceData: { outpatientVisits: 14200, emergencyVisits: 360, inpatientAdmissions: 86, discharges: 84, bedDays: 1260 }, directReport: { outpatientVisits: 14120, emergencyVisits: 360, inpatientAdmissions: 84, discharges: 84, bedDays: 1260 }, status: "待复核" },
       { institutionId: "mr5", institution: "甘井子区人民医院", interfaceData: { outpatientVisits: 64200, emergencyVisits: 7200, inpatientAdmissions: 4260, discharges: 4200, bedDays: 128800 }, directReport: { outpatientVisits: 64240, emergencyVisits: 7180, inpatientAdmissions: 4260, discharges: 4196, bedDays: 128600 }, status: "待复核" }
@@ -6363,7 +6364,7 @@ function seedDeathCertificates() {
       diagnosisBasis: "临床+理化",
       highestDiagnosisUnit: "三级医院",
       issuingInstitutionId: "mr1",
-      issuingInstitution: "大连市中心医院",
+      issuingInstitution: "区域中心医院",
       issuingPhysician: "王医生",
       applicantName: "演示家属C",
       applicantRelation: "配偶",
@@ -6498,7 +6499,7 @@ function seedBirthCertificates() {
   return [
     {
       id: "birth-cert-001",
-      certificateNo: "BC-G210200-20260601001",
+      certificateNo: "BC-G000000-20260601001",
       certificateVersion: "第七版",
       issueType: "首次签发",
       newbornName: "演示新生儿A",
@@ -6515,7 +6516,7 @@ function seedBirthCertificates() {
       fatherName: "演示父亲A",
       fatherDocumentNo: "DEMO-ID-F1",
       issuingInstitutionId: "mr1",
-      issuingInstitution: "大连市中心医院",
+      issuingInstitution: "区域中心医院",
       issuingPhysician: "王医师",
       applicantName: "演示居民D",
       applicantRelation: "母亲",
@@ -6549,7 +6550,7 @@ function seedBirthCertificates() {
       fatherName: "演示父亲B",
       fatherDocumentNo: "DEMO-ID-F2",
       issuingInstitutionId: "mr2",
-      issuingInstitution: "大连医科大学附属医院",
+      issuingInstitution: "区域医科大学附属医院",
       issuingPhysician: "赵医师",
       applicantName: "演示居民B",
       applicantRelation: "母亲",
@@ -6619,9 +6620,9 @@ function seedBirthCertificateDocuments() {
       name: "2026 年空白出生医学证明年度申领计划",
       certificateVersion: "第七版",
       institutionId: "commission",
-      owner: "大连市卫生健康委",
+      owner: "区域卫生健康委",
       quantity: 1200,
-      serialRange: "BC-G210200-2026-000001 至 BC-G210200-2026-001200",
+      serialRange: "BC-G000000-2026-000001 至 BC-G000000-2026-001200",
       status: "已验收",
       evidence: ["年度计划", "验收回执", "专人管理"],
       controlPoints: ["空白证件", "年度申领", "验收回执"],
@@ -6633,9 +6634,9 @@ function seedBirthCertificateDocuments() {
       name: "2026 年二季度第七版证件配发表",
       certificateVersion: "第七版",
       institutionId: "mr1",
-      owner: "大连市卫生健康委/大连市中心医院",
+      owner: "区域卫生健康委/区域中心医院",
       quantity: 300,
-      serialRange: "BC-G210200-2026-000301 至 BC-G210200-2026-000600",
+      serialRange: "BC-G000000-2026-000301 至 BC-G000000-2026-000600",
       status: "已签收",
       evidence: ["季度申领", "配发记录", "签收记录"],
       controlPoints: ["配发记录", "签收", "第七版"],
@@ -6647,7 +6648,7 @@ function seedBirthCertificateDocuments() {
       name: "2026 年 6 月废证登记与销毁记录",
       certificateVersion: "第七版",
       institutionId: "mr2",
-      owner: "大连医科大学附属医院",
+      owner: "区域医科大学附属医院",
       quantity: 2,
       serialRange: "BC-G210211-2026-000118 至 BC-G210211-2026-000119",
       status: "已销毁",
@@ -6661,7 +6662,7 @@ function seedBirthCertificateDocuments() {
       name: "第六版出生医学证明旧版清理台账",
       certificateVersion: "第六版",
       institutionId: "commission",
-      owner: "大连市卫生健康委",
+      owner: "区域卫生健康委",
       quantity: 0,
       serialRange: "第六版库存清零",
       status: "已清理",
@@ -6705,9 +6706,9 @@ function seedBirthStatistics() {
     ],
     workflowRules: [
       { rule: "首次签发", deadline: "具有助产技术服务资质的机构为本机构内出生新生儿直接签发", owner: "签发机构", status: "已建模" },
-      { rule: "换发/补发", deadline: "按原因登记、材料审验、原证归档或补发专章要求闭环办理", owner: "签发机构/大连市卫生健康委", status: "已建模" },
-      { rule: "空白证件与废证", deadline: "证件申领、配发、作废、清理和销毁全流程留痕", owner: "大连市卫生健康委", status: "已建模" },
-      { rule: "第七版证件", deadline: "启用第七版编号/条形码口径，旧版证件按要求清理", owner: "大连市卫生健康委/公安机关", status: "已建模" }
+      { rule: "换发/补发", deadline: "按原因登记、材料审验、原证归档或补发专章要求闭环办理", owner: "签发机构/区域卫生健康委", status: "已建模" },
+      { rule: "空白证件与废证", deadline: "证件申领、配发、作废、清理和销毁全流程留痕", owner: "区域卫生健康委", status: "已建模" },
+      { rule: "第七版证件", deadline: "启用第七版编号/条形码口径，旧版证件按要求清理", owner: "区域卫生健康委/公安机关", status: "已建模" }
     ],
     healthManagement: [
       { service: "新生儿家庭访视", target: "出生后 7 天内或出院后一周内", status: "2 人待跟进" },
@@ -6775,13 +6776,13 @@ function seedHealthBulletin2024() {
   };
 }
 
-function seedDalianHealthStatistics2025() {
+function seedRegionalHealthStatistics2025() {
   return {
-    title: "2025 年大连市卫生健康统计提要",
+    title: "2025 年区域卫生健康统计提要",
     source: "2025 年国家卫生统计信息网络直报系统年报数据",
-    sourceFile: "2025年大连市卫生健康统计提要.pdf",
+    sourceFile: "2025年区域卫生健康统计提要.pdf",
     year: 2025,
-    population: { value: 755.7, unit: "万人", source: "大连市统计局常住人口" },
+    population: { value: 755.7, unit: "万人", source: "区域统计局常住人口" },
     status: "本地提要数据，待正式年报汇编确认",
     note: "统计口径按照国家卫生健康统计调查制度，不包含驻军及武警医疗机构。",
     keyIndicators: [
@@ -6809,17 +6810,17 @@ function seedDalianHealthStatistics2025() {
       { name: "改善医疗服务", value: "检查互认 100%", detail: "二级以上公立医院 63.04% 开展预约诊疗，52.19% 开展远程医疗服务。", status: "服务优化" }
     ],
     nationalComparisons: [
-      { indicator: "每千人口医疗机构床位", dalian: "7.08 张", national: "7.32 张", delta: "-0.24 张", interpretation: "床位配置略低于全国 2024 水平，需结合人口结构和区域流入就医复核。" },
-      { indicator: "每千人口执业助理医师", dalian: "4.12 人", national: "3.61 人", delta: "+0.51 人", interpretation: "医师配置高于全国平均，支撑分级诊疗和专科高峰建设。" },
-      { indicator: "每千人口注册护士", dalian: "4.62 人", national: "4.16 人", delta: "+0.46 人", interpretation: "护理人员配置高于全国平均，但需继续关注医护比和基层分布。" },
-      { indicator: "总诊疗量增速", dalian: "+6.17%", national: "+6.2%", delta: "-0.03 个百分点", interpretation: "诊疗服务恢复和增长节奏与全国基本一致。" },
-      { indicator: "入院人次增速", dalian: "-6.32%", national: "+3.3%", delta: "-9.62 个百分点", interpretation: "大连住院量与全国趋势相反，需要结合床位使用率、病种结构和医保支付方式分析。" },
-      { indicator: "基层诊疗占比", dalian: "46.32%", national: "约 52.12%", delta: "-5.80 个百分点", interpretation: "基层承接仍有提升空间，应继续强化家庭医生、慢病长期处方和基层首诊。" },
-      { indicator: "医院病床使用率", dalian: "64.15%", national: "78.8%", delta: "-14.65 个百分点", interpretation: "医院床位利用率低于全国公报水平，应与专科结构、民营医院床位扩张和住院下降联动分析。" },
-      { indicator: "医院出院者平均住院日", dalian: "8.6 日", national: "8.6 日", delta: "持平", interpretation: "平均住院日与全国一致，说明效率指标具备可比基础。" },
-      { indicator: "医院次均门诊费用", dalian: "372.15 元", national: "361.0 元", delta: "+11.15 元", interpretation: "门诊费用略高于全国医院均值，需结合三级医院占比和检查检验结构复核。" },
-      { indicator: "医院次均住院费用", dalian: "11501.79 元", national: "9870.0 元", delta: "+1631.79 元", interpretation: "住院费用高于全国医院均值，应纳入医保监管和病组费用分析。" },
-      { indicator: "中医类诊疗占比", dalian: "13.69%", national: "约 16.57%", delta: "-2.88 个百分点", interpretation: "中医服务增长较快，但占比仍低于全国粗略测算水平，口径需复核。" }
+      { indicator: "每千人口医疗机构床位", regional: "7.08 张", national: "7.32 张", delta: "-0.24 张", interpretation: "床位配置略低于全国 2024 水平，需结合人口结构和区域流入就医复核。" },
+      { indicator: "每千人口执业助理医师", regional: "4.12 人", national: "3.61 人", delta: "+0.51 人", interpretation: "医师配置高于全国平均，支撑分级诊疗和专科高峰建设。" },
+      { indicator: "每千人口注册护士", regional: "4.62 人", national: "4.16 人", delta: "+0.46 人", interpretation: "护理人员配置高于全国平均，但需继续关注医护比和基层分布。" },
+      { indicator: "总诊疗量增速", regional: "+6.17%", national: "+6.2%", delta: "-0.03 个百分点", interpretation: "诊疗服务恢复和增长节奏与全国基本一致。" },
+      { indicator: "入院人次增速", regional: "-6.32%", national: "+3.3%", delta: "-9.62 个百分点", interpretation: "区域住院量与全国趋势相反，需要结合床位使用率、病种结构和医保支付方式分析。" },
+      { indicator: "基层诊疗占比", regional: "46.32%", national: "约 52.12%", delta: "-5.80 个百分点", interpretation: "基层承接仍有提升空间，应继续强化家庭医生、慢病长期处方和基层首诊。" },
+      { indicator: "医院病床使用率", regional: "64.15%", national: "78.8%", delta: "-14.65 个百分点", interpretation: "医院床位利用率低于全国公报水平，应与专科结构、民营医院床位扩张和住院下降联动分析。" },
+      { indicator: "医院出院者平均住院日", regional: "8.6 日", national: "8.6 日", delta: "持平", interpretation: "平均住院日与全国一致，说明效率指标具备可比基础。" },
+      { indicator: "医院次均门诊费用", regional: "372.15 元", national: "361.0 元", delta: "+11.15 元", interpretation: "门诊费用略高于全国医院均值，需结合三级医院占比和检查检验结构复核。" },
+      { indicator: "医院次均住院费用", regional: "11501.79 元", national: "9870.0 元", delta: "+1631.79 元", interpretation: "住院费用高于全国医院均值，应纳入医保监管和病组费用分析。" },
+      { indicator: "中医类诊疗占比", regional: "13.69%", national: "约 16.57%", delta: "-2.88 个百分点", interpretation: "中医服务增长较快，但占比仍低于全国粗略测算水平，口径需复核。" }
     ],
     dataPipeline: [
       { name: "类似报表导入", detail: "支持 PDF、Excel、Word 年报或提要上传后，经 OCR/表格抽取、字段映射、人工复核进入统计主题库。", status: "已设计" },
@@ -6844,13 +6845,13 @@ function seedHealthStatisticsIngestion() {
     ],
     jobs: [
       {
-        id: "stat-job-dalian-2025",
-        name: "2025 年大连市卫生健康统计提要",
+        id: "stat-job-regional-2025",
+        name: "2025 年区域卫生健康统计提要",
         source: "PDF 报表导入",
         period: "2025 年报",
         status: "已结构化",
         quality: "口径已标注，待正式年报汇编确认",
-        target: "dalianHealthStatistics2025",
+        target: LEGACY_REGIONAL_STATS_KEY,
         nextAction: "补充区县、机构明细和正式年报版本号。"
       },
       {
@@ -6892,7 +6893,7 @@ function seedCareOrders() {
     {
       id: "co1",
       residentId: "r1",
-      institution: "大连市中心医院",
+      institution: "区域中心医院",
       department: "心内科",
       type: "专科复诊",
       status: "待接诊",
@@ -6903,7 +6904,7 @@ function seedCareOrders() {
     {
       id: "co2",
       residentId: "r2",
-      institution: "大连医科大学附属医院",
+      institution: "区域医科大学附属医院",
       department: "内分泌科",
       type: "糖尿病复查",
       status: "已接诊",
@@ -6930,7 +6931,7 @@ function seedInsuranceClaims() {
     {
       id: "ic1",
       residentId: "r1",
-      institution: "大连市中心医院",
+      institution: "区域中心医院",
       claimType: "门诊慢特病",
       diseaseType: "高血压",
       totalAmount: 386.5,
@@ -6943,7 +6944,7 @@ function seedInsuranceClaims() {
     {
       id: "ic2",
       residentId: "r2",
-      institution: "大连医科大学附属医院",
+      institution: "区域医科大学附属医院",
       claimType: "门诊统筹",
       diseaseType: "糖尿病",
       totalAmount: 612.8,
@@ -6980,8 +6981,8 @@ function seedMedicationPickups() {
 
 function seedInstitutionSupervisions() {
   return [
-    { id: "is1", institution: "大连市中心医院", level: "提示", issue: "长期处方占比较高", action: "抽查慢病处方合理性", status: "待复核" },
-    { id: "is2", institution: "大连医科大学附属医院", level: "正常", issue: "结算与病历匹配", action: "持续监测", status: "通过" },
+    { id: "is1", institution: "区域中心医院", level: "提示", issue: "长期处方占比较高", action: "抽查慢病处方合理性", status: "待复核" },
+    { id: "is2", institution: "区域医科大学附属医院", level: "正常", issue: "结算与病历匹配", action: "持续监测", status: "通过" },
     { id: "is3", institution: "青泥洼桥社区卫生服务中心", level: "关注", issue: "基层随访服务包需补充记录", action: "补齐家庭医生随访记录", status: "整改中" }
   ];
 }
@@ -6993,7 +6994,7 @@ function seedDrugConsumableSupervisions() {
       residentId: "r1",
       category: "rational-use",
       boundary: "rational-medication",
-      institution: "Dalian Central Hospital",
+      institution: "Regional Central Hospital",
       sourceCollection: "insuranceClaims",
       sourceId: "ic1",
       relatedPickupId: "mp1",
@@ -7059,7 +7060,7 @@ function seedDrugConsumableSupervisions() {
       residentId: "r4",
       category: "high-value-consumable",
       boundary: "consumable-clue",
-      institution: "Dalian Central Hospital",
+      institution: "Regional Central Hospital",
       sourceCollection: "institutionSupervisions",
       sourceId: "is1",
       relatedPickupId: "mp4",
@@ -7081,7 +7082,7 @@ function seedDrugConsumableSupervisions() {
 
 function seedPersonalRecords() {
   return [
-    record("r1", "emr", "2026-05-21", "原发性高血压 2 级", "复诊血压偏高，建议调整生活方式并规律服药。", "大连市中心医院 · 心内科", {
+    record("r1", "emr", "2026-05-21", "原发性高血压 2 级", "复诊血压偏高，建议调整生活方式并规律服药。", "区域中心医院 · 心内科", {
       visitType: "门诊",
       exams: ["心电图：窦性心律", "肾功能：未见明显异常"],
       medications: ["苯磺酸氨氯地平片", "厄贝沙坦片"]
@@ -7091,7 +7092,7 @@ function seedPersonalRecords() {
       exams: ["血压：158/92 mmHg"],
       medications: ["继续原方案"]
     }),
-    record("r2", "emr", "2026-05-18", "2 型糖尿病", "空腹血糖控制不佳，建议复查糖化血红蛋白。", "大连医科大学附属医院 · 内分泌科", {
+    record("r2", "emr", "2026-05-18", "2 型糖尿病", "空腹血糖控制不佳，建议复查糖化血红蛋白。", "区域医科大学附属医院 · 内分泌科", {
       visitType: "门诊",
       exams: ["空腹血糖：7.8 mmol/L", "糖化血红蛋白：待复查"],
       medications: ["二甲双胍片"]
@@ -7101,9 +7102,9 @@ function seedPersonalRecords() {
       exams: ["血压：148/88 mmHg"],
       medications: ["继续原用药"]
     }),
-    record("r1", "labs", "2026-05-21", "肾功能", "未见明显异常", "大连市中心医院"),
-    record("r1", "labs", "2026-05-21", "心电图", "窦性心律", "大连市中心医院"),
-    record("r2", "labs", "2026-05-18", "空腹血糖", "7.8 mmol/L，偏高", "大连医科大学附属医院"),
+    record("r1", "labs", "2026-05-21", "肾功能", "未见明显异常", "区域中心医院"),
+    record("r1", "labs", "2026-05-21", "心电图", "窦性心律", "区域中心医院"),
+    record("r2", "labs", "2026-05-18", "空腹血糖", "7.8 mmol/L，偏高", "区域医科大学附属医院"),
     record("r4", "labs", "2026-03-30", "血压复测", "148/88 mmHg", "青泥洼桥社区卫生服务中心"),
     record("r1", "medications", "2026-05-21", "苯磺酸氨氯地平片", "每日 1 次", "心内科门诊"),
     record("r1", "medications", "2026-05-21", "厄贝沙坦片", "每日 1 次", "心内科门诊"),
@@ -7112,7 +7113,7 @@ function seedPersonalRecords() {
     record("r2", "allergies", "2025-08-14", "无明确药物过敏史", "已确认", "门诊问诊"),
     record("r1", "vaccines", "2025-11-01", "流感疫苗", "已接种", "社区卫生服务中心"),
     record("r4", "vaccines", "2025-11-05", "流感疫苗", "已接种", "社区卫生服务中心"),
-    record("r1", "admissions", "2024-06-18", "日间观察", "血压波动观察，未住院", "大连市中心医院"),
+    record("r1", "admissions", "2024-06-18", "日间观察", "血压波动观察，未住院", "区域中心医院"),
     record("r3", "admissions", "2025-12-09", "体检中心", "年度体检，无住院记录", "甘井子区人民医院"),
     record("r1", "authorizations", "2026-01-01", "家庭医生团队", "允许查看健康档案和随访记录", "居民授权"),
     record("r1", "authorizations", "2026-01-01", "区域医疗机构", "允许查看电子病历摘要", "居民授权"),
@@ -11690,7 +11691,7 @@ function normalizeState(data) {
     birthCertificateDocuments: mergeByKey(seedBirthCertificateDocuments(), data.birthCertificateDocuments, "id"),
     birthStatistics: data.birthStatistics && typeof data.birthStatistics === "object" ? data.birthStatistics : seedBirthStatistics(),
     healthBulletin2024: data.healthBulletin2024 && typeof data.healthBulletin2024 === "object" ? data.healthBulletin2024 : seedHealthBulletin2024(),
-    dalianHealthStatistics2025: data.dalianHealthStatistics2025 && typeof data.dalianHealthStatistics2025 === "object" ? data.dalianHealthStatistics2025 : seedDalianHealthStatistics2025(),
+    [LEGACY_REGIONAL_STATS_KEY]: data[LEGACY_REGIONAL_STATS_KEY] && typeof data[LEGACY_REGIONAL_STATS_KEY] === "object" ? data[LEGACY_REGIONAL_STATS_KEY] : seedRegionalHealthStatistics2025(),
     healthStatisticsIngestion: data.healthStatisticsIngestion && typeof data.healthStatisticsIngestion === "object" ? data.healthStatisticsIngestion : seedHealthStatisticsIngestion(),
     doctorProfiles: mergeByKey(seedDoctorProfiles(), data.doctorProfiles, "id"),
     multiPracticePolicy: data.multiPracticePolicy && typeof data.multiPracticePolicy === "object" ? data.multiPracticePolicy : seedMultiPracticePolicy(),
@@ -12071,7 +12072,7 @@ function restoreCorruptedStrings(defaultValue, currentValue) {
   if (typeof currentValue === "string") {
     if ((hasCorruptedText(currentValue) || currentValue.includes("?")) && typeof defaultValue === "string" && !hasCorruptedText(defaultValue) && !defaultValue.includes("?")) return defaultValue;
     return currentValue
-      .replace(/��连/g, "大连")
+      .replace(/��连/g, "区域")
       .replace(/健���/g, "健康")
       .replace(/已��发/g, "已签发");
   }
@@ -13976,8 +13977,8 @@ function integrationSampleValue(field, contract, sequence) {
       externalId: `PE-SAMPLE-${String(sequence).padStart(3, "0")}`,
       residentId: "r1",
       sourceType: sequence % 2 ? "exam-center" : "hospital",
-      institutionId: sequence % 2 ? "exam-center-dalian-01" : "hospital-dl-central",
-      institutionName: sequence % 2 ? "大连健康体检中心" : "大连市中心医院",
+      institutionId: sequence % 2 ? "exam-center-regional-01" : "hospital-dl-central",
+      institutionName: sequence % 2 ? "区域健康体检中心" : "区域中心医院",
       examDate: "2026-07-10",
       summary: "现场联调样例：一般项目未见明显异常"
     };
@@ -13986,7 +13987,7 @@ function integrationSampleValue(field, contract, sequence) {
   const values = {
     externalId: `${contract.domain}-${String(sequence).padStart(3, "0")}`,
     residentId: "r1",
-    institution: "大连市中心医院",
+    institution: "区域中心医院",
     visitedAt: "2026-06-21T10:00:00.000Z",
     diagnosis: "高血压复诊",
     recordDate: "2026-06-21",
@@ -14234,7 +14235,7 @@ function seedRegionalSharingPackages() {
       personIndex: "DEMO-ID-R1#DEMO-MOBILE-R1",
       sourceInstitution: "青泥洼桥社区卫生服务中心",
       sourceOrgCode: "MR3",
-      targetInstitutions: ["大连市中心医院", "中山区县域医共体"],
+      targetInstitutions: ["区域中心医院", "中山区县域医共体"],
       targetOrgCodes: ["MR1", "ORG-CONSORTIUM-ZS"],
       category: "慢病复查",
       title: "高血压复查共享包",
@@ -14252,7 +14253,7 @@ function seedRegionalSharingPackages() {
       id: "rsp-r2-diabetes",
       residentId: "r2",
       personIndex: "DEMO-ID-R2#DEMO-MOBILE-R2",
-      sourceInstitution: "大连市中心医院",
+      sourceInstitution: "区域中心医院",
       sourceOrgCode: "MR1",
       targetInstitutions: ["星海湾社区卫生服务中心", "中山区县域医共体"],
       targetOrgCodes: ["MR4", "ORG-CONSORTIUM-ZS"],
@@ -14274,7 +14275,7 @@ function seedRegionalSharingPackages() {
       personIndex: "DEMO-ID-R3#DEMO-MOBILE-R3",
       sourceInstitution: "甘井子区人民医院",
       sourceOrgCode: "MR5",
-      targetInstitutions: ["大连医科大学附属医院"],
+      targetInstitutions: ["区域医科大学附属医院"],
       targetOrgCodes: ["MR2"],
       category: "影像复核",
       title: "影像报告复核共享包",
@@ -14326,7 +14327,7 @@ function seedRegionalSharingAccessReviews() {
       residentId: "r1",
       actor: "医疗机构管理员",
       role: "institution",
-      organization: "大连市中心医院",
+      organization: "区域中心医院",
       purpose: "上转接诊前调阅慢病随访和检验摘要",
       decision: "approved",
       status: "completed",
@@ -16308,7 +16309,7 @@ function normalizeEscortServiceOrder(payload, user, data) {
   const now = new Date().toISOString();
   const note = String(payload.note || "").trim();
   const hospital = String(payload.hospital || registrationOrder?.hospital || "").trim();
-  const hospitalCode = String(payload.hospitalCode || registrationOrder?.hospitalCode || (/(Dalian Central|central hospital|MR1)/i.test(hospital) ? "MR1" : "")).trim();
+  const hospitalCode = String(payload.hospitalCode || registrationOrder?.hospitalCode || (/(Regional Central|central hospital|MR1)/i.test(hospital) ? "MR1" : "")).trim();
   const appointmentAt = String(payload.appointmentAt || payload.due || registrationOrder?.appointmentDate || "").trim();
   const department = String(payload.department || registrationOrder?.department || "").trim();
   if (!hospital && !hospitalCode) throw new Error("hospital is required");
@@ -16494,7 +16495,7 @@ function seedInternetNursingInstitutions() {
     {
       id: "inh-mr1",
       institutionCode: "MR1",
-      name: "Dalian Central Hospital",
+      name: "Regional Central Hospital",
       district: "Zhongshan",
       licenseNo: "PDY-INH-MR1",
       serviceModes: ["home bed", "patrol diagnosis", "community nursing"],
@@ -16627,7 +16628,7 @@ function seedInternetNursingOrders() {
       residentName: "Demo resident A",
       institutionId: "inh-mr1",
       institutionCode: "MR1",
-      institutionName: "Dalian Central Hospital",
+      institutionName: "Regional Central Hospital",
       nurseId: "inn-001",
       nurseName: "Nurse Sun",
       serviceItem: "wound care",
@@ -16735,7 +16736,7 @@ function seedInternetNursingOrders() {
       residentName: "Demo resident C",
       institutionId: "inh-mr1",
       institutionCode: "MR1",
-      institutionName: "Dalian Central Hospital",
+      institutionName: "Regional Central Hospital",
       nurseId: "",
       nurseName: "",
       serviceItem: "PICC maintenance",

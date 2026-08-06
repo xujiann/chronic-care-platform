@@ -169,7 +169,7 @@ function seedDigitalHospitalPilotInstitutions() {
     {
       id: "dhpi-mr1",
       institutionId: "MR1",
-      institutionName: "大连市中心医院",
+      institutionName: "区域中心医院",
       institutionType: "tertiary-general",
       owner: "医院信息中心",
       stage: "controlled-pilot",
@@ -316,7 +316,7 @@ function seedDigitalHospitalPilotIssues() {
     {
       id: "dhissue-mr1-interface-receipt",
       institutionId: "MR1",
-      institutionName: "大连市中心医院",
+      institutionName: "区域中心医院",
       title: "接口回执抽样证据待补齐",
       severity: "P0",
       category: "interface-evidence",
@@ -731,7 +731,7 @@ function normalizeDigitalHospitalPreAssessmentAction(assessment = {}, payload = 
 }
 
 function seedDigitalHospitalPreAssessments() {
-  return [runDigitalHospitalPreAssessment({ institutionId: "MR1", institutionName: "大连市中心医院", profileId: PILOT_PROFILES[0].id }, { role: "commission", name: "试点评价规则引擎" }, { id: "dhpa-mr1-pilot", now: "2026-07-17T03:00:00.000Z" })];
+  return [runDigitalHospitalPreAssessment({ institutionId: "MR1", institutionName: "区域中心医院", profileId: PILOT_PROFILES[0].id }, { role: "commission", name: "试点评价规则引擎" }, { id: "dhpa-mr1-pilot", now: "2026-07-17T03:00:00.000Z" })];
 }
 
 function buildDigitalHospitalEvaluationCatalog() {

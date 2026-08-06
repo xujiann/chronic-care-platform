@@ -1437,7 +1437,7 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(deniedSiteEvidence.response.status, 403);
 
     const releaseReport = await api(baseUrl, "/api/release-report", authorized(accountLogin.body.token));
-    assert.equal(releaseReport.response.status, 200);
+    assert.equal(releaseReport.response.status, 200, JSON.stringify(releaseReport.body));
     assert.equal(releaseReport.body.ok, true, JSON.stringify(releaseReport.body.checks.filter((item) => !item.passed && item.severity !== "warn")));
     assert.equal(releaseReport.body.checks.some((item) => item.name === "sitePack:readiness" && item.passed), true);
     assert.equal(releaseReport.body.checks.some((item) => item.name === "phase2Catalog:readiness" && item.passed), true);

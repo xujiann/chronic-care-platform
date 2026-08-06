@@ -12,7 +12,7 @@
         <div>
           <span>开源健康城市系统</span>
           <h1>健康城市协同总览</h1>
-          <p>以居民健康账户为核心，贯通大连市卫生健康委、医疗机构、医保局/医保中心/区市县医保局、个人端和县域医共体平台，支撑慢病管理、资源监管、结算审核、固定取药和县乡村一体化协同。</p>
+          <p>以居民健康账户为核心，贯通区域卫生健康委、医疗机构、医保局/医保中心/区市县医保局、个人端和县域医共体平台，支撑慢病管理、资源监管、结算审核、固定取药和县乡村一体化协同。</p>
         </div>
         <nav>
           <a href="./platform.html">全民健康平台</a>
@@ -86,7 +86,7 @@
             </a>
             <a class="capability-card" href="./insurance.html">
               <strong>医保管理与经办</strong>
-              <span>大连市医保局负责政策和基金监管，大连市医保中心负责结算经办，区市县医保局负责属地机构监管。</span>
+              <span>区域医保局负责政策和基金监管，区域医保中心负责结算经办，区市县医保局负责属地机构监管。</span>
             </a>
             <a class="capability-card" href="./county.html">
               <strong>县域医共体平台</strong>
@@ -119,8 +119,8 @@
           <span>统一认证、按角色授权、跨端访问留痕</span>
         </div>
         <div class="auth-flow-grid">
-          <div><strong>统一登录</strong><span>居民、医生、大连市医保局/医保中心/区市县医保局、卫健委管理员从同一入口进入。</span></div>
-          <div><strong>角色路由</strong><span>根据角色进入个人端、医疗机构端、医保管理与经办页面或大连市卫生健康委页面。</span></div>
+          <div><strong>统一登录</strong><span>居民、医生、区域医保局/医保中心/区市县医保局、卫健委管理员从同一入口进入。</span></div>
+          <div><strong>角色路由</strong><span>根据角色进入个人端、医疗机构端、医保管理与经办页面或区域卫生健康委页面。</span></div>
           <div><strong>最小权限</strong><span>端系统只展示当前角色需要处理的数据范围。</span></div>
           <div><strong>访问留痕</strong><span>健康档案、电子病历、医保审核和授权共享进入审计日志。</span></div>
         </div>
@@ -162,7 +162,7 @@
           <div><strong>deathCertificateForms</strong><span>电子证照、纸质版、委托书、申报单模板字段</span></div>
           <div><strong>deathStatistics</strong><span>死亡统计、死因排名、地区汇总、时效质控和共享去向</span></div>
           <div><strong>healthBulletin2024</strong><span>2024 年卫生健康事业发展统计公报可视化数据</span></div>
-          <div><strong>dalianHealthStatistics2025</strong><span>2025 年大连市卫生健康统计提要与国家公报对比数据</span></div>
+          <div><strong>regionalHealthStatistics2025</strong><span>2025 年区域卫生健康统计提要与国家公报对比数据</span></div>
           <div><strong>healthStatisticsIngestion</strong><span>统计报表导入、直报系统接口、质控入库和发布留痕流程</span></div>
           <div><strong>careOrders</strong><span>医疗机构协同任务</span></div>
           <div><strong>referralSystem</strong><span>分级诊疗规则、转诊单、预留号源床位、医保支付引导和家庭医生签约服务</span></div>
@@ -175,7 +175,7 @@
           <div><strong>emergencySignals</strong><span>公共卫生应急多点触发预警</span></div>
           <div><strong>seniorServices</strong><span>适老化与家属代办服务</span></div>
           <div><strong>dataAccessLogs</strong><span>个人健康信息访问审计</span></div>
-          <div><strong>authOrganizations</strong><span>市、区市县、大连市卫生健康委、大连市医保局、医保中心、区市县医保局和医疗机构组织登录目录</span></div>
+          <div><strong>authOrganizations</strong><span>市、区市县、区域卫生健康委、区域医保局、医保中心、区市县医保局和医疗机构组织登录目录</span></div>
           <div><strong>authUsers</strong><span>组织账号、角色权限、入口页面和数据范围</span></div>
           <div><strong>interfaceRequirements</strong><span>保留原有系统接口和未来对接接口需求清单</span></div>
           <div><strong>securityEvents</strong><span>登录、退出、接口拒绝和敏感操作安全事件</span></div>
@@ -191,8 +191,8 @@
         <div class="model-grid">
           <div><strong>市级平台</strong><span>账号 city，进入总控台，查看全市运行、跨部门协同和系统建设路线图。</span></div>
           <div><strong>区市县平台</strong><span>账号 district，进入总控台，按区市县管理居民、机构、公卫和基层服务。</span></div>
-          <div><strong>大连市卫生健康委</strong><span>账号 health/whjw，进入同一卫健委端，管理医疗资源、统计直报、公共卫生、分级诊疗和数据质量。</span></div>
-          <div><strong>医保组织</strong><span>账号 mi 为大连市医保局，insurance 为大连市医保中心，district_mi 为区市县医保局，统一进入医保管理与经办页面。</span></div>
+          <div><strong>区域卫生健康委</strong><span>账号 health/whjw，进入同一卫健委端，管理医疗资源、统计直报、公共卫生、分级诊疗和数据质量。</span></div>
+          <div><strong>医保组织</strong><span>账号 mi 为区域医保局，insurance 为区域医保中心，district_mi 为区市县医保局，统一进入医保管理与经办页面。</span></div>
           <div><strong>各医疗机构</strong><span>账号 hospital/community，进入医疗机构端，处理电子病历、检查检验、转诊接诊、长期处方和固定取药。</span></div>
           <div><strong>保留原接口</strong><span>/api/auth/*、/api/state、/api/personal-records、/api/workflow-actions、/api/health-statistics/import-jobs、/api/death-certificates 继续兼容。</span></div>
           <div><strong>新增对接需求</strong><span>统一认证、组织机构编码、居民主索引、HIS/EMR/LIS/PACS、医保结算、统计直报、人口死亡登记、电子证照、消息回调。</span></div>

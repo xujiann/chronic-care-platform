@@ -54,6 +54,6 @@ test("regional CI matrix validates generic core and Dalian independently", () =>
   });
   assert.equal(matrix.ok, true);
   assert.equal(matrix.productionReady, false);
-  assert.deepEqual(matrix.entries.map((item) => item.regionCode), ["template", "210200"]);
+  assert.deepEqual(matrix.entries.map((item) => item.regionCode), ["template", "210200", "990001"]);
   assert.ok(matrix.entries.every((item) => item.technicalReady && item.verification.ok));
 });

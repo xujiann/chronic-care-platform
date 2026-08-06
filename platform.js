@@ -169,11 +169,11 @@ const defaultPlatformCapabilities = [
   },
   {
     group: "惠民应用",
-    source: "健康大连互联网应用统一入口、互联网+药事服务、居民健康画像",
+    source: "健康区域互联网应用统一入口、互联网+药事服务、居民健康画像",
     target: "居民统一入口、诊后用药、用药提醒、个性化健康标签、授权共享",
     existing: ["accounts", "residents", "personalRecords", "medicationPickups", "digitalCredentials"],
     status: "已衔接",
-    next: "把居民端、移动预览、固定取药和授权共享归入健康大连统一入口。"
+    next: "把居民端、移动预览、固定取药和授权共享归入健康区域统一入口。"
   },
   {
     group: "辅政应用",
@@ -241,7 +241,7 @@ const defaultInterfacePlan = [
 const defaultDeliveryRoadmap = [
   { phase: "第一批：平台底座和存量纳管", owner: "市级平台", items: ["统一应用目录", "统一身份认证", "数据资源目录", "存量模块登记", "运行监控"], status: "演示底座闭环" },
   { phase: "第二批：助医和分级诊疗闭环", owner: "医政医管/医疗机构", items: ["双向转诊", "远程会诊", "区域影像", "区域心电", "委托检验", "远程教育"], status: "衔接现有机构端和医共体模块" },
-  { phase: "第三批：惠民统一入口", owner: "基层卫生/居民端", items: ["健康大连统一入口", "互联网+药事服务", "居民健康画像", "授权共享", "固定取药提醒"], status: "衔接居民端和慢病模块" },
+  { phase: "第三批：惠民统一入口", owner: "基层卫生/居民端", items: ["健康区域统一入口", "互联网+药事服务", "居民健康画像", "授权共享", "固定取药提醒"], status: "衔接居民端和慢病模块" },
   { phase: "第四批：辅政和科研", owner: "规划信息/科研管理", items: ["数智健康大脑", "统计质控共享", "信用评价", "专病库", "科研数据集"], status: "补齐治理和科研能力" },
   { phase: "第五批：测评、安全和验收", owner: "项目办/安全管理", items: ["互联互通五乙材料", "等保三级", "密评", "信创适配", "接口验收"], status: "贯穿全周期沉淀证据" }
 ];
@@ -273,7 +273,7 @@ const defaultApplicationCatalog = [
   { id: "app-county", name: "县域医共体协同", sourceSystem: "医共体信息平台", interfaceMode: "API/能力复用", owner: "医政医管处", reuseMode: "协同中心复用", batch: "第二批", evidence: "16255 功能清单/工单样例", status: "已纳管", next: "补齐区级实施批次和培训证据。" },
   { id: "app-institution", name: "医疗机构业务协同", sourceSystem: "HIS/EMR/LIS/PACS", interfaceMode: "标准接口", owner: "医疗机构", reuseMode: "门户集成+数据回流", batch: "第二批", evidence: "字段映射/联调记录", status: "演示对接完成", next: "现场按机构登记真实接口环境、版本和联调责任人。" },
   { id: "app-physical-exam", name: "区域体检系统", sourceSystem: "体检中心/HIS/EMR", interfaceMode: "标准接口+报告回流", owner: "医疗机构/体检中心", reuseMode: "居民主索引+健康档案复用", batch: "第二批", evidence: "physical-examination.html / /api/physical-exams", status: "演示对接完成", next: "按试点机构确认体检项目字典、报告签章和原报告存储地址。" },
-  { id: "app-citizen", name: "健康大连居民服务", sourceSystem: "居民端/健康码", interfaceMode: "统一入口", owner: "基层卫生处", reuseMode: "入口整合", batch: "第三批", evidence: "居民旅程/授权记录", status: "已纳管", next: "接入政务身份源和正式消息服务。" },
+  { id: "app-citizen", name: "健康区域居民服务", sourceSystem: "居民端/健康码", interfaceMode: "统一入口", owner: "基层卫生处", reuseMode: "入口整合", batch: "第三批", evidence: "居民旅程/授权记录", status: "已纳管", next: "接入政务身份源和正式消息服务。" },
   { id: "app-insurance", name: "医保结算监管协同", sourceSystem: "医保核心平台", interfaceMode: "接口接入", owner: "医保局/医保中心", reuseMode: "业务协同", batch: "第三批", evidence: "结算审核/凭证核验样例", status: "演示对接完成", next: "确认生产接口规范和联调窗口。" }
 ];
 
@@ -323,7 +323,7 @@ const defaultPlatformDataBusChannels = [
 ];
 
 const defaultInstitutionCreditEvaluations = [
-  { id: "credit-central", name: "大连市中心医院", institutionType: "三级医院", period: "2026上半年", score: 92, grade: "A", indicators: "依法执业98/质量安全90/数据报送88/服务信用92", owner: "医政医管处", status: "已评价", next: "保持月度数据质量复核并公示优秀项。" },
+  { id: "credit-central", name: "区域中心医院", institutionType: "三级医院", period: "2026上半年", score: 92, grade: "A", indicators: "依法执业98/质量安全90/数据报送88/服务信用92", owner: "医政医管处", status: "已评价", next: "保持月度数据质量复核并公示优秀项。" },
   { id: "credit-ganjingzi", name: "甘井子区人民医院", institutionType: "二级医院", period: "2026上半年", score: 84, grade: "B", indicators: "依法执业92/质量安全86/数据报送76/服务信用82", owner: "属地卫生行政部门", status: "整改中", next: "30日内完成统计迟报和接口数据缺项整改。" },
   { id: "credit-community", name: "青泥洼桥社区卫生服务中心", institutionType: "基层机构", period: "2026上半年", score: 88, grade: "B+", indicators: "依法执业95/质量安全87/数据报送85/服务信用86", owner: "中山区卫生健康局", status: "已评价", next: "补齐家庭医生签约数据质控证据。" }
 ];
@@ -413,7 +413,7 @@ const defaultCitizenServiceBlacklist = [
 ];
 
 const defaultCitizenHospitalServiceConfigs = [
-  { id: "cop-hospital-mr1", institutionCode: "MR1", institutionName: "大连市中心医院", enabledServices: ["appointment", "report-query", "internet-nursing", "escort"], status: "active-demo", launchScope: "white-list-demo", productionReady: false },
+  { id: "cop-hospital-mr1", institutionCode: "MR1", institutionName: "区域中心医院", enabledServices: ["appointment", "report-query", "internet-nursing", "escort"], status: "active-demo", launchScope: "white-list-demo", productionReady: false },
   { id: "cop-hospital-mr3", institutionCode: "MR3", institutionName: "青泥洼桥社区卫生服务中心", enabledServices: ["family-doctor", "chronic-followup", "internet-nursing"], status: "active-demo", launchScope: "white-list-demo", productionReady: false },
   { id: "cop-hospital-mr5", institutionCode: "MR5", institutionName: "甘井子区人民医院", enabledServices: ["appointment", "report-query"], status: "onsite-confirmation-pending", launchScope: "disabled", productionReady: false }
 ];

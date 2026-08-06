@@ -57,7 +57,7 @@ const fallbackState = {
       residentId: "r1",
       providerId: "esp-demo-community",
       providerName: "社区助医陪诊服务站",
-      hospital: "大连市中心医院",
+      hospital: "区域中心医院",
       department: "心内科",
       appointmentAt: todayOffset(3),
       due: todayOffset(3),
@@ -98,7 +98,7 @@ const emrRecords = [
   {
     residentId: "r1",
     date: "2026-05-21",
-    institution: "大连市中心医院",
+    institution: "区域中心医院",
     department: "心内科",
     type: "门诊",
     diagnosis: "原发性高血压 2 级",
@@ -120,7 +120,7 @@ const emrRecords = [
   {
     residentId: "r2",
     date: "2026-05-18",
-    institution: "大连医科大学附属医院",
+    institution: "区域医科大学附属医院",
     department: "内分泌科",
     type: "门诊",
     diagnosis: "2 型糖尿病",
@@ -143,9 +143,9 @@ const emrRecords = [
 
 const personalHealthData = {
   labs: [
-    { residentId: "r1", date: "2026-05-21", name: "肾功能", result: "未见明显异常", source: "大连市中心医院" },
-    { residentId: "r1", date: "2026-05-21", name: "心电图", result: "窦性心律", source: "大连市中心医院" },
-    { residentId: "r2", date: "2026-05-18", name: "空腹血糖", result: "7.8 mmol/L，偏高", source: "大连医科大学附属医院" },
+    { residentId: "r1", date: "2026-05-21", name: "肾功能", result: "未见明显异常", source: "区域中心医院" },
+    { residentId: "r1", date: "2026-05-21", name: "心电图", result: "窦性心律", source: "区域中心医院" },
+    { residentId: "r2", date: "2026-05-18", name: "空腹血糖", result: "7.8 mmol/L，偏高", source: "区域医科大学附属医院" },
     { residentId: "r4", date: "2026-03-30", name: "血压复测", result: "148/88 mmHg", source: "青泥洼桥社区卫生服务中心" }
   ],
   medications: [
@@ -162,12 +162,12 @@ const personalHealthData = {
     { residentId: "r4", date: "2025-11-05", name: "流感疫苗", result: "已接种", source: "社区卫生服务中心" }
   ],
   admissions: [
-    { residentId: "r1", date: "2024-06-18", name: "日间观察", result: "血压波动观察，未住院", source: "大连市中心医院" },
+    { residentId: "r1", date: "2024-06-18", name: "日间观察", result: "血压波动观察，未住院", source: "区域中心医院" },
     { residentId: "r3", date: "2025-12-09", name: "体检中心", result: "年度体检，无住院记录", source: "甘井子区人民医院" }
   ],
   imaging: [
-    { residentId: "r1", date: "2026-05-21", name: "胸部 CT 影像索引", result: "影像号 IMG-DEMO-20260521，结论摘要已归档，原始 DICOM 待院内 PACS 授权调阅。", source: "大连市中心医院 PACS", meta: { attachmentType: "影像", fileName: "IMG-DEMO-20260521.dcm", accessMode: "院内授权调阅" } },
-    { residentId: "r2", date: "2026-05-18", name: "眼底照相报告", result: "糖尿病眼底筛查未见明显新生血管，建议年度复查。", source: "大连医科大学附属医院", meta: { attachmentType: "图片", fileName: "fundus-r2-20260518.jpg", accessMode: "报告摘要" } }
+    { residentId: "r1", date: "2026-05-21", name: "胸部 CT 影像索引", result: "影像号 IMG-DEMO-20260521，结论摘要已归档，原始 DICOM 待院内 PACS 授权调阅。", source: "区域中心医院 PACS", meta: { attachmentType: "影像", fileName: "IMG-DEMO-20260521.dcm", accessMode: "院内授权调阅" } },
+    { residentId: "r2", date: "2026-05-18", name: "眼底照相报告", result: "糖尿病眼底筛查未见明显新生血管，建议年度复查。", source: "区域医科大学附属医院", meta: { attachmentType: "图片", fileName: "fundus-r2-20260518.jpg", accessMode: "报告摘要" } }
   ],
   attachments: [
     { residentId: "r1", date: "2026-05-22", name: "门诊报告 PDF", result: "心内科复诊报告、检查摘要和用药建议已归档。", source: "居民上传", meta: { attachmentType: "PDF", fileName: "cardiology-visit-r1-20260522.pdf", accessMode: "居民端留存" } },
@@ -386,9 +386,9 @@ function citizenActionDockHint(tab, items) {
 }
 
 const registrationSchedules = [
-  { id: "reg-sch-cardio-am", hospital: "大连市中心医院", department: "心内科", doctor: "王医生", date: todayOffset(2), period: "上午", remaining: 6, fee: 18, cancelBeforeHours: 24, source: "医院号源池", tags: ["高血压复诊", "支持陪诊"] },
-  { id: "reg-sch-cardio-waitlist-am", hospital: "大连市中心医院", department: "心内科", doctor: "孙医生", date: todayOffset(1), period: "上午", remaining: 0, fee: 18, cancelBeforeHours: 12, source: "医院号源池", tags: ["号源已满", "支持候补"] },
-  { id: "reg-sch-endocrine-pm", hospital: "大连医科大学附属医院", department: "内分泌科", doctor: "赵医生", date: todayOffset(3), period: "下午", remaining: 4, fee: 22, cancelBeforeHours: 12, source: "医院号源池", tags: ["糖尿病复诊", "检查解读"] },
+  { id: "reg-sch-cardio-am", hospital: "区域中心医院", department: "心内科", doctor: "王医生", date: todayOffset(2), period: "上午", remaining: 6, fee: 18, cancelBeforeHours: 24, source: "医院号源池", tags: ["高血压复诊", "支持陪诊"] },
+  { id: "reg-sch-cardio-waitlist-am", hospital: "区域中心医院", department: "心内科", doctor: "孙医生", date: todayOffset(1), period: "上午", remaining: 0, fee: 18, cancelBeforeHours: 12, source: "医院号源池", tags: ["号源已满", "支持候补"] },
+  { id: "reg-sch-endocrine-pm", hospital: "区域医科大学附属医院", department: "内分泌科", doctor: "赵医生", date: todayOffset(3), period: "下午", remaining: 4, fee: 22, cancelBeforeHours: 12, source: "医院号源池", tags: ["糖尿病复诊", "检查解读"] },
   { id: "reg-sch-community-am", hospital: "青泥洼桥社区卫生服务中心", department: "全科门诊", doctor: "刘医生", date: todayOffset(1), period: "上午", remaining: 12, fee: 8, cancelBeforeHours: 4, source: "基层预约池", tags: ["家庭医生", "慢病随访"] }
 ];
 
@@ -533,7 +533,7 @@ let citizenOperationsPublicFeed = {
     { id: "cop-agreement-service-v1", name: "居民服务使用协议", version: "1.0-demo", acceptanceMode: "explicit-checkbox", status: "active-demo", legalReviewStatus: "onsite-pending" }
   ],
   hospitalServices: [
-    { id: "cop-hospital-mr1", institutionName: "大连市中心医院", enabledServices: ["appointment", "report-query", "internet-nursing", "escort"], status: "active-demo", launchScope: "white-list-demo", productionReady: false },
+    { id: "cop-hospital-mr1", institutionName: "区域中心医院", enabledServices: ["appointment", "report-query", "internet-nursing", "escort"], status: "active-demo", launchScope: "white-list-demo", productionReady: false },
     { id: "cop-hospital-mr3", institutionName: "青泥洼桥社区卫生服务中心", enabledServices: ["family-doctor", "chronic-followup", "internet-nursing"], status: "active-demo", launchScope: "white-list-demo", productionReady: false }
   ],
   boundary: "当前为演示公开信息，正式服务范围、协议和支付退费规则以现场联调及审核发布版本为准。"
@@ -4539,7 +4539,7 @@ function formatEscortDistrict(value) {
 
 function formatEscortHospital(value) {
   return {
-    "Dalian Central Hospital outpatient clinic demo": "大连市中心医院门诊",
+    "Regional Central Hospital outpatient clinic demo": "区域中心医院门诊",
     "Community follow-up clinic demo": "社区随访门诊",
     "Specialist outpatient demo": "专科门诊"
   }[value] || value || "待确认医院";
@@ -4889,10 +4889,10 @@ function activeRegistrationOrders(residentId) {
 
 function formatRegistrationHospital(value) {
   return {
-    "Dalian Central Hospital outpatient clinic demo": "大连市中心医院门诊",
-    "Dalian Medical University Affiliated Hospital demo": "大连医科大学附属医院门诊",
-    "Dalian Central Hospital": "大连市中心医院",
-    "Dalian Medical University Hospital": "大连医科大学附属医院"
+    "Regional Central Hospital outpatient clinic demo": "区域中心医院门诊",
+    "Regional Medical University Affiliated Hospital demo": "区域医科大学附属医院门诊",
+    "Regional Central Hospital": "区域中心医院",
+    "Regional Medical University Hospital": "区域医科大学附属医院"
   }[value] || value || "待确认医院";
 }
 

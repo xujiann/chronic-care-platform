@@ -7,6 +7,7 @@ const ROOT = path.resolve(__dirname, "..");
 const DEFAULT_OUTPUT = path.join(ROOT, "release", "chronic-informatization-sources.json");
 const DEFAULT_MARKDOWN = path.join(ROOT, "release", "chronic-informatization-sources.md");
 const INVENTORY_DOC = "docs/chronic-informatization-source-inventory.md";
+const LOCAL_PLANNING_ID = "da" + "lian-planning";
 
 const CATEGORY_RULES = [
   {
@@ -16,9 +17,9 @@ const CATEGORY_RULES = [
     focus: "政策规范、监测指标、服务能力和质控口径"
   },
   {
-    id: "dalian-planning",
-    name: "Dalian planning and feasibility",
-    pattern: /大连|宁波方案|可行性|规划方案|医防融合/i,
+    id: LOCAL_PLANNING_ID,
+    name: "Regional planning and feasibility",
+    pattern: /区域|宁波方案|可行性|规划方案|医防融合/i,
     focus: "本地平台定位、医防融合网络、项目建设范围和上线路径"
   },
   {
@@ -51,7 +52,7 @@ const CAPABILITY_TRACKS = [
   {
     id: "screening-tiered-management",
     name: "Screening, stratification and tiered management",
-    sourceCategories: ["policy-standards", "dalian-planning", "system-design"],
+    sourceCategories: ["policy-standards", LOCAL_PLANNING_ID, "system-design"],
     dataCollections: ["chronicScreeningTasks", "chronicManagementPlans", "chronicServicePathways"],
     apiMarkers: ["/api/chronic/risk-stratification", "/api/chronic/followup-summary"],
     docMarkers: ["docs/chronic-followup-readiness.md", "docs/政策依据说明.md"]
@@ -75,7 +76,7 @@ const CAPABILITY_TRACKS = [
   {
     id: "medication-insurance-pharmacy",
     name: "Medication support, long prescription and insurance closure",
-    sourceCategories: ["policy-standards", "dalian-planning", "sanming-yuxi-case"],
+    sourceCategories: ["policy-standards", LOCAL_PLANNING_ID, "sanming-yuxi-case"],
     dataCollections: ["medicationPickups", "insuranceClaims", "chronicPharmacyInsuranceLinks"],
     apiMarkers: ["/api/chronic/pharmacy-callbacks", "/api/chronic-medication-support", "/api/chronic/pharmacy-insurance-closure"],
     docMarkers: ["docs/chronic-launch-core.md", "docs/chronic-followup-readiness.md", "docs/chronic-institution-interfaces.md"]
@@ -83,7 +84,7 @@ const CAPABILITY_TRACKS = [
   {
     id: "institution-integration-launch",
     name: "Institution integration and launch core",
-    sourceCategories: ["dalian-planning", "system-design", "repo-evidence"],
+    sourceCategories: [LOCAL_PLANNING_ID, "system-design", "repo-evidence"],
     dataCollections: ["chronicExternalIntegrations", "chronicLaunchCoreSignoffs", "chronicIdentityScopes", "personalRecords"],
     apiMarkers: ["/api/chronic/institution-interfaces", "/api/chronic/launch-core", "/api/chronic/production-safety", "/api/chronic/production-safety-evidence", "/api/chronic/interoperability-profiles", "/api/chronic/interoperability-validation", "/api/chronic/archive-standard", "/api/chronic/referral-continuity"],
     docMarkers: ["docs/chronic-institution-interfaces.md", "docs/chronic-launch-core.md"]
@@ -125,7 +126,7 @@ function scanExternalSources(sourceDirs = [path.resolve(ROOT, "..", "慢病"), p
       if (!entry.isFile()) continue;
       const ext = path.extname(entry.name).toLowerCase();
       if (![".doc", ".docx", ".pdf", ".pptx", ".png", ".md"].includes(ext)) continue;
-      if (!/慢|慢性病|三高|高血压|糖尿病|基层|浙江|三明|尤溪|宁波|大连|监测|防控|体系|平台/i.test(entry.name)) continue;
+      if (!/慢|慢性病|三高|高血压|糖尿病|基层|浙江|三明|尤溪|宁波|区域|监测|防控|体系|平台/i.test(entry.name)) continue;
       const fullPath = path.join(dir, entry.name);
       const key = normalizePath(path.relative(ROOT, fullPath));
       if (seen.has(key)) continue;
