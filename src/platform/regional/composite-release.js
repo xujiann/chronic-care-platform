@@ -76,6 +76,7 @@ function buildCompositeRegionalRelease(options = {}) {
     region: {
       code: loadedManifest.manifest.regionCode,
       name: loadedManifest.manifest.name,
+      deploymentClass: loadedManifest.registration.deploymentClass,
       version: loadedManifest.manifest.release.version,
       manifestDigest: loadedManifest.digest
     },

@@ -13,11 +13,19 @@ const {
 
 const ROOT = path.resolve(__dirname, "..");
 
-test("regional registry selects a generic default and loads both controlled regions", () => {
+test("regional registry selects a generic default and separates production from test regions", () => {
   const generic = loadRegionManifest({ root: ROOT });
   const dalian = loadRegionManifest({ root: ROOT, regionCode: "210200" });
+  const second = loadRegionManifest({ root: ROOT, regionCode: "990001" });
   assert.equal(generic.manifest.regionCode, "template");
   assert.equal(dalian.manifest.regionCode, "210200");
+  assert.equal(generic.registration.deploymentClass, "template");
+  assert.equal(dalian.registration.deploymentClass, "production");
+  assert.equal(second.registration.deploymentClass, "test");
+  assert.throws(
+    () => loadRegionManifest({ root: ROOT, regionCode: "990001", env: { NODE_ENV: "production" } }),
+    /cannot run in production/
+  );
   assert.equal(dalian.manifest.administrativeDivision.parentCode, "210000");
   assert.match(dalian.digest, /^[a-f0-9]{64}$/);
   assert.equal(Object.isFrozen(dalian), true);
@@ -48,10 +56,31 @@ test("regional registry requires unique enabled region declarations", () => {
       schemaVersion: "regional-registry-v1",
       defaultRegion: "template",
       regions: [
-        { code: "template", enabled: true },
-        { code: "template", enabled: true }
+        { code: "template", enabled: true, deploymentClass: "template" },
+        { code: "template", enabled: true, deploymentClass: "template" }
       ]
     }),
     /duplicate region codes/
+  );
+  assert.throws(
+    () => validateRegistry({
+      schemaVersion: "regional-registry-v1",
+      defaultRegion: "template",
+      regions: [
+        { code: "template", enabled: false, deploymentClass: "template" }
+      ]
+    }),
+    /defaultRegion must be an enabled template/
+  );
+  assert.throws(
+    () => validateRegistry({
+      schemaVersion: "regional-registry-v1",
+      defaultRegion: "template",
+      regions: [
+        { code: "template", enabled: true, deploymentClass: "template" },
+        { code: "990001", enabled: true, deploymentClass: "template" }
+      ]
+    }),
+    /reserved for defaultRegion/
   );
 });

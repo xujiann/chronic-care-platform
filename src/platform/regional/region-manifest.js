@@ -12,6 +12,7 @@ const CONFIG_REF_PATTERN = /^config\/[a-z0-9][a-z0-9-]*\.json$/;
 const EXTENSION_KINDS = Object.freeze(["adapter", "policy", "dictionary", "ui", "workflow"]);
 const SENSITIVE_KEY_PATTERN = /(?:password|passwd|token|secret|credential|private.?key|access.?key|signature)/i;
 const MAX_JSON_BYTES = 256 * 1024;
+const DEPLOYMENT_CLASSES = Object.freeze(["template", "production", "test"]);
 
 function stableJson(value) {
   if (Array.isArray(value)) return `[${value.map(stableJson).join(",")}]`;
@@ -92,10 +93,20 @@ function validateRegistry(registry) {
     const code = String(entry.code || "");
     if (!REGION_CODE_PATTERN.test(code)) throw new TypeError(`invalid regional registry code: ${code}`);
     if (typeof entry.enabled !== "boolean") throw new TypeError(`regional registry ${code} enabled must be boolean`);
+    if (!DEPLOYMENT_CLASSES.includes(entry.deploymentClass)) {
+      throw new TypeError(`regional registry ${code} deploymentClass is invalid`);
+    }
+    if (entry.deploymentClass === "template" && code !== registry.defaultRegion) {
+      throw new TypeError("regional registry template deploymentClass is reserved for defaultRegion");
+    }
     return code;
   });
   if (new Set(codes).size !== codes.length) throw new TypeError("regional registry contains duplicate region codes");
   if (!codes.includes(registry.defaultRegion)) throw new TypeError("regional registry defaultRegion is not registered");
+  const defaultRegistration = registry.regions.find((entry) => entry.code === registry.defaultRegion);
+  if (!defaultRegistration.enabled || defaultRegistration.deploymentClass !== "template") {
+    throw new TypeError("regional registry defaultRegion must be an enabled template");
+  }
   return registry;
 }
 
@@ -172,6 +183,9 @@ function loadRegionManifest(options = {}) {
   if (!REGION_CODE_PATTERN.test(regionCode)) throw new TypeError(`invalid REGION_CODE: ${regionCode}`);
   const registration = registry.regions.find((item) => item.code === regionCode);
   if (!registration || !registration.enabled) throw new TypeError(`region ${regionCode} is not enabled in regional registry`);
+  if (registration.deploymentClass === "test" && options.env?.NODE_ENV === "production") {
+    throw new TypeError(`test region ${regionCode} cannot run in production`);
+  }
   const regionsRoot = resolveWithin(projectRoot, "regions", "regions directory");
   const regionRoot = resolveWithin(regionsRoot, regionCode, `region ${regionCode}`);
   const manifestPath = resolveWithin(regionRoot, "manifest.json", `region ${regionCode} manifest`);
@@ -198,6 +212,7 @@ function loadRegionalConfigs(loadedManifest) {
 
 module.exports = {
   CONFIG_REF_PATTERN,
+  DEPLOYMENT_CLASSES,
   EXTENSION_KINDS,
   REGION_SCHEMA_VERSION,
   REGISTRY_SCHEMA_VERSION,

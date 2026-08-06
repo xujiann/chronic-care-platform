@@ -76,6 +76,7 @@ function createRegionalValues(context) {
     schemaVersion: "regional-public-context-v1",
     regionCode: context.regionCode,
     regionName: context.regionName,
+    deploymentClass: context.deploymentClass,
     locale: context.locale,
     timezone: context.timezone,
     administrativeDivision: context.administrativeDivision,

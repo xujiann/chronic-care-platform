@@ -1,32 +1,32 @@
 {
   "schemaVersion": "regional-organization-v1",
-  "authorityName": "待配置地区卫生健康主管部门",
-  "platformDisplayName": "区域卫生健康信息平台",
-  "serviceArea": "待配置",
+  "authorityName": "第二地区卫生健康主管部门",
+  "platformDisplayName": "第二地区卫生健康信息平台",
+  "serviceArea": "第二地区验证范围",
   "contactReference": "由部署环境的受控运维目录提供",
   "organizations": {
     "healthAuthority": {
       "code": "REGION-HEALTH",
-      "name": "地区卫生健康主管部门",
-      "shortName": "地区卫健主管部门",
+      "name": "第二地区卫生健康主管部门",
+      "shortName": "第二地区卫健部门",
       "type": "health_admin"
     },
     "insuranceAuthority": {
       "code": "REGION-INSURANCE",
-      "name": "地区医疗保障主管部门",
-      "shortName": "地区医保主管部门",
+      "name": "第二地区医疗保障主管部门",
+      "shortName": "第二地区医保部门",
       "type": "insurance_bureau"
     },
     "insuranceCenter": {
       "code": "REGION-INSURANCE-CENTER",
-      "name": "地区医疗保障经办中心",
-      "shortName": "地区医保中心",
+      "name": "第二地区医疗保障经办中心",
+      "shortName": "第二地区医保中心",
       "type": "insurance_center"
     },
     "centralHospital": {
       "code": "MR1",
-      "name": "区域中心医院",
-      "shortName": "中心医院",
+      "name": "第二地区中心医院",
+      "shortName": "第二中心医院",
       "type": "medical_institution"
     },
     "friendshipHospital": {

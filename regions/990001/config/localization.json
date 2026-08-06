@@ -1,15 +1,21 @@
 {
   "schemaVersion": "regional-localization-v1",
   "terms": {
-    "platformName": "区域卫生健康信息平台",
-    "platformShortName": "区域卫健平台",
-    "citizenPortalName": "区域居民健康服务",
+    "platformName": "第二地区卫生健康信息平台",
+    "platformShortName": "第二地区卫健平台",
+    "citizenPortalName": "第二地区居民健康服务",
     "governmentUnifiedEntry": "地区政务服务统一入口",
     "statisticsTitle": "地区卫生健康统计提要",
-    "regionLabel": "当前地区",
-    "demonstrationDistrict": "示范区"
+    "regionLabel": "第二地区",
+    "demonstrationDistrict": "第二示范区"
   },
   "legacyReplacements": {
+    "区域卫生健康信息平台": "第二地区卫生健康信息平台",
+    "区域居民健康服务": "第二地区居民健康服务",
+    "地区卫生健康主管部门": "第二地区卫生健康主管部门",
+    "地区医疗保障主管部门": "第二地区医疗保障主管部门",
+    "地区医疗保障经办中心": "第二地区医疗保障经办中心",
+    "区域中心医院": "第二地区中心医院",
     "Dalian Women and Children Medical Center": "区域妇女儿童医疗中心",
     "Dalian Medical University Affiliated Hospital": "区域大学附属医院",
     "Dalian Medical University Hospital": "区域大学附属医院",

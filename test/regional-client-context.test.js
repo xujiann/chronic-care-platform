@@ -48,6 +48,7 @@ test("regional browser client fails safely to the generic template", async () =>
   const client = runClient();
   await client.ready();
   assert.equal(client.current.regionCode, "template");
+  assert.equal(client.current.deploymentClass, "template");
   assert.equal(client.organization("centralHospital").name, "区域中心医院");
   assert.equal(client.localizeText("大连市中心医院"), "区域中心医院");
 });
@@ -60,4 +61,15 @@ test("regional browser client hydrates the server-selected Dalian public context
   assert.equal(client.organization("centralHospital").name, "大连市中心医院");
   assert.equal(client.area("primaryDistrict").name, "中山区");
   assert.equal(client.localizeText("Dalian Central Hospital"), "大连市中心医院");
+  assert.equal(client.localizeText("区域中心医院"), "大连市中心医院");
+});
+
+test("regional browser client hydrates an isolated test-region context", async () => {
+  const publicContext = loadRegionalRuntime({ root: ROOT, regionCode: "990001" }).publicContext;
+  const client = runClient({ protocol: "https:", context: publicContext });
+  await client.ready();
+  assert.equal(client.current.regionCode, "990001");
+  assert.equal(client.current.deploymentClass, "test");
+  assert.equal(client.organization("centralHospital").name, "第二地区中心医院");
+  assert.equal(client.localizeText("区域中心医院"), "第二地区中心医院");
 });

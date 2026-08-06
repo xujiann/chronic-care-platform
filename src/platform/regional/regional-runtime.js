@@ -35,6 +35,7 @@ function loadRegionalRuntime(options = {}) {
     schemaVersion: "regional-runtime-context-v1",
     regionCode: loadedManifest.manifest.regionCode,
     regionName: loadedManifest.manifest.name,
+    deploymentClass: loadedManifest.registration.deploymentClass,
     locale: loadedManifest.manifest.locale,
     timezone: loadedManifest.manifest.timezone,
     administrativeDivision: loadedManifest.manifest.administrativeDivision,

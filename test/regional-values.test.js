@@ -30,6 +30,7 @@ test("Dalian regional values resolve the same business roles to Dalian organizat
   assert.equal(runtime.values.organization("insuranceAuthority").name, "大连市医疗保障局");
   assert.equal(runtime.values.area("primaryDistrict").code, "210202");
   assert.equal(runtime.values.localizeString("Dalian Central Hospital"), "大连市中心医院");
+  assert.equal(runtime.values.localizeString("区域中心医院"), "大连市中心医院");
   assert.equal(runtime.values.publicContext.productionReady, false);
   assert.throws(() => runtime.values.organization("missing"), /unknown regional organization/);
   assert.throws(() => runtime.values.term("missing"), /unknown regional term/);

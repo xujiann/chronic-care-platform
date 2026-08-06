@@ -11,6 +11,7 @@ const ROOT = path.resolve(__dirname, "..");
 test("generic region runtime is the platform-safe default with no executable extensions", () => {
   const runtime = loadRegionalRuntime({ root: ROOT });
   assert.equal(runtime.context.regionCode, "template");
+  assert.equal(runtime.context.deploymentClass, "template");
   assert.equal(runtime.context.productionReady, false);
   assert.equal(runtime.extensions.length, 0);
   assert.equal(runtime.context.isFeatureEnabled("regional.integration"), false);
@@ -25,10 +26,21 @@ test("Dalian runtime activates five typed extensions without enabling production
     "adapter", "dictionary", "policy", "ui", "workflow"
   ]);
   assert.equal(runtime.resolveExtension("regional-health-exchange").productionEnabled, false);
+  assert.equal(runtime.context.deploymentClass, "production");
   assert.equal(runtime.publicContext.organizations.healthAuthority.name, "大连市卫生健康委员会");
   assert.equal(runtime.forDomain("integration").extensions.length, 1);
   assert.equal(runtime.forDomain("public-health").extensions.length, 0);
   assert.throws(() => runtime.resolveExtension("missing"), /unknown active/);
+});
+
+test("second region fixture proves configuration variance without production eligibility", () => {
+  const runtime = loadRegionalRuntime({ root: ROOT, regionCode: "990001" });
+  assert.equal(runtime.context.deploymentClass, "test");
+  assert.equal(runtime.values.organization("centralHospital").name, "第二地区中心医院");
+  assert.equal(runtime.values.localizeString("区域中心医院"), "第二地区中心医院");
+  assert.equal(runtime.values.term("platformName"), "第二地区卫生健康信息平台");
+  assert.equal(runtime.extensions.length, 0);
+  assert.equal(runtime.publicContext.productionReady, false);
 });
 
 test("platform composition exposes regional context separately from least-privilege domain capabilities", () => {

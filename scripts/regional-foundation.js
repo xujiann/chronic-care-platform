@@ -31,6 +31,7 @@ function regionStatus(regionCode, options = {}) {
   return {
     regionCode: runtime.context.regionCode,
     regionName: runtime.context.regionName,
+    deploymentClass: runtime.context.deploymentClass,
     manifestDigest: runtime.context.manifestDigest,
     activeExtensions: runtime.extensions.map((item) => ({
       id: item.id,
@@ -71,6 +72,13 @@ function writeJson(output, value) {
   fs.writeFileSync(output, `${JSON.stringify(value, null, 2)}\n`, "utf8");
 }
 
+function assertPackageEligible(status, options = {}) {
+  if (status.deploymentClass === "test" && options.allowTestRegion !== true) {
+    throw new TypeError(`test region ${status.regionCode} package requires --allow-test-region`);
+  }
+  return status;
+}
+
 function runCli(argv = process.argv.slice(2)) {
   const { command, flags } = parseArgs(argv);
   if (command === "status") {
@@ -88,6 +96,7 @@ function runCli(argv = process.argv.slice(2)) {
   if (command === "package") {
     if (!flags.region) throw new TypeError("regional package requires --region=<code>");
     const status = regionStatus(flags.region);
+    assertPackageEligible(status, { allowTestRegion: flags["allow-test-region"] });
     const output = resolveOutput(String(flags.output || `${flags.region}/composite-release.json`));
     writeJson(output, status.compositeRelease);
     process.stdout.write(`${JSON.stringify({ output, ...status }, null, 2)}\n`);
@@ -107,6 +116,7 @@ if (require.main === module) {
 }
 
 module.exports = {
+  assertPackageEligible,
   parseArgs,
   regionStatus,
   regionalMatrix,

@@ -5,6 +5,7 @@
     schemaVersion: "regional-public-context-v1",
     regionCode: "template",
     regionName: "通用地区模板",
+    deploymentClass: "template",
     locale: "zh-CN",
     timezone: "Asia/Shanghai",
     features: Object.freeze({}),

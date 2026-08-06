@@ -6,18 +6,21 @@
       "code": "template",
       "name": "通用地区模板",
       "enabled": true,
+      "deploymentClass": "template",
       "purpose": "核心平台持续集成与新地区脚手架"
     },
     {
       "code": "210200",
       "name": "辽宁省大连市",
       "enabled": true,
+      "deploymentClass": "production",
       "purpose": "首个存量地区配置迁移样板"
     },
     {
       "code": "990001",
       "name": "第二地区验证夹具",
       "enabled": true,
+      "deploymentClass": "test",
       "purpose": "验证平台核心无需修改即可装配不同地区；不得用于生产"
     }
   ]
