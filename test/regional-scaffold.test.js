@@ -97,12 +97,15 @@ test("regional scaffold writes one validated disabled test region", (t) => {
     .regions.find((item) => item.code === "320100");
   assert.equal(registration.enabled, false);
   assert.equal(registration.deploymentClass, "test");
-  assert.deepEqual(validateRegisteredRegionPackage({ root, regionCode: "320100" }), {
+  const validation = validateRegisteredRegionPackage({ root, regionCode: "320100" });
+  assert.match(validation.contentDigest, /^[a-f0-9]{64}$/);
+  assert.deepEqual(validation, {
     schemaVersion: "regional-package-validation-v1",
     regionCode: "320100",
     name: "示例市",
     enabled: false,
     deploymentClass: "test",
+    contentDigest: validation.contentDigest,
     ok: true,
     files: 6,
     extensions: 0

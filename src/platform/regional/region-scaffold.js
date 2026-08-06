@@ -9,6 +9,8 @@ const {
   loadRegionalConfigs,
   readJsonFile,
   resolveWithin,
+  sha256,
+  stableJson,
   validateManifest,
   validateRegistry
 } = require("./region-manifest");
@@ -181,12 +183,17 @@ function validateRegisteredRegionPackage(options = {}) {
   if (validated.manifest.name !== registration.name) {
     throw new TypeError(`region ${regionCode} manifest name does not match registry`);
   }
+  const contentDigest = sha256(stableJson({
+    registration,
+    files: validated.files
+  }));
   return Object.freeze({
     schemaVersion: "regional-package-validation-v1",
     regionCode,
     name: registration.name,
     enabled: registration.enabled,
     deploymentClass: registration.deploymentClass,
+    contentDigest,
     ok: true,
     files: validated.files.length,
     extensions: validated.extensions.length
