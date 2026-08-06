@@ -1,0 +1,32 @@
+{
+  "schemaVersion": "regional-site-deployment-set-v1",
+  "deploymentId": "regional-validation-example",
+  "sites": [
+    {
+      "siteId": "synthetic-region-validation",
+      "regionCode": "990001",
+      "stage": "validation",
+      "hostId": "validation-host-01",
+      "port": 3101,
+      "serviceName": "health-platform-region-990001",
+      "directories": {
+        "application": "/opt/health-platform/regions/990001/current",
+        "data": "/var/lib/health-platform/regions/990001",
+        "logs": "/var/log/health-platform/regions/990001"
+      },
+      "objectStorage": {
+        "bucket": "health-platform-region-990001"
+      },
+      "identity": {
+        "oidcClientId": "health-platform-region-990001"
+      },
+      "runtime": {
+        "containerImage": "health-platform:validation",
+        "nodeBinary": "/usr/bin/node",
+        "environmentFile": "/etc/health-platform/regions/990001.env",
+        "serviceUser": "health_990001",
+        "serviceGroup": "health_990001"
+      }
+    }
+  ]
+}

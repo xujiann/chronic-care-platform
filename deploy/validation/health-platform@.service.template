@@ -1,0 +1,25 @@
+[Unit]
+Description=Health platform regional site %i
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Use the rendered per-site unit from regional-deployment-plan.js. These
+# placeholders are documentation only and must not be activated as-is.
+User={{SERVICE_USER}}
+Group={{SERVICE_GROUP}}
+WorkingDirectory={{WORKING_DIRECTORY}}
+EnvironmentFile={{ENVIRONMENT_FILE}}
+ExecStart={{NODE_BINARY}} server.js
+Restart=on-failure
+RestartSec=5s
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths={{DATA_DIRECTORY}} {{LOG_DIRECTORY}}
+UMask=0027
+
+[Install]
+WantedBy=multi-user.target

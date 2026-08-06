@@ -17,15 +17,17 @@ const REQUIRED_RUNTIME_FILES = [
   "package-lock.json",
   "service-worker.js",
   "manifest.webmanifest",
+  "deploy/postgres-primary-storage-schema.sql",
   "scripts/postgres-sync-worker.js",
   "scripts/postgres-shadow-reconcile.js"
 ];
 const ADDITIONAL_RUNTIME_FILES = [
   "config/regions.json",
+  "deploy/postgres-primary-storage-schema.sql",
   "scripts/postgres-sync-worker.js",
   "scripts/postgres-shadow-reconcile.js"
 ];
-const RUNTIME_DIRECTORIES = ["src/http", "src/platform/regional", "regions"];
+const RUNTIME_DIRECTORIES = ["src/http", "src/platform/regional", "src/platform/storage", "regions"];
 const EXCLUDED_RUNTIME_FILES = new Set(["playwright.config.js"]);
 
 const SECRET_CONTRACT = [

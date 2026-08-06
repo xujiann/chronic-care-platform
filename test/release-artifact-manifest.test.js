@@ -52,6 +52,11 @@ test("release artifact manifest indexes reports templates commands and evidence"
   assert.equal(report.artifacts.some((item) => item.id === "t10-specialty-cutover" && item.command === "t10:specialty-cutover" && item.markdown === "release/t10-specialty-cutover-pack.md" && item.evidence === "/api/t10-specialty/cutover-pack"), true);
   assert.equal(report.artifacts.some((item) => item.id === "t10-physical-examination-independent-gate" && item.command === "t10:physical-examination:readiness" && item.markdown === "release/physical-examination-standalone-readiness-report.md" && item.evidence === "physical-examination-standalone.html"), true);
   assert.equal(report.artifacts.some((item) => item.id === "integration-control-ledger" && item.command === "integration:control" && item.markdown === "release/integration-control-ledger.md" && item.evidence === "npm run integration:control:gate"), true);
+  assert.equal(report.artifacts.some((item) => item.id === "regional-site-deployment" && item.command === "regional:deploy-plan"), true);
+  assert.equal(report.artifacts.some((item) => item.id === "regional-release-governance" && item.command === "regional:release-governance"), true);
+  assert.equal(report.artifacts.some((item) => item.id === "regional-operations-readiness" && item.command === "regional:operations" && item.evidence === "/api/regional/deployments"), true);
+  assert.equal(report.artifacts.some((item) => item.id === "regional-replication-exercise" && item.command === "regional:replication"), true);
+  assert.equal(report.artifacts.some((item) => item.id === "postgres-primary-storage-contract" && item.command === "postgres:primary-storage-contract:check"), true);
   assert.equal(report.artifacts.some((item) => item.id === "internet-nursing-highlight-center" && item.command === "internet-nursing:readiness" && item.markdown === "docs/internet-nursing-highlight-center.md" && item.evidence === "internet-nursing.html#nursing-highlight-section"), true);
   assert.equal(report.artifacts.some((item) => item.id === "multi-practice" && item.command === "multi-practice:readiness" && item.markdown === "release/multi-practice-readiness-report.md" && item.evidence === "/api/multi-practice-registry"), true);
   assert.equal(report.artifacts.some((item) => item.id === "chronic-followup" && item.command === "chronic:followup-readiness"), true);

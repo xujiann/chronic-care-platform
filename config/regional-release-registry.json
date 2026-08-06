@@ -1,0 +1,7 @@
+{
+  "schemaVersion": "regional-release-governance-v1",
+  "productionReady": false,
+  "approvalBoundary": "external-authority-only",
+  "appendOnly": true,
+  "events": []
+}

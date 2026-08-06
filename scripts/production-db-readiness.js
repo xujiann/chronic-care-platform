@@ -5,6 +5,10 @@ const path = require("node:path");
 const { createHash, randomUUID } = require("node:crypto");
 const { inspectStorageModel } = require("./storage-admin");
 const { buildPostgresMigrationPackage } = require("./postgres-migration-package");
+const {
+  buildPostgresPrimaryStorageConfig,
+  safeConfigStatus
+} = require("../src/platform/storage/postgres-primary-storage-contract");
 
 const ROOT = path.resolve(__dirname, "..");
 const DEFAULT_OUTPUT = path.join(ROOT, "release", "production-db-readiness-report.json");
@@ -289,11 +293,16 @@ function buildProductionDbReadinessReport(options = {}) {
   const runtimeSyncTimer = options.runtimeSyncTimer ?? readText(path.join("deploy", "postgres-sync-worker.timer.template"));
   const shadowReconcileService = options.shadowReconcileService ?? readText(path.join("deploy", "postgres-shadow-reconcile.service.template"));
   const shadowReconcileTimer = options.shadowReconcileTimer ?? readText(path.join("deploy", "postgres-shadow-reconcile.timer.template"));
+  const primaryStorageContractSource = options.primaryStorageContractSource ?? readText(path.join("src", "platform", "storage", "postgres-primary-storage-contract.js"));
+  const primaryStorageDriverSource = options.primaryStorageDriverSource ?? readText(path.join("src", "platform", "storage", "postgres-primary-driver.js"));
+  const primaryStorageSchema = options.primaryStorageSchema ?? readText(path.join("deploy", "postgres-primary-storage-schema.sql"));
+  const primaryStorageDocument = options.primaryStorageDocument ?? readText(path.join("docs", "postgresql-primary-storage-contract.md"));
   const storageModel = options.storageModel ?? inspectStorageModel({ dataDir: path.join(ROOT, "data") });
   const productionTrack = arrayOf(data, "productionDeploymentPlan").find((item) => item.id === "prod-storage-adapter") || null;
   const json = storageModel.jsonSnapshot || {};
   const sqlite = storageModel.sqlite || {};
-  const requiredScripts = ["storage:backup", "storage:inspect", "storage:assess", "rollback:snapshot", "postgres:migration-package", "postgres:migration-verify", "postgres:sync-worker", "postgres:sync-bootstrap", "postgres:shadow-reconcile", "postgres:primary-read-rehearsal", "postgres:adapter-status", "postgres:adapter-verify", "release:report"];
+  const requiredScripts = ["storage:backup", "storage:inspect", "storage:assess", "rollback:snapshot", "postgres:migration-package", "postgres:migration-verify", "postgres:sync-worker", "postgres:sync-bootstrap", "postgres:shadow-reconcile", "postgres:primary-read-rehearsal", "postgres:adapter-status", "postgres:adapter-verify", "postgres:primary-storage-contract:check", "postgres:primary-storage-contract:test", "release:report"];
+  const postgresPrimaryStorage = safeConfigStatus(buildPostgresPrimaryStorageConfig(options.env || process.env));
   const migrationEvidence = {
     currentAdapter: "sqlite-wal-json-snapshot",
     targetAdapter: "postgresql",
@@ -361,6 +370,28 @@ function buildProductionDbReadinessReport(options = {}) {
     { id: "production-db:shadowReconciliation", passed: postgresRuntimeSync.readOnlyReconciliation && postgresRuntimeSync.reconciliationLedger && postgresRuntimeSync.reconciliationCommand, detail: "read-only collection version and SHA-256 comparison persists payload-free differences and exposes a commission-only status API" },
     { id: "production-db:primaryReadRehearsal", passed: postgresRuntimeSync.primaryReadRehearsal, detail: "repeatable-read read-only PostgreSQL snapshot reconstruction verifies every payload digest and the complete SQLite shadow baseline without enabling cutover" },
     { id: "production-db:productionAdapter", passed: postgresRuntimeSync.productionAdapter, detail: "asynchronous PostgreSQL adapter provides verified reads, serializable writes, complete optimistic locking, payload-free write audit and evidence-gated enablement" },
+    {
+      id: "production-db:primaryStorageContract",
+      passed: [
+        "committed-outbox-only",
+        "requestPathWrite: false",
+        "productionPrimary: false",
+        "runtimeCutoverEnabled: false"
+      ].every((marker) => primaryStorageContractSource.includes(marker))
+        && ["SERIALIZABLE", "pg_advisory_xact_lock", "verify-full", "ON CONFLICT (collection_name) DO UPDATE", "source_version = $8"].every((marker) => primaryStorageDriverSource.includes(marker))
+        && ["primary_collection_state", "primary_storage_batches", "DEFERRABLE INITIALLY DEFERRED"].every((marker) => primaryStorageSchema.includes(marker))
+        && ["disabled", "shadow", "primary-read", "primary-write"].every((marker) => primaryStorageDocument.includes(marker)),
+      detail: "formal storage modes, committed-outbox boundary, serializable CAS driver, schema and runbook are present"
+    },
+    {
+      id: "production-db:primaryStorageRuntimeBoundary",
+      passed: postgresPrimaryStorage.modeReady
+        && postgresPrimaryStorage.capabilities.requestPathWrite === false
+        && postgresPrimaryStorage.productionPrimary === false
+        && postgresPrimaryStorage.runtimeCutoverEnabled === false
+        && postgresPrimaryStorage.externalEvidenceVerified === false,
+      detail: `mode=${postgresPrimaryStorage.mode}; modeReady=${postgresPrimaryStorage.modeReady}; productionPrimary=false; runtimeCutoverEnabled=false`
+    },
     { id: "production-db:reconciliationCaseWorkflow", passed: postgresRuntimeSync.reconciliationCaseWorkflow, detail: "commission-only history and case APIs enforce assignment, matched-run clearance, evidence-backed resolution and automatic reopening" },
     { id: "production-db:reconciliationOperationsUi", passed: postgresRuntimeSync.reconciliationOperationsUi, detail: "platform cutover center exposes commission-only case ownership, acknowledgement, comments, verified closure, reopening and reconciliation history" },
     { id: "production-db:prometheusSlo", passed: postgresRuntimeSync.prometheusSlo, detail: "configurable backlog, pending age, reconciliation freshness, unresolved case and failed batch SLOs are Prometheus-scrapeable" },
@@ -377,6 +408,7 @@ function buildProductionDbReadinessReport(options = {}) {
     cutoverCenter,
     postgresMigrationPackage,
     postgresRuntimeSync,
+    postgresPrimaryStorage,
     checks
   };
 }
@@ -438,6 +470,8 @@ function renderMarkdown(report) {
     `- Read-only shadow reconciliation: ${report.postgresRuntimeSync?.readOnlyReconciliation ? "configured" : "missing"}`,
     `- Verified PostgreSQL primary-read rehearsal: ${report.postgresRuntimeSync?.primaryReadRehearsal ? "configured" : "missing"}`,
     `- Evidence-gated PostgreSQL production adapter: ${report.postgresRuntimeSync?.productionAdapter ? "configured" : "missing"}`,
+    `- PostgreSQL primary-storage contract mode: ${report.postgresPrimaryStorage?.mode || "disabled"} (${report.postgresPrimaryStorage?.modeReady ? "contract-ready" : "blocked"})`,
+    `- PostgreSQL request-path writes: ${report.postgresPrimaryStorage?.capabilities?.requestPathWrite ? "enabled" : "blocked"}`,
     `- Reconciliation case workflow: ${report.postgresRuntimeSync?.reconciliationCaseWorkflow ? "configured" : "missing"}`,
     `- Reconciliation operations UI: ${report.postgresRuntimeSync?.reconciliationOperationsUi ? "configured" : "missing"}`,
     `- Prometheus SLO metrics: ${report.postgresRuntimeSync?.prometheusSlo ? "configured" : "missing"}`,

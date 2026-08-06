@@ -27,6 +27,10 @@ const ROUTE_ORDER = Object.freeze([
     "id": "regional-01"
   },
   {
+    "domain": "regional",
+    "id": "regional-02"
+  },
+  {
     "domain": "platform-governance",
     "id": "platform-governance-01"
   },
@@ -321,9 +325,15 @@ function createPlatformApiRouter(runtimeContexts) {
     throw new TypeError(`platform router is missing runtime contexts: ${missingContexts.join(", ")}`);
   }
   const segmentsById = new Map();
+  const runtimeContext = runtimeContexts.forDomain("runtime");
   for (const segment of regional.createRouteSegments({
+    appendSecurityEvent: runtimeContext.appendSecurityEvent,
+    environment: process.env,
+    readDatabase: runtimeContext.readDatabase,
     regionalContext: runtimeContexts.regional,
-    sendJson: runtimeContexts.forDomain("runtime").sendJson
+    requireApiRole: runtimeContext.requireApiRole,
+    sendJson: runtimeContext.sendJson,
+    writeDatabase: runtimeContext.writeDatabase
   })) {
     if (segmentsById.has(segment.id)) throw new TypeError(`duplicate route segment id: ${segment.id}`);
     segmentsById.set(segment.id, segment);

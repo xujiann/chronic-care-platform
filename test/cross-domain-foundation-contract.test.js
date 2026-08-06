@@ -39,8 +39,9 @@ test("runtime composition reaches the router manifest with governance, public-he
     Object.fromEntries(splitSegments.map(({ id, subdomain }) => [id, subdomain])),
     ROUTE_SUBDOMAINS
   );
-  assert.equal(router.manifest.length, 73);
+  assert.equal(router.manifest.length, 74);
   assert.equal(router.manifest.some((item) => item.id === "regional-01" && item.domain === "regional"), true);
+  assert.equal(router.manifest.some((item) => item.id === "regional-02" && item.domain === "regional"), true);
 });
 
 test("router entry rejects the flat global runtime source", () => {

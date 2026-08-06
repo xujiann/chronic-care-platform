@@ -1,0 +1,58 @@
+{
+  "schemaVersion": "regional-site-deployment-set-v1",
+  "deploymentId": "two-region-replication-exercise",
+  "sites": [
+    {
+      "siteId": "production-candidate",
+      "regionCode": "210200",
+      "stage": "production",
+      "hostId": "regional-host-210200",
+      "port": 3201,
+      "serviceName": "health-platform-region-210200",
+      "directories": {
+        "application": "/opt/health-platform/regions/210200/current",
+        "data": "/var/lib/health-platform/regions/210200",
+        "logs": "/var/log/health-platform/regions/210200"
+      },
+      "objectStorage": {
+        "bucket": "health-platform-region-210200"
+      },
+      "identity": {
+        "oidcClientId": "health-platform-region-210200"
+      },
+      "runtime": {
+        "containerImage": "health-platform:regional-validation",
+        "nodeBinary": "/usr/bin/node",
+        "environmentFile": "/etc/health-platform/regions/210200.env",
+        "serviceUser": "health_210200",
+        "serviceGroup": "health_210200"
+      }
+    },
+    {
+      "siteId": "validation-fixture",
+      "regionCode": "990001",
+      "stage": "validation",
+      "hostId": "regional-host-990001",
+      "port": 3202,
+      "serviceName": "health-platform-region-990001",
+      "directories": {
+        "application": "/opt/health-platform/regions/990001/current",
+        "data": "/var/lib/health-platform/regions/990001",
+        "logs": "/var/log/health-platform/regions/990001"
+      },
+      "objectStorage": {
+        "bucket": "health-platform-region-990001"
+      },
+      "identity": {
+        "oidcClientId": "health-platform-region-990001"
+      },
+      "runtime": {
+        "containerImage": "health-platform:regional-validation",
+        "nodeBinary": "/usr/bin/node",
+        "environmentFile": "/etc/health-platform/regions/990001.env",
+        "serviceUser": "health_990001",
+        "serviceGroup": "health_990001"
+      }
+    }
+  ]
+}

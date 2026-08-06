@@ -1,0 +1,26 @@
+services:
+  platform:
+    build:
+      context: ../..
+      dockerfile: deploy/validation/Dockerfile
+    restart: unless-stopped
+    env_file:
+      - path: ./site.activation.env
+        required: true
+    environment:
+      NODE_ENV: validation
+      PORT: 5173
+      DATA_DIR: /app/data
+    ports:
+      - "${PORT:-3101}:5173"
+    volumes:
+      - "${DATA_DIR:-./data}:/app/data"
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:5173/api/live').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
+      interval: 10s
+      timeout: 5s
+      retries: 12
