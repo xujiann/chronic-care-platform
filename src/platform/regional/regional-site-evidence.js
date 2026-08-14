@@ -9,6 +9,11 @@ const {
 } = require("./region-manifest");
 const { buildCompositeRegionalRelease } = require("./composite-release");
 const { buildExpectedSites } = require("./multi-region-operations");
+const {
+  ATTESTATION_KEYS,
+  loadTrustRegistry,
+  verifyEvidenceAttestations
+} = require("./regional-site-evidence-trust");
 
 const DEFAULT_ROOT = path.resolve(__dirname, "..", "..", "..");
 const MAX_EVIDENCE_FILE_BYTES = 512 * 1024;
@@ -41,6 +46,15 @@ const EVIDENCE_KEYS = Object.freeze([
   "expiresAt",
   "custodianRole",
   "reviewerRole"
+]);
+const EVIDENCE_V2_KEYS = Object.freeze([
+  "scope",
+  "ref",
+  "digest",
+  "subjectDigest",
+  "verifiedAt",
+  "expiresAt",
+  "attestations"
 ]);
 
 function evidenceError(code, message) {
@@ -112,7 +126,7 @@ function readRegionalSiteEvidenceFile(file, expectedDigest, options = {}) {
 
 function validateManifestStructure(manifest) {
   if (!exactKeys(manifest, MANIFEST_KEYS)
-    || manifest.schemaVersion !== "regional-site-evidence-v1"
+    || !["regional-site-evidence-v1", "regional-site-evidence-v2"].includes(manifest.schemaVersion)
     || !REGION_CODE_PATTERN.test(String(manifest.regionCode || ""))
     || !String(manifest.releaseId || "").trim()
     || !SHA256_PATTERN.test(normalizeDigest(manifest.compositeDigest))
@@ -122,16 +136,20 @@ function validateManifestStructure(manifest) {
     || !Array.isArray(manifest.evidence)) {
     throw evidenceError("REGIONAL_SITE_EVIDENCE_MANIFEST_INVALID", "regional site evidence manifest contract is invalid");
   }
+  const version2 = manifest.schemaVersion === "regional-site-evidence-v2";
   for (const item of manifest.evidence) {
-    if (!exactKeys(item, EVIDENCE_KEYS)
+    if (!exactKeys(item, version2 ? EVIDENCE_V2_KEYS : EVIDENCE_KEYS)
       || !EVIDENCE_SCOPES.includes(item.scope)
       || !CONTROLLED_REF_PATTERN.test(String(item.ref || ""))
       || !SHA256_PATTERN.test(normalizeDigest(item.digest))
       || !SHA256_PATTERN.test(normalizeDigest(item.subjectDigest))
       || !validTimestamp(item.verifiedAt)
       || !validTimestamp(item.expiresAt)
-      || !String(item.custodianRole || "").trim()
-      || !String(item.reviewerRole || "").trim()) {
+      || (!version2 && (!String(item.custodianRole || "").trim()
+        || !String(item.reviewerRole || "").trim()))
+      || (version2 && (!Array.isArray(item.attestations)
+        || item.attestations.length !== 2
+        || item.attestations.some((row) => !exactKeys(row, ATTESTATION_KEYS))))) {
       throw evidenceError("REGIONAL_SITE_EVIDENCE_ITEM_INVALID", "regional site evidence item contract is invalid");
     }
   }
@@ -144,6 +162,11 @@ function assessRegionalSiteEvidenceManifest(manifest, expected = {}, options = {
     throw evidenceError("REGIONAL_SITE_EVIDENCE_TIME_INVALID", "regional site evidence assessment time is invalid");
   }
   const now = Date.parse(generatedAt);
+  const version2 = manifest.schemaVersion === "regional-site-evidence-v2";
+  const trust = loadTrustRegistry({
+    ...options,
+    evidenceScopes: EVIDENCE_SCOPES
+  });
   const normalized = {
     regionCode: String(manifest.regionCode),
     releaseId: String(manifest.releaseId),
@@ -165,8 +188,18 @@ function assessRegionalSiteEvidenceManifest(manifest, expected = {}, options = {
     const item = items[0];
     const presentOnce = items.length === 1;
     const current = presentOnce && Date.parse(item.verifiedAt) <= now && Date.parse(item.expiresAt) > now;
-    const independentReview = presentOnce
+    const legacyIndependentReview = presentOnce
+      && !version2
       && item.custodianRole.trim().toLowerCase() !== item.reviewerRole.trim().toLowerCase();
+    const attestationTrust = presentOnce && version2 && trust.ok && trust.registry
+      ? verifyEvidenceAttestations(manifest, item, trust.registry, {
+        evaluatedAt: generatedAt,
+        evidenceScopes: EVIDENCE_SCOPES
+      })
+      : null;
+    const independentReview = version2
+      ? Boolean(attestationTrust?.independentPrincipals)
+      : legacyIndependentReview;
     const subjectMatches = presentOnce && normalizeDigest(item.subjectDigest) === normalized.compositeDigest;
     const timelineValid = presentOnce
       && Date.parse(item.verifiedAt) >= Date.parse(normalized.issuedAt)
@@ -179,31 +212,50 @@ function assessRegionalSiteEvidenceManifest(manifest, expected = {}, options = {
       independentReview,
       subjectMatches,
       timelineValid,
+      cryptographicTrust: Boolean(attestationTrust?.trusted),
+      signatureSummary: {
+        required: 2,
+        active: attestationTrust?.activeSignatures || 0,
+        grace: attestationTrust?.graceSignatures || 0,
+        revoked: attestationTrust?.revokedSignatures || 0,
+        invalid: attestationTrust?.invalidSignatures || (version2 ? 2 : 0)
+      },
       evidenceDigest: presentOnce ? normalizeDigest(item.digest) : "",
       verifiedAt: presentOnce ? item.verifiedAt : "",
       expiresAt: presentOnce ? item.expiresAt : "",
-      ready: presentOnce && current && independentReview && subjectMatches && timelineValid
+      ready: presentOnce
+        && current
+        && independentReview
+        && subjectMatches
+        && timelineValid
+        && Boolean(attestationTrust?.trusted)
     });
   });
   const blockers = [
+    !version2 && "regional-site-evidence-legacy-unsigned",
+    version2 && !trust.configured && "regional-site-evidence-trust-unconfigured",
+    version2 && trust.configured && !trust.ok && trust.code,
     !bindingMatches && "regional-site-evidence-binding-mismatch",
     !manifestCurrent && "regional-site-evidence-manifest-not-current",
     ...scopes.filter((item) => !item.presentOnce).map((item) => `regional-site-evidence-${item.scope}-missing-or-duplicate`),
     ...scopes.filter((item) => item.presentOnce && !item.current).map((item) => `regional-site-evidence-${item.scope}-not-current`),
     ...scopes.filter((item) => item.presentOnce && !item.independentReview).map((item) => `regional-site-evidence-${item.scope}-review-not-independent`),
     ...scopes.filter((item) => item.presentOnce && !item.subjectMatches).map((item) => `regional-site-evidence-${item.scope}-subject-mismatch`),
-    ...scopes.filter((item) => item.presentOnce && !item.timelineValid).map((item) => `regional-site-evidence-${item.scope}-timeline-invalid`)
+    ...scopes.filter((item) => item.presentOnce && !item.timelineValid).map((item) => `regional-site-evidence-${item.scope}-timeline-invalid`),
+    ...scopes.filter((item) => item.presentOnce && !item.cryptographicTrust).map((item) => `regional-site-evidence-${item.scope}-signature-untrusted`)
   ].filter(Boolean);
   const base = {
     schemaVersion: "regional-site-evidence-status-v1",
     generatedAt,
     regionCode: normalized.regionCode,
     configured: true,
-    ok: true,
+    ok: trust.ok,
     evidenceReady: bindingMatches && manifestCurrent && scopes.every((item) => item.ready),
     productionReady: false,
     containsEvidenceBodies: false,
     containsReviewerIdentities: false,
+    containsSignatures: false,
+    containsKeyMaterial: false,
     sourceDigest: options.sourceDigest || `sha256:${sha256(stableJson(manifest))}`,
     binding: {
       releaseId: normalized.releaseId,
@@ -216,6 +268,17 @@ function assessRegionalSiteEvidenceManifest(manifest, expected = {}, options = {
       expiresAt: normalized.expiresAt,
       current: manifestCurrent
     },
+    trust: {
+      required: true,
+      manifestVersion: manifest.schemaVersion,
+      registryConfigured: trust.configured,
+      registryHealthy: trust.ok,
+      cryptographicTrustReady: version2 && trust.ok && scopes.every((item) => item.cryptographicTrust),
+      activeSignatures: scopes.reduce((total, item) => total + item.signatureSummary.active, 0),
+      graceSignatures: scopes.reduce((total, item) => total + item.signatureSummary.grace, 0),
+      revokedSignatures: scopes.reduce((total, item) => total + item.signatureSummary.revoked, 0),
+      invalidSignatures: scopes.reduce((total, item) => total + item.signatureSummary.invalid, 0)
+    },
     summary: {
       requiredScopes: EVIDENCE_SCOPES.length,
       presentOnce: scopes.filter((item) => item.presentOnce).length,
@@ -223,6 +286,7 @@ function assessRegionalSiteEvidenceManifest(manifest, expected = {}, options = {
       independentlyReviewed: scopes.filter((item) => item.independentReview).length,
       subjectBound: scopes.filter((item) => item.subjectMatches).length,
       timelineValid: scopes.filter((item) => item.timelineValid).length,
+      cryptographicallyTrusted: scopes.filter((item) => item.cryptographicTrust).length,
       ready: scopes.filter((item) => item.ready).length
     },
     scopes,
@@ -245,9 +309,22 @@ function unavailableStatus(regionCode, generatedAt, code, configured = false) {
     productionReady: false,
     containsEvidenceBodies: false,
     containsReviewerIdentities: false,
+    containsSignatures: false,
+    containsKeyMaterial: false,
     sourceDigest: "",
     binding: { releaseId: "", compositeDigest: "", regionalContentDigest: "", matches: false },
     validity: { issuedAt: "", expiresAt: "", current: false },
+    trust: {
+      required: true,
+      manifestVersion: "",
+      registryConfigured: false,
+      registryHealthy: true,
+      cryptographicTrustReady: false,
+      activeSignatures: 0,
+      graceSignatures: 0,
+      revokedSignatures: 0,
+      invalidSignatures: 0
+    },
     summary: {
       requiredScopes: EVIDENCE_SCOPES.length,
       presentOnce: 0,
@@ -255,6 +332,7 @@ function unavailableStatus(regionCode, generatedAt, code, configured = false) {
       independentlyReviewed: 0,
       subjectBound: 0,
       timelineValid: 0,
+      cryptographicallyTrusted: 0,
       ready: 0
     },
     scopes: EVIDENCE_SCOPES.map((scope) => Object.freeze({
@@ -264,6 +342,8 @@ function unavailableStatus(regionCode, generatedAt, code, configured = false) {
       independentReview: false,
       subjectMatches: false,
       timelineValid: false,
+      cryptographicTrust: false,
+      signatureSummary: { required: 2, active: 0, grace: 0, revoked: 0, invalid: 0 },
       evidenceDigest: "",
       verifiedAt: "",
       expiresAt: "",
@@ -282,7 +362,11 @@ function buildRegionalSiteEvidenceStatus(options = {}) {
     try {
       return assessRegionalSiteEvidenceManifest(options.manifest, options.expected || {}, {
         generatedAt,
-        sourceDigest: options.sourceDigest
+        sourceDigest: options.sourceDigest,
+        env: options.env || {},
+        trustRegistry: options.trustRegistry,
+        trustRegistryFile: options.trustRegistryFile,
+        trustRegistryDigest: options.trustRegistryDigest
       });
     } catch (error) {
       return unavailableStatus(regionCode, generatedAt, error.code || "REGIONAL_SITE_EVIDENCE_INVALID", true);
@@ -302,7 +386,11 @@ function buildRegionalSiteEvidenceStatus(options = {}) {
     const loaded = readRegionalSiteEvidenceFile(file, digest, options);
     return assessRegionalSiteEvidenceManifest(loaded.manifest, options.expected || {}, {
       generatedAt,
-      sourceDigest: loaded.sourceDigest
+      sourceDigest: loaded.sourceDigest,
+      env,
+      trustRegistry: options.trustRegistry,
+      trustRegistryFile: options.trustRegistryFile,
+      trustRegistryDigest: options.trustRegistryDigest
     });
   } catch (error) {
     return unavailableStatus(regionCode, generatedAt, error.code || "REGIONAL_SITE_EVIDENCE_INVALID", true);
@@ -337,6 +425,9 @@ function buildRegionalSiteEvidencePortfolio(options = {}) {
     ok: regions.every((item) => item.ok),
     productionReady: false,
     containsEvidenceBodies: false,
+    containsReviewerIdentities: false,
+    containsSignatures: false,
+    containsKeyMaterial: false,
     summary: {
       regions: regions.length,
       verifierHealthy: regions.filter((item) => item.ok).length,

@@ -1,6 +1,7 @@
 "use strict";
 
 const assert = require("node:assert/strict");
+const { generateKeyPairSync, sign } = require("node:crypto");
 const path = require("node:path");
 const test = require("node:test");
 const { buildCompositeRegionalRelease } = require("../src/platform/regional/composite-release");
@@ -17,6 +18,8 @@ const {
   EVIDENCE_SCOPES,
   assessRegionalSiteEvidenceManifest
 } = require("../src/platform/regional/regional-site-evidence");
+const { createAttestationSubject } = require("../src/platform/regional/regional-site-evidence-trust");
+const { sha256, stableJson } = require("../src/platform/regional/region-manifest");
 const {
   applyTransitionPlanToRegistry,
   buildReleaseBindingFromComposite,
@@ -34,6 +37,10 @@ const ROOT = path.resolve(__dirname, "..");
 const NOW = "2026-08-07T00:00:00.000Z";
 const CERTIFICATE = "2026-10-07T00:00:00.000Z";
 const PLATFORM_DIGEST = `sha256:${"a".repeat(64)}`;
+const SITE_KEYS = Object.freeze({
+  custodian: generateKeyPairSync("ed25519"),
+  reviewer: generateKeyPairSync("ed25519")
+});
 
 function advance(registry, release, toState, minute) {
   const options = {
@@ -101,7 +108,7 @@ function healthyFleet() {
 
 function readySiteEvidence(composite) {
   const manifest = {
-    schemaVersion: "regional-site-evidence-v1",
+    schemaVersion: "regional-site-evidence-v2",
     regionCode: "210200",
     releaseId: composite.releaseId,
     compositeDigest: composite.artifact.digest,
@@ -115,8 +122,38 @@ function readySiteEvidence(composite) {
       subjectDigest: composite.artifact.digest,
       verifiedAt: "2026-08-06T01:00:00.000Z",
       expiresAt: "2026-09-07T00:00:00.000Z",
-      custodianRole: `site-custodian-${index + 1}`,
-      reviewerRole: `independent-reviewer-${index + 1}`
+      attestations: []
+    }))
+  };
+  for (const item of manifest.evidence) {
+    item.attestations = ["custodian", "reviewer"].map((role) => {
+      const subject = createAttestationSubject(manifest, item, role);
+      return {
+        schemaVersion: "regional-site-evidence-attestation-v1",
+        purpose: "regional-site-evidence",
+        role,
+        keyId: `${role}-key-2026`,
+        issuedAt: "2026-08-06T02:00:00.000Z",
+        subjectDigest: `sha256:${sha256(stableJson(subject))}`,
+        signature: sign(null, Buffer.from(stableJson(subject)), SITE_KEYS[role].privateKey).toString("base64url")
+      };
+    });
+  }
+  const trustRegistry = {
+    schemaVersion: "regional-site-evidence-trust-registry-v1",
+    generatedAt: "2026-08-06T00:00:00.000Z",
+    purpose: "regional-site-evidence",
+    keys: ["custodian", "reviewer"].map((role) => ({
+      keyId: `${role}-key-2026`,
+      principalId: `principal:${role}`,
+      role,
+      algorithm: "Ed25519",
+      state: "active",
+      regionCodes: ["210200"],
+      scopes: [...EVIDENCE_SCOPES],
+      validFrom: "2026-08-01T00:00:00.000Z",
+      validUntil: "2026-10-01T00:00:00.000Z",
+      publicKeyPem: SITE_KEYS[role].publicKey.export({ type: "spki", format: "pem" })
     }))
   };
   return assessRegionalSiteEvidenceManifest(manifest, {
@@ -124,7 +161,7 @@ function readySiteEvidence(composite) {
     releaseId: composite.releaseId,
     compositeDigest: composite.artifact.digest,
     regionalContentDigest: `sha256:${composite.region.contentDigest}`
-  }, { now: NOW });
+  }, { now: NOW, trustRegistry });
 }
 
 test("default dossier proves local controls while keeping missing site gates explicit", () => {
@@ -175,6 +212,9 @@ test("approved candidate plus healthy minimized operations can open only candida
   assert.equal(JSON.stringify(dossier).includes("regional.example.gov.cn"), false);
   assert.equal(dossier.externalBlockers.length, 1);
   assert.equal(dossier.siteEvidence.summary.ready, 5);
+  assert.equal(dossier.siteEvidence.trust.cryptographicTrustReady, true);
+  assert.equal(dossier.containsSignatures, false);
+  assert.equal(dossier.containsKeyMaterial, false);
 });
 
 test("test regions and immutable release drift fail closed", () => {

@@ -323,7 +323,7 @@ GitHub Pages 只适合发布静态页面和脱敏 `data/db.json` 快照。以下
 
 地区产品线已提供无密钥部署计划、资源冲突阻断、Docker/Compose 验证模板、六状态发布治理、多地区运维清单和第二地区复制演练。使用 `regional:deploy-plan` 生成逐站点 systemd/激活/Compose 制品，使用 `regional:release-governance` 管理不可变发布账本，使用 `regional:operations` 与 `regional:replication` 验证集中运维和跨地区复制边界。上述工具均保持 `productionReady=false`，不能替代真实现场批准。
 
-地区配置准入、现场证据准入和单地区投产档案已接入统一发布门禁。使用 `regional:configuration` 检查地区配置契约、能力映射和扩展覆盖，使用 `regional:evidence` 验证仓库外 SHA-256 锁定的五类现场证据，使用 `regional:dossier` 聚合组合发布、治理、运维、备份、证书、证据与存储门禁；管理端可读取 `GET /api/regional/deployments/:regionCode/dossier` 的最小化结果。完整说明见 [地区配置准入与投产档案操作指南](docs/地区配置准入与投产档案操作指南-2026-08-07.md)。
+地区配置准入、现场证据准入和单地区投产档案已接入统一发布门禁。使用 `regional:configuration` 检查地区配置契约、能力映射和扩展覆盖，使用 `regional:evidence` 验证仓库外 SHA-256 锁定且由受控 Ed25519 公钥注册表完成保管人/独立复核人双签的五类现场证据，使用 `regional:dossier` 聚合组合发布、治理、运维、备份、证书、证据与存储门禁；管理端可读取 `GET /api/regional/deployments/:regionCode/dossier` 的最小化结果。完整说明见 [地区配置准入与投产档案操作指南](docs/地区配置准入与投产档案操作指南-2026-08-07.md)。
 
 四条开发线及六个迭代的交付范围、统一边界和现场后续事项见 [多地区产品线四线六迭代交付报告](docs/多地区产品线四线六迭代交付报告-2026-08-06.md)。
 

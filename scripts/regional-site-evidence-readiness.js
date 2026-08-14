@@ -52,6 +52,9 @@ function buildReport(options = {}) {
     ok: status.ok,
     productionReady: false,
     containsEvidenceBodies: false,
+    containsReviewerIdentities: false,
+    containsSignatures: false,
+    containsKeyMaterial: false,
     summary: {
       regions: 1,
       verifierHealthy: status.ok ? 1 : 0,

@@ -144,8 +144,10 @@ function buildRegionalCutoverDossier(options = {}) {
       siteEvidence.ok
         && siteEvidence.productionReady === false
         && siteEvidence.containsEvidenceBodies === false
-        && siteEvidence.containsReviewerIdentities === false,
-      `${siteEvidence.summary.ready}/${siteEvidence.summary.requiredScopes} evidence scopes ready; evidence bodies excluded`
+        && siteEvidence.containsReviewerIdentities === false
+        && siteEvidence.containsSignatures === false
+        && siteEvidence.containsKeyMaterial === false,
+      `${siteEvidence.summary.ready}/${siteEvidence.summary.requiredScopes} evidence scopes ready; signatures, identities and key material excluded`
     )
   ];
   const gates = [
@@ -196,8 +198,8 @@ function buildRegionalCutoverDossier(options = {}) {
     ),
     check(
       "regionalDossierGate:siteEvidence",
-      siteEvidence.evidenceReady,
-      `${siteEvidence.summary.ready}/${siteEvidence.summary.requiredScopes} evidence scopes ready`
+      siteEvidence.evidenceReady && siteEvidence.trust.cryptographicTrustReady,
+      `${siteEvidence.summary.ready}/${siteEvidence.summary.requiredScopes} evidence scopes ready; cryptographic trust=${siteEvidence.trust.cryptographicTrustReady}`
     )
   ];
   const blockers = unique([
@@ -226,6 +228,9 @@ function buildRegionalCutoverDossier(options = {}) {
     containsBusinessData: false,
     containsEndpoints: false,
     containsEvidenceBodies: false,
+    containsReviewerIdentities: false,
+    containsSignatures: false,
+    containsKeyMaterial: false,
     release: {
       releaseId: composite.releaseId,
       platformVersion: composite.platform.version,

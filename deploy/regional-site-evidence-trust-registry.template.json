@@ -1,0 +1,31 @@
+{
+  "schemaVersion": "regional-site-evidence-trust-registry-v1",
+  "generatedAt": "1970-01-01T00:00:00.000Z",
+  "purpose": "regional-site-evidence",
+  "keys": [
+    {
+      "keyId": "replace-custodian-key",
+      "principalId": "replace:site-custodian-principal",
+      "role": "custodian",
+      "algorithm": "Ed25519",
+      "state": "active",
+      "regionCodes": ["000000"],
+      "scopes": ["identity-and-institution", "hospital-joint-test", "security-and-compliance", "operations-and-disaster-recovery", "independent-site-acceptance"],
+      "validFrom": "1970-01-01T00:00:00.000Z",
+      "validUntil": "1970-01-01T00:00:00.000Z",
+      "publicKeyPem": "replace-with-ed25519-public-key-pem"
+    },
+    {
+      "keyId": "replace-reviewer-key",
+      "principalId": "replace:independent-reviewer-principal",
+      "role": "reviewer",
+      "algorithm": "Ed25519",
+      "state": "active",
+      "regionCodes": ["000000"],
+      "scopes": ["identity-and-institution", "hospital-joint-test", "security-and-compliance", "operations-and-disaster-recovery", "independent-site-acceptance"],
+      "validFrom": "1970-01-01T00:00:00.000Z",
+      "validUntil": "1970-01-01T00:00:00.000Z",
+      "publicKeyPem": "replace-with-ed25519-public-key-pem"
+    }
+  ]
+}

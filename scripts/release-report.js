@@ -515,10 +515,14 @@ function regionalProductLineChecks(regionalConfigurationReadiness, regionalSiteE
     );
   const evidenceBoundary = regionalSiteEvidenceReadiness.productionReady === false
     && regionalSiteEvidenceReadiness.containsEvidenceBodies === false
+    && regionalSiteEvidenceReadiness.containsSignatures === false
+    && regionalSiteEvidenceReadiness.containsKeyMaterial === false
     && regionalSiteEvidenceReadiness.regions?.every((item) =>
       item.productionReady === false
         && item.containsEvidenceBodies === false
         && item.containsReviewerIdentities === false
+        && item.containsSignatures === false
+        && item.containsKeyMaterial === false
     );
   return [
     check(
@@ -547,7 +551,7 @@ function regionalProductLineChecks(regionalConfigurationReadiness, regionalSiteE
     check(
       "regionalSiteEvidence:minimizedBoundary",
       evidenceBoundary,
-      `${regionalSiteEvidenceReadiness.summary?.evidenceReady || 0} evidence-ready; bodies and reviewer identities excluded`,
+      `${regionalSiteEvidenceReadiness.summary?.evidenceReady || 0} evidence-ready; bodies, signatures, identities and key material excluded`,
       "error",
       "regional-product-line"
     ),

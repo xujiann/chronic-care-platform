@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "regional-site-evidence-v1",
+  "schemaVersion": "regional-site-evidence-v2",
   "regionCode": "000000",
   "releaseId": "replace-with-current-regional-release-id",
   "compositeDigest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
@@ -14,8 +14,10 @@
       "subjectDigest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
       "verifiedAt": "1970-01-01T00:00:00.000Z",
       "expiresAt": "1970-01-01T00:00:00.000Z",
-      "custodianRole": "replace-with-evidence-custodian-role",
-      "reviewerRole": "replace-with-independent-reviewer-role"
+      "attestations": [
+        { "schemaVersion": "regional-site-evidence-attestation-v1", "purpose": "regional-site-evidence", "role": "custodian", "keyId": "replace-custodian-key", "issuedAt": "1970-01-01T00:00:00.000Z", "subjectDigest": "sha256:0000000000000000000000000000000000000000000000000000000000000000", "signature": "replace-with-ed25519-base64url-signature" },
+        { "schemaVersion": "regional-site-evidence-attestation-v1", "purpose": "regional-site-evidence", "role": "reviewer", "keyId": "replace-reviewer-key", "issuedAt": "1970-01-01T00:00:00.000Z", "subjectDigest": "sha256:0000000000000000000000000000000000000000000000000000000000000000", "signature": "replace-with-ed25519-base64url-signature" }
+      ]
     },
     {
       "scope": "hospital-joint-test",
@@ -24,8 +26,10 @@
       "subjectDigest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
       "verifiedAt": "1970-01-01T00:00:00.000Z",
       "expiresAt": "1970-01-01T00:00:00.000Z",
-      "custodianRole": "replace-with-evidence-custodian-role",
-      "reviewerRole": "replace-with-independent-reviewer-role"
+      "attestations": [
+        { "schemaVersion": "regional-site-evidence-attestation-v1", "purpose": "regional-site-evidence", "role": "custodian", "keyId": "replace-custodian-key", "issuedAt": "1970-01-01T00:00:00.000Z", "subjectDigest": "sha256:0000000000000000000000000000000000000000000000000000000000000000", "signature": "replace-with-ed25519-base64url-signature" },
+        { "schemaVersion": "regional-site-evidence-attestation-v1", "purpose": "regional-site-evidence", "role": "reviewer", "keyId": "replace-reviewer-key", "issuedAt": "1970-01-01T00:00:00.000Z", "subjectDigest": "sha256:0000000000000000000000000000000000000000000000000000000000000000", "signature": "replace-with-ed25519-base64url-signature" }
+      ]
     },
     {
       "scope": "security-and-compliance",
@@ -34,8 +38,10 @@
       "subjectDigest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
       "verifiedAt": "1970-01-01T00:00:00.000Z",
       "expiresAt": "1970-01-01T00:00:00.000Z",
-      "custodianRole": "replace-with-evidence-custodian-role",
-      "reviewerRole": "replace-with-independent-reviewer-role"
+      "attestations": [
+        { "schemaVersion": "regional-site-evidence-attestation-v1", "purpose": "regional-site-evidence", "role": "custodian", "keyId": "replace-custodian-key", "issuedAt": "1970-01-01T00:00:00.000Z", "subjectDigest": "sha256:0000000000000000000000000000000000000000000000000000000000000000", "signature": "replace-with-ed25519-base64url-signature" },
+        { "schemaVersion": "regional-site-evidence-attestation-v1", "purpose": "regional-site-evidence", "role": "reviewer", "keyId": "replace-reviewer-key", "issuedAt": "1970-01-01T00:00:00.000Z", "subjectDigest": "sha256:0000000000000000000000000000000000000000000000000000000000000000", "signature": "replace-with-ed25519-base64url-signature" }
+      ]
     },
     {
       "scope": "operations-and-disaster-recovery",
@@ -44,8 +50,10 @@
       "subjectDigest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
       "verifiedAt": "1970-01-01T00:00:00.000Z",
       "expiresAt": "1970-01-01T00:00:00.000Z",
-      "custodianRole": "replace-with-evidence-custodian-role",
-      "reviewerRole": "replace-with-independent-reviewer-role"
+      "attestations": [
+        { "schemaVersion": "regional-site-evidence-attestation-v1", "purpose": "regional-site-evidence", "role": "custodian", "keyId": "replace-custodian-key", "issuedAt": "1970-01-01T00:00:00.000Z", "subjectDigest": "sha256:0000000000000000000000000000000000000000000000000000000000000000", "signature": "replace-with-ed25519-base64url-signature" },
+        { "schemaVersion": "regional-site-evidence-attestation-v1", "purpose": "regional-site-evidence", "role": "reviewer", "keyId": "replace-reviewer-key", "issuedAt": "1970-01-01T00:00:00.000Z", "subjectDigest": "sha256:0000000000000000000000000000000000000000000000000000000000000000", "signature": "replace-with-ed25519-base64url-signature" }
+      ]
     },
     {
       "scope": "independent-site-acceptance",
@@ -54,8 +62,10 @@
       "subjectDigest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
       "verifiedAt": "1970-01-01T00:00:00.000Z",
       "expiresAt": "1970-01-01T00:00:00.000Z",
-      "custodianRole": "replace-with-evidence-custodian-role",
-      "reviewerRole": "replace-with-independent-reviewer-role"
+      "attestations": [
+        { "schemaVersion": "regional-site-evidence-attestation-v1", "purpose": "regional-site-evidence", "role": "custodian", "keyId": "replace-custodian-key", "issuedAt": "1970-01-01T00:00:00.000Z", "subjectDigest": "sha256:0000000000000000000000000000000000000000000000000000000000000000", "signature": "replace-with-ed25519-base64url-signature" },
+        { "schemaVersion": "regional-site-evidence-attestation-v1", "purpose": "regional-site-evidence", "role": "reviewer", "keyId": "replace-reviewer-key", "issuedAt": "1970-01-01T00:00:00.000Z", "subjectDigest": "sha256:0000000000000000000000000000000000000000000000000000000000000000", "signature": "replace-with-ed25519-base64url-signature" }
+      ]
     }
   ]
 }
