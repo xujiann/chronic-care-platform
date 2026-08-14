@@ -421,6 +421,10 @@ test("release report summarizes repository readiness and renders markdown", () =
   assert.equal(report.checks.some((item) => item.name === "regionalConfiguration:readiness" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "regionalConfiguration:valueBoundary" && item.passed), true);
   assert.equal(report.regionalConfigurationReadiness.productionReady, false);
+  assert.equal(report.checks.some((item) => item.name === "regionalSiteEvidence:verifier" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.name === "regionalSiteEvidence:minimizedBoundary" && item.passed), true);
+  assert.equal(report.regionalSiteEvidenceReadiness.productionReady, false);
+  assert.equal(report.regionalSiteEvidenceReadiness.containsEvidenceBodies, false);
   assert.equal(report.checks.some((item) => item.name === "regionalDossier:control" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "regionalDossier:productionBoundary" && item.passed), true);
   assert.equal(report.regionalCutoverDossier.productionReady, false);
@@ -830,6 +834,8 @@ test("release report writes standalone production cutover and storage artifacts"
   const regionalDataSharingMarkdown = fs.readFileSync(path.join(outputDir, "regional-data-sharing-report.md"), "utf8");
   const regionalConfigurationJson = JSON.parse(fs.readFileSync(path.join(outputDir, "regional-configuration-readiness.json"), "utf8"));
   const regionalConfigurationMarkdown = fs.readFileSync(path.join(outputDir, "regional-configuration-readiness.md"), "utf8");
+  const regionalSiteEvidenceJson = JSON.parse(fs.readFileSync(path.join(outputDir, "regional-site-evidence-readiness.json"), "utf8"));
+  const regionalSiteEvidenceMarkdown = fs.readFileSync(path.join(outputDir, "regional-site-evidence-readiness.md"), "utf8");
   const regionalCutoverDossierJson = JSON.parse(fs.readFileSync(path.join(outputDir, "regional-cutover-dossier.json"), "utf8"));
   const regionalCutoverDossierMarkdown = fs.readFileSync(path.join(outputDir, "regional-cutover-dossier.md"), "utf8");
   const regionalReferralOverlapJson = JSON.parse(fs.readFileSync(path.join(outputDir, "regional-referral-overlap-report.json"), "utf8"));
@@ -990,6 +996,9 @@ test("release report writes standalone production cutover and storage artifacts"
   assert.match(regionalDataSharingMarkdown, /转诊会诊交接证据/);
   assert.equal(regionalConfigurationJson.productionReady, false);
   assert.match(regionalConfigurationMarkdown, /地区配置准入审计/);
+  assert.equal(regionalSiteEvidenceJson.productionReady, false);
+  assert.equal(regionalSiteEvidenceJson.containsEvidenceBodies, false);
+  assert.match(regionalSiteEvidenceMarkdown, /地区现场证据准入报告/);
   assert.equal(regionalCutoverDossierJson.productionReady, false);
   assert.match(regionalCutoverDossierMarkdown, /地区投产档案/);
   assert.equal(regionalReferralOverlapJson.regionalReferralOverlap.ok, true);

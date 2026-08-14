@@ -14,6 +14,10 @@ const {
   buildRegionalCutoverPortfolio
 } = require("../src/platform/regional/regional-cutover-dossier");
 const {
+  EVIDENCE_SCOPES,
+  assessRegionalSiteEvidenceManifest
+} = require("../src/platform/regional/regional-site-evidence");
+const {
   applyTransitionPlanToRegistry,
   buildReleaseBindingFromComposite,
   buildTransitionPlan,
@@ -95,6 +99,34 @@ function healthyFleet() {
   });
 }
 
+function readySiteEvidence(composite) {
+  const manifest = {
+    schemaVersion: "regional-site-evidence-v1",
+    regionCode: "210200",
+    releaseId: composite.releaseId,
+    compositeDigest: composite.artifact.digest,
+    regionalContentDigest: `sha256:${composite.region.contentDigest}`,
+    issuedAt: "2026-08-06T00:00:00.000Z",
+    expiresAt: "2026-09-07T00:00:00.000Z",
+    evidence: EVIDENCE_SCOPES.map((scope, index) => ({
+      scope,
+      ref: `controlled://regional/evidence/site-scope-${index + 1}`,
+      digest: `sha256:${"d".repeat(64)}`,
+      subjectDigest: composite.artifact.digest,
+      verifiedAt: "2026-08-06T01:00:00.000Z",
+      expiresAt: "2026-09-07T00:00:00.000Z",
+      custodianRole: `site-custodian-${index + 1}`,
+      reviewerRole: `independent-reviewer-${index + 1}`
+    }))
+  };
+  return assessRegionalSiteEvidenceManifest(manifest, {
+    regionCode: "210200",
+    releaseId: composite.releaseId,
+    compositeDigest: composite.artifact.digest,
+    regionalContentDigest: `sha256:${composite.region.contentDigest}`
+  }, { now: NOW });
+}
+
 test("default dossier proves local controls while keeping missing site gates explicit", () => {
   const dossier = buildRegionalCutoverDossier({
     root: ROOT,
@@ -113,6 +145,8 @@ test("default dossier proves local controls while keeping missing site gates exp
   assert.ok(dossier.blockers.includes("regional-release-not-registered"));
   assert.ok(dossier.blockers.includes("backup-evidence-not-fresh"));
   assert.ok(dossier.blockers.includes("certificate-evidence-not-current"));
+  assert.ok(dossier.blockers.includes("regional-site-evidence-unconfigured"));
+  assert.equal(dossier.siteEvidence.evidenceReady, false);
   assert.match(dossier.dossierDigest, /^sha256:[a-f0-9]{64}$/);
 });
 
@@ -129,6 +163,7 @@ test("approved candidate plus healthy minimized operations can open only candida
     composite,
     registry: candidateRegistry(composite),
     fleet: healthyFleet(),
+    siteEvidence: readySiteEvidence(composite),
     env: {}
   });
   assert.equal(dossier.ok, true);
@@ -138,7 +173,8 @@ test("approved candidate plus healthy minimized operations can open only candida
   assert.equal(dossier.gates.every((item) => item.passed), true);
   assert.deepEqual(dossier.blockers, []);
   assert.equal(JSON.stringify(dossier).includes("regional.example.gov.cn"), false);
-  assert.equal(dossier.externalBlockers.length, 4);
+  assert.equal(dossier.externalBlockers.length, 1);
+  assert.equal(dossier.siteEvidence.summary.ready, 5);
 });
 
 test("test regions and immutable release drift fail closed", () => {

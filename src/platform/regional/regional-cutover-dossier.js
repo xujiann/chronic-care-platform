@@ -10,6 +10,9 @@ const {
   buildRegionConfigurationReadiness
 } = require("./regional-configuration-readiness");
 const {
+  buildRegionalSiteEvidenceStatus
+} = require("./regional-site-evidence");
+const {
   getRelease,
   getReleaseState,
   readRegistry,
@@ -81,6 +84,17 @@ function buildRegionalCutoverDossier(options = {}) {
   const releaseState = getReleaseState(registry, regionCode, composite.releaseId);
   const registeredRelease = getRelease(registry, regionCode, composite.releaseId);
   const storage = safeConfigStatus(buildPostgresPrimaryStorageConfig(options.env || {}));
+  const siteEvidence = options.siteEvidence || buildRegionalSiteEvidenceStatus({
+    env: options.env || {},
+    generatedAt,
+    regionCode,
+    expected: {
+      regionCode,
+      releaseId: composite.releaseId,
+      compositeDigest: composite.artifact.digest,
+      regionalContentDigest: `sha256:${composite.region.contentDigest}`
+    }
+  });
   const releaseBindingMatches = !registeredRelease || (
     registeredRelease.compositeDigest === composite.artifact.digest
     && registeredRelease.regionalContentDigest === `sha256:${composite.region.contentDigest}`
@@ -124,6 +138,14 @@ function buildRegionalCutoverDossier(options = {}) {
         && storage.productionPrimary === false
         && storage.runtimeCutoverEnabled === false,
       `mode=${storage.mode}; request-path writes blocked; production primary false`
+    ),
+    check(
+      "regionalDossier:siteEvidenceBoundary",
+      siteEvidence.ok
+        && siteEvidence.productionReady === false
+        && siteEvidence.containsEvidenceBodies === false
+        && siteEvidence.containsReviewerIdentities === false,
+      `${siteEvidence.summary.ready}/${siteEvidence.summary.requiredScopes} evidence scopes ready; evidence bodies excluded`
     )
   ];
   const gates = [
@@ -171,6 +193,11 @@ function buildRegionalCutoverDossier(options = {}) {
       "regionalDossierGate:storageContract",
       storage.modeReady,
       `mode=${storage.mode}`
+    ),
+    check(
+      "regionalDossierGate:siteEvidence",
+      siteEvidence.evidenceReady,
+      `${siteEvidence.summary.ready}/${siteEvidence.summary.requiredScopes} evidence scopes ready`
     )
   ];
   const blockers = unique([
@@ -184,7 +211,8 @@ function buildRegionalCutoverDossier(options = {}) {
     ...fleetSite.blockers,
     !backupFresh && "backup-evidence-not-fresh",
     !certificateCurrent && "certificate-evidence-not-current",
-    !storage.modeReady && "postgres-storage-contract-not-ready"
+    !storage.modeReady && "postgres-storage-contract-not-ready",
+    ...siteEvidence.blockers
   ]);
   const base = {
     schemaVersion: "regional-cutover-dossier-v1",
@@ -222,15 +250,18 @@ function buildRegionalCutoverDossier(options = {}) {
     },
     operations: operationsProjection(fleetSite),
     storage,
+    siteEvidence,
     checks,
     gates,
     blockers,
-    externalBlockers: [
-      "real identity and hospital-system joint-test evidence",
-      "security, commercial-cryptography and compliance assessment",
-      "staffed monitoring, disaster-recovery rehearsal and incident response",
-      "independent site acceptance and explicit external production authorization"
-    ]
+    externalBlockers: siteEvidence.evidenceReady
+      ? ["explicit external production authorization remains required"]
+      : [
+        "real identity and hospital-system joint-test evidence",
+        "security, commercial-cryptography and compliance assessment",
+        "staffed monitoring, disaster-recovery rehearsal and incident response",
+        "independent site acceptance and explicit external production authorization"
+      ]
   };
   return deepFreeze({
     ...base,

@@ -1,0 +1,61 @@
+{
+  "schemaVersion": "regional-site-evidence-v1",
+  "regionCode": "000000",
+  "releaseId": "replace-with-current-regional-release-id",
+  "compositeDigest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+  "regionalContentDigest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+  "issuedAt": "1970-01-01T00:00:00.000Z",
+  "expiresAt": "1970-01-01T00:00:00.000Z",
+  "evidence": [
+    {
+      "scope": "identity-and-institution",
+      "ref": "controlled://replace/identity-and-institution",
+      "digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      "subjectDigest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      "verifiedAt": "1970-01-01T00:00:00.000Z",
+      "expiresAt": "1970-01-01T00:00:00.000Z",
+      "custodianRole": "replace-with-evidence-custodian-role",
+      "reviewerRole": "replace-with-independent-reviewer-role"
+    },
+    {
+      "scope": "hospital-joint-test",
+      "ref": "controlled://replace/hospital-joint-test",
+      "digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      "subjectDigest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      "verifiedAt": "1970-01-01T00:00:00.000Z",
+      "expiresAt": "1970-01-01T00:00:00.000Z",
+      "custodianRole": "replace-with-evidence-custodian-role",
+      "reviewerRole": "replace-with-independent-reviewer-role"
+    },
+    {
+      "scope": "security-and-compliance",
+      "ref": "controlled://replace/security-and-compliance",
+      "digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      "subjectDigest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      "verifiedAt": "1970-01-01T00:00:00.000Z",
+      "expiresAt": "1970-01-01T00:00:00.000Z",
+      "custodianRole": "replace-with-evidence-custodian-role",
+      "reviewerRole": "replace-with-independent-reviewer-role"
+    },
+    {
+      "scope": "operations-and-disaster-recovery",
+      "ref": "controlled://replace/operations-and-disaster-recovery",
+      "digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      "subjectDigest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      "verifiedAt": "1970-01-01T00:00:00.000Z",
+      "expiresAt": "1970-01-01T00:00:00.000Z",
+      "custodianRole": "replace-with-evidence-custodian-role",
+      "reviewerRole": "replace-with-independent-reviewer-role"
+    },
+    {
+      "scope": "independent-site-acceptance",
+      "ref": "controlled://replace/independent-site-acceptance",
+      "digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      "subjectDigest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      "verifiedAt": "1970-01-01T00:00:00.000Z",
+      "expiresAt": "1970-01-01T00:00:00.000Z",
+      "custodianRole": "replace-with-evidence-custodian-role",
+      "reviewerRole": "replace-with-independent-reviewer-role"
+    }
+  ]
+}

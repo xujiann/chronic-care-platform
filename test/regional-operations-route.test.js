@@ -69,6 +69,10 @@ test("regional dossier API aggregates only minimized control metadata", async ()
   assert.equal(harness.responses[0].body.productionReady, false);
   assert.equal(harness.responses[0].body.containsBusinessData, false);
   assert.equal(harness.responses[0].body.containsEndpoints, false);
+  assert.equal(harness.responses[0].body.siteEvidence.evidenceReady, false);
+  assert.equal(harness.responses[0].body.siteEvidence.containsEvidenceBodies, false);
+  assert.equal(harness.responses[0].body.siteEvidence.containsReviewerIdentities, false);
+  assert.doesNotMatch(JSON.stringify(harness.responses[0].body), /controlled:\/\/|custodianRole|reviewerRole/);
   assert.equal(harness.audits[0].action, "regional-cutover-dossier-read");
 });
 

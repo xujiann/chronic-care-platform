@@ -83,6 +83,7 @@ const { buildInsurancePaymentEvidencePacket, renderMarkdown: renderInsurancePaym
 const { renderMarkdown: renderPriorityApplicationTemplatesMarkdown } = require("./priority-application-templates");
 const { buildRegionalDataSharingReport, renderMarkdown: renderRegionalDataSharingMarkdown } = require("./regional-data-sharing");
 const { buildReport: buildRegionalConfigurationReadiness, renderMarkdown: renderRegionalConfigurationMarkdown } = require("./regional-configuration-readiness");
+const { buildReport: buildRegionalSiteEvidenceReadiness, renderMarkdown: renderRegionalSiteEvidenceMarkdown } = require("./regional-site-evidence-readiness");
 const { buildReport: buildRegionalCutoverDossier, renderMarkdown: renderRegionalCutoverDossierMarkdown } = require("./regional-cutover-dossier");
 const { buildRegionalReferralOverlapReport, renderMarkdown: renderRegionalReferralOverlapMarkdown } = require("./regional-referral-overlap");
 const { buildQualitySafetyReport, renderMarkdown: renderQualitySafetyMarkdown } = require("./quality-safety-report");
@@ -503,7 +504,7 @@ function regionalDataSharingChecks(regionalDataSharing) {
   ];
 }
 
-function regionalProductLineChecks(regionalConfigurationReadiness, regionalCutoverDossier) {
+function regionalProductLineChecks(regionalConfigurationReadiness, regionalSiteEvidenceReadiness, regionalCutoverDossier) {
   const configurationBoundary = regionalConfigurationReadiness.productionReady === false
     && regionalConfigurationReadiness.regions?.every((item) =>
       item.productionReady === false && item.containsConfigurationValues === false
@@ -511,6 +512,13 @@ function regionalProductLineChecks(regionalConfigurationReadiness, regionalCutov
   const dossierBoundary = regionalCutoverDossier.productionReady === false
     && regionalCutoverDossier.regions?.every((item) =>
       item.productionReady === false && !Object.hasOwn(item, "endpoint")
+    );
+  const evidenceBoundary = regionalSiteEvidenceReadiness.productionReady === false
+    && regionalSiteEvidenceReadiness.containsEvidenceBodies === false
+    && regionalSiteEvidenceReadiness.regions?.every((item) =>
+      item.productionReady === false
+        && item.containsEvidenceBodies === false
+        && item.containsReviewerIdentities === false
     );
   return [
     check(
@@ -525,6 +533,21 @@ function regionalProductLineChecks(regionalConfigurationReadiness, regionalCutov
       "regionalConfiguration:valueBoundary",
       configurationBoundary,
       configurationBoundary ? "configuration values are excluded and production remains NO-GO" : "regional configuration output boundary failed",
+      "error",
+      "regional-product-line"
+    ),
+    check(
+      "regionalSiteEvidence:verifier",
+      regionalSiteEvidenceReadiness.ok
+        && regionalSiteEvidenceReadiness.summary?.verifierHealthy === regionalSiteEvidenceReadiness.summary?.regions,
+      `${regionalSiteEvidenceReadiness.summary?.verifierHealthy || 0}/${regionalSiteEvidenceReadiness.summary?.regions || 0} regional evidence verifiers healthy`,
+      "error",
+      "regional-product-line"
+    ),
+    check(
+      "regionalSiteEvidence:minimizedBoundary",
+      evidenceBoundary,
+      `${regionalSiteEvidenceReadiness.summary?.evidenceReady || 0} evidence-ready; bodies and reviewer identities excluded`,
       "error",
       "regional-product-line"
     ),
@@ -1485,6 +1508,10 @@ function buildReleaseReport(options = {}) {
   const phase2Proposal = buildPhase2ProposalReadiness({ pkg });
   const regionalDataSharing = buildRegionalDataSharingReport({ data, pkg });
   const regionalConfigurationReadiness = buildRegionalConfigurationReadiness({ root: ROOT });
+  const regionalSiteEvidenceReadiness = buildRegionalSiteEvidenceReadiness({
+    root: ROOT,
+    env: options.env || {}
+  });
   const regionalCutoverDossier = buildRegionalCutoverDossier({
     root: ROOT,
     env: options.env || {},
@@ -1622,7 +1649,7 @@ function buildReleaseReport(options = {}) {
     ...financialGatewayReadinessChecks(financialGatewayReadiness),
     ...interfaceMappingChecks(interfaceMapping),
     ...regionalDataSharingChecks(regionalDataSharing),
-    ...regionalProductLineChecks(regionalConfigurationReadiness, regionalCutoverDossier),
+    ...regionalProductLineChecks(regionalConfigurationReadiness, regionalSiteEvidenceReadiness, regionalCutoverDossier),
     ...regionalReferralOverlapChecks(regionalReferralOverlap),
     ...hospitalOperationsReadinessChecks(hospitalOperationsReadiness),
     ...hospitalOperationsReleaseChecks(hospitalOperationsRelease),
@@ -1742,6 +1769,7 @@ function buildReleaseReport(options = {}) {
     interfaceMapping,
     regionalDataSharing,
     regionalConfigurationReadiness,
+    regionalSiteEvidenceReadiness,
     regionalCutoverDossier,
     regionalReferralOverlap,
     hospitalOperationsReadiness,
@@ -2072,7 +2100,7 @@ function renderMarkdown(report) {
     "",
     "## Regional configuration admission and cutover dossier",
     "",
-    "See `regional-configuration-readiness.json`, `regional-configuration-readiness.md`, `regional-cutover-dossier.json`, and `regional-cutover-dossier.md` for value-free configuration admission, immutable release binding, operations and storage gates, and the explicit external production authorization boundary.",
+    "See `regional-configuration-readiness.json`, `regional-configuration-readiness.md`, `regional-site-evidence-readiness.json`, `regional-site-evidence-readiness.md`, `regional-cutover-dossier.json`, and `regional-cutover-dossier.md` for value-free configuration admission, digest-pinned five-scope site evidence, immutable release binding, operations and storage gates, and the explicit external production authorization boundary.",
     "",
     "## Internet nursing readiness report",
     "",
@@ -2401,6 +2429,8 @@ function writeOutput(report, flags) {
     }, null, 2), "utf8");
     const regionalConfigurationJson = path.join(path.dirname(output), "regional-configuration-readiness.json");
     fs.writeFileSync(regionalConfigurationJson, JSON.stringify(report.regionalConfigurationReadiness, null, 2), "utf8");
+    const regionalSiteEvidenceJson = path.join(path.dirname(output), "regional-site-evidence-readiness.json");
+    fs.writeFileSync(regionalSiteEvidenceJson, JSON.stringify(report.regionalSiteEvidenceReadiness, null, 2), "utf8");
     const regionalCutoverDossierJson = path.join(path.dirname(output), "regional-cutover-dossier.json");
     fs.writeFileSync(regionalCutoverDossierJson, JSON.stringify(report.regionalCutoverDossier, null, 2), "utf8");
     const regionalReferralOverlapJson = path.join(path.dirname(output), "regional-referral-overlap-report.json");
@@ -2781,6 +2811,8 @@ function writeOutput(report, flags) {
     fs.writeFileSync(regionalDataSharingMarkdown, renderRegionalDataSharingMarkdown(report.regionalDataSharing), "utf8");
     const regionalConfigurationMarkdown = path.join(path.dirname(markdown), "regional-configuration-readiness.md");
     fs.writeFileSync(regionalConfigurationMarkdown, renderRegionalConfigurationMarkdown(report.regionalConfigurationReadiness), "utf8");
+    const regionalSiteEvidenceMarkdown = path.join(path.dirname(markdown), "regional-site-evidence-readiness.md");
+    fs.writeFileSync(regionalSiteEvidenceMarkdown, renderRegionalSiteEvidenceMarkdown(report.regionalSiteEvidenceReadiness), "utf8");
     const regionalCutoverDossierMarkdown = path.join(path.dirname(markdown), "regional-cutover-dossier.md");
     fs.writeFileSync(regionalCutoverDossierMarkdown, renderRegionalCutoverDossierMarkdown(report.regionalCutoverDossier), "utf8");
     const regionalReferralOverlapMarkdown = path.join(path.dirname(markdown), "regional-referral-overlap-report.md");
