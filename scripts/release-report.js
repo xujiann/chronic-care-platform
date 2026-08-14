@@ -515,6 +515,7 @@ function regionalProductLineChecks(regionalConfigurationReadiness, regionalSiteE
     );
   const evidenceBoundary = regionalSiteEvidenceReadiness.productionReady === false
     && regionalSiteEvidenceReadiness.containsEvidenceBodies === false
+    && regionalSiteEvidenceReadiness.containsLifecycleActorIdentities === false
     && regionalSiteEvidenceReadiness.containsSignatures === false
     && regionalSiteEvidenceReadiness.containsKeyMaterial === false
     && regionalSiteEvidenceReadiness.regions?.every((item) =>
@@ -523,6 +524,8 @@ function regionalProductLineChecks(regionalConfigurationReadiness, regionalSiteE
         && item.containsReviewerIdentities === false
         && item.containsSignatures === false
         && item.containsKeyMaterial === false
+        && item.lifecycle?.ok === true
+        && item.lifecycle?.containsActorIdentities === false
     );
   return [
     check(

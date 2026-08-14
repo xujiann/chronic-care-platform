@@ -146,8 +146,9 @@ function buildRegionalCutoverDossier(options = {}) {
         && siteEvidence.containsEvidenceBodies === false
         && siteEvidence.containsReviewerIdentities === false
         && siteEvidence.containsSignatures === false
-        && siteEvidence.containsKeyMaterial === false,
-      `${siteEvidence.summary.ready}/${siteEvidence.summary.requiredScopes} evidence scopes ready; signatures, identities and key material excluded`
+        && siteEvidence.containsKeyMaterial === false
+        && siteEvidence.lifecycle.containsActorIdentities === false,
+      `${siteEvidence.summary.ready}/${siteEvidence.summary.requiredScopes} evidence scopes ready; lifecycle actors and cryptographic material excluded`
     )
   ];
   const gates = [
@@ -198,8 +199,10 @@ function buildRegionalCutoverDossier(options = {}) {
     ),
     check(
       "regionalDossierGate:siteEvidence",
-      siteEvidence.evidenceReady && siteEvidence.trust.cryptographicTrustReady,
-      `${siteEvidence.summary.ready}/${siteEvidence.summary.requiredScopes} evidence scopes ready; cryptographic trust=${siteEvidence.trust.cryptographicTrustReady}`
+      siteEvidence.evidenceReady
+        && siteEvidence.trust.cryptographicTrustReady
+        && siteEvidence.lifecycle.accepted,
+      `${siteEvidence.summary.ready}/${siteEvidence.summary.requiredScopes} evidence scopes ready; trust=${siteEvidence.trust.cryptographicTrustReady}; lifecycle=${siteEvidence.lifecycle.state}`
     )
   ];
   const blockers = unique([
@@ -229,6 +232,7 @@ function buildRegionalCutoverDossier(options = {}) {
     containsEndpoints: false,
     containsEvidenceBodies: false,
     containsReviewerIdentities: false,
+    containsLifecycleActorIdentities: false,
     containsSignatures: false,
     containsKeyMaterial: false,
     release: {

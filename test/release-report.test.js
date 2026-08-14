@@ -427,6 +427,7 @@ test("release report summarizes repository readiness and renders markdown", () =
   assert.equal(report.regionalSiteEvidenceReadiness.containsEvidenceBodies, false);
   assert.equal(report.regionalSiteEvidenceReadiness.containsSignatures, false);
   assert.equal(report.regionalSiteEvidenceReadiness.containsKeyMaterial, false);
+  assert.equal(report.regionalSiteEvidenceReadiness.containsLifecycleActorIdentities, false);
   assert.equal(report.checks.some((item) => item.name === "regionalDossier:control" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "regionalDossier:productionBoundary" && item.passed), true);
   assert.equal(report.regionalCutoverDossier.productionReady, false);

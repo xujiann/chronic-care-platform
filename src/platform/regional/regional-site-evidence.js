@@ -14,6 +14,7 @@ const {
   loadTrustRegistry,
   verifyEvidenceAttestations
 } = require("./regional-site-evidence-trust");
+const { loadEvidenceLifecycleStatus } = require("./regional-site-evidence-lifecycle");
 
 const DEFAULT_ROOT = path.resolve(__dirname, "..", "..", "..");
 const MAX_EVIDENCE_FILE_BYTES = 512 * 1024;
@@ -163,6 +164,7 @@ function assessRegionalSiteEvidenceManifest(manifest, expected = {}, options = {
   }
   const now = Date.parse(generatedAt);
   const version2 = manifest.schemaVersion === "regional-site-evidence-v2";
+  const sourceDigest = options.sourceDigest || `sha256:${sha256(stableJson(manifest))}`;
   const trust = loadTrustRegistry({
     ...options,
     evidenceScopes: EVIDENCE_SCOPES
@@ -181,6 +183,17 @@ function assessRegionalSiteEvidenceManifest(manifest, expected = {}, options = {
     compositeDigest: normalizeDigest(expected.compositeDigest),
     regionalContentDigest: normalizeDigest(expected.regionalContentDigest)
   };
+  const lifecycle = loadEvidenceLifecycleStatus({
+    ...options,
+    expected: {
+      regionCode: expectedBinding.regionCode || normalized.regionCode,
+      releaseId: expectedBinding.releaseId || normalized.releaseId,
+      compositeDigest: expectedBinding.compositeDigest || normalized.compositeDigest,
+      regionalContentDigest: expectedBinding.regionalContentDigest || normalized.regionalContentDigest,
+      evidenceSourceDigest: sourceDigest,
+      generatedAt
+    }
+  });
   const manifestCurrent = Date.parse(normalized.issuedAt) <= now && Date.parse(normalized.expiresAt) > now;
   const bindingMatches = Object.entries(expectedBinding).every(([key, value]) => value && normalized[key] === value);
   const scopes = EVIDENCE_SCOPES.map((scope) => {
@@ -235,6 +248,7 @@ function assessRegionalSiteEvidenceManifest(manifest, expected = {}, options = {
     !version2 && "regional-site-evidence-legacy-unsigned",
     version2 && !trust.configured && "regional-site-evidence-trust-unconfigured",
     version2 && trust.configured && !trust.ok && trust.code,
+    ...lifecycle.blockers,
     !bindingMatches && "regional-site-evidence-binding-mismatch",
     !manifestCurrent && "regional-site-evidence-manifest-not-current",
     ...scopes.filter((item) => !item.presentOnce).map((item) => `regional-site-evidence-${item.scope}-missing-or-duplicate`),
@@ -249,14 +263,18 @@ function assessRegionalSiteEvidenceManifest(manifest, expected = {}, options = {
     generatedAt,
     regionCode: normalized.regionCode,
     configured: true,
-    ok: trust.ok,
-    evidenceReady: bindingMatches && manifestCurrent && scopes.every((item) => item.ready),
+    ok: trust.ok && lifecycle.ok,
+    evidenceReady: bindingMatches
+      && manifestCurrent
+      && lifecycle.accepted
+      && scopes.every((item) => item.ready),
     productionReady: false,
     containsEvidenceBodies: false,
     containsReviewerIdentities: false,
+    containsLifecycleActorIdentities: false,
     containsSignatures: false,
     containsKeyMaterial: false,
-    sourceDigest: options.sourceDigest || `sha256:${sha256(stableJson(manifest))}`,
+    sourceDigest,
     binding: {
       releaseId: normalized.releaseId,
       compositeDigest: normalized.compositeDigest,
@@ -279,6 +297,7 @@ function assessRegionalSiteEvidenceManifest(manifest, expected = {}, options = {
       revokedSignatures: scopes.reduce((total, item) => total + item.signatureSummary.revoked, 0),
       invalidSignatures: scopes.reduce((total, item) => total + item.signatureSummary.invalid, 0)
     },
+    lifecycle,
     summary: {
       requiredScopes: EVIDENCE_SCOPES.length,
       presentOnce: scopes.filter((item) => item.presentOnce).length,
@@ -309,6 +328,7 @@ function unavailableStatus(regionCode, generatedAt, code, configured = false) {
     productionReady: false,
     containsEvidenceBodies: false,
     containsReviewerIdentities: false,
+    containsLifecycleActorIdentities: false,
     containsSignatures: false,
     containsKeyMaterial: false,
     sourceDigest: "",
@@ -324,6 +344,24 @@ function unavailableStatus(regionCode, generatedAt, code, configured = false) {
       graceSignatures: 0,
       revokedSignatures: 0,
       invalidSignatures: 0
+    },
+    lifecycle: {
+      schemaVersion: "regional-site-evidence-lifecycle-status-v1",
+      ok: true,
+      productionReady: false,
+      containsActorIdentities: false,
+      containsEvidenceBodies: false,
+      configured: false,
+      accepted: false,
+      state: "unconfigured",
+      revision: 0,
+      latestAt: "",
+      bindingMatches: false,
+      evidenceMatches: false,
+      currentAtEvaluation: false,
+      eventCount: 0,
+      registryDigest: "",
+      blockers: ["regional-site-evidence-lifecycle-unconfigured"]
     },
     summary: {
       requiredScopes: EVIDENCE_SCOPES.length,
@@ -366,7 +404,10 @@ function buildRegionalSiteEvidenceStatus(options = {}) {
         env: options.env || {},
         trustRegistry: options.trustRegistry,
         trustRegistryFile: options.trustRegistryFile,
-        trustRegistryDigest: options.trustRegistryDigest
+        trustRegistryDigest: options.trustRegistryDigest,
+        lifecycleRegistry: options.lifecycleRegistry,
+        lifecycleRegistryFile: options.lifecycleRegistryFile,
+        lifecycleRegistryDigest: options.lifecycleRegistryDigest
       });
     } catch (error) {
       return unavailableStatus(regionCode, generatedAt, error.code || "REGIONAL_SITE_EVIDENCE_INVALID", true);
@@ -390,7 +431,10 @@ function buildRegionalSiteEvidenceStatus(options = {}) {
       env,
       trustRegistry: options.trustRegistry,
       trustRegistryFile: options.trustRegistryFile,
-      trustRegistryDigest: options.trustRegistryDigest
+      trustRegistryDigest: options.trustRegistryDigest,
+      lifecycleRegistry: options.lifecycleRegistry,
+      lifecycleRegistryFile: options.lifecycleRegistryFile,
+      lifecycleRegistryDigest: options.lifecycleRegistryDigest
     });
   } catch (error) {
     return unavailableStatus(regionCode, generatedAt, error.code || "REGIONAL_SITE_EVIDENCE_INVALID", true);
@@ -426,12 +470,14 @@ function buildRegionalSiteEvidencePortfolio(options = {}) {
     productionReady: false,
     containsEvidenceBodies: false,
     containsReviewerIdentities: false,
+    containsLifecycleActorIdentities: false,
     containsSignatures: false,
     containsKeyMaterial: false,
     summary: {
       regions: regions.length,
       verifierHealthy: regions.filter((item) => item.ok).length,
       configured: regions.filter((item) => item.configured).length,
+      lifecycleAccepted: regions.filter((item) => item.lifecycle.accepted).length,
       evidenceReady: regions.filter((item) => item.evidenceReady).length,
       blocked: regions.filter((item) => !item.evidenceReady).length
     },

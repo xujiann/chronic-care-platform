@@ -19,6 +19,11 @@ const {
   assessRegionalSiteEvidenceManifest
 } = require("../src/platform/regional/regional-site-evidence");
 const { createAttestationSubject } = require("../src/platform/regional/regional-site-evidence-trust");
+const {
+  applyEvidenceLifecycleTransitionPlanToRegistry,
+  buildEvidenceLifecycleTransitionPlan,
+  createEmptyEvidenceLifecycleRegistry
+} = require("../src/platform/regional/regional-site-evidence-lifecycle");
 const { sha256, stableJson } = require("../src/platform/regional/region-manifest");
 const {
   applyTransitionPlanToRegistry,
@@ -156,12 +161,31 @@ function readySiteEvidence(composite) {
       publicKeyPem: SITE_KEYS[role].publicKey.export({ type: "spki", format: "pem" })
     }))
   };
+  let lifecycleRegistry = createEmptyEvidenceLifecycleRegistry();
+  const binding = {
+    regionCode: manifest.regionCode,
+    releaseId: manifest.releaseId,
+    compositeDigest: manifest.compositeDigest,
+    regionalContentDigest: manifest.regionalContentDigest
+  };
+  const evidenceSourceDigest = `sha256:${sha256(stableJson(manifest))}`;
+  for (const [index, action] of ["submit", "review", "accept"].entries()) {
+    const plan = buildEvidenceLifecycleTransitionPlan(lifecycleRegistry, {
+      binding,
+      action,
+      actorDigest: `sha256:${String(index + 1).repeat(64)}`,
+      reasonCode: `${action}-dossier-evidence`,
+      recordedAt: `2026-08-06T0${index + 3}:00:00.000Z`,
+      evidenceSourceDigest: action === "submit" ? evidenceSourceDigest : undefined
+    });
+    lifecycleRegistry = applyEvidenceLifecycleTransitionPlanToRegistry(lifecycleRegistry, plan).registry;
+  }
   return assessRegionalSiteEvidenceManifest(manifest, {
     regionCode: "210200",
     releaseId: composite.releaseId,
     compositeDigest: composite.artifact.digest,
     regionalContentDigest: `sha256:${composite.region.contentDigest}`
-  }, { now: NOW, trustRegistry });
+  }, { now: NOW, trustRegistry, lifecycleRegistry });
 }
 
 test("default dossier proves local controls while keeping missing site gates explicit", () => {
@@ -213,6 +237,7 @@ test("approved candidate plus healthy minimized operations can open only candida
   assert.equal(dossier.externalBlockers.length, 1);
   assert.equal(dossier.siteEvidence.summary.ready, 5);
   assert.equal(dossier.siteEvidence.trust.cryptographicTrustReady, true);
+  assert.equal(dossier.siteEvidence.lifecycle.accepted, true);
   assert.equal(dossier.containsSignatures, false);
   assert.equal(dossier.containsKeyMaterial, false);
 });

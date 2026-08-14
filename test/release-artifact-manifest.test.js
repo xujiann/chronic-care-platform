@@ -57,6 +57,7 @@ test("release artifact manifest indexes reports templates commands and evidence"
   assert.equal(report.artifacts.some((item) => item.id === "regional-operations-readiness" && item.command === "regional:operations" && item.evidence === "/api/regional/deployments"), true);
   assert.equal(report.artifacts.some((item) => item.id === "regional-configuration-readiness" && item.command === "regional:configuration"), true);
   assert.equal(report.artifacts.some((item) => item.id === "regional-site-evidence-readiness" && item.command === "regional:evidence" && item.evidence === "/api/regional/deployments/:regionCode/dossier"), true);
+  assert.equal(report.artifacts.some((item) => item.id === "regional-site-evidence-lifecycle" && item.command === "regional:evidence-lifecycle"), true);
   assert.equal(report.artifacts.some((item) => item.id === "regional-cutover-dossier" && item.command === "regional:dossier" && item.evidence === "/api/regional/deployments/:regionCode/dossier"), true);
   assert.equal(report.artifacts.some((item) => item.id === "regional-replication-exercise" && item.command === "regional:replication"), true);
   assert.equal(report.artifacts.some((item) => item.id === "postgres-primary-storage-contract" && item.command === "postgres:primary-storage-contract:check"), true);

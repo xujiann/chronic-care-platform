@@ -1,0 +1,7 @@
+{
+  "schemaVersion": "regional-site-evidence-lifecycle-v1",
+  "productionReady": false,
+  "appendOnly": true,
+  "authorizationBoundary": "external-production-authorization-required",
+  "events": []
+}

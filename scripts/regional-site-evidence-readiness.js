@@ -53,12 +53,14 @@ function buildReport(options = {}) {
     productionReady: false,
     containsEvidenceBodies: false,
     containsReviewerIdentities: false,
+    containsLifecycleActorIdentities: false,
     containsSignatures: false,
     containsKeyMaterial: false,
     summary: {
       regions: 1,
       verifierHealthy: status.ok ? 1 : 0,
       configured: status.configured ? 1 : 0,
+      lifecycleAccepted: status.lifecycle.accepted ? 1 : 0,
       evidenceReady: status.evidenceReady ? 1 : 0,
       blocked: status.evidenceReady ? 0 : 1
     },
@@ -68,7 +70,7 @@ function buildReport(options = {}) {
 
 function renderMarkdown(report) {
   const overview = report.regions.map((region) =>
-    `| ${region.regionCode} | ${region.ok ? "PASS" : "FAIL"} | ${region.configured ? "YES" : "NO"} | ${region.summary.ready}/${region.summary.requiredScopes} | ${region.evidenceReady ? "YES" : "NO"} | ${region.blockers.join(", ") || "-"} |`
+    `| ${region.regionCode} | ${region.ok ? "PASS" : "FAIL"} | ${region.configured ? "YES" : "NO"} | ${region.summary.ready}/${region.summary.requiredScopes}; lifecycle=${region.lifecycle.state}@r${region.lifecycle.revision} | ${region.evidenceReady ? "YES" : "NO"} | ${region.blockers.join(", ") || "-"} |`
   );
   const scopes = report.regions.flatMap((region) =>
     region.scopes.map((scope) =>

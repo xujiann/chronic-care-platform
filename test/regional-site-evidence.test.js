@@ -21,6 +21,11 @@ const {
   trustEnvironmentKeys,
   validateTrustRegistry
 } = require("../src/platform/regional/regional-site-evidence-trust");
+const {
+  applyEvidenceLifecycleTransitionPlanToRegistry,
+  buildEvidenceLifecycleTransitionPlan,
+  createEmptyEvidenceLifecycleRegistry
+} = require("../src/platform/regional/regional-site-evidence-lifecycle");
 const { sha256, stableJson } = require("../src/platform/regional/region-manifest");
 const {
   buildReport,
@@ -135,10 +140,37 @@ function signedManifest(overrides = {}) {
   return result;
 }
 
+function acceptedLifecycle(input, sourceDigest = `sha256:${sha256(stableJson(input))}`) {
+  const binding = {
+    regionCode: input.regionCode,
+    releaseId: input.releaseId,
+    compositeDigest: input.compositeDigest,
+    regionalContentDigest: input.regionalContentDigest
+  };
+  let registry = createEmptyEvidenceLifecycleRegistry();
+  const transition = (action, actorDigest, recordedAt, extra = {}) => {
+    const plan = buildEvidenceLifecycleTransitionPlan(registry, {
+      binding,
+      action,
+      actorDigest,
+      reasonCode: `${action}-site-evidence`,
+      recordedAt,
+      ...extra
+    });
+    registry = applyEvidenceLifecycleTransitionPlanToRegistry(registry, plan).registry;
+  };
+  transition("submit", `sha256:${"1".repeat(64)}`, "2026-08-13T10:30:00.000Z", { evidenceSourceDigest: sourceDigest });
+  transition("review", `sha256:${"2".repeat(64)}`, "2026-08-13T11:00:00.000Z");
+  transition("accept", `sha256:${"3".repeat(64)}`, "2026-08-13T12:00:00.000Z");
+  return registry;
+}
+
 test("complete site evidence is release-bound, independently reviewed and still non-authorizing", () => {
-  const status = assessRegionalSiteEvidenceManifest(signedManifest(), expected(), {
+  const input = signedManifest();
+  const status = assessRegionalSiteEvidenceManifest(input, expected(), {
     now: NOW,
-    trustRegistry: trustRegistry()
+    trustRegistry: trustRegistry(),
+    lifecycleRegistry: acceptedLifecycle(input)
   });
   assert.equal(status.ok, true);
   assert.equal(status.evidenceReady, true);
@@ -148,6 +180,8 @@ test("complete site evidence is release-bound, independently reviewed and still 
   assert.equal(status.summary.cryptographicallyTrusted, EVIDENCE_SCOPES.length);
   assert.equal(status.trust.activeSignatures, EVIDENCE_SCOPES.length * 2);
   assert.equal(status.trust.cryptographicTrustReady, true);
+  assert.equal(status.lifecycle.accepted, true);
+  assert.equal(status.lifecycle.state, "accepted");
   assert.deepEqual(status.blockers, []);
   const serialized = JSON.stringify(status);
   assert.doesNotMatch(serialized, /controlled:\/\//);
@@ -189,6 +223,22 @@ test("legacy v1 evidence remains readable but cannot open the cryptographic trus
   assert.ok(status.blockers.includes("regional-site-evidence-legacy-unsigned"));
 });
 
+test("an accepted lifecycle from the previous release becomes stale when the expected release changes", () => {
+  const input = signedManifest();
+  const status = assessRegionalSiteEvidenceManifest(input, expected({
+    releaseId: "regional-release-2",
+    compositeDigest: `sha256:${"f".repeat(64)}`
+  }), {
+    now: NOW,
+    trustRegistry: trustRegistry(),
+    lifecycleRegistry: acceptedLifecycle(input)
+  });
+  assert.equal(status.evidenceReady, false);
+  assert.equal(status.lifecycle.state, "stale-release");
+  assert.ok(status.blockers.includes("regional-site-evidence-lifecycle-release-stale"));
+  assert.ok(status.blockers.includes("regional-site-evidence-binding-mismatch"));
+});
+
 test("tampering, revoked keys and a shared signing principal fail closed", () => {
   const tampered = signedManifest();
   tampered.evidence[0].digest = SHA_B;
@@ -221,9 +271,11 @@ test("tampering, revoked keys and a shared signing principal fail closed", () =>
 test("grace keys are accepted and surfaced only as minimized counts", () => {
   const registry = trustRegistry();
   registry.keys[1].state = "grace";
-  const status = assessRegionalSiteEvidenceManifest(signedManifest(), expected(), {
+  const input = signedManifest();
+  const status = assessRegionalSiteEvidenceManifest(input, expected(), {
     now: NOW,
-    trustRegistry: registry
+    trustRegistry: registry,
+    lifecycleRegistry: acceptedLifecycle(input)
   });
   assert.equal(status.evidenceReady, true);
   assert.equal(status.trust.graceSignatures, EVIDENCE_SCOPES.length);
@@ -311,6 +363,7 @@ test("evidence file requires an absolute bounded regular file and an exact SHA-2
     expected: expected(),
     regionCode: REGION,
     trustRegistry: trustRegistry(),
+    lifecycleRegistry: acceptedLifecycle(loaded.manifest, digest),
     now: NOW
   });
   assert.equal(status.evidenceReady, true);
