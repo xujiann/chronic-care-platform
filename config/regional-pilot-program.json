@@ -1,0 +1,36 @@
+{
+  "schemaVersion": "regional-pilot-program-v1",
+  "programId": "pilot-210200-chronic-referral-v1",
+  "regionCode": "210200",
+  "institutionSlot": "primary-general-hospital",
+  "workflow": "chronic-referral-continuity",
+  "steps": [
+    "trusted-identity-match",
+    "discharge-or-risk-event-ingest",
+    "chronic-followup-plan",
+    "referral-order-dispatch",
+    "institution-receipt-reconciliation",
+    "resident-feedback-and-quality-review"
+  ],
+  "adapterContracts": [
+    { "id": "government-oidc", "owner": "identity-security", "receipt": "signed-identity-scope-receipt" },
+    { "id": "hospital-his", "owner": "integration", "receipt": "signed-patient-and-referral-receipt" },
+    { "id": "hospital-emr", "owner": "integration", "receipt": "signed-discharge-summary-receipt" },
+    { "id": "resident-message", "owner": "care-coordination", "receipt": "signed-delivery-and-feedback-receipt" }
+  ],
+  "localArtifacts": [
+    "src/http/routes/citizen-chronic.js",
+    "src/http/routes/care-coordination.js",
+    "src/http/routes/integration.js",
+    "src/platform/regional/regional-site-evidence.js",
+    "test/chronic-followup-readiness.test.js",
+    "test/t05-referral-command-api.test.js"
+  ],
+  "requiredSiteEvidenceScopes": [
+    "identity-and-institution",
+    "hospital-joint-test",
+    "security-and-compliance",
+    "operations-and-disaster-recovery",
+    "independent-site-acceptance"
+  ]
+}

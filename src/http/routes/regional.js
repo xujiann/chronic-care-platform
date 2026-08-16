@@ -7,6 +7,12 @@ const {
 const {
   buildRegionalCutoverDossier
 } = require("../../platform/regional/regional-cutover-dossier");
+const {
+  buildRegionalCutoverWorkbench
+} = require("../../platform/regional/regional-cutover-workbench");
+const {
+  buildRegionalPilotReadiness
+} = require("../../platform/regional/regional-pilot-program");
 
 function createRouteSegments({
   appendSecurityEvent,
@@ -38,6 +44,46 @@ function createRouteSegments({
     id: "regional-02",
     domain: "regional",
     async handle(req, res, url) {
+      if (req.method === "GET" && url.pathname === "/api/regional/pilot-program") {
+        const user = requireApiRole(req, res, ["commission"], url.pathname);
+        if (!user) return true;
+        const data = readDatabase();
+        const report = buildRegionalPilotReadiness({
+          env: environment,
+          receipts: data.regionalDeploymentProbeReceipts
+        });
+        appendSecurityEvent({
+          actor: user.name,
+          role: user.role,
+          action: "regional-pilot-program-read",
+          target: report.program.programId,
+          result: "allowed",
+          detail: `local=${report.localFoundationReady}; site=${report.siteReady}; production gate closed`
+        });
+        sendJson(res, 200, report);
+        return true;
+      }
+
+      if (req.method === "GET" && url.pathname === "/api/regional/cutover-workbench") {
+        const user = requireApiRole(req, res, ["commission"], url.pathname);
+        if (!user) return true;
+        const data = readDatabase();
+        const workbench = buildRegionalCutoverWorkbench({
+          env: environment,
+          receipts: data.regionalDeploymentProbeReceipts
+        });
+        appendSecurityEvent({
+          actor: user.name,
+          role: user.role,
+          action: "regional-cutover-workbench-read",
+          target: url.pathname,
+          result: "allowed",
+          detail: `${workbench.summary.regions} regions; ${workbench.summary.blocked} blocked; production gate closed`
+        });
+        sendJson(res, 200, workbench);
+        return true;
+      }
+
       if (req.method === "GET" && url.pathname === "/api/regional/deployments") {
         const user = requireApiRole(req, res, ["commission"], url.pathname);
         if (!user) return true;

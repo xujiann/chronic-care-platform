@@ -39,6 +39,38 @@ test("regional operations route exposes a commission-only metadata inventory", a
   assert.equal(harness.audits[0].action, "regional-deployment-fleet-read");
 });
 
+test("regional operations route exposes a minimized cutover workbench", async () => {
+  const harness = createHarness();
+  const handled = await harness.segments[1].handle(
+    { method: "GET", headers: {} },
+    {},
+    new URL("https://platform.example.gov.cn/api/regional/cutover-workbench")
+  );
+  assert.equal(handled, true);
+  assert.equal(harness.responses[0].status, 200);
+  assert.equal(harness.responses[0].body.summary.regions, 2);
+  assert.equal(harness.responses[0].body.containsBusinessData, false);
+  assert.equal(harness.responses[0].body.containsEndpoints, false);
+  assert.equal(harness.responses[0].body.productionReady, false);
+  assert.equal(harness.audits[0].action, "regional-cutover-workbench-read");
+});
+
+test("regional operations route exposes the pilot contract without claiming site readiness", async () => {
+  const harness = createHarness();
+  const handled = await harness.segments[1].handle(
+    { method: "GET", headers: {} },
+    {},
+    new URL("https://platform.example.gov.cn/api/regional/pilot-program")
+  );
+  assert.equal(handled, true);
+  assert.equal(harness.responses[0].status, 200);
+  assert.equal(harness.responses[0].body.localFoundationReady, true);
+  assert.equal(harness.responses[0].body.siteReady, false);
+  assert.equal(harness.responses[0].body.productionReady, false);
+  assert.equal(harness.responses[0].body.containsPatientData, false);
+  assert.equal(harness.audits[0].action, "regional-pilot-program-read");
+});
+
 test("regional operations route rejects client-controlled probe inputs before transport", async () => {
   const harness = createHarness({
     environment: { REGIONAL_SITE_210200_BASE_URL: "https://dalian.example.gov.cn" }

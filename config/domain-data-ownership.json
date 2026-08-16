@@ -19,6 +19,17 @@
     "shared",
     "state-data"
   ],
+  "unregisteredCollectionPolicy": {
+    "classification": "legacy-non-authoritative",
+    "productionWriteAllowed": false,
+    "promotionRequires": [
+      "explicit-domain-owner",
+      "data-classification",
+      "reader-allowlist",
+      "versioned-write-contract",
+      "migration-and-rollback-evidence"
+    ]
+  },
   "collections": {
     "residents": {
       "owner": "identity-security",

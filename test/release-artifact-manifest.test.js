@@ -20,6 +20,10 @@ test("release artifact manifest indexes reports templates commands and evidence"
   assert.equal(report.templateReadmes.length, 4);
   assert.equal(report.artifacts.some((item) => item.id === "release-report" && item.command === "release:report"), true);
   assert.equal(report.artifacts.some((item) => item.id === "release-artifact-manifest" && item.command === "release:manifest"), true);
+  assert.equal(report.artifacts.some((item) => item.id === "release-evidence-provenance" && item.command === "release:evidence-provenance" && item.evidence === "npm run release:evidence-provenance:verify"), true);
+  assert.equal(report.artifacts.some((item) => item.id === "platform-runtime-composition" && item.command === "routes:check"), true);
+  assert.equal(report.artifacts.some((item) => item.id === "data-collection-governance" && item.command === "data:collection-governance"), true);
+  assert.equal(report.artifacts.some((item) => item.id === "platform-nonfunctional-readiness" && item.command === "platform:nonfunctional"), true);
   assert.equal(report.artifacts.some((item) => item.id === "platform-capability-map" && item.command === "platform:capability-map" && item.markdown === "release/platform-capability-map.md" && item.evidence === "/api/platform/capability-map"), true);
   assert.equal(report.artifacts.some((item) => item.id === "platform-go-live-slices" && item.command === "platform:go-live-slices" && item.markdown === "release/platform-go-live-slices.md" && item.evidence === "/api/platform/go-live-slices"), true);
   assert.equal(report.artifacts.some((item) => item.id === "platform-standards-ledgers" && item.command === "platform:standards-ledgers" && item.markdown === "release/platform-standards-ledgers.md" && item.evidence === "/api/platform/standards-ledgers"), true);
@@ -59,6 +63,8 @@ test("release artifact manifest indexes reports templates commands and evidence"
   assert.equal(report.artifacts.some((item) => item.id === "regional-site-evidence-readiness" && item.command === "regional:evidence" && item.evidence === "/api/regional/deployments/:regionCode/dossier"), true);
   assert.equal(report.artifacts.some((item) => item.id === "regional-site-evidence-lifecycle" && item.command === "regional:evidence-lifecycle"), true);
   assert.equal(report.artifacts.some((item) => item.id === "regional-cutover-dossier" && item.command === "regional:dossier" && item.evidence === "/api/regional/deployments/:regionCode/dossier"), true);
+  assert.equal(report.artifacts.some((item) => item.id === "regional-cutover-workbench" && item.evidence === "/api/regional/cutover-workbench"), true);
+  assert.equal(report.artifacts.some((item) => item.id === "regional-pilot-readiness" && item.command === "regional:pilot" && item.evidence === "/api/regional/pilot-program"), true);
   assert.equal(report.artifacts.some((item) => item.id === "regional-replication-exercise" && item.command === "regional:replication"), true);
   assert.equal(report.artifacts.some((item) => item.id === "postgres-primary-storage-contract" && item.command === "postgres:primary-storage-contract:check"), true);
   assert.equal(report.artifacts.some((item) => item.id === "internet-nursing-highlight-center" && item.command === "internet-nursing:readiness" && item.markdown === "docs/internet-nursing-highlight-center.md" && item.evidence === "internet-nursing.html#nursing-highlight-section"), true);
@@ -113,6 +119,10 @@ test("release artifact manifest renders and writes artifacts", (t) => {
   assert.match(markdown, /Doctor multi-practice readiness report/);
   assert.match(markdown, /Template READMEs/);
   assert.match(markdown, /release-artifact-manifest\.md/);
+  assert.match(markdown, /Commit-bound freshness and digest provenance/);
+  assert.match(markdown, /data-collection-governance\.md/);
+  assert.match(markdown, /regional-pilot-readiness\.md/);
+  assert.match(markdown, /platform-nonfunctional-readiness\.md/);
   assert.match(markdown, /platform-capability-map\.md/);
   assert.match(markdown, /platform-go-live-slices\.md/);
   assert.match(markdown, /全系统图谱集\.md/);

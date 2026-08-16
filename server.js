@@ -2,11 +2,8 @@ const http = require("http");
 const fs = require("fs");
 const path = require("path");
 const LEGACY_REGIONAL_STATS_KEY = "da" + "lianHealthStatistics2025";
-const { createPlatformApiRouter } = require("./src/http/routes");
-const {
-  createPlatformCapabilityProviders,
-  createPlatformRuntimeContexts
-} = require("./src/http/runtime-contexts");
+const { createPlatformRuntimeComposition } = require("./src/http/platform-runtime-composition");
+const { createPlatformRequestHandler } = require("./src/http/platform-request-handler");
 const { loadRegionalRuntime } = require("./src/platform/regional/regional-runtime");
 const { ContractRegistry } = require("./src/platform/contracts/contract-registry");
 const {
@@ -28564,42 +28561,20 @@ function createRuntimeCapabilitySource() {
   });
 }
 
-const platformCapabilityProviders = createPlatformCapabilityProviders(createRuntimeCapabilitySource());
 const regionalRuntime = loadRegionalRuntime({ root: __dirname, env: process.env });
-const platformRuntimeContexts = createPlatformRuntimeContexts(platformCapabilityProviders, { regionalRuntime });
-
-function createRequestApiRouter() {
-  return createPlatformApiRouter(platformRuntimeContexts);
-}
+const platformRuntimeComposition = createPlatformRuntimeComposition({
+  source: createRuntimeCapabilitySource(),
+  regionalRuntime
+});
+const platformRuntimeContexts = platformRuntimeComposition.contexts;
 
 async function handleApi(req, res) {
   const url = new URL(req.url, `http://${req.headers.host}`);
-  const handled = await createRequestApiRouter().handle(req, res, url);
+  const handled = await platformRuntimeComposition.apiRouter.handle(req, res, url);
   if (!handled) sendJson(res, 404, { error: "API not found" });
 }
 
-const server = http.createServer((req, res) => platformObservability.run(req, res, async () => {
-  const startedAt = Date.now();
-  res.on("finish", () => recordRequestMetrics(req, res, startedAt));
-  try {
-    if (req.url.startsWith("/api/")) {
-      try {
-        await hydrateRequestSession(req);
-        platformObservability.recordDependency("session-store", { ok: true });
-      } catch (error) {
-        platformObservability.recordDependency("session-store", {
-          ok: false,
-          detail: error.code || error.message
-        });
-        console.error(`central session lookup failed: ${error.message}`);
-        sendJson(res, 503, { ok: false, code: "SESSION_STORE_UNAVAILABLE", message: "authentication session service is temporarily unavailable" });
-        return;
-      }
-      await handleApi(req, res);
-      return;
-    }
-    serveStatic(req, res);
-  } catch (error) {
+function handleRequestError(_req, res, error) {
     if (isStorageConflict(error)) {
       sendStorageConflict(res, error);
       return;
@@ -28609,7 +28584,16 @@ const server = http.createServer((req, res) => platformObservability.run(req, re
       return;
     }
     sendJson(res, 500, { error: error.message });
-  }
+}
+
+const server = http.createServer(createPlatformRequestHandler({
+  observability: platformObservability,
+  hydrateRequestSession,
+  handleApi,
+  serveStatic,
+  recordRequestMetrics,
+  sendJson,
+  handleError: handleRequestError
 }));
 
 function startServer(port = PORT) {

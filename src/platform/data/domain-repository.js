@@ -31,6 +31,13 @@ function validateOwnershipManifest(manifest = ownershipManifest) {
   if (production?.authoritative !== "postgresql" || production?.fallbackWrite !== false) {
     throw new TypeError("production storage must be PostgreSQL with fallback writes disabled");
   }
+  const unregistered = manifest.unregisteredCollectionPolicy;
+  if (unregistered?.classification !== "legacy-non-authoritative"
+    || unregistered?.productionWriteAllowed !== false
+    || !Array.isArray(unregistered?.promotionRequires)
+    || unregistered.promotionRequires.length < 4) {
+    throw new TypeError("unregistered collections must be non-authoritative and blocked from production writes");
+  }
   return true;
 }
 

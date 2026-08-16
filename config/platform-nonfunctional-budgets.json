@@ -1,0 +1,29 @@
+{
+  "schemaVersion": "platform-nonfunctional-budgets-v1",
+  "frontendAssets": [
+    { "file": "citizen.js", "maximumBytes": 355000, "maximumLines": 6100 },
+    { "file": "public-health.js", "maximumBytes": 310000, "maximumLines": 4500 },
+    { "file": "platform.js", "maximumBytes": 245000, "maximumLines": 3900 },
+    { "file": "operations.js", "maximumBytes": 228000, "maximumLines": 3800 },
+    { "file": "regional-cutover-workbench-ui.js", "maximumBytes": 20000, "maximumLines": 500 }
+  ],
+  "runtime": {
+    "serverFile": "server.js",
+    "maximumServerLines": 28750,
+    "maximumServerRequires": 125,
+    "requiredCompositionModules": [
+      "src/http/platform-runtime-composition.js",
+      "src/http/platform-request-handler.js"
+    ]
+  },
+  "quality": {
+    "minimumTestFiles": 353,
+    "minimumRouteFiles": 43,
+    "requiredPlatformMarkers": [
+      "lang=\"zh-CN\"",
+      "name=\"viewport\"",
+      "<main",
+      "regional-cutover-workbench-panel"
+    ]
+  }
+}
