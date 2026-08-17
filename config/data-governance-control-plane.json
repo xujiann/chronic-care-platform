@@ -1,0 +1,51 @@
+{
+  "schemaVersion": "data-governance-control-plane-program-v1",
+  "programId": "data-governance-operations-20260817",
+  "iterations": [
+    { "id": "data-1-migration-execution", "capability": "committed-outbox-migration" },
+    { "id": "data-2-recoverable-checkpoint", "capability": "leased-monotonic-checkpoint" },
+    { "id": "data-3-exact-reconciliation", "capability": "count-digest-duplicate-exactness" },
+    { "id": "data-4-rollback-gate", "capability": "independent-rollback-evidence" },
+    { "id": "data-5-quality-rules", "capability": "threshold-and-issue-governance" },
+    { "id": "data-6-lineage-impact", "capability": "downstream-impact-and-work-items" }
+  ],
+  "qualityRules": [
+    { "id": "migration-count-exact", "metric": "mismatchCount", "operator": "max", "threshold": 0, "severity": "critical" },
+    { "id": "migration-duplicate-exact", "metric": "duplicateCount", "operator": "max", "threshold": 0, "severity": "critical" },
+    { "id": "migration-completeness", "metric": "completenessPct", "operator": "min", "threshold": 99.5, "severity": "high" },
+    { "id": "migration-validity", "metric": "validityPct", "operator": "min", "threshold": 99, "severity": "high" },
+    { "id": "migration-freshness", "metric": "freshnessLagSeconds", "operator": "max", "threshold": 300, "severity": "medium" }
+  ],
+  "topology": {
+    "nodes": [
+      "sqlite-authoritative-store",
+      "transactional-outbox",
+      "migration-worker",
+      "recoverable-checkpoint",
+      "postgres-shadow-target",
+      "exact-reconciliation-gate",
+      "rollback-evidence-gate",
+      "quality-rule-gate",
+      "local-candidate"
+    ],
+    "edges": [
+      { "from": "sqlite-authoritative-store", "to": "transactional-outbox", "control": "committed-transaction" },
+      { "from": "transactional-outbox", "to": "migration-worker", "control": "background-lease" },
+      { "from": "migration-worker", "to": "recoverable-checkpoint", "control": "monotonic-sequence" },
+      { "from": "migration-worker", "to": "postgres-shadow-target", "control": "idempotent-apply" },
+      { "from": "recoverable-checkpoint", "to": "exact-reconciliation-gate", "control": "checkpoint-binding" },
+      { "from": "postgres-shadow-target", "to": "exact-reconciliation-gate", "control": "count-and-digest" },
+      { "from": "exact-reconciliation-gate", "to": "rollback-evidence-gate", "control": "zero-difference" },
+      { "from": "rollback-evidence-gate", "to": "quality-rule-gate", "control": "independent-approvals" },
+      { "from": "quality-rule-gate", "to": "local-candidate", "control": "zero-open-findings" }
+    ]
+  },
+  "workItems": {
+    "domain": "platform-governance",
+    "assigneeRole": "platform-governance",
+    "slaHours": { "critical": 4, "high": 8, "medium": 24, "low": 72 }
+  },
+  "requestPathDualWrite": false,
+  "metadataOnly": true,
+  "productionActivationAuthorized": false
+}
