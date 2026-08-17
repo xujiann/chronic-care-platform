@@ -10,6 +10,7 @@ const { buildProductionDeploymentPackage } = require("../scripts/production-depl
 const { createBackup } = require("../scripts/storage-admin");
 const {
   emptyRegistry,
+  isControlledBaselineTransition,
   parseArgs,
   registerRelease,
   renderMarkdown,
@@ -18,6 +19,13 @@ const {
 } = require("../scripts/release-registry");
 
 const ROOT = path.resolve(__dirname, "..");
+
+test("only a dated T00 baseline branch may bridge an unpublished governance tag", () => {
+  assert.equal(isControlledBaselineTransition("process/t00-enhancement-baseline-20260817"), true);
+  assert.equal(isControlledBaselineTransition("main"), false);
+  assert.equal(isControlledBaselineTransition("process/t02-enhancement-baseline-20260817"), false);
+  assert.equal(isControlledBaselineTransition("process/t00-enhancement-baseline-latest"), false);
+});
 
 function fixture(t) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "release-registry-"));

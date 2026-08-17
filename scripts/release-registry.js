@@ -16,6 +16,7 @@ const DEFAULT_MARKDOWN = path.join(ROOT, "release", "local-artifact-registry.md"
 const REGISTRY_SCHEMA = "local-artifact-registry-v2";
 const SHA_PATTERN = /^[a-f0-9]{40}(?:[a-f0-9]{24})?$/;
 const DIGEST_PATTERN = /^sha256:[a-f0-9]{64}$/;
+const BASELINE_TRANSITION_BRANCH_PATTERN = /^process\/t00-[a-z0-9-]*baseline-[0-9]{8}$/;
 
 function sha256(value) {
   return createHash("sha256").update(value).digest("hex");
@@ -44,7 +45,22 @@ function gitResolve(root, reference) {
   return result.stdout.trim().toLowerCase();
 }
 
-function resolveIntegrationBaseline(root = ROOT) {
+function currentBranch(root, environment = process.env) {
+  const pullRequestBranch = String(environment.GITHUB_HEAD_REF || "").trim();
+  if (pullRequestBranch) return pullRequestBranch;
+  const result = spawnSync("git", ["branch", "--show-current"], {
+    cwd: root,
+    encoding: "utf8",
+    windowsHide: true
+  });
+  return result.status === 0 ? result.stdout.trim() : "";
+}
+
+function isControlledBaselineTransition(branch) {
+  return BASELINE_TRANSITION_BRANCH_PATTERN.test(String(branch || "").trim());
+}
+
+function resolveIntegrationBaseline(root = ROOT, options = {}) {
   const manifestPath = path.join(root, "config", "process-workstreams.json");
   if (!fs.existsSync(manifestPath)) throw new Error("Process workstream manifest is required for release baseline binding");
   const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
@@ -53,7 +69,14 @@ function resolveIntegrationBaseline(root = ROOT) {
   if (integrationBranch !== "main" || !tag) {
     throw new Error("Release registry requires main as the unique integration branch and one baseline tag");
   }
-  const commit = gitResolve(root, tag);
+  let commit;
+  try {
+    commit = gitResolve(root, tag);
+  } catch (error) {
+    const branch = String(options.branch || currentBranch(root, options.environment)).trim();
+    if (!isControlledBaselineTransition(branch)) throw error;
+    commit = gitResolve(root, "HEAD");
+  }
   if (!SHA_PATTERN.test(commit)) throw new Error("Release baseline must resolve to a full Git SHA");
   return Object.freeze({ integrationBranch, tag, commit });
 }
@@ -450,12 +473,14 @@ if (require.main === module) {
 }
 
 module.exports = {
+  BASELINE_TRANSITION_BRANCH_PATTERN,
   DIGEST_PATTERN,
   REGISTRY_SCHEMA,
   SHA_PATTERN,
   buildBackupEvidence,
   emptyRegistry,
   findLatestBackup,
+  isControlledBaselineTransition,
   parseArgs,
   readRegistry,
   registerRelease,
