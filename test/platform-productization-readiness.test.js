@@ -19,6 +19,7 @@ test("productization readiness completes local gates and keeps production fail c
   assert.equal(report.containsPatientData, false);
   assert.equal(report.containsCredentials, false);
   assert.equal(report.checks.every((item) => item.passed), true);
+  assert.equal(report.checks.find((item) => item.id === "productization:regionalAssembly").detail, "template");
   assert.match(renderMarkdown(report), /Production readiness: NO-GO/);
 });
 

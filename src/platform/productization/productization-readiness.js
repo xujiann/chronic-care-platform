@@ -31,7 +31,7 @@ function buildPlatformProductizationReadiness(options = {}) {
   const nonfunctional = buildPlatformNonfunctionalReadiness({ root });
   const assembly = buildRegionalProductAssembly({
     root,
-    regionCode: options.regionCode || "210200",
+    regionCode: options.regionCode,
     env: options.env || {},
     data,
     now: options.now
