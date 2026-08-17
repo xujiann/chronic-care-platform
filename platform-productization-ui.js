@@ -38,12 +38,25 @@
     boundary.textContent = report.boundary;
   }
 
+  function renderOperations(report) {
+    const target = document.querySelector("#platform-product-operations");
+    if (!target || !root.HealthPlatformProductOperationsUi) return;
+    root.HealthPlatformProductOperationsUi.mount(report.cockpit, target);
+    target.dataset.localControlReady = report.localControlReady ? "true" : "false";
+    target.dataset.productionReady = "false";
+  }
+
   async function load() {
     if (!root.HealthPlatformApi) return;
     const status = document.querySelector("#platform-productization-status");
     try {
-      const response = await root.HealthPlatformApi.createClient().get("/platform/productization/center");
-      render(response.data);
+      const client = root.HealthPlatformApi.createClient();
+      const [center, operations] = await Promise.all([
+        client.get("/platform/productization/center"),
+        client.get("/platform/productization/operations/cockpit")
+      ]);
+      render(center.data);
+      renderOperations(operations.data);
     } catch {
       if (status) {
         status.textContent = "产品化控制面不可用";
@@ -53,5 +66,5 @@
   }
 
   if (typeof document !== "undefined") document.addEventListener("DOMContentLoaded", load);
-  root.HealthPlatformProductization = Object.freeze({ load, render });
+  root.HealthPlatformProductization = Object.freeze({ load, render, renderOperations });
 })(typeof globalThis === "object" ? globalThis : this);

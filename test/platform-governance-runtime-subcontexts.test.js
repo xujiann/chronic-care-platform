@@ -23,7 +23,7 @@ test("platform governance segments use distinct least-privilege service contexts
       "phase2-operations": 54,
       "mutual-recognition-overview": 4,
       "mutual-recognition-decision": 9,
-      "productization-center": 10
+      "productization-center": 11
     }
   );
   assert.equal(new Set(Object.values(SUBDOMAIN_DEPENDENCIES).map((dependencies) => dependencies.join(","))).size, 11);

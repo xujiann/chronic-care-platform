@@ -11,6 +11,7 @@ function harness(options = {}) {
   const audits = [];
   const segment = createRouteSegment({
     ...runtime,
+    ...(options.runtime || {}),
     appendSecurityEvent: (event) => audits.push(event),
     collectJson: async () => options.payload || {},
     readDatabase: () => state,
@@ -29,6 +30,45 @@ test("productization center is commission-only and production fail closed", asyn
   assert.equal(fixture.responses[0].body.productionReady, false);
   assert.equal(fixture.responses[0].body.dataPromotion.summary.promotedP0, 12);
   assert.equal(fixture.audits[0].action, "platform-productization-center-read");
+});
+
+test("product operations cockpit is commission-only, read-only and minimized", async () => {
+  const calls = [];
+  const fixture = harness({
+    runtime: {
+      buildPlatformProductOperationsCockpit: (data) => {
+        calls.push(data);
+        return {
+          schemaVersion: "platform-product-operations-cockpit-v1",
+          localControlReady: true,
+          siteReady: false,
+          productionReady: false,
+          containsBusinessPayload: false,
+          containsCredentials: false,
+          summary: { projectedWorkItems: 34, regionalSites: 2 },
+          cockpit: { schemaVersion: "product-operations-view-model-v1", cards: [], sections: [], workItems: [], productionReady: false }
+        };
+      }
+    },
+    data: { patientName: "must-not-project" }
+  });
+  const url = new URL("https://example.gov.cn/api/platform/productization/operations/cockpit");
+  assert.equal(await fixture.segment.handle({ method: "GET" }, {}, url), true);
+  assert.equal(fixture.responses[0].status, 200);
+  assert.equal(fixture.responses[0].body.productionReady, false);
+  assert.equal(fixture.responses[0].body.containsBusinessPayload, false);
+  assert.equal(fixture.audits[0].action, "platform-product-operations-cockpit-read");
+  assert.equal(calls.length, 1);
+  assert.equal(await fixture.segment.handle({ method: "POST" }, {}, url), false);
+  assert.equal(fixture.responses.length, 1);
+});
+
+test("product operations cockpit keeps denied access opaque", async () => {
+  const fixture = harness({ requireApiRole: () => null });
+  const handled = await fixture.segment.handle({ method: "GET" }, {}, new URL("https://example.gov.cn/api/platform/productization/operations/cockpit"));
+  assert.equal(handled, true);
+  assert.equal(fixture.responses.length, 0);
+  assert.equal(fixture.audits.length, 0);
 });
 
 test("institution profile and synthetic run APIs persist minimized metadata", async () => {

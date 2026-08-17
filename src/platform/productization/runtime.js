@@ -10,6 +10,9 @@ const {
   registerInstitutionIntegrationProfile,
   runInstitutionSyntheticJointTest
 } = require("./institution-integration-center");
+const {
+  buildPlatformProductOperationsCockpit
+} = require("./product-operations-runtime");
 
 function buildPlatformProductizationCenter(data, options = {}) {
   const dataPromotion = buildDataPromotionCenter(data, options);
@@ -31,6 +34,7 @@ module.exports = {
   applyPlatformWorkItemAction,
   buildDataPromotionCenter,
   buildInstitutionIntegrationCenter,
+  buildPlatformProductOperationsCockpit,
   buildPlatformProductizationCenter,
   buildPlatformWorkItemCenter,
   registerInstitutionIntegrationProfile,
