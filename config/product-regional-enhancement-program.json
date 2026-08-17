@@ -1,0 +1,50 @@
+{
+  "schemaVersion": "product-regional-enhancement-program-v1",
+  "iterations": [
+    { "id": "iteration-1-source-sla", "capabilities": ["source-normalization", "priority-normalization", "sla-evaluation"] },
+    { "id": "iteration-2-dispatch-claim", "capabilities": ["role-dispatch", "actor-claim", "optimistic-version"] },
+    { "id": "iteration-3-collaboration", "capabilities": ["digest-only-message", "read-receipt", "idempotent-command"] },
+    { "id": "iteration-4-lifecycle", "capabilities": ["reopen", "escalation", "redacted-timeline"] },
+    { "id": "iteration-5-regional-view", "capabilities": ["capability-inventory", "configuration-diff", "deployment-replication-acceptance"] },
+    { "id": "iteration-6-runtime-quality", "capabilities": ["nonfunctional-budget", "alert-summary", "safe-ui", "readiness-cli"] }
+  ],
+  "workItems": {
+    "activeRoles": ["platform-governance", "public-health", "care-coordination", "clinical-specialties", "integration", "identity-security"],
+    "priorityAliases": {
+      "critical": "critical",
+      "urgent": "critical",
+      "p0": "critical",
+      "high": "high",
+      "p1": "high",
+      "medium": "medium",
+      "normal": "normal",
+      "low": "low"
+    },
+    "slaHours": { "critical": 2, "high": 8, "medium": 24, "normal": 48, "low": 72 },
+    "dueSoonRatio": 0.25,
+    "maximumMessagesPerItem": 50,
+    "maximumTimelineEvents": 100,
+    "maximumWorkItems": 1000,
+    "maximumReopens": 3,
+    "maximumEscalations": 5
+  },
+  "regional": {
+    "requiredSections": ["capabilities", "configuration", "deployment", "replication", "acceptance", "nonfunctional", "alerts"],
+    "allowedAcceptanceStates": ["pending", "reviewing", "accepted", "rejected", "expired"],
+    "minimumRegions": 2,
+    "maximumVisibleRegions": 20
+  },
+  "frontend": {
+    "file": "product-regional-operations-ui.js",
+    "maximumBytes": 24000,
+    "maximumLines": 450
+  },
+  "externalBlockers": [
+    "real-site-acceptance-pending",
+    "staffed-monitoring-and-alert-drill-pending",
+    "load-weak-network-and-accessibility-evidence-pending",
+    "backup-restore-and-disaster-recovery-evidence-pending",
+    "independent-security-review-pending",
+    "production-cutover-authorization-pending"
+  ]
+}
