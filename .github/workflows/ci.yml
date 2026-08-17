@@ -75,7 +75,15 @@ jobs:
       - name: Install dependencies
         run: npm ci
       - name: Verify process ownership boundary
-        run: node scripts/process-worktree.js verify --branch="${GITHUB_HEAD_REF:-$GITHUB_REF_NAME}"
+        shell: bash
+        run: |
+          branch="${GITHUB_HEAD_REF:-$GITHUB_REF_NAME}"
+          if [[ "$branch" == process/t00-*-baseline-* ]]; then
+            git fetch origin main --depth=1
+            node scripts/process-worktree.js verify --branch="$branch" --base=origin/main
+          else
+            node scripts/process-worktree.js verify --branch="$branch"
+          fi
       - name: Test process worktree governance
         run: node --test test/process-worktree.test.js
       - name: Test modular-monolith architecture contracts
