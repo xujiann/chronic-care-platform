@@ -14,6 +14,10 @@
 
 * { box-sizing: border-box; }
 
+html:not([data-auth-resolved="allowed"]) body:not([data-auth-page="login"]) {
+  visibility: hidden;
+}
+
 body {
   margin: 0;
   min-height: 100vh;
@@ -196,6 +200,29 @@ h1 { margin-top: 4px; font-size: 28px; }
   align-items: center;
 }
 
+.login-environment-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 10px 0;
+  border: 1px solid #efb445;
+  border-radius: 8px;
+  padding: 10px 14px;
+  background: #fff8e7;
+  color: #754b00;
+}
+
+.login-environment-banner[hidden] {
+  display: none;
+}
+
+.login-environment-banner strong {
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: #9a5f00;
+  color: #fff;
+}
+
 .login-layout {
   display: grid;
   grid-template-columns: 1.1fr 0.9fr;
@@ -236,6 +263,23 @@ h1 { margin-top: 4px; font-size: 28px; }
   line-height: 1.7;
 }
 
+.login-security-boundary {
+  margin-top: 24px;
+  border: 1px solid rgba(143, 224, 201, 0.28);
+  border-radius: 8px;
+  padding: 14px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.login-security-boundary strong {
+  color: #8fe0c9;
+}
+
+.login-security-boundary p {
+  margin: 6px 0 0;
+  font-size: 13px;
+}
+
 .login-flow {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -273,6 +317,110 @@ h1 { margin-top: 4px; font-size: 28px; }
   margin-bottom: 14px;
 }
 
+.identity-selector,
+.login-access-preview {
+  display: grid;
+  gap: 10px;
+  margin: 0 0 14px;
+}
+
+.identity-selector[hidden],
+.login-access-preview[hidden] {
+  display: none;
+}
+
+.login-step-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink);
+  font-size: 13px;
+}
+
+.login-step-title span {
+  display: inline-grid;
+  width: 25px;
+  height: 25px;
+  place-items: center;
+  border-radius: 50%;
+  background: #eaf2ff;
+  color: #184a91;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.identity-type-grid,
+.account-card-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.identity-type-grid button,
+.account-card-grid button {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px;
+  background: #fff;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+}
+
+.identity-type-grid button[aria-selected="true"],
+.account-card-grid button[aria-pressed="true"] {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 2px rgba(39, 110, 241, 0.12);
+  background: #f4f8ff;
+}
+
+.identity-type-grid span,
+.account-card-grid span,
+.account-card-grid small {
+  color: var(--muted);
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
+.login-access-preview {
+  border: 1px solid #cfe5df;
+  border-radius: 8px;
+  padding: 12px;
+  background: #f0fbf7;
+}
+
+.access-preview-identity {
+  display: grid;
+  gap: 4px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.access-preview-identity strong {
+  color: var(--teal);
+  font-size: 14px;
+}
+
+.access-preview-functions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.access-preview-functions span {
+  border: 1px solid #b8ddd3;
+  border-radius: 999px;
+  padding: 3px 8px;
+  background: #fff;
+  color: #286a5c;
+  font-size: 11px;
+  font-weight: 700;
+}
+
 .login-method-tabs button {
   min-height: 38px;
   border: 1px solid var(--line);
@@ -302,6 +450,16 @@ h1 { margin-top: 4px; font-size: 28px; }
   color: var(--muted);
   font-size: 12px;
   line-height: 1.55;
+}
+
+.account-provisioning-note summary {
+  color: var(--ink);
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.account-provisioning-note p {
+  margin: 8px 0 0;
 }
 
 .account-provisioning-note strong {

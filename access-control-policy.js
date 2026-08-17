@@ -54,7 +54,7 @@
     "operations-about.html": entry("运行说明", ["commission"], { nav: false }),
     "public-health.html": entry("公共卫生", ["commission"], { group: "公共卫生", capabilities: ["publicHealth"] }),
     "public-health-highlights.html": entry("公卫亮点", ["commission"], { group: "公共卫生", capabilities: ["publicHealth"] }),
-    "immunization.html": entry("免疫规划", ["commission", "institution"], { group: "公共卫生", capabilities: ["immunization"] }),
+    "immunization.html": entry("免疫规划", ["commission", "institution", "citizen"], { group: "公共卫生", capabilities: ["immunization"] }),
     "maternal-child-about.html": entry("妇幼健康", ["commission", "institution", "citizen"], { nav: false, capabilities: ["maternalChild"] }),
     "quality-safety.html": entry("质量安全", ["commission", "institution", "county"], { group: "监管治理", capabilities: ["qualitySafety"] }),
     "quality-safety-about.html": entry("质量安全说明", ["commission", "institution", "county"], { nav: false }),
@@ -69,7 +69,7 @@
     "escort.html": entry("助医陪诊", ["commission", "institution"], { group: "连续服务", capabilities: ["escort"] }),
     "referral-teleconsultation-about.html": entry("转诊会诊", ["commission", "institution", "county"], { nav: false, capabilities: ["referral"] }),
     "imaging-cloud.html": entry("影像云", ["commission", "institution", "county", "citizen"], { group: "临床服务", capabilities: ["imagingCloud"] }),
-    "emergency.html": entry("急救协同", ["commission", "institution", "county"], { group: "临床服务", capabilities: ["emergency"] }),
+    "emergency.html": entry("急救协同", ["commission", "institution", "citizen"], { group: "临床服务", capabilities: ["emergency"] }),
     "physical-examination.html": entry("健康体检", ["commission", "institution", "citizen"], { group: "临床服务", capabilities: ["physicalExamination"] }),
     "physical-examination-standalone.html": entry("体检独立门户", ["institution", "citizen"], { group: "临床服务", capabilities: ["physicalExamination"] }),
     "blood.html": entry("血液管理", ["commission", "institution"], { group: "临床服务", capabilities: ["blood"] }),
@@ -77,14 +77,14 @@
     "blood-go-live.html": entry("血液上线", ["commission", "institution"], { group: "临床服务", capabilities: ["blood"] }),
     "blood-innovation.html": entry("血液创新", ["commission", "institution"], { group: "临床服务", capabilities: ["blood"] }),
     "insurance.html": entry("医保管理", ["insurance"], { group: "医保支付" }),
-    "disease-payment.html": entry("按病种支付", ["insurance", "institution"], { group: "医保支付", capabilities: ["diseasePayment"] }),
+    "disease-payment.html": entry("按病种支付", ["insurance", "commission", "institution"], { group: "医保支付", capabilities: ["diseasePayment"] }),
     "drug-consumable-about.html": entry("药耗管理", ["commission", "institution", "insurance"], { nav: false, capabilities: ["drugConsumable"] }),
     "county.html": entry("县域医共体", ["county"], { group: "医共体" }),
     "citizen.html": entry("居民服务", ["citizen"], { group: "居民服务", accountTypes: residentAccounts }),
     "mobile-preview.html": entry("手机预览", ["citizen"], { group: "居民服务", accountTypes: residentAccounts }),
     "resident-mini-program.html": entry("居民小程序", ["citizen"], { group: "居民服务", accountTypes: residentAccounts }),
     "research-sandbox-about.html": entry("科研沙箱", ["commission", "institution"], { nav: false, capabilities: ["researchSandbox"] }),
-    "t10-specialty-cutover.html": entry("专科切换", ["commission", "institution"], { group: "平台治理" }),
+    "t10-specialty-cutover.html": entry("专科切换", ["commission", "institution", "county"], { group: "平台治理" }),
     "digital-hospital-standard-platform/index.html": entry("数智医院标准平台", ["commission", "institution"], { group: "机构发展" })
   });
 
@@ -128,6 +128,10 @@
     if (!KNOWN_ROLES.includes(role)) return Object.freeze({ allowed: false, reason: "UNKNOWN_ROLE", page, policy });
     if (page === "login.html") return Object.freeze({ allowed: false, reason: "ALREADY_AUTHENTICATED", page, policy });
     if (!policy.roles.includes(role)) return Object.freeze({ allowed: false, reason: "ROLE_DENIED", page, policy });
+    const authorizedPages = normalizeSet(context.pages || context.authorizedPages || user.authorizedPages);
+    if (authorizedPages !== null && !authorizedPages.has(page)) {
+      return Object.freeze({ allowed: false, reason: "SERVER_PAGE_DENIED", page, policy });
+    }
     const accountType = normalizeAccountType(user);
     if (policy.accountTypes.length && !policy.accountTypes.includes(accountType)) {
       return Object.freeze({ allowed: false, reason: "ACCOUNT_TYPE_DENIED", page, policy });

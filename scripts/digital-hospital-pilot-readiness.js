@@ -32,6 +32,7 @@ function buildDigitalHospitalPilotReadiness(options = {}) {
   const ui = options.ui || read("digital-hospital-evaluation-ui.js");
   const server = options.server || readRuntimeSource(ROOT);
   const auth = options.auth || read("auth.js");
+  const accessPolicy = options.accessPolicy || read("access-control-policy.js");
   const doc = options.doc || read("docs/数智医院评价试点上线说明-2026.md");
   const pkg = options.pkg || readJson("package.json");
   const manifest = options.manifest || read("scripts/release-artifact-manifest.js");
@@ -61,7 +62,7 @@ function buildDigitalHospitalPilotReadiness(options = {}) {
     check("pilotReadiness:issueClosure", board.checks.find((item) => item.id === "pilot:issueClosure")?.passed && ["createDigitalHospitalPilotIssue", "normalizeDigitalHospitalPilotIssueAction", "independent issue reviewer"].every((marker) => model.includes(marker)), `${board.summary.openPilotIssues}/${board.summary.pilotIssues} pilot issues open / ${board.summary.pendingPilotIssueReviews} pending review`),
     check("pilotReadiness:api", requiredRoutes.every((marker) => server.includes(marker)), `${requiredRoutes.length}/${requiredRoutes.length} pilot API markers`),
     check("pilotReadiness:ui", requiredSections.every((section) => html.includes(`data-digital-evaluation-section="${section}"`)) && ui.includes("refreshBoard") && ui.includes("run-preassessment") && html.includes("digital-evaluation-pilot-issues") && ui.includes("pilotIssues"), `${requiredSections.length}/${requiredSections.length} workbench sections with pilot issue closure`),
-    check("pilotReadiness:roleScope", html.includes('requireRole(["commission", "institution"])') && auth.includes('"digital-hospital-evaluation.html": ["commission", "institution"]') && model.includes("institution account cannot"), "commission and institution role scope is enforced"),
+    check("pilotReadiness:roleScope", html.includes('requireRole(["commission", "institution"])') && accessPolicy.includes('"digital-hospital-evaluation.html": entry("评价预评", ["commission", "institution"]') && model.includes("institution account cannot"), "commission and institution role scope is enforced by the central policy"),
     check("pilotReadiness:boundary", board.functionalState === "pilot-launch-ready" && board.formalGoLiveState === "blocked-until-site-evidence-signed" && doc.includes("不替代国家或省级正式评价"), `${board.functionalState} / ${board.formalGoLiveState}`),
     check("pilotReadiness:releaseWiring", Boolean(pkg.scripts?.["digital-hospital:pilot-readiness"]) && manifest.includes("digital-hospital-pilot-readiness-report.md") && deploy.includes("digitalHospitalPilotReadiness") && ci.includes("digital-hospital:pilot-readiness"), "package, manifest, deploy check and CI are wired")
   ];

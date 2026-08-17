@@ -1,11 +1,11 @@
 (function (root) {
   "use strict";
 
-  function currentRole() {
+  function currentUser() {
     try {
-      return root.HealthCityAuth?.currentUser?.()?.role
-        || JSON.parse(root.localStorage?.getItem("health-city-auth-session") || "{}").role
-        || "";
+      return root.HealthCityAuth?.getUser?.()
+        || JSON.parse(root.localStorage?.getItem("health-city-auth-session") || "{}")
+        || null;
     } catch (error) {
       return "";
     }
@@ -13,17 +13,21 @@
 
   function boot() {
     root.HealthPlatformDesign?.install?.();
-    const role = currentRole();
-    const modules = root.HealthPlatformModules?.forRole?.(role) || [];
+    const user = currentUser();
+    const role = user?.role || "";
+    const modules = root.HealthPlatformModules?.forUser?.(user) || [];
+    const menu = root.HealthAccessPolicy?.pagesForUser?.(user) || [];
     root.HealthPlatform = Object.freeze({
       api: root.HealthPlatformApi?.createClient?.(),
       role,
+      accountType: root.HealthAccessPolicy?.normalizeAccountType?.(user) || "",
       modules,
-      version: "1.0.0"
+      menu,
+      version: "2.0.0"
     });
     root.document?.documentElement?.setAttribute("data-platform-shell", "ready");
     root.document?.dispatchEvent?.(new root.CustomEvent("health-platform:ready", {
-      detail: { role, moduleIds: modules.map((item) => item.id) }
+      detail: { role, moduleIds: modules.map((item) => item.id), menuPages: menu.map((item) => item.page) }
     }));
   }
 

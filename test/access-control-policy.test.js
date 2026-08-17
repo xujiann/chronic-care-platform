@@ -70,3 +70,9 @@ test("explicit permission checks fail closed", () => {
   assert.equal(policy.canUsePermission("referral.accept", user()), false);
   assert.equal(policy.canUsePermission("", user({ permissions: [""] })), false);
 });
+
+test("server-authorized page lists further narrow local role policy", () => {
+  const institution = user({ authorizedPages: ["institution.html"] });
+  assert.equal(policy.canAccessPage("institution.html", institution), true);
+  assert.equal(policy.accessDecision("imaging-cloud.html", institution).reason, "SERVER_PAGE_DENIED");
+});

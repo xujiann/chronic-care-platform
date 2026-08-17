@@ -14,12 +14,31 @@ function integrationSignature(payload) {
 }
 
 async function login(page, username, expectedPage) {
+  await page.context().clearCookies();
   await page.goto("/login.html");
+  await page.evaluate(() => localStorage.removeItem("health-city-auth-session"));
   await page.locator("#login-user").selectOption(username);
   await page.locator("input[name='password']").fill("123456");
-  await page.getByRole("button", { name: "进入系统" }).click();
+  await page.locator("#login-form button[type='submit']").click();
   await expect(page).toHaveURL(new RegExp(`${expectedPage.replace(".", "\\.")}$`));
 }
+
+test("five identity types receive only their policy menu and reject a forbidden direct link", async ({ page }) => {
+  const identities = [
+    { username: "health", home: "index.html", forbidden: "citizen.html" },
+    { username: "hospital", home: "institution.html", forbidden: "insurance.html" },
+    { username: "insurance", home: "insurance.html", forbidden: "doctor.html" },
+    { username: "citizen", home: "citizen.html", forbidden: "platform.html" },
+    { username: "county", home: "county.html", forbidden: "insurance.html" }
+  ];
+  for (const identity of identities) {
+    await login(page, identity.username, identity.home);
+    await expect(page.locator(".auth-bar")).toBeVisible();
+    await expect(page.locator(`.auth-bar a[href='./${identity.forbidden}']`)).toHaveCount(0);
+    await page.goto(`/${identity.forbidden}`);
+    await expect(page).toHaveURL(new RegExp(`${identity.home.replace(".", "\\.")}\\?denied=${identity.forbidden.replace(".", "\\.")}$`));
+  }
+});
 
 test("commission user reaches the governance dashboard and opens maintenance", async ({ page }) => {
   test.setTimeout(90_000);
@@ -334,11 +353,7 @@ test("institution and insurance accounts land on their own modules", async ({ pa
   await expect(page.locator('[data-registration-integration-source="MR1"]')).toHaveCount(1);
   await expect(page.locator('[data-registration-integration-source="MR2"]')).toHaveCount(0);
 
-  await page.goto("/login.html");
-  await page.locator("#login-user").selectOption("insurance");
-  await page.locator("input[name='password']").fill("123456");
-  await page.getByRole("button", { name: "进入系统" }).click();
-  await expect(page).toHaveURL(/insurance\.html$/);
+  await login(page, "insurance", "insurance.html");
   await expect(page.getByRole("heading", { name: "医保支付、经办审核与基金监管" })).toBeVisible();
 });
 
