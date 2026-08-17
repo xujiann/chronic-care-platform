@@ -46,17 +46,27 @@
     target.dataset.productionReady = "false";
   }
 
+  function renderEnhancements(report) {
+    const target = document.querySelector("#platform-enhancement-operations");
+    if (!target || !root.HealthPlatformProductRegionalOperationsUi) return;
+    root.HealthPlatformProductRegionalOperationsUi.mount(report.cockpit, target);
+    target.dataset.localControlReady = report.localControlReady ? "true" : "false";
+    target.dataset.productionReady = "false";
+  }
+
   async function load() {
     if (!root.HealthPlatformApi) return;
     const status = document.querySelector("#platform-productization-status");
     try {
       const client = root.HealthPlatformApi.createClient();
-      const [center, operations] = await Promise.all([
+      const [center, operations, enhancements] = await Promise.all([
         client.get("/platform/productization/center"),
-        client.get("/platform/productization/operations/cockpit")
+        client.get("/platform/productization/operations/cockpit"),
+        client.get("/platform/productization/enhancements/cockpit")
       ]);
       render(center.data);
       renderOperations(operations.data);
+      renderEnhancements(enhancements.data);
     } catch {
       if (status) {
         status.textContent = "产品化控制面不可用";
@@ -66,5 +76,5 @@
   }
 
   if (typeof document !== "undefined") document.addEventListener("DOMContentLoaded", load);
-  root.HealthPlatformProductization = Object.freeze({ load, render, renderOperations });
+  root.HealthPlatformProductization = Object.freeze({ load, render, renderEnhancements, renderOperations });
 })(typeof globalThis === "object" ? globalThis : this);

@@ -52,6 +52,20 @@ function fixtures(overrides = {}) {
       summary: { workItems: 34 },
       blockers: ["site-acceptance-pending"]
     },
+    enhancement: {
+      schemaVersion: "platform-enhancement-cockpit-v1",
+      ok: false,
+      localControlReady: false,
+      productionReady: false,
+      decision: "NO-GO",
+      summary: { dataIterations: 6, productIterations: 6, workItems: 34, regions: 2 },
+      lines: {
+        data: { productionReady: false },
+        care: { productionReady: false },
+        product: { productionReady: false }
+      },
+      blockers: ["external-site-evidence-pending"]
+    },
     ...overrides
   };
 }
@@ -63,11 +77,13 @@ test("three-line readiness reports usable controls while production stays closed
   assert.equal(report.localReady, false);
   assert.equal(report.productionGate, "NO-GO");
   assert.equal(report.productionReady, false);
+  assert.equal(report.schemaVersion, "development-lines-readiness-v2");
   assert.equal(report.lines.data.summary.collections, 12);
   assert.equal(report.lines.productOperations.summary.workItems, 34);
   assert.equal(report.lines.data.execution.summary.batches, 0);
   assert.equal(report.lines.institutionSandbox.productionGate, "NO-GO");
-  assert.equal(report.checks.length, 6);
+  assert.equal(report.lines.enhancement.summary.productIterations, 6);
+  assert.equal(report.checks.length, 7);
 });
 
 test("three-line readiness detects any line that claims production readiness", () => {

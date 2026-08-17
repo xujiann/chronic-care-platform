@@ -4,7 +4,7 @@ const ROUTE_SEGMENT_ID = "platform-governance-11";
 const SUBDOMAIN = "productization-center";
 
 function createRouteSegment(runtime) {
-  const { appendSecurityEvent, applyPlatformWorkItemAction, buildPlatformProductOperationsCockpit, buildPlatformProductizationCenter, collectJson, readDatabase, registerInstitutionIntegrationProfile, requireApiRole, runInstitutionSyntheticJointTest, sendJson, writeDatabase } = runtime;
+  const { appendSecurityEvent, applyPlatformWorkItemAction, applyPlatformWorkItemV2GovernanceAction, buildPlatformEnhancementCockpit, buildPlatformProductOperationsCockpit, buildPlatformProductizationCenter, collectJson, readDatabase, registerInstitutionIntegrationProfile, requireApiRole, runInstitutionSyntheticJointTest, sendJson, writeDatabase } = runtime;
   return {
     id: ROUTE_SEGMENT_ID,
     domain: "platform-governance",
@@ -41,6 +41,22 @@ function createRouteSegment(runtime) {
         return true;
       }
 
+      if (req.method === "GET" && url.pathname === "/api/platform/productization/enhancements/cockpit") {
+        const user = requireApiRole(req, res, ["commission"], url.pathname);
+        if (!user) return true;
+        const report = buildPlatformEnhancementCockpit(readDatabase());
+        appendSecurityEvent({
+          actor: user.name,
+          role: user.role,
+          action: "platform-enhancement-cockpit-read",
+          target: url.pathname,
+          result: "allowed",
+          detail: `${report.summary.productIterations}/6 product iterations; ${report.summary.workItems} work items; production gate closed`
+        });
+        sendJson(res, 200, report);
+        return true;
+      }
+
       const workItemMatch = url.pathname.match(/^\/api\/platform\/productization\/work-items\/([^/]+)\/actions$/);
       if (req.method === "POST" && workItemMatch) {
         const user = requireApiRole(req, res, ["commission"], "/api/platform/productization/work-items/:id/actions");
@@ -52,6 +68,21 @@ function createRouteSegment(runtime) {
         });
         writeDatabase(execution.data);
         appendSecurityEvent({ actor: user.name, role: user.role, action: `platform-work-item-${payload.action}`, target: execution.result.id, result: "allowed", detail: `version=${execution.result.version}; replayed=${execution.replayed}` });
+        sendJson(res, 200, { ok: true, replayed: execution.replayed, item: execution.result, productionReady: false });
+        return true;
+      }
+
+      const workItemV2Match = url.pathname.match(/^\/api\/platform\/productization\/work-items-v2\/([^/]+)\/actions$/);
+      if (req.method === "POST" && workItemV2Match) {
+        const user = requireApiRole(req, res, ["commission"], "/api/platform/productization/work-items-v2/:id/actions");
+        if (!user) return true;
+        const payload = await collectJson(req);
+        const execution = applyPlatformWorkItemV2GovernanceAction(readDatabase(), {
+          ...payload,
+          itemId: decodeURIComponent(workItemV2Match[1])
+        }, user);
+        writeDatabase(execution.data);
+        appendSecurityEvent({ actor: user.name, role: user.role, action: `platform-work-item-v2-${payload.action}`, target: execution.result.id, result: "allowed", detail: `version=${execution.result.version}; replayed=${execution.replayed}; production gate closed` });
         sendJson(res, 200, { ok: true, replayed: execution.replayed, item: execution.result, productionReady: false });
         return true;
       }
