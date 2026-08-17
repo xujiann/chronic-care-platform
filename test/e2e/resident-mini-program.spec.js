@@ -6,7 +6,7 @@ async function loginAsResident(page) {
   await page.locator("input[name='password']").fill("123456");
   await Promise.all([
     page.waitForURL(/citizen\.html/),
-    page.getByRole("button", { name: "进入系统" }).click()
+    page.locator("#login-form button[type='submit']").click()
   ]);
 }
 
@@ -85,10 +85,9 @@ test("expired or locally forged session is blocked before resident data loads", 
     }));
   });
   await page.goto("/resident-mini-program.html");
-  await expect(page.locator("#session-gate")).toBeVisible();
-  await expect(page.locator("#gate-title")).toHaveText("需要安全登录");
-  await expect(page.locator("#app-content")).toBeHidden();
-  await expect(page.locator("#gate-login")).toBeVisible();
+  await expect(page).toHaveURL(/login\.html\?redirect=resident-mini-program\.html/);
+  await expect(page.locator("#login-form")).toBeVisible();
+  await expect(page.locator("#app-content")).toHaveCount(0);
 });
 
 test("background and offline transitions clear resident state before secure recovery", async ({ page }) => {

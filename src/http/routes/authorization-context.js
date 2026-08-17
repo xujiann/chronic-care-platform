@@ -20,11 +20,14 @@ function buildAuthorizationContext(user, options = {}) {
   const permissions = [...permissionSet(user)].sort();
   const regionalCapabilities = configuredRegionalCapabilities(options.environment);
   const policyContext = { permissions, regionalCapabilities };
-  const pages = AccessPolicy.pagesForUser(user, policyContext, { includeHome: true });
+  const authorizedPages = Object.keys(AccessPolicy.pageCatalog)
+    .filter((page) => AccessPolicy.canAccessPage(page, user, policyContext))
+    .sort();
+  const menus = AccessPolicy.pagesForUser(user, policyContext, { includeHome: true });
   const context = safeAuthorizationContext(user, {
     permissions,
-    pages: pages.map((item) => item.page),
-    menus: pages.map((item) => ({ id: item.page, label: item.label, href: item.href })),
+    pages: authorizedPages,
+    menus: menus.map((item) => ({ id: item.page, label: item.label, href: item.href })),
     organizationScope: claims.organizationScope,
     regionCode: regionalContext.regionCode || user?.regionCode
   });

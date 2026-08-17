@@ -75,7 +75,14 @@ function scopedData() {
 
 test("production session requires a live server-issued resident identity", () => {
   assert.equal(Core.isProductionSession(session(), NOW).ok, true);
+  assert.equal(Core.isProductionSession(session({
+    token: "",
+    authMode: "server-cookie",
+    authContextVersion: "auth-context-v1",
+    authorizedPages: ["citizen.html", "resident-mini-program.html"]
+  }), NOW).ok, true);
   assert.equal(Core.isProductionSession(session({ token: "" }), NOW).reason, "server-session-required");
+  assert.equal(Core.isProductionSession(session({ token: "", authMode: "server-cookie", authContextVersion: "", authorizedPages: [] }), NOW).reason, "server-session-required");
   assert.equal(Core.isProductionSession(session({ authMode: "local" }), NOW).reason, "server-session-required");
   assert.equal(Core.isProductionSession(session({ expiresAt: "2026-07-31T07:59:59.000Z" }), NOW).reason, "session-expired");
   assert.equal(Core.isProductionSession(session({ role: "institution" }), NOW).reason, "citizen-required");

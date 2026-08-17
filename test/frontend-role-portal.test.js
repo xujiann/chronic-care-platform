@@ -67,6 +67,7 @@ test("negative direct links fail closed and select a safe role home", () => {
   assert.equal(policy.accessDecision("doctor.html", insurer).reason, "ROLE_DENIED");
   assert.equal(policy.accessDecision("unregistered.html", insurer).reason, "PAGE_NOT_REGISTERED");
   assert.equal(policy.homeForUser(insurer), "insurance.html");
+  assert.match(read("auth.js"), /deniedPage \? `\?denied=\$\{encodeURIComponent\(deniedPage\)\}`/);
 });
 
 test("auth client initializes the server authorization context before navigation", () => {
@@ -76,7 +77,10 @@ test("auth client initializes the server authorization context before navigation
   assert.match(source, /credentials:\s*"same-origin"/);
   assert.match(source, /health_platform_csrf/);
   assert.match(source, /X-CSRF-Token/);
+  assert.match(source, /const headers = new Headers\(extra\)/);
+  assert.match(source, /headers\.set\("X-CSRF-Token", csrfToken\)/);
   assert.match(source, /HealthAccessPolicy/);
+  assert.match(source, /pageName\.endsWith\("\.html"\) && !canAccessPage/);
   assert.doesNotMatch(source, /return !allowed \|\| allowed\.includes/);
   const contextBody = source.slice(source.indexOf("async function refreshAuthContext()"), source.indexOf("async function logout()"));
   assert.match(contextBody, /fetch\(`\$\{API_BASE\}\/auth\/context`, \{ method: "GET", credentials: "same-origin" \}\)/);
@@ -127,4 +131,5 @@ test("cookie sessions always call server logout and discard script-readable bear
   assert.match(logout, /await authFetch\(`\$\{API_BASE\}\/auth\/logout`/);
   assert.doesNotMatch(logout, /user\?\.token|user\.token/);
   assert.match(source, /delete session\.token/);
+  assert.match(read("login.js"), /if \(auth\.getUser\(\)\) \{[\s\S]*?auth\.refreshAuthContext\(\)/);
 });

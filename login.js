@@ -168,7 +168,11 @@
 
   renderRequestedScope();
   configureMode();
-  auth.refreshAuthContext().then((result) => {
-    if (result.ok && result.source === "server" && result.user) auth.redirectAfterLogin(result.user.home);
-  });
+  // Avoid an expected anonymous 401 probe on a fresh login page. Existing
+  // browser sessions still refresh and return to their authorized home.
+  if (auth.getUser()) {
+    auth.refreshAuthContext().then((result) => {
+      if (result.ok && result.source === "server" && result.user) auth.redirectAfterLogin(result.user.home);
+    });
+  }
 })(typeof globalThis === "object" ? globalThis : this);

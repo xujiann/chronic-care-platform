@@ -3,6 +3,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const test = require("node:test");
+const accessPolicy = require("../access-control-policy");
 
 const {
   STANDARD_TOTALS,
@@ -259,7 +260,6 @@ test("public health page, API, docs and release manifest are wired", () => {
   const server = readRuntimeSource(ROOT);
   const html = fs.readFileSync(path.join(ROOT, "public-health.html"), "utf8");
   const js = fs.readFileSync(path.join(ROOT, "public-health.js"), "utf8");
-  const auth = fs.readFileSync(path.join(ROOT, "auth.js"), "utf8");
   const pkg = readJson("package.json");
   const doc = fs.readFileSync(path.join(ROOT, "docs", "公共卫生信息化系统建设报告.md"), "utf8");
   const plan = fs.readFileSync(path.join(ROOT, "docs", "公共卫生信息化下一步开发计划.md"), "utf8");
@@ -370,7 +370,8 @@ test("public health page, API, docs and release manifest are wired", () => {
   assert.match(js, /renderLaunchGate/);
   assert.match(js, /data-public-health-launch-approval/);
   assert.match(js, /buildStaticLaunchGate/);
-  assert.match(auth, /"public-health\.html": \["commission"\]/);
+  assert.deepEqual([...accessPolicy.pageCatalog["public-health.html"].roles], ["commission"]);
+  assert.deepEqual([...accessPolicy.pageCatalog["public-health.html"].capabilities], ["publicHealth"]);
   assert.equal(pkg.scripts["public-health:readiness"], "node scripts/public-health-readiness.js");
   assert.match(doc, /21\/125\/421/);
   assert.match(doc, /平战结合/);

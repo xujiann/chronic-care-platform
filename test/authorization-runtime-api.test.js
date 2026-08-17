@@ -108,6 +108,8 @@ test("authorization context returns whitelist metadata and role-specific pages",
   assert.equal(body.user.phone, undefined);
   assert.equal(body.pages.includes("doctor.html"), true);
   assert.equal(body.pages.includes("platform.html"), false);
+  assert.equal(body.pages.includes("referral-teleconsultation-about.html"), true);
+  assert.equal(body.menus.some((item) => item.href === "./referral-teleconsultation-about.html"), false);
   assert.equal(body.menus.every((item) => Object.keys(item).every((key) => ["id", "label", "href"].includes(key))), true);
   assert.equal(body.productionReady, false);
 });

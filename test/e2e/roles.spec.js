@@ -23,6 +23,17 @@ async function login(page, username, expectedPage) {
   await expect(page).toHaveURL(new RegExp(`${expectedPage.replace(".", "\\.")}$`));
 }
 
+async function apiLogin(request, username) {
+  const storage = await request.storageState();
+  const csrf = storage.cookies.find((cookie) => cookie.name === "health_platform_csrf")?.value || "";
+  const response = await request.post("/api/auth/login", {
+    headers: csrf ? { "x-csrf-token": csrf } : {},
+    data: { username, password: "123456" }
+  });
+  expect(response.ok()).toBe(true);
+  return (await response.json()).token;
+}
+
 test("five identity types receive only their policy menu and reject a forbidden direct link", async ({ page }) => {
   const identities = [
     { username: "health", home: "index.html", forbidden: "citizen.html" },
@@ -263,6 +274,7 @@ test("about page explains runnable platform capabilities", async ({ page }) => {
   await expect(page.locator("[data-about-section='referral-policy']")).toBeVisible();
   await expect(page.locator("[data-about-section='external-dependencies']")).toBeVisible();
 
+  await login(page, "health", "index.html");
   await page.goto("/referral-teleconsultation-about.html");
   await expect(page.locator("[data-referral-about-section='policy-basis']")).toBeVisible();
   await expect(page.locator("[data-referral-policy='graded-diagnosis']")).toBeVisible();
@@ -271,7 +283,6 @@ test("about page explains runnable platform capabilities", async ({ page }) => {
   await expect(page.locator("[data-referral-signoff='hospital-it']")).toContainText("report-callback");
   await expect(page.locator("[data-referral-about-section='developer']")).toContainText("Dr.Xu");
 
-  await login(page, "health", "index.html");
   await page.goto("/about.html");
   await expect(page.locator(".auth-bar a[href='./about.html']")).toHaveCount(1);
 
@@ -360,13 +371,8 @@ test("institution and insurance accounts land on their own modules", async ({ pa
 test("institution retries its own appointment callback dead letter", async ({ page, request }, testInfo) => {
   test.setTimeout(60_000);
   await page.setViewportSize({ width: 390, height: 844 });
-  const apiLogin = async (username) => {
-    const response = await request.post("/api/auth/login", { data: { username, password: "123456" } });
-    expect(response.ok()).toBe(true);
-    return (await response.json()).token;
-  };
-  const citizenToken = await apiLogin("citizen");
-  const hospitalToken = await apiLogin("hospital");
+  const citizenToken = await apiLogin(request, "citizen");
+  const hospitalToken = await apiLogin(request, "hospital");
   const dashboardResponse = await request.get("/api/registrations/dashboard", { headers: { Authorization: `Bearer ${citizenToken}` } });
   const dashboard = await dashboardResponse.json();
   const schedule = dashboard.schedules.find((item) => item.hospitalCode === "MR1");
@@ -430,13 +436,8 @@ test("institution retries its own appointment callback dead letter", async ({ pa
 test("institution assigns and resolves an appointment reconciliation case", async ({ page, request }, testInfo) => {
   test.setTimeout(60_000);
   await page.setViewportSize({ width: 390, height: 844 });
-  const apiLogin = async (username) => {
-    const response = await request.post("/api/auth/login", { data: { username, password: "123456" } });
-    expect(response.ok()).toBe(true);
-    return (await response.json()).token;
-  };
-  const citizenToken = await apiLogin("citizen");
-  const hospitalToken = await apiLogin("hospital");
+  const citizenToken = await apiLogin(request, "citizen");
+  const hospitalToken = await apiLogin(request, "hospital");
   const dashboard = await (await request.get("/api/registrations/dashboard", { headers: { Authorization: `Bearer ${citizenToken}` } })).json();
   const schedule = dashboard.schedules.find((item) => item.hospitalCode === "MR1");
   const orderResponse = await request.post("/api/registrations/orders", {
@@ -502,12 +503,7 @@ test("institution assigns and resolves an appointment reconciliation case", asyn
 test("hospital disruption notice is accepted by the resident on mobile", async ({ page, request }, testInfo) => {
   test.setTimeout(60_000);
   await page.setViewportSize({ width: 390, height: 844 });
-  const apiLogin = async (username) => {
-    const response = await request.post("/api/auth/login", { data: { username, password: "123456" } });
-    expect(response.ok()).toBe(true);
-    return (await response.json()).token;
-  };
-  const citizenToken = await apiLogin("citizen");
+  const citizenToken = await apiLogin(request, "citizen");
   const dashboard = await (await request.get("/api/registrations/dashboard", { headers: { Authorization: `Bearer ${citizenToken}` } })).json();
   const currentSchedule = dashboard.schedules.find((item) => item.id === "reg-sch-cardio-am");
   const replacementSchedule = dashboard.schedules.find((item) => item.id !== currentSchedule.id && item.hospitalCode === currentSchedule.hospitalCode && item.departmentCode === currentSchedule.departmentCode && item.remaining > 0);

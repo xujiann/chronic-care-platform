@@ -170,7 +170,12 @@
     if (!safeId(session.id) || !safeId(session.accountId) || !safeId(session.residentId)) {
       return { ok: false, reason: "identity-incomplete", message: "居民身份信息不完整，请重新登录" };
     }
-    if (!cleanText(session.token, 4096) || !/^server(?:-|$)/.test(cleanText(session.authMode, 80))) {
+    const authMode = cleanText(session.authMode, 80);
+    const bearerSession = Boolean(cleanText(session.token, 4096)) && /^server(?:-|$)/.test(authMode);
+    const cookieSession = authMode === "server-cookie"
+      && Boolean(cleanText(session.authContextVersion, 120))
+      && Array.isArray(session.authorizedPages);
+    if (!bearerSession && !cookieSession) {
       return { ok: false, reason: "server-session-required", message: "未取得服务端安全会话，请重新登录" };
     }
     const expiresAt = toDate(session.expiresAt);

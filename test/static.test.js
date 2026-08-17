@@ -4,6 +4,7 @@ const path = require("node:path");
 const vm = require("node:vm");
 const test = require("node:test");
 const { readRuntimeSource } = require("../src/http/runtime-source");
+const accessPolicy = require("../access-control-policy");
 
 const ROOT = path.resolve(__dirname, "..");
 
@@ -44,9 +45,10 @@ test("role pages keep explicit page guards", () => {
   assert.match(read("digital-hospital-self-assessment.html"), /requireRole\(\["commission", "institution"\]\)/);
 });
 
-test("server-backed pages reject stale local demo sessions without bearer tokens", () => {
+test("server-backed pages hydrate cookie authorization and reject expired sessions", () => {
   const auth = read("auth.js");
-  assert.match(auth, /API_BASE && !user\.token/);
+  assert.match(auth, /fetch\(`\$\{API_BASE\}\/auth\/context`, \{ method: "GET", credentials: "same-origin" \}\)/);
+  assert.match(auth, /delete session\.token/);
   assert.match(auth, /localStorage\.removeItem\(SESSION_KEY\)/);
   assert.match(auth, /redirect=\$\{encodeURIComponent\(currentPage\(\)\)\}&expired=1/);
 });
@@ -71,7 +73,6 @@ test("application pages avoid placeholder navigation", () => {
 test("about page documents runnable platform capabilities", () => {
   const about = read("about.html");
   const referralAbout = read("referral-teleconsultation-about.html");
-  const auth = read("auth.js");
   assert.match(about, /data-about-section="runtime-capabilities"/);
   assert.match(about, /data-about-section="role-portals"/);
   assert.match(about, /data-about-section="chronic-followup-policy"/);
@@ -106,8 +107,9 @@ test("about page documents runnable platform capabilities", () => {
   assert.match(read("health-city.html"), /href="\.\/about\.html"/);
   assert.match(read("citizen.html"), /href="\.\/about\.html"/);
   assert.match(read("institution.html"), /href="\.\/about\.html"/);
-  assert.match(auth, /\["about\.html", "关于"\]/);
-  assert.match(auth, /referral-teleconsultation-about\.html/);
+  assert.equal(accessPolicy.pageCatalog["about.html"].public, true);
+  assert.equal(accessPolicy.pageCatalog["about.html"].nav, true);
+  assert.deepEqual([...accessPolicy.pageCatalog["referral-teleconsultation-about.html"].roles], ["commission", "institution", "county"]);
   assert.match(referralAbout, /data-referral-about-section="policy-basis"/);
   assert.match(referralAbout, /data-referral-policy="graded-diagnosis"/);
   assert.match(referralAbout, /data-referral-about-section="joint-signoff"/);
@@ -123,8 +125,7 @@ test("about page documents runnable platform capabilities", () => {
   assert.match(referralAbout, /signoff-summary/);
   assert.match(referralAbout, /npm\.cmd run referral:readiness/);
   assert.doesNotMatch(referralAbout, /requireRole/);
-  assert.match(auth, /pageName === "about\.html"/);
-  assert.match(auth, /drug-consumable-about\.html/);
+  assert.deepEqual([...accessPolicy.pageCatalog["drug-consumable-about.html"].roles], ["commission", "institution", "insurance"]);
   assert.doesNotMatch(about, /requireRole/);
 });
 
@@ -218,10 +219,10 @@ test("about page documents doctor multi-practice policy boundaries", () => {
   assert.match(doctorJs, /\/public\/multi-practice-ledger/);
   assert.match(doctorJs, /本人申请/);
   assert.doesNotMatch(doctorAssets, /锟|�|鍖|鎵|鐐|寰|宸|绛|澶|鏆/);
-  assert.match(read("auth.js"), /"doctor\.html": \["institution"\]/);
+  assert.deepEqual([...accessPolicy.pageCatalog["doctor.html"].roles], ["institution"]);
+  assert.deepEqual([...accessPolicy.pageCatalog["doctor.html"].accountTypes], ["doctor"]);
   assert.match(doctorHtml, /requireAccountType\(\["doctor"\]\)/);
   assert.match(read("auth.js"), /function requireAccountType/);
-  assert.match(read("auth.js"), /pageName === "doctor\.html"[\s\S]*accountType === "doctor"/);
   assert.match(read("auth.js"), /home: "doctor\.html", doctorId: "doc-liu"/);
   assert.match(about, /医生账户与多点执业政策说明/);
   assert.match(about, /国卫医发〔2014〕86号/);
@@ -478,7 +479,7 @@ test("public health informatization system is reachable and source-standard alig
   assert.match(server, /public-health-launch-gate-action/);
   assert.match(server, /launch approval is blocked until all prerequisite launch requirements pass/);
   assert.match(server, /APPROVE PUBLIC HEALTH LAUNCH/);
-  assert.match(read("auth.js"), /"public-health\.html": \["commission"\]/);
+  assert.deepEqual([...accessPolicy.pageCatalog["public-health.html"].roles], ["commission"]);
   assert.match(read("platform.html"), /public-health\.html/);
   assert.match(read("health-dashboard.html"), /public-health\.html/);
   assert.match(read("health-city.html"), /public-health\.html/);
@@ -917,7 +918,7 @@ test("health dashboard about page documents policies data boundary and site cuto
   assert.match(js, /aboutRuntimeEvidence/);
   assert.match(js, /staticAboutRuntimeReport/);
   assert.match(read("package.json"), /health-dashboard-about\.js/);
-  assert.match(auth, /"health-dashboard-about\.html": \["commission"\]/);
+  assert.deepEqual([...accessPolicy.pageCatalog["health-dashboard-about.html"].roles], ["commission"]);
 });
 
 test("static snapshot keeps acceptance evidence clean and actionable", () => {
@@ -1704,8 +1705,8 @@ test("regional data sharing application has runnable entry, API and evidence scr
   assert.match(about, /医疗卫生机构信息互通共享三年攻坚/);
   assert.match(about, /医疗机构检查检验结果互认管理办法/);
   assert.match(about, /医疗卫生机构网络安全管理办法/);
-  assert.match(auth, /"regional-data-sharing-about\.html": \["commission", "institution"\]/);
-  assert.match(auth, /\["regional-data-sharing-about\.html", "共享说明"\]/);
+  assert.deepEqual([...accessPolicy.pageCatalog["regional-data-sharing-about.html"].roles], ["commission", "institution"]);
+  assert.equal(accessPolicy.pageCatalog["regional-data-sharing-about.html"].nav, false);
   assert.equal(data.regionalDataSharingScope.reusedCollections.includes("residents"), true);
   assert.equal(data.regionalDataSharingScope.exclusions.length >= 3, true);
   assert.equal(data.regionalSharingPackages.length >= 3, true);
@@ -2090,8 +2091,10 @@ test("platform and workbench expose P2 governance and runtime panels", () => {
   assert.match(readServerRuntime(), /buildOperationsCommandChains/);
   assert.match(readServerRuntime(), /indicatorDetails/);
   assert.match(readServerRuntime(), /review-status-change/);
-  assert.match(read("auth.js"), /\["operations\.html", "运行监测"\]/);
-  assert.match(read("auth.js"), /\["operations-about\.html", "运行说明"\]/);
+  assert.deepEqual([...accessPolicy.pageCatalog["operations.html"].roles], ["commission"]);
+  assert.equal(accessPolicy.pageCatalog["operations.html"].nav, true);
+  assert.deepEqual([...accessPolicy.pageCatalog["operations-about.html"].roles], ["commission"]);
+  assert.equal(accessPolicy.pageCatalog["operations-about.html"].nav, false);
   assert.match(readServerRuntime(), /applyDispatchStatusUpdate/);
   assert.match(readServerRuntime(), /performanceReadinessMatrix/);
   assert.match(readServerRuntime(), /PERFORMANCE_MONITORING_MANUALS/);
@@ -2247,10 +2250,8 @@ test("quality safety supervision app exposes runnable portal, API and release ev
   assert.match(portalCss, /\.table-wrap/);
   assert.match(portalCss, /position: sticky/);
   assert.match(portalCss, /login-scope-note/);
-  assert.match(login, /moduleScopes/);
-  assert.match(login, /quality-safety\.html/);
-  assert.match(login, /医疗质量与安全监管平台准入部门/);
-  assert.match(login, /scope\.roles\.includes\(user\.role\)/);
+  assert.deepEqual(accessPolicy.pageCatalog["quality-safety.html"].roles, ["commission", "institution", "county"]);
+  assert.deepEqual(accessPolicy.pageCatalog["quality-safety.html"].capabilities, ["qualitySafety"]);
   assert.match(server, /\/api\/quality-safety\/dashboard/);
   assert.match(server, /buildQualitySafetyDepartmentTaskView/);
   assert.match(server, /buildQualitySafetyCoreSystemMatrix/);
@@ -2312,7 +2313,7 @@ test("quality safety supervision app exposes runnable portal, API and release ev
   assert.match(read("scripts/release-report.js"), /qualitySafety:goLiveReadiness/);
   assert.match(read("platform.html"), /quality-safety\.html/);
   assert.match(read("workbench.html"), /quality-safety\.html/);
-  assert.match(read("auth.js"), /quality-safety\.html/);
+  assert.deepEqual([...accessPolicy.pageCatalog["quality-safety.html"].roles], ["commission", "institution", "county"]);
   assert.match(readServerRuntime(), /\/api\/chronic\/followup-summary/);
   assert.match(readServerRuntime(), /\/api\/chronic\/followup-feedback/);
   assert.match(readServerRuntime(), /\/api\/chronic\/followup-escalations/);
@@ -2794,8 +2795,8 @@ test("digital hospital standards platform exposes standards center workflow and 
   assert.match(server, /digitalHospitalFormalCutoverApprovals/);
   assert.match(server, /digitalHospitalEvidencePackets/);
   assert.match(server, /digitalHospitalRiskItems/);
-  assert.match(read("auth.js"), /"digital-hospital-standards\.html": \["commission"\]/);
-  assert.match(read("auth.js"), /"digital-hospital-self-assessment\.html": \["commission", "institution"\]/);
+  assert.deepEqual([...accessPolicy.pageCatalog["digital-hospital-standards.html"].roles], ["commission"]);
+  assert.deepEqual([...accessPolicy.pageCatalog["digital-hospital-self-assessment.html"].roles], ["commission", "institution"]);
   assert.match(read("platform.html"), /digital-hospital-standards\.html/);
   assert.match(read("package.json"), /digital-hospital:standards-readiness/);
   assert.match(read("scripts/release-report.js"), /digitalHospitalStandards:readiness/);
@@ -3390,7 +3391,7 @@ test("imaging cloud module exposes hospital ingest, mobile viewing and EMR compa
   assert.match(server, /imaging-cloud\/studies\/:id\/mutual-recognition\/appeal/);
   assert.match(server, /diagnosticReports/);
   assert.match(server, /personalRecords/);
-  assert.match(auth, /"imaging-cloud\.html": \["commission", "institution", "county", "citizen"\]/);
+  assert.deepEqual([...accessPolicy.pageCatalog["imaging-cloud.html"].roles], ["commission", "institution", "county", "citizen"]);
   assert.match(doc, /DICOM C-STORE\/C-MOVE/);
   assert.equal(Boolean(pkg.scripts["imaging-cloud:readiness"]), true);
 });
@@ -3589,8 +3590,8 @@ test("citizen portal exposes resident service tabs and implementation states", (
   assert.match(loginHtml, /data-provisioning-step="nurse"/);
   assert.match(loginHtml, /data-provisioning-step="audit"/);
   assert.match(loginHtml, /data-provisioning-owner/);
-  assert.match(loginHtml, /data-owner-role="resident-master-index"/);
-  assert.match(loginHtml, /data-owner-role="audit-evidence"/);
+  assert.match(loginHtml, /data-provisioning-step="external-identity"/);
+  assert.match(loginHtml, /data-provisioning-step="guardian"/);
   assert.match(loginHtml, /authUsers/);
   assert.match(loginHtml, /securityEvents/);
   assert.match(loginHtml, /dataAccessLogs/);
@@ -3601,7 +3602,7 @@ test("citizen portal exposes resident service tabs and implementation states", (
   assert.match(loginHtml, /doctorId 绑定/);
   assert.match(loginHtml, /账号审计留痕/);
   assert.doesNotMatch(loginHtml, /id="register-form"/);
-  assert.match(loginHtml, /手机号验证码/);
+  assert.match(loginHtml, /短信验证码/);
   assert.match(loginHtml, /data-send-phone-code/);
   assert.match(loginHtml, /phone-code-hint/);
   assert.match(auth, /loginByPhone/);
@@ -4193,7 +4194,7 @@ test("internet nursing module exposes appointment, management and nurse workflow
   assert.match(server, /互联网护理新预约/);
   assert.match(server, /assertInternetNursingActionAllowed/);
   assert.match(server, /nurse can only operate assigned orders/);
-  assert.match(read("auth.js"), /"internet-nursing\.html": \["commission", "institution", "citizen", "county"\]/);
+  assert.deepEqual([...accessPolicy.pageCatalog["internet-nursing.html"].roles], ["commission", "institution", "citizen", "county"]);
   assert.match(read("auth.js"), /username: "nurse"/);
   assert.match(read("auth.js"), /password: "123456"/);
   assert.match(read("auth.js"), /护士工作站/);
@@ -4835,7 +4836,7 @@ test("digital hospital P0-P1 pilot evaluation workbench is wired", () => {
   assert.match(model, /normalizeDigitalHospitalPilotIssueAction/);
   assert.match(model, /independent issue reviewer/);
   assert.match(readiness, /39 EMR \/ 17 service \/ 10 management \/ 4 interoperability/);
-  assert.match(read("auth.js"), /"digital-hospital-evaluation\.html": \["commission", "institution"\]/);
+  assert.deepEqual([...accessPolicy.pageCatalog["digital-hospital-evaluation.html"].roles], ["commission", "institution"]);
   assert.match(read("package.json"), /digital-hospital:pilot-readiness/);
   assert.match(read("scripts/release-artifact-manifest.js"), /digital-hospital-pilot-readiness-report\.md/);
 });

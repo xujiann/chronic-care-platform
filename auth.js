@@ -307,8 +307,10 @@
   }
 
   function authHeaders(extra = {}) {
+    const headers = new Headers(extra);
     const token = getToken();
-    return token ? { ...extra, Authorization: `Bearer ${token}` } : extra;
+    if (token) headers.set("Authorization", `Bearer ${token}`);
+    return headers;
   }
 
   function authFetch(url, options = {}) {
@@ -316,7 +318,7 @@
     const headers = authHeaders(options.headers || {});
     if (!["GET", "HEAD", "OPTIONS"].includes(method)) {
       const csrfToken = readCookie("health_platform_csrf");
-      if (csrfToken) headers["X-CSRF-Token"] = csrfToken;
+      if (csrfToken) headers.set("X-CSRF-Token", csrfToken);
     }
     return fetch(url, {
       ...options,
@@ -432,7 +434,10 @@
     const target = canAccessPage(page, user)
       ? page
       : (accessPolicy?.homeForUser(user) || "health-city.html");
-    window.location.href = localHref(target);
+    const denied = params.get("denied");
+    const deniedPage = denied ? accessPolicy?.normalizePageName(denied) : "";
+    const deniedQuery = deniedPage ? `?denied=${encodeURIComponent(deniedPage)}` : "";
+    window.location.href = `${localHref(target)}${deniedQuery}`;
   }
 
   function normalizePageName(href) {
@@ -494,7 +499,7 @@
     const user = getUser();
     document.querySelectorAll("a[href]").forEach((link) => {
       const pageName = normalizePageName(link.getAttribute("href"));
-      if (pageName && !canAccessPage(pageName, user)) {
+      if (pageName.endsWith(".html") && !canAccessPage(pageName, user)) {
         link.remove();
       }
     });

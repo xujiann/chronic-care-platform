@@ -43,7 +43,7 @@
   // Every browser entry point is registered here. Unknown pages always fail closed.
   const PAGE_CATALOG = Object.freeze({
     "login.html": entry("登录", ALL_ROLES, { public: true, nav: false }),
-    "about.html": entry("关于平台", ALL_ROLES, { public: true, nav: false }),
+    "about.html": entry("关于平台", ALL_ROLES, { public: true, group: "总览" }),
     "health-city.html": entry("平台总览", ALL_ROLES, { public: true, group: "总览" }),
     "index.html": entry("卫健管理", ["commission"], { group: "监管治理" }),
     "health-dashboard.html": entry("健康驾驶舱", ["commission"], { group: "监管治理" }),
