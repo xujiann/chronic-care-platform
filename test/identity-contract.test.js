@@ -60,8 +60,10 @@ test("identity v2 documents organization hierarchy, least privilege and delegate
   assert.equal(contract.protocolMappingStatus.complete, true);
   assert.equal(contract.protocolMappingStatus.subjectNamespaced, true);
   assert.equal(contract.protocolMappingStatus.unknownRolePolicy, "deny");
-  assert.equal(contract.runtimeIdentityAlignment.issuerScopedSubject, false);
-  assert.equal(contract.runtimeIdentityAlignment.unknownRoleFailClosed, false);
+  assert.equal(contract.runtimeIdentityAlignment.issuerScopedSubject, true);
+  assert.equal(contract.runtimeIdentityAlignment.unknownRoleFailClosed, true);
+  assert.equal(contract.runtimeIdentityAlignment.liveAccountValidation, true);
+  assert.equal(contract.runtimeIdentityAlignment.cookieCsrfAndStepUp, true);
   assert.equal(contract.protocolClaimMappings.some((item) => item.field === "orgCode" && item.oidc.includes("org_code")), true);
   assert.equal(contract.protocolClaimMappings.some((item) => item.field === "externalSubject" && item.saml.includes("persistent NameID")), true);
   assert.equal(contract.adapterContracts.saml.runtime, false);

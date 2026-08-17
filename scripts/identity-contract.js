@@ -239,6 +239,7 @@ function buildIdentityContract(options = {}) {
   const adapterSource = options.adapterSource ?? readText("production-adapters.js");
   const serverSource = options.serverSource ?? readRuntimeSource(ROOT);
   const sessionStoreSource = options.sessionStoreSource ?? readText("session-store.js");
+  const runtimeIdentityPolicySource = options.runtimeIdentityPolicySource ?? readText("src/identity-security/runtime-identity-policy.js");
   const authSource = options.authSource ?? readText("auth.js");
   const loginSource = options.loginSource ?? readText("login.html");
   const bloodBusinessSource = options.bloodBusinessSource ?? readText("blood-business.js");
@@ -289,14 +290,15 @@ function buildIdentityContract(options = {}) {
     subjectNamespaced: PROTOCOL_CLAIM_MAPPINGS.some((item) => item.field === "externalSubject" && item.oidc.includes("iss") && item.saml.includes("IdP entityID")),
     unknownRolePolicy: "deny"
   };
-  const externalRoleMapperStart = serverSource.indexOf("function roleFromExternalClaims");
-  const externalRoleMapperEnd = serverSource.indexOf("function homeForRole", externalRoleMapperStart);
-  const externalRoleMapperSource = externalRoleMapperStart >= 0
-    ? serverSource.slice(externalRoleMapperStart, externalRoleMapperEnd > externalRoleMapperStart ? externalRoleMapperEnd : externalRoleMapperStart + 2000)
-    : "";
   const runtimeIdentityAlignment = {
-    issuerScopedSubject: serverSource.includes("externalIssuer") && serverSource.includes("claims.iss"),
-    unknownRoleFailClosed: externalRoleMapperSource.length > 0 && !externalRoleMapperSource.includes('return "commission";')
+    issuerScopedSubject: ["externalIdentityKey", "resolveExternalIdentity", "EXTERNAL_ISSUER_MISMATCH", "legacy-binding-review-required"]
+      .every((marker) => runtimeIdentityPolicySource.includes(marker)),
+    unknownRoleFailClosed: ["KNOWN_ROLES", "UNKNOWN_ROLE_DENIED", "UNKNOWN_ACCOUNT_TYPE_DENIED"]
+      .every((marker) => runtimeIdentityPolicySource.includes(marker)),
+    liveAccountValidation: ["validateLiveSession", "SESSION_IDENTITY_CHANGED", "ORGANIZATION_BINDING_REQUIRED"]
+      .every((marker) => runtimeIdentityPolicySource.includes(marker)),
+    cookieCsrfAndStepUp: ["HttpOnly", "CSRF_VALIDATION_FAILED", "STEP_UP_REQUIRED"]
+      .every((marker) => runtimeIdentityPolicySource.includes(marker))
   };
   const identityReviewCoverage = {
     cases: identityReviewCases.length,
@@ -327,6 +329,12 @@ function buildIdentityContract(options = {}) {
       runtime: false,
       metadataAndCertificates: false,
       signedAssertionValidation: false
+    },
+    runtimeIdentityPolicy: {
+      issuerScopedSubject: runtimeIdentityAlignment.issuerScopedSubject,
+      unknownRoleFailClosed: runtimeIdentityAlignment.unknownRoleFailClosed,
+      liveAccountValidation: runtimeIdentityAlignment.liveAccountValidation,
+      cookieCsrfAndStepUp: runtimeIdentityAlignment.cookieCsrfAndStepUp
     },
     browserIdentityContext: {
       issuerScopedSubject: ["buildExternalIdentityKey", "externalIssuer", "encodeURIComponent(issuer)"].every((marker) => authSource.includes(marker)),

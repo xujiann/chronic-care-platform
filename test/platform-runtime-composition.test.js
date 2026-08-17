@@ -32,6 +32,8 @@ test("request handler centralizes API session failure and static dispatch", asyn
       recordDependency: (name, state) => dependencies.push({ name, state })
     },
     hydrateRequestSession: async () => {},
+    hydrateStaticRequestSession: async () => {},
+    isProtectedStaticRequest: () => false,
     handleApi: async (_req, res) => { res.api = true; },
     serveStatic: (req) => staticRequests.push(req.url),
     recordRequestMetrics: () => {},

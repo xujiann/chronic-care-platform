@@ -1,6 +1,15 @@
 const { test, expect } = require("@playwright/test");
 
+async function loginCommission(page) {
+  await page.goto("/login.html");
+  await page.locator("#login-user").selectOption("health");
+  await page.locator("input[name='password']").fill("123456");
+  await page.locator("#login-form button[type='submit']").click();
+  await expect(page).toHaveURL(/index\.html$/);
+}
+
 async function openPublicHealth(page) {
+  await loginCommission(page);
   await page.goto("/digital-hospital-standard-platform/index.html");
   await page.getByRole("button", { name: "公共卫生", exact: true }).click();
   await expect(page.getByRole("heading", { name: "公共卫生", exact: true })).toBeVisible();

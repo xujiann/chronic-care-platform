@@ -365,6 +365,54 @@ test("identity login persists a structured audit linked to the server correlatio
   assert.equal(JSON.stringify(data.securityEvents).includes("signed-token-raw"), false);
 });
 
+test("local password failures lock the account path and audit every denial", async () => {
+  let data = {
+    authOrganizations: [{ orgCode: "ORG-HEALTH", orgType: "health_admin", status: "enabled" }],
+    authUsers: [{ id: "u-lock", username: "locked-user", name: "Locked User", role: "commission", accountType: "manager", orgCode: "ORG-HEALTH", status: "enabled" }],
+    securityEvents: []
+  };
+  let sequence = 0;
+  let passwordValid = false;
+  const runtime = {
+    collectJson: async () => ({ username: "locked-user", password: "wrong" }),
+    createSession: async (user) => ({ sessionId: "unused", token: "unused", expiresAt: "2026-08-18T00:00:00.000Z", user }),
+    findAuthUser: () => data.authUsers[0],
+    isProductionRuntime: () => false,
+    prependAuditTrailEntry,
+    randomUUID: () => `lock-audit-${++sequence}`,
+    readDatabase: () => data,
+    sendJson: (res, status, body) => res.send(status, body),
+    verifyPassword: () => passwordValid,
+    writeDatabase: (next) => { data = next; }
+  };
+  const segment = createIdentitySegments(runtime).find((item) => item.id === "identity-security-02");
+  const req = {
+    method: "POST",
+    url: "/api/auth/login",
+    correlationId: "trace-password-lock-1234",
+    headers: {}
+  };
+
+  const responses = [];
+  for (let index = 0; index < 5; index += 1) {
+    const response = responseCapture();
+    req.correlationId = `trace-password-lock-${index + 1000}`;
+    await segment.handle(req, response, new URL("http://localhost/api/auth/login"));
+    responses.push(response);
+  }
+  assert.deepEqual(responses.map((item) => item.statusCode), [401, 401, 401, 401, 423]);
+  assert.equal(responses[4].body.code, "PASSWORD_LOGIN_LOCKED");
+  assert.equal(responses[4].body.failedAttempts, 5);
+
+  passwordValid = true;
+  const locked = responseCapture();
+  req.correlationId = "trace-password-lock-locked";
+  await segment.handle(req, locked, new URL("http://localhost/api/auth/login"));
+  assert.equal(locked.statusCode, 423);
+  assert.equal(locked.body.code, "PASSWORD_LOGIN_LOCKED");
+  assert.equal(data.securityEvents.filter((item) => item.action === "local-password-login" && item.result === "denied").length, 6);
+});
+
 test("commission can query session audits by correlation id", async () => {
   let data = { securityEvents: [
     { category: "session-security", correlationId: "trace-query-1234", action: "logout", result: "allowed" },

@@ -14,12 +14,42 @@ function integrationSignature(payload) {
 }
 
 async function login(page, username, expectedPage) {
+  await page.context().clearCookies();
   await page.goto("/login.html");
+  await page.evaluate(() => localStorage.removeItem("health-city-auth-session"));
   await page.locator("#login-user").selectOption(username);
   await page.locator("input[name='password']").fill("123456");
-  await page.getByRole("button", { name: "进入系统" }).click();
+  await page.locator("#login-form button[type='submit']").click();
   await expect(page).toHaveURL(new RegExp(`${expectedPage.replace(".", "\\.")}$`));
 }
+
+async function apiLogin(request, username) {
+  const storage = await request.storageState();
+  const csrf = storage.cookies.find((cookie) => cookie.name === "health_platform_csrf")?.value || "";
+  const response = await request.post("/api/auth/login", {
+    headers: csrf ? { "x-csrf-token": csrf } : {},
+    data: { username, password: "123456" }
+  });
+  expect(response.ok()).toBe(true);
+  return (await response.json()).token;
+}
+
+test("five identity types receive only their policy menu and reject a forbidden direct link", async ({ page }) => {
+  const identities = [
+    { username: "health", home: "index.html", forbidden: "citizen.html" },
+    { username: "hospital", home: "institution.html", forbidden: "insurance.html" },
+    { username: "insurance", home: "insurance.html", forbidden: "doctor.html" },
+    { username: "citizen", home: "citizen.html", forbidden: "platform.html" },
+    { username: "county", home: "county.html", forbidden: "insurance.html" }
+  ];
+  for (const identity of identities) {
+    await login(page, identity.username, identity.home);
+    await expect(page.locator(".auth-bar")).toBeVisible();
+    await expect(page.locator(`.auth-bar a[href='./${identity.forbidden}']`)).toHaveCount(0);
+    await page.goto(`/${identity.forbidden}`);
+    await expect(page).toHaveURL(new RegExp(`${identity.home.replace(".", "\\.")}\\?denied=${identity.forbidden.replace(".", "\\.")}$`));
+  }
+});
 
 test("commission user reaches the governance dashboard and opens maintenance", async ({ page }) => {
   test.setTimeout(90_000);
@@ -244,6 +274,7 @@ test("about page explains runnable platform capabilities", async ({ page }) => {
   await expect(page.locator("[data-about-section='referral-policy']")).toBeVisible();
   await expect(page.locator("[data-about-section='external-dependencies']")).toBeVisible();
 
+  await login(page, "health", "index.html");
   await page.goto("/referral-teleconsultation-about.html");
   await expect(page.locator("[data-referral-about-section='policy-basis']")).toBeVisible();
   await expect(page.locator("[data-referral-policy='graded-diagnosis']")).toBeVisible();
@@ -252,7 +283,6 @@ test("about page explains runnable platform capabilities", async ({ page }) => {
   await expect(page.locator("[data-referral-signoff='hospital-it']")).toContainText("report-callback");
   await expect(page.locator("[data-referral-about-section='developer']")).toContainText("Dr.Xu");
 
-  await login(page, "health", "index.html");
   await page.goto("/about.html");
   await expect(page.locator(".auth-bar a[href='./about.html']")).toHaveCount(1);
 
@@ -334,24 +364,15 @@ test("institution and insurance accounts land on their own modules", async ({ pa
   await expect(page.locator('[data-registration-integration-source="MR1"]')).toHaveCount(1);
   await expect(page.locator('[data-registration-integration-source="MR2"]')).toHaveCount(0);
 
-  await page.goto("/login.html");
-  await page.locator("#login-user").selectOption("insurance");
-  await page.locator("input[name='password']").fill("123456");
-  await page.getByRole("button", { name: "进入系统" }).click();
-  await expect(page).toHaveURL(/insurance\.html$/);
+  await login(page, "insurance", "insurance.html");
   await expect(page.getByRole("heading", { name: "医保支付、经办审核与基金监管" })).toBeVisible();
 });
 
 test("institution retries its own appointment callback dead letter", async ({ page, request }, testInfo) => {
   test.setTimeout(60_000);
   await page.setViewportSize({ width: 390, height: 844 });
-  const apiLogin = async (username) => {
-    const response = await request.post("/api/auth/login", { data: { username, password: "123456" } });
-    expect(response.ok()).toBe(true);
-    return (await response.json()).token;
-  };
-  const citizenToken = await apiLogin("citizen");
-  const hospitalToken = await apiLogin("hospital");
+  const citizenToken = await apiLogin(request, "citizen");
+  const hospitalToken = await apiLogin(request, "hospital");
   const dashboardResponse = await request.get("/api/registrations/dashboard", { headers: { Authorization: `Bearer ${citizenToken}` } });
   const dashboard = await dashboardResponse.json();
   const schedule = dashboard.schedules.find((item) => item.hospitalCode === "MR1");
@@ -415,13 +436,8 @@ test("institution retries its own appointment callback dead letter", async ({ pa
 test("institution assigns and resolves an appointment reconciliation case", async ({ page, request }, testInfo) => {
   test.setTimeout(60_000);
   await page.setViewportSize({ width: 390, height: 844 });
-  const apiLogin = async (username) => {
-    const response = await request.post("/api/auth/login", { data: { username, password: "123456" } });
-    expect(response.ok()).toBe(true);
-    return (await response.json()).token;
-  };
-  const citizenToken = await apiLogin("citizen");
-  const hospitalToken = await apiLogin("hospital");
+  const citizenToken = await apiLogin(request, "citizen");
+  const hospitalToken = await apiLogin(request, "hospital");
   const dashboard = await (await request.get("/api/registrations/dashboard", { headers: { Authorization: `Bearer ${citizenToken}` } })).json();
   const schedule = dashboard.schedules.find((item) => item.hospitalCode === "MR1");
   const orderResponse = await request.post("/api/registrations/orders", {
@@ -487,12 +503,7 @@ test("institution assigns and resolves an appointment reconciliation case", asyn
 test("hospital disruption notice is accepted by the resident on mobile", async ({ page, request }, testInfo) => {
   test.setTimeout(60_000);
   await page.setViewportSize({ width: 390, height: 844 });
-  const apiLogin = async (username) => {
-    const response = await request.post("/api/auth/login", { data: { username, password: "123456" } });
-    expect(response.ok()).toBe(true);
-    return (await response.json()).token;
-  };
-  const citizenToken = await apiLogin("citizen");
+  const citizenToken = await apiLogin(request, "citizen");
   const dashboard = await (await request.get("/api/registrations/dashboard", { headers: { Authorization: `Bearer ${citizenToken}` } })).json();
   const currentSchedule = dashboard.schedules.find((item) => item.id === "reg-sch-cardio-am");
   const replacementSchedule = dashboard.schedules.find((item) => item.id !== currentSchedule.id && item.hospitalCode === currentSchedule.hospitalCode && item.departmentCode === currentSchedule.departmentCode && item.remaining > 0);

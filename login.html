@@ -3,194 +3,107 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>登录 · 健康城市协同系统</title>
+    <title>统一身份登录 · 区域全民健康信息平台</title>
     <link rel="stylesheet" href="./portal.css" />
   </head>
   <body data-auth-page="login">
     <main class="portal-shell login-shell">
       <nav class="project-nav" aria-label="统一导航">
-        <a href="https://xujiann.github.io/healthpolicy/">主页</a>
+        <a href="./health-city.html">平台总览</a>
         <a href="./about.html">关于</a>
       </nav>
+      <section class="login-environment-banner" id="login-environment-banner" hidden role="status">
+        <strong>本地演示模式</strong>
+        <span>页面展示的是虚构账号和样例数据，不代表生产身份源已就绪。</span>
+      </section>
       <section class="login-layout">
         <article class="login-intro">
-          <span>健康城市统一认证</span>
-          <h1>按组织和角色进入协同系统</h1>
-          <p>本地服务运行时，登录会签发后端会话令牌并写入安全审计；静态预览时自动降级为前端演示会话。真实部署可继续接入政务统一身份认证、电子健康码、医保电子凭证、短信验证、CA 证书和人脸核验。</p>
-          <div class="login-flow">
-            <div><strong>1</strong><span>身份识别</span></div>
-            <div><strong>2</strong><span>组织定位</span></div>
-            <div><strong>3</strong><span>角色授权</span></div>
-            <div><strong>4</strong><span>访问留痕</span></div>
+          <span>区域全民健康信息平台 · 统一身份入口</span>
+          <h1>身份决定入口，岗位决定功能，范围决定数据</h1>
+          <p>平台按身份类型、具体岗位、所属机构、权限点和地区能力共同授权。登录后只装载当前身份明确获准的菜单、页面和操作。</p>
+          <div class="login-flow" aria-label="认证授权流程">
+            <div><strong>1</strong><span>识别身份类型</span></div>
+            <div><strong>2</strong><span>确认组织岗位</span></div>
+            <div><strong>3</strong><span>核定功能范围</span></div>
+            <div><strong>4</strong><span>全程审计留痕</span></div>
+          </div>
+          <div class="login-security-boundary">
+            <strong>授权边界</strong>
+            <p>菜单隐藏仅用于改善体验，服务端仍会对页面、接口、机构和地区数据范围作最终裁决。未知角色和未登记功能默认拒绝。</p>
           </div>
         </article>
-
         <article class="panel login-panel">
           <div class="panel-title">
-            <h2>登录</h2>
-            <span>密码 123456 · 居民验证码 888888</span>
+            <div><small>统一认证中心</small><h2>选择身份并登录</h2></div>
+            <span id="login-mode-label">正式身份认证</span>
           </div>
+          <div id="login-scope-note" class="login-scope-note" hidden></div>
+          <section class="identity-selector" id="identity-selector" aria-labelledby="identity-title" hidden>
+            <div class="login-step-title"><span>01</span><strong id="identity-title">选择身份类型</strong></div>
+            <div class="identity-type-grid" id="identity-type-grid" role="tablist"></div>
+            <div class="login-step-title"><span>02</span><strong>选择具体岗位</strong></div>
+            <div class="account-card-grid" id="demo-accounts"></div>
+          </section>
+          <section class="login-access-preview" id="login-access-preview" hidden aria-live="polite">
+            <div class="login-step-title"><span>03</span><strong>登录后权限预览</strong></div>
+            <div class="access-preview-identity">
+              <strong id="access-preview-role"></strong>
+              <span id="access-preview-organization"></span>
+              <span id="access-preview-scope"></span>
+            </div>
+            <div class="access-preview-functions" id="access-preview-functions"></div>
+          </section>
           <div class="login-method-tabs" role="tablist" aria-label="登录方式">
             <button type="button" class="active" data-login-method="account" role="tab" aria-selected="true">账号密码</button>
-            <button type="button" data-login-method="phone" role="tab" aria-selected="false">手机号验证码</button>
-          </div>
-          <div class="account-provisioning-note" data-account-provisioning>
-            <strong>账号开通边界</strong>
-            <span>居民端暂不开放自助注册，需由平台完成实名建档和手机号绑定后登录；医生和护理端账号需由机构开通，并绑定执业资质、第一执业机构、doctorId 或 nurseId。外部身份不自动开户、不自动提权，OIDC/SAML 身份必须经过本地账号和机构目录受控绑定。</span>
-            <ul>
-              <li data-provisioning-step="resident">居民账号：后台受理、实名建档、手机号绑定。</li>
-              <li data-provisioning-step="doctor">医生账号：第一执业机构确认、电子化注册核验、doctorId 绑定。</li>
-              <li data-provisioning-step="nurse">护士账号：机构审核、资质核验、nurseId 绑定。</li>
-              <li data-provisioning-step="external-identity">外部身份：核验身份源、稳定主体、机构编码和角色白名单后受控绑定。</li>
-              <li data-provisioning-step="guardian">监护代办：监护人先完成本人实名，再核验监护关系、代办对象、权限范围和有效期。</li>
-              <li data-provisioning-step="audit">开通动作：启用、变更、停用均进入账号审计留痕。</li>
-            </ul>
-            <div class="account-provisioning-owners" data-provisioning-owner>
-              <span data-owner-role="resident-master-index">责任方：居民主索引管理员、试点机构护理部（会同医政部门）、平台账号管理员（含平台身份管理员）、居民服务窗口。</span>
-              <span data-owner-role="audit-evidence">证据表：authUsers、securityEvents、dataAccessLogs。</span>
-            </div>
+            <button type="button" data-login-method="phone" role="tab" aria-selected="false">居民手机号</button>
           </div>
           <form id="login-form" class="login-form">
-            <div id="login-scope-note" class="login-scope-note" hidden></div>
-            <label>账号
+            <label id="demo-account-field" hidden>演示账号
               <select name="username" id="login-user"></select>
             </label>
-            <label>密码
-              <input name="password" type="password" value="123456" autocomplete="current-password" required />
+            <label id="formal-account-field">登录账号
+              <input name="formalUsername" id="login-username" autocomplete="username" required />
             </label>
-            <button class="primary-action" type="submit">进入系统</button>
+            <label>登录密码
+              <input name="password" id="login-password" type="password" autocomplete="current-password" required />
+            </label>
+            <button class="primary-action" type="submit">安全登录</button>
+            <p class="login-hint" id="account-login-hint">请使用所属机构分配的实名账号登录。</p>
             <p class="login-error" id="login-error" role="alert"></p>
           </form>
           <form id="phone-login-form" class="login-form" hidden>
-            <label>手机号
-              <input name="phone" id="login-phone" value="DEMO-MOBILE-R1" autocomplete="tel" required />
+            <label>已绑定手机号
+              <input name="phone" id="login-phone" autocomplete="tel" required />
             </label>
-            <label>验证码
+            <label>短信验证码
               <span class="phone-code-row">
-                <input name="code" id="login-phone-code" inputmode="numeric" value="888888" maxlength="6" autocomplete="one-time-code" required />
+                <input name="code" id="login-phone-code" inputmode="numeric" maxlength="6" autocomplete="one-time-code" required />
                 <button type="button" data-send-phone-code>获取验证码</button>
               </span>
             </label>
-            <p class="login-hint" id="phone-code-hint">演示环境可发送验证码，也可使用 888888。</p>
+            <p class="login-hint" id="phone-code-hint">验证码仅发送至已完成实名绑定的手机号。</p>
             <button class="primary-action" type="submit">居民手机号登录</button>
             <p class="login-error" id="phone-login-error" role="alert"></p>
           </form>
-          <div class="demo-accounts" id="demo-accounts"></div>
+          <details class="account-provisioning-note" data-account-provisioning>
+            <summary>账号开通与外部身份边界</summary>
+            <p>居民端暂不开放自助注册，需由平台完成实名建档和手机号绑定；医生和护理端账号需由机构开通，医生、护士和技师均须完成执业资质核验。OIDC/SAML 外部身份必须与本地账号和机构目录受控绑定，不自动开户、不自动提权。</p>
+            <ul>
+              <li data-provisioning-step="resident">居民账号：居民主索引管理员完成实名建档、手机号绑定。</li>
+              <li data-provisioning-step="doctor">医生账号：第一执业机构确认、电子化注册核验、doctorId 绑定。</li>
+              <li data-provisioning-step="nurse">护士账号：机构审核、执业资质核验、nurseId 绑定。</li>
+              <li data-provisioning-step="external-identity">外部身份：平台身份管理员核验身份源、稳定主体、机构编码和角色白名单后受控绑定。</li>
+              <li data-provisioning-step="guardian">监护代办：居民服务窗口核验监护关系、代办对象、权限范围和有效期。</li>
+              <li data-provisioning-step="audit">账号动作：平台账号管理员对启用、变更、停用执行账号审计留痕。</li>
+            </ul>
+            <p data-provisioning-owner>责任方：居民主索引管理员、试点机构护理部（会同医政部门）、平台账号管理员（含平台身份管理员）、居民服务窗口；证据集合：authUsers、securityEvents、dataAccessLogs。</p>
+          </details>
         </article>
       </section>
     </main>
-
     <script src="./regional-context.js"></script>
+    <script src="./access-control-policy.js"></script>
     <script src="./auth.js"></script>
-    <script>
-      const select = document.querySelector("#login-user");
-      const params = new URLSearchParams(location.search);
-      const redirectPage = (params.get("redirect") || "").split("?")[0].replace(/^\.\//, "");
-      const moduleScopes = {
-        "quality-safety.html": {
-          title: "医疗质量与安全监管平台准入部门",
-          roles: ["commission", "institution", "county"],
-          message: "本模块仅开放给卫健监管、医疗机构和县域医共体。医保、居民账号不进入质量安全监管集合。"
-        }
-      };
-      const scope = moduleScopes[redirectPage];
-      const accounts = scope ? window.HealthCityAuth.demoUsers.filter((user) => scope.roles.includes(user.role)) : window.HealthCityAuth.demoUsers;
-      const scopeNote = document.querySelector("#login-scope-note");
-      if (scope && scopeNote) {
-        scopeNote.hidden = false;
-        scopeNote.innerHTML = `<strong>${scope.title}</strong><span>${scope.message}</span>`;
-      }
-      const phoneForm = document.querySelector("#phone-login-form");
-      const accountForm = document.querySelector("#login-form");
-      const sendPhoneCodeButton = document.querySelector("[data-send-phone-code]");
-      const phoneCodeHint = document.querySelector("#phone-code-hint");
-      let phoneCodeTimer = 0;
-      select.innerHTML = accounts.map((user) => `<option value="${user.username}">${user.roleName} · ${user.orgName || user.name} · ${user.username}</option>`).join("");
-      document.querySelector("#demo-accounts").innerHTML = accounts.map((user) => `<button type="button" data-user="${user.username}">
-        <strong>${user.roleName}</strong>
-        <span>${user.orgName || user.name}<br>${user.username} / 123456${user.phone ? `<br>${user.phone} / ${window.HealthCityAuth.demoSmsCode}` : ""}<br>${user.dataScope || ""}</span>
-      </button>`).join("");
-      document.querySelectorAll("[data-login-method]").forEach((button) => {
-        button.addEventListener("click", () => {
-          const isPhone = button.dataset.loginMethod === "phone";
-          document.querySelectorAll("[data-login-method]").forEach((item) => {
-            item.classList.toggle("active", item === button);
-            item.setAttribute("aria-selected", String(item === button));
-          });
-          accountForm.hidden = isPhone;
-          phoneForm.hidden = !isPhone;
-        });
-      });
-      document.querySelectorAll("[data-user]").forEach((button) => {
-        button.addEventListener("click", () => {
-          select.value = button.dataset.user;
-          document.querySelector("[name='password']").value = "123456";
-          const user = accounts.find((item) => item.username === button.dataset.user);
-          if (user?.phone) document.querySelector("#login-phone").value = user.phone;
-        });
-      });
-      function setPhoneCodeCooldown(seconds) {
-        window.clearInterval(phoneCodeTimer);
-        let remaining = Number(seconds || 0);
-        const render = () => {
-          if (remaining <= 0) {
-            sendPhoneCodeButton.disabled = false;
-            sendPhoneCodeButton.textContent = "获取验证码";
-            window.clearInterval(phoneCodeTimer);
-            return;
-          }
-          sendPhoneCodeButton.disabled = true;
-          sendPhoneCodeButton.textContent = `${remaining}秒`;
-          remaining -= 1;
-        };
-        render();
-        phoneCodeTimer = window.setInterval(render, 1000);
-      }
-      sendPhoneCodeButton.addEventListener("click", async () => {
-        const phone = document.querySelector("#login-phone").value;
-        sendPhoneCodeButton.disabled = true;
-        sendPhoneCodeButton.textContent = "发送中";
-        const result = await window.HealthCityAuth.sendPhoneCode(phone);
-        if (!result.ok) {
-          phoneCodeHint.textContent = result.message || "验证码发送失败";
-          setPhoneCodeCooldown(result.retryAfterSeconds || 5);
-          return;
-        }
-        if (result.demoCode) document.querySelector("#login-phone-code").value = result.demoCode;
-        const expiresAt = result.expiresAt ? new Date(result.expiresAt).toLocaleTimeString("zh-CN", { hour12: false }) : "5分钟内";
-        phoneCodeHint.textContent = `验证码已发送至 ${result.phone || phone}，${expiresAt} 前有效。`;
-        setPhoneCodeCooldown(result.retryAfterSeconds || 60);
-      });
-      document.querySelector("#login-form").addEventListener("submit", async (event) => {
-        event.preventDefault();
-        const submitButton = event.currentTarget.querySelector("button[type='submit']");
-        const data = Object.fromEntries(new FormData(event.currentTarget));
-        submitButton.disabled = true;
-        submitButton.textContent = "登录中";
-        const result = await window.HealthCityAuth.login(data.username, data.password);
-        submitButton.disabled = false;
-        submitButton.textContent = "进入系统";
-        if (!result.ok) {
-          document.querySelector("#login-error").textContent = result.message;
-          return;
-        }
-        window.HealthCityAuth.redirectAfterLogin(result.user.home);
-      });
-      phoneForm.addEventListener("submit", async (event) => {
-        event.preventDefault();
-        const submitButton = event.currentTarget.querySelector("button[type='submit']");
-        const data = Object.fromEntries(new FormData(event.currentTarget));
-        submitButton.disabled = true;
-        submitButton.textContent = "登录中";
-        const result = await window.HealthCityAuth.loginByPhone(data.phone, data.code);
-        submitButton.disabled = false;
-        submitButton.textContent = "居民手机号登录";
-        if (!result.ok) {
-          document.querySelector("#phone-login-error").textContent = result.message;
-          return;
-        }
-        window.HealthCityAuth.redirectAfterLogin(result.user.home);
-      });
-    </script>
+    <script src="./login.js"></script>
   </body>
 </html>

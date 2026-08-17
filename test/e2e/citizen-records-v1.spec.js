@@ -34,7 +34,7 @@ test("resident creates a scoped consent and revokes it through the dedicated aud
   await page.goto("/login.html");
   await page.locator("#login-user").selectOption("citizen");
   await page.locator("input[name='password']").fill("123456");
-  await page.getByRole("button", { name: "进入系统" }).click();
+  await page.locator("#login-form button[type='submit']").click();
   await expect(page).toHaveURL(/citizen\.html$/);
   await page.goto("/citizen.html?client=mini-program&page=health-record");
 
@@ -272,7 +272,7 @@ test("resident uses the V2 care workspace for correction, one-time sharing and a
   await page.goto("/login.html");
   await page.locator("#login-user").selectOption("citizen");
   await page.locator("input[name='password']").fill("123456");
-  await page.getByRole("button", { name: "进入系统" }).click();
+  await page.locator("#login-form button[type='submit']").click();
   await expect(page).toHaveURL(/citizen\.html$/);
   await page.goto("/citizen.html?client=mini-program&page=health-record");
 
@@ -405,7 +405,7 @@ test("resident reviews all eight next-stage health record capabilities", async (
   await page.locator("input[name='password']").fill("123456");
   await Promise.all([
     page.waitForURL(/citizen\.html/),
-    page.getByRole("button", { name: "进入系统" }).click()
+    page.locator("#login-form button[type='submit']").click()
   ]);
   await page.goto("/citizen.html?client=mini-program&page=health-record");
 
@@ -485,7 +485,7 @@ test("resident-facing pages do not expose English business copy", async ({ page 
   await page.goto("/login.html");
   await page.locator("#login-user").selectOption("citizen");
   await page.locator("input[name='password']").fill("123456");
-  await page.getByRole("button", { name: "进入系统" }).click();
+  await page.locator("#login-form button[type='submit']").click();
   await expect(page).toHaveURL(/citizen\.html$/);
 
   for (const route of routes) {

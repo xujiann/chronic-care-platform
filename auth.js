@@ -10,6 +10,14 @@
   ]);
   const ACCEPTED_STEP_UP_LEVELS = new Set(["aal2", "aal3", "substantial", "high", "l2", "l3"]);
   const DEFAULT_STEP_UP_MAX_AGE_MS = 15 * 60 * 1000;
+  let authContextState = API_BASE ? "pending" : "ready";
+  document.documentElement?.setAttribute("data-auth-resolved", "pending");
+  const pendingStyle = document.createElement?.("style");
+  if (pendingStyle && document.head) {
+    pendingStyle.dataset.authPendingStyle = "";
+    pendingStyle.textContent = 'html:not([data-auth-resolved="allowed"]) body:not([data-auth-page="login"]) { visibility: hidden !important; }';
+    document.head.append(pendingStyle);
+  }
   const demoUsers = [
     { id: "u-nurse", username: "nurse", password: "123456", name: "互联网护理演示护士", role: "institution", roleName: "护士工作站", orgCode: "MR1", orgName: "区域中心医院", orgType: "medical_institution", orgLevel: "三级医院", dataScope: "互联网护理订单与服务轨迹", home: "internet-nursing.html", nurseId: "inn-001", accountType: "nurse" },
     { id: "u-blood-quality", username: "blood_quality", password: "123456", name: "血液中心质控审核员", role: "commission", roleName: "血液中心冷链质控", orgCode: "BLOOD-DL", orgName: "区域血液中心", orgType: "blood_center", orgLevel: "市级", dataScope: "冷链异常、质量处置与血液放行", home: "blood.html", accountType: "blood_quality", bloodPermissions: ["cold_chain_quality_review"] },
@@ -30,66 +38,7 @@
     { id: "u5", username: "county", password: "123456", name: "医共体办公室", role: "county", roleName: "县域医共体平台", orgCode: "ORG-CONSORTIUM-ZS", orgName: "中山区县域医共体", orgType: "county_consortium", orgLevel: "区市县", dataScope: "医共体成员机构", home: "county.html" }
   ];
 
-  const roleHome = {
-    commission: "index.html",
-    institution: "institution.html",
-    insurance: "insurance.html",
-    citizen: "citizen.html",
-    county: "county.html"
-  };
-
-  const routeAccess = {
-    "index.html": ["commission"],
-    "health-dashboard.html": ["commission"],
-    "health-dashboard-about.html": ["commission"],
-    "public-health.html": ["commission"],
-    "workbench.html": ["commission"],
-    "platform.html": ["commission"],
-    "digital-hospital-standards.html": ["commission"],
-    "digital-hospital-self-assessment.html": ["commission", "institution"],
-    "digital-hospital-evaluation.html": ["commission", "institution"],
-    "regional-data-sharing.html": ["commission", "institution"],
-    "regional-data-sharing-about.html": ["commission", "institution"],
-    "quality-safety.html": ["commission"],
-    "operations.html": ["commission"],
-    "operations-about.html": ["commission"],
-    "escort.html": ["commission"],
-    "internet-nursing.html": ["commission", "institution", "citizen", "county"],
-    "imaging-cloud.html": ["commission", "institution", "county", "citizen"],
-    "doctor.html": ["institution"],
-    "institution.html": ["institution"],
-    "insurance.html": ["insurance"],
-    "county.html": ["county"],
-    "citizen.html": ["citizen"],
-    "mobile-preview.html": ["citizen"],
-    "health-city.html": ["commission", "institution", "insurance", "citizen", "county"],
-    "login.html": ["commission", "institution", "insurance", "citizen", "county"],
-    "blood.html": ["commission", "institution"]
-  };
-
-  const roleLinks = {
-    commission: [["platform.html", "全民健康平台"], ["digital-hospital-standards.html", "数智医院"], ["digital-hospital-self-assessment.html", "医院自评"], ["public-health.html", "公共卫生"], ["regional-data-sharing.html", "区域共享"], ["quality-safety.html", "质量安全"], ["operations.html", "运行监测"], ["operations-about.html", "运行说明"], ["escort.html", "助医陪诊"], ["blood.html", "血液管理"], ["health-city.html", "总览"], ["about.html", "关于"], ["workbench.html", "工作台"], ["index.html", "卫健管理"]],
-    institution: [["health-city.html", "总览"], ["digital-hospital-self-assessment.html", "医院自评"], ["doctor.html", "医生端"], ["regional-data-sharing.html", "区域共享"], ["blood.html", "血液管理"], ["about.html", "关于"], ["institution.html", "医疗机构"]],
-    insurance: [["health-city.html", "总览"], ["about.html", "关于"], ["insurance.html", "医保"]],
-    citizen: [["health-city.html", "总览"], ["about.html", "关于"], ["citizen.html", "个人端"], ["mobile-preview.html", "手机预览"]],
-    county: [["health-city.html", "总览"], ["about.html", "关于"], ["referral-teleconsultation-about.html", "转诊会诊"], ["county.html", "医共体"]]
-  };
-
-  roleLinks.commission.splice(5, 0, ["internet-nursing.html", "互联网护理"]);
-  roleLinks.commission.splice(6, 0, ["imaging-cloud.html", "影像云"]);
-  roleLinks.institution.splice(2, 0, ["internet-nursing.html", "互联网护理"]);
-  roleLinks.institution.splice(3, 0, ["imaging-cloud.html", "影像云"]);
-  roleLinks.citizen.splice(1, 0, ["internet-nursing.html", "互联网护理"]);
-  roleLinks.citizen.splice(2, 0, ["imaging-cloud.html", "影像云"]);
-  roleLinks.county.splice(1, 0, ["internet-nursing.html", "互联网护理"]);
-  roleLinks.county.splice(2, 0, ["imaging-cloud.html", "影像云"]);
-
-  roleLinks.commission.splice(2, 0, ["digital-hospital-evaluation.html", "评价预评"]);
-  roleLinks.institution.splice(1, 0, ["digital-hospital-evaluation.html", "评价预评"]);
-
-  roleLinks.commission.splice(6, 0, ["regional-data-sharing-about.html", "共享说明"]);
-  roleLinks.institution.splice(5, 0, ["regional-data-sharing-about.html", "共享说明"]);
-  roleLinks.insurance.splice(1, 0, ["drug-consumable-about.html", "药耗说明"]);
+  const accessPolicy = window.HealthAccessPolicy;
 
   async function login(username, password) {
     if (API_BASE) {
@@ -97,6 +46,7 @@
         const response = await fetch(`${API_BASE}/auth/login`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
+          credentials: "same-origin",
           body: JSON.stringify({ username, password })
         });
         const payload = await response.json().catch(() => ({}));
@@ -109,7 +59,12 @@
             authMode: "server"
           };
           localStorage.setItem(SESSION_KEY, JSON.stringify(session));
-          return { ok: true, user: session };
+          const contextResult = await refreshAuthContext();
+          if (!contextResult.ok) {
+            localStorage.removeItem(SESSION_KEY);
+            return { ok: false, message: "授权上下文初始化失败，已阻止进入系统" };
+          }
+          return { ok: true, user: contextResult.user };
         }
         if (response.status === 401 || response.status === 403) {
           return { ok: false, message: payload.message || "账号或密码不正确" };
@@ -119,6 +74,7 @@
         return { ok: false, message: "认证服务暂不可用，请稍后重试" };
       }
     }
+    if (!isDemoMode()) return { ok: false, message: "正式环境未配置可用身份源" };
     const user = demoUsers.find((item) => item.username === username && item.password === password);
     if (!user) return { ok: false, message: "账号或密码不正确" };
     const session = sanitizeUser(user);
@@ -136,6 +92,7 @@
         const response = await fetch(`${API_BASE}/auth/phone-login`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
+          credentials: "same-origin",
           body: JSON.stringify({ phone: normalizedPhone, code: normalizedCode })
         });
         const payload = await response.json().catch(() => ({}));
@@ -148,7 +105,12 @@
             authMode: "server-phone"
           };
           localStorage.setItem(SESSION_KEY, JSON.stringify(session));
-          return { ok: true, user: session };
+          const contextResult = await refreshAuthContext();
+          if (!contextResult.ok) {
+            localStorage.removeItem(SESSION_KEY);
+            return { ok: false, message: "授权上下文初始化失败，已阻止进入系统" };
+          }
+          return { ok: true, user: contextResult.user };
         }
         if (response.status === 401 || response.status === 403 || response.status === 404 || response.status === 423) {
           return { ok: false, message: payload.message || "手机号或验证码不正确" };
@@ -158,6 +120,7 @@
         return { ok: false, message: "认证服务暂不可用，请稍后重试" };
       }
     }
+    if (!isDemoMode()) return { ok: false, message: "正式环境未配置可用身份源" };
     const user = demoUsers.find((item) => item.role === "citizen" && normalizePhone(item.phone) === normalizedPhone && normalizedCode === (item.smsCode || DEMO_SMS_CODE));
     if (!user) return { ok: false, message: "手机号或验证码不正确" };
     const session = sanitizeUser(user);
@@ -174,6 +137,7 @@
         const response = await fetch(`${API_BASE}/auth/phone-code`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
+          credentials: "same-origin",
           body: JSON.stringify({ phone: normalizedPhone })
         });
         const payload = await response.json().catch(() => ({}));
@@ -183,6 +147,7 @@
         return { ok: false, message: "认证服务暂不可用，请稍后重试", retryAfterSeconds: 0 };
       }
     }
+    if (!isDemoMode()) return { ok: false, message: "正式环境未配置短信身份源" };
     const user = demoUsers.find((item) => item.role === "citizen" && normalizePhone(item.phone) === normalizedPhone);
     if (!user) return { ok: false, message: "手机号未绑定居民账号" };
     return {
@@ -315,6 +280,12 @@
     return location.protocol === "file:" || location.hostname.endsWith("github.io");
   }
 
+  function isDemoMode() {
+    const configured = window.__HEALTH_CITY_CONFIG__?.demoMode;
+    if (typeof configured === "boolean") return configured;
+    return isStaticPreview() || ["localhost", "127.0.0.1", "::1"].includes(location.hostname);
+  }
+
   function getUser() {
     try {
       const saved = localStorage.getItem(SESSION_KEY);
@@ -329,98 +300,198 @@
     return getUser()?.token || "";
   }
 
+  function readCookie(name) {
+    const prefix = `${encodeURIComponent(name)}=`;
+    const row = String(document.cookie || "").split(";").map((item) => item.trim()).find((item) => item.startsWith(prefix));
+    return row ? decodeURIComponent(row.slice(prefix.length)) : "";
+  }
+
   function authHeaders(extra = {}) {
+    const headers = new Headers(extra);
     const token = getToken();
-    return token ? { ...extra, Authorization: `Bearer ${token}` } : extra;
+    if (token) headers.set("Authorization", `Bearer ${token}`);
+    return headers;
   }
 
   function authFetch(url, options = {}) {
+    const method = String(options.method || "GET").toUpperCase();
+    const headers = authHeaders(options.headers || {});
+    if (!["GET", "HEAD", "OPTIONS"].includes(method)) {
+      const csrfToken = readCookie("health_platform_csrf");
+      if (csrfToken) headers.set("X-CSRF-Token", csrfToken);
+    }
     return fetch(url, {
       ...options,
-      headers: authHeaders(options.headers || {})
+      credentials: options.credentials || "same-origin",
+      headers
     });
   }
 
-  function logout() {
-    const user = getUser();
-    if (API_BASE && user?.token) {
-      fetch(`${API_BASE}/auth/logout`, {
-        method: "POST",
-        headers: authHeaders()
-      }).catch(() => {});
+  async function refreshAuthContext() {
+    if (!API_BASE) return { ok: true, user: getUser(), source: "demo" };
+    try {
+      // Context hydration intentionally relies on the HttpOnly browser session.
+      // A stale legacy bearer in localStorage must never override a valid cookie.
+      const response = await fetch(`${API_BASE}/auth/context`, { method: "GET", credentials: "same-origin" });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || !payload.ok || !payload.user) return { ok: false, status: response.status };
+      if (![payload.permissions, payload.regionalCapabilities, payload.pages, payload.menus].every(Array.isArray)) {
+        return { ok: false, status: response.status, reason: "INVALID_AUTH_CONTEXT" };
+      }
+      const previous = getUser() || {};
+      const session = {
+        ...previous,
+        ...payload.user,
+        permissions: payload.permissions,
+        regionalCapabilities: payload.regionalCapabilities,
+        authorizedPages: payload.pages,
+        authorizedMenus: payload.menus,
+        regionalAuthorization: payload.regional || previous.regionalAuthorization || null,
+        policyVersion: payload.policy?.version || payload.policy?.schemaVersion || previous.policyVersion || "",
+        productionReady: payload.productionReady === true,
+        expiresAt: payload.expiresAt || payload.user.expiresAt || previous.expiresAt,
+        authContextVersion: payload.version || payload.schemaVersion || "auth-context-v1",
+        authMode: "server-cookie"
+      };
+      // The context endpoint upgrades the browser to the HttpOnly cookie session.
+      // Do not keep a script-readable bearer token after that hand-off.
+      delete session.token;
+      localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+      authContextState = "ready";
+      return { ok: true, user: session, source: "server" };
+    } catch (error) {
+      authContextState = "failed";
+      return { ok: false, status: 0 };
+    }
+  }
+
+  async function logout() {
+    if (API_BASE) {
+      try {
+        await authFetch(`${API_BASE}/auth/logout`, { method: "POST" });
+      } catch (error) {
+        // Local session state must still be cleared when the server is unavailable.
+      }
     }
     localStorage.removeItem(SESSION_KEY);
-    window.location.href = "./login.html";
+    window.location.href = localHref("login.html");
+  }
+
+  function localHref(page) {
+    const prefix = /\/digital-hospital-standard-platform\//.test(location.pathname) ? "../" : "./";
+    return `${prefix}${String(page || "").replace(/^\.\//, "")}`;
   }
 
   function requireRole(roles) {
+    // Legacy inline guards run in <head>. The server static guard has already
+    // authenticated this request; the central policy decides after cookie hydration.
+    if (API_BASE && authContextState === "pending") return true;
     const allowed = Array.isArray(roles) ? roles : [roles];
     const user = getUser();
     if (!user) {
-      window.location.replace(`./login.html?redirect=${encodeURIComponent(currentPage())}`);
-      return false;
-    }
-    if (API_BASE && !user.token) {
-      localStorage.removeItem(SESSION_KEY);
-      window.location.replace(`./login.html?redirect=${encodeURIComponent(currentPage())}&expired=1`);
+      window.location.replace(`${localHref("login.html")}?redirect=${encodeURIComponent(currentPage())}`);
       return false;
     }
     if (user.expiresAt && new Date(user.expiresAt).getTime() < Date.now()) {
       localStorage.removeItem(SESSION_KEY);
-      window.location.replace(`./login.html?redirect=${encodeURIComponent(currentPage())}&expired=1`);
+      window.location.replace(`${localHref("login.html")}?redirect=${encodeURIComponent(currentPage())}&expired=1`);
       return false;
     }
-    if (!allowed.includes(user.role)) {
-      const target = roleHome[user.role] || "health-city.html";
-      window.location.replace(`./${target}?denied=${encodeURIComponent(currentPage())}`);
+    if (!allowed.includes(user.role) || !canAccessPage(currentPage(), user)) {
+      const target = accessPolicy?.homeForUser(user) || "health-city.html";
+      window.location.replace(`${localHref(target)}?denied=${encodeURIComponent(currentPage())}`);
       return false;
     }
     return true;
   }
 
   function requireAccountType(types) {
+    if (API_BASE && authContextState === "pending") return true;
     const allowed = Array.isArray(types) ? types : [types];
     const user = getUser();
     if (!user) {
-      window.location.replace(`./login.html?redirect=${encodeURIComponent(currentPage())}`);
+      window.location.replace(`${localHref("login.html")}?redirect=${encodeURIComponent(currentPage())}`);
       return false;
     }
-    if (!allowed.includes(user.accountType)) {
-      const target = roleHome[user.role] || "health-city.html";
-      window.location.replace(`./${target}?denied=${encodeURIComponent(currentPage())}`);
+    if (!allowed.includes(normalizeAccountType(user)) || !canAccessPage(currentPage(), user)) {
+      const target = accessPolicy?.homeForUser(user) || "health-city.html";
+      window.location.replace(`${localHref(target)}?denied=${encodeURIComponent(currentPage())}`);
       return false;
     }
     return true;
   }
 
   function currentPage() {
-    const name = location.pathname.split("/").pop() || "health-city.html";
+    const name = accessPolicy?.normalizePageName(location.pathname) || location.pathname.split("/").pop() || "health-city.html";
     return `${name}${location.search || ""}`;
   }
 
   function redirectAfterLogin(fallback) {
     const params = new URLSearchParams(location.search);
-    const redirect = params.get("redirect") || fallback || getUser()?.home || "health-city.html";
-    window.location.href = redirect.startsWith("http") ? "./health-city.html" : `./${redirect.replace(/^\.\//, "")}`;
+    const user = getUser();
+    const requested = params.get("redirect") || fallback || user?.home || "health-city.html";
+    const page = accessPolicy?.normalizePageName(requested) || "";
+    const target = canAccessPage(page, user)
+      ? page
+      : (accessPolicy?.homeForUser(user) || "health-city.html");
+    const denied = params.get("denied");
+    const deniedPage = denied ? accessPolicy?.normalizePageName(denied) : "";
+    const deniedQuery = deniedPage ? `?denied=${encodeURIComponent(deniedPage)}` : "";
+    window.location.href = `${localHref(target)}${deniedQuery}`;
   }
 
   function normalizePageName(href) {
+    const raw = String(href || "").trim();
+    if (!raw || raw.startsWith("#") || /^(mailto:|tel:|javascript:)/i.test(raw)) return "";
     try {
       const url = new URL(href, location.href);
       if (url.origin !== location.origin) return "";
-      return url.pathname.split("/").pop() || "health-city.html";
+      return accessPolicy?.normalizePageName(url.pathname) || "";
     } catch (error) {
       return "";
     }
   }
 
-  function canAccessPage(pageName, user) {
-    if (!pageName || pageName.startsWith("#")) return true;
-    if (!user) return pageName === "login.html" || pageName === "health-city.html" || pageName === "about.html" || pageName === "referral-teleconsultation-about.html";
-    if (pageName === "login.html") return false;
-    if (pageName === "doctor.html") return user.accountType === "doctor";
-    const allowed = routeAccess[pageName];
-    return !allowed || allowed.includes(user.role);
+  function canAccessPage(pageName, user = getUser(), context = {}) {
+    if (!accessPolicy) return false;
+    return accessPolicy.canAccessPage(pageName, user, context);
+  }
+
+  function enforceCurrentPageAccess() {
+    if (document.body?.dataset.authPage === "login") return true;
+    const page = accessPolicy?.normalizePageName(location.pathname) || "";
+    const user = getUser();
+    const decision = accessPolicy?.accessDecision(page, user);
+    if (decision?.allowed) {
+      document.documentElement?.setAttribute("data-auth-resolved", "allowed");
+      return true;
+    }
+    if (!user || decision?.reason === "LOGIN_REQUIRED") {
+      window.location.replace(`${localHref("login.html")}?redirect=${encodeURIComponent(currentPage())}`);
+      return false;
+    }
+    const target = accessPolicy?.homeForUser(user) || "health-city.html";
+    window.location.replace(`${localHref(target)}?denied=${encodeURIComponent(currentPage())}`);
+    return false;
+  }
+
+  async function initializePageAccess() {
+    if (document.body?.dataset.authPage === "login") {
+      document.documentElement?.setAttribute("data-auth-resolved", "allowed");
+      return true;
+    }
+    if (API_BASE) {
+      const contextResult = await refreshAuthContext();
+      if (!contextResult.ok) {
+        authContextState = "failed";
+        localStorage.removeItem(SESSION_KEY);
+      }
+    }
+    if (!enforceCurrentPageAccess()) return false;
+    renderSessionBar();
+    filterRoleLinks();
+    filterRoleFeatures();
+    return true;
   }
 
   function filterRoleLinks() {
@@ -428,9 +499,26 @@
     const user = getUser();
     document.querySelectorAll("a[href]").forEach((link) => {
       const pageName = normalizePageName(link.getAttribute("href"));
-      if (!canAccessPage(pageName, user)) {
+      if (pageName.endsWith(".html") && !canAccessPage(pageName, user)) {
         link.remove();
       }
+    });
+  }
+
+  function filterRoleFeatures() {
+    if (document.body?.dataset.authPage === "login") return;
+    const user = getUser();
+    document.querySelectorAll("[data-permission], [data-role], [data-account-type], [data-regional-capability]").forEach((element) => {
+      const roles = String(element.dataset.role || "").split(/[\s,]+/).filter(Boolean);
+      const accountTypes = String(element.dataset.accountType || "").split(/[\s,]+/).filter(Boolean);
+      const capability = String(element.dataset.regionalCapability || "").trim();
+      const permission = String(element.dataset.permission || "").trim();
+      const allowed = Boolean(user)
+        && (!roles.length || roles.includes(user.role))
+        && (!accountTypes.length || accountTypes.includes(normalizeAccountType(user)))
+        && (!capability || (Array.isArray(user.regionalCapabilities) && user.regionalCapabilities.includes(capability)))
+        && (!permission || accessPolicy?.canUsePermission(permission, user));
+      if (!allowed) element.remove();
     });
   }
 
@@ -450,10 +538,10 @@
     const nav = document.createElement("nav");
     if (user) {
       name.textContent = displayAuthText(user.name);
-      detail.textContent = `${displayAuthText(user.roleName)} · ${displayAuthText(user.orgName || "未绑定机构")} · ${displayAuthText(user.dataScope || "默认范围")} · ${user.authMode === "server" ? "后端会话" : "本地演示"} · ${new Date(user.loginAt || Date.now()).toLocaleString("zh-CN")}`;
-      (roleLinks[user.role] || [["health-city.html", "总览"]]).forEach(([href, label]) => {
+      detail.textContent = `${displayAuthText(user.roleName)} · ${displayAuthText(user.orgName || "未绑定机构")} · ${displayAuthText(user.dataScope || "默认范围")} · ${String(user.authMode || "").startsWith("server") ? "安全服务端会话" : "本地演示"} · ${new Date(user.loginAt || Date.now()).toLocaleString("zh-CN")}`;
+      (accessPolicy?.pagesForUser(user) || []).forEach(({ page: href, label }) => {
         const link = document.createElement("a");
-        link.href = `./${href}`;
+        link.href = localHref(href);
         link.textContent = label;
         nav.append(link);
       });
@@ -466,7 +554,7 @@
       name.textContent = "未登录";
       detail.textContent = "请先选择角色进入健康城市系统";
       const loginLink = document.createElement("a");
-      loginLink.href = `./login.html?redirect=${encodeURIComponent(currentPage())}`;
+      loginLink.href = `${localHref("login.html")}?redirect=${encodeURIComponent(currentPage())}`;
       loginLink.textContent = "登录";
       nav.append(loginLink);
     }
@@ -474,6 +562,7 @@
     shell.prepend(bar);
     bar.querySelector("[data-logout]")?.addEventListener("click", logout);
     filterRoleLinks();
+    filterRoleFeatures();
   }
 
   function displayAuthText(value) {
@@ -489,8 +578,9 @@
   }
 
   window.HealthCityAuth = {
-    demoUsers: demoUsers.map(sanitizeUser),
-    demoSmsCode: DEMO_SMS_CODE,
+    demoUsers: isDemoMode() ? demoUsers.map(sanitizeUser) : [],
+    demoSmsCode: isDemoMode() ? DEMO_SMS_CODE : "",
+    isDemoMode,
     login,
     loginByPhone,
     sendPhoneCode,
@@ -501,17 +591,22 @@
     logout,
     getUser,
     getToken,
+    readCookie,
     authHeaders,
     authFetch,
+    refreshAuthContext,
     requireRole,
     requireAccountType,
+    canAccessPage,
+    enforceCurrentPageAccess,
+    initializePageAccess,
     redirectAfterLogin,
     renderSessionBar,
-    filterRoleLinks
+    filterRoleLinks,
+    filterRoleFeatures
   };
 
-  document.addEventListener("DOMContentLoaded", () => {
-    renderSessionBar();
-    filterRoleLinks();
-  });
+  const startPageAccess = () => { initializePageAccess().catch(() => enforceCurrentPageAccess()); };
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", startPageAccess);
+  else startPageAccess();
 })();

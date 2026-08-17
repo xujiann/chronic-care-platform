@@ -10,6 +10,25 @@ const {
   querySessionSecurityAudits,
   summarizeSessionSecurityAudits
 } = require("../../identity-security/session-security-audit");
+const {
+  IdentityPolicyError,
+  bindExternalIdentity,
+  clearSessionCookies,
+  csrfToken,
+  identityClaims,
+  issueSessionCookies,
+  publicIdentity,
+  requireCsrf,
+  requireStepUp,
+  resolveExternalIdentity,
+  securityReadiness,
+  sessionFromRequest,
+  sessionResponse,
+  sessionTransport,
+  stepUpStatus,
+  validateLiveSession,
+  validateLocalAccount
+} = require("../../identity-security/runtime-identity-policy");
 
 function createRouteSegments(runtime) {
   const { SmsDeliveryCallbackError, appendDataAccessLog, appendSecurityEvent, applyIdentityDirectoryBinding, applyIdentityDirectoryDeactivations, applySmsDeliveryCallback, buildComplianceReport, buildIdentityDirectorySyncPlan, buildSmsDeliveryCenter, canAccessResident, cleanupRuntimeSessions, collectJson, createSession, currentSession, fetchIdentityDirectory, fetchOidcUserInfo, findAuthUser, findCitizenAuthUserByPhone, highRiskSecurityEvents, isProductionRuntime, issuePhoneVerificationCode, mapExternalIdentityClaims, maskPhone, normalizePhone, normalizeState, phoneLoginLockStatus, prependAuditTrailEntry, productionAdapterCenter, randomUUID, readDatabase, recordPhoneLoginFailure, redactSensitiveResponse, refreshOidcAccessToken, refreshSessionStoreStatus, requireApiRole, resealAuditTrail, revokeOidcToken, revokeSession, sendJson, sessionStoreStatus, verifyAuditTrail, verifyPassword, verifyPhoneCode, verifySmsDeliveryCallback, writeDatabase } = runtime;
@@ -31,6 +50,59 @@ function createRouteSegments(runtime) {
     randomUUID,
     repository: sessionSecurityAuditRepository()
   });
+  const passwordFailures = new Map();
+  const passwordLockStatus = (username) => {
+    const key = String(username || "").trim().toLowerCase();
+    const entry = passwordFailures.get(key);
+    if (!entry) return { locked: false, failedAttempts: 0, retryAfterSeconds: 0 };
+    if (entry.lockedUntil > Date.now()) {
+      return { locked: true, failedAttempts: entry.failedAttempts, retryAfterSeconds: Math.ceil((entry.lockedUntil - Date.now()) / 1000) };
+    }
+    if (entry.lockedUntil) passwordFailures.delete(key);
+    return { locked: false, failedAttempts: entry.lockedUntil ? 0 : entry.failedAttempts, retryAfterSeconds: 0 };
+  };
+  const recordPasswordFailure = (username) => {
+    const key = String(username || "").trim().toLowerCase();
+    const previous = passwordFailures.get(key) || { failedAttempts: 0, lockedUntil: 0 };
+    const failedAttempts = previous.failedAttempts + 1;
+    const lockedUntil = failedAttempts >= 5 ? Date.now() + 15 * 60 * 1000 : 0;
+    const next = { failedAttempts, lockedUntil };
+    passwordFailures.set(key, next);
+    return passwordLockStatus(key).locked ? passwordLockStatus(key) : { ...next, locked: false, retryAfterSeconds: 0 };
+  };
+  const clearPasswordFailures = (username) => passwordFailures.delete(String(username || "").trim().toLowerCase());
+  const validateRuntimeAccount = (user) => {
+    const data = readDatabase();
+    return Array.isArray(data?.authUsers) ? validateLocalAccount(user, data).user : user;
+  };
+  const resolveSession = (req) => sessionFromRequest(req, currentSession, process.env);
+  const rejectPolicy = (res, error) => {
+    const known = error instanceof IdentityPolicyError;
+    sendJson(res, known ? error.statusCode : 500, {
+      ok: false,
+      code: known ? error.code : "IDENTITY_POLICY_FAILED",
+      message: known ? error.message : "identity policy evaluation failed"
+    });
+  };
+  const enforceMutationSecurity = (req, res, options = {}) => {
+    try {
+      if (typeof isProductionRuntime !== "function" || !isProductionRuntime()) {
+        const session = typeof currentSession === "function" ? currentSession(req) : null;
+        const data = readDatabase();
+        if (session && Array.isArray(data?.authUsers)) validateLiveSession(session, data);
+        return { session, source: "development", transport: sessionTransport(process.env) };
+      }
+      const resolved = resolveSession(req);
+      if (!resolved.session) throw new IdentityPolicyError("AUTHENTICATION_REQUIRED", "authenticated session is required", 401);
+      validateLiveSession(resolved.session, readDatabase());
+      requireCsrf(req, resolved, process.env);
+      if (options.stepUp) requireStepUp(resolved.session, process.env);
+      return resolved;
+    } catch (error) {
+      rejectPolicy(res, error);
+      return null;
+    }
+  };
   return [
     {
       id: "identity-security-01",
@@ -190,6 +262,7 @@ function createRouteSegments(runtime) {
       if (req.method === "POST" && securityControlActionMatch) {
         const user = requireApiRole(req, res, ["commission"], "/api/security/controls/:id/actions");
         if (!user) return true;
+        if (!enforceMutationSecurity(req, res, { stepUp: true })) return true;
         const id = decodeURIComponent(securityControlActionMatch[1]);
         const payload = await collectJson(req);
         try {
@@ -229,23 +302,51 @@ function createRouteSegments(runtime) {
           return true;
         }
         const credentials = await collectJson(req);
-        const user = findAuthUser(String(credentials.username || "").trim());
+        const username = String(credentials.username || "").trim();
+        const lock = passwordLockStatus(username);
+        if (lock.locked) {
+          await recordSessionAudit(req,
+            { actor: username || "unknown", role: "unknown", action: "local-password-login", target: "unified-auth", result: "denied", detail: "account login is temporarily locked" }
+          );
+          sendJson(res, 423, { ok: false, code: "PASSWORD_LOGIN_LOCKED", message: "账号登录已临时锁定", ...lock });
+          return true;
+        }
+        const user = findAuthUser(username);
         if (!user || !verifyPassword(user, credentials.password)) {
+          const failure = recordPasswordFailure(username);
           await recordSessionAudit(req,
             { actor: credentials.username || "unknown", role: "unknown", action: "local-password-login", target: "unified-auth", result: "denied", detail: "invalid account credentials" },
             undefined,
             { actor: credentials.username || "unknown", role: "unknown", action: "登录", target: "统一认证", result: "拒绝", detail: "账号或密码错误" }
           );
-          sendJson(res, 401, { ok: false, message: "账号或密码不正确" });
+          sendJson(res, failure.locked ? 423 : 401, {
+            ok: false,
+            code: failure.locked ? "PASSWORD_LOGIN_LOCKED" : "INVALID_CREDENTIALS",
+            message: failure.locked ? "账号登录已临时锁定" : "账号或密码不正确",
+            failedAttempts: failure.failedAttempts,
+            retryAfterSeconds: failure.retryAfterSeconds
+          });
           return true;
         }
-        const session = await createSession(user);
+        let validatedUser;
+        try {
+          validatedUser = validateRuntimeAccount(user);
+        } catch (error) {
+          await recordSessionAudit(req,
+            { actor: user.name || username, role: user.role || "unknown", action: "local-password-login", target: "unified-auth", result: "denied", detail: error.code || "identity policy denied" }
+          );
+          rejectPolicy(res, error);
+          return true;
+        }
+        clearPasswordFailures(username);
+        const session = await createSession(validatedUser);
+        issueSessionCookies(res, session, process.env);
         await recordSessionAudit(req,
-          { actor: user.name, role: user.role, action: "local-password-login", target: user.home, result: "allowed", detail: "signed local session issued" },
+          { actor: validatedUser.name, role: validatedUser.role, action: "local-password-login", target: validatedUser.home, result: "allowed", detail: `signed local session issued via ${sessionTransport(process.env).mode}` },
           session,
-          { actor: user.name, role: user.role, action: "登录", target: user.home, result: "允许", detail: "签名会话已签发，支持密钥轮换校验" }
+          { actor: validatedUser.name, role: validatedUser.role, action: "登录", target: validatedUser.home, result: "允许", detail: "签名会话已签发，支持密钥轮换校验" }
         );
-        sendJson(res, 200, { ok: true, token: session.token, expiresAt: session.expiresAt, user: session.user });
+        sendJson(res, 200, { ok: true, ...sessionResponse(session, process.env) });
         return true;
       }
 
@@ -276,6 +377,7 @@ function createRouteSegments(runtime) {
         const user = requireApiRole(req, res, ["commission"], "/api/auth/identity-lifecycle");
         if (!user) return true;
         const center = productionAdapterCenter(process.env);
+        const runtimeSecurity = securityReadiness(process.env);
         sendJson(res, 200, {
           ok: true,
           identity: center.identity,
@@ -286,10 +388,18 @@ function createRouteSegments(runtime) {
             refresh: "upstream-refresh-to-local-session",
             logout: "upstream-revocation-and-local-session-delete",
             directory: "controlled-binding-preview-and-deactivation",
+            externalSubject: "issuer-plus-subject-unique-binding",
+            browserSession: "http-only-cookie-with-signed-double-submit-csrf",
+            stepUp: "provider-verified-strong-authentication",
+            saml: "strict-contract-no-go-until-runtime-and-site-evidence",
             smsDelivery: "signed-callback-idempotency-and-ordered-ledger",
             sessionStore: await refreshSessionStoreStatus()
           },
-          blockers: center.blockers.filter((item) => /OIDC|identity|provider|site/i.test(item)),
+          runtimeSecurity,
+          blockers: [...new Set([
+            ...center.blockers.filter((item) => /OIDC|identity|provider|site/i.test(item)),
+            ...runtimeSecurity.blockers
+          ])],
           productionReady: false,
           boundary: "Provider configuration and lifecycle code do not replace directory ownership, provider receipts, privilege review or site signoff."
         });
@@ -299,6 +409,7 @@ function createRouteSegments(runtime) {
       if (req.method === "POST" && url.pathname === "/api/auth/sessions/cleanup") {
         const user = requireApiRole(req, res, ["commission"], "/api/auth/sessions/cleanup");
         if (!user) return true;
+        if (!enforceMutationSecurity(req, res, { stepUp: true })) return true;
         const payload = await collectJson(req);
         if (String(payload.confirmation || "").trim() !== "PURGE RETAINED SESSIONS") {
           sendJson(res, 400, {
@@ -347,7 +458,7 @@ function createRouteSegments(runtime) {
         try {
           const upstream = await fetchOidcUserInfo(payload.accessToken);
           const data = readDatabase();
-          const mapping = mapExternalIdentityClaims(upstream.claims, data);
+          const mapping = resolveExternalIdentity(upstream.claims, data, { expectedIssuer: process.env.OIDC_ISSUER_URL });
           if (mapping.status !== "matched-existing-user") {
             await recordSessionAudit(req,
               { actor: upstream.claims.sub || "external", role: "external", action: "oidc-login", target: "unified-auth", result: "denied", detail: "external identity requires controlled account binding" },
@@ -357,17 +468,15 @@ function createRouteSegments(runtime) {
             sendJson(res, 403, { ok: false, message: "external identity requires account binding", mapping: { status: mapping.status, warnings: mapping.warnings } });
             return true;
           }
-          const user = (data.authUsers || []).find((item) => item.id === mapping.user.id && item.status !== "停用");
-          if (!user) {
-            await recordSessionAudit(req,
-              { actor: upstream.claims.sub || "external", role: "external", action: "oidc-login", target: "unified-auth", result: "denied", detail: "bound local account is disabled or missing" },
-              undefined,
-              { actor: upstream.claims.sub || "external", role: "external", action: "OIDC login", target: "unified-auth", result: "denied", detail: "bound local account is disabled or missing" }
-            );
-            sendJson(res, 403, { ok: false, message: "bound local account is disabled or missing" });
-            return true;
-          }
+          const user = {
+            ...mapping.user,
+            externalIssuer: mapping.issuer,
+            externalSubject: mapping.subject,
+            assuranceLevel: upstream.claims.acr || (Array.isArray(upstream.claims.amr) && upstream.claims.amr.includes("mfa") ? "mfa" : ""),
+            authTime: upstream.claims.auth_time || upstream.fetchedAt
+          };
           const session = await createSession(user);
+          issueSessionCookies(res, session, process.env);
           await recordSessionAudit(req,
             { actor: user.name, role: user.role, action: "oidc-login", target: user.home, result: "allowed", detail: `verified by ${upstream.adapter}` },
             session,
@@ -375,9 +484,7 @@ function createRouteSegments(runtime) {
           );
           sendJson(res, 200, {
             ok: true,
-            token: session.token,
-            expiresAt: session.expiresAt,
-            user: session.user,
+            ...sessionResponse(session, process.env),
             adapter: upstream.adapter,
             mappedAt: upstream.fetchedAt
           });
@@ -387,7 +494,8 @@ function createRouteSegments(runtime) {
             undefined,
             { actor: "external", role: "external", action: "OIDC login", target: "unified-auth", result: "denied", detail: "identity provider verification failed" }
           );
-          sendJson(res, 502, { ok: false, message: "identity provider verification failed" });
+          if (error instanceof IdentityPolicyError) rejectPolicy(res, error);
+          else sendJson(res, 502, { ok: false, message: "identity provider verification failed" });
         }
         return true;
       }
@@ -398,10 +506,14 @@ function createRouteSegments(runtime) {
           const refreshed = await refreshOidcAccessToken(payload.refreshToken);
           const upstream = await fetchOidcUserInfo(refreshed.accessToken);
           const data = readDatabase();
-          const mapping = mapExternalIdentityClaims(upstream.claims, data);
-          const user = mapping.status === "matched-existing-user"
-            ? (data.authUsers || []).find((item) => item.id === mapping.user.id && item.status !== "停用")
-            : null;
+          const mapping = resolveExternalIdentity(upstream.claims, data, { expectedIssuer: process.env.OIDC_ISSUER_URL });
+          const user = mapping.status === "matched-existing-user" ? {
+            ...mapping.user,
+            externalIssuer: mapping.issuer,
+            externalSubject: mapping.subject,
+            assuranceLevel: upstream.claims.acr || (Array.isArray(upstream.claims.amr) && upstream.claims.amr.includes("mfa") ? "mfa" : ""),
+            authTime: upstream.claims.auth_time || upstream.fetchedAt
+          } : null;
           if (!user) {
             await recordSessionAudit(req,
               { actor: upstream.claims.sub || "external", role: "external", action: "oidc-refresh", target: "unified-auth", result: "denied", detail: "refreshed identity is unbound, disabled or missing" },
@@ -412,6 +524,7 @@ function createRouteSegments(runtime) {
             return true;
           }
           const session = await createSession(user);
+          issueSessionCookies(res, session, process.env);
           await recordSessionAudit(req,
             { actor: user.name, role: user.role, action: "oidc-refresh", target: user.home, result: "allowed", detail: "upstream refresh verified and signed local session issued" },
             session,
@@ -419,9 +532,7 @@ function createRouteSegments(runtime) {
           );
           sendJson(res, 200, {
             ok: true,
-            token: session.token,
-            expiresAt: session.expiresAt,
-            user: session.user,
+            ...sessionResponse(session, process.env),
             adapter: refreshed.adapter,
             upstreamRefreshRotated: refreshed.refreshRotated,
             ...(refreshed.refreshRotated ? { upstreamRefreshToken: refreshed.refreshToken } : {})
@@ -432,21 +543,29 @@ function createRouteSegments(runtime) {
             undefined,
             { actor: "external", role: "external", action: "OIDC refresh", target: "unified-auth", result: "denied", detail: "upstream refresh or identity verification failed" }
           );
-          sendJson(res, 502, { ok: false, message: "identity provider refresh failed" });
+          if (error instanceof IdentityPolicyError) rejectPolicy(res, error);
+          else sendJson(res, 502, { ok: false, message: "identity provider refresh failed" });
         }
         return true;
       }
 
       if (req.method === "POST" && url.pathname === "/api/auth/oidc/revoke") {
-        const session = currentSession(req);
-        if (!session) {
-          sendJson(res, 401, { ok: false, message: "未登录或会话已过期" });
+        let resolved;
+        try {
+          resolved = resolveSession(req);
+          if (!resolved.session) throw new IdentityPolicyError("AUTHENTICATION_REQUIRED", "未登录或会话已过期", 401);
+          requireCsrf(req, resolved, process.env);
+          validateLiveSession(resolved.session, readDatabase());
+        } catch (error) {
+          rejectPolicy(res, error);
           return true;
         }
+        const session = resolved.session;
         const payload = await collectJson(req);
         try {
           const receipt = await revokeOidcToken(payload.upstreamToken, { tokenTypeHint: payload.tokenTypeHint });
           await revokeSession(session, { reason: "oidc-revoke", actor: session.user.username || session.user.id });
+          clearSessionCookies(res, process.env);
           await recordSessionAudit(req,
             { actor: session.user.name, role: session.user.role, action: "oidc-revoke-logout", target: "unified-auth", result: "allowed", detail: "upstream and local sessions revoked" },
             session,
@@ -455,6 +574,7 @@ function createRouteSegments(runtime) {
           sendJson(res, 200, { ok: true, receipt, localSessionRevoked: true, productionReady: false });
         } catch (error) {
           await revokeSession(session, { reason: "oidc-revoke-upstream-failed", actor: session.user.username || session.user.id });
+          clearSessionCookies(res, process.env);
           await recordSessionAudit(req,
             { actor: session.user.name, role: session.user.role, action: "oidc-revoke-logout", target: "unified-auth", result: "partial", detail: "local session revoked; upstream reconciliation required" },
             session,
@@ -482,6 +602,7 @@ function createRouteSegments(runtime) {
       if (req.method === "POST" && url.pathname === "/api/auth/identity-directory/bind") {
         const user = requireApiRole(req, res, ["commission"], "/api/auth/identity-directory/bind");
         if (!user) return true;
+        if (!enforceMutationSecurity(req, res, { stepUp: true })) return true;
         const payload = await collectJson(req);
         const note = String(payload.note || "").trim();
         if (note.length < 8 || payload.confirmation !== "BIND EXTERNAL IDENTITY") {
@@ -492,12 +613,22 @@ function createRouteSegments(runtime) {
           const directory = await fetchIdentityDirectory();
           const data = readDatabase();
           const result = applyIdentityDirectoryBinding(data, directory.records, payload, user);
+          const hardenedBinding = bindExternalIdentity(data, result.localUserId, {
+            issuer: payload.externalIssuer || process.env.IDENTITY_DIRECTORY_ISSUER || process.env.OIDC_ISSUER_URL,
+            subject: result.externalSubject,
+            protocol: payload.protocol || "oidc"
+          });
           writeDatabase(normalizeState(data));
           const plan = buildIdentityDirectorySyncPlan(directory.records, data);
-          appendSecurityEvent({ actor: user.name, role: user.role, action: "external identity binding", target: result.localUserId, result: "allowed", detail: `${result.username} bound to a verified directory subject; no role or organization changes` });
-          sendJson(res, 200, { ok: true, result, plan, productionReady: false });
+          appendSecurityEvent({ actor: user.name, role: user.role, action: "external identity binding", target: result.localUserId, result: "allowed", detail: `${result.username} bound to a verified issuer and subject; no role or organization changes` });
+          sendJson(res, 200, {
+            ok: true,
+            result: { ...result, externalIssuer: hardenedBinding.issuer, identityKey: hardenedBinding.identityKey },
+            plan,
+            productionReady: false
+          });
         } catch (error) {
-          sendJson(res, 409, { ok: false, code: error.code || "IDENTITY_BINDING_FAILED", message: error.code ? error.message : "external identity binding failed" });
+          sendJson(res, error.statusCode || 409, { ok: false, code: error.code || "IDENTITY_BINDING_FAILED", message: error.code ? error.message : "external identity binding failed" });
         }
         return true;
       }
@@ -505,6 +636,7 @@ function createRouteSegments(runtime) {
       if (req.method === "POST" && url.pathname === "/api/auth/identity-directory/apply") {
         const user = requireApiRole(req, res, ["commission"], "/api/auth/identity-directory/apply");
         if (!user) return true;
+        if (!enforceMutationSecurity(req, res, { stepUp: true })) return true;
         const payload = await collectJson(req);
         const note = String(payload.note || "").trim();
         if (note.length < 8 || payload.confirmation !== "APPLY IDENTITY DIRECTORY DEACTIVATIONS") {
@@ -591,28 +723,75 @@ function createRouteSegments(runtime) {
           sendJson(res, 401, { ok: false, message: "invalid phone or verification code" });
           return true;
         }
-        const session = await createSession({ ...user, phone });
+        let validatedUser;
+        try {
+          validatedUser = validateRuntimeAccount({ ...user, phone });
+        } catch (error) {
+          await recordSessionAudit(req,
+            { actor: user.name || maskPhone(phone), role: user.role || "unknown", action: "phone-code-login", target: "unified-auth", result: "denied", detail: error.code || "identity policy denied" }
+          );
+          rejectPolicy(res, error);
+          return true;
+        }
+        const session = await createSession(validatedUser);
+        issueSessionCookies(res, session, process.env);
         await recordSessionAudit(req,
           { actor: user.name, role: user.role, action: "phone-code-login", target: user.home, result: "allowed", detail: "resident signed session issued" },
           session,
           { actor: user.name, role: user.role, action: "phone-code login", target: user.home, result: "allowed", detail: "resident phone-code session issued" }
         );
-        sendJson(res, 200, { ok: true, token: session.token, expiresAt: session.expiresAt, user: session.user });
+        sendJson(res, 200, { ok: true, ...sessionResponse(session, process.env) });
         return true;
       }
 
       if (req.method === "GET" && url.pathname === "/api/auth/me") {
-        const session = currentSession(req);
-        if (!session) {
-          sendJson(res, 401, { ok: false, message: "未登录或会话已过期" });
+        let resolved;
+        try {
+          resolved = resolveSession(req);
+          if (!resolved.session) throw new IdentityPolicyError("AUTHENTICATION_REQUIRED", "未登录或会话已过期", 401);
+          const live = validateLiveSession(resolved.session, readDatabase());
+          const csrf = resolved.source === "cookie" ? csrfToken(resolved.session, process.env) : "";
+          sendJson(res, 200, {
+            ok: true,
+            user: publicIdentity(live.user),
+            claims: identityClaims(live.user),
+            expiresAt: resolved.session.expiresAt,
+            session: {
+              transport: resolved.source,
+              stepUp: stepUpStatus(resolved.session, process.env),
+              csrfRequired: resolved.source === "cookie"
+            },
+            ...(csrf ? { csrfToken: csrf } : {})
+          });
+        } catch (error) {
+          if (resolved?.session) {
+            await revokeSession(resolved.session, { reason: "live-identity-validation-failed", actor: resolved.session.user?.username || resolved.session.user?.id || "system" });
+            clearSessionCookies(res, process.env);
+            await recordSessionAudit(req, {
+              actor: resolved.session.user?.name || "unknown",
+              role: resolved.session.user?.role || "unknown",
+              action: "session-live-identity-validation",
+              target: "unified-auth",
+              result: "denied",
+              detail: error.code || "live identity validation failed"
+            }, resolved.session);
+          }
+          rejectPolicy(res, error);
           return true;
         }
-        sendJson(res, 200, { ok: true, user: session.user, expiresAt: session.expiresAt });
         return true;
       }
 
       if (req.method === "POST" && url.pathname === "/api/auth/logout") {
-        const session = currentSession(req);
+        let resolved;
+        try {
+          resolved = resolveSession(req);
+          if (resolved.session) requireCsrf(req, resolved, process.env);
+        } catch (error) {
+          rejectPolicy(res, error);
+          return true;
+        }
+        const session = resolved.session;
         if (session) {
           await revokeSession(session, { reason: "logout", actor: session.user.username || session.user.id });
           await recordSessionAudit(req,
@@ -621,6 +800,7 @@ function createRouteSegments(runtime) {
             { actor: session.user.name, role: session.user.role, action: "退出登录", target: "统一认证", result: "允许", detail: "后端会话已注销" }
           );
         }
+        clearSessionCookies(res, process.env);
         sendJson(res, 200, { ok: true });
         return true;
       }

@@ -23,7 +23,7 @@ test("citizen mobile action dock remembers and resets the current service order"
   await page.goto("/login.html");
   await page.locator("#login-user").selectOption("citizen");
   await page.locator("input[name='password']").fill("123456");
-  await page.getByRole("button", { name: "进入系统" }).click();
+  await page.locator("#login-form button[type='submit']").click();
   await expect(page).toHaveURL(/citizen\.html$/);
 
   await page.goto("/citizen.html?client=mini-program&page=health-record&compact=1");

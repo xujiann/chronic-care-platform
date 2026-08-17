@@ -407,7 +407,12 @@ async function resolveOidcUserInfoEndpoint(env = process.env, fetchImpl = global
 async function fetchOidcDiscovery(env = process.env, fetchImpl = globalThis.fetch) {
   const issuer = validatedHttpUrl(env.OIDC_ISSUER_URL, "OIDC_ISSUER_URL", env);
   const discoveryUrl = new URL(".well-known/openid-configuration", issuer.toString().endsWith("/") ? issuer : `${issuer}/`);
-  return fetchJson(discoveryUrl, { headers: { Accept: "application/json" } }, env.IDENTITY_ADAPTER_TIMEOUT_MS, fetchImpl);
+  const discovery = await fetchJson(discoveryUrl, { headers: { Accept: "application/json" } }, env.IDENTITY_ADAPTER_TIMEOUT_MS, fetchImpl);
+  const expectedIssuer = issuer.toString().replace(/\/$/, "");
+  const discoveredIssuer = String(discovery.issuer || "").trim().replace(/\/$/, "");
+  if (discoveredIssuer && discoveredIssuer !== expectedIssuer) throw new Error("OIDC discovery issuer does not match OIDC_ISSUER_URL");
+  if (isProduction(env) && !discoveredIssuer) throw new Error("OIDC discovery is missing issuer in production");
+  return discovery;
 }
 
 async function resolveOidcLifecycleEndpoint(envName, discoveryField, label, env = process.env, fetchImpl = globalThis.fetch) {
@@ -433,8 +438,11 @@ async function fetchOidcUserInfo(accessToken, options = {}) {
     }
   }, status.timeoutMs, options.fetchImpl);
   if (!claims.sub && !claims.openid && !claims.uid) throw new Error("OIDC UserInfo response is missing subject claim");
+  const expectedIssuer = validatedHttpUrl(env.OIDC_ISSUER_URL, "OIDC_ISSUER_URL", env).toString().replace(/\/$/, "");
+  const claimedIssuer = String(claims.iss || "").trim().replace(/\/$/, "");
+  if (claimedIssuer && claimedIssuer !== expectedIssuer) throw new Error("OIDC UserInfo issuer does not match OIDC_ISSUER_URL");
   return {
-    claims,
+    claims: { ...claims, iss: claimedIssuer || expectedIssuer },
     endpoint,
     fetchedAt: new Date().toISOString(),
     adapter: "oidc-userinfo"
