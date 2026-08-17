@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "regional-capability-bundles-v1",
+  "core": {
+    "id": "health-platform-core-v1",
+    "capabilities": ["identity", "audit", "work-items", "data-governance", "release-governance"]
+  },
+  "regional": [
+    { "id": "chronic-referral-continuity-v1", "capabilities": ["chronic-followup", "referral", "receipt-reconciliation", "resident-feedback"] },
+    { "id": "public-health-supervision-v1", "capabilities": ["surveillance", "direct-report", "command-tasks", "quality-review"] }
+  ],
+  "institution": [
+    { "id": "general-hospital-connectivity-v1", "adapters": ["government-oidc", "hospital-his", "hospital-emr", "hospital-lis", "hospital-pacs", "resident-message"] }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "schemaVersion": "platform-productization-program-v1",
+  "programId": "platform-productization-20260817",
+  "baselineCommit": "85ab2cc5d6ed8c20894111e8ecfc5a7e95b86e27",
+  "integrationOwner": "T00",
+  "defaultDecision": "NO-GO",
+  "iterations": [
+    { "id": "productization-1", "priority": "P0", "name": "authoritative-data-upgrade", "localGate": "p0-collections-promoted", "externalGate": "production-migration-rehearsal" },
+    { "id": "productization-2", "priority": "P0", "name": "unified-work-item-center", "localGate": "cross-domain-work-items-operational", "externalGate": "domain-owner-acceptance" },
+    { "id": "productization-3", "priority": "P0", "name": "institution-integration-center", "localGate": "synthetic-joint-test-complete", "externalGate": "signed-institution-receipts" },
+    { "id": "productization-4", "priority": "P1", "name": "regional-product-assembly", "localGate": "configuration-only-assembly", "externalGate": "second-region-site-rehearsal" },
+    { "id": "productization-5", "priority": "P1", "name": "chronic-referral-pilot", "localGate": "synthetic-end-to-end-closure", "externalGate": "pilot-institution-acceptance" },
+    { "id": "productization-6", "priority": "P1", "name": "nonfunctional-operations", "localGate": "modular-assets-and-automated-gates", "externalGate": "capacity-accessibility-security-dr-acceptance" }
+  ]
+}

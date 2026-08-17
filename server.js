@@ -4,6 +4,7 @@ const path = require("path");
 const LEGACY_REGIONAL_STATS_KEY = "da" + "lianHealthStatistics2025";
 const { createPlatformRuntimeComposition } = require("./src/http/platform-runtime-composition");
 const { createPlatformRequestHandler } = require("./src/http/platform-request-handler");
+const platformProductizationRuntime = require("./src/platform/productization/runtime");
 const { loadRegionalRuntime } = require("./src/platform/regional/regional-runtime");
 const { ContractRegistry } = require("./src/platform/contracts/contract-registry");
 const {
@@ -27933,6 +27934,7 @@ function buildProductionReleaseEvidencePublicSummary() {
 
 function createRuntimeCapabilitySource() {
   return Object.freeze({
+    ...platformProductizationRuntime,
     APPOINTMENT_CONTRACT_ID,
   DIRECT_REPORT_CONTRACT_ID,
   BloodBusinessService,

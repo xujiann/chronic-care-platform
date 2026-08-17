@@ -31,6 +31,91 @@
     ]
   },
   "collections": {
+    "accounts": {
+      "owner": "identity-security",
+      "classification": "restricted",
+      "readers": ["platform-governance"]
+    },
+    "authOrganizations": {
+      "owner": "identity-security",
+      "classification": "internal",
+      "readers": ["platform-governance", "integration"]
+    },
+    "authUsers": {
+      "owner": "identity-security",
+      "classification": "restricted",
+      "readers": ["platform-governance"]
+    },
+    "integrationContracts": {
+      "owner": "integration",
+      "classification": "internal",
+      "readers": ["platform-governance", "care-coordination", "clinical-specialties", "public-health"]
+    },
+    "platformIntegrations": {
+      "owner": "integration",
+      "classification": "internal",
+      "readers": ["platform-governance"]
+    },
+    "chronicExternalIntegrations": {
+      "owner": "integration",
+      "classification": "internal",
+      "readers": ["citizen-chronic", "care-coordination", "platform-governance"]
+    },
+    "chronicMessageChannels": {
+      "owner": "care-coordination",
+      "classification": "internal",
+      "readers": ["citizen-chronic", "platform-governance"]
+    },
+    "smsDeliveryReceipts": {
+      "owner": "identity-security",
+      "classification": "internal",
+      "readers": ["care-coordination", "platform-governance"]
+    },
+    "publicHealthCommandTasks": {
+      "owner": "public-health",
+      "classification": "restricted",
+      "readers": ["platform-governance", "care-coordination"]
+    },
+    "publicHealthExchangeTasks": {
+      "owner": "public-health",
+      "classification": "internal",
+      "readers": ["platform-governance", "integration"]
+    },
+    "referralSystem": {
+      "owner": "care-coordination",
+      "classification": "restricted",
+      "readers": ["citizen-chronic", "clinical-specialties", "platform-governance"]
+    },
+    "referralTeleconsultations": {
+      "owner": "care-coordination",
+      "classification": "restricted",
+      "readers": ["citizen-chronic", "clinical-specialties", "platform-governance"]
+    },
+    "platformWorkItems": {
+      "owner": "platform-governance",
+      "classification": "internal",
+      "readers": []
+    },
+    "platformWorkItemCommands": {
+      "owner": "platform-governance",
+      "classification": "internal",
+      "readers": []
+    },
+    "institutionIntegrationProfiles": {
+      "owner": "integration",
+      "classification": "internal",
+      "readers": ["platform-governance"]
+    },
+    "institutionJointTestRuns": {
+      "owner": "integration",
+      "classification": "internal",
+      "readers": ["platform-governance"]
+    },
+    "institutionIntegrationCommands": {
+      "owner": "integration",
+      "classification": "internal",
+      "readers": ["platform-governance"]
+    },
     "residents": {
       "owner": "identity-security",
       "classification": "restricted",

@@ -18,14 +18,15 @@ test("platform governance segments use distinct least-privilege service contexts
       "site-launch-evidence": 4,
       "digital-hospital-pilot": 17,
       "digital-hospital-readiness": 21,
-    "production-operations": 22,
+      "production-operations": 22,
       "digital-hospital-governance": 54,
       "phase2-operations": 54,
       "mutual-recognition-overview": 4,
-      "mutual-recognition-decision": 9
+      "mutual-recognition-decision": 9,
+      "productization-center": 10
     }
   );
-  assert.equal(new Set(Object.values(SUBDOMAIN_DEPENDENCIES).map((dependencies) => dependencies.join(","))).size, 10);
+  assert.equal(new Set(Object.values(SUBDOMAIN_DEPENDENCIES).map((dependencies) => dependencies.join(","))).size, 11);
   assert.deepEqual([...new Set(Object.values(SUBDOMAIN_DEPENDENCIES).flat())].sort(), [...DEPENDENCIES].sort());
   assert.equal(Math.max(...Object.values(SUBDOMAIN_DEPENDENCIES).map((dependencies) => dependencies.length)) <= 60, true);
 });
@@ -35,7 +36,7 @@ test("platform governance facade projects every service context and fails fast",
   const segments = createRouteSegments(runtime);
   assert.deepEqual(
     segments.map((segment) => segment.id),
-    Array.from({ length: 10 }, (_, index) => `platform-governance-${String(index + 1).padStart(2, "0")}`)
+    Array.from({ length: 11 }, (_, index) => `platform-governance-${String(index + 1).padStart(2, "0")}`)
   );
   const incomplete = { ...runtime };
   delete incomplete.buildGovernanceCatalog;

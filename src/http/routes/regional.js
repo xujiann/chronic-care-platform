@@ -13,6 +13,9 @@ const {
 const {
   buildRegionalPilotReadiness
 } = require("../../platform/regional/regional-pilot-program");
+const {
+  buildRegionalProductAssembly
+} = require("../../platform/regional/regional-product-assembly");
 
 function createRouteSegments({
   appendSecurityEvent,
@@ -36,6 +39,27 @@ function createRouteSegments({
     id: "regional-01",
     domain: "regional",
     async handle(req, res, url) {
+      const assemblyMatch = url.pathname.match(/^\/api\/regional\/product-assembly\/(template|\d{6})$/);
+      if (req.method === "GET" && assemblyMatch) {
+        const user = requireApiRole(req, res, ["commission"], "/api/regional/product-assembly/:regionCode");
+        if (!user) return true;
+        const report = buildRegionalProductAssembly({
+          regionCode: assemblyMatch[1],
+          env: environment,
+          data: readDatabase()
+        });
+        appendSecurityEvent({
+          actor: user.name,
+          role: user.role,
+          action: "regional-product-assembly-read",
+          target: report.region.code,
+          result: "allowed",
+          detail: `${report.regionalBundles.length} regional bundles; ${report.institutionProfiles.length} institution profiles; production gate closed`
+        });
+        sendJson(res, 200, report);
+        return true;
+      }
+
       if (req.method !== "GET" || url.pathname !== "/api/regional/context") return false;
       sendJson(res, 200, regionalContext);
       return true;

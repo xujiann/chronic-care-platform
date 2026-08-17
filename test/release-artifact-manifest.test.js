@@ -66,6 +66,7 @@ test("release artifact manifest indexes reports templates commands and evidence"
   assert.equal(report.artifacts.some((item) => item.id === "regional-cutover-workbench" && item.evidence === "/api/regional/cutover-workbench"), true);
   assert.equal(report.artifacts.some((item) => item.id === "regional-pilot-readiness" && item.command === "regional:pilot" && item.evidence === "/api/regional/pilot-program"), true);
   assert.equal(report.artifacts.some((item) => item.id === "regional-replication-exercise" && item.command === "regional:replication"), true);
+  assert.equal(report.artifacts.some((item) => item.id === "platform-productization-readiness" && item.command === "productization:readiness" && item.evidence === "/api/platform/productization/center"), true);
   assert.equal(report.artifacts.some((item) => item.id === "postgres-primary-storage-contract" && item.command === "postgres:primary-storage-contract:check"), true);
   assert.equal(report.artifacts.some((item) => item.id === "internet-nursing-highlight-center" && item.command === "internet-nursing:readiness" && item.markdown === "docs/internet-nursing-highlight-center.md" && item.evidence === "internet-nursing.html#nursing-highlight-section"), true);
   assert.equal(report.artifacts.some((item) => item.id === "multi-practice" && item.command === "multi-practice:readiness" && item.markdown === "release/multi-practice-readiness-report.md" && item.evidence === "/api/multi-practice-registry"), true);
@@ -123,6 +124,7 @@ test("release artifact manifest renders and writes artifacts", (t) => {
   assert.match(markdown, /data-collection-governance\.md/);
   assert.match(markdown, /regional-pilot-readiness\.md/);
   assert.match(markdown, /platform-nonfunctional-readiness\.md/);
+  assert.match(markdown, /platform-productization-readiness\.md/);
   assert.match(markdown, /platform-capability-map\.md/);
   assert.match(markdown, /platform-go-live-slices\.md/);
   assert.match(markdown, /全系统图谱集\.md/);

@@ -11,6 +11,7 @@ const ROUTE_SUBDOMAINS = Object.freeze({
   "platform-governance-08": "phase2-operations",
   "platform-governance-09": "mutual-recognition-overview",
   "platform-governance-10": "mutual-recognition-decision",
+  "platform-governance-11": "productization-center",
   "public-health-01": "surveillance-foundation",
   "public-health-02": "public-health-operations",
   "public-health-03": "vital-records",

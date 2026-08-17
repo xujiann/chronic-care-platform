@@ -1,11 +1,12 @@
 {
   "schemaVersion": "platform-nonfunctional-budgets-v1",
   "frontendAssets": [
-    { "file": "citizen.js", "maximumBytes": 355000, "maximumLines": 6100 },
-    { "file": "public-health.js", "maximumBytes": 310000, "maximumLines": 4500 },
-    { "file": "platform.js", "maximumBytes": 245000, "maximumLines": 3900 },
-    { "file": "operations.js", "maximumBytes": 228000, "maximumLines": 3800 },
-    { "file": "regional-cutover-workbench-ui.js", "maximumBytes": 20000, "maximumLines": 500 }
+    { "file": "citizen.js", "maximumBytes": 349500, "maximumLines": 6075 },
+    { "file": "public-health.js", "maximumBytes": 304000, "maximumLines": 4475 },
+    { "file": "platform.js", "maximumBytes": 239000, "maximumLines": 3815 },
+    { "file": "operations.js", "maximumBytes": 223000, "maximumLines": 3725 },
+    { "file": "regional-cutover-workbench-ui.js", "maximumBytes": 20000, "maximumLines": 500 },
+    { "file": "platform-productization-ui.js", "maximumBytes": 30000, "maximumLines": 600 }
   ],
   "runtime": {
     "serverFile": "server.js",
@@ -13,17 +14,19 @@
     "maximumServerRequires": 125,
     "requiredCompositionModules": [
       "src/http/platform-runtime-composition.js",
-      "src/http/platform-request-handler.js"
+      "src/http/platform-request-handler.js",
+      "src/platform/productization/runtime.js"
     ]
   },
   "quality": {
-    "minimumTestFiles": 353,
-    "minimumRouteFiles": 43,
+    "minimumTestFiles": 363,
+    "minimumRouteFiles": 44,
     "requiredPlatformMarkers": [
       "lang=\"zh-CN\"",
       "name=\"viewport\"",
       "<main",
-      "regional-cutover-workbench-panel"
+      "regional-cutover-workbench-panel",
+      "platform-productization-panel"
     ]
   }
 }

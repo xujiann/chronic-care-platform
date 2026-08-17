@@ -1,0 +1,24 @@
+{
+  "schemaVersion": "p0-data-promotions-v1",
+  "programId": "p0-authoritative-data-20260817",
+  "collections": [
+    { "collection": "accounts", "owner": "identity-security", "classification": "restricted", "contract": "identity.account.v1" },
+    { "collection": "authOrganizations", "owner": "identity-security", "classification": "internal", "contract": "identity.organization.v1" },
+    { "collection": "authUsers", "owner": "identity-security", "classification": "restricted", "contract": "identity.user.v1" },
+    { "collection": "integrationContracts", "owner": "integration", "classification": "internal", "contract": "integration.contract.v1" },
+    { "collection": "platformIntegrations", "owner": "integration", "classification": "internal", "contract": "integration.platform-binding.v1" },
+    { "collection": "chronicExternalIntegrations", "owner": "integration", "classification": "internal", "contract": "integration.chronic-binding.v1" },
+    { "collection": "chronicMessageChannels", "owner": "care-coordination", "classification": "internal", "contract": "care.message-channel.v1" },
+    { "collection": "smsDeliveryReceipts", "owner": "identity-security", "classification": "internal", "contract": "identity.message-receipt.v1" },
+    { "collection": "publicHealthCommandTasks", "owner": "public-health", "classification": "restricted", "contract": "public-health.command-task.v1" },
+    { "collection": "publicHealthExchangeTasks", "owner": "public-health", "classification": "internal", "contract": "public-health.exchange-task.v1" },
+    { "collection": "referralSystem", "owner": "care-coordination", "classification": "restricted", "contract": "care.referral-system.v1" },
+    { "collection": "referralTeleconsultations", "owner": "care-coordination", "classification": "restricted", "contract": "care.teleconsultation.v1" }
+  ],
+  "migrationContract": {
+    "mode": "outbox-shadow-then-cutover",
+    "requires": ["source-count", "source-version", "sha256-digest", "rollback-snapshot", "independent-review"],
+    "requestPathDualWrite": false,
+    "productionCutoverAuthorized": false
+  }
+}

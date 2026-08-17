@@ -313,6 +313,10 @@ const ROUTE_ORDER = Object.freeze([
   {
     "domain": "state-data",
     "id": "state-data-03"
+  },
+  {
+    "domain": "platform-governance",
+    "id": "platform-governance-11"
   }
 ]);
 

@@ -23,6 +23,10 @@
     "src/http/routes/care-coordination.js",
     "src/http/routes/integration.js",
     "src/platform/regional/regional-site-evidence.js",
+    "src/platform/productization/work-item-center.js",
+    "src/platform/productization/institution-integration-center.js",
+    "src/platform/regional/regional-product-assembly.js",
+    "platform-productization-ui.js",
     "test/chronic-followup-readiness.test.js",
     "test/t05-referral-command-api.test.js"
   ],

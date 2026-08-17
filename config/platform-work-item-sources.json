@@ -1,0 +1,12 @@
+{
+  "schemaVersion": "platform-work-item-sources-v1",
+  "sources": [
+    { "collection": "taskMessages", "domain": "care-coordination", "label": "居民服务消息待办", "statusField": "status", "dueField": "dueAt", "priorityField": "priority" },
+    { "collection": "publicHealthCommandTasks", "domain": "public-health", "label": "公共卫生指挥任务", "statusField": "status", "dueField": "dueAt", "priorityField": "priority" },
+    { "collection": "publicHealthExchangeTasks", "domain": "public-health", "label": "公共卫生交换任务", "statusField": "status", "dueField": "dueAt", "priorityField": "priority" },
+    { "collection": "qualityRectificationOrders", "domain": "clinical-specialties", "label": "质量整改任务", "statusField": "status", "dueField": "dueAt", "priorityField": "priority" },
+    { "collection": "resourceDispatchRequests", "domain": "care-coordination", "label": "资源调度任务", "statusField": "status", "dueField": "requiredBy", "priorityField": "priority" },
+    { "collection": "phase2ClinicalAssistAlerts", "domain": "clinical-specialties", "label": "临床辅助处置任务", "statusField": "status", "dueField": "dueAt", "priorityField": "severity" },
+    { "collection": "digitalHospitalEvaluationTasks", "domain": "platform-governance", "label": "数智医院评价任务", "statusField": "status", "dueField": "dueAt", "priorityField": "priority" }
+  ]
+}

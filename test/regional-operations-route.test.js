@@ -71,6 +71,21 @@ test("regional operations route exposes the pilot contract without claiming site
   assert.equal(harness.audits[0].action, "regional-pilot-program-read");
 });
 
+test("regional route assembles reviewed bundles without activating production", async () => {
+  const harness = createHarness();
+  const handled = await harness.segments[0].handle(
+    { method: "GET", headers: {} },
+    {},
+    new URL("https://platform.example.gov.cn/api/regional/product-assembly/210200")
+  );
+  assert.equal(handled, true);
+  assert.equal(harness.responses[0].status, 200);
+  assert.equal(harness.responses[0].body.region.code, "210200");
+  assert.equal(harness.responses[0].body.productionReady, false);
+  assert.equal(harness.responses[0].body.checks.every((item) => item.passed), true);
+  assert.equal(harness.audits[0].action, "regional-product-assembly-read");
+});
+
 test("regional operations route rejects client-controlled probe inputs before transport", async () => {
   const harness = createHarness({
     environment: { REGIONAL_SITE_210200_BASE_URL: "https://dalian.example.gov.cn" }

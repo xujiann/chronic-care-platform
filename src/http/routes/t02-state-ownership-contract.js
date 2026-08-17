@@ -96,6 +96,17 @@ const PLATFORM_WRITE_CONTRACTS = Object.freeze({
       phase2MutualRecognitionCitations: "clinical-specialties",
       securityEvents: "platform-governance"
     })
+  }),
+  "productization-center": Object.freeze({
+    id: "platform-governance.productization-center-write.v1",
+    collections: Object.freeze({
+      institutionIntegrationCommands: "integration",
+      institutionIntegrationProfiles: "integration",
+      institutionJointTestRuns: "integration",
+      platformWorkItemCommands: "platform-governance",
+      platformWorkItems: "platform-governance",
+      securityEvents: "platform-governance"
+    })
   })
 });
 

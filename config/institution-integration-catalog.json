@@ -1,0 +1,12 @@
+{
+  "schemaVersion": "institution-integration-catalog-v1",
+  "adapters": [
+    { "id": "government-oidc", "domain": "identity-security", "scenarios": ["subject-match", "scope-denial"] },
+    { "id": "hospital-his", "domain": "integration", "scenarios": ["referral-submit", "receipt-reject"] },
+    { "id": "hospital-emr", "domain": "integration", "scenarios": ["discharge-summary", "invalid-signature"] },
+    { "id": "hospital-lis", "domain": "integration", "scenarios": ["structured-result", "duplicate-replay"] },
+    { "id": "hospital-pacs", "domain": "integration", "scenarios": ["report-index", "resident-scope-denial"] },
+    { "id": "resident-message", "domain": "care-coordination", "scenarios": ["delivery-receipt", "callback-timeout"] }
+  ],
+  "forbiddenProfileFields": ["endpoint", "url", "secret", "token", "password", "privateKey", "patient", "resident"]
+}
