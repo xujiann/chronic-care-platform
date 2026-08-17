@@ -30,7 +30,10 @@ test("OIDC adapter discovers UserInfo and returns verified subject claims", asyn
   const fetchImpl = async (url, options = {}) => {
     requests.push({ url: String(url), options });
     if (String(url).includes("openid-configuration")) {
-      return jsonResponse({ userinfo_endpoint: "https://identity.example.gov.cn/userinfo" });
+      return jsonResponse({
+        issuer: "https://identity.example.gov.cn/real-issuer",
+        userinfo_endpoint: "https://identity.example.gov.cn/userinfo"
+      });
     }
     return jsonResponse({ sub: "external-health-001", preferred_username: "health", org_code: "ORG-HEALTH-DL", roles: ["commission"] });
   };
@@ -46,6 +49,7 @@ test("OIDC adapter discovers UserInfo and returns verified subject claims", asyn
   });
 
   assert.equal(result.claims.sub, "external-health-001");
+  assert.equal(result.claims.iss, "https://identity.example.gov.cn/real-issuer");
   assert.equal(requests.length, 2);
   assert.equal(requests[1].options.headers.Authorization, "Bearer upstream-access-token");
 });
@@ -56,6 +60,7 @@ test("OIDC lifecycle refreshes and revokes tokens without persisting credentials
     requests.push({ url: String(url), options });
     if (String(url).includes("openid-configuration")) {
       return jsonResponse({
+        issuer: "https://identity.example.gov.cn/real-issuer",
         token_endpoint: "https://identity.example.gov.cn/token",
         revocation_endpoint: "https://identity.example.gov.cn/revoke"
       });
