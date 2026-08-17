@@ -3,7 +3,7 @@
 This repository uses one integration line:
 
 - integration and release branch: `main`
-- process baseline: `baseline/governance-20260806-regional-context-v1`
+- process baseline: `baseline/governance-20260817-productization-v1`
 - ownership manifest: `config/process-workstreams.json`
 
 Before changing a protected runtime file, identify the process from the current
