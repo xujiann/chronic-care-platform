@@ -1,0 +1,30 @@
+{
+  "schemaVersion": "institution-sandbox-program-v1",
+  "environment": "preproduction-sandbox",
+  "pilotAdapterProfileId": "chronic-referral-core",
+  "allowedAdapterIds": ["hospital-his", "hospital-emr"],
+  "transportPolicy": {
+    "httpsRequired": true,
+    "maximumRequestSkewSeconds": 300,
+    "maximumReceiptSkewSeconds": 300,
+    "nonceRetentionSeconds": 86400
+  },
+  "retryPolicy": {
+    "maxAttempts": 3,
+    "baseDelaySeconds": 30,
+    "maximumDelaySeconds": 300
+  },
+  "evidencePolicy": {
+    "allowedSchemes": ["artifact", "cmdb", "evidence", "ticket", "vault"],
+    "storeRawMessages": false,
+    "storeCredentials": false,
+    "storeEndpoints": false,
+    "storeSignatures": false
+  },
+  "productionBlockers": [
+    "sandbox-results-are-not-production-evidence",
+    "production-endpoint-and-key-custody-pending",
+    "independent-site-acceptance-pending",
+    "production-change-approval-pending"
+  ]
+}

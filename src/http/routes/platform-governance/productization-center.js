@@ -4,7 +4,7 @@ const ROUTE_SEGMENT_ID = "platform-governance-11";
 const SUBDOMAIN = "productization-center";
 
 function createRouteSegment(runtime) {
-  const { appendSecurityEvent, applyPlatformWorkItemAction, buildPlatformProductizationCenter, collectJson, readDatabase, registerInstitutionIntegrationProfile, requireApiRole, runInstitutionSyntheticJointTest, sendJson, writeDatabase } = runtime;
+  const { appendSecurityEvent, applyPlatformWorkItemAction, buildPlatformProductOperationsCockpit, buildPlatformProductizationCenter, collectJson, readDatabase, registerInstitutionIntegrationProfile, requireApiRole, runInstitutionSyntheticJointTest, sendJson, writeDatabase } = runtime;
   return {
     id: ROUTE_SEGMENT_ID,
     domain: "platform-governance",
@@ -20,6 +20,22 @@ function createRouteSegment(runtime) {
           target: url.pathname,
           result: "allowed",
           detail: `${report.dataPromotion.summary.promotedP0} promoted P0; ${report.workItems.summary.open} open work items; production gate closed`
+        });
+        sendJson(res, 200, report);
+        return true;
+      }
+
+      if (req.method === "GET" && url.pathname === "/api/platform/productization/operations/cockpit") {
+        const user = requireApiRole(req, res, ["commission"], url.pathname);
+        if (!user) return true;
+        const report = buildPlatformProductOperationsCockpit(readDatabase());
+        appendSecurityEvent({
+          actor: user.name,
+          role: user.role,
+          action: "platform-product-operations-cockpit-read",
+          target: url.pathname,
+          result: "allowed",
+          detail: `${report.summary.projectedWorkItems} projected work items; ${report.summary.regionalSites} minimized regional sites; production gate closed`
         });
         sendJson(res, 200, report);
         return true;

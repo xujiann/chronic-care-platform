@@ -1,0 +1,33 @@
+{
+  "schemaVersion": "product-operations-program-v1",
+  "requiredSections": [
+    "work-items",
+    "frontend",
+    "monitoring",
+    "nonfunctional",
+    "regional-replication"
+  ],
+  "minimumProjectedWorkItems": 1,
+  "maximumVisibleWorkItems": 12,
+  "frontendAsset": {
+    "file": "product-operations-ui.js",
+    "maximumBytes": 12000,
+    "maximumLines": 250
+  },
+  "minimumReplicationSites": 2,
+  "requiredMonitoringChecks": [
+    "monitoring:routes",
+    "monitoring:metricSignals",
+    "monitoring:alertSignals",
+    "monitoring:sloTargets",
+    "monitoring:productionBoundary"
+  ],
+  "externalBlockers": [
+    "real-monitoring-receiver-and-on-call-drill-pending",
+    "load-capacity-and-weak-network-evidence-pending",
+    "second-real-region-replication-evidence-pending",
+    "backup-restore-and-disaster-recovery-evidence-pending",
+    "independent-security-and-site-acceptance-pending",
+    "production-cutover-authorization-pending"
+  ]
+}

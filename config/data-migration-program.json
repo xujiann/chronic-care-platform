@@ -1,0 +1,48 @@
+{
+  "schemaVersion": "data-migration-program-v1",
+  "programId": "authoritative-data-control-20260817",
+  "mode": "outbox-shadow-then-cutover",
+  "requestPathDualWrite": false,
+  "productionCutoverAuthorized": false,
+  "waves": [
+    {
+      "id": "wave-identity-contract",
+      "collections": ["accounts", "authOrganizations", "authUsers", "integrationContracts"]
+    },
+    {
+      "id": "wave-integration-channel",
+      "collections": ["platformIntegrations", "chronicExternalIntegrations", "chronicMessageChannels", "smsDeliveryReceipts"]
+    },
+    {
+      "id": "wave-public-health-referral",
+      "collections": ["publicHealthCommandTasks", "publicHealthExchangeTasks", "referralSystem", "referralTeleconsultations"]
+    }
+  ],
+  "reconciliation": {
+    "allowedMismatchCount": 0,
+    "allowedDuplicateCount": 0,
+    "requireMatchingDigest": true,
+    "requiredMetadata": ["sourceCount", "targetCount", "sourceVersion", "sourceDigest", "targetDigest", "outboxCheckpoint"]
+  },
+  "rollback": {
+    "maximumRpoSeconds": 300,
+    "maximumRtoSeconds": 1800,
+    "minimumIndependentApprovals": 2,
+    "requiredApprovalRoles": ["data-owner", "release-manager"]
+  },
+  "qualityThresholds": {
+    "minimumCompletenessPct": 99.5,
+    "minimumValidityPct": 99.0,
+    "minimumUniquenessPct": 99.9,
+    "maximumFreshnessLagSeconds": 300,
+    "maximumCriticalIssueCount": 0,
+    "maximumUnresolvedIssueCount": 0
+  },
+  "externalGates": [
+    "masked-full-volume-rehearsal",
+    "signed-reconciliation-evidence",
+    "independent-rollback-rehearsal",
+    "capacity-and-failover-assessment",
+    "site-change-approval"
+  ]
+}

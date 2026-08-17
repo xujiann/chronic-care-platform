@@ -1,0 +1,31 @@
+{
+  "schemaVersion": "institution-pilot-program-v1",
+  "adapterProfiles": [
+    {
+      "id": "chronic-referral-core",
+      "adapters": ["government-oidc", "hospital-his", "hospital-emr", "resident-message"],
+      "requiredClosureEvents": [
+        "resident-consent-recorded",
+        "referral-created",
+        "referral-accepted",
+        "clinical-delivery-acknowledged",
+        "loop-closed"
+      ]
+    }
+  ],
+  "retryPolicy": {
+    "maxAttempts": 3,
+    "baseDelaySeconds": 30,
+    "maximumDelaySeconds": 300
+  },
+  "reconciliation": {
+    "requiredDigests": ["outboundEnvelopeDigest", "acknowledgedEnvelopeDigest"],
+    "mismatchDisposition": "reconciliation-required"
+  },
+  "productionBlockers": [
+    "real-institution-endpoints-not-configured",
+    "signed-joint-test-receipts-pending",
+    "production-transport-signing-pending",
+    "independent-site-acceptance-pending"
+  ]
+}
