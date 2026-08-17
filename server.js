@@ -461,10 +461,19 @@ const {
   seedPublicHealthSignals,
   seedPublicHealthTriggerRules
 } = require("./public-health-highlights-service");
+const {
+  initializeRuntimeJson,
+  resolveRuntimeDataBoundary
+} = require("./src/identity-security/runtime-data-boundary");
+const {
+  authorize,
+} = require("./src/identity-security/authorization-runtime");
+const { createAuthorizationHttpRuntime } = require("./src/identity-security/authorization-http-runtime");
 
 const PORT = Number(process.env.PORT || 5173);
 const ROOT = __dirname;
-const DATA_DIR = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : path.join(ROOT, "data");
+const RUNTIME_DATA_BOUNDARY = resolveRuntimeDataBoundary({ root: ROOT, env: process.env });
+const DATA_DIR = RUNTIME_DATA_BOUNDARY.runtimeDirectory;
 const DB_FILE = path.join(DATA_DIR, "db.json");
 
 function diseasePaymentPackageSignatureOptions(extra = {}) {
@@ -7135,10 +7144,7 @@ function record(residentId, category, date, name, result, source, meta = {}) {
 }
 
 function ensureDatabase() {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
-  if (!fs.existsSync(DB_FILE)) {
-    fs.writeFileSync(DB_FILE, JSON.stringify(seedState(), null, 2), "utf8");
-  }
+  initializeRuntimeJson(RUNTIME_DATA_BOUNDARY, seedState);
   if (shouldUseSqlite()) {
     ensureSqliteDatabase();
   }
@@ -14656,6 +14662,11 @@ function personIndexForResident(residentMap, residentId) {
 }
 
 function serveStatic(req, res) {
+  const decision = authorizationHttpRuntime.evaluateStaticRequest(req);
+  if (!decision.allowed) {
+    authorizationHttpRuntime.denyStaticRequest(res, decision, authorizationHttpRuntime.currentBrowserUser(req));
+    return;
+  }
   const rawPath = decodeURIComponent(new URL(req.url, `http://${req.headers.host}`).pathname);
   if (rawPath === "/favicon.ico") {
     res.writeHead(204, securityResponseHeaders());
@@ -15579,20 +15590,25 @@ async function revokeSession(session, options = {}) {
   }
 }
 
-function requireApiRole(req, res, roles, target) {
-  const allowed = Array.isArray(roles) ? roles : [roles];
+function requireApiAccess(req, res, policy, target, resource = {}) {
   const session = currentSession(req);
   if (!session) {
     appendSecurityEvent({ actor: "anonymous", role: "anonymous", action: "访问接口", target, result: "拒绝", detail: "未登录或会话已过期", transient: true });
     sendJson(res, 401, { error: "Unauthorized", message: "请先登录后再访问该接口" });
     return null;
   }
-  if (!allowed.includes(session.user.role)) {
-    appendSecurityEvent({ actor: session.user.name, role: session.user.role, action: "访问接口", target, result: "拒绝", detail: `需要角色：${allowed.join("、")}` });
-    sendJson(res, 403, { error: "Forbidden", message: "当前角色无权访问该接口" });
+  const decision = authorize(session.user, policy, resource);
+  if (!decision.allowed) {
+    appendSecurityEvent({ actor: session.user.name, role: session.user.role, action: "访问接口", target, result: "拒绝", detail: decision.code });
+    sendJson(res, 403, { error: "Forbidden", code: decision.code, message: "当前身份、权限或数据范围无权访问该接口" });
     return null;
   }
   return session.user;
+}
+
+function requireApiRole(req, res, roles, target) {
+  const allowed = Array.isArray(roles) ? roles : [roles];
+  return requireApiAccess(req, res, { roles: allowed }, target);
 }
 
 function insurancePaymentActor(user = {}) {
@@ -28588,11 +28604,21 @@ function handleRequestError(_req, res, error) {
     sendJson(res, 500, { error: error.message });
 }
 
+const authorizationHttpRuntime = createAuthorizationHttpRuntime({
+  verifySignedSessionToken,
+  sessionStore: runtimeSessionStore,
+  appendSecurityEvent,
+  securityResponseHeaders,
+  environment: process.env
+});
+
 const server = http.createServer(createPlatformRequestHandler({
   observability: platformObservability,
   hydrateRequestSession,
   handleApi,
   serveStatic,
+  isProtectedStaticRequest: authorizationHttpRuntime.isProtectedStaticRequest,
+  hydrateStaticRequestSession: authorizationHttpRuntime.hydrateStaticRequestSession,
   recordRequestMetrics,
   sendJson,
   handleError: handleRequestError
@@ -28675,6 +28701,7 @@ if (require.main === module) {
 }
 
 module.exports = {
+  authorize,
   assertProductionRuntimeSecurity,
   careServiceReadinessPublicSummary,
   configureDigitalHospitalExecutionRuntime,
@@ -28697,6 +28724,7 @@ module.exports = {
   pilotCutoverControlPlaneReadiness,
   pilotCutoverControlHealthReadiness,
   readDatabase,
+  requireApiAccess,
   requireDigitalHospitalExecutionWorker,
   server,
   sessionStoreMode,

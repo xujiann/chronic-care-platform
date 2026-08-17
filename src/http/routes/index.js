@@ -4,6 +4,7 @@ const { createApiRouter } = require("../api-router");
 const { attachRouteSubdomain } = require("../route-subdomains");
 const { CONTEXT_DEFINITIONS } = require("../runtime-contexts");
 const care_coordination = require("./care-coordination");
+const authorization_context = require("./authorization-context");
 const citizen_chronic = require("./citizen-chronic");
 const clinical_specialties = require("./clinical-specialties");
 const identity_security = require("./identity-security");
@@ -105,6 +106,10 @@ const ROUTE_ORDER = Object.freeze([
   {
     "domain": "identity-security",
     "id": "identity-security-02"
+  },
+  {
+    "domain": "identity-security",
+    "id": "authorization-context-01"
   },
   {
     "domain": "state-data",
@@ -356,6 +361,14 @@ function createPlatformApiRouter(runtimeContexts) {
     segmentsById.set(segment.id, segment);
   }
   for (const segment of identity_security.createRouteSegments(runtimeContexts.forDomain("identity-security"))) {
+    if (segmentsById.has(segment.id)) throw new TypeError(`duplicate route segment id: ${segment.id}`);
+    segmentsById.set(segment.id, segment);
+  }
+  {
+    const segment = authorization_context.createRouteSegment(
+      runtimeContexts.forDomain("identity-security"),
+      { regionalContext: runtimeContexts.regional, environment: process.env }
+    );
     if (segmentsById.has(segment.id)) throw new TypeError(`duplicate route segment id: ${segment.id}`);
     segmentsById.set(segment.id, segment);
   }

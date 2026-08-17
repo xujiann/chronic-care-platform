@@ -8,6 +8,7 @@ data/*.sqlite-wal
 data/backups/
 data/sanitized/
 tmp/
+var/runtime/
 .tmp/
 .tmp-preview-data/
 .tmp-preview-logs/

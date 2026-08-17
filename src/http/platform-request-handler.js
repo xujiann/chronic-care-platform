@@ -13,6 +13,8 @@ function createPlatformRequestHandler(options = {}) {
   const hydrateRequestSession = requiredFunction(options, "hydrateRequestSession");
   const handleApi = requiredFunction(options, "handleApi");
   const serveStatic = requiredFunction(options, "serveStatic");
+  const isProtectedStaticRequest = requiredFunction(options, "isProtectedStaticRequest");
+  const hydrateStaticRequestSession = requiredFunction(options, "hydrateStaticRequestSession");
   const recordRequestMetrics = requiredFunction(options, "recordRequestMetrics");
   const sendJson = requiredFunction(options, "sendJson");
   const handleError = requiredFunction(options, "handleError");
@@ -39,6 +41,21 @@ function createPlatformRequestHandler(options = {}) {
           }
           await handleApi(req, res);
           return;
+        }
+        if (isProtectedStaticRequest(req)) {
+          try {
+            await hydrateStaticRequestSession(req);
+            observability.recordDependency("session-store", { ok: true });
+          } catch (error) {
+            observability.recordDependency("session-store", { ok: false, detail: error.code || error.message });
+            logger.error(`protected page session lookup failed: ${error.message}`);
+            sendJson(res, 503, {
+              ok: false,
+              code: "SESSION_STORE_UNAVAILABLE",
+              message: "authentication session service is temporarily unavailable"
+            });
+            return;
+          }
         }
         serveStatic(req, res);
       } catch (error) {
