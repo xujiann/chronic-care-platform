@@ -1,0 +1,29 @@
+{
+  "schemaVersion": "data-migration-execution-program-v1",
+  "programId": "authoritative-data-execution-20260817",
+  "executionBoundary": "background-worker-only",
+  "sourceBoundary": "committed-local-outbox-only",
+  "requestPathDualWrite": false,
+  "metadataOnly": true,
+  "lease": {
+    "minimumSeconds": 30,
+    "maximumSeconds": 300,
+    "maximumCrashRecoveries": 3
+  },
+  "checkpoint": {
+    "required": true,
+    "monotonic": true,
+    "recoverable": true
+  },
+  "reconciliation": {
+    "requireExactCounts": true,
+    "allowedMismatchCount": 0,
+    "allowedDuplicateCount": 0,
+    "requireMatchingDigest": true
+  },
+  "candidate": {
+    "requiredControlState": "local-candidate",
+    "requireMatchingCheckpoint": true
+  },
+  "productionActivationAuthorized": false
+}
