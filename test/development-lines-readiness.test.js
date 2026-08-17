@@ -26,6 +26,24 @@ function fixtures(overrides = {}) {
       summary: { sessions: 0, localClosedLoops: 0 },
       blockers: ["signed-joint-test-receipts-pending"]
     },
+    dataExecution: {
+      schemaVersion: "data-migration-execution-readiness-v1",
+      ok: true,
+      controlPlaneReady: true,
+      localGateReady: false,
+      productionReady: false,
+      summary: { batches: 0, outboxEvents: 0, localCandidates: 0 }
+    },
+    institutionSandbox: {
+      schema: "institution-sandbox-readiness-v1",
+      ok: false,
+      localTechnicalReady: false,
+      productionGate: "NO-GO",
+      productionReady: false,
+      externalEvidenceVerified: false,
+      summary: { sessions: 0, closedLoops: 0, deadLetters: 0 },
+      blockers: ["production-change-approval-pending"]
+    },
     productOperations: {
       schemaVersion: "product-operations-center-v1",
       ok: true,
@@ -47,7 +65,9 @@ test("three-line readiness reports usable controls while production stays closed
   assert.equal(report.productionReady, false);
   assert.equal(report.lines.data.summary.collections, 12);
   assert.equal(report.lines.productOperations.summary.workItems, 34);
-  assert.equal(report.checks.length, 4);
+  assert.equal(report.lines.data.execution.summary.batches, 0);
+  assert.equal(report.lines.institutionSandbox.productionGate, "NO-GO");
+  assert.equal(report.checks.length, 6);
 });
 
 test("three-line readiness detects any line that claims production readiness", () => {
