@@ -281,9 +281,9 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(healthBody.sessionStore.durable, false);
     assert.deepEqual(Object.keys(healthBody.sessionStore).sort(), ["available", "centralized", "checkedAt", "crossHost", "crossProcess", "durable", "errorCode", "mode", "topology"]);
 
-    const doctorLogin = await login(baseUrl, "doctor");
+    const staticDoctorLogin = await login(baseUrl, "doctor");
     const doctorPage = await fetch(`${baseUrl}/doctor.html`, {
-      headers: { Cookie: `health_city_browser_session=${encodeURIComponent(doctorLogin.body.token)}` },
+      headers: { Cookie: `health_city_browser_session=${encodeURIComponent(staticDoctorLogin.body.token)}` },
       redirect: "manual"
     });
     assert.equal(doctorPage.status, 200);
@@ -291,7 +291,7 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.match(await doctorPage.text(), /doctor-multi-practice-form/);
 
     const missingStaticPage = await fetch(`${baseUrl}/missing-static-page.html`, {
-      headers: { Cookie: `health_city_browser_session=${encodeURIComponent(doctorLogin.body.token)}` },
+      headers: { Cookie: `health_city_browser_session=${encodeURIComponent(staticDoctorLogin.body.token)}` },
       redirect: "manual"
     });
     assert.equal(missingStaticPage.status, 302);
