@@ -17,7 +17,7 @@ test("resident mini program validates session, isolates family scope and fits 39
 
   await expect(page.locator("#app-content")).toBeVisible();
   await expect(page.locator("#session-gate")).toBeHidden();
-  await expect(page.getByRole("heading", { name: "健康大连" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "健康区域" })).toBeVisible();
   await expect(page.locator("#current-member-name")).toContainText("演示居民A");
   await expect(page.getByRole("button", { name: "打开健康档案" })).toBeVisible();
   await expect(page.getByRole("button", { name: "打开急救服务" })).toBeVisible();
