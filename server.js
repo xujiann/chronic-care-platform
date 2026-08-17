@@ -461,15 +461,10 @@ const {
   seedPublicHealthSignals,
   seedPublicHealthTriggerRules
 } = require("./public-health-highlights-service");
-const {
-  initializeRuntimeJson,
-  resolveRuntimeDataBoundary
-} = require("./src/identity-security/runtime-data-boundary");
-const {
-  authorize,
-} = require("./src/identity-security/authorization-runtime");
+const { initializeRuntimeJson, resolveRuntimeDataBoundary } = require("./src/identity-security/runtime-data-boundary");
+const { authorize } = require("./src/identity-security/authorization-runtime");
 const { createAuthorizationHttpRuntime } = require("./src/identity-security/authorization-http-runtime");
-
+const { requireCsrf, sessionFromRequest, validateLiveSession } = require("./src/identity-security/runtime-identity-policy");
 const PORT = Number(process.env.PORT || 5173);
 const ROOT = __dirname;
 const RUNTIME_DATA_BOUNDARY = resolveRuntimeDataBoundary({ root: ROOT, env: process.env });
@@ -15563,15 +15558,27 @@ function requestSessionToken(req) {
 
 async function hydrateRequestSession(req) {
   const store = runtimeSessionStore();
-  if (typeof store.hydrate !== "function") return null;
-  const token = requestSessionToken(req);
+  const resolution = sessionFromRequest(req, (request) => request, process.env);
+  if (resolution.source === "none") {
+    req.authResolution = { ...resolution, session: null };
+    return null;
+  }
+  const token = requestSessionToken(resolution.session);
   if (!token) return null;
   const verified = verifySignedSessionToken(token);
   if (!verified) return null;
-  return store.hydrate(verified.sessionId);
+  const session = typeof store.hydrate === "function"
+    ? await store.hydrate(verified.sessionId)
+    : store.get(verified.sessionId);
+  const resolved = { ...resolution, session };
+  validateLiveSession(session, readDatabase());
+  requireCsrf(req, resolved, process.env);
+  req.authResolution = resolved;
+  return session;
 }
 
 function currentSession(req) {
+  if (req.authResolution && "session" in req.authResolution) return req.authResolution.session;
   const token = requestSessionToken(req);
   if (!token) return null;
   const verified = verifySignedSessionToken(token);
@@ -28618,7 +28625,7 @@ const server = http.createServer(createPlatformRequestHandler({
   handleApi,
   serveStatic,
   isProtectedStaticRequest: authorizationHttpRuntime.isProtectedStaticRequest,
-  hydrateStaticRequestSession: authorizationHttpRuntime.hydrateStaticRequestSession,
+  hydrateStaticRequestSession: hydrateRequestSession,
   recordRequestMetrics,
   sendJson,
   handleError: handleRequestError

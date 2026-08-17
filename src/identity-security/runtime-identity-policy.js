@@ -251,7 +251,7 @@ function parseCookies(header) {
 
 function sessionTransport(env = process.env) {
   const configured = text(env.AUTH_SESSION_TRANSPORT).toLowerCase();
-  const cookieEnabled = configured === "cookie" || configured === "hybrid" || (!configured && isProduction(env));
+  const cookieEnabled = configured === "cookie" || configured === "hybrid" || !configured;
   const bearerEnabled = configured === "bearer" || configured === "hybrid"
     || (!isProduction(env) && configured !== "cookie")
     || text(env.AUTH_BEARER_COMPATIBILITY).toLowerCase() === "enabled";
@@ -277,7 +277,10 @@ function sessionFromRequest(req, currentSession, env = process.env) {
 }
 
 function csrfSecret(env = process.env) {
-  return text(env.CSRF_SECRET) || text(env.SESSION_SECRETS).split(",").map(text).filter(Boolean)[0] || text(env.SESSION_SECRET);
+  return text(env.CSRF_SECRET)
+    || text(env.SESSION_SECRETS).split(",").map(text).filter(Boolean)[0]
+    || text(env.SESSION_SECRET)
+    || (isProduction(env) ? "" : "health-platform-demo-csrf-secret-not-for-production");
 }
 
 function csrfToken(session, env = process.env) {
@@ -380,7 +383,7 @@ function securityReadiness(env = process.env) {
     ...(!csrfSecret(env) ? ["CSRF/session signing secret is not configured"] : []),
     ...(!samlStrict ? ["SAML strict signing, audience and persistent subject contract is incomplete"] : []),
     "SAML assertion runtime validation and real IdP joint-test evidence are not complete",
-    "central router cookie hydration must be accepted by T00 before platform-wide production use"
+    "central cookie and CSRF wiring still requires controlled production-site verification"
   ];
   return {
     productionReady: false,

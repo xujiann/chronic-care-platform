@@ -1,5 +1,7 @@
 "use strict";
 
+const { identityClaims } = require("./runtime-identity-policy");
+
 const KNOWN_ROLES = new Set(["commission", "institution", "insurance", "citizen", "county", "system"]);
 const POLICY_KEYS = new Set([
   "roles", "accountTypes", "permissions", "permissionMode", "orgTypes",
@@ -14,6 +16,7 @@ function list(value) {
 
 function permissionSet(user = {}) {
   return new Set([
+    ...list(identityClaims(user).permissions),
     ...list(user.permissions),
     ...list(user.bloodPermissions),
     ...list(user.scopes),

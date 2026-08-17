@@ -2,6 +2,7 @@
 
 const AccessPolicy = require("../../../access-control-policy");
 const { permissionSet, safeAuthorizationContext } = require("../../identity-security/authorization-runtime");
+const { identityClaims, publicIdentity } = require("../../identity-security/runtime-identity-policy");
 
 const CATALOG_CAPABILITIES = Object.freeze([...new Set(Object.values(AccessPolicy.pageCatalog)
   .flatMap((policy) => policy.capabilities || []))].sort());
@@ -15,6 +16,7 @@ function configuredRegionalCapabilities(environment = process.env) {
 
 function buildAuthorizationContext(user, options = {}) {
   const regionalContext = options.regionalContext || {};
+  const claims = identityClaims(user);
   const permissions = [...permissionSet(user)].sort();
   const regionalCapabilities = configuredRegionalCapabilities(options.environment);
   const policyContext = { permissions, regionalCapabilities };
@@ -23,12 +25,12 @@ function buildAuthorizationContext(user, options = {}) {
     permissions,
     pages: pages.map((item) => item.page),
     menus: pages.map((item) => ({ id: item.page, label: item.label, href: item.href })),
-    organizationScope: user?.orgCode,
+    organizationScope: claims.organizationScope,
     regionCode: regionalContext.regionCode || user?.regionCode
   });
   return Object.freeze({
     ...context,
-    user: Object.freeze({ ...context.user, home: AccessPolicy.homeForUser(user, policyContext) }),
+    user: Object.freeze({ ...publicIdentity(user), home: AccessPolicy.homeForUser(user, policyContext) }),
     regionalCapabilities: Object.freeze(regionalCapabilities),
     regional: Object.freeze({
       regionCode: String(regionalContext.regionCode || user?.regionCode || ""),

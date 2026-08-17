@@ -63,11 +63,35 @@ test("authorization context requires authentication and denies unknown roles", a
   const anonymous = await fetch(`${baseUrl}/api/auth/context`);
   assert.equal(anonymous.status, 401);
 
+  const forged = await fetch(`${baseUrl}/api/auth/context`, { headers: bearer("forged-session") });
+  assert.equal(forged.status, 401);
+
   const unknown = await login("unknown_role");
-  assert.equal(unknown.response.status, 200);
-  const denied = await fetch(`${baseUrl}/api/auth/context`, { headers: bearer(unknown.body.token) });
-  assert.equal(denied.status, 403);
-  assert.equal((await denied.json()).code, "UNKNOWN_ROLE");
+  assert.equal(unknown.response.status, 403);
+  assert.equal(unknown.body.code, "UNKNOWN_ROLE_DENIED");
+});
+
+test("browser cookie can read context while unsafe requests require signed CSRF", async () => {
+  const doctor = await login("doctor");
+  const setCookies = doctor.response.headers.getSetCookie();
+  const cookieHeader = setCookies.map((value) => value.split(";")[0]).join("; ");
+  assert.match(cookieHeader, /health_city_browser_session=/);
+  assert.match(cookieHeader, /health_platform_csrf=/);
+
+  const context = await fetch(`${baseUrl}/api/auth/context`, { headers: { Cookie: cookieHeader } });
+  assert.equal(context.status, 200);
+  assert.equal((await context.json()).user.accountType, "doctor");
+
+  const rejected = await fetch(`${baseUrl}/api/auth/logout`, { method: "POST", headers: { Cookie: cookieHeader } });
+  assert.equal(rejected.status, 403);
+  assert.equal((await rejected.json()).code, "CSRF_VALIDATION_FAILED");
+
+  const csrf = decodeURIComponent(cookieHeader.match(/(?:^|; )health_platform_csrf=([^;]+)/)[1]);
+  const accepted = await fetch(`${baseUrl}/api/auth/logout`, {
+    method: "POST",
+    headers: { Cookie: cookieHeader, "X-CSRF-Token": csrf }
+  });
+  assert.equal(accepted.status, 200);
 });
 
 test("authorization context returns whitelist metadata and role-specific pages", async () => {
