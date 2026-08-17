@@ -13,6 +13,10 @@ const {
 const {
   buildPlatformProductOperationsCockpit
 } = require("./product-operations-runtime");
+const {
+  applyPlatformWorkItemV2GovernanceAction,
+  buildPlatformEnhancementCockpit
+} = require("./enhancement-runtime");
 
 function buildPlatformProductizationCenter(data, options = {}) {
   const dataPromotion = buildDataPromotionCenter(data, options);
@@ -31,10 +35,12 @@ function buildPlatformProductizationCenter(data, options = {}) {
 }
 
 module.exports = {
+  applyPlatformWorkItemV2GovernanceAction,
   applyPlatformWorkItemAction,
   buildDataPromotionCenter,
   buildInstitutionIntegrationCenter,
   buildPlatformProductOperationsCockpit,
+  buildPlatformEnhancementCockpit,
   buildPlatformProductizationCenter,
   buildPlatformWorkItemCenter,
   registerInstitutionIntegrationProfile,

@@ -71,6 +71,49 @@ test("product operations cockpit keeps denied access opaque", async () => {
   assert.equal(fixture.audits.length, 0);
 });
 
+test("enhancement cockpit is commission-only and exposes three fail-closed lines", async () => {
+  const fixture = harness({
+    runtime: {
+      buildPlatformEnhancementCockpit: () => ({
+        schemaVersion: "platform-enhancement-cockpit-v1",
+        localControlReady: true,
+        productionReady: false,
+        containsBusinessPayload: false,
+        containsCredentials: false,
+        summary: { productIterations: 6, workItems: 34 },
+        lines: { data: { productionReady: false }, care: { productionReady: false }, product: { productionReady: false } },
+        cockpit: { schemaVersion: "product-regional-operations-view-model-v1", cards: [], workItems: [], regions: [], configurationDiffs: [], productionReady: false }
+      })
+    }
+  });
+  const url = new URL("https://example.gov.cn/api/platform/productization/enhancements/cockpit");
+  assert.equal(await fixture.segment.handle({ method: "GET" }, {}, url), true);
+  assert.equal(fixture.responses[0].status, 200);
+  assert.equal(fixture.responses[0].body.productionReady, false);
+  assert.equal(fixture.responses[0].body.lines.care.productionReady, false);
+  assert.equal(fixture.audits[0].action, "platform-enhancement-cockpit-read");
+  assert.equal(await fixture.segment.handle({ method: "POST" }, {}, url), false);
+});
+
+test("work item v2 route binds the actor to platform governance and persists metadata", async () => {
+  const calls = [];
+  const fixture = harness({
+    payload: { commandId: "command-v2-001", action: "escalate", expectedVersion: 0, note: "requires governance follow-up" },
+    runtime: {
+      applyPlatformWorkItemV2GovernanceAction: (data, payload, user) => {
+        calls.push({ data, payload, user });
+        return { data: { platformWorkItemsV2: [{ id: payload.itemId }] }, result: { id: payload.itemId, version: 1, productionReady: false }, replayed: false };
+      }
+    }
+  });
+  const url = new URL("https://example.gov.cn/api/platform/productization/work-items-v2/w2-demo-0001/actions");
+  assert.equal(await fixture.segment.handle({ method: "POST" }, {}, url), true);
+  assert.equal(calls[0].payload.itemId, "w2-demo-0001");
+  assert.equal(calls[0].user.role, "commission");
+  assert.equal(fixture.responses[0].body.productionReady, false);
+  assert.equal(fixture.audits[0].action, "platform-work-item-v2-escalate");
+});
+
 test("institution profile and synthetic run APIs persist minimized metadata", async () => {
   const profile = harness({ payload: { commandId: "profile-command-001", regionCode: "210200", institutionSlot: "primary-hospital", adapters: ["hospital-his"] } });
   await profile.segment.handle({ method: "POST" }, {}, new URL("https://example.gov.cn/api/platform/productization/institutions/profiles"));

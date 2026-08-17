@@ -6,6 +6,7 @@ const { assessMigrationExecutionState } = require("../src/platform/data/migratio
 const { buildInstitutionPilotReadiness } = require("../src/platform/integration/institution-pilot-orchestrator");
 const { buildInstitutionSandboxReadiness } = require("../src/platform/integration/institution-sandbox-joint-test");
 const { buildProductOperationsReadiness } = require("./product-operations-readiness");
+const { buildPlatformEnhancementCockpit } = require("../src/platform/productization/enhancement-runtime");
 
 function project(report, fields) {
   return Object.freeze(Object.fromEntries(fields.map((field) => [field, report[field]])));
@@ -22,6 +23,7 @@ function buildDevelopmentLinesReadiness(options = {}) {
   const interfacePilot = options.interfacePilot || buildInstitutionPilotReadiness({}, { now });
   const institutionSandbox = options.institutionSandbox || buildInstitutionSandboxReadiness({}, { now });
   const productOperations = options.productOperations || buildProductOperationsReadiness({ now });
+  const enhancement = options.enhancement || buildPlatformEnhancementCockpit(options.data || {}, { now });
 
   const checks = Object.freeze([
     Object.freeze({
@@ -50,14 +52,21 @@ function buildDevelopmentLinesReadiness(options = {}) {
       detail: `${productOperations.summary?.projectedWorkItems ?? productOperations.summary?.workItems ?? 0} work items projected`
     }),
     Object.freeze({
+      id: "developmentLines:enhancementIterations",
+      passed: enhancement.summary?.dataIterations === 6
+        && enhancement.summary?.productIterations === 6
+        && Object.values(enhancement.lines || {}).every((line) => line.productionReady === false),
+      detail: `${enhancement.summary?.dataIterations || 0} data / ${enhancement.summary?.productIterations || 0} product iterations`
+    }),
+    Object.freeze({
       id: "developmentLines:productionFailClosed",
-      passed: [dataMigration, dataExecution, interfacePilot, institutionSandbox, productOperations].every((report) => report.productionReady === false),
+      passed: [dataMigration, dataExecution, interfacePilot, institutionSandbox, productOperations, enhancement].every((report) => report.productionReady === false),
       detail: "repository-local controls cannot authorize production"
     })
   ]);
 
   return Object.freeze({
-    schemaVersion: "development-lines-readiness-v1",
+    schemaVersion: "development-lines-readiness-v2",
     generatedAt: now,
     ok: checks.every((item) => item.passed),
     localReady: dataMigration.localGateReady === true && dataExecution.localGateReady === true && interfacePilot.ok === true && institutionSandbox.localTechnicalReady === true && productOperations.ok === true,
@@ -70,7 +79,8 @@ function buildDevelopmentLinesReadiness(options = {}) {
       }),
       interfacePilot: project(interfacePilot, ["schema", "ok", "productionGate", "productionReady", "summary", "blockers"]),
       institutionSandbox: project(institutionSandbox, ["schema", "ok", "localTechnicalReady", "productionGate", "productionReady", "summary", "blockers"]),
-      productOperations: project(productOperations, ["schemaVersion", "ok", "status", "productionReady", "summary", "blockers"])
+      productOperations: project(productOperations, ["schemaVersion", "ok", "status", "productionReady", "summary", "blockers"]),
+      enhancement: project(enhancement, ["schemaVersion", "ok", "localControlReady", "productionReady", "decision", "summary", "lines", "blockers"])
     }),
     checks,
     boundary: "The three lines provide local engineering evidence only; real migration, institution connectivity, site acceptance and production authorization remain external gates."

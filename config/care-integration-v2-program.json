@@ -1,0 +1,43 @@
+{
+  "schemaVersion": "care-integration-v2-program-v1",
+  "adapterContracts": [
+    { "id": "care-his-v1", "system": "HIS", "operations": ["referral-submit", "referral-receipt"] },
+    { "id": "care-emr-v1", "system": "EMR", "operations": ["care-plan-index", "discharge-summary-index"] },
+    { "id": "care-lis-v1", "system": "LIS", "operations": ["result-index", "risk-signal"] },
+    { "id": "care-pacs-v1", "system": "PACS", "operations": ["report-index", "risk-signal"] },
+    { "id": "care-pharmacy-v1", "system": "PHARMACY", "operations": ["dispense-receipt-index"] },
+    { "id": "care-insurance-v1", "system": "INSURANCE", "operations": ["coverage-receipt-index"] }
+  ],
+  "requiredContractControls": ["signature", "replay", "idempotency", "retry", "dead-letter", "receipt-reconciliation"],
+  "transportPolicy": {
+    "httpsRequired": true,
+    "maximumClockSkewSeconds": 300,
+    "nonceRetentionSeconds": 86400,
+    "maxAttempts": 3,
+    "baseDelaySeconds": 30,
+    "maximumDelaySeconds": 300
+  },
+  "continuousCareSequence": [
+    "risk-assessed",
+    "care-plan-activated",
+    "anomaly-escalated",
+    "referral-requested",
+    "referral-receipt-reconciled",
+    "followup-closed"
+  ],
+  "requiredExternalReceiptTypes": ["pharmacy", "insurance"],
+  "evidencePolicy": {
+    "allowedSchemes": ["artifact", "cmdb", "evidence", "ticket", "vault"],
+    "storeRawMessages": false,
+    "storeCredentials": false,
+    "storeEndpoints": false,
+    "storeSignatures": false,
+    "storePatientData": false
+  },
+  "productionBlockers": [
+    "metadata-contract-results-are-not-site-acceptance",
+    "production-endpoint-and-key-custody-pending",
+    "clinical-workflow-approval-pending",
+    "independent-security-and-operations-acceptance-pending"
+  ]
+}
