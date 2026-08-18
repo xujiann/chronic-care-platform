@@ -1,5 +1,9 @@
 "use strict";
 
+const {
+  createBloodDashboardQuery
+} = require("../../../clinical-specialties/blood/dashboard-query");
+
 const FORBIDDEN_PUBLIC_FIELD = /^(?:(?:object|physical|storage)[_-]?path|object[_-]?key|access[_-]?url|signed[_-]?url|(?:access|refresh)?[_-]?token|authorization|api[_-]?key|secrets?|passwords?|credentials?|credential[_-]?ref|private[_-]?key|signatures?|signing[_-]?keys?|signature[_-]?keys?|certificate[_-]?fingerprint|endpoint|base[_-]?url|bucket(?:Name)?|containerName)$/i;
 const SENSITIVE_QUERY_PARAMETER = /^(?:token|access_?token|refresh_?token|signature|sig|key|api_?key|secret|password|credential)$/i;
 const PHYSICAL_LOCATION = /(?:\b(?:s3|oss|cos|obs|file):\/\/|(?:^|[\s"'(])[A-Za-z]:\\|(?:^|[\s"'(])\/(?:var|srv|opt|run|mnt|data|tmp)\/)/i;
@@ -90,19 +94,12 @@ function createRouteSegment(runtime) {
     if (req.method === "GET" && url.pathname === "/api/blood-system") {
         const user = requireApiRole(req, res, ["commission", "institution"], "/api/blood-system");
         if (!user) return true;
-        const data = readDatabase();
-        BloodTransactionService.normalizeTransactionState(data);
-        const dashboard = BloodService.buildDashboard(data, user);
-        const scoped = (item) => user.role === "commission" || item.institutionCode === user.orgCode || item.destinationInstitution === user.orgCode;
-        sendJson(res, 200, {
-          ...dashboard,
-          testReports: user.role === "commission" ? data.bloodTestReports : [],
-          releaseReviews: user.role === "commission" ? data.bloodReleaseReviews : [],
-          shipments: data.bloodShipments.filter(scoped),
-          safetyIncidents: data.bloodSafetyIncidents.filter(scoped),
-          compatibilityTests: user.role === "institution" ? data.compatibilityTests.filter((item) => dashboard.transfusionRequests.some((request) => request.id === item.requestId)) : data.compatibilityTests,
-          transfusionEpisodes: data.transfusionEpisodes.filter(scoped)
+        const bloodDashboardQuery = createBloodDashboardQuery({
+          buildBloodDashboard: BloodService.buildDashboard,
+          normalizeTransactionState: BloodTransactionService.normalizeTransactionState
         });
+        const data = readDatabase();
+        sendJson(res, 200, bloodDashboardQuery.execute({ data, user }));
         return true;
       }
 

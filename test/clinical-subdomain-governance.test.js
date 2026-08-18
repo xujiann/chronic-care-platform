@@ -25,6 +25,10 @@ test("clinical specialty governance defines exactly five bounded subdomains", ()
     registry.subdomains[0].implementedUseCases.map((useCase) => useCase.id),
     ["emergency-dashboard-query.v1"]
   );
+  assert.deepEqual(
+    registry.subdomains[1].implementedUseCases.map((useCase) => useCase.id),
+    ["blood-dashboard-query.v1"]
+  );
 });
 
 test("all current clinical API literals have one subdomain or explicit handoff owner", () => {

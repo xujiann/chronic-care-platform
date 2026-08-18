@@ -80,7 +80,17 @@
         "transfusionReactions",
         "transfusionRequests"
       ],
-      "externalReadCollections": ["securityEvents"]
+      "externalReadCollections": ["securityEvents"],
+      "implementedUseCases": [
+        {
+          "id": "blood-dashboard-query.v1",
+          "source": "src/clinical-specialties/blood/dashboard-query.js",
+          "route": "GET /api/blood-system",
+          "ports": ["buildBloodDashboard", "normalizeTransactionState"],
+          "contracts": [],
+          "sideEffects": ["legacy-transaction-state-normalization-in-memory"]
+        }
+      ]
     },
     {
       "id": "imaging",

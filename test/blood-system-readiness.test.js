@@ -22,3 +22,11 @@ test("blood readiness CLI emits the same passing report", () => {
   assert.equal(report.ok, true);
   assert.equal(report.passed, report.total);
 });
+
+test("blood readiness fails closed when the dashboard query projection is missing", () => {
+  const report = buildBloodSystemReadinessReport({ dashboardQuery: "" });
+  const projectionCheck = report.checks.find((item) => item.name === "事务证据实时回读");
+
+  assert.equal(projectionCheck.ok, false);
+  assert.equal(report.ok, false);
+});

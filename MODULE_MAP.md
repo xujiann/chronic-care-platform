@@ -85,7 +85,7 @@ server.js
 | 子域 | Owner | API 字面路径 | 边界状态 |
 |---|---|---:|---|
 | emergency | T06/emergency | 37 | 急救/信号前缀已唯一归属；dashboard 查询已进入目标源码根 |
-| blood | T06/blood | 28 | 与 imaging、physical-examination 仍有混合文件 |
+| blood | T06/blood | 28 | dashboard 查询已进入目标源码根；其余仍与 imaging、physical-examination 混合 |
 | imaging | T06/imaging | 17 | 影像与互认前缀已归属 |
 | physical-examination | T06/physical-examination | 7 | 当前仍与 blood-innovation 同文件 |
 | quality-safety | T06/quality-safety | 14 | 写模型限定为质量自有数据 |
@@ -93,3 +93,5 @@ server.js
 另有 33 个 `/api/operations` 字面路径属于历史错位，目标为 `platform-governance/operations`。五子域治理注册表不改变现有路由顺序或部署方式。
 
 首个标准接口为 `emergency-dashboard-query.v1`：路由完成角色校验和脱敏，查询用例通过 `buildEmergencyDashboard` 与 `readBloodCoordination` 两个注入端口组合只读结果。其余急救写用例仍由遗留模块承担。
+
+血液首个标准接口为 `blood-dashboard-query.v1`：通过 `normalizeTransactionState` 和 `buildBloodDashboard` 两个注入端口保留遗留组装顺序，并在用例内统一 commission 全域、institution 机构范围投影。HTTP 层未新增数据写入；混合路由内的影像、血液写命令和集成接口尚未迁移。

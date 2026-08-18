@@ -48,4 +48,4 @@
 
 当前已满足：机器注册表、API 前缀归属。部分满足：数据子域 Owner、版本化契约、源码目录隔离、独立领域测试。尚未满足：独立 CI。因此五个子域目前可以分别规划和建立测试保护，但还不能宣布完全独立开发，更不能独立部署。
 
-急救首个切片已完成：`emergency-dashboard-query.v1` 通过两个只读端口组合急救面板与 `blood-emergency-coordination.v1` 兼容投影。下一切片进入血液子域，先锁定纯血液 dashboard 的 API/角色/范围特征，再从 `clinical-blood` 混合路由中迁出一个只读用例。
+急救与血液首个切片已完成：`emergency-dashboard-query.v1` 组合急救面板与血液协调投影；`blood-dashboard-query.v1` 统一血液 Dashboard 的角色范围投影并保留既有内存规范化兼容。下一切片进入影像子域，先锁定公开响应投影和角色范围，再从 `clinical-blood` 混合路由迁出一个影像查询用例。
