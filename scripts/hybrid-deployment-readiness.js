@@ -47,6 +47,8 @@ function buildHybridDeploymentReadinessReport(options = {}) {
   const envExample = options.envExample ?? readText(".env.example");
   const deploymentPackageSource = options.deploymentPackageSource ?? readText("scripts/production-deployment-package.js");
   const serviceTemplate = options.serviceTemplate ?? readText("deploy/chronic-care-platform.service.template");
+  const staticPublicationSource = options.staticPublicationSource ?? readText("config/static-publication.json");
+  const pagesWorkflowSource = options.pagesWorkflowSource ?? readText(".github/workflows/pages.yml");
 
   const productionTracks = Array.isArray(data.productionDeploymentPlan) ? data.productionDeploymentPlan : [];
   const requiredScripts = ["dev", "hybrid:deployment-readiness", "deploy:check", "release:report", "release:manifest", "env:check", "deployment:package", "deployment:verify"];
@@ -57,8 +59,9 @@ function buildHybridDeploymentReadinessReport(options = {}) {
   const topology = {
     staticPreview: {
       entries: staticEntries,
-      documented: hasText(readme, /static|GitHub Pages|data\/db\.json/i) && hasText(deployment, /GitHub Pages|static/i),
-      snapshotFallback: hasText(sharedSource, /data\/db\.json/) && hasText(sharedSource, /localStorage/),
+      documented: hasText(readme, /public-demo\.json|脱敏演示快照/i) && hasText(deployment, /public-demo\.json|显式发布/i),
+      snapshotFallback: hasText(sharedSource, /data\/public-demo\.json/) && hasText(sharedSource, /localStorage/),
+      explicitPublication: hasText(staticPublicationSource, /data\/public-demo\.json/) && hasText(pagesWorkflowSource, /static-publication\.js build/) && !hasText(pagesWorkflowSource, /path:\s*\.\s*$/m),
       pageHostCannotRunNode: hasText(deployment, /GitHub Pages/) && hasText(deployment, /Node\.js|Node API|server\.js/)
     },
     dynamicBackend: {
@@ -97,7 +100,7 @@ function buildHybridDeploymentReadinessReport(options = {}) {
   const scriptDetail = topology.releaseWiring.scripts.map((item) => `${item.name}:${item.present ? "present" : "missing"}`).join(";");
   const envDetail = topology.environment.variables.map((item) => `${item.name}:${item.present ? "present" : "missing"}`).join(";");
   const checks = [
-    check("hybrid:staticPreviewBoundary", topology.staticPreview.documented && topology.staticPreview.snapshotFallback && topology.staticPreview.pageHostCannotRunNode, "GitHub Pages/static preview documented with data/db.json and localStorage fallback", "static-preview"),
+    check("hybrid:staticPreviewBoundary", topology.staticPreview.documented && topology.staticPreview.snapshotFallback && topology.staticPreview.explicitPublication && topology.staticPreview.pageHostCannotRunNode, "GitHub Pages/static preview uses an explicit asset set, sanitized public-demo snapshot and localStorage fallback", "static-preview"),
     check("hybrid:dynamicBackendRoutes", topology.dynamicBackend.createServer && topology.dynamicBackend.routeCoverage.every((item) => item.present) && topology.dynamicBackend.authClient, routeDetail, "dynamic-backend"),
     check("hybrid:storageBoundary", topology.storageBoundary.storageEngineGuard && topology.storageBoundary.sqliteMirror && topology.storageBoundary.postgresBlocked && topology.storageBoundary.productionTrack, "auto/sqlite runtime supported; postgres remains guarded until adapter cutover", "storage"),
     check("hybrid:environmentTemplate", topology.environment.variables.every((item) => item.present), envDetail, "environment"),
@@ -122,7 +125,7 @@ function renderMarkdown(report) {
     "",
     `- Generated at: ${report.generatedAt}`,
     `- Result: ${report.ok ? "PASS" : "FAIL"}`,
-    "- Static preview layer: GitHub Pages or direct HTML with `data/db.json` snapshot fallback.",
+    "- Static preview layer: GitHub Pages or direct HTML with the generated `data/public-demo.json` sanitized snapshot.",
     "- Dynamic backend layer: `server.js` serving `/api/*` on a Node-capable host.",
     "- Production posture: keep PostgreSQL blocked until the adapter, migration, rollback, and backup path are complete.",
     "",

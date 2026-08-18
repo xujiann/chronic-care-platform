@@ -147,7 +147,8 @@ test("storage admin creates a sanitized JSON snapshot and report", () => {
     const report = JSON.parse(fs.readFileSync(sanitized.reportFile, "utf8"));
 
     assert.equal(snapshot.residents[0].id, "r1");
-    assert.equal(snapshot.residents[0].name, "居民一");
+    assert.match(snapshot.residents[0].name, /^演示姓名-/);
+    assert.match(snapshot.accounts[0].name, /^演示姓名-/);
     assert.match(snapshot.residents[0].idCard, /^DEMO-ID-/);
     assert.match(snapshot.residents[0].phone, /^DEMO-MOBILE-/);
     assert.equal(snapshot.accounts[0].phone, snapshot.residents[0].phone);
@@ -161,9 +162,9 @@ test("storage admin creates a sanitized JSON snapshot and report", () => {
     assert.equal(JSON.stringify(snapshot).includes("210200199001010011"), false);
     assert.equal(JSON.stringify(snapshot).includes("13900001111"), false);
     assert.equal(JSON.stringify(snapshot).includes("大连市演示区真实地址"), false);
-    assert.equal(report.totalMasked, 10);
+    assert.equal(report.totalMasked, 12);
     assert.equal(report.fieldsMasked["residents.idCard"], 1);
-    assert.equal(snapshot.storageMeta.sanitizedSnapshot.totalMasked, 10);
+    assert.equal(snapshot.storageMeta.sanitizedSnapshot.totalMasked, 12);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }

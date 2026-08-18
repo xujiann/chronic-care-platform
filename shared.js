@@ -103,7 +103,7 @@ async function loadPlatformState(fallback) {
     }
   }
   try {
-    const response = await fetch("./data/db.json");
+    const response = await fetch("./data/public-demo.json");
     if (response.ok) return normalizePlatformState(await response.json());
   } catch (error) {
     // Browser storage fallback below.

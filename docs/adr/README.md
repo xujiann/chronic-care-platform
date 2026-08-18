@@ -20,6 +20,6 @@
 | [模块化单体与微服务提取标准](../ADR-模块化单体与微服务提取标准-2026-08-03.md) | Accepted | 模块边界和服务提取 |
 | [SQLite migration 与核心 schema 冻结](./2026-08-18-sqlite-migration-and-core-schema-freeze.md) | Accepted | 数据库演进治理；实施未完成 |
 | [核心数据 closed-world 定义](./2026-08-18-core-data-closed-world.md) | Accepted | 核心概念不可随意平行创建 |
-| [静态内容安全边界](./2026-08-18-static-content-security-boundary.md) | Proposed | 发布 allowlist、数据和缓存隔离 |
+| [静态内容安全边界](./2026-08-18-static-content-security-boundary.md) | Accepted | 发布 allowlist、数据和缓存隔离 |
 
 模板见 [ADR_TEMPLATE.md](./ADR_TEMPLATE.md)。

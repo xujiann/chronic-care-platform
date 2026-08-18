@@ -18,7 +18,7 @@ async function loadHighlights() {
   } catch (error) {
     document.querySelector("#highlight-api-error").textContent = `当前为静态预览：${error.message}`;
     try {
-      const response = await fetch("./data/db.json");
+      const response = await fetch("./data/public-demo.json");
       const state = response.ok ? await response.json() : {};
       currentHighlights = buildStaticHighlights(state);
     } catch (fallbackError) {

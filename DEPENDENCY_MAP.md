@@ -1,6 +1,6 @@
 # DEPENDENCY MAP — 主线依赖地图
 
-> 快照：`main@b1e4898`。依赖包括代码、数据、外部系统、后台任务、构建和部署关系。
+> 实现分支快照：`process/t00-static-content-boundary-20260818`，基线 `main@58e05e5`。依赖包括代码、数据、外部系统、后台任务、构建和部署关系。
 
 ## 1. 代码依赖方向
 
@@ -57,17 +57,18 @@ server.js
 - `auth.js`、`shared.js`、`platform-api-client.js`、`platform-shell.js` 是主要共享边界。
 - 发现 871 处 `innerHTML=` / `insertAdjacentHTML` 类写入；最高为 citizen 94、app 90、public-health 78、platform 72。
 - CSP 允许 `script-src 'unsafe-inline'` 和 `style-src 'unsafe-inline'`。
-- Service Worker 缓存应用壳以及 `data/db.json`。
+- Service Worker 缓存应用壳以及生成的 `data/public-demo.json`，缓存版本已从 v59 提升到 v60 以撤销旧快照缓存。
 
 ## 5. 数据依赖
 
 ```text
 data/db.json
-  ├─ 静态页面 fetch
   ├─ SQLite 首次种子
   ├─ readiness/report 脚本
-  ├─ Pages 静态发布
-  └─ Service Worker 缓存
+  └─ public-demo-snapshot 纯函数
+       ├─ Node /data/public-demo.json
+       ├─ Pages 临时构建制品
+       └─ Service Worker v60 缓存
 
 SQLite commit
   → transactional outbox
@@ -77,7 +78,7 @@ SQLite commit
   →（仅获批后）primary read/write
 ```
 
-JSON 快照是高扇出依赖；任何结构变化会同时影响浏览器、服务、测试、报告和部署。
+JSON 源快照仍是高扇出依赖，但浏览器和 Pages 只依赖经统一纯函数转换后的公开演示契约；任何结构变化仍需验证脱敏、页面兼容、报告和初始化路径。
 
 ## 6. 外部系统
 
@@ -106,10 +107,10 @@ JSON 快照是高扇出依赖；任何结构变化会同时影响浏览器、服
 - GitHub Actions 使用 `@vN` 标签而非 commit SHA。
 - systemd 模板包含多项 Linux hardening。
 - Solution A 默认 HAPI 镜像为 `latest`；Orthanc DICOM 端口对宿主开放，必须在生产前加固。
-- Pages 直接发布根目录静态内容，与静态发布 allowlist 风险相连。
+- Pages 先在 runner 临时目录构建显式资源集再上传；服务端和 Pages 共用同一发布清单。
 
 ## 9. 依赖治理结论
 
 - 不存在广泛静态环，但唯一已确认环位于关键组合根，应列 P1。
-- `runtime-source`、`technical-evidence`、`data/db.json` 和宽运行时上下文是高耦合枢纽。
+- `runtime-source`、`technical-evidence`、`data/db.json` 和宽运行时上下文仍是高耦合枢纽；静态消费者已从源快照扇出中隔离。
 - 新模块必须依赖稳定端口，不得新增对 `server.js`、根目录全局状态或未注册 JSON 集合的反向依赖。

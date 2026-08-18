@@ -19,10 +19,10 @@ async function loadPlatformState() {
       const response = await request(`${API_BASE}/state`);
       if (response.ok) return await response.json();
     } catch (error) {
-      // Static preview falls through to data/db.json.
+      // Static preview falls through to the sanitized public demo snapshot.
     }
   }
-  const response = await fetch("./data/db.json");
+  const response = await fetch("./data/public-demo.json");
   return response.json();
 }
 

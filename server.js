@@ -3,7 +3,7 @@ const fs = require("fs");
 const path = require("path");
 const LEGACY_REGIONAL_STATS_KEY = "da" + "lianHealthStatistics2025";
 const { createPlatformRuntimeComposition } = require("./src/http/platform-runtime-composition");
-const { createPlatformRequestHandler } = require("./src/http/platform-request-handler");
+const { createPlatformRequestHandler, createStaticContentRuntime } = require("./src/http/platform-request-handler");
 const platformProductizationRuntime = require("./src/platform/productization/runtime");
 const { loadRegionalRuntime } = require("./src/platform/regional/regional-runtime");
 const { ContractRegistry } = require("./src/platform/contracts/contract-registry");
@@ -1480,8 +1480,15 @@ const mimeTypes = {
   ".css": "text/css; charset=utf-8",
   ".js": "application/javascript; charset=utf-8",
   ".json": "application/json; charset=utf-8",
+  ".webmanifest": "application/manifest+json; charset=utf-8",
+  ".ico": "image/x-icon",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
   ".png": "image/png",
-  ".svg": "image/svg+xml"
+  ".svg": "image/svg+xml",
+  ".webp": "image/webp",
+  ".woff": "font/woff",
+  ".woff2": "font/woff2"
 };
 
 function demoBaseDate() {
@@ -14654,40 +14661,6 @@ function personIndexFromParts(idCard, phone) {
 function personIndexForResident(residentMap, residentId) {
   const resident = residentMap.get(residentId);
   return resident ? personIndexFromParts(resident.idCard, resident.phone) : "";
-}
-
-function serveStatic(req, res) {
-  const decision = authorizationHttpRuntime.evaluateStaticRequest(req);
-  if (!decision.allowed) {
-    authorizationHttpRuntime.denyStaticRequest(res, decision, authorizationHttpRuntime.currentBrowserUser(req));
-    return;
-  }
-  const rawPath = decodeURIComponent(new URL(req.url, `http://${req.headers.host}`).pathname);
-  if (rawPath === "/favicon.ico") {
-    res.writeHead(204, securityResponseHeaders());
-    res.end();
-    return;
-  }
-  const requested = rawPath === "/" ? "/index.html" : rawPath;
-  const filePath = path.normalize(path.join(ROOT, requested));
-  const relativePath = path.relative(ROOT, filePath);
-
-  if (relativePath.startsWith("..") || path.isAbsolute(relativePath)) {
-    res.writeHead(403, { ...securityResponseHeaders(), "Content-Type": "text/plain; charset=utf-8" });
-    res.end("Forbidden");
-    return;
-  }
-
-  fs.readFile(filePath, (error, content) => {
-    if (error) {
-      res.writeHead(404, { ...securityResponseHeaders(), "Content-Type": "text/plain; charset=utf-8" });
-      res.end("Not found");
-      return;
-    }
-    const ext = path.extname(filePath);
-    res.writeHead(200, { ...securityResponseHeaders(), "Content-Type": mimeTypes[ext] || "application/octet-stream" });
-    res.end(content);
-  });
 }
 
 function sanitizeUser(user) {
@@ -28619,12 +28592,20 @@ const authorizationHttpRuntime = createAuthorizationHttpRuntime({
   environment: process.env
 });
 
+const staticContentRuntime = createStaticContentRuntime({
+  root: ROOT,
+  databaseFile: DB_FILE,
+  authorization: authorizationHttpRuntime,
+  securityResponseHeaders,
+  mimeTypes
+});
+
 const server = http.createServer(createPlatformRequestHandler({
   observability: platformObservability,
   hydrateRequestSession,
   handleApi,
-  serveStatic,
-  isProtectedStaticRequest: authorizationHttpRuntime.isProtectedStaticRequest,
+  serveStatic: staticContentRuntime.serveStatic,
+  isProtectedStaticRequest: staticContentRuntime.isProtectedStaticRequest,
   hydrateStaticRequestSession: hydrateRequestSession,
   recordRequestMetrics,
   sendJson,

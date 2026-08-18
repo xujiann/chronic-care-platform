@@ -1,15 +1,10 @@
 const { createHash, randomUUID } = require("node:crypto");
 const fs = require("node:fs");
 const path = require("node:path");
+const { sanitizeSnapshot } = require("../src/platform/data/public-demo-snapshot");
 
 const ROOT = path.resolve(__dirname, "..");
 const STORAGE_FILES = ["db.json", "health-city.sqlite"];
-const SENSITIVE_FIELD_RULES = [
-  { pattern: /^(idCard|documentNo|motherDocumentNo|fatherDocumentNo|certificateNo|credentialNo|personIndex|identityIndex)$/i, replacement: "DEMO-ID" },
-  { pattern: /(phone|mobile|tel)$/i, replacement: "DEMO-MOBILE" },
-  { pattern: /address$/i, replacement: "演示地址" },
-  { pattern: /contact$/i, replacement: "演示联系人" }
-];
 
 function sha256(file) {
   return createHash("sha256").update(fs.readFileSync(file)).digest("hex");
@@ -51,15 +46,15 @@ function createSanitizedSnapshot(options = {}) {
   const outputDir = path.resolve(options.outputDir || path.join(dataDir, "sanitized"));
   const outputFile = path.join(outputDir, options.fileName || `db.sanitized.${timestamp()}.json`);
   const snapshot = JSON.parse(fs.readFileSync(source, "utf8"));
+  const sanitization = sanitizeSnapshot(snapshot);
   const report = {
     createdAt: new Date().toISOString(),
     source,
     outputFile,
     sourceSha256: sha256(source),
-    fieldsMasked: {},
-    totalMasked: 0
+    ...sanitization.report
   };
-  const sanitized = sanitizeValue(snapshot, [], report);
+  const sanitized = sanitization.snapshot;
   sanitized.storageMeta = {
     ...(sanitized.storageMeta || {}),
     sanitizedSnapshot: {
@@ -75,27 +70,6 @@ function createSanitizedSnapshot(options = {}) {
   report.outputSha256 = sha256(outputFile);
   fs.writeFileSync(reportFile, JSON.stringify(report, null, 2), "utf8");
   return { outputFile, reportFile, report };
-}
-
-function sanitizeValue(value, pathSegments, report) {
-  if (Array.isArray(value)) return value.map((item, index) => sanitizeValue(item, [...pathSegments, String(index)], report));
-  if (!value || typeof value !== "object") return value;
-
-  return Object.fromEntries(Object.entries(value).map(([key, entryValue]) => {
-    const rule = SENSITIVE_FIELD_RULES.find((item) => item.pattern.test(key));
-    if (rule && entryValue !== undefined && entryValue !== null && String(entryValue).trim() !== "") {
-      const masked = `${rule.replacement}-${stableToken(String(entryValue))}`;
-      const reportKey = [...pathSegments.filter((segment) => !/^\d+$/.test(segment)), key].join(".");
-      report.fieldsMasked[reportKey] = (report.fieldsMasked[reportKey] || 0) + 1;
-      report.totalMasked += 1;
-      return [key, masked];
-    }
-    return [key, sanitizeValue(entryValue, [...pathSegments, key], report)];
-  }));
-}
-
-function stableToken(value) {
-  return createHash("sha256").update(value).digest("hex").slice(0, 8).toUpperCase();
 }
 
 function verifyBackup(backupDir) {

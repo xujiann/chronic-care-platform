@@ -32,7 +32,7 @@ async function fetchInternetNursingDashboard() {
     const response = await request(`${NURSING_API_BASE}/internet-nursing/dashboard`);
     if (response.ok) return response.json();
   }
-  const response = await fetch("./data/db.json");
+  const response = await fetch("./data/public-demo.json");
   const state = response.ok ? await response.json() : {};
   return buildStaticInternetNursingDashboard(state);
 }

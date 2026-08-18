@@ -1,4 +1,4 @@
-const CACHE_NAME = "chronic-care-citizen-v59-regional-context";
+const CACHE_NAME = "chronic-care-citizen-v60-public-demo-boundary";
 const APP_SHELL = [
   "./",
   "./citizen.html",
@@ -60,7 +60,7 @@ const APP_SHELL = [
   "./internet-nursing.js?v=20260629prod",
   "./manifest.webmanifest",
   "./pwa-icon.svg",
-  "./data/db.json"
+  "./data/public-demo.json"
 ];
 
 self.addEventListener("install", (event) => {

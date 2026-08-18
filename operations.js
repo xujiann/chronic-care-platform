@@ -212,7 +212,7 @@ async function fetchOperationsDashboard() {
     const response = await request(`${OPERATIONS_API_BASE}/operations/dashboard`);
     if (response.ok) return response.json();
   }
-  const response = await fetch("./data/db.json");
+  const response = await fetch("./data/public-demo.json");
   const state = response.ok ? await response.json() : {};
   return buildStaticOperationsDashboard(state);
 }

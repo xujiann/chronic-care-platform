@@ -1234,7 +1234,7 @@ async function loadState() {
     }
   }
   try {
-    const response = await fetch("./data/db.json");
+    const response = await fetch("./data/public-demo.json");
     if (response.ok) return await response.json();
   } catch (error) {
     // Fall back to browser data below.

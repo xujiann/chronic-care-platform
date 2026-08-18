@@ -38,11 +38,11 @@ http://localhost:5173/login.html
 - `mobile-preview.html`
 - `county.html`
 
-静态模式适合演示页面和文档，不适合多人共享数据。写入能力会降级到浏览器 `localStorage`。
+静态模式适合演示页面，不适合多人共享数据。数据回退只读取生成的 `data/public-demo.json` 脱敏快照，写入能力会降级到浏览器 `localStorage`。
 
 ## GitHub Pages
 
-GitHub Pages 可部署静态页面和 `data/db.json` 快照：
+GitHub Pages 通过 `config/static-publication.json` 和 `scripts/static-publication.js` 构建显式资源集，只部署静态页面、浏览器依赖和生成的 `data/public-demo.json`：
 
 ```text
 https://xujiann.github.io/chronic-care-platform/
@@ -54,18 +54,16 @@ https://xujiann.github.io/chronic-care-platform/
 - 静态演示数据。
 - 居民端本地上传和授权记录。
 
-发布静态快照前，先生成脱敏副本，避免把正式居民证件号、手机号、地址、证照编号等敏感字段带入演示发布物：
+Pages 工作流会在仓库外的临时目录生成脱敏演示快照，并拒绝把仓库根目录、`data/db.json`、服务端源码、未明确列入清单的配置、文档或元数据作为静态制品。可先只读检查资产清单：
 
 ```powershell
-npm.cmd run storage:sanitize
+npm.cmd run static:inventory
 ```
 
-默认输出到 `data/sanitized/`，同时生成 `.report.json` 脱敏报告。报告会记录源文件 SHA-256、输出文件 SHA-256、脱敏字段计数和总脱敏数量。静态站或外发演示包应使用脱敏副本，不直接外发生产 `data/db.json`。
-
-如需生成固定文件名用于静态发布流水线，可显式指定输出目录和文件名：
+需要本地验证 Pages 制品时，必须把输出放在仓库外的空目录：
 
 ```powershell
-node scripts/storage-admin.js sanitize data/sanitized --file-name=db.json
+node scripts/static-publication.js build --output=C:\temp\health-platform-pages
 ```
 
 不可运行：
@@ -261,7 +259,7 @@ npm.cmd run postgres:migration-verify
 
 `environment:matrix` 会生成 `release/environment-matrix-report.json` 和 `release/environment-matrix-report.md`，把 demo、staging、production 三层环境的必填变量、阻断变量、责任人、门禁脚本和上线验收规则固化为可检查矩阵；`release:report` 会同步写出这些文件，作为环境分层、密钥注入、现场签字和生产切换审查的前置材料。
 
-`hybrid:deployment-readiness` 会生成 `release/hybrid-deployment-readiness-report.json` 和 `release/hybrid-deployment-readiness-report.md`，专项核对静态预览层、`data/db.json` 快照回退、Node API 后端、存储引擎边界、环境模板、CI 和发布门禁接线。
+`hybrid:deployment-readiness` 会生成 `release/hybrid-deployment-readiness-report.json` 和 `release/hybrid-deployment-readiness-report.md`，专项核对静态预览层、`data/public-demo.json` 脱敏快照、显式发布清单、Node API 后端、存储引擎边界、环境模板、CI 和发布门禁接线。
 
 `operations:readiness` 会生成 `release/operations-readiness-report.json` 和 `release/operations-readiness-report.md`，检查健康检查、运行指标、系统就绪报告、生产部署轨道、外部依赖风险和发布运维脚本，作为上线前运维审查证据。`GET /api/production-operations/center` 和运行调度页进一步提供服务级别、24x365 值班、事件响应、RPO/RTO 恢复演练和证据门禁；本地样例演练不替代远端备份、全量恢复、真实呼叫渠道和灾备签字。
 
