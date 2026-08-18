@@ -1,0 +1,44 @@
+# 架构与治理入口
+
+> 更新：2026-08-18。AS-IS、决策和计划必须分开阅读。
+
+## 每日阅读顺序
+
+1. `AGENTS.md` 与 `ENGINEERING_GOVERNANCE.md`。
+2. `ROADMAP.md` 和当天计划。
+3. 六张 AS-IS 地图及任务专项标准。
+4. `docs/adr/README.md` 与相关 ADR。
+
+## 六张地图
+
+| 文档 | 回答的问题 |
+|---|---|
+| [CURRENT_ARCHITECTURE.md](./CURRENT_ARCHITECTURE.md) | 应用、入口、存储和部署当前如何组成？ |
+| [MODULE_MAP.md](./MODULE_MAP.md) | 模块、owner、耦合、循环、重复和大文件在哪里？ |
+| [DATA_MODEL.md](./DATA_MODEL.md) | JSON/SQLite/PostgreSQL 的关系、事实源和风险是什么？ |
+| [API_MAP.md](./API_MAP.md) | 路由域、鉴权、外部接口和错误边界是什么？ |
+| [DEPENDENCY_MAP.md](./DEPENDENCY_MAP.md) | 代码、浏览器、数据、worker 和外部依赖如何连接？ |
+| [TECH_DEBT.md](./TECH_DEBT.md) | 已确认风险、优先级和测试缺口是什么？ |
+
+## 标准
+
+| 文档 | 用途 |
+|---|---|
+| [ENGINEERING_HEALTH_CHECK.md](./ENGINEERING_HEALTH_CHECK.md) | `main@b1e4898` 只读体检基线 |
+| [ENGINEERING_GOVERNANCE.md](./ENGINEERING_GOVERNANCE.md) | 单一主线、所有权、数据、安全、测试与交付治理 |
+| [MODULE_CLASSIFICATION.md](./MODULE_CLASSIFICATION.md) | A/B/C/D 模块处置 |
+| [MODULE_INTERFACE_STANDARD.md](./MODULE_INTERFACE_STANDARD.md) | 标准依赖方向和接口约束 |
+| [REFACTORING_SAFETY_NET.md](./REFACTORING_SAFETY_NET.md) | 遗留代码测试保护 |
+| [DATABASE_SCHEMA.md](./DATABASE_SCHEMA.md) | 当前 schema/migration 台账 |
+| [DATABASE_DEVELOPMENT_STANDARD.md](./DATABASE_DEVELOPMENT_STANDARD.md) | 数据库开发规则 |
+| [CORE_DATA_DEFINITIONS.md](./CORE_DATA_DEFINITIONS.md) | 核心数据不可变概念 |
+| [ADR 台账](./docs/adr/README.md) | Accepted/Proposed 架构决策 |
+
+## 已接受方向
+
+- `main` 是唯一集成和发布主干。
+- 采用模块化单体；微服务提取必须达到机器评分和运维/数据门槛。
+- v1–v14 SQLite migration 语义冻结，后续采用独立、内容指纹化 migration。
+- 核心数据采用 closed-world 定义，不随功能任务创建平行概念。
+
+静态内容安全边界仍为 Proposed，不得把建议写成已实现。
