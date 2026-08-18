@@ -113,7 +113,17 @@
         "imagingSyntheticChecks",
         "mutualRecognitionRules"
       ],
-      "externalReadCollections": ["residents", "personalRecords", "emergencySignals", "securityEvents"]
+      "externalReadCollections": ["residents", "personalRecords", "emergencySignals", "securityEvents"],
+      "implementedUseCases": [
+        {
+          "id": "imaging-dashboard-query.v1",
+          "source": "src/clinical-specialties/imaging/dashboard-query.js",
+          "route": "GET /api/imaging-cloud",
+          "ports": ["buildImagingDashboard", "redactSensitiveResponse"],
+          "contracts": [],
+          "sideEffects": ["resident-data-access-audit-persisted-by-http-adapter"]
+        }
+      ]
     },
     {
       "id": "physical-examination",

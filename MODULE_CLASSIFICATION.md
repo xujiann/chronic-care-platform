@@ -41,6 +41,7 @@
 | clinical five-subdomain governance | T06 | B | 五个 Owner/API 边界已机器登记，源码、数据和 CI 隔离尚未完成 |
 | emergency dashboard query | T06/emergency | B | 首个只读用例已通过小端口隔离并具备特征/单元测试；其余急救仍是遗留边界 |
 | blood dashboard query | T06/blood | B | 首个查询用例已隔离角色范围并具备特征/单元测试；仍接收宽快照并保留内存规范化兼容 |
+| imaging dashboard query / public response | T06/imaging | B | 查询和响应安全策略已归位并有单元、特征及真实 API 安全测试；审计与宽快照仍在兼容边界 |
 | insurance-payment | T07 | B | 聚合、仓储、outbox 边界较清楚 |
 | integration | T08 | B | 契约和外部联合测试边界明确 |
 | research | T09 | B | 范围小，有授权和审计要求 |

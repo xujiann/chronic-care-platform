@@ -45,4 +45,5 @@
 - 第一切片：五子域注册表、136 个 API 字面路径归属、9 个中央登记集合映射、66 个候选集合盘点和 3 个跨子域契约已建立。
 - 第二切片：`GET /api/emergency/dashboard` 已通过 `emergency-dashboard-query.v1` 迁入急救目标源码根，保持原鉴权、脱敏、状态码和只读语义。
 - 第三切片：`GET /api/blood-system` 已通过 `blood-dashboard-query.v1` 迁入血液目标源码根，保持 commission/institution 范围、状态码和遗留内存规范化顺序，不新增持久化。
+- 第四切片：`GET /api/imaging-cloud` 已通过 `imaging-dashboard-query.v1` 迁入影像目标源码根，公开响应净化也归位影像子域；保持原角色、居民范围、访问审计和状态码。
 - 尚未实施：路由移动、运行时上下文拆分、中央数据 Owner 晋升、独立 CI、数据库拆分和独立部署。

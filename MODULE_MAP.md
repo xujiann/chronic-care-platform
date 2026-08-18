@@ -86,7 +86,7 @@ server.js
 |---|---|---:|---|
 | emergency | T06/emergency | 37 | 急救/信号前缀已唯一归属；dashboard 查询已进入目标源码根 |
 | blood | T06/blood | 28 | dashboard 查询已进入目标源码根；其余仍与 imaging、physical-examination 混合 |
-| imaging | T06/imaging | 17 | 影像与互认前缀已归属 |
+| imaging | T06/imaging | 17 | dashboard 查询与公开响应净化已进入目标源码根 |
 | physical-examination | T06/physical-examination | 7 | 当前仍与 blood-innovation 同文件 |
 | quality-safety | T06/quality-safety | 14 | 写模型限定为质量自有数据 |
 
@@ -95,3 +95,5 @@ server.js
 首个标准接口为 `emergency-dashboard-query.v1`：路由完成角色校验和脱敏，查询用例通过 `buildEmergencyDashboard` 与 `readBloodCoordination` 两个注入端口组合只读结果。其余急救写用例仍由遗留模块承担。
 
 血液首个标准接口为 `blood-dashboard-query.v1`：通过 `normalizeTransactionState` 和 `buildBloodDashboard` 两个注入端口保留遗留组装顺序，并在用例内统一 commission 全域、institution 机构范围投影。HTTP 层未新增数据写入；混合路由内的影像、血液写命令和集成接口尚未迁移。
+
+影像首个标准接口为 `imaging-dashboard-query.v1`：通过 `buildImagingDashboard`、`redactSensitiveResponse` 两个注入端口生成结果，并由影像自有 `public-response` 递归剔除凭据、物理存储位置和内部 URL。HTTP 适配器继续执行居民范围检查和既有访问审计持久化；影像写命令与互认流程仍在混合路由。

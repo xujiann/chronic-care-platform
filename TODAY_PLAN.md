@@ -109,3 +109,21 @@
 - `process:verify -- --base=21ddd3c` 与 `process:verify -- --base=origin/main` 均通过，0 个所有权违规；临床五子域机器治理报告仍为 136 个 API 字面路径、9 个登记集合、66 个候选集合和 3 个跨域契约。
 - `test:all` 第 1–8 批通过；第 9 批 246/247，仅命中已登记 TEST-004 SHA-256 文本误报；第 10 批单独补跑 238/238 通过。
 - 未运行不存在的 `build`、`lint`、`typecheck`、`test:unit`、`test:integration`、`test:smoke` 标准入口；该缺口仍由 T00 的 TEST-001 处理。
+
+## 2026-08-18 T06 影像首个用例迁移
+
+- 目标：将 `GET /api/imaging-cloud` 的构建、脱敏和公开投影移到影像目标源码根。
+- 范围：特征测试、`imaging-dashboard-query.v1`、公开响应净化归位、旧导出兼容、注册表和地图同步。
+- 非目标：不改角色、居民范围、安全/访问审计语义、公开字段、schema、运行时依赖清单、CI 或部署。
+- 端口：`buildImagingDashboard`、`redactSensitiveResponse`；公开响应策略由影像子域维护，HTTP 适配器保留居民范围和审计持久化。
+- 回滚：回退本切片提交即可恢复路由内联组合和原净化函数位置；无 migration 或数据恢复步骤。
+- 下一切片：体检 Dashboard 特征测试与最小查询端口。
+
+### 验收结果
+
+- 新增查询/路由/治理专项 17/17、影像相关 12 个文件 49/49、影像 readiness 27/27 通过；readiness 仍明确为正式 `NO-GO`，未把代码就绪冒充现场生产就绪。
+- 路由测试 16/16、架构测试 36/36 通过；`routes:check` 检查 64 个文件通过，`npm run check` 通过。
+- `process:verify -- --base=f998d97` 与 `process:verify -- --base=origin/main` 均通过，0 个所有权违规；临床五子域机器治理报告仍为 136 个 API 字面路径、9 个登记集合、66 个候选集合和 3 个跨域契约。
+- `test:all` 第 1–8 批通过；第 9 批 250/251，仅命中已登记 TEST-004 SHA-256 文本误报；被中断的第 10 批 35 个文件单独补跑 244/244 通过。
+- 未运行不存在的 `build`、`lint`、`typecheck`、`test:unit`、`test:integration`、`test:smoke` 标准入口；该缺口仍由 T00 的 TEST-001 处理。
+- 未改公开 API、鉴权角色、数据库 schema、居民范围、安全/访问审计顺序、中央运行时依赖清单、CI 或部署配置。
