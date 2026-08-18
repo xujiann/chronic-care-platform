@@ -1,0 +1,124 @@
+# 工程治理体系 v1
+
+> 适用基线：`main@b1e4898` 及其后续短生命周期 `process/*` 分支。
+> 本文件补充而不替代 `AGENTS.md`、`config/process-workstreams.json`、分支保护和 Accepted ADR。
+
+## 1. 规则优先级
+
+1. 法律、监管、安全和真实生产约束。
+2. `main` 的 `AGENTS.md`、进程/数据所有权清单、required checks。
+3. Accepted ADR、数据库 migration 和公共兼容契约。
+4. 本治理体系、模块/数据库标准和重构安全网。
+5. 六张 AS-IS 地图、体检报告和技术债台账。
+6. Proposed ADR、路线建议和计划。
+
+事实地图不授予实现权限；Proposed 不等于 Accepted；仓库报告不能替代现场证据。
+
+## 2. 基线与所有权
+
+- `main` 是唯一集成、发布和默认分支。
+- 通过 `npm run process:plan` / `process:create` 创建 `process/tNN-topic-YYYYMMDD` 工作树。
+- T00 独占组合根、全局路由顺序、CI、治理配置和部署打包；T01–T09 只改其领域保护路径。
+- 每次交付运行 `process:verify`；跨域协议或路由顺序交 T00。
+- 脏工作树不得自动 pull/stash/reset/clean；陈旧分支先对账，不继续堆业务功能。
+- 应急目录是可复现派生制品，不是独立源码。
+
+## 3. 应用边界
+
+| 边界 | 规则 |
+|---|---|
+| 主应用 | 根 lockfile、主线 CI、T00–T09 所有权 |
+| 内嵌子站 | 数智医院/居民小程序可有 UI 边界，但共享主仓发布和安全门禁 |
+| 外部展示站 | 不在主线时按独立仓库、lockfile、CI 和托管生命周期治理 |
+| 应急制品 | 只能从批准提交生成，记录来源 SHA 和校验和 |
+| 视频项目 | 独立工具链和脱敏资产，不进入主应用运行依赖 |
+
+## 4. 模块治理
+
+- A KEEP：正确、边界合理、测试较好；默认不动。
+- B KEEP + IMPROVE：功能正常，触及时补接口、命名和测试。
+- C REFACTOR：耦合/重复/体量严重；先特征测试，再逐块迁移。
+- D REPLACE：只有根本设计错误、严重安全风险、无法测试、技术路线废弃或维护成本明显更高时采用；必须有 ADR、迁移和回滚。
+
+标准依赖方向：入口 → 路由协议 → 领域端口 → 仓储/外部端口 → 实现。禁止领域模块反向 require `server.js`，禁止把新业务路由加回组合根，禁止让 `shared` 或 `state-data` 成为数据 owner。
+
+## 5. Boy Scout Rule
+
+修改遗留代码时，不做无关大重构；安全时修复小的邻近问题；适当改善命名；补缺失测试；仅在与任务直接相关时减少重复；让触及代码小幅靠近目标接口。公共接口、schema、授权、依赖、部署或跨域边界变化必须另行批准。
+
+## 6. 数据治理
+
+- 禁止直接编辑 `data/db.json`、SQLite/WAL/SHM、报告、PDF 和归档制品。
+- schema 变化只能通过顺序 migration；历史 migration 默认不可变。
+- migration 内容必须可指纹验证，schema head、公开版本和部署门禁必须一致。
+- 生产集合必须先进入 `domain-data-ownership`，明确 owner、reader、分类、写契约、迁移和回滚。
+- 核心概念遵守 `CORE_DATA_DEFINITIONS.md`，禁止创建平行 Resident/Institution/Practitioner/Record 等模型。
+- 生产目标 PostgreSQL、fallback write=false；请求路径不得双写。
+
+## 7. API、鉴权与审计
+
+- API 变化登记 method/path、owner、调用方、角色、权限、数据范围、错误、幂等和审计事件。
+- 鉴权默认拒绝；角色允许不等于资源范围允许。
+- 认证、越权、跨机构/跨居民、重放、并发和错误输入必须有负向测试。
+- 演示账号、默认密码和本地存储路径不得在生产降级启用。
+- 审计链、留存和导出语义必须由 ADR 明确；链异常不能被模糊成“仅诊断”。
+- 静态服务必须基于发布 allowlist，而不是仓库根路径。
+
+## 8. 测试保护
+
+```text
+LEGACY CODE → TEST PROTECTION → REFACTOR
+```
+
+当前主线有效门禁：
+
+| 目的 | 命令 |
+|---|---|
+| 语法 | `npm run check` |
+| 全量自动发现 | `npm run test:all` |
+| 路由 | `npm run routes:check`、`npm run routes:test` |
+| 架构 | `npm run architecture:test` |
+| 所有权 | `npm run process:verify`、`npm run process:test` |
+| 平台迭代 | `npm run platform:iterations:test` |
+| E2E | `npm run test:e2e` |
+| 部署 | `npm run deploy:check` |
+
+目标标准入口 `build`、`lint`、`typecheck`、`test:unit`、`test:integration`、`test:smoke` 当前缺失。建立它们是独立的 T00 工具链任务；在建立前不得伪称已运行。
+
+## 9. 变更风险门禁
+
+| 变化 | 最低附加门禁 |
+|---|---|
+| 路由/协议 | routes + 领域测试 + API 兼容/负向测试 |
+| 组合根/跨域 | process + architecture + routes + test:all |
+| 鉴权/审计 | 安全矩阵、拒绝路径、会话/重放/留存测试 |
+| 数据库 | migration、空库/升级/重跑/失败、schema 指纹、核对/回滚 |
+| 前端 | 页面角色、XSS sink、静态缓存、E2E/smoke |
+| 依赖 | 官方 audit、许可/维护/兼容、build/test、回滚 |
+| 部署 | deploy check、配置 fail-closed、制品来源和回滚 |
+
+## 10. ADR、Review 与交付
+
+- 架构、安全模型、数据权威源、核心概念、公共破坏性接口、部署拓扑和技术路线替换必须先有 ADR。
+- ADR 包含 problem、options、advantages、disadvantages、migration cost、risk、recommendation。
+- `/review` 检查回归、安全、数据、并发、错误、所有权、测试真实性和文档同步。
+- PR 单一职责，说明基线、进程、问题、决策、范围、非目标、测试、风险、迁移/回滚和 ADR。
+- 未运行项明确写未运行；不删测试、不降门禁换绿灯。
+- merge 后更新地图、风险、ADR、路线图和发布证据。
+
+## 11. 每日循环
+
+```text
+git/CI/昨日 PR 检查
+  → 阅读 ROADMAP / ARCHITECTURE / AGENTS / 治理 / ADR
+  → PLAN
+  → 方向审批
+  → implementation
+  → tests
+  → /review
+  → PR
+  → merge
+  → 下一工作日重新开始
+```
+
+PLAN 前不得编码；批准只覆盖明示范围。任何阶段失败都回到最近的安全阶段，不能跨过测试或 review。

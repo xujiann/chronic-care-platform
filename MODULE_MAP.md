@@ -1,0 +1,81 @@
+# MODULE MAP — 主线模块地图
+
+> 快照：`main@b1e4898`。模块是可分配责任和验证的架构单元，不等同于每一个 JavaScript 文件。
+
+## 1. HTTP 模块与所有权
+
+| 进程 | 路由域 | 路由段 | 可识别精确 API 下限 | 主要职责 |
+|---|---|---:|---:|---|
+| T00 | regional / runtime composition | 2 | 3 | 组合根、区域运行时、全局顺序和协议；组合根本身不作为领域路由域 |
+| T01 | runtime / identity-security | 8 | 31 | 健康、指标、登录、会话、OIDC/SMS、授权和安全控制 |
+| T02 | platform-governance / state-data | 14 | 76 | 平台治理、证据、状态适配、迁移与发布控制 |
+| T03 | public-health | 4 | 49 | 监测、直报、出生死亡和公卫运营 |
+| T04 | citizen-chronic | 7 | 34 | 居民档案、家庭授权、慢病管理 |
+| T05 | care-coordination | 10 | 32 | 挂号、转诊、护理、陪诊和履约 |
+| T06 | clinical-specialties | 10 | 73 | 急救、用血、影像、体检和质量安全 |
+| T07 | insurance-payment | 4 | 27 | 医保、支付、退款和凭证 |
+| T08 | integration | 3 | 13 | 外部网关、签名回调和交换 |
+| T09 | research / shared | 14 | 30 | 科研沙箱、组合查询和确实跨域的体验 |
+
+静态扫描识别 368 个唯一的精确 method/path 组合，未发现重复；动态参数和 prefix 路由未计入该数字。`npm run routes:check` 对 64 个受检模块通过。
+
+## 2. 主要服务模块
+
+| 层 | 位置 | 现状 |
+|---|---|---|
+| 组合根 | `server.js`、`src/http/platform-runtime-composition.js` | 仍向上下文注入数百个函数，耦合中心 |
+| 路由器 | `src/http/api-router.js`、`src/http/routes/index.js` | 固定顺序、ID 唯一、响应短路，结构清楚 |
+| 运行时上下文 | `src/http/runtime-contexts/` | 领域依赖列表显式，但 public-health 160 项、care 102 项，接口过宽 |
+| 身份安全 | `src/identity-security/`、`session-store.js` | Cookie/CSRF、策略、会话仓储和审计已模块化 |
+| 平台数据 | `src/platform/data/`、`src/platform/storage/` | 数据所有权、迁移控制、PostgreSQL 主存储契约 |
+| 领域事件 | `src/platform/events/`、各领域 worker | outbox/inbox、幂等和后台投递 |
+| 区域运行 | `src/platform/regional/`、`regions/` | 多地区清单、能力包、复制和发布注册 |
+| 领域实现 | `src/care-coordination/` 等与根目录服务 | 新旧实现并存，边界尚未完全迁移 |
+| 前端共享 | `auth.js`、`shared.js`、`platform-api-client.js`、`platform-shell.js` | 身份上下文、API 调用、壳和设计系统 |
+
+## 3. 依赖宽度
+
+运行时上下文显式依赖数：public-health 160、care-coordination 102、clinical-specialties 76、citizen-chronic 64、shared 50、identity-security 45。显式依赖好于隐藏全局变量，但这些宽接口会让组合根、测试夹具和跨域演进同步变化，是当前最大的模块耦合指标。
+
+静态 CommonJS 图（排除测试）包含 526 个文件、861 条本地边。最高入度：
+
+- `src/http/runtime-source.js`：62；
+- `src/platform/governance/technical-evidence.js`：22；
+- `src/platform/regional/region-manifest.js`：18；
+- 公卫密钥环/适配服务：10–13。
+
+## 4. 明确循环依赖
+
+```text
+server.js
+  → src/platform/cutover/pilot-cutover-alert-runtime.js
+  → require("../../../server").pilotCutoverControlPlaneReadiness()
+  → server.js
+```
+
+该模块允许通过 `controlProvider` 注入依赖，但默认实现反向读取组合根。目标应是始终由 T00 注入 provider；本轮只记录，不修改。
+
+## 5. 重复与边界重叠
+
+- 根目录与 `src/` 存在同名模块：`blood-innovation`、`digital-hospital-governance`、`imaging-cloud`、`public-health`、`quality-safety`、`shared`。部分是前端/后端同名，部分是迁移期并存；命名本身不足以判定死代码。
+- `server.js` 内仍有大量种子、规范化、存储和领域函数，而相同领域也已在 `src/` 建立模块。
+- 252 个 JSON 集合中仅 83 个进入数据所有权清单；其余被策略标为 legacy-non-authoritative。
+- 许多 readiness/report 脚本重复读取 `data/db.json` 并各自产生报告，证据生成接口尚未统一。
+
+## 6. 超大文件
+
+| 文件 | 行数约 | 风险 |
+|---|---:|---|
+| `server.js` | 28,746 | 组合根、迁移、种子和领域函数集中 |
+| `digital-hospital-standard-platform/app.js` | 10,563 | 单文件子站 |
+| `test/api.test.js` | 8,140 | 回归范围巨大、定位慢 |
+| `citizen.js` | 6,066 | 居民端视图、状态和流程耦合 |
+| `portal.css` | 5,243 | 全局样式影响面大 |
+| `test/static.test.js` | 5,058 | 静态结构测试集中 |
+| `public-health.js` | 4,467 | 公卫前端大控制器 |
+| `platform.js` / `operations.js` | 3,804 / 3,716 | 管理和运营端耦合 |
+| `src/http/routes/care-coordination.js` | 2,174 | 单领域路由仍过大 |
+
+## 7. 死代码判定原则
+
+本次未把“同名”或“无静态入边”直接判为死代码。高可信候选必须同时满足：无路由/页面/脚本/动态加载引用、测试不覆盖、运行时观察无调用、owner 确认可删除。当前最明确的问题是循环和重叠，而不是已经授权删除的文件。

@@ -1,0 +1,76 @@
+# 模块 A/B/C/D 分级（主线 v1）
+
+> 基线：`main@b1e4898`。本表覆盖可分配 owner 的架构模块；文件级清单后续由机器治理生成。标签不是立即重构授权。
+
+## 判定规则
+
+| 标签 | 定义 | 处置 |
+|---|---|---|
+| A KEEP | 功能正确、边界合理、测试较好 | 不动 |
+| B KEEP + IMPROVE | 功能正常，结构可渐进改善 | 触及时小步优化 |
+| C REFACTOR | 严重耦合、重复、过大或难扩展 | 测试保护后逐块重构 |
+| D REPLACE | 根本错误、严重安全、无法测试、路线废弃或重做更便宜 | ADR 批准后替换 |
+
+## 平台与横切模块
+
+| 模块 | Owner | 标签 | 依据 | 下一原则 |
+|---|---|---|---|---|
+| `src/http/api-router.js` + route registry | T00 | A | 顺序、ID 唯一和短路有测试 | 保持稳定，不加领域逻辑 |
+| process worktree/ownership | T00 | A | 可执行计划、创建和越界验证 | 保持主线唯一性 |
+| regional manifests/runtime | T00 | B | 边界明确、入度较高 | 逐步降低 manifest 耦合 |
+| `server.js` 组合根 | T00 | C | 28.7k 行、职责过多 | 先测后抽端口，不整体重写 |
+| 静态根目录服务实现 | T00 | D | 发布根设计导致 P0 数据暴露 | Proposed ADR 后替换为 allowlist publisher |
+| runtime contexts | T00/各域 | C | 最宽 160 项依赖 | 按子域端口缩窄 |
+| technical evidence | T00 | B | 稳定共享但入度 22 | 固化版本化契约 |
+| platform data/storage | T00/T02 | B | 契约、CAS、outbox 测试较强 | 修复版本治理后逐步 KEEP |
+| alert cutover runtime | T00 | C | 反向 require server 形成环 | 始终注入 provider |
+| CI/readiness pipeline | T00 | C | 覆盖广但综合 job 过大 | 拆分可定位门禁 |
+
+## 领域模块
+
+| 领域 | Owner | 标签 | 依据 |
+|---|---|---|---|
+| runtime | T01 | B | 健康/指标边界清楚，仍依赖大上下文 |
+| identity-security | T01 | B | Cookie/CSRF/session 边界已建立；兼容路径和静态资产待治理 |
+| platform-governance | T02 | B/C | 子模块已拆，但 72+ API、证据/发布职责很宽 |
+| state-data | T02 | C | 兼容适配必要，但容易成为通用写入口 |
+| public-health | T03 | C | 上下文 160 项，前端/脚本/外部运行时庞大 |
+| citizen-chronic | T04 | C | 浏览器文件 6k 行、上下文 64 项 |
+| care-coordination | T05 | C | 路由文件 2.1k 行、上下文 102 项 |
+| clinical-specialties | T06 | C | 领域过宽，包含急救/血液/影像/体检/质安 |
+| insurance-payment | T07 | B | 聚合、仓储、outbox 边界较清楚 |
+| integration | T08 | B | 契约和外部联合测试边界明确 |
+| research | T09 | B | 范围小，有授权和审计要求 |
+| shared | T09/T00 review | C | 12 段、50 依赖，有聚合继续膨胀风险 |
+
+## 前端应用
+
+| 模块 | 标签 | 依据 |
+|---|---|---|
+| platform shell / API client / design system | B | 已有共享壳，仍与全局脚本并存 |
+| `app.js` 管理端 | C | 2k+ 行、90 个 HTML sink |
+| `citizen.js` | C | 6k 行、94 个 HTML sink |
+| `public-health.js` | C | 4.4k 行、78 个 HTML sink |
+| `platform.js` / `operations.js` | C | 3.7k+ 行、全局状态和渲染耦合 |
+| 数智医院子站 app | C | 10.5k 单文件 |
+| access policy | B | 页面策略集中且 fail closed，有测试 |
+| Service Worker 的 `data/db.json` 缓存策略 | D | P0 数据发布设计错误，需要迁移后替换 |
+
+## 数据与任务
+
+| 模块 | 标签 | 依据 |
+|---|---|---|
+| domain data ownership registry | A/B | 83 个集合有 owner，仍需扩大覆盖 |
+| JSON 静态快照（演示用途） | B | 本地演示有效，但必须合成/脱敏/隔离 |
+| JSON 静态快照（生产事实源用途） | D | 与生产 PostgreSQL 目标冲突，安全风险高 |
+| SQLite migration 实现 | C | 事务化，但内嵌 server、版本漂移、弱 checksum |
+| PostgreSQL primary/outbox contracts | B | fail closed、CAS、TLS、核对测试较强 |
+| 领域 worker 集合 | B/C | 功能可测但状态/观测接口不统一 |
+
+## 标签使用
+
+- A 模块不能因“顺手整理”被改动。
+- B 模块只做与任务直接相关的小改进。
+- C 模块先写特征测试，按接口分块迁移。
+- D 只替换明确组件，不把整个应用标 D；必须先有 Accepted ADR。
+- 标签变化需更新证据和 review，不凭代码审美升级或降级。
