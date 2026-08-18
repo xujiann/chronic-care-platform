@@ -88,3 +88,5 @@ HTTP request
 ## 8. 临床五子域 API 归属
 
 路由源码中的 136 个去重 API 字面路径现被机器门禁覆盖：急救 37、血液 28、影像 17、体检 7、质量安全 14、历史 operations 33。该计数包含参数模板和同一路径的不同源码表达，不替代 73 条精确 method/path 下限。所有公开路径、鉴权调用和响应语义保持不变；operations 只登记 handoff，不在 T06 中改变全局路由。
+
+`GET /api/emergency/dashboard` 已通过兼容委托接入 `emergency-dashboard-query.v1`。允许角色仍为 commission、institution、citizen；未授权请求在读数据前停止；成功状态仍为 200，响应继续经过既有 `redactSensitiveResponse`，且血液协调投影只暴露 `consumer=emergency`。该只读接口没有新增幂等、写入或审计语义。

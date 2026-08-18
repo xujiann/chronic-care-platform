@@ -82,3 +82,5 @@ flowchart TB
 ## 6. T06 五子域治理切片
 
 本分支新增 `config/clinical-subdomains.json`，把临床专科正式定义为急救、血液、影像、体检、质量安全五个治理子域。运行时、公开 API、数据库和部署拓扑均未改变，仍由同一个 Node 模块化单体承载。现有 `/api/operations` 路由被登记为历史错位并等待 T00/T02 handoff，不能被描述成第六个临床子域。
+
+急救第二切片将 `GET /api/emergency/dashboard` 的查询组合移入 `src/clinical-specialties/emergency/dashboard-query.js`。HTTP 路由、鉴权、数据库读取、响应脱敏和全局运行时上下文保持原位；这是一个用例端口迁移，不代表急救子域已完成源码隔离。

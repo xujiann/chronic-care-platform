@@ -21,6 +21,10 @@ test("clinical specialty governance defines exactly five bounded subdomains", ()
     registry.subdomains.map((item) => item.owner),
     ["T06/emergency", "T06/blood", "T06/imaging", "T06/physical-examination", "T06/quality-safety"]
   );
+  assert.deepEqual(
+    registry.subdomains[0].implementedUseCases.map((useCase) => useCase.id),
+    ["emergency-dashboard-query.v1"]
+  );
 });
 
 test("all current clinical API literals have one subdomain or explicit handoff owner", () => {
@@ -71,6 +75,9 @@ test("governance gate rejects overlapping source, route and contract boundaries"
   registry.subdomains[1].routePrefixes = ["/api/emergency/events"];
   registry.crossSubdomainContracts[0].interaction = "direct-implementation-import";
   registry.crossSubdomainContracts[0].consumers = ["blood"];
+  registry.subdomains[0].implementedUseCases[0].source = "src/http/routes/clinical-specialties/emergency-care.js";
+  registry.subdomains[0].implementedUseCases[0].contracts = ["unknown-contract.v1"];
+  delete registry.subdomains[0].implementedUseCases[0].sideEffects;
 
   const report = validateClinicalSubdomainRegistry(ROOT, registry);
   const issues = report.issues.join("\n");
@@ -79,4 +86,7 @@ test("governance gate rejects overlapping source, route and contract boundaries"
   assert.match(issues, /route prefixes overlap/);
   assert.match(issues, /must separate non-empty providers and consumers/);
   assert.match(issues, /uses disallowed interaction/);
+  assert.match(issues, /source is outside emergency/);
+  assert.match(issues, /references unknown contract unknown-contract\.v1/);
+  assert.match(issues, /must declare side effects explicitly/);
 });

@@ -36,7 +36,17 @@
         "emergencyResources",
         "emergencyRollbackPlan"
       ],
-      "externalReadCollections": ["residents", "personalRecords", "securityEvents"]
+      "externalReadCollections": ["residents", "personalRecords", "securityEvents"],
+      "implementedUseCases": [
+        {
+          "id": "emergency-dashboard-query.v1",
+          "source": "src/clinical-specialties/emergency/dashboard-query.js",
+          "route": "GET /api/emergency/dashboard",
+          "ports": ["buildEmergencyDashboard", "readBloodCoordination"],
+          "contracts": ["blood-emergency-coordination.v1"],
+          "sideEffects": []
+        }
+      ]
     },
     {
       "id": "blood",
@@ -180,7 +190,7 @@
       "consumers": ["emergency"],
       "interaction": "versioned-query",
       "requiredFields": ["projectionId", "status", "occurredAt"],
-      "currentBinding": "BloodEventHub.dashboard",
+      "currentBinding": "EmergencyDashboardQuery.readBloodCoordination -> BloodEventHub.dashboard",
       "status": "legacy-adapter"
     },
     {
@@ -224,7 +234,7 @@
     { "id": "api-prefix-ownership", "status": "met" },
     { "id": "data-subdomain-ownership", "status": "partial" },
     { "id": "versioned-cross-subdomain-contracts", "status": "partial" },
-    { "id": "source-directory-isolation", "status": "not-met" },
+    { "id": "source-directory-isolation", "status": "partial" },
     { "id": "independent-domain-tests", "status": "partial" },
     { "id": "independent-ci-gates", "status": "not-met" }
   ]

@@ -1,5 +1,9 @@
 "use strict";
 
+const {
+  createEmergencyDashboardQuery
+} = require("../../../clinical-specialties/emergency/dashboard-query");
+
 function createRouteSegment(runtime) {
   const { BloodEventHub, EmergencyLifeChain, EmergencyProduction, EmergencyService, collectJson, readDatabase, redactSensitiveResponse, requireApiRole, sendDownload, sendJson, writeDatabase } = runtime;
   return {
@@ -9,9 +13,12 @@ function createRouteSegment(runtime) {
     if (req.method === "GET" && url.pathname === "/api/emergency/dashboard") {
         const user = requireApiRole(req, res, ["commission", "institution", "citizen"], "/api/emergency/dashboard");
         if (!user) return true;
+        const emergencyDashboardQuery = createEmergencyDashboardQuery({
+          buildEmergencyDashboard: EmergencyService.buildDashboard,
+          readBloodCoordination: BloodEventHub.dashboard
+        });
         const data = readDatabase();
-        const bloodCoordination = BloodEventHub.dashboard(data, user);
-        sendJson(res, 200, redactSensitiveResponse({ ...EmergencyService.buildDashboard(data, user), bloodCoordination: { ...bloodCoordination, projections: bloodCoordination.projections.filter((item) => item.consumer === "emergency") } }, user));
+        sendJson(res, 200, redactSensitiveResponse(emergencyDashboardQuery.execute({ data, user }), user));
         return true;
       }
 

@@ -48,6 +48,8 @@ function validateClinicalSubdomainRegistry(root, registry = loadClinicalSubdomai
   const idSet = new Set(ids);
   const legacyAreas = Array.isArray(registry.legacyRouteAreas) ? registry.legacyRouteAreas : [];
   const legacyIds = new Set(legacyAreas.map((item) => item.id));
+  const contractIds = new Set((registry.crossSubdomainContracts || []).map((contract) => contract.id));
+  const implementedUseCases = [];
 
   if (registry.domain !== "clinical-specialties" || registry.processOwner !== "T06") {
     issues.push("registry must describe the T06 clinical-specialties domain");
@@ -73,6 +75,29 @@ function validateClinicalSubdomainRegistry(root, registry = loadClinicalSubdomai
     if (!String(subdomain.targetSourceRoot || "").startsWith("src/clinical-specialties/")) {
       issues.push(`${subdomain.id} target source root is outside clinical-specialties`);
     }
+    (subdomain.implementedUseCases || []).forEach((useCase) => {
+      implementedUseCases.push({ ...useCase, owner: subdomain.id });
+      if (!/\.v\d+$/.test(useCase.id || "")) {
+        issues.push(`${useCase.id || "use case"} must have a versioned id`);
+      }
+      if (!String(useCase.source || "").startsWith(`${subdomain.targetSourceRoot}/`)) {
+        issues.push(`${useCase.id} source is outside ${subdomain.id}`);
+      } else if (!fs.existsSync(path.join(root, useCase.source))) {
+        issues.push(`${useCase.id} source does not exist`);
+      }
+      if (!/^[A-Z]+ \/api\//.test(useCase.route || "")) {
+        issues.push(`${useCase.id} must declare an HTTP method and API path`);
+      }
+      if (!Array.isArray(useCase.ports) || useCase.ports.length === 0) {
+        issues.push(`${useCase.id} must declare its ports`);
+      }
+      (useCase.contracts || []).forEach((contractId) => {
+        if (!contractIds.has(contractId)) issues.push(`${useCase.id} references unknown contract ${contractId}`);
+      });
+      if (!Array.isArray(useCase.sideEffects)) {
+        issues.push(`${useCase.id} must declare side effects explicitly`);
+      }
+    });
   });
   legacyAreas.forEach((area) => {
     (area.routePrefixes || []).forEach((prefix) => prefixOwners.push({ id: area.id, prefix }));
@@ -82,6 +107,9 @@ function validateClinicalSubdomainRegistry(root, registry = loadClinicalSubdomai
   }
   if (new Set(targetSourceRoots).size !== targetSourceRoots.length) {
     issues.push("target source roots must be unique");
+  }
+  if (new Set(implementedUseCases.map((item) => item.id)).size !== implementedUseCases.length) {
+    issues.push("implemented use case ids must be unique");
   }
   prefixOwners.forEach((entry, index) => {
     prefixOwners.slice(index + 1).forEach((other) => {
@@ -107,6 +135,12 @@ function validateClinicalSubdomainRegistry(root, registry = loadClinicalSubdomai
       }
       routeInventory.push({ apiPath, owner: matches[0].id, routeFile });
     });
+  });
+  implementedUseCases.forEach((useCase) => {
+    const apiPath = String(useCase.route || "").split(" ")[1];
+    if (!routeInventory.some((route) => route.owner === useCase.owner && route.apiPath === apiPath)) {
+      issues.push(`${useCase.id} route is not owned by ${useCase.owner}`);
+    }
   });
 
   const registeredSubcontexts = Object.entries(ROUTE_SUBDOMAINS)
