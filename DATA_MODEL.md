@@ -101,3 +101,7 @@ erDiagram
 - `DATA-005`：大量 `payload` JSON 关系没有数据库约束，只能靠应用验证。
 - `DATA-006`：静态发布 `data/db.json` 与 Service Worker 缓存扩大数据泄露面。
 - `DATA-007`：PostgreSQL 目标模型、SQLite 镜像和专项数据库存在版本/核对复杂度。
+
+## 8. 临床子域数据盘点
+
+`config/clinical-subdomains.json` 将中央已登记的 9 个 `clinical-specialties` 集合映射到急救、影像和质量安全子域，并登记 66 个遗留候选集合。候选集合仍受 `legacy-non-authoritative` 策略约束，不因子域盘点获得生产写入资格。血液和体检尚无中央登记的生产候选集合；后续必须通过独立 T00 数据任务晋升。质量安全只能写质量自有集合，通过版本化查询或事件读模型消费其他子域数据。

@@ -78,3 +78,7 @@ flowchart TB
 4. `server.js` 与 `src/platform/cutover/pilot-cutover-alert-runtime.js` 存在运行时 `require` 环。
 5. SQLite migration 数组已到 v14，但 `STORAGE_SCHEMA_VERSION`、部署检查和测试仍声明 v11。
 6. 主线没有统一的 `build`、`lint`、`typecheck`、`test:unit`、`test:integration`、`test:smoke` 脚本入口。
+
+## 6. T06 五子域治理切片
+
+本分支新增 `config/clinical-subdomains.json`，把临床专科正式定义为急救、血液、影像、体检、质量安全五个治理子域。运行时、公开 API、数据库和部署拓扑均未改变，仍由同一个 Node 模块化单体承载。现有 `/api/operations` 路由被登记为历史错位并等待 T00/T02 handoff，不能被描述成第六个临床子域。

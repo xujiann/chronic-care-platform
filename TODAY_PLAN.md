@@ -56,3 +56,23 @@
 - review 无未处理 P0/P1 文档一致性问题。
 
 当前仅剩提交/PR 方向确认；不自动 commit、push、创建 PR 或 merge。
+
+---
+
+## 2026-08-18 T06 临床五子域第一切片
+
+- 分支：`process/t06-clinical-five-subdomains-20260818`
+- 基线：`origin/main@58e05e56b2d97952c36aa05355c484821a74733e`
+- 决策：采用模块化单体内五个可治理子域；方向已获用户批准。
+- 范围：Accepted ADR、五子域机器注册表、API/数据/依赖盘点、跨子域契约、禁止依赖门禁、测试与地图同步。
+- 非目标：不移动路由，不改 API/鉴权/schema/数据库/组合根/CI/部署，不创建微服务。
+- 回滚：整提交回退；无 migration、数据写入或运行时状态变化。
+- 下一切片：从急救子域选择一个已被特征测试保护的用例，定义最小端口并迁移；中央数据 Owner 与 CI 入口交 T00 handoff。
+
+### 验收结果
+
+- `process:verify`、`routes:check`、`routes:test`、`architecture:test` 均通过。
+- 五子域专项回归 203/203 通过；新增治理测试 6/6 通过。
+- `npm run check` 通过；锁文件依赖安装后 PostgreSQL 失败文件 11/11 通过。
+- `test:all` 第 1–8、10 批通过；第 9 批 249/250，通过项之外仅有既有 `resident-mini-program-stage4` 哈希文本误报：构建产物的 SHA-256 摘要偶然包含 `123456`，被口令文本扫描误判。本 T06 切片不跨域修改 T04/T00 发布脚本。
+- 主线仍缺少统一的 `build`、`lint`、`typecheck`、`test:unit`、`test:integration`、`test:smoke` 入口，继续按 `CURRENT_ARCHITECTURE.md` 的 T00 治理债务处理。

@@ -79,3 +79,15 @@ server.js
 ## 7. 死代码判定原则
 
 本次未把“同名”或“无静态入边”直接判为死代码。高可信候选必须同时满足：无路由/页面/脚本/动态加载引用、测试不覆盖、运行时观察无调用、owner 确认可删除。当前最明确的问题是循环和重叠，而不是已经授权删除的文件。
+
+## 8. 临床专科五子域
+
+| 子域 | Owner | API 字面路径 | 边界状态 |
+|---|---|---:|---|
+| emergency | T06/emergency | 37 | 急救/信号前缀已唯一归属 |
+| blood | T06/blood | 28 | 与 imaging、physical-examination 仍有混合文件 |
+| imaging | T06/imaging | 17 | 影像与互认前缀已归属 |
+| physical-examination | T06/physical-examination | 7 | 当前仍与 blood-innovation 同文件 |
+| quality-safety | T06/quality-safety | 14 | 写模型限定为质量自有数据 |
+
+另有 33 个 `/api/operations` 字面路径属于历史错位，目标为 `platform-governance/operations`。五子域治理注册表不改变现有路由顺序或部署方式。

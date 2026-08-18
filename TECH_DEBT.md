@@ -20,6 +20,7 @@
 | ARC-002 | 循环依赖 | `server.js ↔ pilot-cutover-alert-runtime.js` | 部分初始化、测试顺序和模块复用风险 |
 | ARC-003 | 宽接口 | public-health runtime context 160 个依赖 | 组合根和路由同步变化，难形成领域端口 |
 | ARC-004 | 前端超大模块 | 数智医院 app 10.5k、citizen 6k、公卫 4.4k | 全局状态、渲染和流程耦合 |
+| ARC-007 | 临床子域隔离 | 五子域注册表已建立，但 `clinical-blood`、`blood-innovation` 仍混合，operations 仍错位 | 先特征测试，再逐用例迁移；禁止新增混合依赖 |
 | SEC-004 | XSS 面 | 871 个 HTML sink，CSP 允许 inline | 需可信渲染接口和逐页负向测试 |
 | SEC-005 | 混合会话 | HttpOnly Cookie 已建立，但 localStorage/demo bearer 兼容仍存在 | 降级路径、XSS 后凭据暴露面 |
 | SEC-006 | OTP 状态 | 验证码和失败锁定仍使用进程内 Map | 多实例/重启下状态不一致 |
