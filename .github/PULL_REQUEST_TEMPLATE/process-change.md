@@ -1,7 +1,7 @@
 ## 进程交付
 
 - 进程：`TNN`
-- 基线标签：`baseline/governance-20260803-process-v1`
+- 基线 ref/SHA：
 - 分支：`process/tNN-<topic>-YYYYMMDD`
 - 领域路由：
 - 运行时新增依赖：

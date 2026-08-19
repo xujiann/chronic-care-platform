@@ -1,80 +1,18 @@
 "use strict";
 
-const FORBIDDEN_PUBLIC_FIELD = /^(?:(?:object|physical|storage)[_-]?path|object[_-]?key|access[_-]?url|signed[_-]?url|(?:access|refresh)?[_-]?token|authorization|api[_-]?key|secrets?|passwords?|credentials?|credential[_-]?ref|private[_-]?key|signatures?|signing[_-]?keys?|signature[_-]?keys?|certificate[_-]?fingerprint|endpoint|base[_-]?url|bucket(?:Name)?|containerName)$/i;
-const SENSITIVE_QUERY_PARAMETER = /^(?:token|access_?token|refresh_?token|signature|sig|key|api_?key|secret|password|credential)$/i;
-const PHYSICAL_LOCATION = /(?:\b(?:s3|oss|cos|obs|file):\/\/|(?:^|[\s"'(])[A-Za-z]:\\|(?:^|[\s"'(])\/(?:var|srv|opt|run|mnt|data|tmp)\/)/i;
-const AUTHORIZATION_VALUE = /\b(?:bearer|basic)\s+[A-Za-z0-9+/=_\-.]+/i;
-const URL_VALUE = /https?:\/\/[^\s"'<>]+/gi;
-
-function sanitizeUrl(value, { allowViewerUrl = false } = {}) {
-  try {
-    const parsed = new URL(String(value));
-    if (!new Set(["http:", "https:"]).has(parsed.protocol)) return "";
-    parsed.username = "";
-    parsed.password = "";
-    for (const key of [...parsed.searchParams.keys()]) {
-      if (SENSITIVE_QUERY_PARAMETER.test(key)) parsed.searchParams.delete(key);
-    }
-    parsed.hash = "";
-    return allowViewerUrl ? parsed.toString() : "[redacted-url]";
-  } catch {
-    return "";
-  }
-}
-
-function sanitizePublicString(value, options = {}) {
-  const text = String(value);
-  if (AUTHORIZATION_VALUE.test(text) || PHYSICAL_LOCATION.test(text)) {
-    return "[redacted-sensitive-detail]";
-  }
-  return text.replace(URL_VALUE, (url) => sanitizeUrl(url, options) || "[redacted-url]");
-}
-
-function projectPublicImagingResponse(value, options = {}) {
-  if (Array.isArray(value)) return value.map((item) => projectPublicImagingResponse(item, options));
-  if (!value || typeof value !== "object") {
-    return typeof value === "string" ? sanitizePublicString(value, options) : value;
-  }
-  const output = {};
-  for (const [key, item] of Object.entries(value)) {
-    if (FORBIDDEN_PUBLIC_FIELD.test(key)) continue;
-    if (key === "viewerUrl" && !options.allowViewerUrl) continue;
-    output[key] = projectPublicImagingResponse(item, options);
-  }
-  return output;
-}
-
-function projectImagingDashboardResponse(value) {
-  const dashboard = value && typeof value === "object" ? value : {};
-  return projectPublicImagingResponse({
-    ...dashboard,
-    studies: Array.isArray(dashboard.studies) ? dashboard.studies : [],
-    mutualRecognition: Array.isArray(dashboard.mutualRecognition) ? dashboard.mutualRecognition : [],
-    shares: Array.isArray(dashboard.shares) ? dashboard.shares : []
-  });
-}
-
-function projectImagingViewerResponse(value) {
-  const source = value && typeof value === "object" ? value : {};
-  return projectPublicImagingResponse({
-    studyId: source.studyId,
-    studyInstanceUID: source.studyInstanceUID,
-    viewerUrl: source.viewerUrl,
-    viewer: source.viewer,
-    archive: source.archive,
-    expiresAt: source.expiresAt ?? null
-  }, { allowViewerUrl: true });
-}
-
-function projectImagingErrorResponse(value) {
-  const source = value && typeof value === "object" ? value : {};
-  return projectPublicImagingResponse({
-    error: source.error || "Imaging Request Failed",
-    code: source.code,
-    message: source.message || "The imaging request could not be completed.",
-    productionReady: source.productionReady
-  });
-}
+const {
+  createBloodDashboardQuery
+} = require("../../../clinical-specialties/blood/dashboard-query");
+const {
+  createImagingDashboardQuery
+} = require("../../../clinical-specialties/imaging/dashboard-query");
+const {
+  projectImagingDashboardResponse,
+  projectImagingErrorResponse,
+  projectImagingViewerResponse,
+  projectPublicImagingResponse,
+  sanitizePublicString
+} = require("../../../clinical-specialties/imaging/public-response");
 
 function createRouteSegment(runtime) {
   const { BloodBusinessService, BloodIntegrationGateway, BloodMasterData, BloodService, BloodTransactionService, appendDataAccessLog, appendSecurityEvent, buildImageCloudDashboard, buildImageCloudDerivedRecords, buildOhifStudyUrl, canAccessResident, collectJson, createHash, createImageCloudMutualRecognitionChain, listOrthancStudySummaries, mergeByKey, normalizeImageCloudStudy, personIndexForResident, publishDiagnosticReportToFhir, publishImagingStudyToFhir, randomUUID, readDatabase, redactSensitiveResponse, requireApiRole, reviewImageCloudRecognitionAppeal, reviewMutualRecognitionRecord, sendJson, solutionAHealth, submitImageCloudRecognitionAppeal, upsertPhase2MutualRecognitionCitation, writeDatabase } = runtime;
@@ -90,19 +28,12 @@ function createRouteSegment(runtime) {
     if (req.method === "GET" && url.pathname === "/api/blood-system") {
         const user = requireApiRole(req, res, ["commission", "institution"], "/api/blood-system");
         if (!user) return true;
-        const data = readDatabase();
-        BloodTransactionService.normalizeTransactionState(data);
-        const dashboard = BloodService.buildDashboard(data, user);
-        const scoped = (item) => user.role === "commission" || item.institutionCode === user.orgCode || item.destinationInstitution === user.orgCode;
-        sendJson(res, 200, {
-          ...dashboard,
-          testReports: user.role === "commission" ? data.bloodTestReports : [],
-          releaseReviews: user.role === "commission" ? data.bloodReleaseReviews : [],
-          shipments: data.bloodShipments.filter(scoped),
-          safetyIncidents: data.bloodSafetyIncidents.filter(scoped),
-          compatibilityTests: user.role === "institution" ? data.compatibilityTests.filter((item) => dashboard.transfusionRequests.some((request) => request.id === item.requestId)) : data.compatibilityTests,
-          transfusionEpisodes: data.transfusionEpisodes.filter(scoped)
+        const bloodDashboardQuery = createBloodDashboardQuery({
+          buildBloodDashboard: BloodService.buildDashboard,
+          normalizeTransactionState: BloodTransactionService.normalizeTransactionState
         });
+        const data = readDatabase();
+        sendJson(res, 200, bloodDashboardQuery.execute({ data, user }));
         return true;
       }
 
@@ -279,6 +210,10 @@ function createRouteSegment(runtime) {
       if (req.method === "GET" && url.pathname === "/api/imaging-cloud") {
         const user = requireApiRole(req, res, ["commission", "institution", "county", "citizen"], "/api/imaging-cloud");
         if (!user) return true;
+        const imagingDashboardQuery = createImagingDashboardQuery({
+          buildImagingDashboard: buildImageCloudDashboard,
+          redactSensitiveResponse
+        });
         const data = readDatabase();
         const residentId = url.searchParams.get("residentId") || "";
         if (residentId && !canAccessResident(user, residentId, data)) {
@@ -290,11 +225,13 @@ function createRouteSegment(runtime) {
           appendDataAccessLog(data, user, residentId, "医学影像云", "查询影像检查、报告和电子病历索引");
           writeDatabase(data);
         }
-        const dashboard = buildImageCloudDashboard(data, user, {
+        const response = imagingDashboardQuery.execute({
+          data,
+          user,
           residentId,
           institutionCode: url.searchParams.get("institutionCode") || ""
         });
-        sendImagingJson(res, 200, redactSensitiveResponse(dashboard, user), projectImagingDashboardResponse);
+        sendJson(res, 200, response);
         return true;
       }
 

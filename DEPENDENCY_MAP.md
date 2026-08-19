@@ -102,8 +102,15 @@ JSON 源快照仍是高扇出依赖，但浏览器和 Pages 只依赖经统一�
 
 ## 8. CI 与部署依赖
 
-- CI 三类 job：区域矩阵、complete-unit-test、综合 `test`。
-- 综合 job 串接大量 readiness/report/deployment 命令，定位和执行时间风险较高。
+- CI 分为区域矩阵、complete-unit-test、`governance-api`、`browser-e2e`、
+  `release-readiness` 和聚合 `test`。
+- `process/**` PR 的所有权门禁以 GitHub 提供的目标分支为比较基线；固定 `baselineTag` 只用于可复现工作树和发布证据。
+- 区域矩阵保持 5 分钟、complete-unit-test 与 governance-api 为 10 分钟；
+  browser-e2e 和 release-readiness 各为 15 分钟，聚合 test 为 5 分钟。
+- Chromium 安装和 Playwright E2E 独占 browser-e2e runner；发布、数据库、安全、报告和
+  部署证据在 release-readiness 并行执行，不再共享浏览器外部依赖的时间预算。
+- 主分支必需检查名称仍为 `complete-unit-test` 与 `test`。聚合 test 使用 `always()`
+  并要求三个风险域结果全部为 success，失败、取消和跳过均 fail-closed。
 - GitHub Actions 使用 `@vN` 标签而非 commit SHA。
 - systemd 模板包含多项 Linux hardening。
 - Solution A 默认 HAPI 镜像为 `latest`；Orthanc DICOM 端口对宿主开放，必须在生产前加固。
@@ -114,3 +121,15 @@ JSON 源快照仍是高扇出依赖，但浏览器和 Pages 只依赖经统一�
 - 不存在广泛静态环，但唯一已确认环位于关键组合根，应列 P1。
 - `runtime-source`、`technical-evidence`、`data/db.json` 和宽运行时上下文仍是高耦合枢纽；静态消费者已从源快照扇出中隔离。
 - 新模块必须依赖稳定端口，不得新增对 `server.js`、根目录全局状态或未注册 JSON 集合的反向依赖。
+
+## 10. 临床子域依赖约束
+
+五子域注册表禁止目标源码目录直接导入其他子域内部实现，也禁止 `src/clinical-specialties` 新增对 `server.js` 的反向依赖。现有 blood → emergency、blood → quality-safety 由 `BloodEventHub.dashboard` 兼容，已登记为待迁移的版本化查询契约；质量安全的目标是事件读模型，不允许跨子域写入。身份、MPI、机构目录、审计、集成网关、对象存储、outbox、区域上下文和观测继续由平台共享端口提供。
+
+急救 dashboard 当前依赖方向为 `HTTP route → emergency-dashboard-query.v1 → 注入的急救查询端口 / blood-emergency-coordination.v1 兼容端口`。新用例不导入血液实现、不读取 `server.js`，但兼容端口仍由组合根中的 `BloodEventHub.dashboard` 提供，因此跨域契约状态仍为 partial。
+
+血液 dashboard 当前依赖方向为 `HTTP route → blood-dashboard-query.v1 → 注入的 BloodService / BloodTransactionService 兼容端口`。目标模块不导入根目录服务或 `server.js`，但端口实现仍由统一组合根提供，且查询仍接收宽 JSON 快照，因此只完成用例边界，尚未完成仓储或运行时上下文隔离。
+
+影像 dashboard 当前依赖方向为 `HTTP route → imaging-dashboard-query.v1 → 注入的 dashboard builder / 脱敏端口 → imaging/public-response`。生产控制路由也直接复用影像公开投影，不再通过 `clinical-blood` 路由模块获取实现；为兼容现有导入，混合路由仍转导出这些函数。查询依然接收宽 JSON 快照，审计端口仍留在 HTTP 层。
+
+体检 dashboard 当前依赖方向为 `HTTP route → physical-examination-dashboard-query.v1 → 注入的 Overview / readiness 端口`。查询端口不导入根目录体检服务或 `server.js`；实现仍由组合根注入，且继续接收宽 JSON 快照。居民授权集合、生产运行标志、审计持久化和脱敏仍是 HTTP/平台端口，避免领域查询拥有身份或存储实现。

@@ -17,9 +17,13 @@
 | 决策 | 状态 | 范围 |
 |---|---|---|
 | [main 作为唯一集成主干](../ADR-main唯一集成主干-2026-08-03.md) | Accepted | 分支、PR、CI 和发布基线 |
+| [PR 所有权门禁跟随目标集成分支](./2026-08-19-pr-ownership-gate-target-base.md) | Accepted | process PR 的比较基线与所有权校验 |
+| [综合 CI 采用 15 分钟有界时间预算](./2026-08-19-ci-comprehensive-test-time-budget.md) | Superseded | 综合 test job 的超时预算与回归约束 |
+| [CI 按风险域拆分并保留聚合必需检查](./2026-08-19-ci-risk-domain-job-split.md) | Accepted | 治理/API、浏览器 E2E、发布就绪与 required test 聚合 |
 | [模块化单体与微服务提取标准](../ADR-模块化单体与微服务提取标准-2026-08-03.md) | Accepted | 模块边界和服务提取 |
 | [SQLite migration 与核心 schema 冻结](./2026-08-18-sqlite-migration-and-core-schema-freeze.md) | Accepted | 数据库演进治理；实施未完成 |
 | [核心数据 closed-world 定义](./2026-08-18-core-data-closed-world.md) | Accepted | 核心概念不可随意平行创建 |
+| [临床专科五个可治理子域](./2026-08-18-clinical-five-governed-subdomains.md) | Accepted | 急救、血液、影像、体检、质量安全的开发边界 |
 | [静态内容安全边界](./2026-08-18-static-content-security-boundary.md) | Accepted | 发布 allowlist、数据和缓存隔离 |
 
 模板见 [ADR_TEMPLATE.md](./ADR_TEMPLATE.md)。

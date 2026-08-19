@@ -3,7 +3,7 @@
 const {
   projectImagingErrorResponse,
   projectPublicImagingResponse
-} = require("./clinical-blood");
+} = require("../../../clinical-specialties/imaging/public-response");
 
 function createRouteSegment(runtime) {
   const { ImagingCloudProduction, appendSecurityEvent, buildImagingCloudProductionResponse, collectJson, readDatabase, requireApiRole, sendJson, writeDatabase } = runtime;

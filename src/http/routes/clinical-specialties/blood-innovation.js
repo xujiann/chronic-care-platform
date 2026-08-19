@@ -1,5 +1,9 @@
 "use strict";
 
+const {
+  createPhysicalExaminationDashboardQuery
+} = require("../../../clinical-specialties/physical-examination/dashboard-query");
+
 function createRouteSegment(runtime) {
   const { BloodEventHub, BloodGoLiveService, BloodInnovationService, PhysicalExaminationService, allowedResidentIdsForUser, appendDataAccessLog, appendSecurityEvent, buildPhysicalExamProductionReadiness, canAccessResident, canAccessSecureAttachment, collectJson, isProductionRuntime, normalizeState, randomUUID, readDatabase, redactSensitiveResponse, requireApiRole, rowMatchesOrganizationScope, sendJson, writeDatabase } = runtime;
   return {
@@ -81,22 +85,17 @@ function createRouteSegment(runtime) {
           sendJson(res, 403, { error: "Forbidden", message: "无权查看该居民体检报告" });
           return true;
         }
-        const overview = PhysicalExaminationService.buildOverview(data, {
+        const physicalExaminationDashboardQuery = createPhysicalExaminationDashboardQuery({
+          buildPhysicalExamOverview: PhysicalExaminationService.buildOverview,
+          buildPhysicalExamReadiness: buildPhysicalExamProductionReadiness
+        });
+        const overview = physicalExaminationDashboardQuery.execute({
+          data,
+          user,
           residentId,
           residentIds: [...allowedResidentIds],
           excludeDemoData: isProductionRuntime()
         });
-        overview.readiness = buildPhysicalExamProductionReadiness(data, overview);
-        if (!['commission', 'institution'].includes(user.role)) {
-          delete overview.jointTests;
-          delete overview.gatewayEvents;
-          delete overview.specializedIntakes;
-          overview.readiness = {
-            codeReady: overview.readiness.codeReady,
-            quality: overview.readiness.quality,
-            blockers: overview.readiness.blockers.length
-          };
-        }
         if (residentId) {
           appendDataAccessLog(data, user, residentId, "历史体检报告", "同步查看居民健康档案中的体检报告");
           writeDatabase(data);
