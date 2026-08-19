@@ -78,6 +78,7 @@ flowchart TB
 4. `server.js` 与 `src/platform/cutover/pilot-cutover-alert-runtime.js` 存在运行时 `require` 环。
 5. SQLite migration 数组已到 v14，但 `STORAGE_SCHEMA_VERSION`、部署检查和测试仍声明 v11。
 6. 主线没有统一的 `build`、`lint`、`typecheck`、`test:unit`、`test:integration`、`test:smoke` 脚本入口。
+7. 审计验证在组合根与留存脚本重复实现；当前 `passed` 不包含链接完整性，普通内容哈希漂移也可能通过，且部分 API 在验证前重封访问日志。
 
 ## 6. T06 五子域治理切片
 

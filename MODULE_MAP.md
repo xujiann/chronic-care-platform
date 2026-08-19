@@ -64,6 +64,7 @@ server.js
 - 252 个 JSON 集合中仅 83 个进入数据所有权清单；其余被策略标为 legacy-non-authoritative。
 - 许多 readiness/report 脚本重复读取 `data/db.json` 并各自产生报告，证据生成接口尚未统一。
 - 静态发布与 storage-admin 原有脱敏逻辑已收敛到同一纯函数；其他报告脚本的重复读取仍未治理。
+- `server.js` 与 `scripts/audit-retention.js` 各维护一份同语义 `verifyAuditTrail`；宽松失败判定和后续修复必须通过一个版本化安全端口统一，不能分别修改。
 
 ## 6. 超大文件
 

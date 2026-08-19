@@ -55,7 +55,7 @@ HTTP request
 | 数据范围 | `canAccessResident`、机构/区域过滤、delegation | 规则分散在组合根和领域函数 |
 | 页面/资产 | static page guard + access control policy + static asset policy | HTML 先受发布清单约束再执行页面角色策略；非 HTML 只能命中同一显式资源图 |
 | 外部回调 | HMAC、nonce、时间窗、幂等键 | 密钥和现场配置依赖外部证据 |
-| 审计 | securityEvents/dataAccessLogs/专用 PostgreSQL | 链断裂语义当前可诊断但不失败 |
+| 审计 | securityEvents/dataAccessLogs/专用 PostgreSQL | 链断裂不计入 `passed`；普通哈希漂移可能通过，部分访问日志在验证前被重封 |
 
 ## 5. 外部 API
 
@@ -75,6 +75,7 @@ HTTP request
 - 多个领域具有 HMAC、nonce、时间窗、CAS、outbox 和 replay 记录。
 - 错误格式仍由不同路由模块自行构造，存在 `{error}`、`{ok,code,message}` 等多种形态。
 - 审计追加点分散在组合根、路由和领域服务；统一审计契约尚未完全落地。
+- `GET /api/audit/verify` 返回 HTTP 200 的业务验证结果；当前 `dataAccessLogs` 在验证前重封，合规报告沿用相同语义。Proposed ADR 尚未授权改变响应或失败传播。
 
 ## 7. API 风险与缺失测试
 

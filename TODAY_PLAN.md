@@ -329,3 +329,24 @@ PR #125 的综合 `test` 在两个 attempt 中均达到 15 分钟硬上限。两
 - `process:test` 8/8、`routes:check` 64 个文件、`routes:test` 16/16、`architecture:test` 36/36、`platform:iterations:test` 85/85 通过。
 - `npm run check`、`npm run deploy:check` 通过；`npm run test:all` 10/10 批全部通过。
 - 未修改受保护数据、SQLite、数据库文件、报告、PDF、归档或发布制品。
+
+---
+
+## 2026-08-19 T00 SEC-003 审计链失败语义 ADR
+
+- 分支：`process/t00-audit-chain-semantics-adr-20260819`
+- 基线：`origin/main@c41e8c0eb45c1ed090279738e3ac6b82bd9a91d3`
+- 目标：基于只读实现、测试和种子采样形成审计链失败语义、兼容迁移与回滚边界。
+- 证据：验证器在组合根与留存脚本重复；`linkBroken` 不影响 `passed`；普通字段哈希漂移可能通过；部分 API 在验证前重封访问日志。
+- 采样：跟踪种子的安全事件 120 行、访问日志 10 行均无当前哈希或链接漂移；该结果不替代外部环境 preflight。
+- 推荐：版本化严格验证 + 原始摘要封存 + 经独立审批的一次性旧链基线迁移；禁止读取时静默重封。
+- 状态：仅建立 Proposed ADR，等待 T00、T01、审计/留存 Owner 决策；不授权运行时实现。
+- 非目标：不改 API、鉴权、审计数据、数据库、schema、migration、依赖、CI、部署配置或生成制品。
+- 回滚：回退本纯文档提交即可；不存在数据或运行时恢复步骤。
+
+### 验收结果
+
+- `process:verify -- --base=origin/main`：8 个文档文件、0 个所有权违规；ADR 必填章节和 `git diff --check` 通过。
+- `process:test` 8/8、`routes:check` 64 个文件、`routes:test` 16/16、`architecture:test` 36/36、`platform:iterations:test` 85/85 通过。
+- `npm run check`、`npm run deploy:check` 通过；`npm run test:all` 10/10 批全部通过。
+- 未修改运行时、API、数据库、审计行、受保护数据、报告、PDF、归档或发布制品。
