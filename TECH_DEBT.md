@@ -1,13 +1,13 @@
 # TECH DEBT — 主线技术债与风险台账
 
-> 快照：`main@b1e4898`。严重级别表示建议治理优先级，不代表已获得修复授权。
+> 实现分支快照：`process/t00-static-content-boundary-20260818`，迁移复验基线 `main@29e01ce`。严重级别表示建议治理优先级；“已缓解”已通过最新主线本地复验，仍需 PR CI、review 和合入确认。
 
 ## P0 — 必须先决策
 
 | ID | 类别 | 现状与证据 | 影响 | 当前动作 |
 |---|---|---|---|---|
-| SEC-001 | 静态发布 | `serveStatic` 从仓库根目录读取；非 HTML 默认 `ASSET` 放行 | 数据、配置、源码或 Git 元数据可能被读取 | Proposed ADR；建立最小发布 allowlist 和负向测试 |
-| SEC-002 | 数据暴露 | `data/db.json` 被跟踪、前端读取、Pages 发布并由 Service Worker 缓存 | 演示/敏感边界失效、离线副本难撤销 | 先分类和迁移缓存，再隔离发布面 |
+| SEC-001 | 静态发布 | 已缓解：Node/Pages 共用显式资源图，未知和敏感路径统一拒绝 | 新页面漏登记会 404；清单审查成为新门禁 | Accepted ADR；44 入口盘点、构建和负向测试已实现 |
+| SEC-002 | 数据暴露 | 已缓解：浏览器与 Service Worker 只读取生成的 `public-demo.json`，凭据删除、身份联系字段掩码 | 仓库历史与源快照分类仍需单独治理 | v60 缓存撤销；Pages 仓库外生成；禁止直接发布源快照 |
 | SEC-003 | 审计完整性 | `linkBroken` 不计入 `passed`，测试明确允许链漂移通过 | 审计证据可能在链断裂时误报有效 | 独立 ADR 明确语义和兼容成本 |
 
 ## P1 — 近期治理
@@ -27,7 +27,7 @@
 | DATA-003 | 集合治理 | JSON 252 个集合，只有 83 个有 owner | 169 个遗留集合不能安全晋升生产 |
 | TEST-001 | 标准门禁 | 缺 `build/lint/typecheck/test:unit/test:integration/test:smoke` | 本地与 AI 工作流缺统一入口 |
 | TEST-002 | 覆盖率 | c8 只 include `server.js`，固定测试清单 | 新 `src/` 模块和浏览器代码不在覆盖率结论中 |
-| TEST-003 | 安全负向测试 | 没有仓库敏感静态路径拒绝矩阵 | SEC-001 无回归保护 |
+| TEST-003 | 安全负向测试 | 已建立源码、配置、环境模板、Git 元数据、文档和 `data/db.json` 拒绝矩阵 | 后续新增敏感类别必须扩展矩阵 |
 | DEPLOY-001 | Compose | HAPI 默认 `latest`；Orthanc 暴露 4242 | 不可复现和网络攻击面 |
 | SUPPLY-001 | Actions | workflow actions 未固定 commit SHA | 上游标签漂移的供应链风险 |
 | GOV-001 | 规则冲突 | 基线中的路由工作流仍写旧集成分支/旧 baseline；本 T00 已校准，待合入关闭 | 操作人员可能走错误合入路径 |
@@ -60,10 +60,9 @@
 
 ## 测试缺口优先顺序
 
-1. 静态敏感路径拒绝矩阵和 Service Worker 缓存撤销。
-2. 审计链任意内容/链接断裂均按 ADR 语义判定。
-3. schema head、公开版本、migration 内容指纹一致。
-4. OTP/锁定在多实例、重启、并发下的一致性。
-5. role × permission × resident/institution/region 数据范围矩阵。
-6. 组合根循环移除前后的启动、注入和故障测试。
-7. 前端 sink 的可信输入/恶意输入回归。
+1. 审计链任意内容/链接断裂均按 ADR 语义判定。
+2. schema head、公开版本、migration 内容指纹一致。
+3. OTP/锁定在多实例、重启、并发下的一致性。
+4. role × permission × resident/institution/region 数据范围矩阵。
+5. 组合根循环移除前后的启动、注入和故障测试。
+6. 前端 sink 的可信输入/恶意输入回归。

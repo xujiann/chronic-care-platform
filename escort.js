@@ -18,7 +18,7 @@ async function fetchEscortDashboard() {
     const response = await request(`${ESCORT_API_BASE}/escort-services/dashboard`);
     if (response.ok) return response.json();
   }
-  const response = await fetch("./data/db.json");
+  const response = await fetch("./data/public-demo.json");
   const state = response.ok ? await response.json() : {};
   return buildStaticEscortDashboard(state);
 }

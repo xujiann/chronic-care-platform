@@ -1,5 +1,7 @@
 "use strict";
 
+const { createStaticContentRuntime } = require("./static-content-runtime");
+
 function requiredFunction(options, name) {
   if (typeof options[name] !== "function") throw new TypeError(`platform request handler requires ${name}`);
   return options[name];
@@ -67,4 +69,4 @@ function createPlatformRequestHandler(options = {}) {
   };
 }
 
-module.exports = { createPlatformRequestHandler };
+module.exports = { createPlatformRequestHandler, createStaticContentRuntime };

@@ -3295,7 +3295,7 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   assert.equal(manifest.shortcuts.some((item) => item.url === "./citizen.html?client=app&page=escort#service-escort"), true);
   assert.equal(manifest.shortcuts.some((item) => item.url === "./mobile-preview.html?client=app"), true);
   assert.match(serviceWorker, /CACHE_NAME/);
-  assert.match(serviceWorker, /chronic-care-citizen-v59-regional-context/);
+  assert.match(serviceWorker, /chronic-care-citizen-v60-public-demo-boundary/);
   assert.match(serviceWorker, /regional-context\.js/);
   assert.match(serviceWorker, /physical-examination-standards\.js/);
   assert.match(serviceWorker, /physical-examination-highlights\.js/);
@@ -3328,7 +3328,8 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   assert.match(serviceWorker, /mobile-preview\.css/);
   assert.match(serviceWorker, /requestUrl\.pathname\.endsWith\("\/mobile-preview\.html"\)/);
   assert.match(serviceWorker, /fallbackPage/);
-  assert.match(serviceWorker, /data\/db\.json/);
+  assert.match(serviceWorker, /data\/public-demo\.json/);
+  assert.doesNotMatch(serviceWorker, /data\/db\.json/);
   assert.match(serviceWorker, /\?:html\|js\|css/);
   assert.match(serviceWorker, /cache: "no-store"/);
   assert.match(read("package.json"), /node --check service-worker\.js/);

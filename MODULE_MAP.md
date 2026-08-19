@@ -1,6 +1,6 @@
 # MODULE MAP — 主线模块地图
 
-> 快照：`main@b1e4898`。模块是可分配责任和验证的架构单元，不等同于每一个 JavaScript 文件。
+> 实现分支快照：`process/t00-static-content-boundary-20260818`，迁移复验基线 `main@29e01ce`。模块是可分配责任和验证的架构单元，不等同于每一个 JavaScript 文件。
 
 ## 1. HTTP 模块与所有权
 
@@ -32,6 +32,8 @@
 | 区域运行 | `src/platform/regional/`、`regions/` | 多地区清单、能力包、复制和发布注册 |
 | 领域实现 | `src/care-coordination/` 等与根目录服务 | 新旧实现并存，边界尚未完全迁移 |
 | 前端共享 | `auth.js`、`shared.js`、`platform-api-client.js`、`platform-shell.js` | 身份上下文、API 调用、壳和设计系统 |
+| 静态发布 | `src/http/static-asset-policy.js`、`src/http/static-content-runtime.js`、`scripts/static-publication.js`、`config/static-publication.json` | 44 个入口、递归资源图、Pages 制品和服务端读取共用一份默认拒绝契约；HTTP 细节不再堆入组合根 |
+| 演示脱敏 | `src/platform/data/public-demo-snapshot.js` | 服务端合成、Pages 构建和 storage-admin 共用纯函数，凭据字段删除、个人姓名/身份/联系字段稳定掩码 |
 
 ## 3. 依赖宽度
 
@@ -61,6 +63,7 @@ server.js
 - `server.js` 内仍有大量种子、规范化、存储和领域函数，而相同领域也已在 `src/` 建立模块。
 - 252 个 JSON 集合中仅 83 个进入数据所有权清单；其余被策略标为 legacy-non-authoritative。
 - 许多 readiness/report 脚本重复读取 `data/db.json` 并各自产生报告，证据生成接口尚未统一。
+- 静态发布与 storage-admin 原有脱敏逻辑已收敛到同一纯函数；其他报告脚本的重复读取仍未治理。
 
 ## 6. 超大文件
 

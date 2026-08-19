@@ -129,8 +129,8 @@ test("protected static business pages require and enforce the browser session", 
   assert.match(roleDenied.headers.get("location"), /^\/login\.html\?denied=/);
 
   const unknownPage = await fetch(`${baseUrl}/future-admin.html`, { headers: { Cookie: cookie }, redirect: "manual" });
-  assert.equal(unknownPage.status, 302);
-  assert.match(unknownPage.headers.get("location"), /^\/login\.html\?denied=/);
+  assert.equal(unknownPage.status, 404);
+  assert.equal(unknownPage.headers.get("location"), null);
 });
 
 test("public whitelist remains available without a session", async () => {

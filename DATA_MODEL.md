@@ -1,12 +1,12 @@
 # DATA MODEL — 主线数据地图
 
-> 快照：`main@b1e4898`。禁止据此直接编辑数据库或 `data/db.json`；schema 事实必须由运行时与 migration 再验证。
+> 实现分支快照：`process/t00-static-content-boundary-20260818`，迁移复验基线 `main@29e01ce`。禁止据此直接编辑数据库或 `data/db.json`；schema 事实必须由运行时与 migration 再验证。
 
 ## 1. 存储拓扑
 
 | 环境/用途 | 存储 | 权威性 |
 |---|---|---|
-| 静态演示 | `data/db.json` | 只读演示快照，不应成为生产事实源 |
+| 静态演示 | 生成的 `data/public-demo.json` | 从运行时/构建时 JSON 输入合成，删除凭据并掩码身份联系字段；不入库、不成为生产事实源 |
 | 本地开发 | JSON 或 Node `node:sqlite` | `config/domain-data-ownership.json` 声明 local-demo-only |
 | 自动化测试 | 隔离测试适配器/临时文件 | 仅用于确定性验证 |
 | 迁移期 | SQLite + transactional outbox + PostgreSQL shadow | 本地提交后异步复制，禁止请求路径双写 |
@@ -64,10 +64,11 @@ erDiagram
 
 `data/db.json` 当前有 252 个顶层集合。主要用途：
 
-- 静态页面和离线演示直接 fetch；
 - SQLite 首次初始化种子；
 - readiness、报告和部署检查输入；
 - 本地兼容快照与回退读取。
+
+静态页面不再直接读取该文件。Node 静态服务按源文件 mtime/size 合成 `data/public-demo.json`；Pages 在仓库外临时目录生成同名制品，Service Worker 只缓存该脱敏结果。
 
 `config/domain-data-ownership.json` 只登记 83 个集合：platform-governance 32、care 11、public-health 10、clinical 9、integration 7、citizen 6、identity 5、insurance 2、research 1。其余集合按策略为 `legacy-non-authoritative`，禁止直接晋升为生产写模型。
 
@@ -99,7 +100,7 @@ erDiagram
 - `DATA-003`：252 个 JSON 集合仅 83 个有生产所有权，遗留数据边界巨大。
 - `DATA-004`：JSON 快照同时承担页面数据、种子和报告输入，多角色耦合。
 - `DATA-005`：大量 `payload` JSON 关系没有数据库约束，只能靠应用验证。
-- `DATA-006`：静态发布 `data/db.json` 与 Service Worker 缓存扩大数据泄露面。
+- `DATA-006`：已由显式发布清单、合成脱敏快照、旧缓存版本撤销和敏感路径负向测试缓解；仓库历史与源快照的数据分类仍需单独治理。
 - `DATA-007`：PostgreSQL 目标模型、SQLite 镜像和专项数据库存在版本/核对复杂度。
 
 ## 8. 临床子域数据盘点

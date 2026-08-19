@@ -1,6 +1,6 @@
 # API MAP — 主线接口地图
 
-> 快照：`main@b1e4898`。静态分析识别的 368 条精确路由是下限；动态 ID、prefix 和外部回调变体需以运行时路由测试为准。
+> 实现分支快照：`process/t00-static-content-boundary-20260818`，迁移复验基线 `main@29e01ce`。静态分析识别的 368 条精确路由是下限；动态 ID、prefix 和外部回调变体需以运行时路由测试为准。
 
 ## 1. 请求链
 
@@ -53,7 +53,7 @@ HTTP request
 | 身份 | 签名 token、Cookie、session store | 兼容 bearer/demo 路径扩大状态空间 |
 | 角色/权限 | authorization runtime、`requireApiRole`、permission set | 大量路由逐段调用，策略一致性依赖测试 |
 | 数据范围 | `canAccessResident`、机构/区域过滤、delegation | 规则分散在组合根和领域函数 |
-| 页面 | static page guard + access control policy | 只保护 HTML，不保护非 HTML 资产发布范围 |
+| 页面/资产 | static page guard + access control policy + static asset policy | HTML 先受发布清单约束再执行页面角色策略；非 HTML 只能命中同一显式资源图 |
 | 外部回调 | HMAC、nonce、时间窗、幂等键 | 密钥和现场配置依赖外部证据 |
 | 审计 | securityEvents/dataAccessLogs/专用 PostgreSQL | 链断裂语义当前可诊断但不失败 |
 
@@ -71,6 +71,7 @@ HTTP request
 ## 6. 错误、幂等与审计
 
 - router 未命中统一 404；存储冲突和 session store 不可用有专用错误转换。
+- 静态未知/敏感路径统一 404；`GET/HEAD /data/public-demo.json` 返回合成脱敏数据，`/data/db.json`、源码、配置和仓库元数据不可发布。
 - 多个领域具有 HMAC、nonce、时间窗、CAS、outbox 和 replay 记录。
 - 错误格式仍由不同路由模块自行构造，存在 `{error}`、`{ok,code,message}` 等多种形态。
 - 审计追加点分散在组合根、路由和领域服务；统一审计契约尚未完全落地。
@@ -81,7 +82,7 @@ HTTP request
 - `API-002`：授权和数据范围规则分散，缺少全量 role × permission × resource 矩阵测试。
 - `API-003`：错误响应契约不统一，调用方需要理解多个格式。
 - `API-004`：`shared` 有 12 个路由段，容易成为跨域逻辑聚集点。
-- `API-005`：静态非 HTML 资产不进入页面授权，仓库文件可能绕过 API 安全边界。
+- `API-005`：已通过 Pages/Node 共用显式资源图和敏感路径拒绝矩阵缓解；后续新增页面资源必须同步更新清单并通过构建验证。
 - `API-006`：浏览器 Cookie 与 legacy localStorage/bearer 双路径增加兼容和降级风险。
 - `API-007`：外部接口的生产可用性、证书、密钥和回执只能由现场证据证明。
 

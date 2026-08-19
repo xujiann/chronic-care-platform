@@ -110,7 +110,7 @@ async function loadPublicHealthSystem() {
       const response = await request(`${PUBLIC_HEALTH_API_BASE}${PUBLIC_HEALTH_PATH}`);
       if (response.ok) return response.json();
     } catch (error) {
-      // Static preview falls back to data/db.json.
+      // Static preview falls back to the sanitized public demo snapshot.
     }
   }
   const state = await loadPlatformState({});

@@ -347,8 +347,9 @@ test("regional sharing page renders referral handoff boundary", async ({ page })
 test("citizen stays in the household experience and cannot open commission pages", async ({ page }) => {
   await login(page, "citizen", "citizen.html");
   await expect(page.getByRole("heading", { name: "个人健康信息库" })).toBeVisible();
-  await expect(page.locator("#member-list")).toContainText("演示居民A");
-  await expect(page.locator("#member-list")).toContainText("演示居民D");
+  await expect(page.locator("#member-list")).toContainText("演示姓名-");
+  await expect(page.locator("#member-list")).toContainText("本人");
+  await expect(page.locator("#member-list")).toContainText("母亲");
 
   await page.goto("/platform.html");
   await expect(page).toHaveURL(/citizen\.html\?denied=platform\.html$/);

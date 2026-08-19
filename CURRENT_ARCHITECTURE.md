@@ -1,6 +1,6 @@
 # CURRENT ARCHITECTURE — 主线现状地图
 
-> 快照：`main@b1e489852e85db982fca9239da694e2a641f5945`
+> 实现分支快照：`process/t00-static-content-boundary-20260818`，迁移复验基线 `main@29e01ce7e72fa32464038dbe1ebcddd230f48f1e`
 > 采集日期：2026-08-18
 > 性质：AS-IS，只描述已存在实现，不表达目标状态或实施授权。
 
@@ -32,12 +32,12 @@ flowchart TB
 | 路径 | 作用 | 当前边界 |
 |---|---|---|
 | `/` | 服务入口、浏览器页面、遗留领域服务 | 仍然平铺，存在同名模块和超大文件 |
-| `src/http/` | API router、路由段、运行时上下文 | T00 管组合与顺序；T01–T09 管领域路由 |
+| `src/http/` | API router、路由段、运行时上下文、静态资产发布策略 | T00 管组合、顺序和显式静态发布边界；T01–T09 管领域路由 |
 | `src/platform/` | 数据、事件、区域、部署、治理与切换控制 | 模块化程度较高，仍依赖组合根注入 |
-| `src/identity-security/` | 会话、认证、授权、静态页面守卫、安全审计 | 已有 fail-closed 能力；静态资产发布根仍不安全 |
+| `src/identity-security/` | 会话、认证、授权、静态页面守卫、安全审计 | 页面授权与资产发布策略分层执行，均默认拒绝 |
 | `src/*领域*/` | 新领域服务、仓储、传输和 worker | 与根目录遗留服务并存 |
 | `config/` | 进程、数据所有权、区域、迁移和发布策略 | 多数为机器可读治理事实 |
-| `data/` | 被跟踪的 `db.json` 静态/开发快照 | 同时被浏览器、脚本和 SQLite 初始化使用 |
+| `data/` | 被跟踪的 `db.json` 开发/迁移输入 | 浏览器只读取运行时或构建时生成的 `public-demo.json`；生成物不入库 |
 | `deploy/` | SQL、systemd、Compose、环境模板和现场验证 | 生产证据默认 NO-GO |
 | `scripts/` | 测试、readiness、报告、部署和后台 worker | 168 个文件，职责和产物较分散 |
 | `test/` | Node test 与 Playwright | 393 个 test/spec 文件 |
@@ -52,7 +52,7 @@ flowchart TB
 
 | 应用/入口 | 技术 | 责任 |
 |---|---|---|
-| Node API 服务 | `server.js` | 启动、依赖装配、会话、静态读取、API 调度、SQLite/JSON 兼容 |
+| Node API 服务 | `server.js` | 启动、依赖装配、会话、allowlist 静态读取、合成演示快照、API 调度、SQLite/JSON 兼容 |
 | 平台管理端 | `index.html`、`app.js` | 监管、资源、统计、公共卫生与治理入口 |
 | 居民端 | `citizen.html`、`citizen.js` | 居民档案、授权、慢病和服务旅程 |
 | 机构/医生/医保/县域端 | 对应 HTML/JS | 各角色工作台 |
@@ -72,9 +72,9 @@ flowchart TB
 
 ## 5. 已确认的边界偏差
 
-1. 静态服务器在页面授权后仍从仓库根目录读取任意非越界路径，非 HTML 资产默认 `ASSET` 放行。
-2. `data/db.json` 是被跟踪、被前端读取并被 Service Worker 缓存的快照。
-3. `server.js` 仍约 28,746 行；路由拆分没有同步拆完组合根和领域实现。
+1. 静态服务器与 Pages 现按 `config/static-publication.json` 的 44 个入口递归收集显式浏览器资源；未知路径统一 404。
+2. 浏览器和 Service Worker 已迁移到合成的 `data/public-demo.json`；`data/db.json` 不进入静态制品。
+3. `server.js` 仍约 28.8k 行；路由拆分没有同步拆完组合根和领域实现。
 4. `server.js` 与 `src/platform/cutover/pilot-cutover-alert-runtime.js` 存在运行时 `require` 环。
 5. SQLite migration 数组已到 v14，但 `STORAGE_SCHEMA_VERSION`、部署检查和测试仍声明 v11。
 6. 主线没有统一的 `build`、`lint`、`typecheck`、`test:unit`、`test:integration`、`test:smoke` 脚本入口。

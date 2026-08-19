@@ -294,8 +294,19 @@ test("API authentication, scoping and governance regression suite", async (t) =>
       headers: { Cookie: `health_city_browser_session=${encodeURIComponent(staticDoctorLogin.body.token)}` },
       redirect: "manual"
     });
-    assert.equal(missingStaticPage.status, 302);
-    assert.match(missingStaticPage.headers.get("location"), /^\/login\.html\?denied=/);
+    assert.equal(missingStaticPage.status, 404);
+
+    for (const sensitivePath of ["/server.js", "/package.json", "/.env.example", "/config/static-publication.json", "/data/db.json"]) {
+      const sensitiveResponse = await fetch(`${baseUrl}${sensitivePath}`, { redirect: "manual" });
+      assert.equal(sensitiveResponse.status, 404, sensitivePath);
+    }
+    const staticPostResponse = await fetch(`${baseUrl}/index.html`, { method: "POST", redirect: "manual" });
+    assert.equal(staticPostResponse.status, 404);
+    const publicDemoResponse = await fetch(`${baseUrl}/data/public-demo.json`);
+    assert.equal(publicDemoResponse.status, 200);
+    const publicDemoText = await publicDemoResponse.text();
+    assert.doesNotMatch(publicDemoText, /"(?:password|passwordHash|accessToken|refreshToken|clientSecret)"\s*:/i);
+    assert.match(publicDemoText, /"classification": "PUBLIC_DEMO"/);
 
     const accountLogin = await login(baseUrl, "health");
     assert.equal(typeof accountLogin.body.token, "string");

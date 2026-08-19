@@ -15,6 +15,7 @@
     "requiredCompositionModules": [
       "src/http/platform-runtime-composition.js",
       "src/http/platform-request-handler.js",
+      "src/http/static-content-runtime.js",
       "src/platform/productization/runtime.js"
     ]
   },

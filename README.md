@@ -45,7 +45,7 @@ npm.cmd run dev
 http://localhost:5173/login.html
 ```
 
-静态预览可以直接打开 HTML 或通过 GitHub Pages 发布根目录页面。静态模式只能读取 `data/db.json` 快照，不能执行 Node API 写入、会话、审计和工作流动作。
+静态预览可以直接打开 HTML；GitHub Pages 只发布 `config/static-publication.json` 声明的资源图，并读取生成的 `data/public-demo.json` 脱敏演示快照。静态模式不能执行 Node API 写入、会话、审计和工作流动作。
 
 ## 演示账号
 
@@ -278,7 +278,7 @@ npm.cmd run hybrid:deployment-readiness
 
 `environment:matrix` 会生成 `release/environment-matrix-report.json` 与 `release/environment-matrix-report.md`，把 demo、staging、production 三层环境的必填变量、阻断变量、责任人、门禁脚本和上线验收规则固化为可检查矩阵；`release:report` 会同步归档该矩阵，便于生产切换前逐项确认环境分层和签字证据。
 
-`hybrid:deployment-readiness` 会生成 `release/hybrid-deployment-readiness-report.json` 与 `release/hybrid-deployment-readiness-report.md`，核对 GitHub Pages/静态 HTML 预览层、`data/db.json` 快照回退、`server.js` Node API 后端、存储引擎边界、环境变量模板、CI 和发布门禁接线。
+`hybrid:deployment-readiness` 会生成 `release/hybrid-deployment-readiness-report.json` 与 `release/hybrid-deployment-readiness-report.md`，核对 GitHub Pages/静态 HTML 预览层、`data/public-demo.json` 脱敏快照、显式发布清单、`server.js` Node API 后端、存储引擎边界、环境变量模板、CI 和发布门禁接线。
 
 `operations:readiness` 会生成 `release/operations-readiness-report.json` 与 `release/operations-readiness-report.md`，检查 `/api/live`、`/api/health`、`/api/metrics`、`/api/system/readiness`、生产部署轨道、外部依赖风险和发布运维脚本。运行调度页同时提供“生产运维与灾备运行中心”，通过 `GET /api/production-operations/center` 和分资源动作 API 管理 4 类服务级别、3 个 24x365 值班模板、故障事件、恢复演练、RPO/RTO 样例记录及证据包；本地动作均保持 `productionReady=false`，正式运行仍需远端备份、真实监控呼叫/工单、实名排班、全量恢复实测和多方签字。
 
@@ -320,7 +320,7 @@ npm.cmd run rollback:snapshot -- "data/backups/<备份目录>"
 
 ## 发布边界
 
-GitHub Pages 只适合发布静态页面和脱敏 `data/db.json` 快照。以下能力必须部署 Node 后端才能使用：
+GitHub Pages 只适合发布清单内的静态页面、两份明确批准的 DRG/DIP 空白下载模板和生成的 `data/public-demo.json` 脱敏演示快照；`data/db.json`、其他源码/配置、文档和仓库元数据不属于公开制品。以下能力必须部署 Node 后端才能使用：
 
 - 登录会话和角色 API 权限
 - SQLite 主存储、集合版本和乐观锁

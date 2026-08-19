@@ -148,7 +148,7 @@ async function loadState() {
       const response = await request(`${API_BASE}/state`);
       if (response.ok) {
         apiEnabled = true;
-        showToast("已连接本地服务，数据保存到 data/db.json");
+        showToast("已连接本地服务；静态预览使用脱敏演示快照");
         return await response.json();
       }
     } catch (error) {
@@ -156,7 +156,7 @@ async function loadState() {
     }
   }
   try {
-    const response = await fetch("./data/db.json");
+    const response = await fetch("./data/public-demo.json");
     if (response.ok) {
       showToast("已加载开源演示数据");
       return await response.json();
