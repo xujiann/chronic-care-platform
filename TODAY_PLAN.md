@@ -216,3 +216,74 @@
 - `npm ci` 成功；`test:all` 共 397 个测试文件、10/10 批全部通过，原第 9 批 TEST-004 误报不再出现，第 10 批 253/253 通过。
 - 未运行不存在的 `build`、`lint`、`typecheck`、`test:unit`、`test:integration`、`test:smoke` 标准入口；该缺口仍由 TEST-001 跟踪。
 - 未改 API、鉴权、审计、数据库、schema、migration、依赖、CI、required checks、产物结构或部署拓扑；系统临时目录之外无生成制品变更。
+
+---
+
+## 2026-08-19 T00 CI 风险域作业拆分
+
+- 分支：`process/t00-ci-browser-job-20260819`
+- 基线：`origin/main@dcfbed160d415104a012c8b1da43bc41e7b86134`
+- 状态：PR #126 已合入 `main@02624d9`；PR 与合并后 main 的 GitHub Actions、Pages 均通过
+- Owner：T00
+
+### 问题与证据
+
+PR #125 的综合 `test` 在两个 attempt 中均达到 15 分钟硬上限。两次均已通过治理、
+架构、专项和 API 回归，随后 `npx playwright install --with-deps chromium` 因 Ubuntu
+镜像访问异常运行约 11 分钟后被取消，浏览器 E2E 与后续约 60 项发布检查全部跳过。
+这满足上一份时间预算 ADR 的升级条件：不得继续增加超时或依赖人工重跑，应按风险域拆分。
+
+### 批准范围
+
+- 将治理/架构/专项/API 门禁迁入 `governance-api` job。
+- 将 Chromium 安装和 `npm run test:e2e` 迁入独立 `browser-e2e` job。
+- 将部署、数据库、安全、报告、发布制品与依赖审计迁入 `release-readiness` job。
+- 新增 fail-closed 聚合 job，继续使用必需检查名称 `test`，只有三个上游 job 全部
+  `success` 才成功。
+- 新增 Accepted ADR、确定性 workflow 契约测试，并同步路线图、依赖地图和技术债。
+
+### 非目标
+
+- 不删除、跳过或放宽任何测试和发布门禁，不继续增加 15 分钟风险域预算。
+- 不修改 GitHub 分支保护中的 `complete-unit-test`、`test` required check 名称。
+- 不增加 npm 或 GitHub Action 依赖，不引入浏览器缓存，不改变 Playwright 命令。
+- 不修改业务运行时、API、鉴权、审计、数据库、schema、migration 或部署拓扑。
+- 不修改 TEST-004 分支和 PR #125 的代码提交。
+
+### 风险、迁移与回滚
+
+- 三个 job 各自执行 checkout、Node setup 和 `npm ci`，会增加少量 runner 启动与安装成本；
+  换取并行执行、故障隔离和完整门禁覆盖。
+- 拆分可能暴露步骤之间未声明的临时文件依赖；通过本地逐链验证和 GitHub PR 实跑验证。
+- `test` 聚合使用 `always()`，上游失败、取消或跳过均 fail-closed，不得把取消误报为成功。
+- 回滚为回退本切片提交，恢复单一 15 分钟综合 job；不涉及数据或运行时恢复。
+
+### 测试与完成条件
+
+- 先新增 workflow 契约测试并确认旧配置失败，再实施 job 拆分至测试通过。
+- 验证 workflow YAML、`process:verify`、`process:test`、`routes:check`、`routes:test`、
+  `architecture:test`、`platform:iterations:test`、`npm run check` 和 `npm run test:all`。
+- 执行完整 `npm run test:e2e` 和部署检查；不得提交生成报告或发布制品。
+- 创建独立 Draft PR，确认三个风险域 job 与聚合 `test` 在 GitHub Actions 实际通过后再合并。
+- 合并后刷新 PR #125，确认 TEST-004 在新 CI 拓扑下全绿。
+
+### 本地验收结果
+
+- 测试先行：旧 workflow 下 `process:test` 7/8，仅新增拆分契约按预期失败；实施后
+  `process:test` 8/8、workflow 相关合计 10/10 通过。
+- workflow YAML 解析与 `git diff --check` 通过；聚合 test 的 `always()`、三个 needs
+  结果和非 success 时 `exit 1` 均由契约测试锁定。
+- `process:verify -- --base=origin/main` 通过，9 个预期文件、2 个 T00 保护文件、0 违规。
+- `routes:check` 检查 64 个文件，`routes:test` 16/16、`architecture:test` 36/36、
+  `platform:iterations:test` 85/85、`npm run check` 和 `npm run deploy:check` 均通过。
+- 完整 `npm run test:e2e` 36/36 通过，覆盖居民、角色、越权、移动端和跨门户旅程。
+- `npm run test:coverage` 194/194 通过；server.js 行 85.18%、函数 87.37%、分支 56.47%。
+- `test:all` 前 8 批通过，第 9 批 246/247，仅为主线已登记且由 PR #125 修复的
+  TEST-004 Windows SHA-256 文本误报；第 10 批 37 个文件单独补跑 253/253 通过。
+- `npm audit --omit=dev --registry=https://registry.npmjs.org`：0 漏洞。本机用户级
+  npmmirror 不实现 audit endpoint，因此未把镜像 404 误报为依赖漏洞。
+- 不存在统一 `build`、`lint`、`typecheck`、`test:unit`、`test:integration`、
+  `test:smoke` 入口，继续由 TEST-001 跟踪；本任务未伪造这些命令。
+- 未修改业务代码、API、鉴权、审计、数据库、schema、migration、依赖、分支保护或
+  部署拓扑；受保护数据和生成制品无跟踪变更。Linux Chromium 在 PR 与 main runner
+  均安装成功，browser-e2e、complete-unit-test 和聚合 test 全部通过。

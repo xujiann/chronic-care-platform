@@ -19,6 +19,14 @@ const {
 
 const manifest = loadManifest();
 
+function workflowJob(workflow, jobId) {
+  const marker = new RegExp(`^  ${jobId}:\\r?$`, "m").exec(workflow);
+  assert.ok(marker, `workflow job ${jobId} must exist`);
+  const remainder = workflow.slice(marker.index + marker[0].length);
+  const nextJob = /\r?\n  [a-z0-9-]+:\r?\n/m.exec(remainder);
+  return nextJob ? remainder.slice(0, nextJob.index) : remainder;
+}
+
 test("process manifest pins the unique integration baseline and evidence policy", () => {
   assert.equal(manifest.integrationBranch, "main");
   assert.equal(manifest.baselineTag, "baseline/governance-20260817-enhancement-v1");
@@ -117,10 +125,40 @@ test("CI verifies every process pull request against its target integration bran
   assert.doesNotMatch(pullRequestTemplate, /baseline\/governance-20260803-process-v1/);
 });
 
-test("CI budgets the comprehensive test chain without relaxing focused jobs", () => {
+test("CI isolates browser E2E and release readiness behind the required test aggregate", () => {
   const workflow = fs.readFileSync(path.resolve(__dirname, "..", ".github", "workflows", "ci.yml"), "utf8");
+
+  const governanceJob = workflowJob(workflow, "governance-api");
+  const browserJob = workflowJob(workflow, "browser-e2e");
+  const releaseJob = workflowJob(workflow, "release-readiness");
+  const requiredAggregate = workflowJob(workflow, "test");
 
   assert.match(workflow, /\n  regional-foundation:\r?\n    runs-on: ubuntu-latest\r?\n    timeout-minutes: 5\r?\n/);
   assert.match(workflow, /\n  complete-unit-test:\r?\n    runs-on: ubuntu-latest\r?\n    timeout-minutes: 10\r?\n/);
-  assert.match(workflow, /\n  test:\r?\n    runs-on: ubuntu-latest\r?\n    timeout-minutes: 15\r?\n/);
+
+  assert.match(governanceJob, /timeout-minutes: 10/);
+  assert.match(governanceJob, /Verify process ownership boundary/);
+  assert.match(governanceJob, /Run API regression tests/);
+  assert.doesNotMatch(governanceJob, /Install Chromium|Run deployment readiness gate/);
+
+  assert.match(browserJob, /timeout-minutes: 15/);
+  assert.match(browserJob, /npx playwright install --with-deps chromium/);
+  assert.match(browserJob, /npm run test:e2e/);
+  assert.doesNotMatch(browserJob, /Run API regression tests|Run deployment readiness gate/);
+
+  assert.match(releaseJob, /timeout-minutes: 15/);
+  assert.match(releaseJob, /Run deployment readiness gate/);
+  assert.match(releaseJob, /Upload release readiness report/);
+  assert.match(releaseJob, /npm audit --omit=dev/);
+  assert.doesNotMatch(releaseJob, /Install Chromium|npm run test:e2e/);
+
+  assert.match(requiredAggregate, /needs:\r?\n      - governance-api\r?\n      - browser-e2e\r?\n      - release-readiness/);
+  assert.match(requiredAggregate, /if: \$\{\{ always\(\) \}\}/);
+  assert.match(requiredAggregate, /timeout-minutes: 5/);
+  assert.match(requiredAggregate, /GOVERNANCE_RESULT: \$\{\{ needs\.governance-api\.result \}\}/);
+  assert.match(requiredAggregate, /BROWSER_RESULT: \$\{\{ needs\.browser-e2e\.result \}\}/);
+  assert.match(requiredAggregate, /RELEASE_RESULT: \$\{\{ needs\.release-readiness\.result \}\}/);
+  assert.match(requiredAggregate, /for result in "\$GOVERNANCE_RESULT" "\$BROWSER_RESULT" "\$RELEASE_RESULT"; do/);
+  assert.match(requiredAggregate, /if \[\[ "\$result" != "success" \]\]; then/);
+  assert.match(requiredAggregate, /exit 1/);
 });
