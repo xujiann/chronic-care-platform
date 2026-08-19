@@ -102,6 +102,7 @@ JSON 快照是高扇出依赖；任何结构变化会同时影响浏览器、服
 ## 8. CI 与部署依赖
 
 - CI 三类 job：区域矩阵、complete-unit-test、综合 `test`。
+- `process/**` PR 的所有权门禁以 GitHub 提供的目标分支为比较基线；固定 `baselineTag` 只用于可复现工作树和发布证据。
 - 综合 job 串接大量 readiness/report/deployment 命令，定位和执行时间风险较高。
 - GitHub Actions 使用 `@vN` 标签而非 commit SHA。
 - systemd 模板包含多项 Linux hardening。

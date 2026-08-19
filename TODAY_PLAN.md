@@ -56,3 +56,26 @@
 - review 无未处理 P0/P1 文档一致性问题。
 
 当前仅剩提交/PR 方向确认；不自动 commit、push、创建 PR 或 merge。
+
+---
+
+## 2026-08-19 T00 PR 所有权基线修复
+
+- 分支：`process/t00-ci-pr-base-20260819`
+- 基线：`origin/main@58e05e56b2d97952c36aa05355c484821a74733e`
+- 问题：普通 `process/*` PR 的 CI 默认对比固定旧标签，最新 main 分支会把主线已有文件误判为跨进程越权。
+- 决策：PR 所有权门禁使用 `GITHUB_BASE_REF` 指向的目标集成分支；固定 `baselineTag` 继续服务于可复现工作树和发布证据。
+- 范围：CI workflow、回归测试、Accepted ADR、PR 模板和治理文档同步。
+- 非目标：不改变进程 Owner、required checks、业务代码、运行时、数据库、API、鉴权、审计或部署产物。
+- 风险：错误或未引用的 base ref 可能扩大比较范围；通过固定 PR 触发目标、引用远端 ref、shell 引号和回归测试控制。
+- 回滚：回退本切片提交即可恢复原条件；无数据或制品恢复步骤。
+- 后续：本 T00 修复合入 main 后，更新 T06 PR #122 并重跑 CI。
+
+### 验收结果
+
+- 重构前 workflow 契约测试 6/7，通过项之外的新测试按预期失败；修复后 `process:test` 7/7 通过。
+- workflow YAML 解析通过；使用 Git for Windows Bash 真实执行 process PR 分支、`GITHUB_BASE_REF=main` 和显式远端基线路径通过。系统 WSL Bash 不可用，已使用 CI 同类 Bash 语义验证；本机未安装 `actionlint`。
+- `process:verify -- --base=origin/main` 与 T00 默认基线验证均通过，0 个所有权违规；`routes:check` 检查 64 个文件、`routes:test` 16/16、`architecture:test` 36/36、`platform:iterations:test` 85/85、`npm run check` 均通过。
+- `test:all` 第 1–8 批通过；第 9 批 235/236，仅命中已登记 TEST-004 SHA-256 文本误报；第 10 批 28 个文件单独补跑 221/221。全量清单共 388 个测试文件，失败测试位于索引 345，失败点后的清单已全部覆盖。
+- 未运行不存在的 `build`、`lint`、`typecheck`、`test:unit`、`test:integration`、`test:smoke` 标准入口；该缺口仍由 TEST-001 跟踪。
+- 未改业务代码、API、鉴权、审计、数据库、schema、migration、依赖、required checks 或部署产物；受保护数据和生成制品无变更。
