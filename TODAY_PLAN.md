@@ -70,7 +70,7 @@
 - 验证结果：`static:test` 6/6、授权边界 5/5、API 44/44、静态/存储/混合部署 82/82、路由 16/16、架构 36/36、流程 6/6、平台迭代 85/85、部署检查通过。
 - 浏览器 E2E：全套首跑 34/36；静态姓名掩码断言同步后与既有超时恢复波动用例定向复跑 2/2 通过。
 - `test:all`：第 1–8 批通过；第 9 批 249/250，唯一失败仍为已登记 TEST-004（摘要偶然含 `888888`）；第 10 批单独补跑 225/225 通过。
-- 当前状态：实现、门禁和最终只读 review 完成；本次基于最新 main 重新迁移并复验，未合入前不视为生效。
+- 当前状态：已通过 PR #121 合入 `main@6c18221`，静态内容安全边界已在主线生效。
 
 ### 最新 main 迁移复验
 
@@ -78,7 +78,8 @@
 - `static:test` 6/6、HTTP/API/存储/混合部署回归 131/131、浏览器 E2E 36/36、路由 16/16、架构 36/36、流程 8/8、平台迭代 85/85、`check` 与 `deploy:check` 均通过。
 - `test:all` 10/10 批全部通过，TEST-004 不再误报；生产依赖审计为 0 个漏洞。
 - `process:verify -- --base=origin/main` 检查 43 个变更文件，0 个所有权违规；未修改数据库、SQLite、migration、`data/db.json`、生成报告或归档制品。
-- 当前状态：最新主线迁移与本地 review 完成，待 PR CI、Pages 构建验证和合入；未合入前不视为主线生效。
+- 主线验收：PR #121 的 8 项检查全部通过；合并后 CI 与 Pages 均在 `main@6c18221` 成功。
+- 当前状态：本方向已完成；后续新增静态入口、模板例外或公开数据字段必须继续通过 manifest、脱敏和负向测试门禁。
 
 ---
 
@@ -310,3 +311,21 @@ PR #125 的综合 `test` 在两个 attempt 中均达到 15 分钟硬上限。两
 - 未修改业务代码、API、鉴权、审计、数据库、schema、migration、依赖、分支保护或
   部署拓扑；受保护数据和生成制品无跟踪变更。Linux Chromium 在 PR 与 main runner
   均安装成功，browser-e2e、complete-unit-test 和聚合 test 全部通过。
+
+---
+
+## 2026-08-19 T00 静态安全边界合并后治理收口
+
+- 分支：`process/t00-governance-closeout-20260819`
+- 基线：`origin/main@6c182218cddebb639904b6537b351386dfbeeb67`
+- 目标：把 PR #121 已合入、PR/main CI 与 Pages 已通过的事实同步到治理入口、六张地图、路线图、技术债和 Accepted ADR。
+- 范围：仅治理 Markdown；SEC-001、SEC-002 从未决 P0 移入已关闭，并保留仓库历史分类的 DATA-006 残余风险。
+- 非目标：不修改运行时代码、API、鉴权、审计语义、数据库、schema、migration、依赖、CI、部署配置或生成制品。
+- 回滚：回退本纯文档提交即可；不涉及数据、缓存、服务或发布制品恢复。
+
+### 验收结果
+
+- `process:verify -- --base=origin/main`：11 个文档文件、0 个所有权违规；`git diff --check` 通过。
+- `process:test` 8/8、`routes:check` 64 个文件、`routes:test` 16/16、`architecture:test` 36/36、`platform:iterations:test` 85/85 通过。
+- `npm run check`、`npm run deploy:check` 通过；`npm run test:all` 10/10 批全部通过。
+- 未修改受保护数据、SQLite、数据库文件、报告、PDF、归档或发布制品。

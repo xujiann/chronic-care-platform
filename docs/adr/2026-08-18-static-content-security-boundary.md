@@ -39,6 +39,7 @@
 ## Implementation and rollback
 
 - 实现分支：`process/t00-static-content-boundary-20260818`。
+- 实施结果：PR #121 已于 2026-08-19 合入 `main@6c182218cddebb639904b6537b351386dfbeeb67`；PR 的 8 项检查及合并后主线 CI、Pages 均通过。
 - 兼容：保留 44 个 HTML 入口、现有浏览器资源、两份明确列入清单的 DRG/DIP 空白下载模板和静态演示；其他仓库文档、源码、配置、环境模板、Git 元数据及源快照不发布。
 - 缓存：Service Worker 提升到 v60，只缓存 `data/public-demo.json`，激活时删除旧缓存。
 - 回滚：回退本实现提交并重新部署前一制品；由于旧边界会重新暴露仓库根和源快照，只允许应急、限时回滚。若回退后再次前滚，必须再次提升缓存版本。

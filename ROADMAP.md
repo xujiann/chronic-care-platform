@@ -1,6 +1,6 @@
 # 工程治理路线图
 
-> 更新：2026-08-18。队列不是实施授权；只有 Accepted ADR/明确 owner 审批的范围可进入实现。
+> 更新：2026-08-19。队列不是实施授权；只有 Accepted ADR/明确 owner 审批的范围可进入实现。
 
 ## 已建立基线
 
@@ -15,7 +15,7 @@
 | 优先级 | 事项 | 状态 | 进入实现条件 |
 |---:|---|---|---|
 | 0 | T00 治理基线迁移 | 已合入 `main@58e05e5` | 按每日循环持续维护 |
-| 1 | 静态内容 allowlist 与快照隔离 | Accepted；基于 `main@29e01ce` 完成迁移、本地全量复验和只读 review，待 PR CI | PR CI 与 Pages 构建验证后合入 |
+| 1 | 静态内容 allowlist 与快照隔离 | 已合入 `main@6c18221`；PR/main CI 与 Pages 验证通过 | 持续执行清单审查、负向测试与缓存版本治理 |
 | 2 | 审计链失败语义 | 待 ADR / P0 | 安全、审计、兼容和留存 owner 决策 |
 | 3 | Schema v14/v11 一致与 migration 指纹 | Accepted 方向 / P1 | 独立 T00 数据任务、升级 fixture 和回滚 |
 | 4 | 标准 build/lint/typecheck/unit/integration/smoke 入口 | 候选 / P1 | 不改变现有 test:all 语义，CI 映射和测试分类评审 |

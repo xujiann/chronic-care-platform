@@ -1,7 +1,7 @@
 # CURRENT ARCHITECTURE — 主线现状地图
 
-> 实现分支快照：`process/t00-static-content-boundary-20260818`，迁移复验基线 `main@29e01ce7e72fa32464038dbe1ebcddd230f48f1e`
-> 采集日期：2026-08-18
+> 主线 AS-IS 快照：`main@6c182218cddebb639904b6537b351386dfbeeb67`
+> 采集日期：2026-08-19
 > 性质：AS-IS，只描述已存在实现，不表达目标状态或实施授权。
 
 ## 1. 系统轮廓
