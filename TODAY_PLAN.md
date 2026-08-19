@@ -190,3 +190,29 @@
 - `npm ci` 成功。`test:all` 第 1–8 批通过；第 9 批 246/247，仅命中已登记 TEST-004 的确定性 SHA-256 文本误报；第 10 批 37 个文件单独补跑 253/253 通过。全量清单共 397 个测试文件，失败测试及相关 8 个源文件、发布脚本均与 `origin/main` 一致。
 - 未运行不存在的 `build`、`lint`、`typecheck`、`test:unit`、`test:integration`、`test:smoke` 标准入口；该缺口仍由 TEST-001 跟踪。
 - 未改业务代码、API、鉴权、审计、数据库、schema、migration、依赖、required checks 或部署产物；GitHub Actions 结果在 PR 与合并后 main 验证中留证。
+
+---
+
+## 2026-08-19 T00 TEST-004 结构化制品扫描修复
+
+- 分支：`process/t00-test004-structured-scan-20260819`
+- 基线：`origin/main@dcfbed160d415104a012c8b1da43bc41e7b86134`
+- Owner：T00；方向依据：ROADMAP 优先级 11、TECH_DEBT TEST-004 及用户批准的下一审批建议。
+- 问题：居民小程序发布检查把整个 JSON 制品当作文本扫描；Windows 工作树生成的 `deterministicSourceDigest` 恰好包含 `888888`，导致安全软件候选误报失败。
+- 方案：JSON 制品只递归扫描语义字符串值，并仅在 `sha256`、`deterministicSourceDigest` 字段包含合法 64 位十六进制摘要时跳过；非 JSON 制品继续按原文本规则扫描。真实 `123456`、`888888` 或 `DEMO-MOBILE` 字符串仍必须失败。
+- 备选：保留全文扫描并接受重跑会继续误报；只排除当前摘要文本容易依赖具体哈希；建立通用制品扫描框架会扩大本次范围。选择最小的结构化递归检查。
+- 范围：发布脚本、阶段四回归测试、第四阶段说明、路线图、技术债和当天计划。
+- 非目标：不改小程序业务代码、平台壳字段、公开 CLI/产物结构、API、鉴权、数据库、依赖、CI、required checks 或部署拓扑。
+- 风险：跳过字段过宽会漏报真实凭据；因此忽略集合只包含两个精确摘要键、值还必须满足 SHA-256 格式，并用语义字段及伪造摘要负向 fixture 锁定 fail-closed 行为。
+- 迁移与回滚：无 schema、数据或制品迁移；回退本切片提交即可恢复原扫描方式。
+- 验收：先确认基线 8/9 失败，再以摘要正例和真实演示凭据负例驱动修复；运行居民小程序专项、process/routes/architecture/platform/check、`test:all` 及 PR/main CI。
+
+### 验收结果
+
+- 测试先行按预期先红后绿：基线阶段四 8/9，仅摘要误报失败；新增回归后旧实现 8/10，分别因缺少结构化扫描器和既有误报失败；修复后阶段四 10/10、居民小程序专项 56/56 通过。
+- 摘要 fixture 中 `deterministicSourceDigest` 命中 `888888`、`sha256` 命中 `123456` 均放行；语义字符串中的 `888888`、`123456`、`DEMO-MOBILE`、伪造的非摘要 `sha256` 和非 JSON 文本均拒绝。扫描器只忽略两个精确摘要键下合法的 64 位十六进制摘要值。
+- 中文门禁和居民小程序 readiness 通过；独立发布命令返回 `softwareReady: true`、`productionReady: false`，保持正式平台与五类外部服务的 NO-GO 阻断；居民小程序 E2E 13/13 通过并正常释放测试端口。
+- `process:verify -- --base=origin/main` 通过，6 个变更文件、0 个所有权违规；`process:test` 8/8、`routes:check` 64 个文件、`routes:test` 16/16、`architecture:test` 36/36、`platform:iterations:test` 85/85、`npm run check` 与 `deploy:check` 均通过。
+- `npm ci` 成功；`test:all` 共 397 个测试文件、10/10 批全部通过，原第 9 批 TEST-004 误报不再出现，第 10 批 253/253 通过。
+- 未运行不存在的 `build`、`lint`、`typecheck`、`test:unit`、`test:integration`、`test:smoke` 标准入口；该缺口仍由 TEST-001 跟踪。
+- 未改 API、鉴权、审计、数据库、schema、migration、依赖、CI、required checks、产物结构或部署拓扑；系统临时目录之外无生成制品变更。

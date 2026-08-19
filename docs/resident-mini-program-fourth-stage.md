@@ -36,7 +36,7 @@ node scripts/resident-mini-program-release.js
 - `platform/alipay.project.json`；
 - `platform/privacy-map.json`。
 
-构建脚本不依赖根 `package.json`，只允许写入系统临时目录的明确子目录。每次构建先清理该专属目录，输出不包含正式数据、`localhost`、测试凭证、调试语句、敏感日志或英文业务界面。相同源文件生成相同源摘要和清单。
+构建脚本不依赖根 `package.json`，只允许写入系统临时目录的明确子目录。每次构建先清理该专属目录，输出不包含正式数据、`localhost`、测试凭证、调试语句、敏感日志或英文业务界面。JSON 制品按结构递归检查语义字符串值，仅在 `sha256` 和 `deterministicSourceDigest` 两个字段包含合法 64 位十六进制摘要时跳过；非 JSON 制品继续按文本检查。真实 `123456`、`888888` 或 `DEMO-MOBILE` 值以及伪造的摘要字段仍会阻断软件候选，合法摘要偶然包含相同数字不会误报。相同源文件生成相同源摘要和清单。
 
 `--production` 模式要求平台配置和五类外部服务全部就绪，否则以非零状态退出：
 
