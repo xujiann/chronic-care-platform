@@ -1,6 +1,6 @@
 # MODULE MAP — 主线模块地图
 
-> 实现分支快照：`process/t00-static-content-boundary-20260818`，基线 `main@58e05e5`。模块是可分配责任和验证的架构单元，不等同于每一个 JavaScript 文件。
+> 实现分支快照：`process/t00-static-content-boundary-20260818`，迁移复验基线 `main@29e01ce`。模块是可分配责任和验证的架构单元，不等同于每一个 JavaScript 文件。
 
 ## 1. HTTP 模块与所有权
 

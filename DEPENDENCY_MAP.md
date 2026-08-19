@@ -1,6 +1,6 @@
 # DEPENDENCY MAP — 主线依赖地图
 
-> 实现分支快照：`process/t00-static-content-boundary-20260818`，基线 `main@58e05e5`。依赖包括代码、数据、外部系统、后台任务、构建和部署关系。
+> 实现分支快照：`process/t00-static-content-boundary-20260818`，迁移复验基线 `main@29e01ce`。依赖包括代码、数据、外部系统、后台任务、构建和部署关系。
 
 ## 1. 代码依赖方向
 

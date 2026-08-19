@@ -1,6 +1,6 @@
 # API MAP — 主线接口地图
 
-> 实现分支快照：`process/t00-static-content-boundary-20260818`，基线 `main@58e05e5`。静态分析识别的 368 条精确路由是下限；动态 ID、prefix 和外部回调变体需以运行时路由测试为准。
+> 实现分支快照：`process/t00-static-content-boundary-20260818`，迁移复验基线 `main@29e01ce`。静态分析识别的 368 条精确路由是下限；动态 ID、prefix 和外部回调变体需以运行时路由测试为准。
 
 ## 1. 请求链
 

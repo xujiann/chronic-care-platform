@@ -1,6 +1,6 @@
 # TECH DEBT — 主线技术债与风险台账
 
-> 实现分支快照：`process/t00-static-content-boundary-20260818`，基线 `main@58e05e5`。严重级别表示建议治理优先级；“已缓解”仍需 CI、review 和合入确认。
+> 实现分支快照：`process/t00-static-content-boundary-20260818`，迁移复验基线 `main@29e01ce`。严重级别表示建议治理优先级；“已缓解”已通过最新主线本地复验，仍需 PR CI、review 和合入确认。
 
 ## P0 — 必须先决策
 

@@ -15,7 +15,7 @@
 | 优先级 | 事项 | 状态 | 进入实现条件 |
 |---:|---|---|---|
 | 0 | T00 治理基线迁移 | 已合入 `main@58e05e5` | 按每日循环持续维护 |
-| 1 | 静态内容 allowlist 与快照隔离 | Accepted；实现与定向测试完成，待 review/PR | CI、review、Pages 构建验证后合入 |
+| 1 | 静态内容 allowlist 与快照隔离 | Accepted；基于 `main@29e01ce` 完成迁移、本地全量复验和只读 review，待 PR CI | PR CI 与 Pages 构建验证后合入 |
 | 2 | 审计链失败语义 | 待 ADR / P0 | 安全、审计、兼容和留存 owner 决策 |
 | 3 | Schema v14/v11 一致与 migration 指纹 | Accepted 方向 / P1 | 独立 T00 数据任务、升级 fixture 和回滚 |
 | 4 | 标准 build/lint/typecheck/unit/integration/smoke 入口 | 候选 / P1 | 不改变现有 test:all 语义，CI 映射和测试分类评审 |

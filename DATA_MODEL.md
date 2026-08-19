@@ -1,6 +1,6 @@
 # DATA MODEL — 主线数据地图
 
-> 实现分支快照：`process/t00-static-content-boundary-20260818`，基线 `main@58e05e5`。禁止据此直接编辑数据库或 `data/db.json`；schema 事实必须由运行时与 migration 再验证。
+> 实现分支快照：`process/t00-static-content-boundary-20260818`，迁移复验基线 `main@29e01ce`。禁止据此直接编辑数据库或 `data/db.json`；schema 事实必须由运行时与 migration 再验证。
 
 ## 1. 存储拓扑
 
