@@ -101,10 +101,15 @@ JSON 快照是高扇出依赖；任何结构变化会同时影响浏览器、服
 
 ## 8. CI 与部署依赖
 
-- CI 三类 job：区域矩阵、complete-unit-test、综合 `test`。
+- CI 分为区域矩阵、complete-unit-test、`governance-api`、`browser-e2e`、
+  `release-readiness` 和聚合 `test`。
 - `process/**` PR 的所有权门禁以 GitHub 提供的目标分支为比较基线；固定 `baselineTag` 只用于可复现工作树和发布证据。
-- 区域矩阵保持 5 分钟、complete-unit-test 保持 10 分钟；综合 `test` 因串接 API、Chromium、E2E 和 readiness/report/deployment 命令采用 15 分钟有界预算。
-- 综合 job 仍然过长，定位和执行时间风险未消除；15 分钟预算只避免干净 runner 的误取消，不替代后续按风险域拆分。
+- 区域矩阵保持 5 分钟、complete-unit-test 与 governance-api 为 10 分钟；
+  browser-e2e 和 release-readiness 各为 15 分钟，聚合 test 为 5 分钟。
+- Chromium 安装和 Playwright E2E 独占 browser-e2e runner；发布、数据库、安全、报告和
+  部署证据在 release-readiness 并行执行，不再共享浏览器外部依赖的时间预算。
+- 主分支必需检查名称仍为 `complete-unit-test` 与 `test`。聚合 test 使用 `always()`
+  并要求三个风险域结果全部为 success，失败、取消和跳过均 fail-closed。
 - GitHub Actions 使用 `@vN` 标签而非 commit SHA。
 - systemd 模板包含多项 Linux hardening。
 - Solution A 默认 HAPI 镜像为 `latest`；Orthanc DICOM 端口对宿主开放，必须在生产前加固。
