@@ -1,6 +1,7 @@
 "use strict";
 
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
 const path = require("node:path");
 const test = require("node:test");
 
@@ -101,4 +102,17 @@ test("protected path matcher supports exact paths and recursive directories", ()
   assert.equal(matchesPattern("server.js", "server.js"), true);
   assert.equal(matchesPattern(".github/workflows/ci.yml", ".github/**"), true);
   assert.equal(matchesPattern("src/http/routes/runtime.js", ".github/**"), false);
+});
+
+test("CI verifies every process pull request against its target integration branch", () => {
+  const workflow = fs.readFileSync(path.resolve(__dirname, "..", ".github", "workflows", "ci.yml"), "utf8");
+  const pullRequestTemplate = fs.readFileSync(path.resolve(__dirname, "..", ".github", "PULL_REQUEST_TEMPLATE", "process-change.md"), "utf8");
+
+  assert.match(workflow, /if \[\[ "\$branch" == process\/\* \]\]; then/);
+  assert.match(workflow, /base_branch="\$\{GITHUB_BASE_REF:-main\}"/);
+  assert.match(workflow, /git fetch origin "\$base_branch" --depth=1/);
+  assert.match(workflow, /--base="origin\/\$base_branch"/);
+  assert.doesNotMatch(workflow, /process\/t00-\*-baseline-\*/);
+  assert.match(pullRequestTemplate, /基线 ref\/SHA：/);
+  assert.doesNotMatch(pullRequestTemplate, /baseline\/governance-20260803-process-v1/);
 });

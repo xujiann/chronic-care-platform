@@ -78,9 +78,10 @@ jobs:
         shell: bash
         run: |
           branch="${GITHUB_HEAD_REF:-$GITHUB_REF_NAME}"
-          if [[ "$branch" == process/t00-*-baseline-* ]]; then
-            git fetch origin main --depth=1
-            node scripts/process-worktree.js verify --branch="$branch" --base=origin/main
+          if [[ "$branch" == process/* ]]; then
+            base_branch="${GITHUB_BASE_REF:-main}"
+            git fetch origin "$base_branch" --depth=1
+            node scripts/process-worktree.js verify --branch="$branch" --base="origin/$base_branch"
           else
             node scripts/process-worktree.js verify --branch="$branch"
           fi
