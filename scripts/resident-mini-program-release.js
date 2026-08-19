@@ -9,6 +9,9 @@ const { assessChineseCopy } = require("./resident-mini-program-chinese-scan");
 
 const root = path.resolve(__dirname, "..");
 const defaultOutput = path.join(os.tmpdir(), "t04-mp-release-candidate");
+const testCredentialPattern = /(?:123456|888888|DEMO-MOBILE)/;
+const sha256Pattern = /^[a-f0-9]{64}$/i;
+const nonSemanticArtifactFields = new Set(["sha256", "deterministicSourceDigest"]);
 const sourceAssets = [
   "resident-mini-program.html",
   "resident-mini-program.css",
@@ -26,6 +29,24 @@ function readJson(relativePath) {
 
 function sha256(value) {
   return crypto.createHash("sha256").update(value).digest("hex");
+}
+
+function semanticValueHasTestCredentials(value, field = "") {
+  if (nonSemanticArtifactFields.has(field) && typeof value === "string" && sha256Pattern.test(value)) return false;
+  if (typeof value === "string") return testCredentialPattern.test(value);
+  if (Array.isArray(value)) return value.some((item) => semanticValueHasTestCredentials(item));
+  if (value && typeof value === "object") {
+    return Object.entries(value).some(([key, item]) => semanticValueHasTestCredentials(item, key));
+  }
+  return false;
+}
+
+function artifactHasTestCredentials(content) {
+  try {
+    return semanticValueHasTestCredentials(JSON.parse(content));
+  } catch {
+    return testCredentialPattern.test(content);
+  }
 }
 
 function booleanEnvironment(name) {
@@ -153,12 +174,12 @@ function buildCandidate(argumentsList = process.argv.slice(2)) {
   fs.writeFileSync(path.join(outputDirectory, "release-manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`);
   fs.writeFileSync(path.join(outputDirectory, "release-report.json"), `${JSON.stringify(report, null, 2)}\n`);
 
-  const emitted = fs.readdirSync(outputDirectory, { recursive: true })
+  const emittedArtifacts = fs.readdirSync(outputDirectory, { recursive: true })
     .filter((item) => fs.statSync(path.join(outputDirectory, item)).isFile())
-    .map((item) => fs.readFileSync(path.join(outputDirectory, item), "utf8"))
-    .join("\n");
+    .map((item) => fs.readFileSync(path.join(outputDirectory, item), "utf8"));
+  const emitted = emittedArtifacts.join("\n");
   report.checks.noLocalhostInArtifacts = !/(?:localhost|127\.0\.0\.1|\[?::1\]?)/i.test(emitted);
-  report.checks.noTestCredentialsInArtifacts = !/(?:123456|888888|DEMO-MOBILE)/.test(emitted);
+  report.checks.noTestCredentialsInArtifacts = !emittedArtifacts.some(artifactHasTestCredentials);
   report.softwareReady = Object.values(report.checks).every(Boolean);
   report.productionReady = report.softwareReady && release.productionReady;
   fs.writeFileSync(path.join(outputDirectory, "release-report.json"), `${JSON.stringify(report, null, 2)}\n`);
@@ -177,6 +198,7 @@ if (require.main === module) {
 }
 
 module.exports = {
+  artifactHasTestCredentials,
   buildCandidate,
   defaultOutput,
   environmentContract,

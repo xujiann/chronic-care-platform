@@ -218,6 +218,22 @@ test("all service view states remain Chinese and fail closed", () => {
   assert.equal(Delivery.serviceViewDecision({ permission: true, rows: [{}] }).state, "ready");
 });
 
+test("artifact credential scan ignores digest metadata and rejects semantic demo values", () => {
+  const digestOnly = JSON.stringify({
+    deterministicSourceDigest: "68761dee3b13affc5f25a688888857670592743678cb2ac6d867343c5af897dc",
+    sourceAssets: [{
+      path: "resident-mini-program.js",
+      sha256: "1234560000000000000000000000000000000000000000000000000000000000"
+    }]
+  });
+  assert.equal(Release.artifactHasTestCredentials(digestOnly), false);
+  assert.equal(Release.artifactHasTestCredentials(JSON.stringify({ sha256: "DEMO-MOBILE" })), true);
+  assert.equal(Release.artifactHasTestCredentials(JSON.stringify({ verificationCode: "888888" })), true);
+  assert.equal(Release.artifactHasTestCredentials(JSON.stringify({ password: "123456" })), true);
+  assert.equal(Release.artifactHasTestCredentials(JSON.stringify({ mobile: "DEMO-MOBILE" })), true);
+  assert.equal(Release.artifactHasTestCredentials("verificationCode=888888"), true);
+});
+
 test("release candidate build is deterministic, clean and production-blocked by placeholders", () => {
   const output = path.join(os.tmpdir(), "t04-mp-release-candidate-stage4-test");
   try {
@@ -229,7 +245,8 @@ test("release candidate build is deterministic, clean and production-blocked by 
     assert.equal(first.productionReady, false);
     assert.equal(second.softwareReady, true);
     assert.equal(firstManifest, secondManifest);
-    assert.doesNotMatch(firstManifest, /localhost|127\.0\.0\.1|123456|888888/);
+    assert.equal(Release.artifactHasTestCredentials(firstManifest), false);
+    assert.doesNotMatch(firstManifest, /localhost|127\.0\.0\.1/);
     assert.match(first.blockers.join("；"), /正式应用标识未配置/);
   } finally {
     fs.rmSync(output, { recursive: true, force: true });
