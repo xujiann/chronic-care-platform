@@ -23,6 +23,7 @@ function buildReport(options = {}) {
   const page = read("physical-examination.html");
   const client = read("physical-examination.js");
   const service = read("physical-examination-service.js");
+  const dashboardQuery = read("src/clinical-specialties/physical-examination/dashboard-query.js");
   const highlights = read("physical-examination-highlights.js");
   const standards = read("physical-examination-standards.js");
   const production = read("physical-examination-production.js");
@@ -41,6 +42,7 @@ function buildReport(options = {}) {
     check("archive:provenance", overview.reports.every((item) => item.meta?.institutionId && item.meta?.externalId && item.meta?.reportNo), "来源机构和外部报告标识完整"),
     check("archive:findings", overview.reports.every((item) => Array.isArray(item.meta?.findings) && Array.isArray(item.meta?.recommendations)), "结构化异常项与健康建议"),
     check("api:query", server.includes('url.pathname === "/api/physical-exams"'), "GET /api/physical-exams"),
+    check("architecture:dashboard-query", dashboardQuery.includes('USE_CASE = "physical-examination-dashboard-query.v1"') && server.includes("createPhysicalExaminationDashboardQuery"), "体检 Dashboard 通过版本化查询端口保持角色投影和遗留审计边界"),
     check("api:import", server.includes('url.pathname === "/api/physical-exams/import"'), "POST /api/physical-exams/import"),
     check("api:role-guard", server.includes('["institution", "commission"], "/api/physical-exams/import"'), "接入写入仅机构和卫健委角色"),
     check("api:signed-gateway", server.includes("landPhysicalExamIntegrationEvent(data, payload, event, user)") && server.includes("verifyIntegrationSignature"), "签名网关验签后落库"),

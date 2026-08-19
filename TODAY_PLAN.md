@@ -59,6 +59,96 @@
 
 ---
 
+## 2026-08-18 T06 临床五子域第一切片
+
+- 分支：`process/t06-clinical-five-subdomains-20260818`
+- 基线：`origin/main@58e05e56b2d97952c36aa05355c484821a74733e`
+- 决策：采用模块化单体内五个可治理子域；方向已获用户批准。
+- 范围：Accepted ADR、五子域机器注册表、API/数据/依赖盘点、跨子域契约、禁止依赖门禁、测试与地图同步。
+- 非目标：不移动路由，不改 API/鉴权/schema/数据库/组合根/CI/部署，不创建微服务。
+- 回滚：整提交回退；无 migration、数据写入或运行时状态变化。
+- 下一切片：从急救子域选择一个已被特征测试保护的用例，定义最小端口并迁移；中央数据 Owner 与 CI 入口交 T00 handoff。
+
+### 验收结果
+
+- `process:verify`、`routes:check`、`routes:test`、`architecture:test` 均通过。
+- 五子域专项回归 203/203 通过；新增治理测试 6/6 通过。
+- `npm run check` 通过；锁文件依赖安装后 PostgreSQL 失败文件 11/11 通过。
+- `test:all` 第 1–8、10 批通过；第 9 批 249/250，通过项之外仅有既有 `resident-mini-program-stage4` 哈希文本误报：构建产物的 SHA-256 摘要偶然包含 `123456`，被口令文本扫描误判。本 T06 切片不跨域修改 T04/T00 发布脚本。
+- 主线仍缺少统一的 `build`、`lint`、`typecheck`、`test:unit`、`test:integration`、`test:smoke` 入口，继续按 `CURRENT_ARCHITECTURE.md` 的 T00 治理债务处理。
+
+## 2026-08-18 T06 急救首个用例迁移
+
+- 目标：将 `GET /api/emergency/dashboard` 的组合逻辑移到急救目标源码根。
+- 范围：特征测试、`emergency-dashboard-query.v1`、旧路由兼容委托、注册表和地图同步。
+- 非目标：不改路由顺序、公开协议、鉴权角色、数据、审计、运行时依赖清单、CI 或部署。
+- 端口：`buildEmergencyDashboard`、`readBloodCoordination`；跨域契约仍为 `blood-emergency-coordination.v1` 兼容适配。
+- 回滚：回退本切片提交即可恢复路由内联组合；无 migration 或数据恢复步骤。
+- 下一切片：血液 dashboard 特征测试与最小查询端口。
+
+### 验收结果
+
+- 急救专项测试 84/84、路由测试 16/16、架构测试 36/36 通过；`npm run check` 通过。
+- `process:verify -- --base=4d65eb1` 与 `process:verify -- --base=origin/main` 均通过，0 个所有权违规；临床五子域机器治理报告通过，API 路由字面量计数和各子域归属未漂移。
+- `test:all` 第 1–8 批通过；第 9 批 250/251，仅命中已登记的 TEST-004 SHA-256 文本误报；被中断的第 10 批单独补跑 225/225 通过。
+- 未改 API 响应、鉴权角色、数据库 schema、审计、路由顺序、中央运行时依赖清单、CI 或部署配置。
+
+## 2026-08-18 T06 血液首个用例迁移
+
+- 目标：将 `GET /api/blood-system` 的 Dashboard 组合和机构范围投影移到血液目标源码根。
+- 范围：特征测试、`blood-dashboard-query.v1`、旧路由兼容委托、注册表和地图同步。
+- 非目标：不改公开协议、鉴权角色、候选集合 Owner、schema、审计、运行时依赖清单、CI 或部署。
+- 端口：`buildBloodDashboard`、`normalizeTransactionState`；保留 GET 中既有的交易数组内存补齐顺序，但不调用持久化写入。
+- 回滚：回退本切片提交即可恢复路由内联组合；无 migration 或数据恢复步骤。
+- 下一切片：影像公开 Dashboard 特征测试与最小查询端口。
+
+### 验收结果
+
+- 新增查询/路由/治理专项 15/15、血液相关 17 个文件 79/79、路由测试 16/16、架构测试 36/36 通过；`routes:check` 检查 64 个文件通过，`npm run check` 通过。
+- readiness 已改为同时验证旧路由委托和新查询投影；新增缺少查询投影时 fail-closed 的负向测试，readiness 3/3 通过。
+- `process:verify -- --base=21ddd3c` 与 `process:verify -- --base=origin/main` 均通过，0 个所有权违规；临床五子域机器治理报告仍为 136 个 API 字面路径、9 个登记集合、66 个候选集合和 3 个跨域契约。
+- `test:all` 第 1–8 批通过；第 9 批 246/247，仅命中已登记 TEST-004 SHA-256 文本误报；第 10 批单独补跑 238/238 通过。
+- 未运行不存在的 `build`、`lint`、`typecheck`、`test:unit`、`test:integration`、`test:smoke` 标准入口；该缺口仍由 T00 的 TEST-001 处理。
+
+## 2026-08-18 T06 影像首个用例迁移
+
+- 目标：将 `GET /api/imaging-cloud` 的构建、脱敏和公开投影移到影像目标源码根。
+- 范围：特征测试、`imaging-dashboard-query.v1`、公开响应净化归位、旧导出兼容、注册表和地图同步。
+- 非目标：不改角色、居民范围、安全/访问审计语义、公开字段、schema、运行时依赖清单、CI 或部署。
+- 端口：`buildImagingDashboard`、`redactSensitiveResponse`；公开响应策略由影像子域维护，HTTP 适配器保留居民范围和审计持久化。
+- 回滚：回退本切片提交即可恢复路由内联组合和原净化函数位置；无 migration 或数据恢复步骤。
+- 下一切片：体检 Dashboard 特征测试与最小查询端口。
+
+### 验收结果
+
+- 新增查询/路由/治理专项 17/17、影像相关 12 个文件 49/49、影像 readiness 27/27 通过；readiness 仍明确为正式 `NO-GO`，未把代码就绪冒充现场生产就绪。
+- 路由测试 16/16、架构测试 36/36 通过；`routes:check` 检查 64 个文件通过，`npm run check` 通过。
+- `process:verify -- --base=f998d97` 与 `process:verify -- --base=origin/main` 均通过，0 个所有权违规；临床五子域机器治理报告仍为 136 个 API 字面路径、9 个登记集合、66 个候选集合和 3 个跨域契约。
+- `test:all` 第 1–8 批通过；第 9 批 250/251，仅命中已登记 TEST-004 SHA-256 文本误报；被中断的第 10 批 35 个文件单独补跑 244/244 通过。
+- 未运行不存在的 `build`、`lint`、`typecheck`、`test:unit`、`test:integration`、`test:smoke` 标准入口；该缺口仍由 T00 的 TEST-001 处理。
+- 未改公开 API、鉴权角色、数据库 schema、居民范围、安全/访问审计顺序、中央运行时依赖清单、CI 或部署配置。
+
+## 2026-08-19 T06 体检首个用例迁移
+
+- 晨检：`origin/main@58e05e5` 未变化，主线 CI/Pages 通过；开放 PR #121 检查全绿、无 review decision；当前 T06 分支无 PR且工作树起始干净。
+- 目标：将 `GET /api/physical-exams` 的 Overview 构建、生产 readiness 和角色投影移到体检目标源码根。
+- 范围：特征测试、`physical-examination-dashboard-query.v1`、旧路由兼容委托、readiness 机器门禁、注册表和地图同步。
+- 非目标：不改路由顺序、公开协议、鉴权角色、居民范围、审计/脱敏顺序、候选集合 Owner、schema、CI、依赖或部署。
+- 端口：`buildPhysicalExamOverview`、`buildPhysicalExamReadiness`；授权集合、生产标志、访问审计持久化和最终脱敏保留在 HTTP/平台适配层。
+- 风险：citizen 投影若漂移可能暴露联调或网关明细；审计与脱敏重排可能改变失败语义。因此用特征测试锁定字段和调用顺序。
+- 回滚：回退本切片提交即可恢复路由内联构建；无 migration 或数据恢复步骤。
+- 下一切片：质量安全 Dashboard 特征测试与最小只读查询端口。
+
+### 验收结果
+
+- 重构前特征测试 7/7 通过；重构后新增查询/路由测试 11/11、查询/路由/治理专项 17/17、体检相关核心回归 27/27、`physical-examination:test` 21/21 通过。
+- 路由测试 16/16、架构测试 36/36 通过；`routes:check` 检查 64 个文件通过，`npm run check` 通过。
+- `process:verify -- --base=201cfd9` 与 `process:verify -- --base=origin/main` 均通过，0 个所有权违规；临床五子域机器治理报告仍为 136 个 API 字面路径、9 个登记集合、66 个候选集合和 3 个跨域契约。
+- `test:all` 第 1–8 批通过；第 9 批 246/247，仅命中已登记 TEST-004 SHA-256 文本误报；第 10 批 37 个文件单独补跑 253/253 通过。全量清单共 397 个测试文件，失败测试位于索引 354，剩余清单已全部覆盖。
+- 未运行不存在的 `build`、`lint`、`typecheck`、`test:unit`、`test:integration`、`test:smoke` 标准入口；该缺口仍由 T00 的 TEST-001 处理。
+- 未改公开 API、鉴权角色、数据库 schema、居民范围、访问审计与脱敏顺序、中央运行时依赖清单、CI 或部署配置。
+---
+
 ## 2026-08-19 T00 PR 所有权基线修复
 
 - 分支：`process/t00-ci-pr-base-20260819`

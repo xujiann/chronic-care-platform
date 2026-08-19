@@ -1,0 +1,271 @@
+{
+  "schemaVersion": "1.0.0",
+  "domain": "clinical-specialties",
+  "processOwner": "T06",
+  "architecture": "modular-monolith",
+  "deploymentBoundary": "shared-node-runtime",
+  "independentDeploymentAuthorized": false,
+  "routeSourceRoot": "src/http/routes/clinical-specialties",
+  "subdomains": [
+    {
+      "id": "emergency",
+      "name": "急救",
+      "owner": "T06/emergency",
+      "targetSourceRoot": "src/clinical-specialties/emergency",
+      "routePrefixes": ["/api/emergency", "/api/emergency-signals"],
+      "roleEnvelope": ["commission", "institution", "citizen"],
+      "registeredCollections": ["emergencySignals", "emergencySignalCommandInbox"],
+      "candidateCollections": [
+        "emergencyAuditEvents",
+        "emergencyCutoverApprovals",
+        "emergencyDataQualityIssues",
+        "emergencyDataQualityRules",
+        "emergencyDeliveryQueue",
+        "emergencyDrills",
+        "emergencyDutyShifts",
+        "emergencyEvents",
+        "emergencyGoLiveObservations",
+        "emergencyHospitals",
+        "emergencyIntegrationEndpoints",
+        "emergencyLaunchCommandBriefs",
+        "emergencyLaunchIncidents",
+        "emergencyLaunchRequirements",
+        "emergencyOperationalAlerts",
+        "emergencyProductionAudit",
+        "emergencyProductionHandoffs",
+        "emergencyResources",
+        "emergencyRollbackPlan"
+      ],
+      "externalReadCollections": ["residents", "personalRecords", "securityEvents"],
+      "implementedUseCases": [
+        {
+          "id": "emergency-dashboard-query.v1",
+          "source": "src/clinical-specialties/emergency/dashboard-query.js",
+          "route": "GET /api/emergency/dashboard",
+          "ports": ["buildEmergencyDashboard", "readBloodCoordination"],
+          "contracts": ["blood-emergency-coordination.v1"],
+          "sideEffects": []
+        }
+      ]
+    },
+    {
+      "id": "blood",
+      "name": "血液",
+      "owner": "T06/blood",
+      "targetSourceRoot": "src/clinical-specialties/blood",
+      "routePrefixes": ["/api/blood-system"],
+      "roleEnvelope": ["commission", "institution"],
+      "registeredCollections": [],
+      "candidateCollections": [
+        "bloodAuditEvents",
+        "bloodBusinessRecords",
+        "bloodDomainEvents",
+        "bloodEventDeliveries",
+        "bloodIdempotencyRecords",
+        "bloodIntegrationDeadLetters",
+        "bloodIntegrationEndpoints",
+        "bloodIntegrationEvents",
+        "bloodModuleProjections",
+        "bloodRecalls",
+        "bloodReleaseReviews",
+        "bloodSafetyIncidents",
+        "bloodShipments",
+        "bloodSpecimens",
+        "bloodTestReports",
+        "bloodUnits",
+        "compatibilityTests",
+        "donorSafetyCases",
+        "emergencyBloodAllocations",
+        "transfusionEpisodes",
+        "transfusionReactions",
+        "transfusionRequests"
+      ],
+      "externalReadCollections": ["securityEvents"],
+      "implementedUseCases": [
+        {
+          "id": "blood-dashboard-query.v1",
+          "source": "src/clinical-specialties/blood/dashboard-query.js",
+          "route": "GET /api/blood-system",
+          "ports": ["buildBloodDashboard", "normalizeTransactionState"],
+          "contracts": [],
+          "sideEffects": ["legacy-transaction-state-normalization-in-memory"]
+        }
+      ]
+    },
+    {
+      "id": "imaging",
+      "name": "影像",
+      "owner": "T06/imaging",
+      "targetSourceRoot": "src/clinical-specialties/imaging",
+      "routePrefixes": ["/api/imaging-cloud", "/api/mutual-recognition"],
+      "roleEnvelope": ["commission", "institution", "county", "citizen"],
+      "registeredCollections": ["diagnosticReports", "countyMutualRecognitionRecords", "phase2MutualRecognitionCitations"],
+      "candidateCollections": [
+        "imageCloudQualityReviews",
+        "imageCloudShares",
+        "imageCloudStudies",
+        "imagingCutoverApprovals",
+        "imagingProductionAudit",
+        "imagingProductionDrills",
+        "imagingProductionEndpoints",
+        "imagingProductionRequirements",
+        "imagingSiteReceipts",
+        "imagingSyntheticChecks",
+        "mutualRecognitionRules"
+      ],
+      "externalReadCollections": ["residents", "personalRecords", "emergencySignals", "securityEvents"],
+      "implementedUseCases": [
+        {
+          "id": "imaging-dashboard-query.v1",
+          "source": "src/clinical-specialties/imaging/dashboard-query.js",
+          "route": "GET /api/imaging-cloud",
+          "ports": ["buildImagingDashboard", "redactSensitiveResponse"],
+          "contracts": [],
+          "sideEffects": ["resident-data-access-audit-persisted-by-http-adapter"]
+        }
+      ]
+    },
+    {
+      "id": "physical-examination",
+      "name": "体检",
+      "owner": "T06/physical-examination",
+      "targetSourceRoot": "src/clinical-specialties/physical-examination",
+      "routePrefixes": ["/api/physical-exams"],
+      "roleEnvelope": ["commission", "institution", "citizen"],
+      "registeredCollections": [],
+      "candidateCollections": [
+        "physicalExamAbnormalCases",
+        "physicalExamFamilyRiskConsents",
+        "physicalExamHealthPassports",
+        "physicalExamHighlightActions",
+        "physicalExamJointTests",
+        "physicalExamReviewRequests",
+        "physicalExamSpecializedIntakes"
+      ],
+      "externalReadCollections": [
+        "residents",
+        "accounts",
+        "personalRecords",
+        "diseases",
+        "chronicScreeningTasks",
+        "phase2FamilyDoctorContracts",
+        "secureAttachments",
+        "securityEvents",
+        "taskMessages"
+      ],
+      "implementedUseCases": [
+        {
+          "id": "physical-examination-dashboard-query.v1",
+          "source": "src/clinical-specialties/physical-examination/dashboard-query.js",
+          "route": "GET /api/physical-exams",
+          "ports": ["buildPhysicalExamOverview", "buildPhysicalExamReadiness"],
+          "contracts": [],
+          "sideEffects": ["resident-data-access-audit-persisted-by-http-adapter"]
+        }
+      ]
+    },
+    {
+      "id": "quality-safety",
+      "name": "质量安全",
+      "owner": "T06/quality-safety",
+      "targetSourceRoot": "src/clinical-specialties/quality-safety",
+      "routePrefixes": ["/api/quality-safety"],
+      "roleEnvelope": ["commission", "institution"],
+      "writeBoundary": "quality-owned-only",
+      "registeredCollections": [
+        "qualityRectificationOrders",
+        "phase2ClinicalAssistAlerts",
+        "phase2ClinicalAssistReceipts",
+        "phase2ClinicalAssistRules"
+      ],
+      "candidateCollections": [
+        "clinicalPathwayCases",
+        "criticalValueAlerts",
+        "medicalRecordQualityReviews",
+        "mutualRecognitionQualityReviews",
+        "qualitySafetyCoreSystemEvidence",
+        "qualitySafetyEvents",
+        "qualitySafetySiteSignoffs"
+      ],
+      "externalReadCollections": []
+    }
+  ],
+  "routeSubcontextAssignments": {
+    "imaging-cloud": { "owners": ["imaging"], "status": "aligned" },
+    "operations-dashboard": { "owners": ["legacy-platform-operations"], "status": "handoff-required" },
+    "operations-command": { "owners": ["legacy-platform-operations"], "status": "handoff-required" },
+    "emergency-care": { "owners": ["emergency"], "status": "aligned" },
+    "quality-safety": { "owners": ["quality-safety"], "status": "aligned" },
+    "clinical-blood": { "owners": ["blood", "imaging"], "status": "legacy-mixed" },
+    "mutual-recognition-ingest": { "owners": ["imaging"], "status": "aligned" },
+    "mutual-recognition-review": { "owners": ["imaging"], "status": "aligned" },
+    "emergency-signals": { "owners": ["emergency"], "status": "aligned" },
+    "blood-innovation": { "owners": ["blood", "physical-examination"], "status": "legacy-mixed" }
+  },
+  "legacyRouteAreas": [
+    {
+      "id": "legacy-platform-operations",
+      "routePrefixes": ["/api/operations"],
+      "currentRouteSubcontexts": ["operations-dashboard", "operations-command"],
+      "targetDomain": "platform-governance/operations",
+      "handoffOwners": ["T00", "T02"],
+      "status": "handoff-required"
+    }
+  ],
+  "crossSubdomainContracts": [
+    {
+      "id": "blood-emergency-coordination.v1",
+      "version": "1.0.0",
+      "providers": ["blood"],
+      "consumers": ["emergency"],
+      "interaction": "versioned-query",
+      "requiredFields": ["projectionId", "status", "occurredAt"],
+      "currentBinding": "EmergencyDashboardQuery.readBloodCoordination -> BloodEventHub.dashboard",
+      "status": "legacy-adapter"
+    },
+    {
+      "id": "blood-quality-signal.v1",
+      "version": "1.0.0",
+      "providers": ["blood"],
+      "consumers": ["quality-safety"],
+      "interaction": "versioned-query",
+      "requiredFields": ["eventId", "eventType", "status", "occurredAt"],
+      "currentBinding": "BloodEventHub.dashboard",
+      "status": "legacy-adapter"
+    },
+    {
+      "id": "clinical-quality-observation.v1",
+      "version": "1.0.0",
+      "providers": ["emergency", "blood", "imaging", "physical-examination"],
+      "consumers": ["quality-safety"],
+      "interaction": "event-read-model",
+      "requiredFields": ["sourceSubdomain", "subjectRef", "eventType", "status", "occurredAt"],
+      "status": "target-contract"
+    }
+  ],
+  "sharedPlatformPorts": [
+    "identity-and-authorization",
+    "resident-mpi",
+    "institution-and-practitioner-directory",
+    "audit-and-security-events",
+    "integration-gateway",
+    "object-storage",
+    "transactional-outbox",
+    "regional-context",
+    "observability"
+  ],
+  "sourceRules": {
+    "forbidServerDependency": true,
+    "forbidCrossSubdomainImplementationImports": true,
+    "crossSubdomainAccess": ["versioned-query", "event-read-model", "owner-command-port"]
+  },
+  "independentDevelopmentExitCriteria": [
+    { "id": "machine-registry", "status": "met" },
+    { "id": "api-prefix-ownership", "status": "met" },
+    { "id": "data-subdomain-ownership", "status": "partial" },
+    { "id": "versioned-cross-subdomain-contracts", "status": "partial" },
+    { "id": "source-directory-isolation", "status": "partial" },
+    { "id": "independent-domain-tests", "status": "partial" },
+    { "id": "independent-ci-gates", "status": "not-met" }
+  ]
+}

@@ -8,7 +8,7 @@ const {
   projectImagingErrorResponse,
   projectImagingViewerResponse,
   projectPublicImagingResponse
-} = require("../src/http/routes/clinical-specialties/clinical-blood");
+} = require("../src/clinical-specialties/imaging/public-response");
 
 const FORBIDDEN_KEYS = /^(?:(?:object|physical|storage)[_-]?path|object[_-]?key|access[_-]?url|signed[_-]?url|(?:access|refresh)?[_-]?token|authorization|api[_-]?key|secrets?|passwords?|credentials?|credential[_-]?ref|private[_-]?key|signatures?|signing[_-]?keys?|signature[_-]?keys?|certificate[_-]?fingerprint|endpoint|base[_-]?url|bucket(?:Name)?|containerName)$/i;
 

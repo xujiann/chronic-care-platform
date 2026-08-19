@@ -19,6 +19,7 @@ function buildBloodSystemReadinessReport(options = {}) {
   const server = options.server ?? readRuntimeSource(ROOT);
   const transaction = options.transaction ?? readText("blood-transaction-service.js");
   const service = options.service ?? readText("blood-service.js");
+  const dashboardQuery = options.dashboardQuery ?? readText("src/clinical-specialties/blood/dashboard-query.js");
   const domain = options.domain ?? require(path.join(ROOT, "blood-domain.js"));
   const pkg = options.pkg ?? readJson("package.json");
   const ci = options.ci ?? readText(".github/workflows/ci.yml");
@@ -51,7 +52,7 @@ function buildBloodSystemReadinessReport(options = {}) {
     ["床旁核对与疗效评价", server.includes("BloodTransactionService.startTransfusion") && server.includes("BloodTransactionService.completeTransfusion")],
     ["关键操作幂等", server.includes('req.headers["idempotency-key"]')],
     ["事务闭环工作台", html.includes('id="transaction"') && js.includes("runTransactionAction")],
-    ["事务证据实时回读", server.includes("releaseReviews:") && server.includes("transfusionEpisodes:")],
+    ["事务证据实时回读", server.includes("createBloodDashboardQuery") && dashboardQuery.includes("releaseReviews:") && dashboardQuery.includes("compatibilityTests:") && dashboardQuery.includes("transfusionEpisodes:")],
     ["冷链越限持久化隔离", transaction.includes("cold_chain_breach") && transaction.includes("Temperature Reading Required") && transaction.includes("awaiting_quality_review") && transaction.includes('status: "quarantined"')],
     ["冷链质控处置闭环", transaction.includes("reviewColdChainIncident") && transaction.includes("discard_or_return_to_center") && server.includes("/api/blood-system/safety-incidents/cold-chain/review")],
     ["会话绑定配血双签", transaction.includes("compatibilityReviewer") && transaction.includes("Reviewer Identity Source") && transaction.includes("compatibility_review") && !js.includes("reviewerIds:[")],
