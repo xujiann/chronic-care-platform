@@ -16,7 +16,7 @@
 |---:|---|---|---|
 | 0 | T00 治理基线迁移 | 已合入 `main@58e05e5` | 按每日循环持续维护 |
 | 1 | 静态内容 allowlist 与快照隔离 | 已合入 `main@6c18221`；PR/main CI 与 Pages 验证通过 | 持续执行清单审查、负向测试与缓存版本治理 |
-| 2 | 审计链失败语义 | 待 ADR / P0 | 安全、审计、兼容和留存 owner 决策 |
+| 2 | 审计链失败语义 | Proposed ADR 已形成 / P0；未授权实施 | T00、T01、审计/留存 Owner 批准严格语义、API 兼容和旧链迁移 |
 | 3 | Schema v14/v11 一致与 migration 指纹 | Accepted 方向 / P1 | 独立 T00 数据任务、升级 fixture 和回滚 |
 | 4 | 标准 build/lint/typecheck/unit/integration/smoke 入口 | 候选 / P1 | 不改变现有 test:all 语义，CI 映射和测试分类评审 |
 | 5 | 移除组合根循环依赖 | 候选 / P1 | 特征测试；provider 注入方案；架构测试 |

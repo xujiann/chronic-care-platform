@@ -25,5 +25,6 @@
 | [核心数据 closed-world 定义](./2026-08-18-core-data-closed-world.md) | Accepted | 核心概念不可随意平行创建 |
 | [临床专科五个可治理子域](./2026-08-18-clinical-five-governed-subdomains.md) | Accepted | 急救、血液、影像、体检、质量安全的开发边界 |
 | [静态内容安全边界](./2026-08-18-static-content-security-boundary.md) | Accepted | 已合入 `main@6c18221`；发布 allowlist、数据和缓存隔离 |
+| [审计链失败语义与兼容迁移](./2026-08-19-audit-chain-failure-semantics.md) | Proposed | 严格验证、失败传播、旧链基线迁移与留存边界；不得实施 |
 
 模板见 [ADR_TEMPLATE.md](./ADR_TEMPLATE.md)。
