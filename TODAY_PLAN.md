@@ -127,3 +127,23 @@
 - `test:all` 第 1–8 批通过；第 9 批 250/251，仅命中已登记 TEST-004 SHA-256 文本误报；被中断的第 10 批 35 个文件单独补跑 244/244 通过。
 - 未运行不存在的 `build`、`lint`、`typecheck`、`test:unit`、`test:integration`、`test:smoke` 标准入口；该缺口仍由 T00 的 TEST-001 处理。
 - 未改公开 API、鉴权角色、数据库 schema、居民范围、安全/访问审计顺序、中央运行时依赖清单、CI 或部署配置。
+
+## 2026-08-19 T06 体检首个用例迁移
+
+- 晨检：`origin/main@58e05e5` 未变化，主线 CI/Pages 通过；开放 PR #121 检查全绿、无 review decision；当前 T06 分支无 PR且工作树起始干净。
+- 目标：将 `GET /api/physical-exams` 的 Overview 构建、生产 readiness 和角色投影移到体检目标源码根。
+- 范围：特征测试、`physical-examination-dashboard-query.v1`、旧路由兼容委托、readiness 机器门禁、注册表和地图同步。
+- 非目标：不改路由顺序、公开协议、鉴权角色、居民范围、审计/脱敏顺序、候选集合 Owner、schema、CI、依赖或部署。
+- 端口：`buildPhysicalExamOverview`、`buildPhysicalExamReadiness`；授权集合、生产标志、访问审计持久化和最终脱敏保留在 HTTP/平台适配层。
+- 风险：citizen 投影若漂移可能暴露联调或网关明细；审计与脱敏重排可能改变失败语义。因此用特征测试锁定字段和调用顺序。
+- 回滚：回退本切片提交即可恢复路由内联构建；无 migration 或数据恢复步骤。
+- 下一切片：质量安全 Dashboard 特征测试与最小只读查询端口。
+
+### 验收结果
+
+- 重构前特征测试 7/7 通过；重构后新增查询/路由测试 11/11、查询/路由/治理专项 17/17、体检相关核心回归 27/27、`physical-examination:test` 21/21 通过。
+- 路由测试 16/16、架构测试 36/36 通过；`routes:check` 检查 64 个文件通过，`npm run check` 通过。
+- `process:verify -- --base=201cfd9` 与 `process:verify -- --base=origin/main` 均通过，0 个所有权违规；临床五子域机器治理报告仍为 136 个 API 字面路径、9 个登记集合、66 个候选集合和 3 个跨域契约。
+- `test:all` 第 1–8 批通过；第 9 批 246/247，仅命中已登记 TEST-004 SHA-256 文本误报；第 10 批 37 个文件单独补跑 253/253 通过。全量清单共 397 个测试文件，失败测试位于索引 354，剩余清单已全部覆盖。
+- 未运行不存在的 `build`、`lint`、`typecheck`、`test:unit`、`test:integration`、`test:smoke` 标准入口；该缺口仍由 T00 的 TEST-001 处理。
+- 未改公开 API、鉴权角色、数据库 schema、居民范围、访问审计与脱敏顺序、中央运行时依赖清单、CI 或部署配置。

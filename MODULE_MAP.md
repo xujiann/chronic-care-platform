@@ -87,7 +87,7 @@ server.js
 | emergency | T06/emergency | 37 | 急救/信号前缀已唯一归属；dashboard 查询已进入目标源码根 |
 | blood | T06/blood | 28 | dashboard 查询已进入目标源码根；其余仍与 imaging、physical-examination 混合 |
 | imaging | T06/imaging | 17 | dashboard 查询与公开响应净化已进入目标源码根 |
-| physical-examination | T06/physical-examination | 7 | 当前仍与 blood-innovation 同文件 |
+| physical-examination | T06/physical-examination | 7 | dashboard 查询已进入目标源码根；写命令仍与 blood-innovation 混合 |
 | quality-safety | T06/quality-safety | 14 | 写模型限定为质量自有数据 |
 
 另有 33 个 `/api/operations` 字面路径属于历史错位，目标为 `platform-governance/operations`。五子域治理注册表不改变现有路由顺序或部署方式。
@@ -97,3 +97,5 @@ server.js
 血液首个标准接口为 `blood-dashboard-query.v1`：通过 `normalizeTransactionState` 和 `buildBloodDashboard` 两个注入端口保留遗留组装顺序，并在用例内统一 commission 全域、institution 机构范围投影。HTTP 层未新增数据写入；混合路由内的影像、血液写命令和集成接口尚未迁移。
 
 影像首个标准接口为 `imaging-dashboard-query.v1`：通过 `buildImagingDashboard`、`redactSensitiveResponse` 两个注入端口生成结果，并由影像自有 `public-response` 递归剔除凭据、物理存储位置和内部 URL。HTTP 适配器继续执行居民范围检查和既有访问审计持久化；影像写命令与互认流程仍在混合路由。
+
+体检首个标准接口为 `physical-examination-dashboard-query.v1`：通过 `buildPhysicalExamOverview`、`buildPhysicalExamReadiness` 两个注入端口生成查询视图，并在用例内统一 citizen 最小 readiness 与管理角色完整投影。HTTP 适配器继续执行范围拒绝、安全事件、居民访问审计、持久化和最终脱敏；体检导入与闭环命令尚未迁移。

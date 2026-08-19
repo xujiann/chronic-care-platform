@@ -94,3 +94,5 @@ HTTP request
 `GET /api/blood-system` 已通过兼容委托接入 `blood-dashboard-query.v1`。允许角色仍为 commission、institution；未授权请求在读数据前停止。commission 保留全域交易投影，institution 继续按 `orgCode`、目的机构和可见输血申请过滤；状态码仍为 200，既有接口不经过额外脱敏。本切片没有增加持久化、幂等或审计语义。
 
 `GET /api/imaging-cloud` 已通过兼容委托接入 `imaging-dashboard-query.v1`。允许角色仍为 commission、institution、county、citizen；显式 `residentId` 继续通过 `canAccessResident`，拒绝时记录安全事件并返回净化后的 403。成功响应仍为 200，先执行既有角色脱敏，再递归删除凭据、签名 URL、物理路径和内部连接字段；带居民过滤的成功调阅仍持久化既有数据访问审计。
+
+`GET /api/physical-exams` 已通过兼容委托接入 `physical-examination-dashboard-query.v1`。允许角色仍为 citizen、institution、commission；显式 `residentId` 继续按 `allowedResidentIdsForUser` 拒绝越权并记录安全事件。citizen 仍不接收联调、网关和专项分流明细，readiness 只暴露代码状态、质量和阻断数量；管理角色保留完整投影。成功响应继续在既有访问审计持久化之后执行最终脱敏。

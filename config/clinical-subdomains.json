@@ -152,6 +152,16 @@
         "secureAttachments",
         "securityEvents",
         "taskMessages"
+      ],
+      "implementedUseCases": [
+        {
+          "id": "physical-examination-dashboard-query.v1",
+          "source": "src/clinical-specialties/physical-examination/dashboard-query.js",
+          "route": "GET /api/physical-exams",
+          "ports": ["buildPhysicalExamOverview", "buildPhysicalExamReadiness"],
+          "contracts": [],
+          "sideEffects": ["resident-data-access-audit-persisted-by-http-adapter"]
+        }
       ]
     },
     {
