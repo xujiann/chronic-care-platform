@@ -1,6 +1,6 @@
 # ADR：综合 CI 采用 15 分钟有界时间预算
 
-- 状态：Accepted
+- 状态：Superseded
 - 日期：2026-08-19
 - Owner：T00
 - 影响范围：GitHub Actions 综合 test job、CI 反馈时限、主线验收
@@ -55,3 +55,7 @@ Chromium 安装、36 个浏览器 E2E 以及大量 readiness/report/deployment �
 
 迁移先通过独立 T00 PR 验证，再合入 main 并观察合并后 push CI。回滚只需回退该 T00
 提交；不得通过删除 E2E、跳过 readiness、放宽 required checks 或无限重跑替代修复。
+
+> 2026-08-19：PR #125 的两个 attempt 证明 15 分钟单体预算仍会被 Chromium 系统依赖
+> 安装耗尽。本 ADR 的有界预算原则保留；单体 job 拓扑由
+> `2026-08-19-ci-risk-domain-job-split.md` supersede。
