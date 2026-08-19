@@ -169,3 +169,24 @@
 - `test:all` 第 1–8 批通过；第 9 批 235/236，仅命中已登记 TEST-004 SHA-256 文本误报；第 10 批 28 个文件单独补跑 221/221。全量清单共 388 个测试文件，失败测试位于索引 345，失败点后的清单已全部覆盖。
 - 未运行不存在的 `build`、`lint`、`typecheck`、`test:unit`、`test:integration`、`test:smoke` 标准入口；该缺口仍由 TEST-001 跟踪。
 - 未改业务代码、API、鉴权、审计、数据库、schema、migration、依赖、required checks 或部署产物；受保护数据和生成制品无变更。
+
+---
+
+## 2026-08-19 T00 综合 CI 时间预算修复
+
+- 分支：`process/t00-ci-timeout-20260819`
+- 基线：`origin/main@faad45c792609e14b097400b054a2e0858b78f24`
+- 问题：PR #122 合并后的 main CI 两次在综合 `test` 的 10 分钟硬上限处取消；已完成步骤没有测试失败，取消均发生在浏览器 E2E。
+- 决策：仅把综合 `test` 调整为 15 分钟；区域矩阵继续为 5 分钟，complete-unit-test 继续为 10 分钟。
+- 范围：CI workflow、配置回归测试、Accepted ADR、依赖地图和技术债同步。
+- 非目标：不拆分 job，不改变 required checks、测试命令、业务代码、API、鉴权、数据库、依赖或部署产物。
+- 风险：更长预算会延迟真实挂起的反馈；通过固定 15 分钟上限、保持专项 job 较短及后续 CI-001 拆分债务控制。
+- 回滚：回退本 T00 提交即可恢复 10 分钟；无数据、制品或运行时恢复步骤。
+
+### 验收结果
+
+- 回归测试按预期先红后绿：修改 workflow 前 `process:test` 7/8，仅新增时间预算契约失败；调整后 8/8 通过。workflow YAML 解析及 `git diff --check` 通过。
+- `process:verify -- --base=origin/main` 通过，7 个变更文件、0 个所有权违规；`routes:check` 检查 64 个文件、`routes:test` 16/16、`architecture:test` 36/36、`platform:iterations:test` 85/85、`npm run check` 均通过。
+- `npm ci` 成功。`test:all` 第 1–8 批通过；第 9 批 246/247，仅命中已登记 TEST-004 的确定性 SHA-256 文本误报；第 10 批 37 个文件单独补跑 253/253 通过。全量清单共 397 个测试文件，失败测试及相关 8 个源文件、发布脚本均与 `origin/main` 一致。
+- 未运行不存在的 `build`、`lint`、`typecheck`、`test:unit`、`test:integration`、`test:smoke` 标准入口；该缺口仍由 TEST-001 跟踪。
+- 未改业务代码、API、鉴权、审计、数据库、schema、migration、依赖、required checks 或部署产物；GitHub Actions 结果在 PR 与合并后 main 验证中留证。

@@ -116,3 +116,11 @@ test("CI verifies every process pull request against its target integration bran
   assert.match(pullRequestTemplate, /基线 ref\/SHA：/);
   assert.doesNotMatch(pullRequestTemplate, /baseline\/governance-20260803-process-v1/);
 });
+
+test("CI budgets the comprehensive test chain without relaxing focused jobs", () => {
+  const workflow = fs.readFileSync(path.resolve(__dirname, "..", ".github", "workflows", "ci.yml"), "utf8");
+
+  assert.match(workflow, /\n  regional-foundation:\r?\n    runs-on: ubuntu-latest\r?\n    timeout-minutes: 5\r?\n/);
+  assert.match(workflow, /\n  complete-unit-test:\r?\n    runs-on: ubuntu-latest\r?\n    timeout-minutes: 10\r?\n/);
+  assert.match(workflow, /\n  test:\r?\n    runs-on: ubuntu-latest\r?\n    timeout-minutes: 15\r?\n/);
+});

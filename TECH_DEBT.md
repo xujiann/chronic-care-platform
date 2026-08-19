@@ -41,7 +41,7 @@
 | API-001 | 错误契约 | 多种 JSON 错误格式 | 新 API 使用版本化标准错误接口 |
 | API-002 | 接口目录 | 368+ API 缺完整机器目录 | 逐域补 owner/角色/范围/幂等/审计元数据 |
 | JOB-001 | Worker 一致性 | 多套 worker/retry/checkpoint 语义 | 建立共同任务状态和观测契约 |
-| CI-001 | 大型 job | 综合 CI 串接大量 readiness/report | 按风险域拆可复用、可定位 job |
+| CI-001 | 大型 job | 综合 CI 串接 API、Chromium、E2E 和大量 readiness/report；当前以 15 分钟预算避免干净 runner 在 10 分钟处误取消 | 按风险域拆可复用、可定位 job；不得用继续放宽超时替代拆分 |
 | TEST-004 | 制品扫描误报 | 居民小程序测试对整个 manifest 做 `123456/888888` 文本扫描，SHA-256 摘要可偶然命中 | 改为结构化扫描语义字段，并保留真实演示凭证负向 fixture |
 | DOC-001 | 历史文档 | 205 份 Markdown，历史快照与当前规则并存 | 标明 snapshot/current/superseded，不删除历史证据 |
 | REPO-001 | 跟踪制品 | `output/pdf` 有 3 个 PDF | 明确生成源、是否保留及禁止手工编辑 |
