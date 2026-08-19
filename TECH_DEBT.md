@@ -1,6 +1,6 @@
 # TECH DEBT — 主线技术债与风险台账
 
-> 主线 AS-IS 快照：`main@6c18221`。严重级别表示建议治理优先级；已关闭项以主线 CI、Pages 或专项门禁为回归依据。
+> 实施分支 AS-IS 快照：基于 `main@a15d10d`。严重级别表示建议治理优先级；已关闭项以专项测试及 PR/main CI 为回归依据。
 
 ## P0 — 必须先决策
 
@@ -12,9 +12,7 @@
 
 | ID | 类别 | 现状与证据 | 风险/缺失测试 |
 |---|---|---|---|
-| DATA-001 | Schema | migration head v14，`STORAGE_SCHEMA_VERSION` 与门禁仍为 v11 | 版本报告错误、部署判断漂移；缺版本一致性测试 |
-| DATA-002 | Migration | checksum 仅散列 version/name，不散列 migration 内容 | 已应用 SQL 漂移不可检测 |
-| ARC-001 | 超大组合根 | `server.js` 约 28.7k 行 | 变更冲突、初始化耦合、难隔离测试 |
+| ARC-001 | 超大组合根 | `server.js` 约 28.2k 行 | 变更冲突、初始化耦合、难隔离测试 |
 | ARC-002 | 循环依赖 | `server.js ↔ pilot-cutover-alert-runtime.js` | 部分初始化、测试顺序和模块复用风险 |
 | ARC-003 | 宽接口 | public-health runtime context 160 个依赖 | 组合根和路由同步变化，难形成领域端口 |
 | ARC-004 | 前端超大模块 | 数智医院 app 10.5k、citizen 6k、公卫 4.4k | 全局状态、渲染和流程耦合 |
@@ -39,6 +37,7 @@
 | API-001 | 错误契约 | 多种 JSON 错误格式 | 新 API 使用版本化标准错误接口 |
 | API-002 | 接口目录 | 368+ API 缺完整机器目录 | 逐域补 owner/角色/范围/幂等/审计元数据 |
 | JOB-001 | Worker 一致性 | 多套 worker/retry/checkpoint 语义 | 建立共同任务状态和观测契约 |
+| TEST-005 | 浏览器一致性 | Windows 本地配置优先系统 Chrome；完整 36 项中小程序超时恢复用例可受前序共享服务状态影响，而同文件 13/13、单例 1/1、CI Chromium 36/36 通过 | 后续独立测试任务统一本地/CI 浏览器选择并隔离 E2E 服务状态，不在数据治理切片中修改业务代码 |
 | DOC-001 | 历史文档 | 205 份 Markdown，历史快照与当前规则并存 | 标明 snapshot/current/superseded，不删除历史证据 |
 | REPO-001 | 跟踪制品 | `output/pdf` 有 3 个 PDF | 明确生成源、是否保留及禁止手工编辑 |
 
@@ -50,6 +49,8 @@
 | SEC-002 | 2026-08-19 | 浏览器和 Service Worker 只消费生成的 `public-demo.json`；凭据删除、身份联系字段掩码、v60 撤销旧缓存 | 共享脱敏纯函数、源快照拒绝、Pages 仓库外构建；仓库历史分类残余风险继续由 `DATA_MODEL.md` 的 DATA-006 跟踪 |
 | CI-001 | 2026-08-19 | 综合 CI 拆为 governance-api、browser-e2e、release-readiness，并保留 fail-closed 聚合 test | workflow 契约测试锁定步骤归属、预算、always 聚合和三个上游结果 |
 | TEST-004 | 2026-08-19 | 居民小程序 JSON 制品改为递归扫描语义字符串值，仅跳过精确摘要字段中的合法 SHA-256；非 JSON 仍全文扫描 | 摘要命中放行，伪造摘要字段、`123456`、`888888`、`DEMO-MOBILE` 语义值和非 JSON 文本均拒绝 |
+| DATA-001 | 2026-08-20 | `STORAGE_SCHEMA_VERSION`、storageMeta、部署/readiness/release 门禁统一派生注册表 head v14 | 静态契约、storage、部署、生产就绪与发布报告测试 |
+| DATA-002 | 2026-08-20 | v1–v14 独立注册并冻结内容指纹，保留历史 ledger；v15+ ledger 写内容 SHA-256，runner 拒绝连续性/name/checksum 漂移 | 空库、v11 升级、重跑、指纹/ledger 漂移、v15 checksum、失败回滚与 schema fingerprint 测试 |
 
 ## 重复、死代码和命名结论
 
@@ -61,7 +62,7 @@
 ## 测试缺口优先顺序
 
 1. 审计链任意内容/链接断裂均按 ADR 语义判定。
-2. schema head、公开版本、migration 内容指纹一致。
+2. 后续 v15+ migration 的数据回填、前滚恢复和多历史版本 fixture。
 3. OTP/锁定在多实例、重启、并发下的一致性。
 4. role × permission × resident/institution/region 数据范围矩阵。
 5. 组合根循环移除前后的启动、注入和故障测试。

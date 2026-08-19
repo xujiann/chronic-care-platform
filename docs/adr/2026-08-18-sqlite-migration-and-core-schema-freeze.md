@@ -33,4 +33,10 @@
 
 ## Recommendation
 
-冻结 v1–v14 语义；v15 起采用独立 migration、内容 SHA-256、事务和可执行校验。核心身份、记录、业务镜像、会话和 outbox 表不得由功能任务随意改列/索引/FK。任何改变都需 migration、owner、测试和必要 ADR。此 ADR 接受治理方向，不表示提取和版本修复已经实施。
+冻结 v1–v14 语义；v15 起采用独立 migration、内容 SHA-256、事务和可执行校验。核心身份、记录、业务镜像、会话和 outbox 表不得由功能任务随意改列/索引/FK。任何改变都需 migration、owner、测试和必要 ADR。
+
+## Implementation
+
+2026-08-20 的 T00 切片已将 v1–v14 提取到独立注册表，并以固定 SHA-256 校验历史定义。为避免拒绝既有数据库，历史 ledger checksum 不重算，仍验证原 `version:name` 摘要；v15+ 才把内容 SHA-256 写入 ledger。公开 schema head、部署检查、生产 readiness 和发布报告统一消费注册表 v14。空库、v11 升级、重跑、历史漂移、未来 v15 checksum、失败回滚和 schema fingerprint 已建立回归测试。
+
+该实施没有修改任何数据库文件、业务表数据、API 形状、鉴权或审计语义。生产环境升级与 PostgreSQL 切换仍需独立现场证据。

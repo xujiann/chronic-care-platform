@@ -1,6 +1,6 @@
 # 工程治理路线图
 
-> 更新：2026-08-19。队列不是实施授权；只有 Accepted ADR/明确 owner 审批的范围可进入实现。
+> 更新：2026-08-20。队列不是实施授权；只有 Accepted ADR/明确 owner 审批的范围可进入实现。
 
 ## 已建立基线
 
@@ -17,7 +17,7 @@
 | 0 | T00 治理基线迁移 | 已合入 `main@58e05e5` | 按每日循环持续维护 |
 | 1 | 静态内容 allowlist 与快照隔离 | 已合入 `main@6c18221`；PR/main CI 与 Pages 验证通过 | 持续执行清单审查、负向测试与缓存版本治理 |
 | 2 | 审计链失败语义 | Proposed ADR 已形成 / P0；未授权实施 | T00、T01、审计/留存 Owner 批准严格语义、API 兼容和旧链迁移 |
-| 3 | Schema v14/v11 一致与 migration 指纹 | Accepted 方向 / P1 | 独立 T00 数据任务、升级 fixture 和回滚 |
+| 3 | Schema v14/v11 一致与 migration 指纹 | 已按 Accepted ADR 实施 / P1 | 以专项测试及 PR/main CI 为完成门禁；后续 v15+ 按冻结规则追加 |
 | 4 | 标准 build/lint/typecheck/unit/integration/smoke 入口 | 候选 / P1 | 不改变现有 test:all 语义，CI 映射和测试分类评审 |
 | 5 | 移除组合根循环依赖 | 候选 / P1 | 特征测试；provider 注入方案；架构测试 |
 | 6 | OTP/锁定共享状态 | 待 ADR / P1 | 共享 TTL 存储、并发/重启/多实例测试 |

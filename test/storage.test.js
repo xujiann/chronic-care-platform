@@ -233,7 +233,7 @@ test("SQLite migrations are idempotent and collection versions change only on wr
       storage.writeDatabase(orphanServiceState);
     }, /FOREIGN KEY constraint failed/);
     const meta = storage.storageMeta();
-    assert.equal(meta.schemaVersion, 11);
+    assert.equal(meta.schemaVersion, 14);
     assert.equal(meta.postgresSync.reconciliation.status, "never");
     assert.equal(meta.postgresSync.reconciliation.cases.unresolved, 0);
     assert.deepEqual(meta.sqliteProfile, {

@@ -1,12 +1,13 @@
 # 数据库 Schema 基线
 
-> 快照：`main@b1e4898`。这是源代码定义清单，不代表生产数据库已部署或已迁移。
+> 实施分支快照：基于 `main@a15d10d`。这是源代码定义清单，不代表生产数据库已部署或已迁移。
 
 ## 1. Schema Head
 
-- SQLite migration 数组：v1–v14。
-- 运行时公开常量：`STORAGE_SCHEMA_VERSION = 11`（与实际 head 不一致）。
+- SQLite migration 注册表：v1–v14，位于 `src/platform/storage/sqlite-migrations.js`。
+- 运行时公开常量：`STORAGE_SCHEMA_VERSION = SQLITE_SCHEMA_HEAD = 14`。
 - migration ledger：`schema_migrations`。
+- v1–v14 ledger checksum 保持历史兼容，源码内容由冻结 SHA-256 保护；v15+ ledger checksum 为内容 SHA-256。
 - PostgreSQL：5 份跟踪 SQL，共 13 张显式候选表；另有脚本生成的迁移包/MPI 结构。
 
 ## 2. SQLite Migration 台账
@@ -42,10 +43,9 @@
 
 生产应用前必须校验 TLS、schema 权限、唯一约束、迁移 ledger、回滚和核对证据。
 
-## 4. 已知偏差
+## 4. 已知边界
 
-- v14/v11 版本不一致。
-- migration checksum 不覆盖 migration 代码。
-- migration 仍内嵌 28k 行 `server.js`。
-- 没有独立、确定性的 schema fingerprint 基线。
-- 专项 SQLite 表不共享同一个版本台账。
+- v1–v14 现场 ledger 无法追溯当年实际执行源码，因此不得重算或改写历史行；冻结注册表防止今后源码漂移。
+- schema fingerprint 用于确定性比较空库与受支持升级 fixture，不替代生产数据核对、备份或现场迁移证据。
+- 专项 SQLite 表不共享同一个版本台账，不能纳入主 schema head。
+- v15+ 仍需按新需求补业务数据回填、核对和前滚恢复证据，不能只凭 DDL 测试上线。

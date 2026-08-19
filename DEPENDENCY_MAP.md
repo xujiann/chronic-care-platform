@@ -1,6 +1,6 @@
 # DEPENDENCY MAP — 主线依赖地图
 
-> 主线 AS-IS 快照：`main@6c18221`。依赖包括代码、数据、外部系统、后台任务、构建和部署关系。
+> 实施分支 AS-IS 快照：基于 `main@a15d10d`。依赖包括代码、数据、外部系统、后台任务、构建和部署关系。
 
 ## 1. 代码依赖方向
 
@@ -15,6 +15,8 @@ flowchart LR
   ROUTES --> DOMAIN["domain services"]
   DOMAIN --> REPO["repository / storage ports"]
   REPO --> STORE["JSON / SQLite / PostgreSQL"]
+  HTTP --> MIG["SQLite migration registry"]
+  MIG --> STORE
   DOMAIN --> EXT["external adapters"]
   DOMAIN --> EVT["outbox / audit / evidence"]
 ```
@@ -78,6 +80,8 @@ SQLite commit
   →（仅获批后）primary read/write
 ```
 
+SQLite schema 依赖现为 `server.js → sqlite-migrations → node:sqlite/session schema helper`。部署检查、生产数据库 readiness 和发布报告也只读消费注册表 head/校验器，不再各自硬编码 v11。注册表不得反向依赖组合根或领域路由，因此本切片没有新增循环依赖。
+
 JSON 源快照仍是高扇出依赖，但浏览器和 Pages 只依赖经统一纯函数转换后的公开演示契约；任何结构变化仍需验证脱敏、页面兼容、报告和初始化路径。
 
 ## 6. 外部系统
@@ -121,6 +125,7 @@ JSON 源快照仍是高扇出依赖，但浏览器和 Pages 只依赖经统一�
 - 不存在广泛静态环，但唯一已确认环位于关键组合根，应列 P1。
 - `runtime-source`、`technical-evidence`、`data/db.json` 和宽运行时上下文仍是高耦合枢纽；静态消费者已从源快照扇出中隔离。
 - 新模块必须依赖稳定端口，不得新增对 `server.js`、根目录全局状态或未注册 JSON 集合的反向依赖。
+- SQLite DDL 必须追加到 T00 注册表；运行时、测试和发布门禁只能消费其公开 head/校验接口，禁止复制版本常量或迁移定义。
 
 ## 10. 临床子域依赖约束
 

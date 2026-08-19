@@ -47,4 +47,11 @@
 
 ① 输出 schema → ② 分析关系 → ③ 核对实际使用 → ④ 维护 `DATA_MODEL.md` → ⑤ 加固 migration 体系 → ⑥ 冻结核心表/定义 → ⑦ 新需求按新标准 → ⑧ 旧结构渐进迁移。
 
-本轮完成①–④的主线重验；⑤–⑧需要 Proposed ADR 接受后分步实施。
+①–④已完成主线重验；⑤已由 Accepted ADR 和独立 migration 注册表实施，⑥由 v1–v14 冻结指纹、`CORE_DATA_DEFINITIONS.md` 与 owner 规则共同约束。⑦–⑧继续按新 migration 标准和逐批数据核对实施，不得回写历史版本。
+
+### 当前兼容约束
+
+- v1–v14 的 `schema_migrations.checksum` 保持既有 `version:name` 算法，禁止批量重算或更新现场 ledger。
+- v1–v14 的源码内容必须匹配仓库冻结 SHA-256；任何修正都新建 v15+ migration。
+- v15+ 的 ledger checksum 使用注册表内容 SHA-256，并继续要求事务、空库/升级/重跑/失败测试。
+- schema head 只能从注册表导出；运行时、部署、readiness、报告和测试不得另建数字常量。

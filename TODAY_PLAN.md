@@ -350,3 +350,32 @@ PR #125 的综合 `test` 在两个 attempt 中均达到 15 分钟硬上限。两
 - `process:test` 8/8、`routes:check` 64 个文件、`routes:test` 16/16、`architecture:test` 36/36、`platform:iterations:test` 85/85 通过。
 - `npm run check`、`npm run deploy:check` 通过；`npm run test:all` 10/10 批全部通过。
 - 未修改运行时、API、数据库、审计行、受保护数据、报告、PDF、归档或发布制品。
+
+---
+
+## 2026-08-20 T00 SQLite migration 与核心 Schema 冻结实施
+
+- 分支：`process/t00-sqlite-migration-governance-20260820`
+- 基线：`origin/main@a15d10dc67a7fd89540d3073ece34b5d8c7b942e`
+- 决策：执行 Accepted ADR `2026-08-18-sqlite-migration-and-core-schema-freeze`，两个审批方向均已通过。
+- 目标：关闭 DATA-001/002，把 v1–v14 从组合根迁入独立连续注册表，冻结历史定义并统一公开 schema head v14。
+- 范围：migration registry/runner、`server.js` 委托、部署/生产就绪/发布门禁、因单一新增注册表依赖而精确校准的组合根 require 预算、专项测试和治理文档。
+- 非目标：不修改 `data/db.json`、SQLite/WAL/SHM、PostgreSQL、业务数据、API 字段形状、鉴权、审计语义、依赖或部署拓扑。
+
+### 兼容、风险与回滚
+
+- v1–v14 继续使用既有 `version:name` ledger checksum，避免拒绝已部署数据库；源码由固定内容 SHA-256 独立保护。
+- v15+ 才把内容 SHA-256 写入 ledger；runner 在迁移前拒绝非连续 ledger、名称或 checksum 漂移。
+- 每个 migration 与 ledger 插入在同一事务内；失败回滚不留下半结构或版本行。
+- 机械对比 `origin/main` 的内联 v1–v14 与新注册表（仅忽略新增指纹依赖元数据）完全相等：19,148 字符，SHA-256 `72a2e54a1943d2c6b7cd5bc94855461583b96d8c0da82bb874a5e3b0619c4832`。
+- 回滚代码提交即可恢复旧 runner；已存在 v1–v14 无数据变更。若未来已执行 v15+，必须使用对应前滚/恢复方案，不能改写历史 migration。
+
+### 测试先行与完成条件
+
+- 先新增空库、v11 升级、重跑、冻结指纹、ledger 漂移、未来 v15 checksum、失败回滚和 storageMeta v14 测试；旧实现按预期因模块缺失及版本 11 失败。
+- 实施后专项 migration/storage 测试 8/8、部署/readiness/release/static 契约测试 90/90 已通过。
+- `process:verify` 校验 27 个预期文件、2 个 T00 保护文件、0 越界；`process:test` 8/8、`routes:check` 64 个文件、`routes:test` 16/16、`architecture:test` 36/36、`platform:iterations:test` 85/85 通过。
+- `npm run check`、`npm run deploy:check` 通过；全量 Node `test:all` 10/10 批全部通过、0 失败。
+- 安装与 Playwright 1.61 lockfile 匹配的 Chromium 1228 到用户缓存后，CI 等价模式 E2E 36/36 通过；该安装不产生仓库 diff。
+- Windows 系统 Chrome 模式完整套件有一个既有顺序/共享服务状态问题（35/36），但该 spec 独立 13/13、单例 1/1 且 CI Chromium 36/36；已登记 TEST-005，不混改本切片业务代码。
+- 完成前继续执行只读 review、依赖审计和最终 diff 检查，并确认无受保护数据或生成制品进入 diff。

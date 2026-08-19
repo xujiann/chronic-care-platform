@@ -1,7 +1,7 @@
 # CURRENT ARCHITECTURE — 主线现状地图
 
-> 主线 AS-IS 快照：`main@6c182218cddebb639904b6537b351386dfbeeb67`
-> 采集日期：2026-08-19
+> 实施分支 AS-IS 快照：基于 `main@a15d10dc67a7fd89540d3073ece34b5d8c7b942e`
+> 采集日期：2026-08-20
 > 性质：AS-IS，只描述已存在实现，不表达目标状态或实施授权。
 
 ## 1. 系统轮廓
@@ -23,11 +23,11 @@ flowchart TB
   G --> H
 ```
 
-平台是一个模块化单体，但迁移并不完整：HTTP 路由已经模块化，组合根、种子数据、存储装配和大量领域函数仍集中在 `server.js`；浏览器应用仍以多个大体量全局脚本为主。
+平台是一个模块化单体，但迁移并不完整：HTTP 路由已经模块化，SQLite migration 注册表已从组合根分离，种子数据、存储装配和大量领域函数仍集中在 `server.js`；浏览器应用仍以多个大体量全局脚本为主。
 
 ## 2. 仓库结构
 
-主线跟踪 1,335 个文件，其中 JavaScript 924、Markdown 205、JSON 92、HTML 44。主要目录：
+本实施分支预计跟踪 1,388 个文件，其中 JavaScript 947、Markdown 233、JSON 94、HTML 44。主要目录：
 
 | 路径 | 作用 | 当前边界 |
 |---|---|---|
@@ -39,8 +39,8 @@ flowchart TB
 | `config/` | 进程、数据所有权、区域、迁移和发布策略 | 多数为机器可读治理事实 |
 | `data/` | 被跟踪的 `db.json` 开发/迁移输入 | 浏览器只读取运行时或构建时生成的 `public-demo.json`；生成物不入库 |
 | `deploy/` | SQL、systemd、Compose、环境模板和现场验证 | 生产证据默认 NO-GO |
-| `scripts/` | 测试、readiness、报告、部署和后台 worker | 168 个文件，职责和产物较分散 |
-| `test/` | Node test 与 Playwright | 393 个 test/spec 文件 |
+| `scripts/` | 测试、readiness、报告、部署和后台 worker | 169 个根级文件，职责和产物较分散 |
+| `test/` | Node test 与 Playwright | 405 个 test/spec 文件（400 Node、5 E2E） |
 | `regions/` | 多地区部署配置 | 由区域清单和发布注册表控制 |
 | `digital-hospital-standard-platform/` | 内嵌数智医院展示前端 | 独立页面但仍共享主仓发布生命周期 |
 | `resident-mini-program-platform/` | 居民小程序适配前端 | 独立页面但仍共享主仓发布生命周期 |
@@ -52,7 +52,7 @@ flowchart TB
 
 | 应用/入口 | 技术 | 责任 |
 |---|---|---|
-| Node API 服务 | `server.js` | 启动、依赖装配、会话、allowlist 静态读取、合成演示快照、API 调度、SQLite/JSON 兼容 |
+| Node API 服务 | `server.js` | 启动、依赖装配、会话、allowlist 静态读取、合成演示快照、API 调度、SQLite/JSON 兼容；SQLite DDL 委托独立注册表 |
 | 平台管理端 | `index.html`、`app.js` | 监管、资源、统计、公共卫生与治理入口 |
 | 居民端 | `citizen.html`、`citizen.js` | 居民档案、授权、慢病和服务旅程 |
 | 机构/医生/医保/县域端 | 对应 HTML/JS | 各角色工作台 |
@@ -74,9 +74,9 @@ flowchart TB
 
 1. 静态服务器与 Pages 现按 `config/static-publication.json` 的 44 个入口递归收集显式浏览器资源；未知路径统一 404。
 2. 浏览器和 Service Worker 已迁移到合成的 `data/public-demo.json`；`data/db.json` 不进入静态制品。
-3. `server.js` 仍约 28.8k 行；路由拆分没有同步拆完组合根和领域实现。
+3. `server.js` 仍约 28.2k 行；SQLite migration 已抽离约 550 行，但路由拆分没有同步拆完组合根和领域实现。
 4. `server.js` 与 `src/platform/cutover/pilot-cutover-alert-runtime.js` 存在运行时 `require` 环。
-5. SQLite migration 数组已到 v14，但 `STORAGE_SCHEMA_VERSION`、部署检查和测试仍声明 v11。
+5. SQLite v1–v14 已迁入 `src/platform/storage/sqlite-migrations.js` 并冻结内容指纹；`STORAGE_SCHEMA_VERSION`、部署检查和测试统一从注册表 head v14 派生。历史 ledger 的 v1–v14 checksum 保持兼容，v15 起写入内容 SHA-256。
 6. 主线没有统一的 `build`、`lint`、`typecheck`、`test:unit`、`test:integration`、`test:smoke` 脚本入口。
 7. 审计验证在组合根与留存脚本重复实现；当前 `passed` 不包含链接完整性，普通内容哈希漂移也可能通过，且部分 API 在验证前重封访问日志。
 
