@@ -70,6 +70,23 @@ liveTest("real PostgreSQL contract enforces shared auth state, schema health and
     duplicateClient.release();
   }
 
+  const reusedBatchId = buildPostgresSyncBatch(
+    [{ collection: "contract_settings", operation: "upsert", sourceVersion: 8, payload: { enabled: false } }],
+    { batchId: first.batchId, previousChainHash: "b".repeat(64) }
+  );
+  const conflictClient = await pool.connect();
+  try {
+    await assert.rejects(() => applyPostgresSyncBatch(conflictClient, reusedBatchId, { schema }), { code: "POSTGRES_SYNC_BATCH_ID_CONFLICT" });
+  } finally {
+    conflictClient.release();
+  }
+  const immutableBatch = await pool.query(`SELECT payload_sha256, previous_chain_hash, chain_hash FROM ${schema}.runtime_sync_batches WHERE batch_id = $1`, [first.batchId]);
+  assert.deepEqual(immutableBatch.rows[0], {
+    payload_sha256: first.payloadSha256,
+    previous_chain_hash: first.previousChainHash,
+    chain_hash: first.chainHash
+  });
+
   const equalVersionDrift = buildPostgresSyncBatch([{ collection: "contract_settings", operation: "upsert", sourceVersion: 7, payload: { enabled: false } }]);
   const driftClient = await pool.connect();
   try {
