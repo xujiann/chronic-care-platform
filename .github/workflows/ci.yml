@@ -57,7 +57,7 @@ jobs:
       - name: Install dependencies
         run: npm ci
       - name: Run every root unit and integration test
-        run: npm run test:all
+        run: npm run test:unit && npm run test:integration
 
   governance-api:
     runs-on: ubuntu-latest
@@ -91,7 +91,11 @@ jobs:
         run: npm run architecture:test
       - name: Verify parallel development-line contracts
         run: npm run development-lines:check && npm run development-lines:test && npm run development-lines:readiness
-      - name: Check JavaScript syntax
+      - name: Run standard lint and incremental type checks
+        run: npm run lint && npm run typecheck
+      - name: Run isolated runtime smoke tests
+        run: npm run test:smoke
+      - name: Check legacy JavaScript syntax baseline
         run: npm run check
       - name: Verify static publication security boundary
         run: npm run static:check && npm run static:test
@@ -139,6 +143,8 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm ci
+      - name: Build explicit public asset set
+        run: npm run build
       - name: Run deployment readiness gate
         run: npm run deploy:check
       - name: Inspect storage model

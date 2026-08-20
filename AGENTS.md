@@ -44,7 +44,10 @@ Before changing a protected runtime file, identify the process from the current
 ## Verification
 
 - Add deterministic unit tests for every new state transition, failure path and evidence gate.
-- Run the narrow test set while developing and `npm run test:all` before integration.
+- Run the narrow test set while developing. Before integration run `npm run build`,
+  `npm run lint`, `npm run typecheck`, `npm run test:unit`,
+  `npm run test:integration`, `npm run test:smoke`, and the unchanged legacy
+  full-discovery guard `npm run test:all`.
 - Run `npm run routes:check`, `npm run architecture:test`, `npm run process:test`, and `npm run platform:iterations:test` for central changes.
 - Do not weaken checks to make a merge pass. Any temporary branch-protection exception must be recorded and restored immediately after the authorized merge.
 

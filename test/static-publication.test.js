@@ -101,7 +101,11 @@ test("static consumers and Pages workflow use the sanitized publication boundary
     assert.doesNotMatch(content, /(?:fetch\(["']\.\/data\/db\.json|["']\.\/data\/db\.json["'])/, file);
   });
   const workflow = fs.readFileSync(path.join(ROOT, ".github", "workflows", "pages.yml"), "utf8");
-  assert.match(workflow, /static-publication\.js build/);
+  const packageJson = JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8"));
+  const standardBuild = fs.readFileSync(path.join(ROOT, "scripts", "standard-build.js"), "utf8");
+  assert.match(workflow, /npm run build -- --output="\$RUNNER_TEMP\/pages-site"/);
+  assert.equal(packageJson.scripts.build, "node scripts/standard-build.js");
+  assert.match(standardBuild, /buildStaticPublication/);
   assert.match(workflow, /path: \$\{\{ runner\.temp \}\}\/pages-site/);
   assert.doesNotMatch(workflow, /path:\s*\.\s*$/m);
 });

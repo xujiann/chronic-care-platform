@@ -18,7 +18,7 @@
 | 1 | 静态内容 allowlist 与快照隔离 | 已合入 `main@6c18221`；PR/main CI 与 Pages 验证通过 | 持续执行清单审查、负向测试与缓存版本治理 |
 | 2 | 审计链失败语义 | Proposed ADR 已形成 / P0；未授权实施 | T00、T01、审计/留存 Owner 批准严格语义、API 兼容和旧链迁移 |
 | 3 | Schema v14/v11 一致与 migration 指纹 | 已按 Accepted ADR 实施 / P1 | 以专项测试及 PR/main CI 为完成门禁；后续 v15+ 按冻结规则追加 |
-| 4 | 标准 build/lint/typecheck/unit/integration/smoke 入口 | 候选 / P1 | 不改变现有 test:all 语义，CI 映射和测试分类评审 |
+| 4 | 标准 build/lint/typecheck/unit/integration/smoke 入口 | 已按明确审批实施，待 PR/main 验证 / P1 | 保持 test:all 语义；逐步扩大 lint/typecheck 基线并治理测试时长 |
 | 5 | 移除组合根循环依赖 | 候选 / P1 | 特征测试；provider 注入方案；架构测试 |
 | 6 | OTP/锁定共享状态 | 待 ADR / P1 | 共享 TTL 存储、并发/重启/多实例测试 |
 | 7 | 运行时上下文瘦身 | 候选 / P1 | 按领域子端口，逐块迁移，不重写 server |

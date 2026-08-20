@@ -24,7 +24,7 @@
 | technical evidence | T00 | B | 稳定共享但入度 22 | 固化版本化契约 |
 | platform data/storage | T00/T02 | B | 契约、CAS、outbox 测试较强 | 修复版本治理后逐步 KEEP |
 | alert cutover runtime | T00 | C | 反向 require server 形成环 | 始终注入 provider |
-| CI/readiness pipeline | T00 | B | 已按风险域拆分并保留 fail-closed 聚合门禁 | 继续治理供应链固定与 worker 观测 |
+| CI/readiness pipeline | T00 | B | 已按风险域拆分、建立六个标准入口并保留 fail-closed 聚合门禁 | 扩大静态检查基线，继续治理测试性能、供应链固定与 worker 观测 |
 
 ## 领域模块
 

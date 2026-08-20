@@ -47,6 +47,21 @@ http://localhost:5173/login.html
 
 静态预览可以直接打开 HTML；GitHub Pages 只发布 `config/static-publication.json` 声明的资源图，并读取生成的 `data/public-demo.json` 脱敏演示快照。静态模式不能执行 Node API 写入、会话、审计和工作流动作。
 
+## 标准工程入口
+
+```powershell
+npm.cmd run build
+npm.cmd run lint
+npm.cmd run typecheck
+npm.cmd run test:unit
+npm.cmd run test:integration
+npm.cmd run test:smoke
+```
+
+`build` 默认写入系统临时目录，不在仓库生成发布制品；Pages 通过同一入口显式写入
+runner 临时目录。unit 与 integration 完整且不重叠地覆盖根 Node 测试，smoke 使用临时
+JSON 数据目录启动隔离服务。`test:all` 保持原自动发现语义，合入前仍需运行。
+
 ## 演示账号
 
 统一密码：
