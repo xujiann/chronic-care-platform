@@ -14,6 +14,7 @@ const {
 } = require("../src/identity-security/session-security-audit");
 const { createRouteSegments: createIdentitySegments } = require("../src/http/routes/identity-security");
 const { createRouteSegments: createRuntimeSegments } = require("../src/http/routes/runtime");
+const { createAuthSecurityStateStore } = require("../auth-security-state-store");
 
 function prependAuditTrailEntry(rows, entry) {
   return [{ ...entry, previousAuditHash: "", auditHash: `hash-${entry.id}` }, ...(rows || [])];
@@ -27,6 +28,21 @@ function responseCapture() {
       this.statusCode = status;
       this.body = body;
     }
+  };
+}
+
+function memoryAuthSecurityRuntime() {
+  const store = createAuthSecurityStateStore({
+    mode: "memory",
+    env: { NODE_ENV: "test" },
+    keySecret: "t01-runtime-identity-hardening-test-key"
+  });
+  return {
+    authLoginLockStatus: (input) => store.getLoginLock(input),
+    clearAuthLoginFailures: (input) => store.clearLoginFailures(input),
+    consumeAuthRateLimit: (input) => store.consumeRateLimit(input),
+    recordAuthLoginFailure: (input) => store.recordLoginFailure(input),
+    requestRateLimitSubject: () => "t01-test-network"
   };
 }
 
@@ -330,6 +346,7 @@ test("identity login persists a structured audit linked to the server correlatio
   let sequence = 0;
   const response = responseCapture();
   const runtime = {
+    ...memoryAuthSecurityRuntime(),
     appendSecurityEvent: () => {},
     collectJson: async () => ({ username: "city", password: "correct" }),
     createSession: async (user) => ({
@@ -374,6 +391,7 @@ test("local password failures lock the account path and audit every denial", asy
   let sequence = 0;
   let passwordValid = false;
   const runtime = {
+    ...memoryAuthSecurityRuntime(),
     collectJson: async () => ({ username: "locked-user", password: "wrong" }),
     createSession: async (user) => ({ sessionId: "unused", token: "unused", expiresAt: "2026-08-18T00:00:00.000Z", user }),
     findAuthUser: () => data.authUsers[0],
