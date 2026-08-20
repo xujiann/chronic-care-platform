@@ -78,7 +78,8 @@ flowchart TB
 4. `server.js` 与 `src/platform/cutover/pilot-cutover-alert-runtime.js` 存在运行时 `require` 环。
 5. SQLite v1–v14 已迁入 `src/platform/storage/sqlite-migrations.js` 并冻结内容指纹；`STORAGE_SCHEMA_VERSION`、部署检查和测试统一从注册表 head v14 派生。历史 ledger 的 v1–v14 checksum 保持兼容，v15 起写入内容 SHA-256。
 6. TEST-001 候选已建立统一的 `build`、`lint`、`typecheck`、`test:unit`、`test:integration`、`test:smoke` 入口；build 复用静态发布 allowlist 并默认输出到仓库外，unit/integration 完整分区根测试，smoke 独立启动临时 JSON 运行时。lint 仍有 3 个文件的精确遗留规则例外，typecheck 当前只覆盖 6 个治理/安全边界文件。
-7. 审计验证在组合根与留存脚本重复实现；当前 `passed` 不包含链接完整性，普通内容哈希漂移也可能通过，且部分 API 在验证前重封访问日志。
+7. 审计验证已收敛到 `src/identity-security/audit-chain.js` 的 v2 严格端口；内容、链接、结构和重复 ID 任一异常均失败，验证 API/合规报告不再读取时重封。全量状态写入中的审计数组由服务端管理。
+8. 机器 API 授权矩阵扫描全部模块化路由源码的 `requireApiRole` 声明，并对九条高风险接口锁定 owner、角色、范围和用途；CI 对声明数量和高风险唯一性 fail closed。
 
 ## 6. T06 五子域治理切片
 

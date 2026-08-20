@@ -26,7 +26,7 @@
 | 组合根 | `server.js`、`src/http/platform-runtime-composition.js` | 仍向上下文注入数百个函数，耦合中心 |
 | 路由器 | `src/http/api-router.js`、`src/http/routes/index.js` | 固定顺序、ID 唯一、响应短路，结构清楚 |
 | 运行时上下文 | `src/http/runtime-contexts/` | 领域依赖列表显式，但 public-health 160 项、care 102 项，接口过宽 |
-| 身份安全 | `src/identity-security/`、`session-store.js` | Cookie/CSRF、策略、会话仓储和审计已模块化 |
+| 身份安全 | `src/identity-security/`、`session-store.js` | Cookie/CSRF、策略、会话仓储和 v2 审计链验证已模块化 |
 | 平台数据 | `src/platform/data/`、`src/platform/storage/` | 数据所有权、SQLite migration 注册表/runner、PostgreSQL 主存储契约 |
 | 领域事件 | `src/platform/events/`、各领域 worker | outbox/inbox、幂等和后台投递 |
 | 区域运行 | `src/platform/regional/`、`regions/` | 多地区清单、能力包、复制和发布注册 |
@@ -64,7 +64,7 @@ server.js
 - 252 个 JSON 集合中仅 83 个进入数据所有权清单；其余被策略标为 legacy-non-authoritative。
 - 许多 readiness/report 脚本重复读取 `data/db.json` 并各自产生报告，证据生成接口尚未统一。
 - 静态发布与 storage-admin 原有脱敏逻辑已收敛到同一纯函数；其他报告脚本的重复读取仍未治理。
-- `server.js` 与 `scripts/audit-retention.js` 各维护一份同语义 `verifyAuditTrail`；宽松失败判定和后续修复必须通过一个版本化安全端口统一，不能分别修改。
+- `server.js` 与 `scripts/audit-retention.js` 已统一消费 `src/identity-security/audit-chain.js`；审计验证不再保留两份平行语义。
 
 ## 6. 超大文件
 

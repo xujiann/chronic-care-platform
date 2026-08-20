@@ -19,6 +19,8 @@ flowchart LR
   MIG --> STORE
   DOMAIN --> EXT["external adapters"]
   DOMAIN --> EVT["outbox / audit / evidence"]
+  HTTP --> AUDIT["audit-chain v2"]
+  EVT --> AUDIT
 ```
 
 期望方向大体存在，但组合根仍把大量底层函数直接注入路由上下文，领域模块也可能回读根模块。

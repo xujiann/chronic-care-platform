@@ -99,6 +99,8 @@ jobs:
         run: npm run check
       - name: Verify static publication security boundary
         run: npm run static:check && npm run static:test
+      - name: Verify API authorization matrix
+        run: npm run api:authorization-matrix
       - name: Run blood system readiness gate
         run: npm run blood-system:readiness
       - name: Run emergency collaboration API gate
