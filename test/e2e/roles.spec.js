@@ -14,9 +14,12 @@ function integrationSignature(payload) {
 }
 
 async function login(page, username, expectedPage) {
+  if (page.url() !== "about:blank") {
+    await page.waitForLoadState("domcontentloaded");
+    await page.evaluate(() => localStorage.removeItem("health-city-auth-session"));
+  }
   await page.context().clearCookies();
   await page.goto("/login.html");
-  await page.evaluate(() => localStorage.removeItem("health-city-auth-session"));
   await page.locator("#login-user").selectOption(username);
   await page.locator("input[name='password']").fill("123456");
   await page.locator("#login-form button[type='submit']").click();
