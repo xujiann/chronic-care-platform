@@ -155,6 +155,8 @@ jobs:
         run: npm run identity:contract
       - name: Generate audit retention report
         run: npm run audit:retention
+      - name: Verify continuous audit delivery controls
+        run: npm run audit:delivery:test
       - name: Generate chronic follow-up readiness report
         run: npm run chronic:followup-readiness
       - name: Generate chronic informatization source report
