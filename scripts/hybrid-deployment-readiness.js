@@ -49,19 +49,24 @@ function buildHybridDeploymentReadinessReport(options = {}) {
   const serviceTemplate = options.serviceTemplate ?? readText("deploy/chronic-care-platform.service.template");
   const staticPublicationSource = options.staticPublicationSource ?? readText("config/static-publication.json");
   const pagesWorkflowSource = options.pagesWorkflowSource ?? readText(".github/workflows/pages.yml");
+  const standardBuildSource = options.standardBuildSource ?? readText("scripts/standard-build.js");
 
   const productionTracks = Array.isArray(data.productionDeploymentPlan) ? data.productionDeploymentPlan : [];
   const requiredScripts = ["dev", "hybrid:deployment-readiness", "deploy:check", "release:report", "release:manifest", "env:check", "deployment:package", "deployment:verify"];
   const staticEntries = ["index.html", "login.html", "workbench.html", "citizen.html", "institution.html", "insurance.html", "county.html"];
   const dynamicRoutes = ["/api/health", "/api/auth/login", "/api/auth/me", "/api/state", "/api/metrics"];
   const envVars = ["PORT", "NODE_ENV", "STORAGE_ENGINE", "DATA_DIR", "SESSION_SECRETS", "INTEGRATION_GATEWAY_SECRET", "DEPLOYMENT_SECRET_PROVIDER", "DEPLOYMENT_RELEASE_ID", "DEPLOYMENT_ARTIFACT_DIGEST"];
+  const directStaticPublication = hasText(pagesWorkflowSource, /static-publication\.js build/);
+  const standardStaticPublication = hasText(pagesWorkflowSource, /npm run build -- --output=/)
+    && pkg.scripts?.build === "node scripts/standard-build.js"
+    && hasText(standardBuildSource, /buildStaticPublication/);
 
   const topology = {
     staticPreview: {
       entries: staticEntries,
       documented: hasText(readme, /public-demo\.json|脱敏演示快照/i) && hasText(deployment, /public-demo\.json|显式发布/i),
       snapshotFallback: hasText(sharedSource, /data\/public-demo\.json/) && hasText(sharedSource, /localStorage/),
-      explicitPublication: hasText(staticPublicationSource, /data\/public-demo\.json/) && hasText(pagesWorkflowSource, /static-publication\.js build/) && !hasText(pagesWorkflowSource, /path:\s*\.\s*$/m),
+      explicitPublication: hasText(staticPublicationSource, /data\/public-demo\.json/) && (directStaticPublication || standardStaticPublication) && !hasText(pagesWorkflowSource, /path:\s*\.\s*$/m),
       pageHostCannotRunNode: hasText(deployment, /GitHub Pages/) && hasText(deployment, /Node\.js|Node API|server\.js/)
     },
     dynamicBackend: {

@@ -74,6 +74,9 @@ LEGACY CODE → TEST PROTECTION → REFACTOR
 
 | 目的 | 命令 |
 |---|---|
+| 标准构建 | `npm run build`（默认写入仓库外临时目录） |
+| 静态检查 | `npm run lint`、`npm run typecheck` |
+| 标准测试分类 | `npm run test:unit`、`npm run test:integration`、`npm run test:smoke` |
 | 语法 | `npm run check` |
 | 全量自动发现 | `npm run test:all` |
 | 路由 | `npm run routes:check`、`npm run routes:test` |
@@ -83,7 +86,12 @@ LEGACY CODE → TEST PROTECTION → REFACTOR
 | E2E | `npm run test:e2e` |
 | 部署 | `npm run deploy:check` |
 
-目标标准入口 `build`、`lint`、`typecheck`、`test:unit`、`test:integration`、`test:smoke` 当前缺失。建立它们是独立的 T00 工具链任务；在建立前不得伪称已运行。
+六个标准入口已在 TEST-001 T00 切片建立。`test:unit` 与
+`test:integration` 对根 `test/*.test.js` 形成不重叠且完整的分区，`test:smoke`
+是可快速独立运行的精选集合；`test:all` 的自动发现语义保持不变。`lint`
+覆盖仓库 JavaScript，但对 3 个已登记遗留文件保留精确规则级例外；`typecheck`
+是 6 个治理/安全边界文件的增量基线，不得表述为全仓类型检查。扩大基线时应先清债，
+不得用全局关闭规则换取通过。
 
 ## 9. 变更风险门禁
 

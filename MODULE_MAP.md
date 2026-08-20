@@ -107,3 +107,14 @@ server.js
 ## 9. SQLite migration 模块
 
 `src/platform/storage/sqlite-migrations.js` 是 T00 管理的单一注册表和执行入口。`server.js` 只消费 `SQLITE_SCHEMA_HEAD` 与 `applySqliteMigrations`；部署检查、生产数据库 readiness 和发布报告消费同一注册表校验结果。v1–v14 定义保持原执行顺序和历史 ledger checksum，独立冻结指纹阻止源码漂移；v15 及以后必须使用内容指纹作为 ledger checksum。该模块不拥有业务数据，不允许领域模块绕过注册表执行 DDL。
+
+## 10. 标准工程门禁模块
+
+- `scripts/standard-build.js` 是标准构建适配器，委托既有 `static-publication`
+  allowlist；默认使用系统临时目录，显式输出仍必须位于仓库外。
+- `scripts/run-standard-test-suite.js` 与 `config/standard-test-suites.json` 管理测试分类；
+  integration 冻结旧 `npm test` 清单，unit 是 `test:all` 根测试集合的精确补集，smoke
+  只保留隔离启动与发布健康检查。
+- `eslint.config.js` 与 `jsconfig.typecheck.json` 是渐进式静态质量边界，不拥有业务接口。
+  Pages、complete-unit-test、governance-api 和 release-readiness 只消费这些标准入口；
+  `test:all` 仍是独立的自动发现回归保护。

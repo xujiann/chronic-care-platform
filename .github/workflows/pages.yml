@@ -24,7 +24,7 @@ jobs:
         with:
           node-version: 24
       - name: Build explicit public asset set
-        run: node scripts/static-publication.js build --output="$RUNNER_TEMP/pages-site"
+        run: npm run build -- --output="$RUNNER_TEMP/pages-site"
       - name: Configure Pages
         uses: actions/configure-pages@v6
       - name: Upload Pages artifact

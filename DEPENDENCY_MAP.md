@@ -49,9 +49,12 @@ server.js
 | 生产 npm | `pg ^8.22.0` | PostgreSQL 适配器；官方 npm audit 为 0 |
 | 测试 | `@playwright/test ^1.61.0` | 浏览器 E2E |
 | 覆盖率 | `c8 ^11.0.0` | 只 include `server.js` |
+| 静态质量（开发） | `eslint 9.39.5`、`typescript 7.0.2`、`@types/node 22.20.1` | 精确版本；Node `>=22.5` 兼容；不进入生产依赖 |
 | 平台内置 | http/fs/path/crypto/https | 无 Web 框架，路由和静态服务自行实现 |
 
-主线没有 ESLint、TypeScript 或独立 build 工具依赖，也没有相应标准脚本。增加依赖前必须先证明现有能力不足。
+标准 build 继续使用 Node 内置模块和既有静态发布代码，没有引入 bundler。ESLint、
+TypeScript 与 Node 类型仅用于开发门禁；lockfile audit 已修复 c8 传递链中的
+`brace-expansion` 漏洞，当前完整依赖树与生产依赖树均为 0 vulnerabilities。
 
 ## 4. 浏览器依赖
 
@@ -113,6 +116,8 @@ JSON 源快照仍是高扇出依赖，但浏览器和 Pages 只依赖经统一�
   browser-e2e 和 release-readiness 各为 15 分钟，聚合 test 为 5 分钟。
 - Chromium 安装和 Playwright E2E 独占 browser-e2e runner；发布、数据库、安全、报告和
   部署证据在 release-readiness 并行执行，不再共享浏览器外部依赖的时间预算。
+- complete-unit-test 依次运行标准 unit/integration，governance-api 运行 lint/typecheck/smoke，
+  release-readiness 和 Pages 运行标准 build；required check 名称和 fail-closed 聚合保持不变。
 - 主分支必需检查名称仍为 `complete-unit-test` 与 `test`。聚合 test 使用 `always()`
   并要求三个风险域结果全部为 success，失败、取消和跳过均 fail-closed。
 - GitHub Actions 使用 `@vN` 标签而非 commit SHA。

@@ -379,3 +379,36 @@ PR #125 的综合 `test` 在两个 attempt 中均达到 15 分钟硬上限。两
 - 安装与 Playwright 1.61 lockfile 匹配的 Chromium 1228 到用户缓存后，CI 等价模式 E2E 36/36 通过；该安装不产生仓库 diff。
 - Windows 系统 Chrome 模式完整套件有一个既有顺序/共享服务状态问题（35/36），但该 spec 独立 13/13、单例 1/1 且 CI Chromium 36/36；已登记 TEST-005，不混改本切片业务代码。
 - 完成前继续执行只读 review、依赖审计和最终 diff 检查，并确认无受保护数据或生成制品进入 diff。
+
+---
+
+## 2026-08-20 T00 TEST-001 标准工程门禁实施
+
+- 分支：`process/t00-standard-engineering-gates-20260820`。
+- 基线：`origin/main@026762fc9a5854f4b5dc953e0563372380f9221e`。
+- 审批：TEST-001 方案、`eslint 9.39.5`、`typescript 7.0.2`、
+  `@types/node 22.20.1` 三个开发依赖及 CI 映射均已明确通过。
+- 范围：六个标准 npm 入口、测试分类配置、隔离 smoke、CI/Pages 映射、契约测试和治理文档。
+- 非目标：不改应用运行时、API、鉴权、审计、数据库、schema、migration、数据或部署拓扑；
+  `test:all` 自动发现语义不变。
+- 构建：标准 build 委托既有静态发布 allowlist，默认写入系统临时目录；Pages 只向
+  runner 临时目录发布净化制品。
+- 测试分类：根测试共 402 个文件，unit 338、integration 64，二者无交集且并集完整；
+  smoke 精选 2 个文件并使用临时数据目录和随机端口。
+- CI：complete-unit-test 运行 unit/integration，governance-api 运行
+  lint/typecheck/smoke，release-readiness 与 Pages 运行 build；required check 名称与
+  fail-closed 聚合不变。
+- 静态基线：lint 仅对 3 个遗留文件保留精确规则例外；typecheck 先覆盖 6 个治理/安全
+  文件。遗留例外和约 174 秒的超大 API 集成测试已登记 TEST-006。
+- 测试先行：新增契约在旧实现下 0/6，实施后目标测试 10/10；旧 Pages 直连构建断言和
+  hybrid readiness 已同步为可验证的标准构建委托链。
+- 已通过：`npm run build`、`npm run lint`、`npm run typecheck`、
+  `npm run test:unit`、`npm run test:integration`、`npm run test:smoke`；完整依赖树与
+  生产依赖 audit 最终均为 0 vulnerabilities；`test:all` 402 个文件、11/11 批通过，
+  `deploy:check` 通过。
+- 覆盖门禁首次运行 194/194 测试通过但行覆盖 84.94%，暴露标准 smoke 未进入既有
+  覆盖命令；未下调 85/85/55 阈值，而是把六个 fail-closed 生产就绪出口加入 smoke
+  断言并纳入覆盖命令。复验 195/195，通过率为行 85.64%、函数 88.26%、分支 56.37%。
+- 本地默认系统 Chrome 复现既有 TEST-005（35/36，同一慢服务恢复用例）；CI 等价的
+  已安装 Chromium 模式 36/36 通过，未修改小程序业务代码或浏览器配置。
+- 回滚：回退本切片即可恢复旧脚本与 workflow；没有数据迁移、运行时状态或制品恢复步骤。
