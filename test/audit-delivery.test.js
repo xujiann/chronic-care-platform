@@ -9,6 +9,7 @@ const { auditHashFor } = require("../src/identity-security/audit-chain");
 const {
   assessAuditDeliveryConfig,
   buildAuditBatch,
+  createPilotCutoverAuditLifecycleBridge,
   createSecureAuditTransport,
   createSiemAuditAdapter,
   createWormAuditAdapter,
@@ -123,6 +124,35 @@ test("delivery lifecycle maps failure acknowledgement and recovery onto existing
   });
   assert.equal(recovered.incidentTransition, "recovered");
   assert.deepEqual(events.map((item) => item.type), ["opened", "acknowledged", "recovered"]);
+});
+
+test("normal success has no orphan acknowledgement and WORM never maps into SIEM alert lifecycle", async () => {
+  const events = [];
+  const success = await runAuditDeliveryCycle({
+    adapter: { async deliver(batch) { return { receiptId: "receipt", batchId: batch.batchId, digest: batch.digest, recordCount: batch.recordCount }; } },
+    records: RECORDS,
+    lifecycle: async (type) => events.push(type)
+  });
+  assert.equal(success.ok, true);
+  assert.deepEqual(events, []);
+  assert.equal(createPilotCutoverAuditLifecycleBridge({ adapterKind: "worm-filesystem", file: "must-not-be-used" }), null);
+});
+
+test("WORM delivery failures emit operational control signals without a cutover alert route", async (t) => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "audit-worm-signal-"));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const sqliteFile = path.join(directory, "audit.sqlite");
+  const checkpointFile = path.join(directory, "checkpoint.json");
+  createAuditDatabase(sqliteFile);
+  const signals = [];
+  const adapter = {
+    status: () => ({ type: "worm-filesystem" }),
+    async deliver() { throw Object.assign(new Error("WORM unavailable"), { code: "AUDIT_WORM_UNAVAILABLE" }); }
+  };
+  const result = await runWorker({ sqliteFile, checkpointFile, adapter, env: {}, emitOperationalSignal: async (signal) => signals.push(signal) });
+  assert.equal(result.ok, false);
+  assert.equal(signals.length, 1);
+  assert.equal(signals[0].id, "audit-write-failure");
 });
 
 test("worker checkpoint v2 prevents redelivery rollback corruption and concurrent ownership", async (t) => {

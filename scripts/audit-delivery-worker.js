@@ -173,10 +173,15 @@ async function runWorker(options = {}) {
     const checkpoint = readCheckpoint(checkpointFile);
     const pending = loadAuditRecords(path.resolve(sqliteInput), checkpoint.deliveredDigests);
     const selected = pending.slice(0, Math.min(1000, Math.max(1, Number(env.AUDIT_DELIVERY_BATCH_SIZE || 200) || 200)));
+    const adapter = options.adapter || createConfiguredAdapter(env);
+    const adapterKind = String(adapter.status?.().type || "custom");
     const lifecycle = options.lifecycle || (env.PLATFORM_PILOT_CUTOVER_ALERT_JOURNAL_FILE
-      ? createPilotCutoverAuditLifecycleBridge({ file: path.resolve(env.PLATFORM_PILOT_CUTOVER_ALERT_JOURNAL_FILE), actorAccount: env.AUDIT_DELIVERY_SERVICE_USER || "audit-delivery-worker" })
+      ? createPilotCutoverAuditLifecycleBridge({ adapterKind, file: path.resolve(env.PLATFORM_PILOT_CUTOVER_ALERT_JOURNAL_FILE), actorAccount: env.AUDIT_DELIVERY_SERVICE_USER || "audit-delivery-worker" })
       : null);
-    const result = await runAuditDeliveryCycle({ adapter: options.adapter || createConfiguredAdapter(env), records: selected.map(({ trail, record }) => ({ trail, record })), previousIncidentOpen: checkpoint.incidentOpen, lifecycle });
+    const result = await runAuditDeliveryCycle({ adapter, records: selected.map(({ trail, record }) => ({ trail, record })), previousIncidentOpen: checkpoint.incidentOpen, lifecycle });
+    if (!result.ok && adapterKind === "worm-filesystem" && typeof options.emitOperationalSignal === "function") {
+      await options.emitOperationalSignal(auditWriteFailureSignal({ code: result.errorCode }));
+    }
     const next = {
       sequence: checkpoint.sequence,
       previousCheckpointDigest: checkpoint.checkpointDigest,

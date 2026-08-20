@@ -250,6 +250,7 @@ function createSiemAuditAdapter(options = {}) {
 }
 
 function createPilotCutoverAuditLifecycleBridge(options = {}) {
+  if (options.adapterKind !== "siem-https") return null;
   const file = options.file;
   const actorAccount = options.actorAccount || "audit-delivery-worker";
   return async (type, context) => {
@@ -279,8 +280,10 @@ async function runAuditDeliveryCycle(options = {}) {
   const batch = buildAuditBatch(records, options);
   try {
     const receipt = await options.adapter.deliver(batch);
-    if (options.lifecycle) await options.lifecycle("acknowledged", { batch, receipt, recordedAt: options.recordedAt });
-    if (options.previousIncidentOpen && options.lifecycle) await options.lifecycle("recovered", { batch, receipt, recordedAt: options.recordedAt });
+    if (options.previousIncidentOpen && options.lifecycle) {
+      await options.lifecycle("acknowledged", { batch, receipt, recordedAt: options.recordedAt });
+      await options.lifecycle("recovered", { batch, receipt, recordedAt: options.recordedAt });
+    }
     return { ok: true, delivered: batch.recordCount, incidentTransition: options.previousIncidentOpen ? "recovered" : "none", receipt };
   } catch (error) {
     const errorCode = String(error?.code || "AUDIT_DELIVERY_FAILED").slice(0, 120);
