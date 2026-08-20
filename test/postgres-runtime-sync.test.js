@@ -18,7 +18,9 @@ const {
   loadPendingPostgresSyncBatches,
   loadSqliteCollectionState,
   markPostgresSyncBatch,
+  postgresSchemaIdentifier,
   postgresPoolConfig,
+  probePostgresInfrastructure,
   readLatestPostgresReconciliation,
   readPostgresReconciliationCase,
   readPostgresReconciliationRun,
@@ -198,10 +200,77 @@ test("PostgreSQL apply uses a transaction and treats duplicate batches as delive
   const duplicateClient = {
     async query(sql) {
       if (/RETURNING batch_id/.test(sql)) return { rowCount: 0, rows: [] };
+      if (/SELECT payload_sha256, previous_chain_hash, chain_hash/.test(sql)) {
+        return { rowCount: 1, rows: [{
+          payload_sha256: batch.payloadSha256,
+          previous_chain_hash: batch.previousChainHash,
+          chain_hash: batch.chainHash
+        }] };
+      }
       return { rowCount: 0, rows: [] };
     }
   };
   assert.equal((await applyPostgresSyncBatch(duplicateClient, batch)).duplicate, true);
+});
+
+test("PostgreSQL apply rejects a reused batch id with different immutable content", async () => {
+  const batch = buildPostgresSyncBatch([{ collection: "residents", operation: "upsert", sourceVersion: 1, payload: [{ id: "r1" }] }]);
+  const queries = [];
+  const client = {
+    async query(sql) {
+      queries.push(sql);
+      if (/RETURNING batch_id/.test(sql)) return { rowCount: 0, rows: [] };
+      if (/SELECT payload_sha256, previous_chain_hash, chain_hash/.test(sql)) {
+        return { rowCount: 1, rows: [{
+          payload_sha256: "f".repeat(64),
+          previous_chain_hash: batch.previousChainHash,
+          chain_hash: batch.chainHash
+        }] };
+      }
+      return { rowCount: 0, rows: [] };
+    }
+  };
+  await assert.rejects(() => applyPostgresSyncBatch(client, batch), { code: "POSTGRES_SYNC_BATCH_ID_CONFLICT" });
+  assert.equal(queries.at(-1), "ROLLBACK");
+  assert.equal(queries.includes("COMMIT"), false);
+});
+
+test("PostgreSQL apply accepts equal-version identical digests but rejects equal-version payload drift", async () => {
+  const batch = buildPostgresSyncBatch([{ collection: "settings", operation: "upsert", sourceVersion: 7, payload: { enabled: true } }]);
+  const change = JSON.parse(batch.payload).changes[0];
+  const clientFor = (digest) => ({
+    queries: [],
+    async query(sql) {
+      this.queries.push(sql);
+      if (/RETURNING batch_id/.test(sql)) return { rowCount: 1, rows: [{ batch_id: batch.batchId }] };
+      if (/SELECT payload_sha256, source_version/.test(sql)) return { rowCount: 1, rows: [{ payload_sha256: digest, source_version: 7 }] };
+      return { rowCount: 1, rows: [] };
+    }
+  });
+  const identical = clientFor(change.payloadSha256);
+  assert.equal((await applyPostgresSyncBatch(identical, batch)).applied, true);
+  assert.equal(identical.queries.some((sql) => /INSERT INTO health_platform\.runtime_collection_state/.test(sql)), false);
+
+  const drift = clientFor("e".repeat(64));
+  await assert.rejects(() => applyPostgresSyncBatch(drift, batch), { code: "POSTGRES_SYNC_VERSION_CONFLICT" });
+  assert.equal(drift.queries.at(-1), "ROLLBACK");
+  assert.equal(drift.queries.includes("COMMIT"), false);
+});
+
+test("PostgreSQL apply rejects an equal-version tombstone and keeps the existing payload", async () => {
+  const batch = buildPostgresSyncBatch([{ collection: "settings", operation: "delete", sourceVersion: 7 }]);
+  const queries = [];
+  const client = {
+    async query(sql) {
+      queries.push(sql);
+      if (/RETURNING batch_id/.test(sql)) return { rowCount: 1, rows: [{ batch_id: batch.batchId }] };
+      if (/SELECT payload_sha256, source_version/.test(sql)) return { rowCount: 1, rows: [{ payload_sha256: "a".repeat(64), source_version: 7 }] };
+      return { rowCount: 1, rows: [] };
+    }
+  };
+  await assert.rejects(() => applyPostgresSyncBatch(client, batch), { code: "POSTGRES_SYNC_VERSION_CONFLICT" });
+  assert.equal(queries.some((sql) => /^DELETE FROM/.test(sql.trim())), false);
+  assert.equal(queries.at(-1), "ROLLBACK");
 });
 
 test("PostgreSQL worker marks successful attempts without exposing connection details", async (t) => {
@@ -419,4 +488,27 @@ test("PostgreSQL pool and CLI contracts require secure explicit configuration", 
     summary: { localCollections: 1, remoteCollections: 1, matched: 1, mismatched: 0 },
     differences: []
   }), /contains no business payloads or database credentials/);
+});
+
+test("PostgreSQL infrastructure probe validates the target schema without leaking connection errors", async () => {
+  const queries = [];
+  const pool = {
+    async query(sql, params) {
+      queries.push({ sql, params });
+      return { rows: ["auth_security_state", "auth_sessions", "runtime_collection_state", "runtime_sync_batches"].map((table_name) => ({ table_name })) };
+    }
+  };
+  const report = await probePostgresInfrastructure({ pool, schema: "tenant_alpha" });
+  assert.equal(report.ok, true);
+  assert.equal(report.productionPrimary, false);
+  assert.deepEqual(queries[0].params[0], "tenant_alpha");
+  assert.equal(postgresSchemaIdentifier("tenant_alpha"), "tenant_alpha");
+  assert.throws(() => postgresSchemaIdentifier("tenant-alpha;drop schema public"), /lowercase SQL identifier/);
+
+  const failed = await probePostgresInfrastructure({
+    pool: { async query() { const error = new Error("postgres://user:secret@db/internal"); error.code = "ECONNREFUSED"; throw error; } },
+    schema: "tenant_alpha"
+  });
+  assert.equal(failed.errorCode, "ECONNREFUSED");
+  assert.doesNotMatch(JSON.stringify(failed), /user:secret|internal/);
 });

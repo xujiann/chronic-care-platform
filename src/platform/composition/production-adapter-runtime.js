@@ -141,7 +141,8 @@ function createProductionAdapterRuntime(options = {}) {
     if (!repositories.has(id)) {
       const factoryOptions = {
         env,
-        pool: options.pools?.[id]
+        pool: options.pools?.[id] || options.pools?.shared,
+        schema: env.POSTGRES_SCHEMA || "health_platform"
       };
       if (id === "identity" || id === "emergency") {
         factoryOptions.poolTlsVerification = options.poolSecurityEvidence?.[id];

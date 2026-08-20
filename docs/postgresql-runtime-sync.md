@@ -27,7 +27,7 @@ npm.cmd run postgres:sync-worker -- --sqlite-file=D:\platform-data\health-city.s
 npm.cmd run postgres:shadow-reconcile -- --sqlite-file=D:\platform-data\health-city.sqlite --output=D:\platform-logs\postgres-shadow-reconciliation.json --markdown=D:\platform-logs\postgres-shadow-reconciliation.md
 ```
 
-worker 在队列为空时仍会校验 PostgreSQL 连接配置，但不会输出连接串。远端批次使用 `health_platform.runtime_sync_batches` 去重，集合状态写入 `health_platform.runtime_collection_state`；低版本批次不能覆盖更高版本状态。
+worker 在队列为空时仍会校验 PostgreSQL 连接配置，但不会输出连接串。默认 schema 为 `health_platform`，可通过只接受小写 SQL identifier 的 `POSTGRES_SCHEMA` 隔离。批次 ID 重放只有在 payload、前序链和链摘要完全一致时才视为幂等；等版本 upsert 必须 digest 相同，等版本 tombstone 必须冲突回滚，低版本批次不能覆盖或删除更高版本状态。
 
 影子核对器通过 `BEGIN READ ONLY` 读取 PostgreSQL，只比较集合名、源版本和 payload SHA-256。SQLite v10 的 `postgres_sync_reconciliations` 仅保存核对汇总、差异类型和摘要，不保存业务正文或数据库凭据；最近一次结果通过 `/api/health`、`/api/metrics` 和仅限卫健管理角色的 `/api/production-database/shadow-reconciliation` 暴露。定时核对模板为 `deploy/postgres-shadow-reconcile.service.template` 与 `deploy/postgres-shadow-reconcile.timer.template`。
 
