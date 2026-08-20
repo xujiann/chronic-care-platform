@@ -79,6 +79,7 @@ HTTP request
 - `GET /api/audit/verify` 继续返回 HTTP 200 的可解析业务结果，运行时与留存 CLI 共用 v2 严格验证器；合规报告和留存门禁按相同失败语义传播。
 - `PUT /api/state` 保持原路径和成功形状，但审计数组成为服务端管理字段：省略时保留，提交时必须与当前值完全一致；乐观版本冲突仍优先返回 `409 STORAGE_CONFLICT`。
 - `npm run api:authorization-matrix` 从模块化路由源码生成/校验 owner、身份、角色、范围、用途和九条高风险接口唯一性。
+- 身份/SMS HTTP 路径保持不变；组合根已为短信发送生成随机 request ID，适配器现在拒绝缺失幂等 ID，OIDC refresh 返回的 ID token 必须通过 JWKS/claims 验证后才暴露脱敏 claims。
 
 ## 7. API 风险与缺失测试
 

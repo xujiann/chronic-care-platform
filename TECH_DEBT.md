@@ -51,6 +51,9 @@
 | DATA-002 | 2026-08-20 | v1–v14 独立注册并冻结内容指纹，保留历史 ledger；v15+ ledger 写内容 SHA-256，runner 拒绝连续性/name/checksum 漂移 | 空库、v11 升级、重跑、指纹/ledger 漂移、v15 checksum、失败回滚与 schema fingerprint 测试 |
 | TEST-001 | 2026-08-20 | 建立 build/lint/typecheck/unit/integration/smoke 标准入口并映射 CI/Pages；test:all 语义不变 | 标准门禁契约、完整测试分区、隔离 smoke、静态发布链、CI 映射和全量回归 |
 | SEC-003 | 2026-08-20 | v2 验证器统一运行时/留存语义；内容、链接、结构、重复 ID 严格失败；全量 state 写入不能修改服务端审计数组 | 普通字段、首中尾链接、删除、插入、重排、结构和 API 拒绝回归 |
+| SEC-004 | 2026-08-21 | OIDC ID token 使用 JWKS 验签与完整 trust claims；SMS 生产凭据、随机幂等键、有界重试和健康探针 fail closed | RS/PS/ES、issuer/audience/expiry/nonce、重试稳定性和日志脱敏专项 |
+| DATA-003 | 2026-08-21 | PostgreSQL schema 隔离、目标 probe、outbox CAS、batch 内容绑定和等版本/tombstone 冲突回滚 | PG/session/identity repository 专项与负向事务测试 |
+| OPS-001 | 2026-08-21 | 连续审计投递使用安全 SIEM/WORM adapter、checkpoint v2 和既有 cutover alert lifecycle | TLS/receipt/retry/WORM/rollback/lock/systemd 专项 |
 
 ## 重复、死代码和命名结论
 

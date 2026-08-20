@@ -20,6 +20,7 @@
 | 3 | Schema v14/v11 一致与 migration 指纹 | 已按 Accepted ADR 实施 / P1 | 以专项测试及 PR/main CI 为完成门禁；后续 v15+ 按冻结规则追加 |
 | 4 | 标准 build/lint/typecheck/unit/integration/smoke 入口 | 已按明确审批实施，待 PR/main 验证 / P1 | 保持 test:all 语义；逐步扩大 lint/typecheck 基线并治理测试时长 |
 | 5 | 移除组合根循环依赖 | 候选 / P1 | 特征测试；provider 注入方案；架构测试 |
+| 6 | 生产身份/SMS、PostgreSQL shadow、连续审计投递 | Accepted ADR 已按主线端口完成 P1 代码增量 | 真实 provider/PG/SIEM/WORM 联调与现场证据继续 NO-GO |
 | 6 | OTP/锁定共享状态 | 待 ADR / P1 | 共享 TTL 存储、并发/重启/多实例测试 |
 | 7 | 运行时上下文瘦身 | 候选 / P1 | 按领域子端口，逐块迁移，不重写 server |
 | 7A | 临床五个可治理子域 | 治理切片完成，急救/血液/影像/体检首用例已迁移 / P1 | Accepted ADR；保持协议兼容，按子域逐用例迁移 |
