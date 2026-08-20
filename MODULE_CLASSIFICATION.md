@@ -1,6 +1,6 @@
-# 模块 A/B/C/D 分级（主线 v1）
+# 模块 A/B/C/D 分级（实施分支）
 
-> 基线：`main@b1e4898`。本表覆盖可分配 owner 的架构模块；文件级清单后续由机器治理生成。标签不是立即重构授权。
+> 基线：`main@a15d10d`，更新于 2026-08-20。本表覆盖可分配 owner 的架构模块；文件级清单后续由机器治理生成。标签不是立即重构授权。
 
 ## 判定规则
 
@@ -18,13 +18,13 @@
 | `src/http/api-router.js` + route registry | T00 | A | 顺序、ID 唯一和短路有测试 | 保持稳定，不加领域逻辑 |
 | process worktree/ownership | T00 | A | 可执行计划、创建和越界验证 | 保持主线唯一性 |
 | regional manifests/runtime | T00 | B | 边界明确、入度较高 | 逐步降低 manifest 耦合 |
-| `server.js` 组合根 | T00 | C | 28.7k 行、职责过多 | 先测后抽端口，不整体重写 |
-| 静态根目录服务实现 | T00 | D | 发布根设计导致 P0 数据暴露 | Proposed ADR 后替换为 allowlist publisher |
+| `server.js` 组合根 | T00 | C | 28.2k 行、职责过多 | 先测后抽端口，不整体重写 |
+| 静态资源发布实现 | T00 | B | Node/Pages 共用显式 allowlist 与负向测试 | 新资源必须注册，不扩大默认发布面 |
 | runtime contexts | T00/各域 | C | 最宽 160 项依赖 | 按子域端口缩窄 |
 | technical evidence | T00 | B | 稳定共享但入度 22 | 固化版本化契约 |
 | platform data/storage | T00/T02 | B | 契约、CAS、outbox 测试较强 | 修复版本治理后逐步 KEEP |
 | alert cutover runtime | T00 | C | 反向 require server 形成环 | 始终注入 provider |
-| CI/readiness pipeline | T00 | C | 覆盖广但综合 job 过大 | 拆分可定位门禁 |
+| CI/readiness pipeline | T00 | B | 已按风险域拆分并保留 fail-closed 聚合门禁 | 继续治理供应链固定与 worker 观测 |
 
 ## 领域模块
 
@@ -59,7 +59,7 @@
 | `platform.js` / `operations.js` | C | 3.7k+ 行、全局状态和渲染耦合 |
 | 数智医院子站 app | C | 10.5k 单文件 |
 | access policy | B | 页面策略集中且 fail closed，有测试 |
-| Service Worker 的 `data/db.json` 缓存策略 | D | P0 数据发布设计错误，需要迁移后替换 |
+| Service Worker 的公开演示缓存策略 | B | 只缓存合成脱敏 `public-demo.json`，旧源快照缓存已撤销 |
 
 ## 数据与任务
 
@@ -68,7 +68,7 @@
 | domain data ownership registry | A/B | 83 个集合有 owner，仍需扩大覆盖 |
 | JSON 静态快照（演示用途） | B | 本地演示有效，但必须合成/脱敏/隔离 |
 | JSON 静态快照（生产事实源用途） | D | 与生产 PostgreSQL 目标冲突，安全风险高 |
-| SQLite migration 实现 | C | 事务化，但内嵌 server、版本漂移、弱 checksum |
+| SQLite migration 注册表/runner | B | 已独立、连续、事务化；v1–v14 指纹冻结，v15+ 内容 checksum，专项回归齐备 |
 | PostgreSQL primary/outbox contracts | B | fail closed、CAS、TLS、核对测试较强 |
 | 领域 worker 集合 | B/C | 功能可测但状态/观测接口不统一 |
 

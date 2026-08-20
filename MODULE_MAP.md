@@ -1,6 +1,6 @@
 # MODULE MAP — 主线模块地图
 
-> 主线 AS-IS 快照：`main@6c18221`。模块是可分配责任和验证的架构单元，不等同于每一个 JavaScript 文件。
+> 实施分支 AS-IS 快照：基于 `main@a15d10d`。模块是可分配责任和验证的架构单元，不等同于每一个 JavaScript 文件。
 
 ## 1. HTTP 模块与所有权
 
@@ -27,7 +27,7 @@
 | 路由器 | `src/http/api-router.js`、`src/http/routes/index.js` | 固定顺序、ID 唯一、响应短路，结构清楚 |
 | 运行时上下文 | `src/http/runtime-contexts/` | 领域依赖列表显式，但 public-health 160 项、care 102 项，接口过宽 |
 | 身份安全 | `src/identity-security/`、`session-store.js` | Cookie/CSRF、策略、会话仓储和审计已模块化 |
-| 平台数据 | `src/platform/data/`、`src/platform/storage/` | 数据所有权、迁移控制、PostgreSQL 主存储契约 |
+| 平台数据 | `src/platform/data/`、`src/platform/storage/` | 数据所有权、SQLite migration 注册表/runner、PostgreSQL 主存储契约 |
 | 领域事件 | `src/platform/events/`、各领域 worker | outbox/inbox、幂等和后台投递 |
 | 区域运行 | `src/platform/regional/`、`regions/` | 多地区清单、能力包、复制和发布注册 |
 | 领域实现 | `src/care-coordination/` 等与根目录服务 | 新旧实现并存，边界尚未完全迁移 |
@@ -70,7 +70,7 @@ server.js
 
 | 文件 | 行数约 | 风险 |
 |---|---:|---|
-| `server.js` | 28,746 | 组合根、迁移、种子和领域函数集中 |
+| `server.js` | 28,189 | 组合根、种子和领域函数仍集中；SQLite migration 已抽离 |
 | `digital-hospital-standard-platform/app.js` | 10,563 | 单文件子站 |
 | `test/api.test.js` | 8,140 | 回归范围巨大、定位慢 |
 | `citizen.js` | 6,066 | 居民端视图、状态和流程耦合 |
@@ -103,3 +103,7 @@ server.js
 影像首个标准接口为 `imaging-dashboard-query.v1`：通过 `buildImagingDashboard`、`redactSensitiveResponse` 两个注入端口生成结果，并由影像自有 `public-response` 递归剔除凭据、物理存储位置和内部 URL。HTTP 适配器继续执行居民范围检查和既有访问审计持久化；影像写命令与互认流程仍在混合路由。
 
 体检首个标准接口为 `physical-examination-dashboard-query.v1`：通过 `buildPhysicalExamOverview`、`buildPhysicalExamReadiness` 两个注入端口生成查询视图，并在用例内统一 citizen 最小 readiness 与管理角色完整投影。HTTP 适配器继续执行范围拒绝、安全事件、居民访问审计、持久化和最终脱敏；体检导入与闭环命令尚未迁移。
+
+## 9. SQLite migration 模块
+
+`src/platform/storage/sqlite-migrations.js` 是 T00 管理的单一注册表和执行入口。`server.js` 只消费 `SQLITE_SCHEMA_HEAD` 与 `applySqliteMigrations`；部署检查、生产数据库 readiness 和发布报告消费同一注册表校验结果。v1–v14 定义保持原执行顺序和历史 ledger checksum，独立冻结指纹阻止源码漂移；v15 及以后必须使用内容指纹作为 ledger checksum。该模块不拥有业务数据，不允许领域模块绕过注册表执行 DDL。

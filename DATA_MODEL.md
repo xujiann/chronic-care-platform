@@ -1,6 +1,6 @@
 # DATA MODEL — 主线数据地图
 
-> 主线 AS-IS 快照：`main@6c18221`。禁止据此直接编辑数据库或 `data/db.json`；schema 事实必须由运行时与 migration 再验证。
+> 实施分支 AS-IS 快照：基于 `main@a15d10d`。禁止据此直接编辑数据库或 `data/db.json`；schema 事实必须由运行时与 migration 再验证。
 
 ## 1. 存储拓扑
 
@@ -15,7 +15,7 @@
 
 ## 2. SQLite Schema
 
-主存储 migration 位于 `server.js` 的 `SQLITE_MIGRATIONS` 数组，当前实际 migration head 为 v14。包括 `schema_migrations` 在内，主 SQLite 逻辑上创建 30 张表：
+主存储 migration 位于 `src/platform/storage/sqlite-migrations.js` 的版本化注册表，当前实际与公开 head 均为 v14。包括 `schema_migrations` 在内，主 SQLite 逻辑上创建 30 张表：
 
 | 组 | 表 |
 |---|---|
@@ -52,13 +52,14 @@ erDiagram
 
 ## 3. Migration 现状
 
-- v1–v14 顺序执行，每次在事务中 apply，成功后写 `schema_migrations(version,name,checksum,applied_at)`。
-- checksum 只基于 `version:name`，不包含 SQL/函数实现；已应用 migration 被修改时无法发现内容漂移。
-- migration 定义和大型运行时位于同一个 `server.js`，所有权为 T00，模块边界不清。
-- `STORAGE_SCHEMA_VERSION` 仍为 11；`storageMeta`、部署脚本和静态测试仍以 v11 为门禁，但 migration 已到 v14。
-- 当前没有独立的 schema 快照、完整指纹或“已应用 migration 不可变”机器门禁。
+- v1–v14 在独立注册表中连续执行，每个版本在事务中 apply，成功后写 `schema_migrations(version,name,checksum,applied_at)`。
+- 为兼容既有数据库，v1–v14 ledger checksum 继续使用历史 `version:name` 摘要；对应源码内容另由 14 个冻结 SHA-256 和注册表校验保护，禁止改写。
+- v15 及以后 ledger checksum 使用包含 version、name、owner、apply 实现和显式依赖的内容 SHA-256；新版本必须连续追加。
+- runner 在执行新迁移前校验已应用 ledger 是注册表的连续前缀，name/checksum 漂移会 fail-closed；单个迁移失败时 DDL 与 ledger 行一并回滚。
+- `STORAGE_SCHEMA_VERSION`、`storageMeta`、部署检查、生产 readiness 和发布报告统一从 `SQLITE_SCHEMA_HEAD` 派生，当前为 14。
+- 自动化测试覆盖空库 0→14、v11→14、重复执行、冻结指纹、ledger 漂移、未来 v15 内容 checksum 和失败回滚；schema fingerprint 用于比较升级结果与空库结果。
 
-因此“v14 已存在”不等于 migration 体系已经治理完成。
+专项 SQLite 表仍有独立生命周期和台账，不得误计入主 schema head；生产 PostgreSQL 是否已迁移仍必须由现场证据证明。
 
 ## 4. JSON 集合与实际使用
 
@@ -95,8 +96,7 @@ erDiagram
 
 ## 7. 主要风险
 
-- `DATA-001`：migration head v14 与公开 schema version v11 不一致。
-- `DATA-002`：migration checksum 不覆盖 SQL 内容，历史漂移不可检测。
+- `DATA-001`、`DATA-002` 已在本切片关闭：公开 head 已统一为 v14，历史源码由冻结内容指纹保护，v15+ ledger 使用内容 checksum。
 - `DATA-003`：252 个 JSON 集合仅 83 个有生产所有权，遗留数据边界巨大。
 - `DATA-004`：JSON 快照同时承担页面数据、种子和报告输入，多角色耦合。
 - `DATA-005`：大量 `payload` JSON 关系没有数据库约束，只能靠应用验证。

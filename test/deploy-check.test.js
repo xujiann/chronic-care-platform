@@ -177,6 +177,7 @@ test("deploy check report covers release-critical snapshot gates", () => {
     "api:productionDatabaseCutoverCenter",
     "database:postgresMigrationPackage",
     "database:postgresMigrationReleaseWiring",
+    "database:sqliteMigrationRegistry",
     "database:postgresTransactionalOutbox",
     "database:postgresIdempotentWorker",
     "database:postgresWorkerDeployment",

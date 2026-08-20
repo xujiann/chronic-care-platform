@@ -1,6 +1,6 @@
 # API MAP — 主线接口地图
 
-> 主线 AS-IS 快照：`main@6c18221`。静态分析识别的 368 条精确路由是下限；动态 ID、prefix 和外部回调变体需以运行时路由测试为准。
+> 实施分支 AS-IS 快照：基于 `main@a15d10d`。静态分析识别的 368 条精确路由是下限；动态 ID、prefix 和外部回调变体需以运行时路由测试为准。
 
 ## 1. 请求链
 
@@ -71,6 +71,7 @@ HTTP request
 ## 6. 错误、幂等与审计
 
 - router 未命中统一 404；存储冲突和 session store 不可用有专用错误转换。
+- 健康/存储元数据的既有 `schemaVersion` 字段形状保持不变，值由 SQLite 注册表 head 派生并从错误的 11 修正为 14；未新增或删除 API 路径、角色、权限或审计动作。
 - 静态未知/敏感路径统一 404；`GET/HEAD /data/public-demo.json` 返回合成脱敏数据，`/data/db.json`、源码、配置和仓库元数据不可发布。
 - 多个领域具有 HMAC、nonce、时间窗、CAS、outbox 和 replay 记录。
 - 错误格式仍由不同路由模块自行构造，存在 `{error}`、`{ok,code,message}` 等多种形态。

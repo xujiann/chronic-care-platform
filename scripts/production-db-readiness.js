@@ -9,6 +9,10 @@ const {
   buildPostgresPrimaryStorageConfig,
   safeConfigStatus
 } = require("../src/platform/storage/postgres-primary-storage-contract");
+const {
+  SQLITE_SCHEMA_HEAD,
+  validateSqliteMigrationRegistry
+} = require("../src/platform/storage/sqlite-migrations");
 
 const ROOT = path.resolve(__dirname, "..");
 const DEFAULT_OUTPUT = path.join(ROOT, "release", "production-db-readiness-report.json");
@@ -271,9 +275,12 @@ function buildProductionDatabaseCutoverCenter(data = {}) {
 }
 
 function buildProductionDbReadinessReport(options = {}) {
+  const sqliteMigrationRegistry = validateSqliteMigrationRegistry();
   const data = options.data ?? readJson("data/db.json");
   const pkg = options.pkg ?? readJson("package.json");
   const serverSource = options.serverSource ?? readRuntimeSource(ROOT);
+  const sqliteMigrationSource = options.sqliteMigrationSource ?? readText(path.join("src", "platform", "storage", "sqlite-migrations.js"));
+  const sqliteRuntimeSource = `${serverSource}\n${sqliteMigrationSource}`;
   const deployment = options.deployment ?? readText("DEPLOYMENT.md");
   const envTemplate = options.envTemplate ?? readText(".env.example");
   const readme = options.readme ?? readText("README.md");
@@ -328,7 +335,7 @@ function buildProductionDbReadinessReport(options = {}) {
   const postgresMigrationPackage = buildPostgresMigrationPackage({ data });
   const migrationSourceRecords = Object.values(data).filter(Array.isArray).reduce((sum, rows) => sum + rows.length, 0);
   const postgresRuntimeSync = {
-    transactionalOutbox: ["postgres_sync_outbox", "enqueuePostgresSyncBatch", "db.exec(\"COMMIT\")", "STORAGE_SCHEMA_VERSION = 11"].every((marker) => serverSource.includes(marker)),
+    transactionalOutbox: ["postgres_sync_outbox", "enqueuePostgresSyncBatch", "db.exec(\"COMMIT\")", "STORAGE_SCHEMA_VERSION = SQLITE_SCHEMA_HEAD"].every((marker) => sqliteRuntimeSource.includes(marker)),
     batchIntegrity: ["buildPostgresSyncBatch", "payloadSha256", "previousChainHash", "chainHash", "validatePostgresSyncBatch"].every((marker) => runtimeSyncSource.includes(marker)),
     idempotentApply: ["runtime_sync_batches", "ON CONFLICT (batch_id) DO NOTHING", "runtime_collection_state", "source_version <= EXCLUDED.source_version"].every((marker) => runtimeSyncSource.includes(marker)),
     retryState: ["pending", "retry", "delivered", "failed", "next_attempt_at", "maxAttempts"].every((marker) => runtimeSyncSource.includes(marker)),
@@ -336,8 +343,8 @@ function buildProductionDbReadinessReport(options = {}) {
     workerCommand: runtimeSyncWorker.includes("runPostgresSyncWorker") && pkg.scripts?.["postgres:sync-worker"],
     baselineBootstrap: runtimeSyncSource.includes("enqueuePostgresSyncBaseline") && shadowReconcileSource.includes('command === "bootstrap"') && pkg.scripts?.["postgres:sync-bootstrap"],
     readOnlyReconciliation: ["BEGIN READ ONLY", "comparePostgresShadowState", "runPostgresShadowReconciliation", "recordPostgresReconciliation"].every((marker) => runtimeSyncSource.includes(marker)),
-    reconciliationLedger: serverSource.includes("postgres_sync_reconciliations") && serverSource.includes("readLatestPostgresReconciliation") && serverSource.includes("/api/production-database/shadow-reconciliation"),
-    reconciliationCaseWorkflow: ["syncPostgresReconciliationCases", "listPostgresReconciliationHistory", "listPostgresReconciliationCases", "applyPostgresReconciliationCaseAction", "RECONCILIATION_CLEARANCE_REQUIRED", "auto-reopen"].every((marker) => runtimeSyncSource.includes(marker)) && ["postgres_sync_reconciliation_cases", "postgres_sync_reconciliation_case_actions", "/api/production-database/shadow-reconciliations", "/api/production-database/reconciliation-cases", "postgres-reconciliation-case-action"].every((marker) => serverSource.includes(marker)),
+    reconciliationLedger: sqliteRuntimeSource.includes("postgres_sync_reconciliations") && sqliteRuntimeSource.includes("readLatestPostgresReconciliation") && sqliteRuntimeSource.includes("/api/production-database/shadow-reconciliation"),
+    reconciliationCaseWorkflow: ["syncPostgresReconciliationCases", "listPostgresReconciliationHistory", "listPostgresReconciliationCases", "applyPostgresReconciliationCaseAction", "RECONCILIATION_CLEARANCE_REQUIRED", "auto-reopen"].every((marker) => runtimeSyncSource.includes(marker)) && ["postgres_sync_reconciliation_cases", "postgres_sync_reconciliation_case_actions", "/api/production-database/shadow-reconciliations", "/api/production-database/reconciliation-cases", "postgres-reconciliation-case-action"].every((marker) => sqliteRuntimeSource.includes(marker)),
     reconciliationOperationsUi: ["postgres-reconciliation-metrics", "postgres-reconciliation-cases", "postgres-reconciliation-history"].every((marker) => platformHtml.includes(marker)) && ["loadPostgresReconciliationCenter", "renderPostgresReconciliationCenter", "runPostgresReconciliationCaseAction", "data-postgres-reconciliation-action"].every((marker) => platformSource.includes(marker)),
     prometheusSlo: ["buildPostgresSyncSlo", "renderPrometheusRuntimeMetrics", "/api/metrics/prometheus", "health_platform_postgres_sync_slo_breaches"].every((marker) => serverSource.includes(marker)) && ["POSTGRES_SYNC_BACKLOG_SLO_MAX=20", "POSTGRES_SYNC_PENDING_AGE_SLO_SECONDS=300", "POSTGRES_RECONCILIATION_AGE_SLO_SECONDS=600", "POSTGRES_RECONCILIATION_OPEN_CASES_SLO_MAX=0"].every((marker) => envTemplate.includes(marker)),
     reconciliationCommand: shadowReconcileSource.includes("runPostgresShadowReconciliation") && shadowReconcileSource.includes("contains no business payloads or database credentials") && pkg.scripts?.["postgres:shadow-reconcile"],
@@ -363,7 +370,8 @@ function buildProductionDbReadinessReport(options = {}) {
     { id: "production-db:cutoverDocs", passed: ["migration batch", "rollback checkpoint", "/api/production-database/cutover-runs"].every((token) => cutoverDocument.includes(token)), detail: "cutover center model, APIs and production boundary are documented" },
     { id: "production-db:migrationPackage", passed: postgresMigrationPackage.ok && postgresMigrationPackage.manifest.mode === "manifest" && postgresMigrationPackage.manifest.summary.records === migrationSourceRecords && !postgresMigrationPackage.files["records.copy.tsv"], detail: `${postgresMigrationPackage.manifest.summary.collections} collections / ${postgresMigrationPackage.manifest.summary.records} source records / no payload artifact` },
     { id: "production-db:secureFullExportBoundary", passed: ["acknowledge-sensitive-data", "must be written outside the repository", "credentialsPersisted: false"].every((marker) => migrationPackageSource.includes(marker)) && ["仓库之外", "不得上传 Git", "迁移包通过不等于 PostgreSQL 运行时适配器已经启用"].every((marker) => migrationPackageDocument.includes(marker)), detail: "full export requires explicit acknowledgement, external protected path and keeps credentials out" },
-    { id: "production-db:transactionalOutbox", passed: postgresRuntimeSync.transactionalOutbox && postgresRuntimeSync.batchIntegrity && postgresRuntimeSync.healthStatus, detail: "SQLite schema v11 retains atomic signed collection changes and health-visible queue state" },
+    { id: "production-db:sqliteMigrationRegistry", passed: sqliteMigrationRegistry.head === SQLITE_SCHEMA_HEAD && /^[a-f0-9]{64}$/.test(sqliteMigrationRegistry.registryFingerprint), detail: `SQLite schema v${SQLITE_SCHEMA_HEAD} / registry ${sqliteMigrationRegistry.registryFingerprint.slice(0, 12)}` },
+    { id: "production-db:transactionalOutbox", passed: postgresRuntimeSync.transactionalOutbox && postgresRuntimeSync.batchIntegrity && postgresRuntimeSync.healthStatus, detail: `SQLite schema v${SQLITE_SCHEMA_HEAD} retains atomic signed collection changes and health-visible queue state` },
     { id: "production-db:idempotentWorker", passed: postgresRuntimeSync.idempotentApply && postgresRuntimeSync.retryState && postgresRuntimeSync.workerCommand, detail: "worker applies batch ids once, rejects stale collection versions and records retry outcomes" },
     { id: "production-db:workerDeployment", passed: postgresRuntimeSync.hardenedService && postgresRuntimeSync.environmentContract && postgresRuntimeSync.documentedBoundary, detail: "hardened one-shot timer, TLS environment contract and shadow-primary boundary documented" },
     { id: "production-db:baselineBootstrap", passed: postgresRuntimeSync.baselineBootstrap, detail: "current SQLite collection versions can be queued once before incremental shadow sync" },
@@ -404,6 +412,7 @@ function buildProductionDbReadinessReport(options = {}) {
     productionTrack,
     migrationEvidence,
     rehearsalEvidence,
+    sqliteMigrationRegistry,
     sqliteRuntimeProfile,
     cutoverCenter,
     postgresMigrationPackage,
