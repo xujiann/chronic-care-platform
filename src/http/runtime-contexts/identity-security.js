@@ -10,7 +10,7 @@ const DEPENDENCIES = Object.freeze([
   "findCitizenAuthUserByPhone", "highRiskSecurityEvents", "isProductionRuntime", "issuePhoneVerificationCode",
   "mapExternalIdentityClaims", "maskPhone", "normalizePhone", "normalizeState", "phoneLoginLockStatus",
   "prependAuditTrailEntry", "productionAdapterCenter", "randomUUID", "readDatabase", "recordPhoneLoginFailure",
-  "redactSensitiveResponse", "refreshOidcAccessToken", "refreshSessionStoreStatus", "requireApiRole", "resealAuditTrail",
+  "redactSensitiveResponse", "refreshOidcAccessToken", "refreshSessionStoreStatus", "requireApiRole",
   "revokeOidcToken", "revokeSession", "sendJson", "sessionStoreStatus", "verifyAuditTrail", "verifyPassword",
   "verifyPhoneCode", "verifySmsDeliveryCallback", "writeDatabase"
 ]);

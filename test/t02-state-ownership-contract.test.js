@@ -105,7 +105,7 @@ test("legacy full-state route audits delegated owners and blocks new catch-all k
   let responseStatus = null;
   const runtime = {
     COLLECTION_WRITE_KEYS: new Set(["residents"]),
-    auditTrailRowsMatch: () => true,
+    auditTrailRowsMatch: (left, right) => JSON.stringify(left) === JSON.stringify(right),
     auditTrailRowsMatchById: () => true,
     collectJson: async () => structuredClone(payload),
     normalizeState: (value) => structuredClone(value),
@@ -138,6 +138,14 @@ test("legacy full-state route audits delegated owners and blocks new catch-all k
     responseBody.securityEvents[0].ownershipContract.collections[0].owner,
     "identity-security"
   );
+
+  const preservedState = structuredClone(state);
+  payload = structuredClone(state);
+  payload.securityEvents[0].action = "client-side audit mutation";
+  await segment.handle({ method: "PUT", headers: {} }, responseDouble(), new URL("http://local/api/state"));
+  assert.equal(responseStatus, 400);
+  assert.equal(responseBody.code, "AUDIT_TRAIL_WRITE_REJECTED");
+  assert.deepEqual(state, preservedState);
 
   payload = { ...structuredClone(state), futureCatchAll: [] };
   const blockedRes = responseDouble();

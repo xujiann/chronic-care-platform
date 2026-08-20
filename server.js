@@ -44,6 +44,7 @@ const {
   applySqliteMigrations
 } = require("./src/platform/storage/sqlite-migrations");
 const { createHash, createHmac, pbkdf2Sync, randomUUID, timingSafeEqual } = require("crypto");
+const { auditHashFor, verifyAuditTrail } = require("./src/identity-security/audit-chain");
 const { MemorySessionStore, PostgresSessionStore, SqliteSessionStore } = require("./session-store");
 const {
   applyPostgresReconciliationCaseAction,
@@ -13128,35 +13129,8 @@ function auditTrailHasNonRepairEdit(incomingRows, currentRows) {
   });
 }
 
-function verifyAuditTrail(rows) {
-  const items = Array.isArray(rows) ? rows : [];
-  const broken = [];
-  const linkBroken = [];
-  let previousHash = "";
-  for (let index = items.length - 1; index >= 0; index -= 1) {
-    const item = items[index];
-    const expectedHash = auditHashFor(item);
-    const expectedPreviousHash = previousHash;
-    const explicitTamper = /tampered/i.test(String(item.detail || item.result || item.action || ""));
-    if (item.auditHash !== expectedHash && (explicitTamper || !item.auditHash)) {
-      broken.push({ index, id: item.id || "", expectedPreviousHash, actualPreviousHash: item.previousAuditHash || "", expectedHash, actualHash: item.auditHash || "" });
-    }
-    if (item.previousAuditHash !== expectedPreviousHash) {
-      linkBroken.push({ index, id: item.id || "", expectedPreviousHash, actualPreviousHash: item.previousAuditHash || "" });
-    }
-    previousHash = item.auditHash || expectedHash;
-  }
-  return {
-    passed: broken.length === 0,
-    count: items.length,
-    broken,
-    linkBroken
-  };
-}
-
 function auditTrailRowsMatch(leftRows, rightRows) {
-  const clean = (rows) => (Array.isArray(rows) ? rows : []).map(({ auditHash, previousAuditHash, ...item }) => item);
-  return stableStringify(clean(leftRows)) === stableStringify(clean(rightRows));
+  return stableStringify(Array.isArray(leftRows) ? leftRows : []) === stableStringify(Array.isArray(rightRows) ? rightRows : []);
 }
 
 function auditTrailRowsMatchById(leftRows, rightRows) {
@@ -13164,11 +13138,6 @@ function auditTrailRowsMatchById(leftRows, rightRows) {
   const rightById = new Map(clean(rightRows).filter((item) => item.id).map((item) => [item.id, stableStringify(item)]));
   const left = clean(leftRows);
   return left.length <= rightById.size && left.every((item) => item.id && rightById.get(item.id) === stableStringify(item));
-}
-
-function auditHashFor(item) {
-  const { auditHash, ...payload } = item || {};
-  return createHash("sha256").update(stableStringify(payload)).digest("hex");
 }
 
 function stableStringify(value) {
@@ -23614,7 +23583,7 @@ function appendQualitySafetyAudit(data, user, action, target, detail) {
 function buildComplianceReport(data) {
   const audit = {
     securityEvents: verifyAuditTrail(data.securityEvents),
-    dataAccessLogs: verifyAuditTrail(resealAuditTrail(data.dataAccessLogs))
+    dataAccessLogs: verifyAuditTrail(data.dataAccessLogs)
   };
   const ledger = data.securityAcceptanceLedger || [];
   return {

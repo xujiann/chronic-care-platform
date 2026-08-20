@@ -7989,9 +7989,13 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(blockedDashboard.body.siteCutoverPack.tracks.every((item) => item.status === "blocked"), true);
     assert.equal(blockedDashboard.body.siteCutoverPack.productionBlockers.length >= 1, true);
 
+    const latestForRestore = await api(baseUrl, "/api/state", authorized(commissionToken));
+    latestForRestore.body.internetNursingPolicy = current.body.internetNursingPolicy;
+    delete latestForRestore.body.securityEvents;
+    delete latestForRestore.body.dataAccessLogs;
     const restored = await api(baseUrl, "/api/state", authorized(commissionToken, {
       method: "PUT",
-      body: JSON.stringify(current.body)
+      body: JSON.stringify(latestForRestore.body)
     }));
     assert.equal(restored.response.status, 200);
     const restoredDashboard = await api(baseUrl, "/api/internet-nursing/dashboard", authorized(commissionToken));
@@ -8033,13 +8037,13 @@ test("API authentication, scoping and governance regression suite", async (t) =>
       method: "PUT",
       body: JSON.stringify(current.body)
     }));
-    assert.equal(tamperedSave.response.status, 200);
+    assert.equal(tamperedSave.response.status, 400);
+    assert.equal(tamperedSave.body.code, "AUDIT_TRAIL_WRITE_REJECTED");
 
     const tamperedVerify = await api(baseUrl, "/api/audit/verify", authorized(commissionToken));
     assert.equal(tamperedVerify.response.status, 200);
-    assert.equal(tamperedVerify.body.passed, false);
-    assert.equal(tamperedVerify.body.trails.securityEvents.passed, false);
-    assert.ok(tamperedVerify.body.trails.securityEvents.broken.length > 0);
+    assert.equal(tamperedVerify.body.passed, true);
+    assert.equal(tamperedVerify.body.trails.securityEvents.passed, true);
   });
 
   await t.test("governs P0-07 remediation with independent security retest", async () => {

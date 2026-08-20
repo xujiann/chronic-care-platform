@@ -3,10 +3,10 @@
 const DOMAIN = "state-data";
 const PROCESS = "T02";
 const DEPENDENCIES = Object.freeze([
-  "COLLECTION_WRITE_KEYS", "auditTrailRowsMatch", "auditTrailRowsMatchById", "collectJson",
-  "normalizeState", "prependAuditEventPreservingTrail", "prependAuditTrailEntry", "randomUUID",
-  "readDatabase", "redactSensitiveResponse", "requireApiRole", "resealAuditTrail",
-  "scopeStateForUser", "sealAuditTrail", "seedState", "sendJson",
+  "COLLECTION_WRITE_KEYS", "auditTrailRowsMatch", "collectJson",
+  "normalizeState", "prependAuditTrailEntry", "randomUUID",
+  "readDatabase", "redactSensitiveResponse", "requireApiRole",
+  "scopeStateForUser", "seedState", "sendJson",
   "storageMeta", "verifyAuditTrail", "writeDatabase"
 ]);
 
