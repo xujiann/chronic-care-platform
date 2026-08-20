@@ -85,7 +85,16 @@ function buildSnapshotCopy(data, migrationRunId) {
   return lines.length ? `${lines.join("\n")}\n` : "";
 }
 
-function schemaSql() {
+function postgresSchemaIdentifier(value = "health_platform") {
+  const schema = String(value || "").trim();
+  if (!/^[a-z_][a-z0-9_]{0,62}$/.test(schema)) {
+    throw new Error("PostgreSQL schema must be a lowercase SQL identifier");
+  }
+  return schema;
+}
+
+function schemaSql(options = {}) {
+  const schema = postgresSchemaIdentifier(options.schema);
   return [
     "BEGIN;",
     "CREATE SCHEMA IF NOT EXISTS health_platform;",
@@ -123,6 +132,7 @@ function schemaSql() {
     "  status text NOT NULL CHECK (status IN ('applying', 'applied')),",
     "  applied_at timestamptz",
     ");",
+    "CREATE UNIQUE INDEX IF NOT EXISTS runtime_sync_batches_chain_hash_uidx ON health_platform.runtime_sync_batches (chain_hash);",
     "CREATE TABLE IF NOT EXISTS health_platform.runtime_collection_state (",
     "  collection_name text PRIMARY KEY,",
     "  payload jsonb NOT NULL,",
@@ -160,9 +170,16 @@ function schemaSql() {
     ");",
     "CREATE INDEX IF NOT EXISTS auth_sessions_user_active_idx ON health_platform.auth_sessions (user_id, expires_at) WHERE revoked_at IS NULL;",
     "CREATE INDEX IF NOT EXISTS auth_sessions_retention_idx ON health_platform.auth_sessions (revoked_at, expires_at);",
+    "CREATE TABLE IF NOT EXISTS health_platform.auth_security_state (",
+    "  state_key text PRIMARY KEY,",
+    "  payload jsonb NOT NULL,",
+    "  version bigint NOT NULL DEFAULT 1 CHECK (version > 0),",
+    "  updated_at timestamptz NOT NULL DEFAULT now()",
+    ");",
+    "REVOKE ALL ON health_platform.auth_security_state FROM PUBLIC;",
     "COMMIT;",
     ""
-  ].join("\n");
+  ].join("\n").replaceAll("health_platform", schema);
 }
 
 function loadSql() {
@@ -395,6 +412,8 @@ module.exports = {
   canonicalStringify,
   collectionInventory,
   parseArgs,
+  postgresSchemaIdentifier,
+  schemaSql,
   verifyPostgresMigrationPackage,
   writePostgresMigrationPackage
 };

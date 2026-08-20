@@ -129,6 +129,7 @@
     "production-db:readiness": "node scripts/production-db-readiness.js",
     "postgres:migration-package": "node scripts/postgres-migration-package.js build",
     "postgres:migration-verify": "node scripts/postgres-migration-package.js verify",
+    "postgres:production-contract": "node --test test/postgres-production-contract.test.js",
     "postgres:mpi-foundation": "node scripts/postgres-mpi-foundation.js build",
     "postgres:mpi-verify": "node scripts/postgres-mpi-foundation.js verify",
     "postgres:sync-worker": "node scripts/postgres-sync-worker.js",

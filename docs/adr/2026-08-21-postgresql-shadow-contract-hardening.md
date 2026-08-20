@@ -28,5 +28,6 @@
 - upsert 等版本只允许相同 payload digest 幂等；不同 digest 返回 `POSTGRES_SYNC_VERSION_CONFLICT`。delete tombstone 在等版本时同样冲突，仅能删除更低版本数据；更高版本保持不变。
 - SQLite outbox 状态更新使用 pending/retry CAS，终态不会被陈旧 worker 覆盖；错误仅持久化稳定 code。
 - 目标 schema probe 与 shadow/reconciliation 健康合成仍只证明 rehearsal 能力，`productionPrimary=false`。
+- 迁移包实际创建 `${POSTGRES_SCHEMA}.auth_security_state`，应用运行账号不执行 PostgreSQL DDL；会话与认证安全状态借用组合根同一长期 pool。CI 使用临时 PostgreSQL 16 实例验证 schema probe、跨连接 OTP/限流原子性及 shadow 等版本冲突回滚。
 
-真实 PostgreSQL 合同测试以外部 `POSTGRES_URL`/CI 临时实例为后续环境门禁；本 ADR 不授权主读、双写或切流。
+外部环境仍可通过 `POSTGRES_URL` 重跑同一真实合同；本 ADR 不授权主读、双写或切流。
