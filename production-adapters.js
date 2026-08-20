@@ -1,6 +1,16 @@
-const { createHash, createHmac, randomInt, timingSafeEqual } = require("node:crypto");
+const {
+  constants: cryptoConstants,
+  createHash,
+  createHmac,
+  createPublicKey,
+  randomInt,
+  timingSafeEqual,
+  verify: verifySignature
+} = require("node:crypto");
 
 const DEFAULT_TIMEOUT_MS = 8000;
+const DEFAULT_MAX_ATTEMPTS = 3;
+const DEFAULT_OIDC_CLOCK_SKEW_SECONDS = 60;
 const DEFAULT_SMS_CALLBACK_MAX_SKEW_SECONDS = 300;
 const SMS_DELIVERY_STATUSES = new Set(["accepted", "queued", "sent", "delivered", "failed", "expired", "undeliverable", "rejected"]);
 const SMS_DELIVERY_TERMINAL_STATUSES = new Set(["delivered", "failed", "expired", "undeliverable", "rejected"]);
@@ -24,6 +34,16 @@ class SmsDeliveryCallbackError extends Error {
   }
 }
 
+class ProductionAdapterError extends Error {
+  constructor(message, code, options = {}) {
+    super(message, options.cause ? { cause: options.cause } : undefined);
+    this.name = "ProductionAdapterError";
+    this.code = code;
+    this.statusCode = options.statusCode || 502;
+    this.retryable = options.retryable === true;
+  }
+}
+
 function isProduction(env = process.env) {
   return String(env.NODE_ENV || "").toLowerCase() === "production";
 }
@@ -41,7 +61,22 @@ function validatedHttpUrl(value, label, env = process.env) {
 }
 
 function boundedTimeout(value) {
-  return Math.min(30000, Math.max(1000, Number(value || DEFAULT_TIMEOUT_MS) || DEFAULT_TIMEOUT_MS));
+  return Math.min(30000, Math.max(100, Number(value || DEFAULT_TIMEOUT_MS) || DEFAULT_TIMEOUT_MS));
+}
+
+function boundedAttempts(value) {
+  return Math.min(5, Math.max(1, Number(value || DEFAULT_MAX_ATTEMPTS) || DEFAULT_MAX_ATTEMPTS));
+}
+
+function safeAdapterLog(logger, level, event, fields = {}) {
+  if (!logger || typeof logger[level] !== "function") return;
+  const safeFields = Object.fromEntries(Object.entries(fields).filter(([key, value]) => (
+    !/token|secret|authorization|phone|mobile|code|credential|payload|body|idempotency/i.test(key)
+    && ["string", "number", "boolean"].includes(typeof value)
+  )));
+  try {
+    logger[level](event, safeFields);
+  } catch {}
 }
 
 function identityAdapterStatus(env = process.env) {
@@ -65,24 +100,34 @@ function identityAdapterStatus(env = process.env) {
     directoryCredentialConfigured: Boolean(env.IDENTITY_DIRECTORY_TOKEN),
     productionHttps: !isProduction(env) || [issuer, userInfo, tokenEndpoint, revocationEndpoint, directoryEndpoint].filter(Boolean).every((item) => /^https:\/\//i.test(item)),
     timeoutMs: boundedTimeout(env.IDENTITY_ADAPTER_TIMEOUT_MS),
+    clockSkewSeconds: Math.min(300, Math.max(0, Number(env.OIDC_CLOCK_SKEW_SECONDS || DEFAULT_OIDC_CLOCK_SKEW_SECONDS) || DEFAULT_OIDC_CLOCK_SKEW_SECONDS)),
     boundary: "The adapter verifies UserInfo, refreshes and revokes upstream tokens, and previews directory deactivations. Provisioning, privilege changes and reactivation remain controlled workflows."
   };
 }
 
 function smsAdapterStatus(env = process.env) {
   const gatewayUrl = String(env.SMS_GATEWAY_URL || "").trim();
+  const healthUrl = String(env.SMS_GATEWAY_HEALTH_URL || "").trim();
+  const authMode = String(env.SMS_GATEWAY_AUTH_MODE || "bearer").trim().toLowerCase();
+  const authModeSupported = ["bearer", "mtls", "none"].includes(authMode);
+  const credentialConfigured = authMode === "bearer" ? Boolean(String(env.SMS_GATEWAY_TOKEN || "").trim()) : authModeSupported;
   const callbackMaxSkewSeconds = Math.min(900, Math.max(60, Number(env.SMS_DELIVERY_CALLBACK_MAX_SKEW_SECONDS || DEFAULT_SMS_CALLBACK_MAX_SKEW_SECONDS) || DEFAULT_SMS_CALLBACK_MAX_SKEW_SECONDS));
   return {
     type: "http-json",
     configured: Boolean(gatewayUrl && env.SMS_TEMPLATE_ID),
+    productionConfigured: Boolean(gatewayUrl && env.SMS_TEMPLATE_ID && credentialConfigured && authModeSupported),
     gatewayConfigured: Boolean(gatewayUrl),
+    healthEndpointConfigured: Boolean(healthUrl),
     templateConfigured: Boolean(env.SMS_TEMPLATE_ID),
     senderConfigured: Boolean(env.SMS_SENDER),
-    credentialConfigured: Boolean(env.SMS_GATEWAY_TOKEN),
+    authMode,
+    authModeSupported,
+    credentialConfigured,
     callbackConfigured: Boolean(String(env.SMS_DELIVERY_CALLBACK_SECRET || "").trim()),
     callbackMaxSkewSeconds,
     productionHttps: !isProduction(env) || !gatewayUrl || /^https:\/\//i.test(gatewayUrl),
     timeoutMs: boundedTimeout(env.SMS_GATEWAY_TIMEOUT_MS),
+    maxAttempts: boundedAttempts(env.SMS_GATEWAY_MAX_ATTEMPTS),
     boundary: "Provider acceptance and signed final-delivery callbacks are persisted. Provider-specific field mapping, production keys and joint-test receipts remain site integration work."
   };
 }
@@ -372,29 +417,95 @@ function buildSmsDeliveryCenter(data = {}, env = process.env) {
   };
 }
 
-async function fetchJson(url, options = {}, timeoutMs = DEFAULT_TIMEOUT_MS, fetchImpl = globalThis.fetch) {
-  if (typeof fetchImpl !== "function") throw new Error("fetch runtime is unavailable");
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), boundedTimeout(timeoutMs));
-  try {
-    const response = await fetchImpl(url, { ...options, signal: controller.signal });
-    const text = await response.text();
-    let body = {};
-    if (text) {
-      try {
-        body = JSON.parse(text);
-      } catch {
-        throw new Error(`adapter returned non-JSON response (${response.status})`);
-      }
-    }
-    if (!response.ok) {
-      const detail = body.error_description || body.message || body.error || `HTTP ${response.status}`;
-      throw new Error(`adapter request failed: ${detail}`);
-    }
-    return body;
-  } finally {
-    clearTimeout(timer);
+function createHttpJsonTransport(options = {}) {
+  const fetchImpl = options.fetchImpl || globalThis.fetch;
+  const sleepImpl = options.sleepImpl || ((delayMs) => new Promise((resolve) => setTimeout(resolve, delayMs)));
+  const logger = options.logger;
+  if (typeof fetchImpl !== "function") {
+    throw new ProductionAdapterError("HTTP transport is unavailable", "ADAPTER_TRANSPORT_UNAVAILABLE", { statusCode: 503 });
   }
+  return Object.freeze({
+    async request(url, requestOptions = {}) {
+      const timeoutMs = boundedTimeout(requestOptions.timeoutMs);
+      const maxAttempts = boundedAttempts(requestOptions.maxAttempts || 1);
+      const retryStatuses = new Set(requestOptions.retryStatuses || [408, 425, 429, 500, 502, 503, 504]);
+      const fetchOptions = { ...requestOptions };
+      delete fetchOptions.maxAttempts;
+      delete fetchOptions.retryStatuses;
+      delete fetchOptions.timeoutMs;
+      for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+        const controller = new AbortController();
+        let timer;
+        try {
+          const timeout = new Promise((_, reject) => {
+            timer = setTimeout(() => {
+              controller.abort();
+              reject(new ProductionAdapterError("Provider request timed out", "ADAPTER_TIMEOUT", { retryable: true, statusCode: 504 }));
+            }, timeoutMs);
+          });
+          const response = await Promise.race([
+            fetchImpl(url, { ...fetchOptions, signal: controller.signal }),
+            timeout
+          ]);
+          clearTimeout(timer);
+          const text = await response.text();
+          let body = {};
+          if (text) {
+            try {
+              body = JSON.parse(text);
+            } catch {
+              throw new ProductionAdapterError("Provider returned an invalid JSON response", "ADAPTER_RESPONSE_INVALID");
+            }
+          }
+          if (!response.ok) {
+            const retryable = retryStatuses.has(response.status);
+            if (retryable && attempt < maxAttempts) {
+              safeAdapterLog(logger, "warn", "provider-request-retry", { attempt, status: response.status });
+              await sleepImpl(Math.min(1000, 100 * (2 ** (attempt - 1))));
+              continue;
+            }
+            throw new ProductionAdapterError("Provider request was not accepted", "ADAPTER_HTTP_ERROR", {
+              retryable,
+              statusCode: response.status || 502
+            });
+          }
+          safeAdapterLog(logger, "info", "provider-request-accepted", { attempt, status: response.status });
+          return body;
+        } catch (error) {
+          clearTimeout(timer);
+          const normalized = error instanceof ProductionAdapterError
+            ? error
+            : new ProductionAdapterError("Provider request failed", "ADAPTER_NETWORK_ERROR", { cause: error, retryable: true });
+          if (!normalized.retryable || attempt >= maxAttempts) throw normalized;
+          safeAdapterLog(logger, "warn", "provider-request-retry", { attempt, reason: normalized.code });
+          await sleepImpl(Math.min(1000, 100 * (2 ** (attempt - 1))));
+        }
+      }
+      throw new ProductionAdapterError("Provider request failed", "ADAPTER_RETRY_EXHAUSTED");
+    }
+  });
+}
+
+async function fetchJson(url, options = {}, timeoutMs = DEFAULT_TIMEOUT_MS, fetchImpl = globalThis.fetch) {
+  return createHttpJsonTransport({ fetchImpl }).request(url, { ...options, timeoutMs, maxAttempts: 1 });
+}
+
+function adapterRequestJson(url, requestOptions, options = {}) {
+  const transport = options.transport || createHttpJsonTransport({
+    fetchImpl: options.fetchImpl,
+    sleepImpl: options.sleepImpl,
+    logger: options.logger
+  });
+  return transport.request(url, requestOptions);
+}
+
+function transportAsFetch(transport) {
+  if (!transport || typeof transport.request !== "function") return null;
+  return async (url, options = {}) => ({
+    ok: true,
+    status: 200,
+    text: async () => JSON.stringify(await transport.request(url, options) ?? {})
+  });
 }
 
 async function resolveOidcUserInfoEndpoint(env = process.env, fetchImpl = globalThis.fetch) {
@@ -410,8 +521,8 @@ async function fetchOidcDiscovery(env = process.env, fetchImpl = globalThis.fetc
   const discovery = await fetchJson(discoveryUrl, { headers: { Accept: "application/json" } }, env.IDENTITY_ADAPTER_TIMEOUT_MS, fetchImpl);
   const expectedIssuer = issuer.toString().replace(/\/$/, "");
   const discoveredIssuer = String(discovery.issuer || "").trim().replace(/\/$/, "");
-  if (discoveredIssuer && discoveredIssuer !== expectedIssuer) throw new Error("OIDC discovery issuer does not match OIDC_ISSUER_URL");
-  if (isProduction(env) && !discoveredIssuer) throw new Error("OIDC discovery is missing issuer in production");
+  if (discoveredIssuer && discoveredIssuer !== expectedIssuer) throw new ProductionAdapterError("OIDC discovery issuer mismatch", "OIDC_DISCOVERY_ISSUER_MISMATCH", { statusCode: 401 });
+  if (isProduction(env) && !discoveredIssuer) throw new ProductionAdapterError("OIDC discovery issuer is missing", "OIDC_DISCOVERY_ISSUER_MISSING");
   return discovery;
 }
 
@@ -420,6 +531,105 @@ async function resolveOidcLifecycleEndpoint(envName, discoveryField, label, env 
   const discovery = await fetchOidcDiscovery(env, fetchImpl);
   if (!discovery[discoveryField]) throw new Error(`OIDC discovery does not expose ${discoveryField}`);
   return validatedHttpUrl(discovery[discoveryField], label, env).toString();
+}
+
+function decodeJwtPart(value, label) {
+  try {
+    const decoded = Buffer.from(String(value || ""), "base64url").toString("utf8");
+    if (!decoded || decoded.length > 16384) throw new Error("invalid size");
+    const parsed = JSON.parse(decoded);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("invalid shape");
+    return parsed;
+  } catch {
+    throw new ProductionAdapterError(`OIDC ID token ${label} is invalid`, `OIDC_ID_TOKEN_${label.toUpperCase()}_INVALID`, { statusCode: 401 });
+  }
+}
+
+function safeStringEqual(left, right) {
+  const leftDigest = createHash("sha256").update(String(left || "")).digest();
+  const rightDigest = createHash("sha256").update(String(right || "")).digest();
+  return timingSafeEqual(leftDigest, rightDigest);
+}
+
+async function fetchOidcJwks(options = {}) {
+  const env = options.env || process.env;
+  const discovery = options.discovery || await fetchOidcDiscovery(env, options.fetchImpl);
+  if (!discovery.jwks_uri) throw new ProductionAdapterError("OIDC discovery does not expose jwks_uri", "OIDC_JWKS_URI_MISSING");
+  const endpoint = validatedHttpUrl(discovery.jwks_uri, "OIDC jwks_uri", env).toString();
+  const document = await adapterRequestJson(endpoint, {
+    headers: { Accept: "application/json" },
+    timeoutMs: identityAdapterStatus(env).timeoutMs,
+    maxAttempts: 2
+  }, options);
+  if (!Array.isArray(document.keys) || document.keys.length === 0 || document.keys.length > 100) {
+    throw new ProductionAdapterError("OIDC JWKS document is invalid", "OIDC_JWKS_INVALID");
+  }
+  return { endpoint, keys: document.keys };
+}
+
+async function verifyOidcIdToken(idToken, options = {}) {
+  const env = options.env || process.env;
+  const parts = String(idToken || "").trim().split(".");
+  if (parts.length !== 3 || parts.some((part) => !part)) {
+    throw new ProductionAdapterError("OIDC ID token format is invalid", "OIDC_ID_TOKEN_FORMAT_INVALID", { statusCode: 401 });
+  }
+  const header = decodeJwtPart(parts[0], "header");
+  const claims = decodeJwtPart(parts[1], "claims");
+  const algorithms = new Set(["RS256", "PS256", "ES256"]);
+  if (!algorithms.has(String(header.alg || ""))) {
+    throw new ProductionAdapterError("OIDC ID token algorithm is not allowed", "OIDC_ID_TOKEN_ALGORITHM_REJECTED", { statusCode: 401 });
+  }
+  const kid = String(header.kid || "").trim();
+  if (!kid || kid.length > 240) throw new ProductionAdapterError("OIDC ID token key id is missing", "OIDC_ID_TOKEN_KID_MISSING", { statusCode: 401 });
+  const jwks = await fetchOidcJwks(options);
+  const matchingKeys = jwks.keys.filter((key) => String(key.kid || "") === kid && (!key.alg || key.alg === header.alg) && (!key.use || key.use === "sig"));
+  if (matchingKeys.length !== 1) throw new ProductionAdapterError("OIDC signing key is not uniquely available", "OIDC_SIGNING_KEY_UNAVAILABLE", { statusCode: 401 });
+  let publicKey;
+  try {
+    publicKey = createPublicKey({ key: matchingKeys[0], format: "jwk" });
+  } catch {
+    throw new ProductionAdapterError("OIDC signing key is invalid", "OIDC_SIGNING_KEY_INVALID");
+  }
+  const keyOptions = header.alg === "PS256"
+    ? { key: publicKey, padding: cryptoConstants.RSA_PKCS1_PSS_PADDING, saltLength: 32 }
+    : header.alg === "ES256"
+      ? { key: publicKey, dsaEncoding: "ieee-p1363" }
+      : publicKey;
+  let signatureValid = false;
+  try {
+    signatureValid = verifySignature("sha256", Buffer.from(`${parts[0]}.${parts[1]}`), keyOptions, Buffer.from(parts[2], "base64url"));
+  } catch {}
+  if (!signatureValid) throw new ProductionAdapterError("OIDC ID token signature is invalid", "OIDC_ID_TOKEN_SIGNATURE_INVALID", { statusCode: 401 });
+
+  const issuer = validatedHttpUrl(env.OIDC_ISSUER_URL, "OIDC_ISSUER_URL", env).toString().replace(/\/$/, "");
+  if (!safeStringEqual(String(claims.iss || "").replace(/\/$/, ""), issuer)) {
+    throw new ProductionAdapterError("OIDC ID token issuer mismatch", "OIDC_ID_TOKEN_ISSUER_MISMATCH", { statusCode: 401 });
+  }
+  const clientId = String(env.OIDC_CLIENT_ID || "").trim();
+  const audience = Array.isArray(claims.aud) ? claims.aud.map(String) : claims.aud ? [String(claims.aud)] : [];
+  if (!clientId || !audience.some((item) => safeStringEqual(item, clientId))) {
+    throw new ProductionAdapterError("OIDC ID token audience mismatch", "OIDC_ID_TOKEN_AUDIENCE_MISMATCH", { statusCode: 401 });
+  }
+  if (audience.length > 1 && !safeStringEqual(claims.azp, clientId)) {
+    throw new ProductionAdapterError("OIDC ID token authorized party mismatch", "OIDC_ID_TOKEN_AZP_MISMATCH", { statusCode: 401 });
+  }
+  if (!String(claims.sub || "").trim()) throw new ProductionAdapterError("OIDC ID token subject is missing", "OIDC_ID_TOKEN_SUBJECT_MISSING", { statusCode: 401 });
+  const nowSeconds = Math.floor(Number(options.nowMs ?? Date.now()) / 1000);
+  const skew = identityAdapterStatus(env).clockSkewSeconds;
+  if (!Number.isFinite(claims.exp) || claims.exp <= nowSeconds - skew) throw new ProductionAdapterError("OIDC ID token has expired", "OIDC_ID_TOKEN_EXPIRED", { statusCode: 401 });
+  if (Number.isFinite(claims.nbf) && claims.nbf > nowSeconds + skew) throw new ProductionAdapterError("OIDC ID token is not active", "OIDC_ID_TOKEN_NOT_ACTIVE", { statusCode: 401 });
+  if (Number.isFinite(claims.iat) && claims.iat > nowSeconds + skew) throw new ProductionAdapterError("OIDC ID token issued-at time is invalid", "OIDC_ID_TOKEN_IAT_INVALID", { statusCode: 401 });
+  if (options.nonce !== undefined && !safeStringEqual(claims.nonce, options.nonce)) {
+    throw new ProductionAdapterError("OIDC ID token nonce mismatch", "OIDC_ID_TOKEN_NONCE_MISMATCH", { statusCode: 401 });
+  }
+  return Object.freeze({
+    claims: Object.freeze({ ...claims, iss: issuer }),
+    algorithm: header.alg,
+    keyId: kid,
+    verifiedAt: new Date(nowSeconds * 1000).toISOString(),
+    signatureVerified: true,
+    credentialsPersisted: false
+  });
 }
 
 async function fetchOidcUserInfo(accessToken, options = {}) {
@@ -440,7 +650,11 @@ async function fetchOidcUserInfo(accessToken, options = {}) {
   if (!claims.sub && !claims.openid && !claims.uid) throw new Error("OIDC UserInfo response is missing subject claim");
   const expectedIssuer = validatedHttpUrl(env.OIDC_ISSUER_URL, "OIDC_ISSUER_URL", env).toString().replace(/\/$/, "");
   const claimedIssuer = String(claims.iss || "").trim().replace(/\/$/, "");
-  if (claimedIssuer && claimedIssuer !== expectedIssuer) throw new Error("OIDC UserInfo issuer does not match OIDC_ISSUER_URL");
+  if (claimedIssuer && claimedIssuer !== expectedIssuer) throw new ProductionAdapterError("OIDC UserInfo issuer mismatch", "OIDC_USERINFO_ISSUER_MISMATCH", { statusCode: 401 });
+  const claimedAudience = Array.isArray(claims.aud) ? claims.aud.map(String) : claims.aud ? [String(claims.aud)] : [];
+  if (claimedAudience.length && !claimedAudience.includes(String(env.OIDC_CLIENT_ID))) {
+    throw new ProductionAdapterError("OIDC UserInfo audience mismatch", "OIDC_USERINFO_AUDIENCE_MISMATCH", { statusCode: 401 });
+  }
   return {
     claims: { ...claims, iss: claimedIssuer || expectedIssuer },
     endpoint,
@@ -475,12 +689,23 @@ async function refreshOidcAccessToken(refreshToken, options = {}) {
   }, status.timeoutMs, options.fetchImpl);
   const accessToken = String(body.access_token || "").trim();
   if (!accessToken) throw new Error("OIDC token response is missing access_token");
+  const idTokenVerification = body.id_token
+    ? await verifyOidcIdToken(body.id_token, {
+      env,
+      fetchImpl: options.fetchImpl,
+      transport: options.transport,
+      nonce: options.nonce,
+      nowMs: options.nowMs
+    })
+    : null;
   return {
     accessToken,
     refreshToken: String(body.refresh_token || token).trim(),
     refreshRotated: Boolean(body.refresh_token && body.refresh_token !== token),
     tokenType: String(body.token_type || "Bearer").trim(),
     expiresIn: Math.max(0, Number(body.expires_in || 0) || 0),
+    idTokenClaims: idTokenVerification?.claims || null,
+    idTokenSignatureVerified: idTokenVerification?.signatureVerified === true,
     refreshedAt: new Date().toISOString(),
     adapter: "oidc-refresh"
   };
@@ -572,28 +797,41 @@ async function sendSmsVerificationCode(message, options = {}) {
   const status = smsAdapterStatus(env);
   if (!status.configured) throw new Error("SMS gateway is not configured");
   if (!status.productionHttps) throw new Error("SMS_GATEWAY_URL must use HTTPS in production");
+  if (!status.authModeSupported) throw new ProductionAdapterError("SMS gateway authentication mode is unsupported", "SMS_GATEWAY_AUTH_MODE_INVALID", { statusCode: 503 });
+  if (isProduction(env) && !status.productionConfigured) throw new ProductionAdapterError("SMS gateway credential is not configured", "SMS_GATEWAY_CREDENTIAL_MISSING", { statusCode: 503 });
   const endpoint = validatedHttpUrl(env.SMS_GATEWAY_URL, "SMS_GATEWAY_URL", env).toString();
+  const phone = String(message.phone || "").trim();
+  const code = String(message.code || "").trim();
+  const clientRequestId = safeCallbackText(message.clientRequestId, 160);
+  if (!/^\+?\d{7,15}$/.test(phone)) throw new ProductionAdapterError("SMS recipient is invalid", "SMS_RECIPIENT_INVALID", { statusCode: 400 });
+  if (!/^\d{4,10}$/.test(code)) throw new ProductionAdapterError("SMS verification code is invalid", "SMS_CODE_INVALID", { statusCode: 400 });
+  if (!/^[A-Za-z0-9._:-]{8,160}$/.test(clientRequestId)) {
+    throw new ProductionAdapterError("SMS client request id is required", "SMS_IDEMPOTENCY_KEY_REQUIRED", { statusCode: 400 });
+  }
   const headers = { Accept: "application/json", "Content-Type": "application/json" };
-  if (env.SMS_GATEWAY_TOKEN) headers.Authorization = `Bearer ${env.SMS_GATEWAY_TOKEN}`;
-  const body = await fetchJson(endpoint, {
+  if (status.authMode === "bearer") headers.Authorization = `Bearer ${String(env.SMS_GATEWAY_TOKEN).trim()}`;
+  headers["Idempotency-Key"] = clientRequestId;
+  const body = await adapterRequestJson(endpoint, {
     method: "POST",
     headers,
     body: JSON.stringify({
-      mobile: String(message.phone || "").trim(),
+      mobile: phone,
       templateId: env.SMS_TEMPLATE_ID,
       sender: env.SMS_SENDER || "",
       parameters: {
-        code: String(message.code || ""),
+        code,
         expiresInMinutes: Number(message.expiresInMinutes || 5)
       },
-      clientRequestId: message.clientRequestId
-    })
-  }, status.timeoutMs, options.fetchImpl);
+      clientRequestId
+    }),
+    timeoutMs: status.timeoutMs,
+    maxAttempts: status.maxAttempts
+  }, options);
   const providerMessageId = String(body.providerMessageId || body.messageId || body.requestId || "").trim();
-  if (!providerMessageId) throw new Error("SMS gateway response is missing provider message id");
+  if (!providerMessageId) throw new ProductionAdapterError("SMS gateway response is missing provider message id", "SMS_PROVIDER_MESSAGE_ID_MISSING");
   const providerStatus = String(body.status || "accepted").trim().toLowerCase();
   if (body.success === false || ["rejected", "failed", "error", "denied"].includes(providerStatus)) {
-    throw new Error(`SMS gateway rejected the request (${providerStatus})`);
+    throw new ProductionAdapterError("SMS gateway rejected the request", "SMS_GATEWAY_REJECTED");
   }
   return {
     providerMessageId,
@@ -604,11 +842,41 @@ async function sendSmsVerificationCode(message, options = {}) {
   };
 }
 
+async function probeIdentityAdapterHealth(options = {}) {
+  const env = options.env || process.env;
+  const status = identityAdapterStatus(env);
+  if (!status.configured || !status.productionHttps) {
+    throw new ProductionAdapterError("OIDC adapter is not safely configured", "OIDC_ADAPTER_NOT_CONFIGURED", { statusCode: 503 });
+  }
+  const discovery = await fetchOidcDiscovery(env, options.fetchImpl);
+  const required = ["issuer", "jwks_uri", "userinfo_endpoint", "token_endpoint"];
+  if (required.some((key) => !String(discovery[key] || "").trim())) {
+    throw new ProductionAdapterError("OIDC discovery is incomplete", "OIDC_DISCOVERY_INCOMPLETE");
+  }
+  return Object.freeze({ ok: true, providerReachable: true, discoveryVerified: true, checkedAt: new Date().toISOString(), credentialsExposed: false });
+}
+
+async function probeSmsAdapterHealth(options = {}) {
+  const env = options.env || process.env;
+  const status = smsAdapterStatus(env);
+  if (!status.productionConfigured || !status.productionHttps) {
+    throw new ProductionAdapterError("SMS adapter is not safely configured", "SMS_ADAPTER_NOT_CONFIGURED", { statusCode: 503 });
+  }
+  if (!status.healthEndpointConfigured) {
+    return Object.freeze({ ok: true, configurationVerified: true, providerReachable: false, checkedAt: new Date().toISOString(), credentialsExposed: false });
+  }
+  const endpoint = validatedHttpUrl(env.SMS_GATEWAY_HEALTH_URL, "SMS_GATEWAY_HEALTH_URL", env).toString();
+  const headers = { Accept: "application/json" };
+  if (status.authMode === "bearer") headers.Authorization = `Bearer ${String(env.SMS_GATEWAY_TOKEN).trim()}`;
+  await adapterRequestJson(endpoint, { method: "GET", headers, timeoutMs: status.timeoutMs, maxAttempts: 2 }, options);
+  return Object.freeze({ ok: true, configurationVerified: true, providerReachable: true, checkedAt: new Date().toISOString(), credentialsExposed: false });
+}
+
 function productionAdapterCenter(env = process.env) {
   const identity = identityAdapterStatus(env);
   const sms = smsAdapterStatus(env);
   const identityLifecycleReady = identity.configured && identity.productionHttps && identity.refreshConfigured && identity.revocationConfigured && identity.directoryConfigured;
-  const smsDeliveryCallbackReady = sms.configured && sms.productionHttps && sms.callbackConfigured;
+  const smsDeliveryCallbackReady = (isProduction(env) ? sms.productionConfigured : sms.configured) && sms.productionHttps && sms.callbackConfigured;
   const adapterReady = identityLifecycleReady && smsDeliveryCallbackReady;
   return {
     generatedAt: new Date().toISOString(),
@@ -627,6 +895,7 @@ function productionAdapterCenter(env = process.env) {
       ...(!identity.revocationConfigured ? ["OIDC token revocation endpoint"] : []),
       ...(!identity.directoryConfigured ? ["identity directory endpoint and credential"] : []),
       ...(!sms.configured ? ["SMS gateway URL and template"] : []),
+      ...(sms.configured && isProduction(env) && !sms.productionConfigured ? ["SMS gateway authentication mode and credential"] : []),
       ...(!sms.productionHttps ? ["SMS gateway HTTPS endpoint"] : []),
       ...(!sms.callbackConfigured ? ["SMS delivery callback signing secret"] : []),
       "real provider joint-test receipts and site signoff"
@@ -634,14 +903,48 @@ function productionAdapterCenter(env = process.env) {
   };
 }
 
+function createIdentityAdapter(options = {}) {
+  const env = options.env || process.env;
+  const transport = options.transport;
+  const fetchImpl = options.fetchImpl || transportAsFetch(transport) || globalThis.fetch;
+  return Object.freeze({
+    profile: "platform-adapter-v1",
+    status: () => identityAdapterStatus(env),
+    userInfo: (accessToken) => fetchOidcUserInfo(accessToken, { env, fetchImpl }),
+    verifyIdToken: (idToken, verifyOptions = {}) => verifyOidcIdToken(idToken, { env, fetchImpl, transport, ...verifyOptions }),
+    refresh: (refreshToken) => refreshOidcAccessToken(refreshToken, { env, fetchImpl, transport }),
+    revoke: (upstreamToken, revokeOptions = {}) => revokeOidcToken(upstreamToken, { env, fetchImpl, ...revokeOptions }),
+    directory: (directoryOptions = {}) => fetchIdentityDirectory({ env, fetchImpl, ...directoryOptions }),
+    health: () => probeIdentityAdapterHealth({ env, fetchImpl, transport })
+  });
+}
+
+function createSmsAdapter(options = {}) {
+  const env = options.env || process.env;
+  const fetchImpl = options.fetchImpl || globalThis.fetch;
+  const transport = options.transport;
+  return Object.freeze({
+    profile: "platform-adapter-v1",
+    status: () => smsAdapterStatus(env),
+    send: (message) => sendSmsVerificationCode(message, { env, fetchImpl, transport, sleepImpl: options.sleepImpl, logger: options.logger }),
+    verifyCallback: (payload, callbackOptions = {}) => verifySmsDeliveryCallback(payload, { env, ...callbackOptions }),
+    health: () => probeSmsAdapterHealth({ env, fetchImpl, transport, sleepImpl: options.sleepImpl, logger: options.logger })
+  });
+}
+
 module.exports = {
   SMS_DELIVERY_STATUSES,
   SMS_DELIVERY_TERMINAL_STATUSES,
+  ProductionAdapterError,
   SmsDeliveryCallbackError,
   applySmsDeliveryCallback,
   buildSmsDeliveryCenter,
+  createHttpJsonTransport,
+  createIdentityAdapter,
+  createSmsAdapter,
   digestPhoneVerificationCode,
   fetchIdentityDirectory,
+  fetchOidcJwks,
   fetchOidcDiscovery,
   fetchOidcUserInfo,
   generatePhoneVerificationCode,
@@ -650,6 +953,8 @@ module.exports = {
   normalizePersistedSmsDeliveryReceipt,
   normalizeSmsDeliveryCallback,
   productionAdapterCenter,
+  probeIdentityAdapterHealth,
+  probeSmsAdapterHealth,
   recordSmsDeliveryAcceptance,
   refreshOidcAccessToken,
   resolveOidcLifecycleEndpoint,
@@ -659,5 +964,6 @@ module.exports = {
   signSmsDeliveryCallback,
   smsAdapterStatus,
   stableSmsCallbackStringify,
+  verifyOidcIdToken,
   verifySmsDeliveryCallback
 };

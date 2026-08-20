@@ -35,17 +35,19 @@
 
 ## 配置契约
 
-统一身份需要 `OIDC_ISSUER_URL`、`OIDC_CLIENT_ID`、`OIDC_CLIENT_SECRET`、`IDENTITY_DIRECTORY_URL` 和 `IDENTITY_DIRECTORY_TOKEN`；UserInfo、token 与 revocation endpoint 可通过发现文档解析，也可分别用 `OIDC_USERINFO_URL`、`OIDC_TOKEN_URL`、`OIDC_REVOCATION_URL` 显式指定。可选超时为 `IDENTITY_ADAPTER_TIMEOUT_MS`。短信需要 `SMS_GATEWAY_URL`、`SMS_TEMPLATE_ID` 和不少于 32 位的 `SMS_DELIVERY_CALLBACK_SECRET`，可选 `SMS_GATEWAY_TOKEN`、`SMS_SENDER`、`SMS_GATEWAY_TIMEOUT_MS` 和 `SMS_DELIVERY_CALLBACK_MAX_SKEW_SECONDS`。生产端点必须使用 HTTPS，真实密钥不得写入仓库。
+统一身份需要 `OIDC_ISSUER_URL`、`OIDC_CLIENT_ID`、`OIDC_CLIENT_SECRET`、`IDENTITY_DIRECTORY_URL` 和 `IDENTITY_DIRECTORY_TOKEN`；UserInfo、token 与 revocation endpoint 可通过发现文档解析，也可分别用 `OIDC_USERINFO_URL`、`OIDC_TOKEN_URL`、`OIDC_REVOCATION_URL` 显式指定。`OIDC_CLOCK_SKEW_SECONDS` 控制最多 300 秒的 ID token 时间偏差。短信需要 `SMS_GATEWAY_URL`、`SMS_TEMPLATE_ID`、显式 `SMS_GATEWAY_AUTH_MODE` 和满足该模式的凭据，以及不少于 32 位的 `SMS_DELIVERY_CALLBACK_SECRET`；可配置健康 endpoint、最多五次有界重试和超时。生产端点必须使用 HTTPS，真实密钥不得写入仓库。
 
 ## 安全控制
 
 - 上游 access token 仅用于本次 UserInfo 请求，不写入日志、审计记录或响应。
+- ID token 仅接受 RS256/PS256/ES256，必须经 discovery JWKS 唯一 `kid` 验签并校验 issuer、audience/authorized party、subject、时效和 nonce。
 - 刷新后必须重新校验 UserInfo 与本地账号启用状态；仅在供应商轮换 refresh token 时才把新 token 返回调用方。
 - OIDC 登录和刷新只按已绑定的稳定 subject 匹配本地账号，不按同名用户名自动回退；同名未绑定身份始终拒绝登录并进入受控绑定复核。
 - 目录同步不自动开户、不自动提权、不改变角色或机构，也不自动复活已停用账号；未绑定身份进入受控绑定队列。
 - 受控绑定要求目录与本地用户名、机构一致，subject 未被其他账号占用；已绑定账号的 subject 改绑必须另行安全复核。
 - 目录停用禁止停用当前操作员和最后一个卫健委账号，执行后撤销该账号的全部本地会话，并记录脱敏审计事件。
 - 生产验证码不以明文写入内存记录，只保存手机号、用户、有效期、请求号、受理回执和 keyed digest。
+- 短信发送的幂等键只能使用组合根生成并传入的稳定随机请求 ID；缺失时拒绝发送，禁止用手机号、验证码和模板的可枚举摘要替代。
 - 身份映射沿用机构、角色和门户白名单；外部声明不能直接创建可登录账号。
 - 短信受理回执持久化供应商消息号、客户端请求号、脱敏手机号、用途、受理时间和非敏感代码，不保存验证码。
 - 最终送达回调使用 HMAC-SHA256 回调验签，默认允许 300 秒时钟偏差；过期时间戳、签名不匹配、非法 nonce 和 nonce 重放全部失败关闭。

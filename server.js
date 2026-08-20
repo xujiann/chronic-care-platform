@@ -14593,15 +14593,17 @@ function assertProductionRuntimeSecurity(env = process.env) {
 
 function runtimeSessionStore() {
   const mode = sessionStoreMode();
+  const postgresSchema = String(process.env.POSTGRES_SCHEMA || "health_platform").trim();
   const postgresKey = mode === "postgres"
-    ? createHash("sha256").update(String(process.env.DATABASE_URL || "missing")).digest("hex").slice(0, 16)
+    ? createHash("sha256").update(`${String(process.env.DATABASE_URL || "missing")}:${postgresSchema}`).digest("hex").slice(0, 16)
     : "";
   const key = `${mode}:${mode === "sqlite" ? SQLITE_FILE : mode === "postgres" ? postgresKey : "process"}`;
   if (runtimeSessionStoreInstance && runtimeSessionStoreKey === key) return runtimeSessionStoreInstance;
   if (mode === "sqlite") runtimeSessionStoreInstance = new SqliteSessionStore({ openDatabase: openSqliteDatabase });
   else if (mode === "postgres") runtimeSessionStoreInstance = new PostgresSessionStore({
     PoolClass: require("pg").Pool,
-    poolConfig: postgresPoolConfig(process.env)
+    poolConfig: postgresPoolConfig(process.env),
+    schema: postgresSchema
   });
   else runtimeSessionStoreInstance = new MemorySessionStore();
   runtimeSessionStoreKey = key;
