@@ -26,7 +26,9 @@
 
 - ID token 只允许 RS256、PS256、ES256，经 discovery `jwks_uri` 唯一 `kid` 验签，并严格校验 `iss`、`aud`、多 audience 时的 `azp`、`sub`、`exp`、`nbf`、`iat` 与请求 `nonce`。
 - 通用 HTTP transport 使用有界超时、最多五次重试和稳定安全错误；日志字段拒绝 token、secret、手机号、验证码、payload 和幂等键。
-- 生产 SMS 必须显式选择受支持认证模式并满足凭据条件；发送重试必须复用组合根生成的随机 `clientRequestId`。
+- 生产 SMS 当前只允许已实现且具备 token 的 bearer 模式；`none` 仅限非生产，mTLS 在证书 transport 与门禁实现前 fail closed。发送重试必须复用组合根生成的随机 `clientRequestId`。
+- OTP、发送/登录限流和失败锁定使用共享认证安全状态仓储：单主机 SQLite 复用冻结迁移后的 `state_collections`，多实例生产使用迁移包创建的 PostgreSQL 表与组合根长期 pool；内存模式禁止用于生产。
+- 验证码流程固定为限流、原子签发、供应商发送；共享状态写失败不得调用供应商，供应商失败只撤销本次 OTP。成功验证原子消费，重放、跨进程竞争、过期和尝试耗尽均失败关闭。
 - 禁止从手机号、验证码、模板等低熵材料派生幂等键；缺少随机请求 ID 时 fail closed。
 - 健康探针仅返回配置和连通性状态，不返回 endpoint、凭据或原始断言。
 

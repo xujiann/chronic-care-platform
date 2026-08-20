@@ -4,14 +4,14 @@ const DOMAIN = "identity-security";
 const PROCESS = "T01";
 const DEPENDENCIES = Object.freeze([
   "SmsDeliveryCallbackError", "appendDataAccessLog", "appendSecurityEvent", "applyIdentityDirectoryBinding",
-  "applyIdentityDirectoryDeactivations", "applySmsDeliveryCallback", "buildComplianceReport",
+  "applyIdentityDirectoryDeactivations", "applySmsDeliveryCallback", "authLoginLockStatus", "buildComplianceReport",
   "buildIdentityDirectorySyncPlan", "buildSmsDeliveryCenter", "canAccessResident", "cleanupRuntimeSessions",
-  "collectJson", "createSession", "currentSession", "fetchIdentityDirectory", "fetchOidcUserInfo", "findAuthUser",
+  "clearAuthLoginFailures", "clearPhoneLoginFailures", "collectJson", "consumeAuthRateLimit", "createSession", "currentSession", "fetchIdentityDirectory", "fetchOidcUserInfo", "findAuthUser",
   "findCitizenAuthUserByPhone", "highRiskSecurityEvents", "isProductionRuntime", "issuePhoneVerificationCode",
   "mapExternalIdentityClaims", "maskPhone", "normalizePhone", "normalizeState", "phoneLoginLockStatus",
-  "prependAuditTrailEntry", "productionAdapterCenter", "randomUUID", "readDatabase", "recordPhoneLoginFailure",
-  "redactSensitiveResponse", "refreshOidcAccessToken", "refreshSessionStoreStatus", "requireApiRole",
-  "revokeOidcToken", "revokeSession", "sendJson", "sessionStoreStatus", "verifyAuditTrail", "verifyPassword",
+  "prependAuditTrailEntry", "productionAdapterCenter", "randomUUID", "readDatabase", "recordAuthLoginFailure", "recordPhoneLoginFailure",
+  "redactSensitiveResponse", "refreshOidcAccessToken", "refreshSessionStoreStatus", "requestRateLimitSubject",
+  "requireApiRole", "revokeOidcToken", "revokeSession", "sendJson", "sessionStoreStatus", "verifyAuditTrail", "verifyPassword",
   "verifyPhoneCode", "verifySmsDeliveryCallback", "writeDatabase"
 ]);
 

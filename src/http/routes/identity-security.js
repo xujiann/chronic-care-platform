@@ -31,7 +31,7 @@ const {
 } = require("../../identity-security/runtime-identity-policy");
 
 function createRouteSegments(runtime) {
-  const { SmsDeliveryCallbackError, appendDataAccessLog, appendSecurityEvent, applyIdentityDirectoryBinding, applyIdentityDirectoryDeactivations, applySmsDeliveryCallback, buildComplianceReport, buildIdentityDirectorySyncPlan, buildSmsDeliveryCenter, canAccessResident, cleanupRuntimeSessions, collectJson, createSession, currentSession, fetchIdentityDirectory, fetchOidcUserInfo, findAuthUser, findCitizenAuthUserByPhone, highRiskSecurityEvents, isProductionRuntime, issuePhoneVerificationCode, mapExternalIdentityClaims, maskPhone, normalizePhone, normalizeState, phoneLoginLockStatus, prependAuditTrailEntry, productionAdapterCenter, randomUUID, readDatabase, recordPhoneLoginFailure, redactSensitiveResponse, refreshOidcAccessToken, refreshSessionStoreStatus, requireApiRole, revokeOidcToken, revokeSession, sendJson, sessionStoreStatus, verifyAuditTrail, verifyPassword, verifyPhoneCode, verifySmsDeliveryCallback, writeDatabase } = runtime;
+  const { SmsDeliveryCallbackError, appendDataAccessLog, appendSecurityEvent, applyIdentityDirectoryBinding, applyIdentityDirectoryDeactivations, applySmsDeliveryCallback, authLoginLockStatus, buildComplianceReport, buildIdentityDirectorySyncPlan, buildSmsDeliveryCenter, canAccessResident, cleanupRuntimeSessions, clearAuthLoginFailures, clearPhoneLoginFailures, collectJson, consumeAuthRateLimit, createSession, currentSession, fetchIdentityDirectory, fetchOidcUserInfo, findAuthUser, findCitizenAuthUserByPhone, highRiskSecurityEvents, isProductionRuntime, issuePhoneVerificationCode, mapExternalIdentityClaims, maskPhone, normalizePhone, normalizeState, phoneLoginLockStatus, prependAuditTrailEntry, productionAdapterCenter, randomUUID, readDatabase, recordAuthLoginFailure, recordPhoneLoginFailure, redactSensitiveResponse, refreshOidcAccessToken, refreshSessionStoreStatus, requestRateLimitSubject, requireApiRole, revokeOidcToken, revokeSession, sendJson, sessionStoreStatus, verifyAuditTrail, verifyPassword, verifyPhoneCode, verifySmsDeliveryCallback, writeDatabase } = runtime;
   let auditRepository;
   const sessionSecurityAuditRepository = () => {
     auditRepository ||= createSessionSecurityAuditRepository({
@@ -50,27 +50,7 @@ function createRouteSegments(runtime) {
     randomUUID,
     repository: sessionSecurityAuditRepository()
   });
-  const passwordFailures = new Map();
-  const passwordLockStatus = (username) => {
-    const key = String(username || "").trim().toLowerCase();
-    const entry = passwordFailures.get(key);
-    if (!entry) return { locked: false, failedAttempts: 0, retryAfterSeconds: 0 };
-    if (entry.lockedUntil > Date.now()) {
-      return { locked: true, failedAttempts: entry.failedAttempts, retryAfterSeconds: Math.ceil((entry.lockedUntil - Date.now()) / 1000) };
-    }
-    if (entry.lockedUntil) passwordFailures.delete(key);
-    return { locked: false, failedAttempts: entry.lockedUntil ? 0 : entry.failedAttempts, retryAfterSeconds: 0 };
-  };
-  const recordPasswordFailure = (username) => {
-    const key = String(username || "").trim().toLowerCase();
-    const previous = passwordFailures.get(key) || { failedAttempts: 0, lockedUntil: 0 };
-    const failedAttempts = previous.failedAttempts + 1;
-    const lockedUntil = failedAttempts >= 5 ? Date.now() + 15 * 60 * 1000 : 0;
-    const next = { failedAttempts, lockedUntil };
-    passwordFailures.set(key, next);
-    return passwordLockStatus(key).locked ? passwordLockStatus(key) : { ...next, locked: false, retryAfterSeconds: 0 };
-  };
-  const clearPasswordFailures = (username) => passwordFailures.delete(String(username || "").trim().toLowerCase());
+  const passwordSubject = (username) => String(username || "").trim().toLowerCase();
   const validateRuntimeAccount = (user) => {
     const data = readDatabase();
     return Array.isArray(data?.authUsers) ? validateLocalAccount(user, data).user : user;
@@ -84,6 +64,11 @@ function createRouteSegments(runtime) {
       message: known ? error.message : "identity policy evaluation failed"
     });
   };
+  const rejectAuthState = (res, error) => sendJson(res, 503, {
+    ok: false,
+    code: error?.code || "AUTH_SECURITY_STATE_UNAVAILABLE",
+    message: "认证安全状态服务暂不可用"
+  });
   const enforceMutationSecurity = (req, res, options = {}) => {
     try {
       if (typeof isProductionRuntime !== "function" || !isProductionRuntime()) {
@@ -303,7 +288,26 @@ function createRouteSegments(runtime) {
         }
         const credentials = await collectJson(req);
         const username = String(credentials.username || "").trim();
-        const lock = passwordLockStatus(username);
+        let requestLimit;
+        let lock;
+        try {
+          requestLimit = await consumeAuthRateLimit({
+            subject: requestRateLimitSubject(req),
+            purpose: "password-login-network",
+            limit: 200,
+            windowMs: 60 * 1000
+          });
+          if (requestLimit.allowed) {
+            lock = await authLoginLockStatus({ subject: passwordSubject(username), purpose: "password-login" });
+          }
+        } catch (error) {
+          rejectAuthState(res, error);
+          return true;
+        }
+        if (!requestLimit.allowed) {
+          sendJson(res, 429, { ok: false, code: "PASSWORD_LOGIN_RATE_LIMITED", message: "登录请求过于频繁", retryAfterSeconds: requestLimit.retryAfterSeconds });
+          return true;
+        }
         if (lock.locked) {
           await recordSessionAudit(req,
             { actor: username || "unknown", role: "unknown", action: "local-password-login", target: "unified-auth", result: "denied", detail: "account login is temporarily locked" }
@@ -313,7 +317,19 @@ function createRouteSegments(runtime) {
         }
         const user = findAuthUser(username);
         if (!user || !verifyPassword(user, credentials.password)) {
-          const failure = recordPasswordFailure(username);
+          let failure;
+          try {
+            failure = await recordAuthLoginFailure({
+              subject: passwordSubject(username),
+              purpose: "password-login",
+              threshold: 5,
+              failureTtlMs: 15 * 60 * 1000,
+              lockoutMs: 15 * 60 * 1000
+            });
+          } catch (error) {
+            rejectAuthState(res, error);
+            return true;
+          }
           await recordSessionAudit(req,
             { actor: credentials.username || "unknown", role: "unknown", action: "local-password-login", target: "unified-auth", result: "denied", detail: "invalid account credentials" },
             undefined,
@@ -338,7 +354,12 @@ function createRouteSegments(runtime) {
           rejectPolicy(res, error);
           return true;
         }
-        clearPasswordFailures(username);
+        try {
+          await clearAuthLoginFailures({ subject: passwordSubject(username), purpose: "password-login" });
+        } catch (error) {
+          rejectAuthState(res, error);
+          return true;
+        }
         const session = await createSession(validatedUser);
         issueSessionCookies(res, session, process.env);
         await recordSessionAudit(req,
@@ -663,6 +684,22 @@ function createRouteSegments(runtime) {
       if (req.method === "POST" && url.pathname === "/api/auth/phone-code") {
         const payload = await collectJson(req);
         const phone = normalizePhone(payload.phone);
+        let sendLimit;
+        try {
+          sendLimit = await consumeAuthRateLimit({
+            subject: phone || requestRateLimitSubject(req),
+            purpose: "phone-code-send",
+            limit: 1,
+            windowMs: 60 * 1000
+          });
+        } catch (error) {
+          rejectAuthState(res, error);
+          return true;
+        }
+        if (!sendLimit.allowed) {
+          sendJson(res, 429, { ok: false, message: "验证码发送过于频繁", retryAfterSeconds: sendLimit.retryAfterSeconds });
+          return true;
+        }
         const user = findCitizenAuthUserByPhone(phone);
         if (!user) {
           appendSecurityEvent({ actor: phone || "unknown", role: "citizen", action: "发送手机号验证码", target: "统一认证", result: "拒绝", detail: "手机号未绑定居民账号" });
@@ -671,15 +708,11 @@ function createRouteSegments(runtime) {
         }
         let issued;
         try {
-          issued = await issuePhoneVerificationCode(phone, user);
+          issued = await issuePhoneVerificationCode(phone);
         } catch (error) {
-          appendSecurityEvent({ actor: user.name, role: user.role, action: "发送手机号验证码", target: "统一认证", result: "拒绝", detail: `短信网关发送失败：${error.message}` });
-          sendJson(res, 502, { ok: false, message: "短信网关发送失败" });
-          return true;
-        }
-        if (!issued.ok) {
-          appendSecurityEvent({ actor: user.name, role: user.role, action: "发送手机号验证码", target: "统一认证", result: "拒绝", detail: `验证码发送过于频繁，${issued.retryAfterSeconds} 秒后可重试` });
-          sendJson(res, 429, { ok: false, message: "验证码发送过于频繁", retryAfterSeconds: issued.retryAfterSeconds, expiresAt: issued.expiresAt });
+          const unavailable = error.code === "AUTH_SECURITY_STATE_UNAVAILABLE";
+          appendSecurityEvent({ actor: user.name, role: user.role, action: "发送手机号验证码", target: "统一认证", result: "拒绝", detail: unavailable ? "认证安全状态服务不可用" : "短信网关发送失败" });
+          sendJson(res, unavailable ? 503 : 502, { ok: false, code: error.code || "SMS_DELIVERY_FAILED", message: unavailable ? "认证安全状态服务暂不可用" : "短信网关发送失败" });
           return true;
         }
         appendSecurityEvent({ actor: user.name, role: user.role, action: "发送手机号验证码", target: "统一认证", result: "允许", detail: issued.demo ? "居民端演示短信验证码已签发" : `短信网关已受理：${issued.receipt.providerMessageId}` });
@@ -699,7 +732,24 @@ function createRouteSegments(runtime) {
         const phone = normalizePhone(credentials.phone);
         const code = String(credentials.code || "").trim();
         const user = findCitizenAuthUserByPhone(phone);
-        const lock = phoneLoginLockStatus(phone);
+        let requestLimit;
+        let lock;
+        try {
+          requestLimit = await consumeAuthRateLimit({
+            subject: requestRateLimitSubject(req),
+            purpose: "phone-login-network",
+            limit: 20,
+            windowMs: 60 * 1000
+          });
+          if (requestLimit.allowed) lock = await phoneLoginLockStatus(phone);
+        } catch (error) {
+          rejectAuthState(res, error);
+          return true;
+        }
+        if (!requestLimit.allowed) {
+          sendJson(res, 429, { ok: false, message: "登录请求过于频繁", retryAfterSeconds: requestLimit.retryAfterSeconds });
+          return true;
+        }
         if (lock.locked) {
           await recordSessionAudit(req,
             { actor: maskPhone(phone) || "unknown", role: "citizen", action: "phone-code-login", target: "unified-auth", result: "denied", detail: `login locked; retry after ${lock.retryAfterSeconds} seconds` },
@@ -709,8 +759,21 @@ function createRouteSegments(runtime) {
           sendJson(res, 423, { ok: false, message: "phone-code login locked after repeated failures", retryAfterSeconds: lock.retryAfterSeconds, failedAttempts: lock.failedAttempts });
           return true;
         }
-        if (!user || !verifyPhoneCode(phone, code, user)) {
-          const failure = recordPhoneLoginFailure(phone);
+        let verification;
+        try {
+          verification = await verifyPhoneCode(phone, code);
+        } catch (error) {
+          rejectAuthState(res, error);
+          return true;
+        }
+        if (!user || !verification.verified) {
+          let failure;
+          try {
+            failure = await recordPhoneLoginFailure(phone);
+          } catch (error) {
+            rejectAuthState(res, error);
+            return true;
+          }
           await recordSessionAudit(req,
             { actor: maskPhone(phone) || "unknown", role: "citizen", action: "phone-code-login", target: "unified-auth", result: "denied", detail: failure.locked ? "login locked after repeated failures" : "invalid phone or verification code" },
             undefined,
@@ -721,6 +784,12 @@ function createRouteSegments(runtime) {
             return true;
           }
           sendJson(res, 401, { ok: false, message: "invalid phone or verification code" });
+          return true;
+        }
+        try {
+          await clearPhoneLoginFailures(phone);
+        } catch (error) {
+          rejectAuthState(res, error);
           return true;
         }
         let validatedUser;

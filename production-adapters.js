@@ -110,18 +110,20 @@ function smsAdapterStatus(env = process.env) {
   const healthUrl = String(env.SMS_GATEWAY_HEALTH_URL || "").trim();
   const authMode = String(env.SMS_GATEWAY_AUTH_MODE || "bearer").trim().toLowerCase();
   const authModeSupported = ["bearer", "mtls", "none"].includes(authMode);
-  const credentialConfigured = authMode === "bearer" ? Boolean(String(env.SMS_GATEWAY_TOKEN || "").trim()) : authModeSupported;
+  const credentialConfigured = authMode === "bearer" && Boolean(String(env.SMS_GATEWAY_TOKEN || "").trim());
+  const productionAuthSupported = authMode === "bearer";
   const callbackMaxSkewSeconds = Math.min(900, Math.max(60, Number(env.SMS_DELIVERY_CALLBACK_MAX_SKEW_SECONDS || DEFAULT_SMS_CALLBACK_MAX_SKEW_SECONDS) || DEFAULT_SMS_CALLBACK_MAX_SKEW_SECONDS));
   return {
     type: "http-json",
     configured: Boolean(gatewayUrl && env.SMS_TEMPLATE_ID),
-    productionConfigured: Boolean(gatewayUrl && env.SMS_TEMPLATE_ID && credentialConfigured && authModeSupported),
+    productionConfigured: Boolean(gatewayUrl && env.SMS_TEMPLATE_ID && credentialConfigured && productionAuthSupported),
     gatewayConfigured: Boolean(gatewayUrl),
     healthEndpointConfigured: Boolean(healthUrl),
     templateConfigured: Boolean(env.SMS_TEMPLATE_ID),
     senderConfigured: Boolean(env.SMS_SENDER),
     authMode,
     authModeSupported,
+    productionAuthSupported,
     credentialConfigured,
     callbackConfigured: Boolean(String(env.SMS_DELIVERY_CALLBACK_SECRET || "").trim()),
     callbackMaxSkewSeconds,

@@ -142,6 +142,12 @@ test("SMS production sends fail closed without credentials or a caller request i
     env: { ...baseEnv, SMS_GATEWAY_TOKEN: "injected-token" },
     fetchImpl: async () => jsonResponse({ providerMessageId: "must-not-send" })
   }), { code: "SMS_IDEMPOTENCY_KEY_REQUIRED" });
+  for (const authMode of ["none", "mtls"]) {
+    await assert.rejects(() => sendSmsVerificationCode({ phone: "13800000000", code: "654321", clientRequestId: `request-${authMode}-001` }, {
+      env: { ...baseEnv, SMS_GATEWAY_AUTH_MODE: authMode },
+      fetchImpl: async () => jsonResponse({ providerMessageId: "must-not-send" })
+    }), { code: "SMS_GATEWAY_CREDENTIAL_MISSING" });
+  }
 });
 
 test("provider facades expose sanitized health without provider credentials", async () => {

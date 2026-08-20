@@ -391,7 +391,16 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(unavailableOidc.response.status, 502);
     assert.equal(unavailableOidc.body.message, "identity provider verification failed");
 
-    const residentPhoneLogin = await phoneLogin(baseUrl, "DEMO-MOBILE-R1");
+    const sentPhoneCode = await phoneCode(baseUrl, "DEMO-MOBILE-R1");
+    assert.equal(sentPhoneCode.response.status, 200);
+    assert.equal(sentPhoneCode.body.ok, true);
+    assert.equal(sentPhoneCode.body.channel, "demo-sms");
+    assert.equal(sentPhoneCode.body.phone, "DEM****E-R1");
+    assert.equal(sentPhoneCode.body.demoCode, "888888");
+    assert.equal(sentPhoneCode.body.retryAfterSeconds >= 1, true);
+    assert.equal(typeof sentPhoneCode.body.expiresAt, "string");
+
+    const residentPhoneLogin = await phoneLogin(baseUrl, "DEMO-MOBILE-R1", sentPhoneCode.body.demoCode);
     assert.equal(residentPhoneLogin.response.status, 200);
     assert.equal(residentPhoneLogin.body.user.role, "citizen");
     assert.equal(residentPhoneLogin.body.user.home, "citizen.html");
@@ -403,23 +412,13 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     const deniedSmsDeliveries = await api(baseUrl, "/api/auth/sms-deliveries", authorized(residentPhoneLogin.body.token));
     assert.equal(deniedSmsDeliveries.response.status, 403);
 
-    const sentPhoneCode = await phoneCode(baseUrl, "DEMO-MOBILE-R1");
-    assert.equal(sentPhoneCode.response.status, 200);
-    assert.equal(sentPhoneCode.body.ok, true);
-    assert.equal(sentPhoneCode.body.channel, "demo-sms");
-    assert.equal(sentPhoneCode.body.phone, "DEM****E-R1");
-    assert.equal(sentPhoneCode.body.demoCode, "888888");
-    assert.equal(sentPhoneCode.body.retryAfterSeconds >= 1, true);
-    assert.equal(typeof sentPhoneCode.body.expiresAt, "string");
-
     const throttledPhoneCode = await phoneCode(baseUrl, "DEMO-MOBILE-R1");
     assert.equal(throttledPhoneCode.response.status, 429);
     assert.equal(throttledPhoneCode.body.ok, false);
     assert.equal(throttledPhoneCode.body.retryAfterSeconds >= 1, true);
 
-    const issuedCodeLogin = await phoneLogin(baseUrl, "DEMO-MOBILE-R1", sentPhoneCode.body.demoCode);
-    assert.equal(issuedCodeLogin.response.status, 200);
-    assert.equal(issuedCodeLogin.body.user.role, "citizen");
+    const consumedCodeReplay = await phoneLogin(baseUrl, "DEMO-MOBILE-R1", sentPhoneCode.body.demoCode);
+    assert.equal(consumedCodeReplay.response.status, 401);
 
     const missing = await api(baseUrl, "/api/not-found", authorized(accountLogin.body.token));
     assert.equal(missing.response.status, 404);
@@ -2778,9 +2777,9 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(lockedCorrectCode.response.status, 423);
     const resetPhoneCode = await phoneCode(baseUrl, "DEMO-MOBILE-R2");
     assert.equal(resetPhoneCode.response.status, 200);
-    const resetPhoneLogin = await phoneLogin(baseUrl, "DEMO-MOBILE-R2", resetPhoneCode.body.demoCode);
-    assert.equal(resetPhoneLogin.response.status, 200);
-    assert.equal(resetPhoneLogin.body.user.residentId, "r2");
+    const stillLockedPhoneLogin = await phoneLogin(baseUrl, "DEMO-MOBILE-R2", resetPhoneCode.body.demoCode);
+    assert.equal(stillLockedPhoneLogin.response.status, 423);
+    assert.equal(stillLockedPhoneLogin.body.failedAttempts, 5);
 
     const hashedLogin = await login(baseUrl, "hashed_commission", "hashed-pass");
     assert.equal(hashedLogin.response.status, 200);
@@ -2798,9 +2797,10 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(badHashedLogin.response.status, 401);
     const missingPhoneCode = await phoneCode(baseUrl, "DEMO-MOBILE-MISSING");
     assert.equal(missingPhoneCode.response.status, 404);
-    const firstPhoneCode = await phoneCode(baseUrl, "DEMO-MOBILE-R1");
-    assert.equal(firstPhoneCode.response.status, 200);
-    const repeatedPhoneCode = await phoneCode(baseUrl, "DEMO-MOBILE-R1");
+    const firstPhoneCodeAttempt = await phoneCode(baseUrl, "DEMO-MOBILE-R1");
+    const repeatedPhoneCode = firstPhoneCodeAttempt.response.status === 429
+      ? firstPhoneCodeAttempt
+      : await phoneCode(baseUrl, "DEMO-MOBILE-R1");
     assert.equal(repeatedPhoneCode.response.status, 429);
     assert.equal(repeatedPhoneCode.body.ok, false);
     assert.equal(repeatedPhoneCode.body.retryAfterSeconds >= 1, true);
