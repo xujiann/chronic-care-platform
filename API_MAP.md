@@ -25,12 +25,12 @@ HTTP request
 | runtime | 4 | 8 | live、health、metrics、runtime status |
 | regional | 2 | 3 | 区域状态、配置与能力 |
 | identity-security | 4 | 23 | 登录、SMS、OIDC、会话、身份目录、安全审计 |
-| platform-governance | 11 | 72 | 生产控制、迁移、证据、数智医院、产品化 |
+| platform-governance | 12 | 73 | 生产控制、迁移、证据、数智医院、产品化、医院运行 dashboard |
 | state-data | 3 | 4 | 通用状态和 collection 兼容访问 |
 | public-health | 4 | 49 | 监测、直报、生命登记、交换和运营 |
 | citizen-chronic | 7 | 34 | 居民、档案、授权、慢病、随访 |
 | care-coordination | 10 | 32 | 挂号、转诊、护理、陪诊、协同订单 |
-| clinical-specialties | 10 | 73 | 急救、用血、影像、体检、质量安全 |
+| clinical-specialties | 9 | 72 | 急救、用血、影像、体检、质量安全；operations command 为待移交兼容入口 |
 | insurance-payment | 4 | 27 | 医保结算、支付、退款、凭证 |
 | integration | 3 | 13 | HIS/EMR/LIS/PACS 网关、签名回调 |
 | research | 2 | 5 | 科研数据集、申请、审计和成果 |
@@ -93,7 +93,7 @@ HTTP request
 
 ## 8. 临床五子域 API 归属
 
-路由源码中的 136 个去重 API 字面路径现被机器门禁覆盖：急救 37、血液 28、影像 17、体检 7、质量安全 14、历史 operations 33。该计数包含参数模板和同一路径的不同源码表达，不替代 73 条精确 method/path 下限。所有公开路径、鉴权调用和响应语义保持不变；operations 只登记 handoff，不在 T06 中改变全局路由。
+原临床路由源码中的 136 个去重 API 字面路径现有 135 个继续由 T06 机器门禁覆盖：急救 37、血液 28、影像 17、体检 7、质量安全 14、历史 operations command 32；`GET /api/operations/dashboard` 已成为 T02 `platform-governance-12` 的唯一源码归属。该计数包含参数模板和同一路径的不同源码表达，不替代精确 method/path 下限。dashboard 的 method/path、commission 角色、响应和等效路由顺序保持不变。
 
 `GET /api/emergency/dashboard` 已通过兼容委托接入 `emergency-dashboard-query.v1`。允许角色仍为 commission、institution、citizen；未授权请求在读数据前停止；成功状态仍为 200，响应继续经过既有 `redactSensitiveResponse`，且血液协调投影只暴露 `consumer=emergency`。该只读接口没有新增幂等、写入或审计语义。
 

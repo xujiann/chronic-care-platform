@@ -11,7 +11,6 @@ const { createRouteSegments } = require("../src/http/routes/clinical-specialties
 
 const EXPECTED_COUNTS = {
   "imaging-cloud": 8,
-  "operations-dashboard": 8,
   "operations-command": 20,
   "emergency-care": 11,
   "quality-safety": 18,
@@ -27,7 +26,7 @@ test("clinical specialty subdomains declare distinct least-privilege contexts", 
     Object.fromEntries(Object.entries(SUBDOMAIN_DEPENDENCIES).map(([name, dependencies]) => [name, dependencies.length])),
     EXPECTED_COUNTS
   );
-  assert.equal(new Set(Object.values(SUBDOMAIN_DEPENDENCIES).map((dependencies) => dependencies.join(","))).size, 10);
+  assert.equal(new Set(Object.values(SUBDOMAIN_DEPENDENCIES).map((dependencies) => dependencies.join(","))).size, 9);
   assert.deepEqual([...new Set(Object.values(SUBDOMAIN_DEPENDENCIES).flat())].sort(), [...DEPENDENCIES].sort());
 });
 
@@ -36,7 +35,7 @@ test("clinical specialty facade projects every segment and fails fast on missing
   const segments = createRouteSegments(runtime);
   assert.deepEqual(
     segments.map((segment) => segment.id),
-    Array.from({ length: 10 }, (_, index) => `clinical-specialties-${String(index + 1).padStart(2, "0")}`)
+    ["clinical-specialties-01", ...Array.from({ length: 8 }, (_, index) => `clinical-specialties-${String(index + 3).padStart(2, "0")}`)]
   );
 
   const incomplete = { ...runtime };
