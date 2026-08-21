@@ -48,6 +48,8 @@ async function stateWithEvent() {
     commandId: "delivery-command-001",
     expectedVersion: 1,
     correlationId: "trace-delivery-001",
+    source: "internal",
+    actor: { id: "referral-delivery-test", role: "system" },
     input: { status: "accepted" }
   });
   return {
@@ -261,6 +263,8 @@ test("command and replay evidence collections are not truncated at a fixed capac
     referralId: "rf1",
     commandId: "capacity-proof-command",
     expectedVersion: 1,
+    source: "internal",
+    actor: { id: "referral-capacity-test", role: "system" },
     input: { status: "accepted" }
   });
   assert.equal(state.referralSystem[OUTBOX_COLLECTION].length, 1001);

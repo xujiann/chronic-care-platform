@@ -95,6 +95,10 @@ attempt/backoff 和 dead-letter，因此不能把当前结构描述为多实例�
 
 此外脚本生成 MPI、collection migration 和 runtime sync SQL；PostgreSQL migration package 同时创建 runtime sync、中央会话与 `auth_security_state` 表。生产是否真实建立这些表取决于外部环境证据，仓库不得宣称已切换。
 
+### 转诊命令持久化
+
+三条转诊 HTTP 写入口共用既有 `referralSystem.referrals`、`referralCommandInbox` 与 `referralOutbox`。一次非重放命令在同一 UoW 中写入聚合新版本、幂等收件箱回执和 `care-coordination.referral-updated.v1` 发件箱事件；旧记录缺少 `version` 时按既有兼容规则解释为 1。REF-01a 不新增表、集合或 migration。
+
 ## 6. 核心数据不可变边界
 
 核心概念定义见 `CORE_DATA_DEFINITIONS.md`。主线现有机器事实优先级为：
@@ -124,3 +128,12 @@ attempt/backoff 和 dead-letter，因此不能把当前结构描述为多实例�
 影像 dashboard 查询读取既有 studies、shares、互认和报告投影，并继续使用居民/个人记录等外部只读数据形成授权范围。带 `residentId` 的请求仍由 HTTP 适配器追加现有数据访问日志并调用原持久化边界；查询端口本身不写业务集合。本切片没有新增集合、改变 Owner、schema、migration 或事实源。
 
 体检 dashboard 查询读取 `personalRecords[category=physical-exam]`、异常案例、联调、专项分流、附件、网关事件和慢病任务等既有投影。7 个体检候选集合仍为 `legacy-non-authoritative`，没有被本切片晋升为生产 Owner；显式居民查询继续由 HTTP 适配器持久化原有访问审计，查询端口不写业务集合，也不改变 schema、migration 或事实源。
+
+## 9. 健康驾驶舱指标测量
+
+`population-service-visits.v1` 是代码内版本化逻辑合同，不新增集合、表、DDL 或 migration。
+测量只读取既有 `healthStatistics.dailyServiceReports` 与 `healthStatistics.serviceReports` 聚合，
+不持久化为权威事实。日报必须具备受认可的签名摘要或获批来源版本才可能达到 `ready`；月报
+比例折算明确标记为 estimated/blocked。缺少服务端区域范围、来源水位或完整证据同样失败关闭。
+如后续把测量快照晋升为生产事实，必须先登记数据 owner、分类、reader、write contract，并由
+T00 建立 migration 和回滚证据。

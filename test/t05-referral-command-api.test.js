@@ -104,4 +104,53 @@ test("referral command inbox and outbox survive the real JSON persistence bounda
   assert.deepEqual(replay.body.event, firstEvent);
   assert.equal(replay.body.event.causationId, "t05-real-persistence-command-001");
   assert.equal(replay.body.referral.version, 2);
+
+  const hospitalLogin = await request(secondRuntime.baseUrl, "/api/auth/login", "", {
+    method: "POST",
+    body: JSON.stringify({ username: "hospital", password: "123456" })
+  });
+  assert.equal(hospitalLogin.response.status, 200);
+  const workflow = await request(secondRuntime.baseUrl, "/api/workflow-actions", hospitalLogin.body.token, {
+    method: "POST",
+    headers: { "Idempotency-Key": "t05-workflow-command-001" },
+    body: JSON.stringify({
+      collection: "referrals",
+      id: "rf1",
+      expectedVersion: 2,
+      status: "report-returned",
+      updates: { receivingFeedback: "receiving hospital returned feedback" }
+    })
+  });
+  assert.equal(workflow.response.status, 200);
+  assert.equal(workflow.body.id, "rf1");
+  assert.equal(workflow.body.version, 3);
+
+  const citizenLogin = await request(secondRuntime.baseUrl, "/api/auth/login", "", {
+    method: "POST",
+    body: JSON.stringify({ username: "citizen", password: "123456" })
+  });
+  assert.equal(citizenLogin.response.status, 200);
+  const citizenTask = await request(
+    secondRuntime.baseUrl,
+    `/api/tasks/${encodeURIComponent("referrals:rf1")}/actions`,
+    citizenLogin.body.token,
+    {
+      method: "POST",
+      headers: { "Idempotency-Key": "t05-citizen-task-command-001" },
+      body: JSON.stringify({
+        action: "resident-confirm",
+        comment: "居民端确认服务安排",
+        expectedVersion: 3
+      })
+    }
+  );
+  assert.equal(citizenTask.response.status, 200);
+  assert.equal(citizenTask.body.id, "rf1");
+  assert.equal(citizenTask.body.taskAction, "resident-confirm");
+  assert.equal(citizenTask.body.version, 4);
+
+  const finalPersisted = JSON.parse(fs.readFileSync(path.join(dataDir, "db.json"), "utf8"));
+  assert.equal(finalPersisted.referralSystem.referralOutbox.length, 3);
+  assert.equal(finalPersisted.referralSystem.referralCommandInbox.length, 3);
+  assert.equal(finalPersisted.taskMessages.some((item) => item.sourceId === "rf1" && item.createdBy === "citizen"), true);
 });

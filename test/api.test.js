@@ -495,9 +495,15 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(industryGovernanceIndicators.response.status, 200);
     assert.equal(industryGovernanceIndicators.body.ok, true);
     assert.equal(industryGovernanceIndicators.body.summary.indicators, 8);
+    assert.equal(industryGovernanceIndicators.body.summary.contractVersion, "health-dashboard-indicator-contract.v1");
     assert.equal(industryGovernanceIndicators.body.periodViews.length, 2);
     assert.equal(industryGovernanceIndicators.body.indicators.some((item) => item.id === "industry-disease-reporting" && item.sourceSystems.includes("HIS/EMR")), true);
     assert.equal(industryGovernanceIndicators.body.indicators.every((item) => item.reports.length === 2 && item.drilldown.href), true);
+    const governedVisits = industryGovernanceIndicators.body.indicators.find((item) => item.canonicalId === "performance-public-hospital");
+    assert.equal(governedVisits.contract.id, "population-service-visits.v1");
+    assert.equal(governedVisits.measurement.schemaVersion, "health-dashboard-indicator-contract.v1");
+    assert.equal(governedVisits.measurement.value.type, "integer");
+    assert.equal(governedVisits.measurement.qualityStatus, "blocked");
 
     const deniedIndustryGovernanceIndicators = await api(baseUrl, "/api/health-dashboard/industry-governance-indicators", authorized(residentPhoneLogin.body.token));
     assert.equal(deniedIndustryGovernanceIndicators.response.status, 403);
@@ -7493,8 +7499,78 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(compliantExport.response.status, 201);
     assert.equal(compliantExport.body.datasetId, application.body.id);
     assert.equal(compliantExport.body.deidentified, true);
-    assert.equal(compliantExport.body.minimumNecessary, true);
-    assert.equal(compliantExport.body.reviewStatus, "approved");
+    assert.equal(compliantExport.body.minimumNecessary, false);
+    assert.equal(compliantExport.body.reviewStatus, "pending");
+    assert.equal(compliantExport.body.exportStatus, "blocked");
+    assert.equal(compliantExport.body.domainVersion, 1);
+    const duplicateCompliantExport = await api(baseUrl, `/api/research/datasets/${application.body.id}/compliant-exports`, authorized(researchInstitution.body.token, {
+      method: "POST",
+      body: JSON.stringify({
+        id: compliantExport.body.id,
+        purpose: "duplicate export id must be rejected",
+        destination: "research-governance-reviewed-share",
+        requestedFields: ["ageBand"]
+      })
+    }));
+    assert.equal(duplicateCompliantExport.response.status, 409);
+    assert.equal(duplicateCompliantExport.body.code, "RESEARCH_EXPORT_ID_CONFLICT");
+    const institutionExports = await api(baseUrl, "/api/research/compliant-exports", authorized(researchInstitution.body.token));
+    assert.equal(institutionExports.response.status, 200);
+    assert.equal(institutionExports.body.exports.some((item) => item.id === compliantExport.body.id), true);
+    assert.equal(institutionExports.body.exports.some((item) => item.id === "cde-htn-001"), false);
+    const institutionReviewDenied = await api(baseUrl, `/api/research/compliant-exports/${compliantExport.body.id}/actions`, authorized(researchInstitution.body.token, {
+      method: "POST",
+      body: JSON.stringify({ action: "approve", expectedVersion: 1, reviewEvidenceRef: "REVIEW-COPD-2026" })
+    }));
+    assert.equal(institutionReviewDenied.response.status, 403);
+    const approvalCommandId = "research-export-approve-copd-001";
+    const exportApprovalPayload = {
+      action: "approve",
+      expectedVersion: 1,
+      reviewEvidenceRef: "REVIEW-COPD-2026",
+      reviewNote: "Minimum necessary field set and destination independently reviewed."
+    };
+    const compliantExportApproval = await api(baseUrl, `/api/research/compliant-exports/${compliantExport.body.id}/actions`, authorized(commissionToken, {
+      method: "POST",
+      headers: { "Idempotency-Key": approvalCommandId },
+      body: JSON.stringify(exportApprovalPayload)
+    }));
+    assert.equal(compliantExportApproval.response.status, 200);
+    assert.equal(compliantExportApproval.body.replayed, false);
+    assert.equal(compliantExportApproval.body.domainVersion, 2);
+    assert.equal(compliantExportApproval.body.reviewStatus, "approved");
+    assert.equal(compliantExportApproval.body.exportStatus, "approved-pending-release");
+    assert.equal(compliantExportApproval.body.minimumNecessary, true);
+    const compliantExportApprovalReplay = await api(baseUrl, `/api/research/compliant-exports/${compliantExport.body.id}/actions`, authorized(commissionToken, {
+      method: "POST",
+      headers: { "Idempotency-Key": approvalCommandId },
+      body: JSON.stringify(exportApprovalPayload)
+    }));
+    assert.equal(compliantExportApprovalReplay.response.status, 200);
+    assert.equal(compliantExportApprovalReplay.body.replayed, true);
+    assert.equal(compliantExportApprovalReplay.body.domainVersion, 2);
+    const compliantExportApprovalConflict = await api(baseUrl, `/api/research/compliant-exports/${compliantExport.body.id}/actions`, authorized(commissionToken, {
+      method: "POST",
+      headers: { "Idempotency-Key": approvalCommandId },
+      body: JSON.stringify({ ...exportApprovalPayload, reviewNote: "changed payload" })
+    }));
+    assert.equal(compliantExportApprovalConflict.response.status, 409);
+    assert.equal(compliantExportApprovalConflict.body.code, "RESEARCH_EXPORT_IDEMPOTENCY_CONFLICT");
+    const compliantExportRelease = await api(baseUrl, `/api/research/compliant-exports/${compliantExport.body.id}/actions`, authorized(commissionToken, {
+      method: "POST",
+      headers: { "Idempotency-Key": "research-export-release-copd-001" },
+      body: JSON.stringify({
+        action: "release",
+        expectedVersion: 2,
+        releaseEvidenceRef: "RELEASE-COPD-2026",
+        releaseNote: "Release evidence recorded.",
+        watermark: `wm-${application.body.id}-approved`
+      })
+    }));
+    assert.equal(compliantExportRelease.response.status, 200);
+    assert.equal(compliantExportRelease.body.domainVersion, 3);
+    assert.equal(compliantExportRelease.body.exportStatus, "released");
+    assert.equal(compliantExportRelease.body.watermark, `wm-${application.body.id}-approved`);
     const exportsAfterCreate = await api(baseUrl, "/api/research/compliant-exports", authorized(commissionToken));
     assert.equal(exportsAfterCreate.body.exports.some((item) => item.id === compliantExport.body.id), true);
     const returnedOutcome = await api(baseUrl, `/api/research/datasets/${application.body.id}/outcomes`, authorized(researchInstitution.body.token, {

@@ -89,6 +89,7 @@ HTTP request
   activation verifier、安全 HTTPS/HMAC 配置或可信 receipt capability 时以稳定
   `FOLLOWUP_EVENT_PUBLISHER_*` 错误失败且 outbox 保持 pending，`productionReady` 始终为
   `false`。本切片不提供 worker、lease 或多实例 exactly-once 声明。
+- 科研合规导出创建路径保持 `POST /api/research/datasets/:id/compliant-exports`，但新记录只进入 `pending/blocked`；`POST /api/research/compliant-exports/:id/actions` 由 commission 执行独立审核、退回和发布。命令要求 `expectedVersion` 与幂等键，同键异载荷或陈旧版本返回稳定 409；机构列表只返回本主体申请，历史 released 记录保持只读兼容。
 
 ## 7. API 风险与缺失测试
 
@@ -111,3 +112,16 @@ HTTP request
 `GET /api/imaging-cloud` 已通过兼容委托接入 `imaging-dashboard-query.v1`。允许角色仍为 commission、institution、county、citizen；显式 `residentId` 继续通过 `canAccessResident`，拒绝时记录安全事件并返回净化后的 403。成功响应仍为 200，先执行既有角色脱敏，再递归删除凭据、签名 URL、物理路径和内部连接字段；带居民过滤的成功调阅仍持久化既有数据访问审计。
 
 `GET /api/physical-exams` 已通过兼容委托接入 `physical-examination-dashboard-query.v1`。允许角色仍为 citizen、institution、commission；显式 `residentId` 继续按 `allowedResidentIdsForUser` 拒绝越权并记录安全事件。citizen 仍不接收联调、网关和专项分流明细，readiness 只暴露代码状态、质量和阻断数量；管理角色保留完整投影。成功响应继续在既有访问审计持久化之后执行最终脱敏。
+
+## 9. T05 转诊命令 API
+
+`POST /api/referrals/:id/actions`、`POST /api/workflow-actions`（`collection=referrals`）与 `POST /api/tasks/:id/actions`（`referrals:*`）继续保留原路径和各自成功响应形状，现统一进入 `referral-order.v1` owner command。三条路径均要求 `Idempotency-Key` 和正整数 `expectedVersion`；冲突、越权、超长字段和 action allowlist 失败返回稳定 `REFERRAL_*` code。权限在幂等回放和版本 CAS 之前执行。
+
+## 10. 健康驾驶舱指标合同 API 投影
+
+`GET /api/health-dashboard/summary` 与
+`GET /api/health-dashboard/industry-governance-indicators` 的 method/path、commission-only
+角色和既有响应字段保持不变。指标条目加法返回 canonical ID、显式 legacy alias、
+`health-dashboard-indicator-contract.v1` 定义及 `population-service-visits.v1` 测量；summary
+加法返回合同版本和阻断测量数。范围只接受服务端运行时注入，未解析范围或未经签名/版本认可的
+来源返回 `blocked` 元数据，不会因报告结构 `ok=true` 被提升为生产证据。

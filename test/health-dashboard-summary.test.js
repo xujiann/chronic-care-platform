@@ -38,6 +38,18 @@ test("health dashboard summary tracks the eight priority applications without re
   assert.equal(report.indicatorCenter.indicators.some((item) => item.id === "industry-physical-exam" && item.status === "blocked"), true);
   assert.equal(report.indicatorCenter.indicators.some((item) => item.id === "industry-appointment-reconciliation" && item.drilldown.href === "./citizen.html"), true);
   assert.equal(report.indicatorCenter.indicators.every((item) => item.definition && item.owner && item.sourceCollections.length && item.sourceSystems.length && item.reports.length === 2 && item.drilldown.href), true);
+  assert.equal(report.indicatorCenter.summary.contractVersion, "health-dashboard-indicator-contract.v1");
+  assert.equal(report.indicatorCenter.contracts[0].id, "population-service-visits.v1");
+  assert.equal(report.indicatorCenter.legacyAliases.length, 3);
+  const governedVisits = report.indicatorCenter.indicators.find((item) => item.canonicalId === "performance-public-hospital");
+  assert.equal(governedVisits.id, "industry-appointment-reconciliation");
+  assert.equal(governedVisits.legacyAlias.mapping, "explicit-compatibility-alias");
+  assert.equal(governedVisits.contract.id, "population-service-visits.v1");
+  assert.equal(governedVisits.measurement.value.type, "integer");
+  assert.equal(governedVisits.measurement.value.unit, "visits");
+  assert.equal(governedVisits.measurement.scope.provenance, "server-runtime");
+  assert.equal(governedVisits.measurement.qualityStatus, "blocked");
+  assert.equal(governedVisits.measurement.blockers.includes("SERVER_SCOPE_UNRESOLVED"), true);
   assert.equal(report.checks.some((item) => item.id === "dashboard:source-boundary" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "dashboard:aggregate-boundary" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "dashboard:development-template" && item.passed), true);
@@ -99,4 +111,10 @@ test("health dashboard summary supports empty source application boundaries", ()
   assert.equal(report.applications.some((item) => item.status === "empty-ready"), true);
   assert.equal(report.scope.role, "priority-eight-application-portfolio");
   assert.equal(report.checks.some((item) => item.id === "dashboard:source-boundary" && item.passed), true);
+});
+
+test("industry compatibility aliases are keyed by canonical id rather than array position", () => {
+  const source = fs.readFileSync(path.join(ROOT, "scripts", "health-dashboard-summary.js"), "utf8");
+  assert.match(source, /legacyAliasFor\(item\.id\)/);
+  assert.doesNotMatch(source, /compatibilityIds|compatibilityIds\s*\[\s*index\s*\]/);
 });

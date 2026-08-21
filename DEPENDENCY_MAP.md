@@ -166,3 +166,14 @@ JSON 源快照仍是高扇出依赖，但浏览器和 Pages 只依赖经统一�
 体检 dashboard 当前依赖方向为 `HTTP route → physical-examination-dashboard-query.v1 → 注入的 Overview / readiness 端口`。查询端口不导入根目录体检服务或 `server.js`；实现仍由组合根注入，且继续接收宽 JSON 快照。居民授权集合、生产运行标志、审计持久化和脱敏仍是 HTTP/平台端口，避免领域查询拥有身份或存储实现。
 
 医院运行 dashboard 的依赖方向现为 `platform-governance/operations-dashboard HTTP route → 注入的既有 operations builders / BloodEventHub 只读投影`。T06 已删除该子上下文以及仅由它使用的 observability、production operations 和 runtime metrics 依赖；builder、组合根、数据和响应未移动。`operations-command` 及其写依赖继续留在 T06 兼容边界，后续必须单独移交。
+
+## 11. T05 转诊命令依赖约束
+
+转诊写依赖方向为 `shared.js / citizen.js → 三条兼容 HTTP 路径 → referral-command-service → DomainRepository → referrals + command inbox + outbox`。领域服务只依赖平台 contract、repository 和 event runtime，不导入 `server.js` 或其他子域内部；HTTP 层注入居民授权和 JSON 存储端口。兼容路由不得绕过 owner command，居民任务消息和安全审计在命令成功后由 HTTP 层保留。
+
+## 12. 健康驾驶舱指标合同依赖
+
+依赖方向为 `health-dashboard-summary → health-dashboard-indicator-contract.v1 →
+technical-evidence.sha256`。合同模块不依赖 `server.js`、HTTP 路由、JSON 文件或数据库实现；
+调用方显式传入人口服务聚合、来源元数据、服务端 scope 与计算时间。T03 继续拥有日报/月报来源，
+T02 只拥有聚合合同和测量投影。当前 runtime 路由仍归 T01，本切片没有移动路由或改变组合顺序。
