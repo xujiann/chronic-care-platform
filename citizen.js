@@ -2185,11 +2185,19 @@ function defaultResidentTaskComment(action) {
 
 async function submitResidentTaskAction(taskId, collection, payload) {
   if (API_BASE) {
+    const itemId = String(taskId || "").split(":")[1];
+    const current = collection === "referrals"
+      ? findResidentTaskRows(collection).find((item) => item.id === itemId)
+      : null;
+    const referralCommandId = collection === "referrals" ? citizenCareRequestNonce() : "";
+    const commandPayload = collection === "referrals"
+      ? { ...payload, expectedVersion: Number(current?.version || 1) }
+      : payload;
     const request = window.HealthCityAuth?.authFetch || fetch;
     const response = await request(`${API_BASE}/tasks/${encodeURIComponent(taskId)}/actions`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
+      headers: { "Content-Type": "application/json", ...(referralCommandId ? { "Idempotency-Key": referralCommandId } : {}) },
+      body: JSON.stringify(commandPayload)
     });
     if (!response.ok) throw new Error(`服务待办更新失败：${response.status}`);
     const updated = await response.json();

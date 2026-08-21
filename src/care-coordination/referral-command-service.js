@@ -46,6 +46,191 @@ function text(value, max = 300) {
   return String(value || "").trim().slice(0, max);
 }
 
+function boundedCommandText(value, { field, max, code, required = false, requiredCode = code }) {
+  const normalized = String(value || "").trim();
+  if (required && !normalized) {
+    throw new ReferralCommandError(requiredCode, `${field} is required`);
+  }
+  if (normalized.length > max) {
+    throw new ReferralCommandError(code, `${field} exceeds ${max} characters`);
+  }
+  return normalized;
+}
+
+function normalizeCommandActor(actor = {}) {
+  const identityValues = [actor.id, actor.username].filter((value) => value !== undefined && value !== null);
+  for (const value of identityValues) {
+    boundedCommandText(value, { field: "actor id", max: 120, code: "REFERRAL_ACTOR_ID_TOO_LONG" });
+  }
+  const organizationValues = [actor.orgCode, actor.orgName].filter((value) => value !== undefined && value !== null);
+  for (const value of organizationValues) {
+    boundedCommandText(value, { field: "actor organization", max: 200, code: "REFERRAL_ACTOR_ORG_TOO_LONG" });
+  }
+  const regionValues = [actor.regionCode, actor.region, actor.district, actor.dataScope]
+    .filter((value) => value !== undefined && value !== null);
+  for (const value of regionValues) {
+    boundedCommandText(value, { field: "actor region", max: 200, code: "REFERRAL_ACTOR_REGION_TOO_LONG" });
+  }
+  return Object.freeze({
+    id: boundedCommandText(actor.id, { field: "actor id", max: 120, code: "REFERRAL_ACTOR_ID_TOO_LONG" }),
+    username: boundedCommandText(actor.username, { field: "actor username", max: 120, code: "REFERRAL_ACTOR_ID_TOO_LONG" }),
+    name: boundedCommandText(actor.name, { field: "actor name", max: 120, code: "REFERRAL_ACTOR_NAME_TOO_LONG" }),
+    role: boundedCommandText(actor.role, { field: "actor role", max: 40, code: "REFERRAL_ACTOR_ROLE_TOO_LONG" }),
+    orgCode: boundedCommandText(actor.orgCode, { field: "actor organization code", max: 120, code: "REFERRAL_ACTOR_ORG_TOO_LONG" }),
+    orgName: boundedCommandText(actor.orgName, { field: "actor organization name", max: 200, code: "REFERRAL_ACTOR_ORG_TOO_LONG" }),
+    orgType: boundedCommandText(actor.orgType, { field: "actor organization type", max: 80, code: "REFERRAL_ACTOR_ORG_TOO_LONG" }),
+    orgLevel: boundedCommandText(actor.orgLevel, { field: "actor organization level", max: 80, code: "REFERRAL_ACTOR_ORG_TOO_LONG" }),
+    regionCode: boundedCommandText(actor.regionCode, { field: "actor region code", max: 120, code: "REFERRAL_ACTOR_REGION_TOO_LONG" }),
+    region: boundedCommandText(actor.region || actor.district, { field: "actor region", max: 120, code: "REFERRAL_ACTOR_REGION_TOO_LONG" }),
+    dataScope: boundedCommandText(actor.dataScope, { field: "actor data scope", max: 200, code: "REFERRAL_ACTOR_REGION_TOO_LONG" }),
+    residentId: boundedCommandText(actor.residentId, { field: "actor resident id", max: 200, code: "REFERRAL_ACTOR_ID_TOO_LONG" }),
+    residentIds: Array.isArray(actor.residentIds)
+      ? actor.residentIds.map((value) => boundedCommandText(value, { field: "actor resident id", max: 200, code: "REFERRAL_ACTOR_ID_TOO_LONG" }))
+      : []
+  });
+}
+
+function normalizedScopeValue(value) {
+  return String(value || "").trim().toLocaleLowerCase("zh-CN").replace(/[\s·・,，。()（）_-]+/g, "");
+}
+
+function scopeValuesMatch(left, right) {
+  const a = normalizedScopeValue(left);
+  const b = normalizedScopeValue(right);
+  return Boolean(a && b && (a === b || (a.length >= 3 && b.includes(a)) || (b.length >= 3 && a.includes(b))));
+}
+
+function organizationValuesMatch(left, right) {
+  const organizationRoot = (value) => normalizedScopeValue(String(value || "").split(/[·・]/, 1)[0]);
+  const a = organizationRoot(left);
+  const b = organizationRoot(right);
+  return Boolean(a && b && a === b);
+}
+
+function referralOrganizationValues(referral) {
+  return [
+    referral?.from,
+    referral?.to,
+    referral?.sourceInstitution,
+    referral?.targetInstitution,
+    referral?.fromInstitution,
+    referral?.toInstitution,
+    referral?.sourceInstitutionCode,
+    referral?.targetInstitutionCode,
+    referral?.fromInstitutionCode,
+    referral?.toInstitutionCode,
+    referral?.sourceOrgCode,
+    referral?.targetOrgCode
+  ].filter(Boolean);
+}
+
+function organizationAliases(state, actor) {
+  const aliases = new Set([actor.orgCode, actor.orgName].filter(Boolean));
+  for (const organization of Array.isArray(state?.authOrganizations) ? state.authOrganizations : []) {
+    if ([organization.orgCode, organization.name].some((value) => [...aliases].some((alias) => organizationValuesMatch(value, alias)))) {
+      if (organization.orgCode) aliases.add(organization.orgCode);
+      if (organization.name) aliases.add(organization.name);
+    }
+  }
+  for (const resource of Array.isArray(state?.medicalResources) ? state.medicalResources : []) {
+    if ([resource.id, resource.institution, resource.orgCode].some((value) => [...aliases].some((alias) => organizationValuesMatch(value, alias)))) {
+      if (resource.id) aliases.add(resource.id);
+      if (resource.institution) aliases.add(resource.institution);
+      if (resource.orgCode) aliases.add(resource.orgCode);
+    }
+  }
+  return [...aliases];
+}
+
+function referralRegions(state, referral) {
+  const values = [referral?.regionCode, referral?.region, referral?.district].filter(Boolean);
+  const organizations = referralOrganizationValues(referral);
+  const resident = (Array.isArray(state?.residents) ? state.residents : [])
+    .find((item) => item.id === referral?.residentId);
+  if (resident?.organization) organizations.push(resident.organization);
+  for (const resource of Array.isArray(state?.medicalResources) ? state.medicalResources : []) {
+    if (organizations.some((value) => [resource.id, resource.institution, resource.orgCode]
+      .some((candidate) => scopeValuesMatch(value, candidate)))) {
+      if (resource.region) values.push(resource.region);
+      if (resource.regionCode) values.push(resource.regionCode);
+      if (resource.district) values.push(resource.district);
+    }
+  }
+  return values;
+}
+
+function actorRegions(state, actor) {
+  const values = [actor.regionCode, actor.region, actor.orgName, actor.dataScope].filter(Boolean);
+  for (const organization of Array.isArray(state?.authOrganizations) ? state.authOrganizations : []) {
+    if ([organization.orgCode, organization.name].some((value) => [actor.orgCode, actor.orgName]
+      .some((candidate) => scopeValuesMatch(value, candidate)))) {
+      values.push(organization.orgCode, organization.name, organization.parentCode, organization.dataScope);
+    }
+  }
+  return values.filter(Boolean);
+}
+
+const COMMAND_SOURCE_ROLES = Object.freeze({
+  direct: new Set(["institution", "county", "commission"]),
+  workflow: new Set(["institution", "commission"]),
+  task: new Set(["institution", "commission", "citizen"]),
+  internal: new Set(["system"])
+});
+
+function authorizeReferralCommand({ state, referral, actor, source, commandInput, canAccessResident }) {
+  if (!actor.role) {
+    throw new ReferralCommandError("REFERRAL_ACTOR_REQUIRED", "authenticated referral command actor is required", 403);
+  }
+  const allowedRoles = COMMAND_SOURCE_ROLES[source];
+  if (!allowedRoles || !allowedRoles.has(actor.role)) {
+    throw new ReferralCommandError("REFERRAL_ACTION_DENIED", "actor role cannot use this referral command path", 403);
+  }
+  if (actor.role === "citizen") {
+    if (!canAccessResident(actor, referral.residentId, state)) {
+      throw new ReferralCommandError("REFERRAL_SCOPE_DENIED", "resident or family authorization scope denied", 403);
+    }
+    return;
+  }
+  if (actor.role === "system" && source === "internal") return;
+  if (actor.role === "institution") {
+    const aliases = organizationAliases(state, actor);
+    const sourceOrganizations = [
+      referral?.from,
+      referral?.sourceInstitution,
+      referral?.fromInstitution,
+      referral?.sourceInstitutionCode,
+      referral?.fromInstitutionCode,
+      referral?.sourceOrgCode
+    ].filter(Boolean);
+    const targetOrganizations = [
+      referral?.to,
+      referral?.targetInstitution,
+      referral?.toInstitution,
+      referral?.targetInstitutionCode,
+      referral?.toInstitutionCode,
+      referral?.targetOrgCode
+    ].filter(Boolean);
+    const matches = (organizations) => aliases.some((alias) =>
+      organizations.some((value) => organizationValuesMatch(alias, value)));
+    if (!matches([...sourceOrganizations, ...targetOrganizations])) {
+      throw new ReferralCommandError("REFERRAL_SCOPE_DENIED", "referral institution scope denied", 403);
+    }
+    const requestedStatus = String(commandInput?.patch?.status || "").trim();
+    if (["accepted", "已接诊", "基层承接"].includes(requestedStatus) && !matches(targetOrganizations)) {
+      throw new ReferralCommandError("REFERRAL_ACTION_SCOPE_DENIED", "receiving institution scope is required", 403);
+    }
+    return;
+  }
+  const regionScoped = actor.role === "county" || actor.orgType === "district" || /区市县|本区/.test(actor.orgLevel + actor.dataScope);
+  if (regionScoped) {
+    const allowedRegions = actorRegions(state, actor);
+    const resourceRegions = referralRegions(state, referral);
+    if (!allowedRegions.some((allowed) => resourceRegions.some((resource) => scopeValuesMatch(allowed, resource)))) {
+      throw new ReferralCommandError("REFERRAL_SCOPE_DENIED", "referral region scope denied", 403);
+    }
+  }
+}
+
 function dateValue(value, label = "timestamp") {
   const date = new Date(value);
   if (!Number.isFinite(date.getTime())) {
@@ -252,20 +437,108 @@ function createStateRepositoryAdapter({ readState, writeState }) {
   };
 }
 
+const REFERRAL_PATCH_LIMITS = Object.freeze({
+  status: 100,
+  priority: 80,
+  reservedResource: 300,
+  insurancePolicy: 300,
+  reason: 1000,
+  receivingFeedback: 1000,
+  nextAction: 300
+});
+
 function cleanReferralPatch(input = {}) {
   const patch = input.patch && typeof input.patch === "object" && !Array.isArray(input.patch)
     ? input.patch
     : input;
-  const allowed = [
-    "status", "priority", "reservedResource", "insurancePolicy", "reason",
-    "receivingFeedback", "nextAction"
-  ];
-  return Object.fromEntries(allowed
+  return Object.fromEntries(Object.keys(REFERRAL_PATCH_LIMITS)
     .filter((field) => Object.hasOwn(patch, field))
-    .map((field) => [field, text(patch[field], field === "reason" || field === "receivingFeedback" ? 1000 : 300)]));
+    .map((field) => [field, boundedCommandText(patch[field], {
+      field: `referral patch ${field}`,
+      max: REFERRAL_PATCH_LIMITS[field],
+      code: "REFERRAL_PATCH_FIELD_TOO_LONG"
+    })]));
 }
 
-function createReferralCommandService({ readState, writeState, now = () => new Date().toISOString() }) {
+function taskCommandIntent(input, actor) {
+  const action = boundedCommandText(input.action || "update", {
+    field: "referral task action",
+    max: 80,
+    code: "REFERRAL_ACTION_TOO_LONG",
+    required: true
+  });
+  const allowedActions = actor.role === "citizen"
+    ? new Set(["resident-confirm", "cancel-request"])
+    : new Set(["update", "accept", "complete", "return", "cancel"]);
+  if (!allowedActions.has(action)) {
+    throw new ReferralCommandError("REFERRAL_ACTION_DENIED", "unsupported referral task action", 403);
+  }
+  const comment = boundedCommandText(input.comment || input.note, {
+    field: "referral task comment",
+    max: 1000,
+    code: "REFERRAL_PATCH_FIELD_TOO_LONG"
+  });
+  const satisfaction = boundedCommandText(input.satisfaction, {
+    field: "referral satisfaction",
+    max: 100,
+    code: "REFERRAL_PATCH_FIELD_TOO_LONG"
+  });
+  const patch = actor.role === "citizen" ? {} : cleanReferralPatch(input);
+  if (actor.role !== "citizen" && Object.keys(patch).length === 0 && action === "update") {
+    throw new ReferralCommandError("REFERRAL_PATCH_REQUIRED", "referral update requires allowed fields");
+  }
+  return Object.freeze({ action, comment, satisfaction, patch });
+}
+
+function buildTaskPatch(intent, actor, current, occurredAt) {
+  const handledBy = actor.username || actor.id || actor.role;
+  const patch = {
+    ...intent.patch,
+    taskAction: intent.action,
+    taskComment: intent.comment,
+    handledAt: occurredAt,
+    handledBy,
+    handledByName: actor.name
+  };
+  if (actor.role === "citizen") {
+    patch.residentActionAt = occurredAt;
+    patch.residentActionBy = actor.name || handledBy || "居民";
+    if (intent.action === "resident-confirm") patch.residentConfirmation = "confirmed";
+    if (intent.action === "cancel-request") {
+      patch.status = "cancel-requested";
+      patch.cancellationReason = intent.comment || "居民端申请取消";
+    }
+  }
+  patch.auditTrail = [
+    { at: occurredAt, action: intent.action, by: handledBy, note: intent.comment || patch.status || intent.satisfaction || "referral task action" },
+    ...(Array.isArray(current.auditTrail) ? current.auditTrail : [])
+  ].slice(0, 30);
+  return patch;
+}
+
+function validateReferralContractFields(referral) {
+  const fields = [
+    [referral?.id, "referral id", 200],
+    [referral?.residentId, "resident id", 200],
+    [referral?.status, "status", 100],
+    [referral?.type, "type", 100],
+    [referral?.priority, "priority", 80],
+    [referral?.from || referral?.sourceInstitution, "source institution", 200],
+    [referral?.to || referral?.targetInstitution, "target institution", 200],
+    [referral?.lastUpdated || referral?.updatedAt, "updated timestamp", 80]
+  ];
+  for (const [value, field, max] of fields) {
+    boundedCommandText(value, { field, max, code: "REFERRAL_AGGREGATE_FIELD_TOO_LONG" });
+  }
+}
+
+function createReferralCommandService({
+  readState,
+  writeState,
+  now = () => new Date().toISOString(),
+  canAccessResident = (actor, residentId) => actor.role !== "citizen" ||
+    actor.residentId === residentId || actor.residentIds.includes(residentId)
+}) {
   const adapter = createStateRepositoryAdapter({ readState, writeState });
   const repository = new DomainRepository({ domain: DOMAIN, adapter });
 
@@ -275,28 +548,58 @@ function createReferralCommandService({ readState, writeState, now = () => new D
     expectedVersion,
     correlationId,
     actor = {},
-    input = {}
+    input = {},
+    source = "direct"
   }) {
-    const normalizedReferralId = text(referralId, 200);
-    const normalizedCommandId = text(commandId, 160);
-    if (!normalizedReferralId) throw new ReferralCommandError("REFERRAL_ID_REQUIRED", "referral id is required");
-    if (!normalizedCommandId) {
-      throw new ReferralCommandError("REFERRAL_COMMAND_ID_REQUIRED", "Idempotency-Key is required");
+    const normalizedReferralId = boundedCommandText(referralId, {
+      field: "referral id", max: 200, code: "REFERRAL_ID_TOO_LONG", required: true, requiredCode: "REFERRAL_ID_REQUIRED"
+    });
+    const normalizedCommandId = boundedCommandText(commandId, {
+      field: "Idempotency-Key", max: 160, code: "REFERRAL_COMMAND_ID_TOO_LONG", required: true, requiredCode: "REFERRAL_COMMAND_ID_REQUIRED"
+    });
+    const normalizedCorrelationId = boundedCommandText(correlationId, {
+      field: "correlation id", max: 240, code: "REFERRAL_CORRELATION_ID_TOO_LONG"
+    });
+    const normalizedSource = boundedCommandText(source, {
+      field: "command source", max: 20, code: "REFERRAL_COMMAND_SOURCE_INVALID", required: true
+    });
+    if (!Object.hasOwn(COMMAND_SOURCE_ROLES, normalizedSource)) {
+      throw new ReferralCommandError("REFERRAL_COMMAND_SOURCE_INVALID", "unsupported referral command source");
     }
+    const normalizedActor = normalizeCommandActor(actor);
     if (!Number.isInteger(Number(expectedVersion)) || Number(expectedVersion) < 1) {
       throw new ReferralCommandError("REFERRAL_EXPECTED_VERSION_REQUIRED", "positive expectedVersion is required");
     }
-    const patch = cleanReferralPatch(input);
-    if (Object.keys(patch).length === 0) {
+    const commandInput = normalizedSource === "task"
+      ? taskCommandIntent(input, normalizedActor)
+      : Object.freeze({ patch: cleanReferralPatch(input) });
+    if (normalizedSource !== "task" && Object.keys(commandInput.patch).length === 0) {
       throw new ReferralCommandError("REFERRAL_PATCH_REQUIRED", "referral update requires allowed fields");
     }
     const intent = {
       referralId: normalizedReferralId,
       expectedVersion: Number(expectedVersion),
-      patch
+      source: normalizedSource,
+      actor: {
+        id: normalizedActor.id || normalizedActor.username || normalizedActor.role,
+        role: normalizedActor.role,
+        orgCode: normalizedActor.orgCode,
+        residentId: normalizedActor.residentId
+      },
+      input: commandInput
     };
     const intentDigest = digest(intent);
     const state = readState();
+    const authorizationTarget = referralRows(state).find((item) => item.id === normalizedReferralId);
+    if (!authorizationTarget) throw new ReferralCommandError("REFERRAL_NOT_FOUND", "referral was not found", 404);
+    authorizeReferralCommand({
+      state,
+      referral: authorizationTarget,
+      actor: normalizedActor,
+      source: normalizedSource,
+      commandInput,
+      canAccessResident
+    });
     const receipt = (Array.isArray(state.referralSystem?.[INBOX_COLLECTION])
       ? state.referralSystem[INBOX_COLLECTION]
       : [])
@@ -336,14 +639,18 @@ function createReferralCommandService({ readState, writeState, now = () => new D
       );
     }
     const occurredAt = now();
+    const patch = normalizedSource === "task"
+      ? buildTaskPatch(commandInput, normalizedActor, current, occurredAt)
+      : commandInput.patch;
     const next = {
       ...current,
       ...patch,
       version: actualVersion + 1,
       lastUpdated: occurredAt,
-      updatedBy: text(actor.username || actor.id || actor.role, 120),
-      updatedByName: text(actor.name, 120)
+      updatedBy: normalizedActor.username || normalizedActor.id || normalizedActor.role,
+      updatedByName: normalizedActor.name
     };
+    validateReferralContractFields(next);
     const contract = buildReferralOrderContract(next);
     const eventId = `referral-event-${digest({ commandId: normalizedCommandId, referralId: normalizedReferralId }).slice(0, 32)}`;
     const event = createDomainEvent({
@@ -352,7 +659,7 @@ function createReferralCommandService({ readState, writeState, now = () => new D
       type: EVENT_TYPE,
       aggregateId: normalizedReferralId,
       aggregateVersion: next.version,
-      correlationId,
+      correlationId: normalizedCorrelationId,
       causationId: normalizedCommandId,
       occurredAt,
       payload: {
@@ -361,7 +668,7 @@ function createReferralCommandService({ readState, writeState, now = () => new D
         contract
       }
     });
-    const unitOfWork = repository.unitOfWork({ correlationId });
+    const unitOfWork = repository.unitOfWork({ correlationId: normalizedCorrelationId });
     unitOfWork
       .put("referrals", normalizedReferralId, next, actualVersion)
       .publish(event);

@@ -100,7 +100,11 @@ flowchart TB
 
 体检第五切片将 `GET /api/physical-exams` 的 Overview 构建、生产 readiness 组合和角色投影移入 `src/clinical-specialties/physical-examination/dashboard-query.js`。混合 HTTP 路由仍负责鉴权、居民范围、安全事件、访问审计持久化和最终脱敏，调用顺序保持不变；体检写命令仍留在 `blood-innovation`。
 
-## 7. 健康驾驶舱指标治理首切片
+## 7. T05 转诊单一命令轨道
+
+本实施分支保留 `/api/referrals/:id/actions`、`/api/workflow-actions` 和 `/api/tasks/:id/actions` 三条公开路径及原成功响应形状，但 `collection=referrals` 的写入统一委托 `src/care-coordination/referral-command-service.js`。权限先于 inbox 重放和 CAS；机构按 from/to/org、区县主体按 region、居民按本人或家庭授权校验。聚合、command inbox 和 outbox 继续由既有 UoW 原子提交，未新增 schema、部署进程或转诊核心概念。
+
+## 8. 健康驾驶舱指标治理首切片
 
 `src/platform/governance/health-dashboard-indicator-contract.js` 已建立
 `health-dashboard-indicator-contract.v1`，首个定义为月度门急诊人次
