@@ -30,3 +30,11 @@ test("blood readiness fails closed when the dashboard query projection is missin
   assert.equal(projectionCheck.ok, false);
   assert.equal(report.ok, false);
 });
+
+test("blood readiness fails closed when the quality safety projection contract is missing", () => {
+  const report = buildBloodSystemReadinessReport({ qualitySafetyDashboardQuery: "" });
+  const projectionCheck = report.checks.find((item) => item.name === "Consumer APIs expose scoped blood coordination");
+
+  assert.equal(projectionCheck.ok, false);
+  assert.equal(report.ok, false);
+});
