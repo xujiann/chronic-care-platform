@@ -35,6 +35,7 @@
 | runtime | T01 | B | 健康/指标边界清楚，仍依赖大上下文 |
 | identity-security | T01 | B | Cookie/CSRF/session 边界已建立；兼容路径和静态资产待治理 |
 | platform-governance | T02 | B/C | 子模块已拆，但 72+ API、证据/发布职责很宽 |
+| health-dashboard indicator contract | T02 | B | 首个版本化聚合指标采用小型纯合同端口；旧 summary 聚合器和未版本化指标仍需渐进治理 |
 | state-data | T02 | C | 兼容适配必要，但容易成为通用写入口 |
 | public-health | T03 | C | 上下文 160 项，前端/脚本/外部运行时庞大 |
 | citizen-chronic | T04 | C | 浏览器文件 6k 行、上下文 64 项 |
