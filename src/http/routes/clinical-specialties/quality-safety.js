@@ -1,5 +1,9 @@
 "use strict";
 
+const {
+  createQualitySafetyDashboardQuery
+} = require("../../../clinical-specialties/quality-safety/dashboard-query");
+
 function createRouteSegment(runtime) {
   const { BloodEventHub, appendQualitySafetyAudit, appendSecurityEvent, buildQualitySafetyCoreSystemMatrix, buildQualitySafetyDashboard, buildQualitySafetyInterfaceJointTestPack, buildQualitySafetyInterfaceStandard, buildQualitySafetyIssues, collectJson, integrationGatewaySecret, normalizeQualitySafetyStatus, qualitySafetySlaState, randomUUID, readDatabase, requireApiRole, sendJson, validateQualitySafetyInterfaceMessage, writeDatabase } = runtime;
   return {
@@ -10,8 +14,11 @@ function createRouteSegment(runtime) {
         const user = requireApiRole(req, res, ["commission", "institution", "county"], "/api/quality-safety/dashboard");
         if (!user) return true;
         const data = readDatabase();
-        const bloodCoordination = BloodEventHub.dashboard(data, user);
-        sendJson(res, 200, { ...buildQualitySafetyDashboard(data, user), bloodCoordination: { ...bloodCoordination, projections: bloodCoordination.projections.filter((item) => item.consumer === "quality-safety") } });
+        const qualitySafetyDashboardQuery = createQualitySafetyDashboardQuery({
+          buildQualitySafetyDashboard,
+          readBloodCoordination: BloodEventHub.dashboard
+        });
+        sendJson(res, 200, qualitySafetyDashboardQuery.execute({ data, user }));
         return true;
       }
 

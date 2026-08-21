@@ -20,6 +20,9 @@ function buildBloodSystemReadinessReport(options = {}) {
   const transaction = options.transaction ?? readText("blood-transaction-service.js");
   const service = options.service ?? readText("blood-service.js");
   const dashboardQuery = options.dashboardQuery ?? readText("src/clinical-specialties/blood/dashboard-query.js");
+  const emergencyDashboardQuery = options.emergencyDashboardQuery ?? readText("src/clinical-specialties/emergency/dashboard-query.js");
+  const qualitySafetyDashboardQuery = options.qualitySafetyDashboardQuery ?? readText("src/clinical-specialties/quality-safety/dashboard-query.js");
+  const qualitySafetyRoute = options.qualitySafetyRoute ?? readText("src/http/routes/clinical-specialties/quality-safety.js");
   const domain = options.domain ?? require(path.join(ROOT, "blood-domain.js"));
   const pkg = options.pkg ?? readJson("package.json");
   const ci = options.ci ?? readText(".github/workflows/ci.yml");
@@ -84,7 +87,11 @@ function buildBloodSystemReadinessReport(options = {}) {
     ["Event idempotency dead letter and retry", readText("blood-event-hub.js").includes("stableId") && readText("blood-event-hub.js").includes('status: options.failConsumer === consumer ? "dead_letter"') && server.includes("BloodEventHub.retry")],
     ["Cross-module event operations UI", readText("blood-innovation.html").includes("跨模块事件枢纽") && readText("blood-innovation.js").includes("publish-events") && server.includes('url.pathname === "/api/blood-system/events/publish"')],
     ["Four consumer dashboards receive blood projections", ["emergency.html", "quality-safety.html", "operations.html", "health-dashboard.html"].every((file) => readText(file).includes("blood-coordination")) && ["emergency.js", "quality-safety.js", "operations.js", "health-dashboard.js"].every((file) => readText(file).includes("renderBloodCoordination"))],
-    ["Consumer APIs expose scoped blood coordination", server.includes("dashboard.bloodCoordination") && server.includes("bloodCoordination: { ...bloodCoordination") && server.includes("bloodCoordination: BloodEventHub.dashboard")],
+    ["Consumer APIs expose scoped blood coordination", server.includes("dashboard.bloodCoordination")
+      && server.includes("bloodCoordination: BloodEventHub.dashboard")
+      && emergencyDashboardQuery.includes('item.consumer === "emergency"')
+      && qualitySafetyRoute.includes("createQualitySafetyDashboardQuery")
+      && qualitySafetyDashboardQuery.includes('item.consumer === "quality-safety"')],
     ["Blood production cutover center", server.includes("BloodGoLiveService.center") && readText("blood-go-live.html").includes("临床用血独立模块上线控制中心") && readText("blood-go-live.js").includes("/api/blood-system/go-live")],
     ["WS/T 866 dataset registry", require(path.join(ROOT, "blood-standard-registry.js")).coverage().completeSubsetCoverage && readText("blood-go-live.html").includes("gl-standard-registry")],
     ["Clinical six-gate production view", readText("blood-go-live.js").includes("receiptsValid") && readText("blood-go-live.js").includes("rollbackPassed") && readText("blood-go-live.html").includes("gl-clinical-gates")],

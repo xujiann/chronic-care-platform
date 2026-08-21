@@ -3,8 +3,8 @@
 function createRouteSegment(runtime) {
   const { BloodEventHub, buildHospitalOperationsDashboard, buildObservabilityAlertCenter, buildProductionOperationsCenter, buildRuntimeMetrics, readDatabase, requireApiRole, sendJson } = runtime;
   return {
-      id: "clinical-specialties-02",
-      domain: "clinical-specialties",
+      id: "platform-governance-12",
+      domain: "platform-governance",
       async handle(req, res, url) {
     if (req.method === "GET" && url.pathname === "/api/operations/dashboard") {
         const user = requireApiRole(req, res, ["commission"], "/api/operations/dashboard");
@@ -22,4 +22,4 @@ function createRouteSegment(runtime) {
     };
 }
 
-module.exports = { createRouteSegment, ROUTE_SEGMENT_ID: "clinical-specialties-02", SUBDOMAIN: "operations-dashboard" };
+module.exports = { createRouteSegment, ROUTE_SEGMENT_ID: "platform-governance-12", SUBDOMAIN: "operations-dashboard" };
