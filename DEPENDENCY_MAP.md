@@ -19,20 +19,25 @@ flowchart LR
   MIG --> STORE
   DOMAIN --> EXT["external adapters"]
   DOMAIN --> EVT["outbox / audit / evidence"]
+  HTTP --> AUDIT["audit-chain v2"]
+  EVT --> AUDIT
+  AUDIT --> ADEL["audit-delivery worker"]
+  ADEL --> ALERT["pilot-cutover-alert-lifecycle"]
+  ADEL --> EXT
 ```
 
 期望方向大体存在，但组合根仍把大量底层函数直接注入路由上下文；新模块不得回读组合根。
-ARC-002 本地候选已把已确认的 alert runtime 反向依赖移到 worker 组合边界。
+ARC-002 已把已确认的 alert runtime 反向依赖移到 worker 组合边界，并通过 PR #132 合入主线。
 
 ## 2. 静态依赖指标
 
 - 非测试 CommonJS 文件：526。
 - 本地 `require` 边：861。
-- 显式循环：本地 ARC-002 候选为 0 条（实施基线为 1 条）。
+- 显式循环：当前主线为 0 条（ARC-002 实施前基线为 1 条）。
 - 最高入度模块：`runtime-source` 62、`technical-evidence` 22、`region-manifest` 18。
 - 最宽上下文：public-health 160 个依赖、care 102、clinical 76。
 
-### 已移除循环（本地候选）
+### 已移除循环（主线）
 
 ```text
 旧：server.js → pilot-cutover-alert-runtime.js → server.js
@@ -45,8 +50,8 @@ ARC-002 本地候选已把已确认的 alert runtime 反向依赖移到 worker �
 `pilot-cutover-alert-runtime.js` 只接受显式 `controlProvider`，不再静态或动态导入
 `server.js`。worker 默认 provider 在真正执行 `run-once` 时才读取组合根，`status` 与组合
 对象创建均不加载 server。由此形成单向 DAG；缺失、无效和异常 provider 都保持脱敏
-`NO-GO`。该事实当前只存在于已通过本地只读 review 的未发布候选，main 合入前 ARC-002 仍
-保留在 P1 台账。
+`NO-GO`。该实现已通过 PR #132、required checks、合并后 main CI 与 Pages，ARC-002 已从
+P1 台账关闭。
 
 ## 3. Node 与第三方包
 
@@ -94,13 +99,15 @@ SQLite schema 依赖现为 `server.js → sqlite-migrations → node:sqlite/sess
 
 JSON 源快照仍是高扇出依赖，但浏览器和 Pages 只依赖经统一纯函数转换后的公开演示契约；任何结构变化仍需验证脱敏、页面兼容、报告和初始化路径。
 
+身份安全状态依赖方向为 `identity route → auth-security-state-store → SQLite state_collections / PostgreSQL auth_security_state`。组合根为会话与认证状态注入同一长期 PostgreSQL pool，仓储只借用连接且不关闭调用方拥有的 pool；发送验证码固定为限流、原子签发、供应商发送，失败时只撤销本次 OTP。
+
 ## 6. 外部系统
 
 | 外部依赖 | 主要模块 | 失败边界 |
 |---|---|---|
 | PostgreSQL | platform storage、session、领域 repository | TLS、schema、CAS、outbox、核对 |
 | HIS/EMR/LIS/PACS | T08、care、clinical | 现场地址、凭据、证书、字段与回执 |
-| OIDC/SMS | T01 identity-security | provider 可用性、绑定、重放、回调验签 |
+| OIDC/SMS | T01 identity-security | provider 可用性、绑定、重放、回调验签及共享 OTP/限流/锁定状态 |
 | HAPI FHIR/Orthanc/OHIF | Solution A、clinical | 容器版本、认证、DICOM/FHIR 兼容 |
 | 对象存储 | secure object storage | 引用、摘要、签名 URL、保留期 |
 | GitHub Actions/Pages | CI 与静态站 | 分支保护、制品、外部 5xx |
@@ -135,8 +142,8 @@ JSON 源快照仍是高扇出依赖，但浏览器和 Pages 只依赖经统一�
 
 ## 9. 依赖治理结论
 
-- ARC-002 本地候选已移除唯一已确认的静态环且只读 review 无 P0/P1；在 PR/main CI 完成前继续按 P1
-  跟踪。架构回归禁止 `pilot-cutover-alert-runtime` 重新导入组合根。
+- ARC-002 已移除唯一已确认的静态环并通过 PR/main CI 与 Pages；架构回归继续禁止
+  `pilot-cutover-alert-runtime` 重新导入组合根。
 - `runtime-source`、`technical-evidence`、`data/db.json` 和宽运行时上下文仍是高耦合枢纽；静态消费者已从源快照扇出中隔离。
 - 新模块必须依赖稳定端口，不得新增对 `server.js`、根目录全局状态或未注册 JSON 集合的反向依赖。
 - SQLite DDL 必须追加到 T00 注册表；运行时、测试和发布门禁只能消费其公开 head/校验接口，禁止复制版本常量或迁移定义。

@@ -26,9 +26,10 @@
 | 组合根 | `server.js`、`src/http/platform-runtime-composition.js` | 仍向上下文注入数百个函数，耦合中心 |
 | 路由器 | `src/http/api-router.js`、`src/http/routes/index.js` | 固定顺序、ID 唯一、响应短路，结构清楚 |
 | 运行时上下文 | `src/http/runtime-contexts/` | 领域依赖列表显式，但 public-health 160 项、care 102 项，接口过宽 |
-| 身份安全 | `src/identity-security/`、`session-store.js` | Cookie/CSRF、策略、会话仓储和审计已模块化 |
+| 身份安全 | `src/identity-security/`、`production-adapters.js`、`session-store.js`、`auth-security-state-store.js` | Cookie/CSRF、OIDC/JWKS、SMS、会话仓储、共享 OTP/限流/锁定状态和 v2 审计链验证已模块化 |
 | 平台数据 | `src/platform/data/`、`src/platform/storage/` | 数据所有权、SQLite migration 注册表/runner、PostgreSQL 主存储契约 |
 | 领域事件 | `src/platform/events/`、各领域 worker | outbox/inbox、幂等和后台投递 |
+| 审计投递 | `src/platform/operations/audit-delivery.js`、`scripts/audit-delivery-worker.js` | SIEM/WORM、checkpoint v2；复用 cutover alert lifecycle，外部门禁保持关闭 |
 | 区域运行 | `src/platform/regional/`、`regions/` | 多地区清单、能力包、复制和发布注册 |
 | 领域实现 | `src/care-coordination/` 等与根目录服务 | 新旧实现并存，边界尚未完全迁移 |
 | 前端共享 | `auth.js`、`shared.js`、`platform-api-client.js`、`platform-shell.js` | 身份上下文、API 调用、壳和设计系统 |
@@ -46,7 +47,7 @@
 - `src/platform/regional/region-manifest.js`：18；
 - 公卫密钥环/适配服务：10–13。
 
-## 4. 循环依赖收口（ARC-002 本地候选）
+## 4. 循环依赖收口（ARC-002 已关闭）
 
 ```text
 scripts/platform-cutover-alert-worker.js
@@ -57,8 +58,8 @@ scripts/platform-cutover-alert-worker.js
 
 平台运行时不再导入组合根；worker CLI 是仓库内该用例的组合边界，并以懒 provider 复用
 现有控制面实现。库级调用者必须显式提供 provider；缺失、无效或抛错时返回受限错误码、
-`NO-GO` 和非授权投影。架构测试禁止反向依赖恢复，worker 组合测试锁定默认装配；本地候选
-已无该循环且只读 review 无 P0/P1，仍须经 PR 和 main CI 才能关闭 ARC-002。worker 继续加载较大的
+`NO-GO` 和非授权投影。架构测试禁止反向依赖恢复，worker 组合测试锁定默认装配；PR #132
+及合并后 main CI/Pages 已通过，ARC-002 已关闭。worker 继续加载较大的
 `server.js` 属 ARC-001 残余，不在本切片抽取控制面。
 
 ## 5. 重复与边界重叠
@@ -68,7 +69,7 @@ scripts/platform-cutover-alert-worker.js
 - 252 个 JSON 集合中仅 83 个进入数据所有权清单；其余被策略标为 legacy-non-authoritative。
 - 许多 readiness/report 脚本重复读取 `data/db.json` 并各自产生报告，证据生成接口尚未统一。
 - 静态发布与 storage-admin 原有脱敏逻辑已收敛到同一纯函数；其他报告脚本的重复读取仍未治理。
-- `server.js` 与 `scripts/audit-retention.js` 各维护一份同语义 `verifyAuditTrail`；宽松失败判定和后续修复必须通过一个版本化安全端口统一，不能分别修改。
+- `server.js` 与 `scripts/audit-retention.js` 已统一消费 `src/identity-security/audit-chain.js`；审计验证不再保留两份平行语义。
 
 ## 6. 超大文件
 

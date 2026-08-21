@@ -101,16 +101,17 @@ CommonJS 部分初始化、测试顺序、独立 worker 启动和模块复用风
 
 本 ADR 已由 T00 于 2026-08-20 按方案 2 批准。批准只授权 `TODAY_PLAN.md` 明示的测试保护、
 最小 provider 注入和事实文档同步；不授权扩大到 `server.js` 重构或其他技术债。Accepted
-不代表已完成，仍须通过实施、测试、review、PR 与 main CI 后才能关闭 ARC-002。
+不代表自动完成；本决策已按下述实施状态通过测试、review、PR 与 main CI，并关闭 ARC-002。
 
 ## Implementation status
 
-方案 2 已在 `process/t00-arc002-provider-decoupling-20260820` 本地候选中完成：alert runtime
+方案 2 已在 `process/t00-arc002-provider-decoupling-20260820` 完成，并通过 PR #132 合入
+`main@21d8f3c8f659c70e3d4980c3a67c39ca72d1712a`：alert runtime
 不再导入组合根，worker CLI 提供懒默认 provider，缺失、无效和异常 provider 均返回受限
 错误码并保持 `NO-GO`。报告 schema 标识、HTTP API、鉴权、数据库、migration、journal、
 审计语义和部署拓扑未改变；周期报告仅兼容性增加 `controlErrorCode`。
 
 测试先行证据、专项/架构/路由/流程验证、六个标准工程门禁、11 批 `test:all`、Chromium
 E2E、部署检查及完整/生产依赖审计均已通过。`API_MAP.md` 与 `DATA_MODEL.md` 因无 API 或
-数据变化保持不变。本地只读 review 未发现 P0/P1；当前尚未提交、推送或创建 PR。ARC-002
-仍须通过 PR required checks 与 main CI 后才能从技术债台账关闭。
+数据变化保持不变。只读 review 未发现 P0/P1；PR required checks、合并后 main CI 与 Pages
+均成功，ARC-002 已从技术债台账关闭。

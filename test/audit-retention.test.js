@@ -7,6 +7,16 @@ const { auditHashFor, buildAuditRetentionReport, parseArgs, renderMarkdown, veri
 
 const ROOT = path.resolve(__dirname, "..");
 
+function seal(rows) {
+  let previousAuditHash = "";
+  return rows.slice().reverse().map((row) => {
+    const item = { ...row, previousAuditHash };
+    item.auditHash = auditHashFor(item);
+    previousAuditHash = item.auditHash;
+    return item;
+  }).reverse();
+}
+
 test("audit retention report verifies hash chains and export evidence", () => {
   const report = buildAuditRetentionReport({ env: { AUDIT_EXPORT_PATH: "/var/log/chronic-care-platform/audit" } });
   assert.equal(report.ok, true);
@@ -28,13 +38,33 @@ test("audit retention report detects tampered audit rows", () => {
   assert.equal(verifyAuditTrail(data.securityEvents).broken.length > 0, true);
 });
 
-test("audit retention report keeps link drift diagnostic without failing valid hashes", () => {
+test("audit retention report fails closed on previous-hash drift", () => {
   const row = { id: "audit-link-drift", action: "reset demo data", previousAuditHash: "stale-link" };
   row.auditHash = auditHashFor(row);
   const trail = verifyAuditTrail([row]);
-  assert.equal(trail.passed, true);
+  assert.equal(trail.passed, false);
   assert.equal(trail.broken.length, 0);
   assert.equal(trail.linkBroken.length, 1);
+});
+
+test("audit verification rejects mutation deletion insertion reorder and structural defects", () => {
+  const valid = seal([
+    { id: "audit-3", action: "third", detail: "valid" },
+    { id: "audit-2", action: "second", detail: "valid" },
+    { id: "audit-1", action: "first", detail: "valid" }
+  ]);
+  assert.equal(verifyAuditTrail(valid).passed, true);
+
+  const mutated = valid.map((item) => ({ ...item }));
+  mutated[0].detail = "changed without a marker word";
+  assert.equal(verifyAuditTrail(mutated).passed, false);
+  assert.equal(verifyAuditTrail([valid[0], valid[2]]).passed, false);
+  assert.equal(verifyAuditTrail([{ id: "inserted", action: "insert" }, ...valid]).passed, false);
+  assert.equal(verifyAuditTrail([valid[1], valid[0], valid[2]]).passed, false);
+  assert.equal(verifyAuditTrail([{ ...valid[0], previousAuditHash: "broken" }, ...valid.slice(1)]).passed, false);
+  assert.equal(verifyAuditTrail([{ action: "missing id and hashes" }]).passed, false);
+  assert.equal(verifyAuditTrail([valid[0], { ...valid[0] }]).passed, false);
+  assert.equal(verifyAuditTrail(null).passed, false);
 });
 
 test("audit retention report renders and writes release artifacts", (t) => {

@@ -4647,7 +4647,9 @@ test("PostgreSQL migration package keeps CI payload-free and full exports contro
   assert.match(read("scripts/release-artifact-manifest.js"), /postgres-migration-package\/manifest\.json/);
   assert.match(read("postgres-runtime-sync.js"), /buildPostgresSyncBatch/);
   assert.match(read("postgres-runtime-sync.js"), /ON CONFLICT \(batch_id\) DO NOTHING/);
-  assert.match(read("postgres-runtime-sync.js"), /source_version <= EXCLUDED\.source_version/);
+  assert.match(read("postgres-runtime-sync.js"), /source_version < EXCLUDED\.source_version/);
+  assert.match(read("postgres-runtime-sync.js"), /POSTGRES_SYNC_BATCH_ID_CONFLICT/);
+  assert.match(read("postgres-runtime-sync.js"), /POSTGRES_SYNC_VERSION_CONFLICT/);
   const sqliteMigrations = read("src/platform/storage/sqlite-migrations.js");
   assert.match(sqliteMigrations, /postgres_sync_outbox/);
   assert.match(readServerRuntime(), /STORAGE_SCHEMA_VERSION = SQLITE_SCHEMA_HEAD/);

@@ -55,7 +55,7 @@ HTTP request
 | 数据范围 | `canAccessResident`、机构/区域过滤、delegation | 规则分散在组合根和领域函数 |
 | 页面/资产 | static page guard + access control policy + static asset policy | HTML 先受发布清单约束再执行页面角色策略；非 HTML 只能命中同一显式资源图 |
 | 外部回调 | HMAC、nonce、时间窗、幂等键 | 密钥和现场配置依赖外部证据 |
-| 审计 | securityEvents/dataAccessLogs/专用 PostgreSQL | 链断裂不计入 `passed`；普通哈希漂移可能通过，部分访问日志在验证前被重封 |
+| 审计 | securityEvents/dataAccessLogs/专用 PostgreSQL | v2 对内容、链接、结构和重复 ID 严格失败；验证读取不重封，全量写入不能修改服务端审计数组 |
 
 ## 5. 外部 API
 
@@ -63,7 +63,7 @@ HTTP request
 |---|---|---|
 | HIS / EMR / LIS / PACS | HTTPS、FHIR R4、DICOMweb、签名事件 | T08 契约，真实联调仍是外部阻断项 |
 | OIDC 身份源 | issuer/userinfo/token/revoke | T01，生产必须真实 provider 与绑定目录 |
-| SMS 网关 | HTTPS + token + 签名回执 | T01，OTP/失败状态仍有进程内部分 |
+| SMS 网关 | HTTPS + bearer token + 签名回执 | T01；OTP、发送/登录限流和失败锁定已进入共享认证安全状态仓储，生产多实例要求 PostgreSQL |
 | PostgreSQL | TLS verify-full、outbox/reconcile | 迁移期禁止请求路径双写 |
 | Orthanc / OHIF / HAPI FHIR | Solution A Compose | 专科集成演示与受控部署 |
 | 对象存储 | 引用/摘要、签名访问 | 不得在仓库存真实凭据或原始敏感对象 |
@@ -76,12 +76,15 @@ HTTP request
 - 多个领域具有 HMAC、nonce、时间窗、CAS、outbox 和 replay 记录。
 - 错误格式仍由不同路由模块自行构造，存在 `{error}`、`{ok,code,message}` 等多种形态。
 - 审计追加点分散在组合根、路由和领域服务；统一审计契约尚未完全落地。
-- `GET /api/audit/verify` 返回 HTTP 200 的业务验证结果；当前 `dataAccessLogs` 在验证前重封，合规报告沿用相同语义。Proposed ADR 尚未授权改变响应或失败传播。
+- `GET /api/audit/verify` 继续返回 HTTP 200 的可解析业务结果，运行时与留存 CLI 共用 v2 严格验证器；合规报告和留存门禁按相同失败语义传播。
+- `PUT /api/state` 保持原路径和成功形状，但审计数组成为服务端管理字段：省略时保留，提交时必须与当前值完全一致；乐观版本冲突仍优先返回 `409 STORAGE_CONFLICT`。
+- `npm run api:authorization-matrix` 从模块化路由源码生成/校验 owner、身份、角色、范围、用途和九条高风险接口唯一性。
+- 身份/SMS HTTP 路径保持不变；组合根已为短信发送生成随机 request ID，适配器现在拒绝缺失幂等 ID，OIDC refresh 返回的 ID token 必须通过 JWKS/claims 验证后才暴露脱敏 claims。
 
 ## 7. API 风险与缺失测试
 
 - `API-001`：368+ 接口缺少一份机器生成、带 owner/角色/范围的完整目录。
-- `API-002`：授权和数据范围规则分散，缺少全量 role × permission × resource 矩阵测试。
+- `API-002`：已建立 582 条受保护声明的静态 owner/role/scope/purpose 矩阵；运行时 role × permission × resource 允许/拒绝组合仍需继续扩展。
 - `API-003`：错误响应契约不统一，调用方需要理解多个格式。
 - `API-004`：`shared` 有 12 个路由段，容易成为跨域逻辑聚集点。
 - `API-005`：已通过 Pages/Node 共用显式资源图和敏感路径拒绝矩阵缓解；后续新增页面资源必须同步更新清单并通过构建验证。

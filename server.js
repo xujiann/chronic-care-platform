@@ -44,7 +44,9 @@ const {
   applySqliteMigrations
 } = require("./src/platform/storage/sqlite-migrations");
 const { createHash, createHmac, pbkdf2Sync, randomUUID, timingSafeEqual } = require("crypto");
+const { auditHashFor, verifyAuditTrail } = require("./src/identity-security/audit-chain");
 const { MemorySessionStore, PostgresSessionStore, SqliteSessionStore } = require("./session-store");
+const { createAuthSecurityStateStore } = require("./auth-security-state-store");
 const {
   applyPostgresReconciliationCaseAction,
   assertSyncMode,
@@ -534,6 +536,9 @@ const serviceExtractionDecisions = validateScorecard();
 validateOwnershipManifest();
 let runtimeSessionStoreInstance = null;
 let runtimeSessionStoreKey = "";
+let runtimeAuthSecurityStateStoreInstance = null;
+let runtimeAuthSecurityStateStoreKey = "";
+let runtimePostgresPoolInstance = null;
 let digitalHospitalExecutionServiceInstance = null;
 let productionAdapterRuntimeInstance = null;
 
@@ -901,7 +906,7 @@ const PHONE_CODE_TTL_MS = 5 * 60 * 1000;
 const PHONE_CODE_COOLDOWN_MS = 60 * 1000;
 const PHONE_LOGIN_MAX_FAILED_ATTEMPTS = 5;
 const PHONE_LOGIN_LOCK_MS = 10 * 60 * 1000;
-const phoneVerificationCodes = new Map();
+const RUNTIME_INTERNAL_COLLECTION_KEYS = new Set(["auth-security-state-v1"]);
 
 function boundedEnvironmentNumber(name, fallback, minimum, maximum) {
   const raw = String(process.env[name] ?? "").trim();
@@ -909,7 +914,6 @@ function boundedEnvironmentNumber(name, fallback, minimum, maximum) {
   const parsed = Number(raw);
   return Number.isFinite(parsed) ? Math.min(maximum, Math.max(minimum, parsed)) : fallback;
 }
-const phoneLoginFailures = new Map();
 const PUBLIC_HEALTH_EVENT_ACTION_DEFAULTS = {
   review: {
     label: "疾控复核",
@@ -7681,6 +7685,7 @@ function readSqliteStateFromConnection(db) {
   const rows = db.prepare("SELECT key, payload FROM state_collections").all();
   if (!rows.length) return JSON.parse(fs.readFileSync(DB_FILE, "utf8"));
   return rows.reduce((state, row) => {
+    if (RUNTIME_INTERNAL_COLLECTION_KEYS.has(row.key)) return state;
     state[row.key] = JSON.parse(row.payload);
     return state;
   }, {});
@@ -7744,12 +7749,13 @@ function writeSqliteState(
     syncPublicHealthModernizationUniqueKeys(db, normalized, now);
     syncPublicHealthRespiratoryLifecycleUniqueKeys(db, normalized, now);
     syncPublicHealthOfficialExchangeUniqueKeys(db, normalized, now);
-    const entries = Object.entries(normalized).filter(([key]) => key !== "storageMeta");
+    const entries = Object.entries(normalized).filter(([key]) => key !== "storageMeta" && !RUNTIME_INTERNAL_COLLECTION_KEYS.has(key));
     verifySqliteCollectionVersions(db, entries.map(([key]) => key), expectedVersions);
     const incomingKeys = new Set(entries.map(([key]) => key));
     const existingRows = db.prepare("SELECT key, payload, version FROM state_collections").all();
-    const postgresSyncChanges = POSTGRES_SYNC_MODE === "outbox" ? buildCollectionChanges(existingRows, entries) : [];
-    const existingPayloads = new Map(existingRows.map((row) => [row.key, row.payload]));
+    const businessExistingRows = existingRows.filter((row) => !RUNTIME_INTERNAL_COLLECTION_KEYS.has(row.key));
+    const postgresSyncChanges = POSTGRES_SYNC_MODE === "outbox" ? buildCollectionChanges(businessExistingRows, entries) : [];
+    const existingPayloads = new Map(businessExistingRows.map((row) => [row.key, row.payload]));
     const deleteStatement = db.prepare("DELETE FROM state_collections WHERE key = ?");
     existingPayloads.forEach((_, key) => {
       if (!incomingKeys.has(key)) deleteStatement.run(key);
@@ -8295,6 +8301,7 @@ function sqliteCollectionVersions() {
     const table = db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'state_collections'").get();
     if (!table) return {};
     return db.prepare("SELECT key, version FROM state_collections").all().reduce((versions, row) => {
+      if (RUNTIME_INTERNAL_COLLECTION_KEYS.has(row.key)) return versions;
       versions[row.key] = Number(row.version);
       return versions;
     }, {});
@@ -13128,35 +13135,8 @@ function auditTrailHasNonRepairEdit(incomingRows, currentRows) {
   });
 }
 
-function verifyAuditTrail(rows) {
-  const items = Array.isArray(rows) ? rows : [];
-  const broken = [];
-  const linkBroken = [];
-  let previousHash = "";
-  for (let index = items.length - 1; index >= 0; index -= 1) {
-    const item = items[index];
-    const expectedHash = auditHashFor(item);
-    const expectedPreviousHash = previousHash;
-    const explicitTamper = /tampered/i.test(String(item.detail || item.result || item.action || ""));
-    if (item.auditHash !== expectedHash && (explicitTamper || !item.auditHash)) {
-      broken.push({ index, id: item.id || "", expectedPreviousHash, actualPreviousHash: item.previousAuditHash || "", expectedHash, actualHash: item.auditHash || "" });
-    }
-    if (item.previousAuditHash !== expectedPreviousHash) {
-      linkBroken.push({ index, id: item.id || "", expectedPreviousHash, actualPreviousHash: item.previousAuditHash || "" });
-    }
-    previousHash = item.auditHash || expectedHash;
-  }
-  return {
-    passed: broken.length === 0,
-    count: items.length,
-    broken,
-    linkBroken
-  };
-}
-
 function auditTrailRowsMatch(leftRows, rightRows) {
-  const clean = (rows) => (Array.isArray(rows) ? rows : []).map(({ auditHash, previousAuditHash, ...item }) => item);
-  return stableStringify(clean(leftRows)) === stableStringify(clean(rightRows));
+  return stableStringify(Array.isArray(leftRows) ? leftRows : []) === stableStringify(Array.isArray(rightRows) ? rightRows : []);
 }
 
 function auditTrailRowsMatchById(leftRows, rightRows) {
@@ -13164,11 +13144,6 @@ function auditTrailRowsMatchById(leftRows, rightRows) {
   const rightById = new Map(clean(rightRows).filter((item) => item.id).map((item) => [item.id, stableStringify(item)]));
   const left = clean(leftRows);
   return left.length <= rightById.size && left.every((item) => item.id && rightById.get(item.id) === stableStringify(item));
-}
-
-function auditHashFor(item) {
-  const { auditHash, ...payload } = item || {};
-  return createHash("sha256").update(stableStringify(payload)).digest("hex");
 }
 
 function stableStringify(value) {
@@ -14449,7 +14424,9 @@ async function applyIdentityDirectoryDeactivations(data, plan, operator, note) {
   const applied = [];
   data.authUsers = (data.authUsers || []).map((item) => {
     if (!candidateIds.has(item.id)) return item;
-    applied.push({ userId: item.id, username: item.username, role: item.role, orgCode: item.orgCode || "" });
+    const account = (data.accounts || []).find((entry) => entry.id === item.accountId)
+      || (data.accounts || []).find((entry) => (entry.members || []).some((member) => member.residentId === item.residentId));
+    applied.push({ userId: item.id, username: item.username, role: item.role, orgCode: item.orgCode || "", phone: normalizePhone(account?.phone) });
     return {
       ...item,
       status: "停用",
@@ -14466,10 +14443,16 @@ async function applyIdentityDirectoryDeactivations(data, plan, operator, note) {
     reason: "identity-directory-deactivation",
     actor: operator.username || operator.id
   });
+  let revokedAuthSecurityEntries = 0;
+  for (const subject of [...new Set(applied.flatMap((item) => [item.userId, item.username, item.phone]).filter(Boolean))]) {
+    const result = await revokeAuthSecuritySubject(subject);
+    revokedAuthSecurityEntries += Number(result.revoked || 0);
+  }
   return {
     appliedAt,
-    applied,
-    revokedSessions
+    applied: applied.map(({ phone: _phone, ...item }) => item),
+    revokedSessions,
+    revokedAuthSecurityEntries
   };
 }
 
@@ -14514,6 +14497,9 @@ function productionSessionStoreErrors(env = process.env) {
   if (!isProductionRuntime(env)) return [];
   const mode = sessionStoreMode(env);
   const topology = sessionTopology(env);
+  const instanceCount = Math.max(1, Number(env.INSTANCE_COUNT || 1) || 1);
+  const configuredAuthMode = String(env.AUTH_SECURITY_STATE_STORE || "").trim().toLowerCase();
+  const authMode = configuredAuthMode || (topology === "multi-host" || instanceCount > 1 ? "postgres" : "sqlite");
   const errors = [];
   if (!String(env.SESSION_TOPOLOGY || "").trim()) errors.push("SESSION_TOPOLOGY is required in production");
   if (!["sqlite", "postgres"].includes(mode)) errors.push("SESSION_STORE=sqlite or postgres is required in production");
@@ -14521,6 +14507,16 @@ function productionSessionStoreErrors(env = process.env) {
   if (mode === "postgres" && !/^postgres(?:ql)?:\/\//i.test(String(env.DATABASE_URL || "").trim())) errors.push("DATABASE_URL is required for PostgreSQL sessions");
   if (mode === "postgres" && !String(env.POSTGRES_SSL_MODE || "").trim()) errors.push("POSTGRES_SSL_MODE is required for PostgreSQL sessions in production");
   else if (mode === "postgres" && String(env.POSTGRES_SSL_MODE).trim().toLowerCase() !== "verify-full") errors.push("POSTGRES_SSL_MODE=verify-full is required for PostgreSQL sessions in production");
+  if (!["sqlite", "postgres"].includes(authMode)) errors.push("AUTH_SECURITY_STATE_STORE=sqlite or postgres is required in production");
+  if ((topology === "multi-host" || instanceCount > 1) && authMode !== "postgres") {
+    errors.push("AUTH_SECURITY_STATE_STORE=postgres is required for multi-instance production");
+  }
+  if (authMode === "postgres" && !/^postgres(?:ql)?:\/\//i.test(String(env.DATABASE_URL || "").trim())) {
+    errors.push("DATABASE_URL is required for PostgreSQL authentication security state");
+  }
+  if (authMode === "postgres" && String(env.POSTGRES_SSL_MODE || "").trim().toLowerCase() !== "verify-full") {
+    errors.push("POSTGRES_SSL_MODE=verify-full is required for PostgreSQL authentication security state in production");
+  }
   return errors;
 }
 
@@ -14622,21 +14618,102 @@ function assertProductionRuntimeSecurity(env = process.env) {
   return true;
 }
 
+function runtimePostgresPool() {
+  if (!runtimePostgresPoolInstance) {
+    const { Pool } = require("pg");
+    runtimePostgresPoolInstance = new Pool(postgresPoolConfig(process.env));
+  }
+  return runtimePostgresPoolInstance;
+}
+
 function runtimeSessionStore() {
   const mode = sessionStoreMode();
+  const postgresSchema = String(process.env.POSTGRES_SCHEMA || "health_platform").trim();
   const postgresKey = mode === "postgres"
-    ? createHash("sha256").update(String(process.env.DATABASE_URL || "missing")).digest("hex").slice(0, 16)
+    ? createHash("sha256").update(`${String(process.env.DATABASE_URL || "missing")}:${postgresSchema}`).digest("hex").slice(0, 16)
     : "";
   const key = `${mode}:${mode === "sqlite" ? SQLITE_FILE : mode === "postgres" ? postgresKey : "process"}`;
   if (runtimeSessionStoreInstance && runtimeSessionStoreKey === key) return runtimeSessionStoreInstance;
   if (mode === "sqlite") runtimeSessionStoreInstance = new SqliteSessionStore({ openDatabase: openSqliteDatabase });
   else if (mode === "postgres") runtimeSessionStoreInstance = new PostgresSessionStore({
-    PoolClass: require("pg").Pool,
-    poolConfig: postgresPoolConfig(process.env)
+    pool: runtimePostgresPool(),
+    schema: postgresSchema
   });
   else runtimeSessionStoreInstance = new MemorySessionStore();
   runtimeSessionStoreKey = key;
   return runtimeSessionStoreInstance;
+}
+
+function authSecurityStateStoreMode(env = process.env) {
+  const configured = String(env.AUTH_SECURITY_STATE_STORE || "").trim().toLowerCase();
+  const instanceCount = Math.max(1, Number(env.INSTANCE_COUNT || 1) || 1);
+  const multiInstance = sessionTopology(env) === "multi-host" || instanceCount > 1;
+  const mode = configured || (isProductionRuntime(env) && multiInstance
+    ? "postgres"
+    : shouldUseSqlite() ? "sqlite" : "memory");
+  if (["memory", "sqlite", "postgres"].includes(mode)) return mode;
+  const error = new Error(`unsupported AUTH_SECURITY_STATE_STORE=${mode}; expected memory, sqlite or postgres`);
+  error.code = "AUTH_SECURITY_STATE_STORE_INVALID";
+  throw error;
+}
+
+function runtimeAuthSecurityStateStore() {
+  const mode = authSecurityStateStoreMode();
+  const schema = String(process.env.POSTGRES_SCHEMA || "health_platform").trim();
+  const postgresKey = mode === "postgres"
+    ? createHash("sha256").update(`${String(process.env.DATABASE_URL || "missing")}:${schema}`).digest("hex").slice(0, 16)
+    : "";
+  const key = `${mode}:${mode === "sqlite" ? SQLITE_FILE : mode === "postgres" ? postgresKey : "process"}`;
+  if (runtimeAuthSecurityStateStoreInstance && runtimeAuthSecurityStateStoreKey === key) {
+    return runtimeAuthSecurityStateStoreInstance;
+  }
+  runtimeAuthSecurityStateStoreInstance = createAuthSecurityStateStore({
+    mode,
+    env: process.env,
+    openDatabase: openSqliteDatabase,
+    ...(mode === "postgres" ? { pool: runtimePostgresPool(), schema } : {}),
+    keySecret: process.env.AUTH_SECURITY_STATE_KEY_SECRET || authSecrets()[0]
+  });
+  runtimeAuthSecurityStateStoreKey = key;
+  return runtimeAuthSecurityStateStoreInstance;
+}
+
+function authSecurityStateUnavailable(error, operation) {
+  if (error?.code === "AUTH_SECURITY_STATE_UNAVAILABLE") return error;
+  console.error(`authentication security state ${operation} failed: ${error?.message || "unknown error"}`);
+  const unavailable = new Error("authentication security state service is temporarily unavailable");
+  unavailable.code = "AUTH_SECURITY_STATE_UNAVAILABLE";
+  unavailable.statusCode = 503;
+  unavailable.cause = error;
+  return unavailable;
+}
+
+async function withAuthSecurityState(operation, callback) {
+  try {
+    return await callback(runtimeAuthSecurityStateStore());
+  } catch (error) {
+    throw authSecurityStateUnavailable(error, operation);
+  }
+}
+
+async function consumeAuthRateLimit(input) {
+  return withAuthSecurityState("consume rate limit", (store) => store.consumeRateLimit(input));
+}
+
+async function authLoginLockStatus(input) {
+  return withAuthSecurityState("read login lock", (store) => store.getLoginLock(input));
+}
+
+async function recordAuthLoginFailure(input) {
+  return withAuthSecurityState("record login failure", (store) => store.recordLoginFailure(input));
+}
+
+async function clearAuthLoginFailures(input) {
+  return withAuthSecurityState("clear login failures", (store) => store.clearLoginFailures(input));
+}
+
+async function revokeAuthSecuritySubject(subject, purposes) {
+  return withAuthSecurityState("revoke subject", (store) => store.revokeSubject({ subject, purposes }));
 }
 
 function sessionStoreUnavailableError(error, operation) {
@@ -14838,87 +14915,64 @@ function maskPhone(phone) {
   return `${value.slice(0, 3)}****${value.slice(-4)}`;
 }
 
-function prunePhoneVerificationCodes(now = Date.now()) {
-  for (const [phone, item] of phoneVerificationCodes.entries()) {
-    if (!item || Number(item.expiresAtMs || 0) <= now) phoneVerificationCodes.delete(phone);
-  }
+function requestRateLimitSubject(req) {
+  return String(req?.socket?.remoteAddress || "unknown-network-source").trim().slice(0, 200);
 }
 
-function prunePhoneLoginFailures(now = Date.now()) {
-  for (const [phone, item] of phoneLoginFailures.entries()) {
-    if (!item || (Number(item.lockedUntilMs || 0) > 0 && Number(item.lockedUntilMs || 0) <= now)) {
-      phoneLoginFailures.delete(phone);
-    }
-  }
-}
-
-function phoneLoginLockStatus(phone, now = Date.now()) {
-  const normalizedPhone = normalizePhone(phone);
-  prunePhoneLoginFailures(now);
-  const failure = phoneLoginFailures.get(normalizedPhone);
-  if (!failure || Number(failure.lockedUntilMs || 0) <= now) return { locked: false, retryAfterSeconds: 0, failedAttempts: failure?.failedAttempts || 0 };
-  return {
-    locked: true,
-    retryAfterSeconds: Math.ceil((Number(failure.lockedUntilMs) - now) / 1000),
-    failedAttempts: failure.failedAttempts || 0
-  };
+function phoneLoginLockStatus(phone) {
+  return authLoginLockStatus({ subject: normalizePhone(phone), purpose: "phone-login" });
 }
 
 function clearPhoneLoginFailures(phone) {
-  phoneLoginFailures.delete(normalizePhone(phone));
+  return clearAuthLoginFailures({ subject: normalizePhone(phone), purpose: "phone-login" });
 }
 
-function recordPhoneLoginFailure(phone, now = Date.now()) {
-  const normalizedPhone = normalizePhone(phone);
-  prunePhoneLoginFailures(now);
-  const current = phoneLoginFailures.get(normalizedPhone) || { failedAttempts: 0, lockedUntilMs: 0 };
-  const failedAttempts = Number(current.failedAttempts || 0) + 1;
-  const lockedUntilMs = failedAttempts >= PHONE_LOGIN_MAX_FAILED_ATTEMPTS ? now + PHONE_LOGIN_LOCK_MS : 0;
-  const next = { failedAttempts, lockedUntilMs, lastFailedAtMs: now };
-  phoneLoginFailures.set(normalizedPhone, next);
-  return {
-    locked: lockedUntilMs > 0,
-    failedAttempts,
-    retryAfterSeconds: lockedUntilMs > 0 ? Math.ceil((lockedUntilMs - now) / 1000) : 0
-  };
+function recordPhoneLoginFailure(phone) {
+  return recordAuthLoginFailure({
+    subject: normalizePhone(phone),
+    purpose: "phone-login",
+    threshold: PHONE_LOGIN_MAX_FAILED_ATTEMPTS,
+    failureTtlMs: PHONE_LOGIN_LOCK_MS,
+    lockoutMs: PHONE_LOGIN_LOCK_MS
+  });
 }
 
-async function issuePhoneVerificationCode(phone, user) {
+async function issuePhoneVerificationCode(phone, options = {}) {
   const normalizedPhone = normalizePhone(phone);
-  const now = Date.now();
-  const production = String(process.env.NODE_ENV || "").toLowerCase() === "production";
-  prunePhoneVerificationCodes(now);
-  clearPhoneLoginFailures(normalizedPhone);
-  const existing = phoneVerificationCodes.get(normalizedPhone);
-  if (existing && now - Number(existing.sentAtMs || 0) < PHONE_CODE_COOLDOWN_MS) {
-    return {
-      ok: false,
-      retryAfterSeconds: Math.ceil((PHONE_CODE_COOLDOWN_MS - (now - existing.sentAtMs)) / 1000),
-      expiresAt: new Date(existing.expiresAtMs).toISOString()
-    };
-  }
-  const code = production ? generatePhoneVerificationCode() : DEMO_SMS_CODE;
+  const env = options.env || process.env;
+  const production = String(env.NODE_ENV || "").toLowerCase() === "production";
+  const code = production ? (options.generateCode || generatePhoneVerificationCode)() : String(options.demoCode || DEMO_SMS_CODE);
   const clientRequestId = randomUUID();
-  const receipt = production
-    ? await sendSmsVerificationCode({
-      phone: normalizedPhone,
-      code,
-      expiresInMinutes: Math.ceil(PHONE_CODE_TTL_MS / 60000),
-      clientRequestId
-    })
-    : null;
-  const record = {
-    phone: normalizedPhone,
-    userId: user.id,
-    sentAtMs: now,
-    expiresAtMs: now + PHONE_CODE_TTL_MS,
-    clientRequestId,
-    channel: production ? "sms-gateway" : "demo-sms",
-    receipt,
-    ...(production
-      ? { codeDigest: digestPhoneVerificationCode(normalizedPhone, code, authSecrets()[0]) }
-      : { code })
-  };
+  const digestSecret = options.digestSecret || authSecrets()[0];
+  const storeOperation = (operation, callback) => options.store
+    ? callback(options.store)
+    : withAuthSecurityState(operation, callback);
+  const issued = await storeOperation("issue verification code", (store) => store.issueVerificationCode({
+    subject: normalizedPhone,
+    purpose: "resident-phone-code",
+    codeDigest: digestPhoneVerificationCode(normalizedPhone, code, digestSecret),
+    ttlMs: PHONE_CODE_TTL_MS,
+    maxAttempts: PHONE_LOGIN_MAX_FAILED_ATTEMPTS
+  }));
+  let receipt = null;
+  if (production) {
+    try {
+      receipt = await (options.sendSms || ((message) => sendSmsVerificationCode(message, { env })))(
+        {
+          phone: normalizedPhone,
+          code,
+          expiresInMinutes: Math.ceil(PHONE_CODE_TTL_MS / 60000),
+          clientRequestId
+        }
+      );
+    } catch (error) {
+      await storeOperation("revoke rejected verification code", (store) => store.revokeVerificationCode({
+        subject: normalizedPhone,
+        purpose: "resident-phone-code"
+      }));
+      throw error;
+    }
+  }
   if (production) {
     const data = readDatabase();
     recordSmsDeliveryAcceptance(data, {
@@ -14932,35 +14986,25 @@ async function issuePhoneVerificationCode(phone, user) {
     });
     writeDatabase(normalizeState(data));
   }
-  phoneVerificationCodes.set(normalizedPhone, record);
   return {
     ok: true,
     demo: !production,
-    channel: record.channel,
+    channel: production ? "sms-gateway" : "demo-sms",
     receipt,
     ...(production ? {} : { code }),
     retryAfterSeconds: Math.ceil(PHONE_CODE_COOLDOWN_MS / 1000),
-    expiresAt: new Date(record.expiresAtMs).toISOString()
+    expiresAt: issued.expiresAt
   };
 }
 
-function verifyPhoneCode(phone, code, user) {
+async function verifyPhoneCode(phone, code) {
   const normalizedPhone = normalizePhone(phone);
   const normalizedCode = String(code || "").trim();
-  const now = Date.now();
-  prunePhoneVerificationCodes(now);
-  const issued = phoneVerificationCodes.get(normalizedPhone);
-  const issuedCodeMatches = issued?.codeDigest
-    ? timingSafeTextEqual(issued.codeDigest, digestPhoneVerificationCode(normalizedPhone, normalizedCode, authSecrets()[0]))
-    : timingSafeTextEqual(issued?.code || "", normalizedCode);
-  if (issued && issued.userId === user.id && issued.expiresAtMs > now && issuedCodeMatches) {
-    phoneVerificationCodes.delete(normalizedPhone);
-    clearPhoneLoginFailures(normalizedPhone);
-    return true;
-  }
-  const demoMatched = String(process.env.NODE_ENV || "").toLowerCase() !== "production" && timingSafeTextEqual(DEMO_SMS_CODE, normalizedCode);
-  if (demoMatched) clearPhoneLoginFailures(normalizedPhone);
-  return demoMatched;
+  return withAuthSecurityState("verify verification code", (store) => store.verifyAndConsumeCode({
+    subject: normalizedPhone,
+    purpose: "resident-phone-code",
+    codeDigest: digestPhoneVerificationCode(normalizedPhone, normalizedCode, authSecrets()[0])
+  }));
 }
 
 async function createSession(user) {
@@ -23614,7 +23658,7 @@ function appendQualitySafetyAudit(data, user, action, target, detail) {
 function buildComplianceReport(data) {
   const audit = {
     securityEvents: verifyAuditTrail(data.securityEvents),
-    dataAccessLogs: verifyAuditTrail(resealAuditTrail(data.dataAccessLogs))
+    dataAccessLogs: verifyAuditTrail(data.dataAccessLogs)
   };
   const ledger = data.securityAcceptanceLedger || [];
   return {
@@ -27630,6 +27674,7 @@ function createRuntimeCapabilitySource() {
   buildSystemReadinessReport,
   buildT10PlatformBlockedReadiness,
   buildUnifiedTasks,
+  authLoginLockStatus,
   calculateCreditEvaluations,
   canAccessEscortOrder,
   canAccessInternetNursingOrder,
@@ -27663,8 +27708,11 @@ function createRuntimeCapabilitySource() {
   cleanResidentPatch,
   cleanWorkflowUpdates,
   cleanupRuntimeSessions,
+  clearAuthLoginFailures,
+  clearPhoneLoginFailures,
   closeFamilyDoctorChronicAction,
   collectJson,
+  consumeAuthRateLimit,
   completeReferralTeleconsultationJointTestTask,
   contractAttestationUniqueKey,
   createDigitalHospitalPilotInstitution,
@@ -27869,6 +27917,7 @@ function createRuntimeCapabilitySource() {
   recordChronicPharmacyCallback,
   recordChronicReferralContinuity,
   recordClaimedPublicHealthExternalAttemptToState,
+  recordAuthLoginFailure,
   recordPhoneLoginFailure,
   recordPublicHealthExternalAttemptToState,
   recordTrustedDirectReportCallbackToState,
@@ -27885,6 +27934,7 @@ function createRuntimeCapabilitySource() {
   renderPlatformStandardsLedgerDetailMarkdown,
   renderPlatformStandardsLedgersMarkdown,
   renderPrometheusRuntimeMetrics,
+  requestRateLimitSubject,
   requestPublicHealthRespiratoryNetworkLifecycle,
   requeuePublicHealthExternalDeadLetterToState,
   requeueDirectReportDeadLetterToState,
@@ -28039,7 +28089,7 @@ function handleRequestError(_req, res, error) {
       sendStorageConflict(res, error);
       return;
     }
-    if (error?.code === "SESSION_STORE_UNAVAILABLE") {
+    if (["SESSION_STORE_UNAVAILABLE", "AUTH_SECURITY_STATE_UNAVAILABLE"].includes(error?.code)) {
       sendJson(res, 503, { ok: false, code: error.code, message: error.message });
       return;
     }
@@ -28076,12 +28126,13 @@ const server = http.createServer(createPlatformRequestHandler({
 
 function startServer(port = PORT) {
   assertProductionRuntimeSecurity();
-  if (sessionStoreMode() === "postgres") {
-    const error = new Error("PostgreSQL session store requires asynchronous startup");
+  if (sessionStoreMode() === "postgres" || authSecurityStateStoreMode() === "postgres") {
+    const error = new Error("PostgreSQL authentication state requires asynchronous startup");
     error.code = "POSTGRES_SESSION_ASYNC_START_REQUIRED";
     throw error;
   }
   ensureDatabase();
+  runtimeAuthSecurityStateStore();
   cleanupRuntimeSessions({ trigger: "startup", actor: "system" });
   scheduleSessionCleanup();
   return server.listen(port, () => {
@@ -28095,8 +28146,10 @@ async function startServerAsync(port = PORT) {
   assertProductionRuntimeSecurity();
   ensureDatabase();
   const store = runtimeSessionStore();
+  const authStateStore = runtimeAuthSecurityStateStore();
   try {
     if (typeof store.initialize === "function") await store.initialize();
+    await authStateStore.status();
     await cleanupRuntimeSessions({ trigger: "startup", actor: "system" });
   } catch (error) {
     if (typeof store.close === "function") {
@@ -28108,6 +28161,16 @@ async function startServerAsync(port = PORT) {
     }
     runtimeSessionStoreInstance = null;
     runtimeSessionStoreKey = "";
+    runtimeAuthSecurityStateStoreInstance = null;
+    runtimeAuthSecurityStateStoreKey = "";
+    if (runtimePostgresPoolInstance) {
+      try {
+        await runtimePostgresPoolInstance.end();
+      } catch (closeError) {
+        console.error(`PostgreSQL pool close after startup failure failed: ${closeError.message}`);
+      }
+      runtimePostgresPoolInstance = null;
+    }
     throw error;
   }
   scheduleSessionCleanup();
@@ -28134,6 +28197,10 @@ async function stopServer() {
   }
   runtimeSessionStoreInstance = null;
   runtimeSessionStoreKey = "";
+  runtimeAuthSecurityStateStoreInstance = null;
+  runtimeAuthSecurityStateStoreKey = "";
+  if (runtimePostgresPoolInstance) await runtimePostgresPoolInstance.end();
+  runtimePostgresPoolInstance = null;
 }
 
 /* c8 ignore next 8 */
@@ -28152,6 +28219,7 @@ if (require.main === module) {
 
 module.exports = {
   authorize,
+  authSecurityStateStoreMode,
   assertProductionRuntimeSecurity,
   careServiceReadinessPublicSummary,
   configureDigitalHospitalExecutionRuntime,
@@ -28162,6 +28230,7 @@ module.exports = {
   digitalHospitalClientCertificate,
   digitalHospitalWorkerFingerprints,
   ensureDatabase,
+  issuePhoneVerificationCode,
   openSqliteDatabase,
   productionSessionSecretErrors,
   productionSessionRetentionErrors,
@@ -28181,6 +28250,7 @@ module.exports = {
   sessionTopology,
   sessionRetentionPolicy,
   sessionStoreStatus,
+  runtimeAuthSecurityStateStore,
   startServer,
   startServerAsync,
   stopServer,

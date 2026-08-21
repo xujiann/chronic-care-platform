@@ -7,6 +7,7 @@ const test = require("node:test");
 const {
   buildPostgresMigrationPackage,
   parseArgs,
+  schemaSql,
   verifyPostgresMigrationPackage,
   writePostgresMigrationPackage
 } = require("../scripts/postgres-migration-package");
@@ -33,9 +34,18 @@ test("PostgreSQL manifest package exposes counts and digests without record payl
   assert.match(pkg.files["schema.sql"], /CREATE TABLE IF NOT EXISTS health_platform\.runtime_collection_state/);
   assert.match(pkg.files["schema.sql"], /CREATE TABLE IF NOT EXISTS health_platform\.runtime_primary_write_audit/);
   assert.match(pkg.files["schema.sql"], /CREATE TABLE IF NOT EXISTS health_platform\.auth_sessions/);
+  assert.match(pkg.files["schema.sql"], /CREATE TABLE IF NOT EXISTS health_platform\.auth_security_state/);
+  assert.match(pkg.files["schema.sql"], /runtime_sync_batches_chain_hash_uidx/);
   assert.match(pkg.files["schema.sql"], /auth_sessions_user_active_idx/);
   assert.match(pkg.files["schema.sql"], /auth_sessions_retention_idx/);
   assert.match(pkg.files["rollback.sql"], /DELETE FROM health_platform\.migration_runs/);
+});
+
+test("PostgreSQL migration schema scopes auth state to a validated target schema", () => {
+  const sql = schemaSql({ schema: "tenant_contract" });
+  assert.match(sql, /CREATE TABLE IF NOT EXISTS tenant_contract\.auth_security_state/);
+  assert.doesNotMatch(sql, /health_platform/);
+  assert.throws(() => schemaSql({ schema: "tenant;drop" }), /lowercase SQL identifier/);
 });
 
 test("PostgreSQL full export requires explicit sensitive-data acknowledgement", () => {

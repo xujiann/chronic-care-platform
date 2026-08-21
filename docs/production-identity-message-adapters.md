@@ -15,6 +15,7 @@
 - 动态血液业务字段在进入 `innerHTML` 前统一编码，服务端下发 CSP、`nosniff`、同源嵌入、引用策略和生产 HSTS 响应头。
 - SQLite 会话可跨进程读取，并在共享同一 `DATA_DIR` 的实例间同步注销、账号停用和撤销审计；进程重启不会使有效会话丢失。多主机集中式会话使用 PostgreSQL 中央会话表：请求先装载中央状态再进入现有角色守卫，签发、注销和目录停用在响应前完成中央写入；数据库不可用时返回 `SESSION_STORE_UNAVAILABLE` 并失败关闭。
 - `SESSION_TOPOLOGY=multi-host` 强制要求 `SESSION_STORE=postgres`、有效 `DATABASE_URL` 和显式的生产 `POSTGRES_SSL_MODE=verify-full`；中央表由 PostgreSQL 迁移包创建，应用启动只校验表结构，不以运行账号执行 DDL。依赖就绪检查使用轻量 PostgreSQL 探针，中央会话不可用时 `/api/health` 返回 503 且不暴露数据库错误；无依赖的 `/api/live` 仍用于进程存活判定。
+- OTP、验证码发送/登录限流和失败锁定统一进入共享认证安全状态仓储；单主机 SQLite 复用 `state_collections` 的注册迁移基线和 `BEGIN IMMEDIATE`，不在运行时建表，多实例生产强制使用 PostgreSQL `${POSTGRES_SCHEMA}.auth_security_state` 与长期共享连接池。持久化键使用服务端 HMAC，不保存手机号、用户名或验证码明文；目录停用会同时撤销会话和该主体的 OTP、限流与锁定状态。
 - 过期会话与撤销会话分别按 `SESSION_EXPIRED_RETENTION_DAYS`、`SESSION_REVOKED_RETENTION_DAYS` 保留，服务启动及 `SESSION_CLEANUP_INTERVAL_MS` 周期执行幂等清理；最近结果、删除分类和失败状态通过身份生命周期接口暴露。
 
 ## 运行接口
@@ -35,17 +36,21 @@
 
 ## 配置契约
 
-统一身份需要 `OIDC_ISSUER_URL`、`OIDC_CLIENT_ID`、`OIDC_CLIENT_SECRET`、`IDENTITY_DIRECTORY_URL` 和 `IDENTITY_DIRECTORY_TOKEN`；UserInfo、token 与 revocation endpoint 可通过发现文档解析，也可分别用 `OIDC_USERINFO_URL`、`OIDC_TOKEN_URL`、`OIDC_REVOCATION_URL` 显式指定。可选超时为 `IDENTITY_ADAPTER_TIMEOUT_MS`。短信需要 `SMS_GATEWAY_URL`、`SMS_TEMPLATE_ID` 和不少于 32 位的 `SMS_DELIVERY_CALLBACK_SECRET`，可选 `SMS_GATEWAY_TOKEN`、`SMS_SENDER`、`SMS_GATEWAY_TIMEOUT_MS` 和 `SMS_DELIVERY_CALLBACK_MAX_SKEW_SECONDS`。生产端点必须使用 HTTPS，真实密钥不得写入仓库。
+统一身份需要 `OIDC_ISSUER_URL`、`OIDC_CLIENT_ID`、`OIDC_CLIENT_SECRET`、`IDENTITY_DIRECTORY_URL` 和 `IDENTITY_DIRECTORY_TOKEN`；UserInfo、token 与 revocation endpoint 可通过发现文档解析，也可分别用 `OIDC_USERINFO_URL`、`OIDC_TOKEN_URL`、`OIDC_REVOCATION_URL` 显式指定。`OIDC_CLOCK_SKEW_SECONDS` 控制最多 300 秒的 ID token 时间偏差。短信需要 `SMS_GATEWAY_URL`、`SMS_TEMPLATE_ID`、`SMS_GATEWAY_AUTH_MODE=bearer`、`SMS_GATEWAY_TOKEN` 和不少于 32 位的 `SMS_DELIVERY_CALLBACK_SECRET`；当前生产 transport 只实现 bearer，`none` 仅限非生产，mTLS 在证书 transport 实现与验收前保持 fail closed。可配置健康 endpoint、最多五次有界重试和超时。生产端点必须使用 HTTPS，真实密钥不得写入仓库。
+
+共享认证状态使用 `AUTH_SECURITY_STATE_STORE=sqlite|postgres`；生产 `INSTANCE_COUNT>1` 或多主机拓扑只能选择 `postgres`，并要求 `DATABASE_URL`、`POSTGRES_SCHEMA` 与 `POSTGRES_SSL_MODE=verify-full`。`AUTH_SECURITY_STATE_KEY_SECRET` 建议使用独立的 32 位以上托管密钥，未配置时沿用当前会话签名主密钥。
 
 ## 安全控制
 
 - 上游 access token 仅用于本次 UserInfo 请求，不写入日志、审计记录或响应。
+- ID token 仅接受 RS256/PS256/ES256，必须经 discovery JWKS 唯一 `kid` 验签并校验 issuer、audience/authorized party、subject、时效和 nonce。
 - 刷新后必须重新校验 UserInfo 与本地账号启用状态；仅在供应商轮换 refresh token 时才把新 token 返回调用方。
 - OIDC 登录和刷新只按已绑定的稳定 subject 匹配本地账号，不按同名用户名自动回退；同名未绑定身份始终拒绝登录并进入受控绑定复核。
 - 目录同步不自动开户、不自动提权、不改变角色或机构，也不自动复活已停用账号；未绑定身份进入受控绑定队列。
 - 受控绑定要求目录与本地用户名、机构一致，subject 未被其他账号占用；已绑定账号的 subject 改绑必须另行安全复核。
 - 目录停用禁止停用当前操作员和最后一个卫健委账号，执行后撤销该账号的全部本地会话，并记录脱敏审计事件。
-- 生产验证码不以明文写入内存记录，只保存手机号、用户、有效期、请求号、受理回执和 keyed digest。
+- 生产验证码只在共享仓储保存 keyed digest、TTL 和剩余尝试次数，原子验证成功后立即消费；固定演示码也必须先签发再验证。发送按“限流→原子签发→供应商发送”执行，供应商拒绝会只撤销本次 OTP，不清登录锁和限流；共享状态写失败时不会调用供应商。
+- 短信发送的幂等键只能使用组合根生成并传入的稳定随机请求 ID；缺失时拒绝发送，禁止用手机号、验证码和模板的可枚举摘要替代。
 - 身份映射沿用机构、角色和门户白名单；外部声明不能直接创建可登录账号。
 - 短信受理回执持久化供应商消息号、客户端请求号、脱敏手机号、用途、受理时间和非敏感代码，不保存验证码。
 - 最终送达回调使用 HMAC-SHA256 回调验签，默认允许 300 秒时钟偏差；过期时间戳、签名不匹配、非法 nonce 和 nonce 重放全部失败关闭。

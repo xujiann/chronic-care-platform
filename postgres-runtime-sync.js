@@ -1,6 +1,6 @@
 const fs = require("node:fs");
 const path = require("node:path");
-const { createHash, randomUUID } = require("node:crypto");
+const { createHash, randomUUID, timingSafeEqual } = require("node:crypto");
 const { canonicalStringify } = require("./scripts/postgres-migration-package");
 
 const SYNC_MODE = String(process.env.POSTGRES_SYNC_MODE || "disabled").trim().toLowerCase();
@@ -34,6 +34,29 @@ class PostgresPrimaryReadError extends Error {
 
 function sha256(value) {
   return createHash("sha256").update(value).digest("hex");
+}
+
+function postgresSchemaIdentifier(value = "health_platform") {
+  const schema = String(value || "").trim();
+  if (!/^[a-z_][a-z0-9_]{0,62}$/.test(schema)) {
+    throw new Error("PostgreSQL schema must be a lowercase SQL identifier");
+  }
+  return schema;
+}
+
+function safePostgresErrorCode(error) {
+  const candidate = String(error?.code || error || "").trim().toUpperCase();
+  return /^[A-Z0-9_]{2,80}$/.test(candidate) ? candidate : "POSTGRES_SYNC_FAILED";
+}
+
+function constantTimeTextEqual(left, right) {
+  const leftDigest = createHash("sha256").update(String(left ?? "")).digest();
+  const rightDigest = createHash("sha256").update(String(right ?? "")).digest();
+  return timingSafeEqual(leftDigest, rightDigest);
+}
+
+function postgresSyncConflict(code, message) {
+  return Object.assign(new Error(message), { code, statusCode: 409, retryable: false });
 }
 
 function assertSyncMode(mode = SYNC_MODE) {
@@ -524,6 +547,63 @@ function readPostgresSyncStatus(sqliteFile) {
   }
 }
 
+function assessPostgresSyncHealth(sqliteFile, options = {}) {
+  const status = readPostgresSyncStatus(sqliteFile);
+  const nowMs = Number(options.nowMs ?? Date.now());
+  const maxBacklog = boundedPrimaryReadLimit(options.maxBacklog, 1000, 0, 1000000);
+  const maxPendingAgeSeconds = boundedPrimaryReadLimit(options.maxPendingAgeSeconds, 300, 1, 86400 * 30);
+  const maxReconciliationAgeSeconds = boundedPrimaryReadLimit(options.maxReconciliationAgeSeconds, 900, 1, 86400 * 30);
+  const backlog = status.pending + status.retry;
+  const pendingAgeSeconds = status.oldestPendingAt
+    ? Math.max(0, Math.floor((nowMs - Date.parse(status.oldestPendingAt)) / 1000))
+    : 0;
+  const reconciliationAgeSeconds = status.reconciliation.checkedAt
+    ? Math.max(0, Math.floor((nowMs - Date.parse(status.reconciliation.checkedAt)) / 1000))
+    : null;
+  const checks = [
+    { id: "postgres-sync:backlog-capacity", passed: backlog <= maxBacklog, value: backlog, threshold: maxBacklog },
+    { id: "postgres-sync:pending-lag", passed: pendingAgeSeconds <= maxPendingAgeSeconds, value: pendingAgeSeconds, threshold: maxPendingAgeSeconds },
+    { id: "postgres-sync:terminal-failures", passed: status.failed === 0, value: status.failed, threshold: 0 },
+    { id: "postgres-sync:reconciliation-current", passed: reconciliationAgeSeconds !== null && reconciliationAgeSeconds <= maxReconciliationAgeSeconds, value: reconciliationAgeSeconds, threshold: maxReconciliationAgeSeconds },
+    { id: "postgres-sync:reconciliation-matched", passed: status.reconciliation.status === "matched" && status.reconciliation.mismatched === 0, value: status.reconciliation.mismatched, threshold: 0 },
+    { id: "postgres-sync:difference-cases", passed: status.reconciliation.cases.unresolved === 0, value: status.reconciliation.cases.unresolved, threshold: 0 }
+  ];
+  return { ok: checks.every((item) => item.passed), productionPrimary: false, role: "shadow-sync-and-reconciliation", checkedAt: new Date(nowMs).toISOString(), backlog, pendingAgeSeconds, reconciliationAgeSeconds, status, checks };
+}
+
+async function probePostgresInfrastructure(options = {}) {
+  const schema = postgresSchemaIdentifier(options.schema);
+  const requiredTables = ["auth_security_state", "auth_sessions", "runtime_collection_state", "runtime_sync_batches"];
+  const poolConfig = options.pool ? null : (options.poolConfig || postgresPoolConfig(options.env || process.env));
+  const pool = options.pool || new (options.PoolClass || require("pg").Pool)(poolConfig);
+  try {
+    const result = await pool.query(`
+      SELECT table_name
+      FROM information_schema.tables
+      WHERE table_schema = $1 AND table_name = ANY($2::text[])
+      ORDER BY table_name
+    `, [schema, requiredTables]);
+    const available = new Set((result.rows || []).map((row) => String(row.table_name || "")));
+    const missingTables = requiredTables.filter((table) => !available.has(table));
+    return { ok: missingTables.length === 0, available: true, schema, requiredTables: requiredTables.length, verifiedTables: requiredTables.length - missingTables.length, missingTables, errorCode: "", productionPrimary: false, credentialsExposed: false };
+  } catch (error) {
+    return { ok: false, available: false, schema, requiredTables: requiredTables.length, verifiedTables: 0, missingTables: [], errorCode: safePostgresErrorCode(error), productionPrimary: false, credentialsExposed: false };
+  } finally {
+    if (!options.pool) await pool.end();
+  }
+}
+
+async function assessPostgresInfrastructureHealth(sqliteFile, options = {}) {
+  const shadow = assessPostgresSyncHealth(sqliteFile, options);
+  const target = await probePostgresInfrastructure(options);
+  const checks = [
+    ...shadow.checks,
+    { id: "postgres-target:connectivity", passed: target.available, value: target.available, threshold: true },
+    { id: "postgres-target:schema", passed: target.ok, value: target.verifiedTables, threshold: target.requiredTables }
+  ];
+  return { ok: checks.every((item) => item.passed), productionPrimary: false, role: "session-auth-state-and-shadow-sync", checkedAt: shadow.checkedAt, shadow, target, checks };
+}
+
 function loadSqliteCollectionState(sqliteFile) {
   const db = openSqlite(sqliteFile);
   try {
@@ -711,6 +791,7 @@ async function runPostgresPrimaryReadRehearsal(options = {}) {
   const poolConfig = options.pool ? null : (options.poolConfig || postgresPoolConfig(env));
   const pool = options.pool || new (options.PoolClass || require("pg").Pool)(poolConfig);
   const runId = options.runId || `pgread-${randomUUID()}`;
+  const schema = postgresSchemaIdentifier(options.schema);
   const checkedAt = options.checkedAt || new Date().toISOString();
   const startedAt = Date.now();
   let client;
@@ -719,7 +800,7 @@ async function runPostgresPrimaryReadRehearsal(options = {}) {
     await client.query("BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY");
     const result = await client.query(`
       SELECT collection_name, payload, payload_sha256, source_version, batch_id, updated_at
-      FROM health_platform.runtime_collection_state
+      FROM ${schema}.runtime_collection_state
       ORDER BY collection_name
     `);
     const snapshot = buildPostgresPrimaryReadSnapshot(result.rows, {
@@ -931,52 +1012,95 @@ function markPostgresSyncBatch(sqliteFile, batchId, result = {}) {
   try {
     const now = result.at || new Date().toISOString();
     if (result.delivered) {
-      db.prepare(`
+      const update = db.prepare(`
         UPDATE postgres_sync_outbox
         SET status = 'delivered', attempts = attempts + 1, delivered_at = ?, last_error = '', next_attempt_at = ?
-        WHERE batch_id = ?
+        WHERE batch_id = ? AND status IN ('pending', 'retry')
       `).run(now, now, batchId);
-      return;
+      return Number(update.changes || 0) === 1;
     }
-    const row = db.prepare("SELECT attempts FROM postgres_sync_outbox WHERE batch_id = ?").get(batchId);
+    const row = db.prepare("SELECT attempts, status FROM postgres_sync_outbox WHERE batch_id = ?").get(batchId);
+    if (!row || !["pending", "retry"].includes(row.status)) return false;
     const attempts = Number(row?.attempts || 0) + 1;
     const terminal = attempts >= Number(result.maxAttempts || 5);
     const delayMs = Math.min(300000, 1000 * (2 ** Math.min(attempts, 8)));
     const nextAttemptAt = new Date(new Date(now).getTime() + delayMs).toISOString();
-    db.prepare(`
+    const update = db.prepare(`
       UPDATE postgres_sync_outbox
       SET status = ?, attempts = ?, last_error = ?, next_attempt_at = ?
-      WHERE batch_id = ?
-    `).run(terminal ? "failed" : "retry", attempts, String(result.error || "PostgreSQL sync failed").slice(0, 500), nextAttemptAt, batchId);
+      WHERE batch_id = ? AND status IN ('pending', 'retry')
+    `).run(terminal ? "failed" : "retry", attempts, safePostgresErrorCode(result.error), nextAttemptAt, batchId);
+    return Number(update.changes || 0) === 1;
   } finally {
     db.close();
   }
 }
 
-async function applyPostgresSyncBatch(client, batch) {
+async function applyPostgresSyncBatch(client, batch, options = {}) {
   const validation = validatePostgresSyncBatch(batch);
   if (!validation.ok) throw new Error("PostgreSQL sync batch integrity validation failed");
+  const schema = postgresSchemaIdentifier(options.schema);
   const parsed = JSON.parse(batch.payload);
   await client.query("BEGIN");
   try {
     const inserted = await client.query(`
-      INSERT INTO health_platform.runtime_sync_batches (
+      INSERT INTO ${schema}.runtime_sync_batches (
         batch_id, created_at, payload_sha256, previous_chain_hash, chain_hash, status
       ) VALUES ($1, $2, $3, $4, $5, 'applying')
       ON CONFLICT (batch_id) DO NOTHING
       RETURNING batch_id
     `, [batch.batchId, batch.createdAt, batch.payloadSha256, batch.previousChainHash, batch.chainHash]);
     if (inserted.rowCount === 0) {
+      const existingBatch = await client.query(`
+        SELECT payload_sha256, previous_chain_hash, chain_hash
+        FROM ${schema}.runtime_sync_batches
+        WHERE batch_id = $1
+        FOR UPDATE
+      `, [batch.batchId]);
+      const existing = existingBatch.rows?.[0];
+      const sameIdentity = existingBatch.rowCount === 1
+        && constantTimeTextEqual(existing.payload_sha256, batch.payloadSha256)
+        && constantTimeTextEqual(existing.previous_chain_hash, batch.previousChainHash)
+        && constantTimeTextEqual(existing.chain_hash, batch.chainHash);
+      if (!sameIdentity) {
+        throw postgresSyncConflict("POSTGRES_SYNC_BATCH_ID_CONFLICT", "PostgreSQL sync batch id is bound to different content");
+      }
       await client.query("COMMIT");
       return { applied: false, duplicate: true, changes: 0 };
     }
     for (const change of parsed.changes) {
       if (change.operation === "delete") {
-        await client.query("DELETE FROM health_platform.runtime_collection_state WHERE collection_name = $1", [change.collection]);
+        const current = await client.query(`
+          SELECT payload_sha256, source_version
+          FROM ${schema}.runtime_collection_state
+          WHERE collection_name = $1
+          FOR UPDATE
+        `, [change.collection]);
+        if (current.rowCount === 1 && current.rows?.[0]) {
+          const remoteVersion = Number(current.rows[0].source_version);
+          if (remoteVersion === Number(change.sourceVersion)) {
+            throw postgresSyncConflict("POSTGRES_SYNC_VERSION_CONFLICT", "an equal-version tombstone cannot delete an existing PostgreSQL payload");
+          }
+          if (remoteVersion < Number(change.sourceVersion)) {
+            await client.query(`DELETE FROM ${schema}.runtime_collection_state WHERE collection_name = $1 AND source_version < $2`, [change.collection, change.sourceVersion]);
+          }
+        }
+        continue;
+      }
+      const current = await client.query(`
+        SELECT payload_sha256, source_version
+        FROM ${schema}.runtime_collection_state
+        WHERE collection_name = $1
+        FOR UPDATE
+      `, [change.collection]);
+      if (current.rowCount === 1 && current.rows?.[0] && Number(current.rows[0].source_version) === Number(change.sourceVersion)) {
+        if (!constantTimeTextEqual(current.rows[0].payload_sha256, change.payloadSha256)) {
+          throw postgresSyncConflict("POSTGRES_SYNC_VERSION_CONFLICT", "equal PostgreSQL source versions must have identical payload digests");
+        }
         continue;
       }
       await client.query(`
-        INSERT INTO health_platform.runtime_collection_state (
+        INSERT INTO ${schema}.runtime_collection_state (
           collection_name, payload, payload_sha256, source_version, batch_id, updated_at
         ) VALUES ($1, $2::jsonb, $3, $4, $5, $6)
         ON CONFLICT (collection_name) DO UPDATE SET
@@ -985,10 +1109,10 @@ async function applyPostgresSyncBatch(client, batch) {
           source_version = EXCLUDED.source_version,
           batch_id = EXCLUDED.batch_id,
           updated_at = EXCLUDED.updated_at
-        WHERE health_platform.runtime_collection_state.source_version <= EXCLUDED.source_version
+        WHERE ${schema}.runtime_collection_state.source_version < EXCLUDED.source_version
       `, [change.collection, change.payload, change.payloadSha256, change.sourceVersion, batch.batchId, batch.createdAt]);
     }
-    await client.query("UPDATE health_platform.runtime_sync_batches SET status = 'applied', applied_at = now() WHERE batch_id = $1", [batch.batchId]);
+    await client.query(`UPDATE ${schema}.runtime_sync_batches SET status = 'applied', applied_at = now() WHERE batch_id = $1`, [batch.batchId]);
     await client.query("COMMIT");
     return { applied: true, duplicate: false, changes: parsed.changes.length };
   } catch (error) {
@@ -1021,6 +1145,7 @@ async function runPostgresShadowReconciliation(options = {}) {
   const PoolClass = options.PoolClass || require("pg").Pool;
   const pool = options.pool || new PoolClass(poolConfig);
   const runId = options.runId || `pgrecon-${randomUUID()}`;
+  const schema = postgresSchemaIdentifier(options.schema);
   let client;
   let report;
   try {
@@ -1028,7 +1153,7 @@ async function runPostgresShadowReconciliation(options = {}) {
     await client.query("BEGIN READ ONLY");
     const result = await client.query(`
       SELECT collection_name, payload_sha256, source_version, batch_id
-      FROM health_platform.runtime_collection_state
+      FROM ${schema}.runtime_collection_state
       ORDER BY collection_name
     `);
     await client.query("COMMIT");
@@ -1066,7 +1191,7 @@ async function runPostgresShadowReconciliation(options = {}) {
       checkedAt,
       status: "error",
       durationMs: Math.max(0, Date.now() - startedAt),
-      errorCode: String(error.code || "POSTGRES_RECONCILIATION_FAILED").slice(0, 80),
+      errorCode: safePostgresErrorCode(error),
       summary: {
         localCollections: localRows.length,
         remoteCollections: 0,
@@ -1104,11 +1229,11 @@ async function runPostgresSyncWorker(options = {}) {
       let client;
       try {
         client = await pool.connect();
-        await applyPostgresSyncBatch(client, batch);
+        await applyPostgresSyncBatch(client, batch, { schema: options.schema });
         markPostgresSyncBatch(sqliteFile, batch.batchId, { delivered: true });
         delivered += 1;
       } catch (error) {
-        markPostgresSyncBatch(sqliteFile, batch.batchId, { error: error.message, maxAttempts: options.maxAttempts });
+        markPostgresSyncBatch(sqliteFile, batch.batchId, { error, maxAttempts: options.maxAttempts });
         failed += 1;
       } finally {
         client?.release?.();
@@ -1127,6 +1252,8 @@ module.exports = {
   SYNC_MODES,
   applyPostgresReconciliationCaseAction,
   applyPostgresSyncBatch,
+  assessPostgresInfrastructureHealth,
+  assessPostgresSyncHealth,
   assertPrimaryReadMode,
   assertSyncMode,
   buildCollectionChanges,
@@ -1141,7 +1268,9 @@ module.exports = {
   loadPendingPostgresSyncBatches,
   loadSqliteCollectionState,
   markPostgresSyncBatch,
+  postgresSchemaIdentifier,
   postgresPoolConfig,
+  probePostgresInfrastructure,
   readPostgresReconciliationCase,
   readPostgresReconciliationRun,
   readLatestPostgresReconciliation,
@@ -1150,5 +1279,6 @@ module.exports = {
   runPostgresPrimaryReadRehearsal,
   runPostgresShadowReconciliation,
   runPostgresSyncWorker,
+  safePostgresErrorCode,
   validatePostgresSyncBatch
 };

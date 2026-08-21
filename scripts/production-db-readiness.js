@@ -337,7 +337,7 @@ function buildProductionDbReadinessReport(options = {}) {
   const postgresRuntimeSync = {
     transactionalOutbox: ["postgres_sync_outbox", "enqueuePostgresSyncBatch", "db.exec(\"COMMIT\")", "STORAGE_SCHEMA_VERSION = SQLITE_SCHEMA_HEAD"].every((marker) => sqliteRuntimeSource.includes(marker)),
     batchIntegrity: ["buildPostgresSyncBatch", "payloadSha256", "previousChainHash", "chainHash", "validatePostgresSyncBatch"].every((marker) => runtimeSyncSource.includes(marker)),
-    idempotentApply: ["runtime_sync_batches", "ON CONFLICT (batch_id) DO NOTHING", "runtime_collection_state", "source_version <= EXCLUDED.source_version"].every((marker) => runtimeSyncSource.includes(marker)),
+    idempotentApply: ["runtime_sync_batches", "ON CONFLICT (batch_id) DO NOTHING", "FOR UPDATE", "POSTGRES_SYNC_BATCH_ID_CONFLICT", "runtime_collection_state", "source_version < EXCLUDED.source_version", "POSTGRES_SYNC_VERSION_CONFLICT"].every((marker) => runtimeSyncSource.includes(marker)),
     retryState: ["pending", "retry", "delivered", "failed", "next_attempt_at", "maxAttempts"].every((marker) => runtimeSyncSource.includes(marker)),
     healthStatus: serverSource.includes("postgresSync") && serverSource.includes("readPostgresSyncStatus") && serverSource.includes("productionPrimary: false"),
     workerCommand: runtimeSyncWorker.includes("runPostgresSyncWorker") && pkg.scripts?.["postgres:sync-worker"],

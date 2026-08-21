@@ -5,7 +5,7 @@ const os = require("node:os");
 const path = require("node:path");
 const test = require("node:test");
 
-const { MemorySessionStore, PostgresSessionStore, SqliteSessionStore } = require("../session-store");
+const { MemorySessionStore, PostgresSessionStore, SqliteSessionStore, postgresSessionSchema } = require("../session-store");
 
 let DatabaseSync = null;
 try {
@@ -203,6 +203,26 @@ test("PostgreSQL session store refuses startup when the central schema is incomp
   );
   assert.equal(store.status().available, false);
   assert.equal(store.status().errorCode, "POSTGRES_SESSION_SCHEMA_INVALID");
+});
+
+test("PostgreSQL session store isolates an explicitly validated schema", async () => {
+  const queries = [];
+  const pool = {
+    async query(sql, params = []) {
+      queries.push({ sql: String(sql), params });
+      if (/information_schema\.columns/.test(sql)) {
+        return { rows: ["session_id", "user_id", "username", "role", "user_payload", "issued_at", "expires_at", "revoked_at", "revoke_reason", "revoked_by", "created_at"].map((column_name) => ({ column_name })) };
+      }
+      return { rows: [], rowCount: 0 };
+    }
+  };
+  const store = new PostgresSessionStore({ pool, schema: "tenant_alpha" });
+  await store.initialize();
+  assert.deepEqual(queries[0].params, ["tenant_alpha"]);
+  await store.hydrate("missing-session");
+  assert.match(queries[1].sql, /FROM tenant_alpha\.auth_sessions/);
+  assert.equal(postgresSessionSchema("tenant_alpha"), "tenant_alpha");
+  assert.throws(() => postgresSessionSchema("tenant-alpha;drop schema public"), /lowercase SQL identifier/);
 });
 
 test("SQLite session stores share sessions and retain revocation audit evidence", { skip: !DatabaseSync }, () => {

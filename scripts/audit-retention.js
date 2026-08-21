@@ -2,6 +2,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const { createHash } = require("node:crypto");
+const { auditHashFor, verifyAuditTrail } = require("../src/identity-security/audit-chain");
 
 const ROOT = path.resolve(__dirname, "..");
 const DEFAULT_OUTPUT = path.join(ROOT, "release", "audit-retention-report.json");
@@ -14,40 +15,6 @@ const RETENTION_TARGETS = [
 
 function readJson(relativePath) {
   return JSON.parse(fs.readFileSync(path.join(ROOT, relativePath), "utf8"));
-}
-
-function stableStringify(value) {
-  if (Array.isArray(value)) return `[${value.map((item) => stableStringify(item)).join(",")}]`;
-  if (value && typeof value === "object") {
-    return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${stableStringify(value[key])}`).join(",")}}`;
-  }
-  return JSON.stringify(value);
-}
-
-function auditHashFor(item) {
-  const { auditHash, ...payload } = item || {};
-  return createHash("sha256").update(stableStringify(payload)).digest("hex");
-}
-
-function verifyAuditTrail(rows) {
-  const items = Array.isArray(rows) ? rows : [];
-  const broken = [];
-  const linkBroken = [];
-  let previousHash = "";
-  for (let index = items.length - 1; index >= 0; index -= 1) {
-    const item = items[index];
-    const expectedHash = auditHashFor(item);
-    const expectedPreviousHash = previousHash;
-    const explicitTamper = /tampered/i.test(String(item.detail || item.result || item.action || ""));
-    if (item.auditHash !== expectedHash && (explicitTamper || !item.auditHash)) {
-      broken.push({ index, id: item.id || "", expectedPreviousHash, actualPreviousHash: item.previousAuditHash || "", expectedHash, actualHash: item.auditHash || "" });
-    }
-    if (item.previousAuditHash !== expectedPreviousHash) {
-      linkBroken.push({ index, id: item.id || "", expectedPreviousHash, actualPreviousHash: item.previousAuditHash || "" });
-    }
-    previousHash = item.auditHash || expectedHash;
-  }
-  return { passed: broken.length === 0, count: items.length, broken, linkBroken };
 }
 
 function sha256Text(value) {

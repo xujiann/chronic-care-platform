@@ -9,8 +9,28 @@ const {
   setOwnedWriteHeaders
 } = require("./t02-state-ownership-contract");
 
+function firstVersionConflict(currentData, payload) {
+  const expectedVersions = payload?.storageMeta?.collectionVersions || {};
+  const currentVersions = currentData?.storageMeta?.collectionVersions || {};
+  const collections = changedCollections(currentData, payload).filter((collection) =>
+    collection !== "storageMeta" && collection !== "securityEvents" && collection !== "dataAccessLogs"
+  ).sort((left, right) =>
+    Number(ownerForCollection(right, { allowLegacy: true }).registered) -
+    Number(ownerForCollection(left, { allowLegacy: true }).registered)
+  );
+  for (const collection of collections) {
+    if (!Object.hasOwn(expectedVersions, collection)) continue;
+    const expectedVersion = Number(expectedVersions[collection]);
+    const currentVersion = Number(currentVersions[collection]);
+    if (Number.isFinite(expectedVersion) && Number.isFinite(currentVersion) && expectedVersion !== currentVersion) {
+      return { collection, expectedVersion, currentVersion };
+    }
+  }
+  return null;
+}
+
 function createRouteSegments(runtime) {
-  const { COLLECTION_WRITE_KEYS, auditTrailRowsMatch, auditTrailRowsMatchById, collectJson, normalizeState, prependAuditEventPreservingTrail, prependAuditTrailEntry, randomUUID, readDatabase, redactSensitiveResponse, requireApiRole, resealAuditTrail, scopeStateForUser, sealAuditTrail, seedState, sendJson, storageMeta, verifyAuditTrail, writeDatabase } = runtime;
+  const { COLLECTION_WRITE_KEYS, auditTrailRowsMatch, collectJson, normalizeState, prependAuditTrailEntry, randomUUID, readDatabase, redactSensitiveResponse, requireApiRole, scopeStateForUser, seedState, sendJson, storageMeta, verifyAuditTrail, writeDatabase } = runtime;
   return [
     {
       id: "state-data-01",
@@ -46,14 +66,46 @@ function createRouteSegments(runtime) {
           });
           return true;
         }
-        const incomingSecurityEvents = Array.isArray(payload.securityEvents) ? payload.securityEvents : [];
-        const incomingAccessLogs = Array.isArray(payload.dataAccessLogs) ? payload.dataAccessLogs : [];
-        const incomingSecurityTrailOk = incomingSecurityEvents.length === 0 ||
-          verifyAuditTrail(incomingSecurityEvents).passed ||
-          auditTrailRowsMatch(incomingSecurityEvents, currentData.securityEvents) ||
-          auditTrailRowsMatchById(incomingSecurityEvents, currentData.securityEvents);
-        const incomingAccessTrailOk = incomingAccessLogs.length === 0 || verifyAuditTrail(incomingAccessLogs).passed;
-        const data = normalizeState(payload);
+        const versionConflict = firstVersionConflict(currentData, payload);
+        if (versionConflict) {
+          sendJson(res, 409, {
+            error: "Conflict",
+            code: "STORAGE_CONFLICT",
+            message: "数据已被其他写入更新，请刷新后重试。",
+            ...versionConflict
+          });
+          return true;
+        }
+        const incomingSecurityTrailOk = !Object.hasOwn(payload, "securityEvents") ||
+          (Array.isArray(payload.securityEvents) && auditTrailRowsMatch(payload.securityEvents, currentData.securityEvents));
+        const incomingAccessTrailOk = !Object.hasOwn(payload, "dataAccessLogs") ||
+          (Array.isArray(payload.dataAccessLogs) && auditTrailRowsMatch(payload.dataAccessLogs, currentData.dataAccessLogs));
+        if (!incomingSecurityTrailOk || !incomingAccessTrailOk) {
+          sendJson(res, 400, {
+            error: "Bad Request",
+            code: "AUDIT_TRAIL_WRITE_REJECTED",
+            message: "审计链由服务端管理，提交值必须省略或与当前值完全一致。"
+          });
+          return true;
+        }
+        const currentTrails = {
+          securityEvents: verifyAuditTrail(currentData.securityEvents),
+          dataAccessLogs: verifyAuditTrail(currentData.dataAccessLogs)
+        };
+        if (!currentTrails.securityEvents.passed || !currentTrails.dataAccessLogs.passed) {
+          sendJson(res, 409, {
+            error: "Conflict",
+            code: "AUDIT_TRAIL_INTEGRITY_FAILED",
+            message: "现有审计链完整性校验失败，写入已拒绝。",
+            trails: currentTrails
+          });
+          return true;
+        }
+        const data = normalizeState({
+          ...payload,
+          securityEvents: currentData.securityEvents,
+          dataAccessLogs: currentData.dataAccessLogs
+        });
         data.storageMeta = payload.storageMeta;
         const ownershipChanges = ownershipEntries(
           changedCollections(currentData, data).filter((collection) =>
@@ -61,7 +113,7 @@ function createRouteSegments(runtime) {
           ),
           { allowLegacy: true }
         );
-        data.dataAccessLogs = incomingAccessTrailOk ? resealAuditTrail(data.dataAccessLogs) : sealAuditTrail(data.dataAccessLogs);
+        data.dataAccessLogs = currentData.dataAccessLogs;
         const saveEvent = {
           id: randomUUID(),
           at: new Date().toLocaleString("zh-CN", { hour12: false }),
@@ -78,10 +130,7 @@ function createRouteSegments(runtime) {
             collections: ownershipChanges
           }
         };
-        const nextSecurityEvents = [saveEvent, ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])].slice(0, 120);
-        data.securityEvents = incomingSecurityTrailOk
-          ? resealAuditTrail(nextSecurityEvents)
-          : prependAuditEventPreservingTrail(saveEvent, data.securityEvents);
+        data.securityEvents = prependAuditTrailEntry(currentData.securityEvents, saveEvent);
         writeDatabase(data);
         const normalized = readDatabase();
         setLegacyWriteHeaders(res);

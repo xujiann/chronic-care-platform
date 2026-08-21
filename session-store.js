@@ -6,6 +6,14 @@ function normalizedText(value, maximumLength = 200) {
   return String(value || "").trim().slice(0, maximumLength);
 }
 
+function postgresSessionSchema(value = "health_platform") {
+  const schema = String(value || "").trim();
+  if (!/^[a-z_][a-z0-9_]{0,62}$/.test(schema)) {
+    throw new Error("PostgreSQL session schema must be a lowercase SQL identifier");
+  }
+  return schema;
+}
+
 const SENSITIVE_SESSION_USER_FIELDS = new Set([
   "password",
   "passwordHash",
@@ -292,6 +300,8 @@ class PostgresSessionStore {
     if (!options.pool && typeof options.PoolClass !== "function") throw new Error("pool or PoolClass is required");
     this.pool = options.pool || new options.PoolClass(options.poolConfig || {});
     this.ownsPool = !options.pool;
+    this.schema = postgresSessionSchema(options.schema);
+    this.table = `${this.schema}.auth_sessions`;
     this.now = options.now || (() => new Date());
     this.cache = new MemorySessionStore({ now: this.now });
     this.remoteStatus = {
@@ -323,9 +333,9 @@ class PostgresSessionStore {
     const result = await this.query(`
       SELECT column_name
       FROM information_schema.columns
-      WHERE table_schema = 'health_platform' AND table_name = 'auth_sessions'
+      WHERE table_schema = $1 AND table_name = 'auth_sessions'
       ORDER BY ordinal_position
-    `);
+    `, [this.schema]);
     const columns = new Set((result.rows || []).map((row) => String(row.column_name || "")));
     const required = ["session_id", "user_id", "username", "role", "user_payload", "issued_at", "expires_at", "revoked_at", "revoke_reason", "revoked_by", "created_at"];
     const missing = required.filter((column) => !columns.has(column));
@@ -344,7 +354,7 @@ class PostgresSessionStore {
   async create(session) {
     const normalized = normalizeSession(session);
     await this.query(`
-      INSERT INTO health_platform.auth_sessions (
+      INSERT INTO ${this.table} (
         session_id, user_id, username, role, user_payload, issued_at, expires_at, created_at
       ) VALUES ($1, $2, $3, $4, $5::jsonb, $6::timestamptz, $7::timestamptz, $8::timestamptz)
     `, [
@@ -370,7 +380,7 @@ class PostgresSessionStore {
     if (!id) return null;
     const result = await this.query(`
       SELECT session_id, user_payload, issued_at, expires_at
-      FROM health_platform.auth_sessions
+      FROM ${this.table}
       WHERE session_id = $1 AND revoked_at IS NULL AND expires_at > $2::timestamptz
     `, [id, this.now().toISOString()]);
     const row = result.rows?.[0];
@@ -393,7 +403,7 @@ class PostgresSessionStore {
     if (!id) return 0;
     const revokedAt = this.now().toISOString();
     const result = await this.query(`
-      UPDATE health_platform.auth_sessions
+      UPDATE ${this.table}
       SET revoked_at = $1::timestamptz, revoke_reason = $2, revoked_by = $3
       WHERE session_id = $4 AND revoked_at IS NULL
     `, [
@@ -411,7 +421,7 @@ class PostgresSessionStore {
     if (!ids.length) return 0;
     const revokedAt = this.now().toISOString();
     const result = await this.query(`
-      UPDATE health_platform.auth_sessions
+      UPDATE ${this.table}
       SET revoked_at = $1::timestamptz, revoke_reason = $2, revoked_by = $3
       WHERE user_id = ANY($4::text[]) AND revoked_at IS NULL AND expires_at > $1::timestamptz
     `, [
@@ -429,7 +439,7 @@ class PostgresSessionStore {
     const revokedBefore = normalizedDate(options.revokedBefore, "revokedBefore");
     const result = await this.query(`
       WITH deleted AS (
-        DELETE FROM health_platform.auth_sessions
+        DELETE FROM ${this.table}
         WHERE (revoked_at IS NOT NULL AND revoked_at <= $1::timestamptz)
            OR (revoked_at IS NULL AND expires_at <= $2::timestamptz)
         RETURNING revoked_at
@@ -459,7 +469,7 @@ class PostgresSessionStore {
         COUNT(*) FILTER (WHERE revoked_at IS NULL AND expires_at > $1::timestamptz)::integer AS active,
         COUNT(*) FILTER (WHERE revoked_at IS NOT NULL)::integer AS revoked,
         COUNT(*) FILTER (WHERE revoked_at IS NULL AND expires_at <= $1::timestamptz)::integer AS expired
-      FROM health_platform.auth_sessions
+      FROM ${this.table}
     `, [now]);
     this.remoteStatus = {
       available: true,
@@ -500,5 +510,6 @@ module.exports = {
   MemorySessionStore,
   PostgresSessionStore,
   SqliteSessionStore,
-  createSqliteSessionSchema
+  createSqliteSessionSchema,
+  postgresSessionSchema
 };

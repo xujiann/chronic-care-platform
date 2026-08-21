@@ -1,0 +1,31 @@
+[Unit]
+Description=Health platform continuous audit delivery worker
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User={{SERVICE_USER}}
+Group={{SERVICE_GROUP}}
+WorkingDirectory={{APP_DIR}}
+EnvironmentFile={{ENV_FILE}}
+ExecStart={{NODE_BIN}} {{APP_DIR}}/scripts/audit-delivery-worker.js
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+SystemCallArchitectures=native
+ReadOnlyPaths={{APP_DIR}}
+ReadWritePaths={{DATA_DIR}} {{AUDIT_CHECKPOINT_DIR}} {{AUDIT_WORM_DIRECTORY}}
+
+[Install]
+WantedBy=multi-user.target

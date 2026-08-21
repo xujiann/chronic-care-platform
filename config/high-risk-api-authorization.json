@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "high-risk-api-authorization-v1",
+  "routes": {
+    "PUT /api/state": { "owner": "T02", "roles": ["commission"], "dataScope": "platform", "purpose": "replace-platform-state-with-server-managed-audit" },
+    "GET /api/audit/verify": { "owner": "T01", "roles": ["commission"], "dataScope": "platform", "purpose": "verify-audit-integrity" },
+    "GET /api/audit/export": { "owner": "T01", "roles": ["commission"], "dataScope": "platform", "purpose": "export-minimized-audit-evidence" },
+    "GET /api/public-health/highlights": { "owner": "T03", "roles": ["commission"], "dataScope": "platform", "purpose": "read-public-health-command-overview" },
+    "POST /api/public-health/highlights/signals": { "owner": "T03", "roles": ["commission"], "dataScope": "institution", "purpose": "ingest-public-health-signal" },
+    "POST /api/public-health/highlights/alerts/:id/actions": { "owner": "T03", "roles": ["commission"], "dataScope": "platform", "purpose": "dispatch-public-health-alert" },
+    "POST /api/public-health/highlights/command-tasks/:id/actions": { "owner": "T03", "roles": ["commission"], "dataScope": "institution", "purpose": "operate-public-health-command-task" },
+    "POST /api/public-health/highlights/ai-reviews/:id/actions": { "owner": "T03", "roles": ["commission"], "dataScope": "platform", "purpose": "human-review-public-health-ai-output" },
+    "POST /api/public-health/highlights/evidence/:id/actions": { "owner": "T03", "roles": ["commission"], "dataScope": "platform", "purpose": "verify-public-health-evidence" }
+  }
+}

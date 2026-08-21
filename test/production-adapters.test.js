@@ -165,10 +165,11 @@ test("SMS adapter records provider acceptance without exposing credentials", asy
 });
 
 test("SMS adapter rejects negative provider receipts", async () => {
-  await assert.rejects(() => sendSmsVerificationCode({ phone: "13800000000", code: "654321" }, {
+  await assert.rejects(() => sendSmsVerificationCode({ phone: "13800000000", code: "654321", clientRequestId: "phone-code-negative-001" }, {
     env: {
       NODE_ENV: "production",
       SMS_GATEWAY_URL: "https://sms.example.gov.cn/send",
+      SMS_GATEWAY_TOKEN: "provider-token",
       SMS_TEMPLATE_ID: "resident-login-code"
     },
     fetchImpl: async () => jsonResponse({ providerMessageId: "provider-sms-rejected", status: "rejected" })
@@ -324,6 +325,7 @@ test("adapter center separates configured code from site joint-test readiness", 
     IDENTITY_DIRECTORY_URL: "https://identity.example.gov.cn/scim/v2/Users",
     IDENTITY_DIRECTORY_TOKEN: "directory-secret",
     SMS_GATEWAY_URL: "https://sms.example.gov.cn/send",
+    SMS_GATEWAY_TOKEN: "provider-token",
     SMS_TEMPLATE_ID: "resident-login-code",
     SMS_DELIVERY_CALLBACK_SECRET: "sms-callback-secret-with-at-least-32-characters"
   });

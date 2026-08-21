@@ -53,6 +53,29 @@ test("production startup rejects missing, weak and placeholder session secrets",
       NODE_ENV: "production",
       SESSION_SECRET: "production-session-signing-key-with-adequate-entropy",
       SESSION_STORE: "sqlite",
+      SESSION_TOPOLOGY: "single-host",
+      AUTH_SECURITY_STATE_STORE: "memory"
+    }),
+    (error) => error.code === "PRODUCTION_SESSION_STORE_INVALID" && /AUTH_SECURITY_STATE_STORE/.test(error.message)
+  );
+  assert.throws(
+    () => assertProductionRuntimeSecurity({
+      NODE_ENV: "production",
+      SESSION_SECRET: "production-session-signing-key-with-adequate-entropy",
+      SESSION_STORE: "postgres",
+      SESSION_TOPOLOGY: "multi-host",
+      INSTANCE_COUNT: "2",
+      AUTH_SECURITY_STATE_STORE: "sqlite",
+      DATABASE_URL: "postgres://health:secret@postgres.internal:5432/health",
+      POSTGRES_SSL_MODE: "verify-full"
+    }),
+    (error) => error.code === "PRODUCTION_SESSION_STORE_INVALID" && /multi-instance/.test(error.message)
+  );
+  assert.throws(
+    () => assertProductionRuntimeSecurity({
+      NODE_ENV: "production",
+      SESSION_SECRET: "production-session-signing-key-with-adequate-entropy",
+      SESSION_STORE: "sqlite",
       SESSION_TOPOLOGY: "single-host"
     }),
     (error) => error.code === "PRODUCTION_SESSION_RETENTION_INVALID" && /SESSION_EXPIRED_RETENTION_DAYS/.test(error.message)

@@ -1,9 +1,10 @@
 # CURRENT ARCHITECTURE — 主线现状地图
 
-> 实施分支 AS-IS 快照：基于 `main@a15d10dc67a7fd89540d3073ece34b5d8c7b942e`
+> 实施分支 AS-IS 快照：历史采样基于 `main@a15d10dc67a7fd89540d3073ece34b5d8c7b942e`；
+> 当前对账基线为 `main@21d8f3c8f659c70e3d4980c3a67c39ca72d1712a`
 > 采集日期：2026-08-20
-> 性质：AS-IS，只描述已存在实现，不表达目标状态或实施授权。ARC-002 条目另记录基于
-> `origin/main@fc42833e95156571fb197b16a959708db715f057` 的本地实施候选，尚未合入主线。
+> 性质：AS-IS，只描述已存在实现，不表达目标状态或实施授权。#131 的 P0/P1 增量仍是
+> 待重新验证的 PR 候选；ARC-002 已通过 PR #132 合入当前主线。
 
 ## 1. 系统轮廓
 
@@ -76,14 +77,16 @@ flowchart TB
 1. 静态服务器与 Pages 现按 `config/static-publication.json` 的 44 个入口递归收集显式浏览器资源；未知路径统一 404。
 2. 浏览器和 Service Worker 已迁移到合成的 `data/public-demo.json`；`data/db.json` 不进入静态制品。
 3. `server.js` 仍约 28.2k 行；SQLite migration 已抽离约 550 行，但路由拆分没有同步拆完组合根和领域实现。
-4. ARC-002 本地实施候选已删除 `pilot-cutover-alert-runtime` 对 `server.js` 的反向
+4. ARC-002 已删除 `pilot-cutover-alert-runtime` 对 `server.js` 的反向
    `require`：运行时只消费显式 `controlProvider`，worker CLI 在组合边界懒注入现有
    `pilotCutoverControlPlaneReadiness`。provider 缺失、返回值无效或抛错均投影为受限
-   `controlErrorCode` 和 `NO-GO`，不泄露错误正文；当前静态图不再形成该环，本地只读 review
-   无 P0/P1，待 PR 和 main CI 后关闭主线技术债。
+   `controlErrorCode` 和 `NO-GO`，不泄露错误正文；当前静态图不再形成该环。PR #132、
+   required checks、合并后 main CI 与 Pages 均已通过，主线 ARC-002 已关闭。
 5. SQLite v1–v14 已迁入 `src/platform/storage/sqlite-migrations.js` 并冻结内容指纹；`STORAGE_SCHEMA_VERSION`、部署检查和测试统一从注册表 head v14 派生。历史 ledger 的 v1–v14 checksum 保持兼容，v15 起写入内容 SHA-256。
 6. TEST-001 候选已建立统一的 `build`、`lint`、`typecheck`、`test:unit`、`test:integration`、`test:smoke` 入口；build 复用静态发布 allowlist 并默认输出到仓库外，unit/integration 完整分区根测试，smoke 独立启动临时 JSON 运行时。lint 仍有 3 个文件的精确遗留规则例外，typecheck 当前只覆盖 6 个治理/安全边界文件。
-7. 审计验证在组合根与留存脚本重复实现；当前 `passed` 不包含链接完整性，普通内容哈希漂移也可能通过，且部分 API 在验证前重封访问日志。
+7. 审计验证已收敛到 `src/identity-security/audit-chain.js` 的 v2 严格端口；内容、链接、结构和重复 ID 任一异常均失败，验证 API/合规报告不再读取时重封。全量状态写入中的审计数组由服务端管理。
+8. 机器 API 授权矩阵扫描全部模块化路由源码的 `requireApiRole` 声明，并对九条高风险接口锁定 owner、角色、范围和用途；CI 对声明数量和高风险唯一性 fail closed。
+9. P1 生产适配器增量保持现有 owner：T01 的 `production-adapters.js` 承担 JWKS/JWT 与 SMS 协议；OTP、发送/登录限流和失败锁定由共享 `auth-security-state-store` 承载，单主机 SQLite 复用 `state_collections`、生产多实例使用组合根长期 PostgreSQL pool；T00 的 PostgreSQL 组合保持 shadow/rehearsal 且 `productionPrimary=false`；连续审计投递复用既有 cutover alert lifecycle 与 operational signal。
 
 ## 6. T06 五子域治理切片
 

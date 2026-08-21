@@ -3,7 +3,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const { createHash, randomUUID } = require("node:crypto");
-const { postgresPoolConfig } = require("../../postgres-runtime-sync");
+const { postgresPoolConfig, postgresSchemaIdentifier } = require("../../postgres-runtime-sync");
 const { SessionSecurityAuditError } = require("./session-security-audit");
 
 const MIGRATION_FILE = path.join(__dirname, "..", "..", "deploy", "identity-security-audit-postgres.sql");
@@ -376,6 +376,7 @@ function createPostgresSessionSecurityAuditRepository(options = {}) {
   const env = options.env || process.env;
   const config = options.config || buildPostgresSessionSecurityAuditConfig(env);
   const streamId = safeIdentifier(options.streamId || DEFAULT_STREAM_ID, "streamId");
+  const schema = postgresSchemaIdentifier(options.schema);
   const idFactory = options.randomUUID || randomUUID;
   const now = options.now || (() => new Date());
   const testBypass = options.testBypassEvidenceGate === true;
@@ -424,14 +425,14 @@ function createPostgresSessionSecurityAuditRepository(options = {}) {
       [streamId]
     );
     await client.query(`
-      INSERT INTO health_platform.identity_security_audit_streams (
+      INSERT INTO ${schema}.identity_security_audit_streams (
         stream_id, stream_version, created_at, updated_at
       ) VALUES ($1, 0, $2, $2)
       ON CONFLICT (stream_id) DO NOTHING
     `, [streamId, occurredAt]);
     const result = await client.query(`
       SELECT stream_id, stream_version, created_at, updated_at
-      FROM health_platform.identity_security_audit_streams
+      FROM ${schema}.identity_security_audit_streams
       WHERE stream_id = $1
       FOR UPDATE
     `, [streamId]);
@@ -452,7 +453,7 @@ function createPostgresSessionSecurityAuditRepository(options = {}) {
     const receipt = await client.query(`
       SELECT command_key_sha256, intent_sha256, stream_version,
              result_snapshot, result_sha256, committed_at
-      FROM health_platform.identity_security_audit_commands
+      FROM ${schema}.identity_security_audit_commands
       WHERE stream_id = $1 AND command_key_sha256 = $2
     `, [streamId, command.commandKeyHash]);
     if (receipt.rowCount !== 1) return null;
@@ -469,7 +470,7 @@ function createPostgresSessionSecurityAuditRepository(options = {}) {
              actor_ref_sha256, role, action, target_ref_sha256, result,
              detail_sha256, request_method, request_path, client_ref_sha256,
              session_ref_sha256, command_key_sha256, intent_sha256, event_sha256
-      FROM health_platform.identity_security_audit_events
+      FROM ${schema}.identity_security_audit_events
       WHERE stream_id = $1 AND command_key_sha256 = $2
     `, [streamId, command.commandKeyHash]);
     if (event.rowCount !== 1) {
@@ -489,7 +490,7 @@ function createPostgresSessionSecurityAuditRepository(options = {}) {
 
   async function updateStreamVersion(client, expectedVersion, nextVersion, occurredAt) {
     const updated = await client.query(`
-      UPDATE health_platform.identity_security_audit_streams
+      UPDATE ${schema}.identity_security_audit_streams
       SET stream_version = $2, updated_at = $3
       WHERE stream_id = $1 AND stream_version = $4
       RETURNING stream_id
@@ -513,7 +514,7 @@ function createPostgresSessionSecurityAuditRepository(options = {}) {
     };
     const eventDigest = sha256(stableStringify(eventRecord));
     await client.query(`
-      INSERT INTO health_platform.identity_security_audit_commands (
+      INSERT INTO ${schema}.identity_security_audit_commands (
         stream_id, command_key_sha256, intent_sha256, stream_version,
         result_snapshot, result_sha256, committed_at
       ) VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7)
@@ -527,7 +528,7 @@ function createPostgresSessionSecurityAuditRepository(options = {}) {
       command.event.occurredAt
     ]);
     await client.query(`
-      INSERT INTO health_platform.identity_security_audit_events (
+      INSERT INTO ${schema}.identity_security_audit_events (
         event_id, stream_id, stream_version, command_key_sha256, intent_sha256,
         occurred_at, correlation_id, actor_ref_sha256, role, action,
         target_ref_sha256, result, detail_sha256, request_method, request_path,
@@ -588,7 +589,7 @@ function createPostgresSessionSecurityAuditRepository(options = {}) {
       const selected = await client.query(`
         SELECT control_id, control_version, status, evidence, next_action,
                last_action, updated_by_ref_sha256, created_at, updated_at
-        FROM health_platform.identity_security_controls
+        FROM ${schema}.identity_security_controls
         WHERE control_id = $1
         FOR UPDATE
       `, [command.controlId]);
@@ -602,7 +603,7 @@ function createPostgresSessionSecurityAuditRepository(options = {}) {
       const current = selected.rows[0];
       const expectedControlVersion = Number(current.control_version);
       const updated = await client.query(`
-        UPDATE health_platform.identity_security_controls
+        UPDATE ${schema}.identity_security_controls
         SET control_version = $2, status = $3, evidence = $4,
             next_action = $5, last_action = $6,
             updated_by_ref_sha256 = $7, updated_at = $8
@@ -644,10 +645,10 @@ function createPostgresSessionSecurityAuditRepository(options = {}) {
     return withSerializableTransaction(pool(), async (client) => {
       const tables = await client.query(`
         SELECT
-          to_regclass('health_platform.identity_security_audit_streams') AS streams,
-          to_regclass('health_platform.identity_security_controls') AS controls,
-          to_regclass('health_platform.identity_security_audit_commands') AS commands,
-          to_regclass('health_platform.identity_security_audit_events') AS events
+          to_regclass('${schema}.identity_security_audit_streams') AS streams,
+          to_regclass('${schema}.identity_security_controls') AS controls,
+          to_regclass('${schema}.identity_security_audit_commands') AS commands,
+          to_regclass('${schema}.identity_security_audit_events') AS events
       `);
       const row = tables.rows[0] || {};
       const checks = {
