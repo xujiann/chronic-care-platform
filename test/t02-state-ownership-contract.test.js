@@ -164,3 +164,71 @@ test("collection diff ignores storage metadata and remains deterministic", () =>
     ["residents", "securityEvents"]
   );
 });
+
+test("collection diff ignores object property insertion order", () => {
+  assert.deepEqual(
+    changedCollections(
+      {
+        regionalDataSharingScope: {
+          id: "regional-data-sharing",
+          statusNorms: { ready: "可共享", blocked: "暂缓共享" }
+        }
+      },
+      {
+        regionalDataSharingScope: {
+          statusNorms: { blocked: "暂缓共享", ready: "可共享" },
+          id: "regional-data-sharing"
+        }
+      }
+    ),
+    []
+  );
+});
+
+test("legacy full-state conflicts prioritize registered collection owners", async () => {
+  const current = {
+    residents: [{ id: "r1", name: "current" }],
+    regionalDataSharingScope: { status: "current" },
+    securityEvents: [],
+    dataAccessLogs: [],
+    storageMeta: {
+      collectionVersions: {
+        residents: 2,
+        regionalDataSharingScope: 2
+      }
+    }
+  };
+  const payload = {
+    ...structuredClone(current),
+    residents: [{ id: "r1", name: "stale" }],
+    regionalDataSharingScope: { status: "stale" },
+    storageMeta: {
+      collectionVersions: {
+        residents: 1,
+        regionalDataSharingScope: 1
+      }
+    }
+  };
+  let responseStatus = null;
+  let responseBody = null;
+  const runtime = {
+    collectJson: async () => structuredClone(payload),
+    readDatabase: () => structuredClone(current),
+    requireApiRole: () => ({ name: "commissioner", role: "commission" }),
+    sendJson: (_res, status, body) => {
+      responseStatus = status;
+      responseBody = body;
+    }
+  };
+  const segment = stateDataRoutes.createRouteSegments(runtime)[1];
+
+  await segment.handle(
+    { method: "PUT", headers: {} },
+    responseDouble(),
+    new URL("http://local/api/state")
+  );
+
+  assert.equal(responseStatus, 409);
+  assert.equal(responseBody.code, "STORAGE_CONFLICT");
+  assert.equal(responseBody.collection, "residents");
+});

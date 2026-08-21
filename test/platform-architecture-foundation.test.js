@@ -1,6 +1,8 @@
 "use strict";
 
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const path = require("node:path");
 const test = require("node:test");
 const ownershipManifest = require("../config/domain-data-ownership.json");
 const { ContractRegistry } = require("../src/platform/contracts/contract-registry");
@@ -24,6 +26,18 @@ const SYSTEM_COLLECTION_POLICIES = Object.freeze({
   dataAccessLogs: "platform-governance",
   platformProcessAudit: "platform-governance",
   securityEvents: "platform-governance"
+});
+
+test("pilot cutover alert runtime never imports the composition root", () => {
+  const source = fs.readFileSync(path.join(
+    __dirname,
+    "..",
+    "src",
+    "platform",
+    "cutover",
+    "pilot-cutover-alert-runtime.js"
+  ), "utf8");
+  assert.doesNotMatch(source, /require\s*\(\s*["'][^"']*server(?:\.js)?["']\s*\)/);
 });
 
 test("business collections have one domain owner and production has no fallback writes", () => {

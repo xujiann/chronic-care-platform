@@ -26,6 +26,7 @@
 | [临床专科五个可治理子域](./2026-08-18-clinical-five-governed-subdomains.md) | Accepted | 急救、血液、影像、体检、质量安全的开发边界 |
 | [静态内容安全边界](./2026-08-18-static-content-security-boundary.md) | Accepted | 已合入 `main@6c18221`；发布 allowlist、数据和缓存隔离 |
 | [审计链失败语义与兼容迁移](./2026-08-19-audit-chain-failure-semantics.md) | Accepted | v2 严格验证、服务端管理审计字段、失败传播和受控旧链迁移 |
+| [切换告警运行时采用显式控制面 Provider 注入](./2026-08-20-pilot-cutover-alert-provider-injection.md) | Accepted | 已合入 `main@21d8f3c`（PR #132）；显式 provider、默认拒绝投影与反向依赖守卫 |
 | [生产身份与短信适配器信任边界](./2026-08-21-production-identity-sms-trust-boundary.md) | Accepted | JWKS/JWT、脱敏 transport、SMS 凭据/幂等/重试/健康及共享 OTP/锁定状态 |
 | [PostgreSQL shadow 合同强化](./2026-08-21-postgresql-shadow-contract-hardening.md) | Accepted | schema 隔离、健康探针、batch/digest/version/tombstone 冲突 |
 | [连续审计投递与耐久 checkpoint](./2026-08-21-continuous-audit-delivery.md) | Accepted | SIEM/WORM、checkpoint v2、既有告警生命周期与 systemd |

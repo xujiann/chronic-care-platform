@@ -1,6 +1,8 @@
 # 模块 A/B/C/D 分级（实施分支）
 
-> 基线：`main@a15d10d`，更新于 2026-08-20。本表覆盖可分配 owner 的架构模块；文件级清单后续由机器治理生成。标签不是立即重构授权。
+> 历史采样基线：`main@a15d10d`，当前对账基线：`main@21d8f3c`，更新于 2026-08-21；
+> ARC-002 已通过 PR #132 合入主线。本表覆盖可分配 owner 的架构模块；文件级清单
+> 后续由机器治理生成。标签不是立即重构授权。
 
 ## 判定规则
 
@@ -23,7 +25,7 @@
 | runtime contexts | T00/各域 | C | 最宽 160 项依赖 | 按子域端口缩窄 |
 | technical evidence | T00 | B | 稳定共享但入度 22 | 固化版本化契约 |
 | platform data/storage | T00/T02 | B | 契约、CAS、outbox 测试较强 | 修复版本治理后逐步 KEEP |
-| alert cutover runtime | T00 | C | 反向 require server 形成环 | 始终注入 provider |
+| alert cutover runtime | T00 | B | 已改为显式 provider 端口，并有缺失/无效/异常失败测试和禁止反向依赖的架构测试 | 保持接口与 NO-GO 语义；worker 加载大组合根的残余随 ARC-001 渐进治理 |
 | CI/readiness pipeline | T00 | B | 已按风险域拆分、建立六个标准入口并保留 fail-closed 聚合门禁 | 扩大静态检查基线，继续治理测试性能、供应链固定与 worker 观测 |
 
 ## 领域模块

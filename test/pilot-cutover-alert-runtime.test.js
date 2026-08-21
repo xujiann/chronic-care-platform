@@ -11,6 +11,7 @@ const {
   runPilotCutoverAlertDeliveryCycle
 } = require("../src/platform/cutover/pilot-cutover-alert-runtime");
 const {
+  createDefaultRuntime,
   parseArgs,
   run
 } = require("../scripts/platform-cutover-alert-worker");
@@ -57,6 +58,88 @@ function blockedControl() {
     productionReady: false
   };
 }
+
+test("worker default composition supplies a lazy control provider", () => {
+  const serverPath = require.resolve("../server");
+  delete require.cache[serverPath];
+  const runtime = createDefaultRuntime();
+  assert.equal(Object.isFrozen(runtime), true);
+  assert.equal(typeof runtime.controlProvider, "function");
+  assert.equal(require.cache[serverPath], undefined);
+});
+
+test("delivery cycle requires an injected provider without loading the composition root", async () => {
+  const fixture = runtimeFixture();
+  const serverPath = require.resolve("../server");
+  delete require.cache[serverPath];
+  try {
+    const report = await runPilotCutoverAlertDeliveryCycle({
+      env: fixture.env,
+      now: NOW,
+      dispatcher: async () => ({
+        receiptId: "provider-required-receipt",
+        status: "accepted",
+        acceptedAt: NOW
+      })
+    });
+    assert.equal(report.schema, "pilot-cutover-alert-worker-cycle-v1");
+    assert.equal(report.controlDecision, "NO-GO");
+    assert.equal(report.controlErrorCode, "PILOT_CUTOVER_CONTROL_PROVIDER_REQUIRED");
+    assert.equal(report.productionReady, false);
+    assert.equal(require.cache[serverPath], undefined);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("provider failures expose only a bounded code and remain non-authorizing", async () => {
+  const fixture = runtimeFixture();
+  try {
+    const report = await runPilotCutoverAlertDeliveryCycle({
+      env: fixture.env,
+      now: NOW,
+      controlProvider: async () => {
+        throw Object.assign(new Error("secret provider response must stay private"), {
+          code: "UPSTREAM_CONTROL_PROVIDER_BLOCKED"
+        });
+      },
+      dispatcher: async () => ({
+        receiptId: "provider-failure-receipt",
+        status: "accepted",
+        acceptedAt: NOW
+      })
+    });
+    assert.equal(report.controlDecision, "NO-GO");
+    assert.equal(report.controlErrorCode, "UPSTREAM_CONTROL_PROVIDER_BLOCKED");
+    assert.equal(report.cutoverExecutionAuthorized, false);
+    assert.equal(report.productionReady, false);
+    assert.doesNotMatch(JSON.stringify(report), /secret provider response/i);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("invalid provider projections fail closed before candidate derivation", async () => {
+  const fixture = runtimeFixture();
+  try {
+    const report = await runPilotCutoverAlertDeliveryCycle({
+      env: fixture.env,
+      now: NOW,
+      controlProvider: async () => null,
+      dispatcher: async () => ({
+        receiptId: "invalid-provider-receipt",
+        status: "accepted",
+        acceptedAt: NOW
+      })
+    });
+    assert.equal(report.controlDecision, "NO-GO");
+    assert.equal(report.controlErrorCode, "PILOT_CUTOVER_CONTROL_PROVIDER_INVALID");
+    assert.equal(report.cutoverExecutionAuthorized, false);
+    assert.equal(report.productionReady, false);
+  } finally {
+    fixture.cleanup();
+  }
+});
 
 test("worker delivers metadata candidates outside request handling and remains non-authorizing", async () => {
   const fixture = runtimeFixture();
@@ -155,17 +238,48 @@ test("worker CLI is fail-closed when adapter configuration is absent", async () 
     command: "status",
     options: { "require-operational": true }
   });
+  let providerCalls = 0;
   const result = await run({
     command: "run-once",
     options: {}
   }, {
     env: {},
     now: NOW,
-    controlProvider: async () => blockedControl()
+    controlProvider: async () => {
+      providerCalls += 1;
+      return blockedControl();
+    }
   });
   assert.equal(result.exitCode, 2);
   assert.equal(result.report.status, "blocked");
   assert.equal(result.report.productionReady, false);
+  assert.equal(providerCalls, 0);
+});
+
+test("worker CLI default provider composes the existing server readiness", async () => {
+  const fixture = runtimeFixture();
+  try {
+    const result = await run({
+      command: "run-once",
+      options: {}
+    }, {
+      ...createDefaultRuntime(),
+      env: fixture.env,
+      now: NOW,
+      dispatcher: async () => ({
+        receiptId: "default-provider-receipt",
+        status: "accepted",
+        acceptedAt: NOW
+      })
+    });
+    assert.equal(result.exitCode, 0);
+    assert.equal(result.report.schema, "pilot-cutover-alert-worker-cycle-v1");
+    assert.equal(result.report.controlDecision, "NO-GO");
+    assert.equal(result.report.cutoverExecutionAuthorized, false);
+    assert.equal(result.report.productionReady, false);
+  } finally {
+    fixture.cleanup();
+  }
 });
 
 test("deployment runs a hardened independent worker on a timer", () => {

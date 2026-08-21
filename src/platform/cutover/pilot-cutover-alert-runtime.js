@@ -154,6 +154,12 @@ function blockedControl(now, error) {
   });
 }
 
+function controlProviderError(code) {
+  return Object.assign(new Error("pilot cutover control provider is unavailable"), {
+    code
+  });
+}
+
 async function runPilotCutoverAlertDeliveryCycle(options = {}) {
   const env = options.env || process.env;
   const now = options.now || new Date().toISOString();
@@ -188,9 +194,14 @@ async function runPilotCutoverAlertDeliveryCycle(options = {}) {
   }
   let control;
   try {
-    const provider = options.controlProvider
-      || (() => require("../../../server").pilotCutoverControlPlaneReadiness());
+    const provider = options.controlProvider;
+    if (typeof provider !== "function") {
+      throw controlProviderError("PILOT_CUTOVER_CONTROL_PROVIDER_REQUIRED");
+    }
     control = await provider();
+    if (!control || typeof control !== "object" || Array.isArray(control)) {
+      throw controlProviderError("PILOT_CUTOVER_CONTROL_PROVIDER_INVALID");
+    }
   } catch (error) {
     control = blockedControl(now, error);
   }
@@ -238,6 +249,7 @@ async function runPilotCutoverAlertDeliveryCycle(options = {}) {
     workerEnabled: enabled,
     results: Object.freeze(results),
     controlDecision: control.decision === "GO-CANDIDATE" ? "GO-CANDIDATE" : "NO-GO",
+    controlErrorCode: clean(control.error?.code, 120),
     failClosed: failed > 0,
     monitoringAcceptanceProven: false,
     cutoverExecutionAuthorized: false,

@@ -16,12 +16,12 @@
 |---:|---|---|---|
 | 0 | T00 治理基线迁移 | 已合入 `main@58e05e5` | 按每日循环持续维护 |
 | 1 | 静态内容 allowlist 与快照隔离 | 已合入 `main@6c18221`；PR/main CI 与 Pages 验证通过 | 持续执行清单审查、负向测试与缓存版本治理 |
-| 2 | 审计链失败语义 | Accepted ADR 已按用户明确批准实施 / P0 | 持续运行严格验证、全量写入拒绝和外部历史链 preflight |
+| 2 | 审计链失败语义 | Accepted ADR；#131 候选已实施，待最新 PR/main CI / P0 | 持续运行严格验证、全量写入拒绝和外部历史链 preflight；真实历史链迁移继续 NO-GO |
 | 3 | Schema v14/v11 一致与 migration 指纹 | 已合入 `main@026762f`（PR #129）/ P1 | 后续 v15+ 按冻结规则追加，并保持空库/升级/重跑/失败回滚门禁 |
-| 4 | 标准 build/lint/typecheck/unit/integration/smoke 入口 | 已合入 `main@fc42833`（PR #130）/ P1 | 保持 test:all 语义；逐步扩大 lint/typecheck 基线并治理测试时长 |
-| 5 | 移除组合根循环依赖 | 候选 / P1 | 特征测试；provider 注入方案；架构测试 |
-| 6 | 生产身份/SMS、PostgreSQL shadow、连续审计投递 | Accepted ADR 已按主线端口完成 P1 代码增量，待 PR/main CI | 真实 provider/PG/SIEM/WORM 联调与现场证据继续 NO-GO |
-| 6 | OTP/锁定共享状态 | 已纳入生产身份 ADR 并完成 P1 代码增量，待 PR/main CI | 保持 SQLite 单主机、PostgreSQL 多实例及原子消费/限流/锁定契约；真实 PG 由 CI 和现场重跑 |
+| 4 | 标准 build/lint/typecheck/unit/integration/smoke 入口 | 已合入 `main@fc42833`（PR #130）；PR/main CI 与 Pages 验证通过 / P1 | 保持 test:all 语义；逐步扩大 lint/typecheck 基线并治理测试时长 |
+| 5 | 移除组合根循环依赖 | 已合入 `main@21d8f3c`（PR #132）；PR/main CI 与 Pages 验证通过 / P1 | ARC-002 已关闭；后续组合根瘦身归 ARC-001，不扩大本切片 |
+| 6 | 生产身份/SMS、PostgreSQL shadow、连续审计投递 | Accepted ADR；#131 候选已完成 P1 代码增量，待最新 PR/main CI | 真实 provider/PG/SIEM/WORM 联调与现场证据继续 NO-GO |
+| 6A | OTP/锁定共享状态 | 已纳入生产身份 ADR；#131 候选已完成 P1 代码增量，待最新 PR/main CI | 保持 SQLite 单主机、PostgreSQL 多实例及原子消费/限流/锁定契约；真实 PG 由 CI 和现场重跑 |
 | 7 | 运行时上下文瘦身 | 候选 / P1 | 按领域子端口，逐块迁移，不重写 server |
 | 7A | 临床五个可治理子域 | 治理切片完成，急救/血液/影像/体检首用例已迁移 / P1 | Accepted ADR；保持协议兼容，按子域逐用例迁移 |
 | 8 | JSON 169 个遗留集合治理 | 候选 / P1 | owner 分类、使用证据、晋升/归档/迁移批次 |

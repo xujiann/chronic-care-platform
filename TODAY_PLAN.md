@@ -412,3 +412,134 @@ PR #125 的综合 `test` 在两个 attempt 中均达到 15 分钟硬上限。两
 - 本地默认系统 Chrome 复现既有 TEST-005（35/36，同一慢服务恢复用例）；CI 等价的
   已安装 Chromium 模式 36/36 通过，未修改小程序业务代码或浏览器配置。
 - 回滚：回退本切片即可恢复旧脚本与 workflow；没有数据迁移、运行时状态或制品恢复步骤。
+
+---
+
+## 2026-08-20 T00 ARC-002 组合根循环依赖决策与实施 PLAN
+
+- 分支：`process/t00-arc002-provider-decoupling-20260820`
+- 基线：`origin/main@fc42833e95156571fb197b16a959708db715f057`
+- Owner：T00
+- 状态：方案 2 已由 T00 批准；本地最小实现、全量门禁与只读 review 完成，待发布审批
+- 决策材料：
+  `docs/adr/2026-08-20-pilot-cutover-alert-provider-injection.md`
+
+### 目标与依据
+
+移除以下唯一已确认的 CommonJS 循环，并保持平台仍为模块化单体：
+
+```text
+server.js
+  -> src/platform/cutover/pilot-cutover-alert-runtime.js
+  -> server.js.pilotCutoverControlPlaneReadiness
+```
+
+地图、模块分级和技术债均把 alert cutover runtime 标为 C/ARC-002。只读调用方扫描确认，
+delivery cycle 的仓库内生产入口只有 `scripts/platform-cutover-alert-worker.js`；其主程序
+默认不提供 `controlProvider`，因此 adapter 已就绪时会触发运行时模块内的反向 require。
+
+### 推荐方向
+
+采用 Accepted ADR 方案 2：
+
+- alert runtime 只消费显式 `controlProvider`，不再寻找或加载组合根；
+- worker CLI 在组合边界注入现有 `pilotCutoverControlPlaneReadiness`；
+- provider 缺失、类型错误或执行失败时，继续转成稳定、脱敏、默认 NO-GO 的控制投影；
+- 不抽取或重写 `server.js` 中的 trust、ledger、readiness 实现。
+
+### 范围
+
+获批后的预期运行时变更仅限：
+
+- `src/platform/cutover/pilot-cutover-alert-runtime.js`：显式 provider 端口与失败分类；
+- `scripts/platform-cutover-alert-worker.js`：默认 CLI 组合和 provider 注入；
+- `test/pilot-cutover-alert-runtime.test.js`：特征、失败和 CLI 组合回归；
+- `test/platform-architecture-foundation.test.js`：禁止平台运行时反向导入组合根；
+- 与事实变化直接相关的依赖地图、模块分类、技术债、ADR 状态和交付记录。
+
+预计不需要修改 `server.js`：现有公开 readiness 导出已经满足组合注入。若实施时发现必须
+改变该导出、公共运行时上下文或路由协议，应停止并回到审批点，不扩大当前授权。
+
+### 非目标
+
+- 不拆分微服务，不整体瘦身或重写 `server.js`。
+- 不改变 HTTP method/path、响应 schema、角色、权限、数据范围或审计语义。
+- 不修改数据库、SQLite/PostgreSQL、schema、migration、`data/db.json` 或告警 journal 格式。
+- 不增加依赖，不修改 CI required checks、systemd service/timer 或部署拓扑。
+- 不处理 ARC-001、ARC-003、OTP、前端 CSP 或审计链等邻近债务。
+
+### 分阶段实施
+
+1. **特征测试保护。** 锁定 provider 调用次数、adapter 未就绪时不调用 provider、provider
+   抛错后的受限投影、三个告警候选、worker CLI 报告 schema/退出码及敏感字段不泄露。
+2. **架构测试先红。** 增加精确测试，证明 alert runtime 当前仍包含/触发对 `server.js` 的
+   反向依赖，并要求 worker 默认组合显式提供 provider。
+3. **最小实现。** 删除 runtime fallback require；在 worker 的 CLI 组合边界注入现有
+   readiness 函数；不复制控制面逻辑。
+4. **兼容复验。** 验证 API readiness、standard smoke、worker status/run-once、部署模板、
+   平台迭代清单和默认 NO-GO 行为无漂移。
+5. **事实收口。** 仅在实现与全部门禁通过后把 ADR 改为 Accepted/Implemented，并更新
+   AS-IS 地图、模块标签和 ARC-002 状态；Proposed 阶段不得预先宣称循环已关闭。
+
+### 风险与控制
+
+- 未注入 provider 会导致 worker 无法读取真实控制面：用稳定错误码、CLI 默认组合测试和
+  NO-GO 断言控制。
+- 直接调用者可能依赖旧的隐式 fallback：保持导出和报告 schema，仓库调用方全部迁移，
+  并在 review 中复查动态加载及外部使用说明。
+- provider 原始错误可能含内部信息：对外只保留归一化 code，不输出错误正文或 provider
+  payload。
+- worker 仍会加载大组合根：这是已知残余，不在本切片扩大为 server 抽取。
+
+### 迁移与回滚
+
+- 无数据、schema、journal 或部署迁移；仓库内 worker 在同一实现提交中完成调用迁移。
+- 回滚为整体回退未来的单一实现切片，告警 journal 原样保留，不执行数据恢复。
+- 回滚会重新引入 ARC-002，只能作为临时应急措施；必须恢复技术债状态并重新排期。
+
+### 测试计划
+
+- 测试先行：`node --test test/pilot-cutover-alert-runtime.test.js`；
+- API/启动：`node --test test/platform-production-adapter-runtime-api.test.js test/standard-smoke.test.js`；
+- 组合与架构：`npm run architecture:test`、`npm run process:verify -- --base=origin/main`、
+  `npm run process:test`、`npm run platform:iterations:test`；
+- 路由与语法：`npm run routes:check`、`npm run routes:test`、`npm run check`；
+- 标准门禁：`npm run build`、`npm run lint`、`npm run typecheck`、`npm run test:unit`、
+  `npm run test:integration`、`npm run test:smoke`、`npm run test:all`；
+- 浏览器 E2E 不因本后端组合变更自动豁免；完整执行与否在实现 review 时依据变更风险记录，
+  PR/main required checks 必须全部通过。
+
+### 完成条件
+
+- `src/platform/cutover/pilot-cutover-alert-runtime.js` 对 `server.js` 的静态和动态依赖均为零；
+- worker 主程序显式装配 provider，provider 缺失/失败保持可观测、脱敏和 NO-GO；
+- 公开 API、worker 命令、报告 schema、journal、退出码原则和生产安全边界无意外变化；
+- 专项、架构、流程、平台迭代、标准门禁及 PR/main CI 通过；
+- `/review` 无未处理 P0/P1，且地图和 ADR 只在事实落地后同步为完成。
+
+T00 已批准方案 2、provider 缺失时的脱敏 NO-GO 语义及上述兼容边界。实现已遵循测试
+先行和最小修改完成；尚未提交、推送或创建 PR。
+
+### 本阶段验收结果
+
+- TEST-001 已通过 PR #130 squash 合入 `main@fc42833e95156571fb197b16a959708db715f057`；
+  PR 8 项检查、合并后 [main CI](https://github.com/xujiann/chronic-care-platform/actions/runs/32337594730)
+  与 [Pages](https://github.com/xujiann/chronic-care-platform/actions/runs/32337594732) 均成功。
+- ARC-002 工作树从该最新 main 创建，初始 HEAD 与 `origin/main` 完全一致；现有用户工作树未被
+  pull、stash、reset、clean 或覆盖。
+- 测试先红：新增 provider/组合/架构保护在旧实现下 4/14 失败；最小实现后专项
+  14/14、alert runtime 9/9、API/启动 7/7、`architecture:test` 37/37、
+  `platform:iterations:test` 90/90、`routes:test` 16/16 通过，`routes:check` 检查 64 个文件通过。
+- alert runtime 已无 `server.js` 静态或动态依赖；worker 默认 runtime 以懒 provider 复用
+  现有 readiness。provider 缺失、无效或抛错均返回受限 `controlErrorCode`、`NO-GO`，且
+  不泄露错误正文；adapter 未就绪时不会调用 provider。
+- `npm run build`、`lint`、`typecheck`、`test:unit`、`test:integration`（373 项）、
+  `test:smoke`（5 项）均通过；`test:all` 11/11 批通过，Chromium E2E 36/36 通过。
+- `process:test` 8/8、`deploy:check` 通过；完整依赖树与生产依赖树的官方 npm audit 均为
+  0 vulnerabilities。文档收口后的 `process:verify -- --base=origin/main` 检查 14 个文件、
+  4 个 T00 保护文件、0 越界；`npm run check` 与 `git diff --check` 通过。
+- 最终只读 review 已复核仓库调用方、懒加载路径、报告兼容字段、失败关闭、敏感信息边界、
+  未跟踪文件及完整 diff，未发现 P0/P1；没有 stage、commit、push 或创建 PR。
+- API method/path、鉴权、数据范围、数据库、schema、migration、audit/journal 语义、依赖、CI、
+  systemd 与部署拓扑均未修改；`API_MAP.md`、`DATA_MODEL.md` 无事实变化。未触碰
+  `data/db.json`、SQLite、生成报告、PDF、归档或发布制品。

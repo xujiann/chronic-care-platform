@@ -26,25 +26,32 @@ flowchart LR
   ADEL --> EXT
 ```
 
-期望方向大体存在，但组合根仍把大量底层函数直接注入路由上下文，领域模块也可能回读根模块。
+期望方向大体存在，但组合根仍把大量底层函数直接注入路由上下文；新模块不得回读组合根。
+ARC-002 已把已确认的 alert runtime 反向依赖移到 worker 组合边界，并通过 PR #132 合入主线。
 
 ## 2. 静态依赖指标
 
 - 非测试 CommonJS 文件：526。
 - 本地 `require` 边：861。
-- 显式循环：1 条。
+- 显式循环：当前主线为 0 条（ARC-002 实施前基线为 1 条）。
 - 最高入度模块：`runtime-source` 62、`technical-evidence` 22、`region-manifest` 18。
 - 最宽上下文：public-health 160 个依赖、care 102、clinical 76。
 
-### 已确认循环
+### 已移除循环（主线）
 
 ```text
-server.js
-  → pilot-cutover-alert-runtime.js
-  → server.js.pilotCutoverControlPlaneReadiness
+旧：server.js → pilot-cutover-alert-runtime.js → server.js
+
+现：platform-cutover-alert-worker.js
+      ├─→ pilot-cutover-alert-runtime.js
+      └─→ server.js → pilot-cutover-alert-runtime.js
 ```
 
-这是组合根被领域/平台模块反向依赖的实例，导致初始化顺序和测试替身更脆弱。
+`pilot-cutover-alert-runtime.js` 只接受显式 `controlProvider`，不再静态或动态导入
+`server.js`。worker 默认 provider 在真正执行 `run-once` 时才读取组合根，`status` 与组合
+对象创建均不加载 server。由此形成单向 DAG；缺失、无效和异常 provider 都保持脱敏
+`NO-GO`。该实现已通过 PR #132、required checks、合并后 main CI 与 Pages，ARC-002 已从
+P1 台账关闭。
 
 ## 3. Node 与第三方包
 
@@ -111,6 +118,7 @@ JSON 源快照仍是高扇出依赖，但浏览器和 Pages 只依赖经统一�
 - systemd：PostgreSQL sync/reconcile、platform shadow relay/reconcile、care outbox worker。
 - 领域 worker：referral delivery、emergency signal、insurance payment、public health 等。
 - 平台事件：通用 pending outbox publish runtime。
+- 切换告警 worker：CLI 组合层懒注入中央控制面，库级告警运行时不反向依赖组合根。
 
 没有单一队列产品；不同 worker 各自实现 lease、checkpoint、retry 或 receipt。优点是依赖少，风险是重试语义、观测和运维接口不一致。
 
@@ -134,7 +142,8 @@ JSON 源快照仍是高扇出依赖，但浏览器和 Pages 只依赖经统一�
 
 ## 9. 依赖治理结论
 
-- 不存在广泛静态环，但唯一已确认环位于关键组合根，应列 P1。
+- ARC-002 已移除唯一已确认的静态环并通过 PR/main CI 与 Pages；架构回归继续禁止
+  `pilot-cutover-alert-runtime` 重新导入组合根。
 - `runtime-source`、`technical-evidence`、`data/db.json` 和宽运行时上下文仍是高耦合枢纽；静态消费者已从源快照扇出中隔离。
 - 新模块必须依赖稳定端口，不得新增对 `server.js`、根目录全局状态或未注册 JSON 集合的反向依赖。
 - SQLite DDL 必须追加到 T00 注册表；运行时、测试和发布门禁只能消费其公开 head/校验接口，禁止复制版本常量或迁移定义。

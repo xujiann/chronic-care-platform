@@ -14,6 +14,9 @@ function firstVersionConflict(currentData, payload) {
   const currentVersions = currentData?.storageMeta?.collectionVersions || {};
   const collections = changedCollections(currentData, payload).filter((collection) =>
     collection !== "storageMeta" && collection !== "securityEvents" && collection !== "dataAccessLogs"
+  ).sort((left, right) =>
+    Number(ownerForCollection(right, { allowLegacy: true }).registered) -
+    Number(ownerForCollection(left, { allowLegacy: true }).registered)
   );
   for (const collection of collections) {
     if (!Object.hasOwn(expectedVersions, collection)) continue;

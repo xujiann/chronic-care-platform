@@ -1,5 +1,7 @@
 "use strict";
 
+const { isDeepStrictEqual } = require("node:util");
+
 const ownershipManifest = require("../../../config/domain-data-ownership.json");
 
 const SYSTEM_COLLECTION_OWNERS = Object.freeze({
@@ -118,7 +120,7 @@ const LEGACY_FULL_STATE_CONTRACT = Object.freeze({
 });
 
 function valuesEqual(left, right) {
-  return JSON.stringify(left) === JSON.stringify(right);
+  return isDeepStrictEqual(left, right);
 }
 
 function changedCollections(current = {}, next = {}) {
