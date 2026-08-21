@@ -26,5 +26,6 @@
 | [临床专科五个可治理子域](./2026-08-18-clinical-five-governed-subdomains.md) | Accepted | 急救、血液、影像、体检、质量安全的开发边界 |
 | [静态内容安全边界](./2026-08-18-static-content-security-boundary.md) | Accepted | 已合入 `main@6c18221`；发布 allowlist、数据和缓存隔离 |
 | [审计链失败语义与兼容迁移](./2026-08-19-audit-chain-failure-semantics.md) | Proposed | 严格验证、失败传播、旧链基线迁移与留存边界；不得实施 |
+| [切换告警运行时采用显式控制面 Provider 注入](./2026-08-20-pilot-cutover-alert-provider-injection.md) | Accepted | ARC-002 本地实现、全量门禁和只读 review 完成；待 PR/main CI 后关闭 |
 
 模板见 [ADR_TEMPLATE.md](./ADR_TEMPLATE.md)。

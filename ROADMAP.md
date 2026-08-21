@@ -18,8 +18,8 @@
 | 1 | 静态内容 allowlist 与快照隔离 | 已合入 `main@6c18221`；PR/main CI 与 Pages 验证通过 | 持续执行清单审查、负向测试与缓存版本治理 |
 | 2 | 审计链失败语义 | Proposed ADR 已形成 / P0；未授权实施 | T00、T01、审计/留存 Owner 批准严格语义、API 兼容和旧链迁移 |
 | 3 | Schema v14/v11 一致与 migration 指纹 | 已按 Accepted ADR 实施 / P1 | 以专项测试及 PR/main CI 为完成门禁；后续 v15+ 按冻结规则追加 |
-| 4 | 标准 build/lint/typecheck/unit/integration/smoke 入口 | 已按明确审批实施，待 PR/main 验证 / P1 | 保持 test:all 语义；逐步扩大 lint/typecheck 基线并治理测试时长 |
-| 5 | 移除组合根循环依赖 | 候选 / P1 | 特征测试；provider 注入方案；架构测试 |
+| 4 | 标准 build/lint/typecheck/unit/integration/smoke 入口 | 已合入 `main@fc42833`；PR/main CI 与 Pages 验证通过 / P1 | 保持 test:all 语义；逐步扩大 lint/typecheck 基线并治理测试时长 |
+| 5 | 移除组合根循环依赖 | Accepted ADR；方案 2 本地实施、全量门禁和只读 review 已完成，待发布审批与 PR/main CI / P1 | 主线合入后关闭 ARC-002；后续组合根瘦身归 ARC-001，不扩大本切片 |
 | 6 | OTP/锁定共享状态 | 待 ADR / P1 | 共享 TTL 存储、并发/重启/多实例测试 |
 | 7 | 运行时上下文瘦身 | 候选 / P1 | 按领域子端口，逐块迁移，不重写 server |
 | 7A | 临床五个可治理子域 | 治理切片完成，急救/血液/影像/体检首用例已迁移 / P1 | Accepted ADR；保持协议兼容，按子域逐用例迁移 |

@@ -13,7 +13,7 @@
 | ID | 类别 | 现状与证据 | 风险/缺失测试 |
 |---|---|---|---|
 | ARC-001 | 超大组合根 | `server.js` 约 28.2k 行 | 变更冲突、初始化耦合、难隔离测试 |
-| ARC-002 | 循环依赖 | `server.js ↔ pilot-cutover-alert-runtime.js` | 部分初始化、测试顺序和模块复用风险 |
+| ARC-002 | 循环依赖（本地已解除） | 本地候选已将 alert runtime 改为显式 provider，worker 在组合边界懒注入现有 readiness；静态环由 1 降为 0 | 缺失/无效/异常 provider、CLI 默认组合和反向依赖均有回归保护；[Accepted ADR](./docs/adr/2026-08-20-pilot-cutover-alert-provider-injection.md) 已实施并通过本地全量门禁及只读 review，待 PR/main CI 后关闭 |
 | ARC-003 | 宽接口 | public-health runtime context 160 个依赖 | 组合根和路由同步变化，难形成领域端口 |
 | ARC-004 | 前端超大模块 | 数智医院 app 10.5k、citizen 6k、公卫 4.4k | 全局状态、渲染和流程耦合 |
 | ARC-007 | 临床子域隔离 | 急救、血液、影像、体检首个查询端口已建立，但两个混合路由仍承载写命令；血液 GET 有内存规范化，影像和体检 GET 有审计持久化，operations 仍错位 | 按特征测试逐用例迁移；禁止新增混合依赖或把兼容副作用误写成纯查询 |
@@ -66,5 +66,4 @@
 2. 后续 v15+ migration 的数据回填、前滚恢复和多历史版本 fixture。
 3. OTP/锁定在多实例、重启、并发下的一致性。
 4. role × permission × resident/institution/region 数据范围矩阵。
-5. 组合根循环移除前后的启动、注入和故障测试。
-6. 前端 sink 的可信输入/恶意输入回归。
+5. 前端 sink 的可信输入/恶意输入回归。
