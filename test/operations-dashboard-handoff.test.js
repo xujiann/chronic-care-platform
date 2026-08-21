@@ -161,6 +161,6 @@ test("T06 drops dashboard dependencies and the completed handoff cannot flow bac
   assert.doesNotMatch(clinicalRuntime, /operations-dashboard/);
   assert.equal(fs.existsSync(legacyRoute), false);
   assert.equal(registry.routeSubcontextAssignments["operations-dashboard"], undefined);
-  assert.deepEqual(legacyArea.currentRouteSubcontexts, ["operations-command"]);
-  assert.deepEqual(legacyArea.completedRouteSubcontexts, ["operations-dashboard"]);
+  assert.deepEqual(legacyArea.currentRouteSubcontexts, []);
+  assert.deepEqual(legacyArea.completedRouteSubcontexts, ["operations-dashboard", "operations-command"]);
 });

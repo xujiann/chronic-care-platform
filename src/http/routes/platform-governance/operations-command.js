@@ -3,8 +3,8 @@
 function createRouteSegment(runtime) {
   const { appendOperationsIntegrationAudit, applyDispatchStatusUpdate, assertSignedOperationsPayload, buildHospitalOperationsDashboard, buildOperationsInterfaceMappingEvidence, buildOperationsMobileDuty, buildOperationsSiteJointPatrol, buildPerformanceMonitoringEvidence, collectJson, createOperationsMobileDutyReminder, integrationPayloadAllowedForInstitution, normalizeDispatchAction, normalizeHandoverSignoff, normalizeOperationSnapshot, normalizeReconciliationBatchItem, randomUUID, readDatabase, requireApiRole, sendJson, writeDatabase } = runtime;
   return {
-      id: "clinical-specialties-03",
-      domain: "clinical-specialties",
+      id: "platform-governance-13",
+      domain: "platform-governance",
       async handle(req, res, url) {
     if (req.method === "GET" && url.pathname === "/api/operations/performance-monitoring") {
         const user = requireApiRole(req, res, ["commission"], "/api/operations/performance-monitoring");
@@ -696,4 +696,4 @@ function createRouteSegment(runtime) {
     };
 }
 
-module.exports = { createRouteSegment, ROUTE_SEGMENT_ID: "clinical-specialties-03", SUBDOMAIN: "operations-command" };
+module.exports = { createRouteSegment, ROUTE_SEGMENT_ID: "platform-governance-13", SUBDOMAIN: "operations-command" };

@@ -85,8 +85,8 @@ const ROUTE_ORDER = Object.freeze([
     "id": "platform-governance-04"
   },
   {
-    "domain": "clinical-specialties",
-    "id": "clinical-specialties-03"
+    "domain": "platform-governance",
+    "id": "platform-governance-13"
   },
   {
     "domain": "shared",

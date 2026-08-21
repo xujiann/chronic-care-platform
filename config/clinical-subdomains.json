@@ -192,7 +192,6 @@
   ],
   "routeSubcontextAssignments": {
     "imaging-cloud": { "owners": ["imaging"], "status": "aligned" },
-    "operations-command": { "owners": ["legacy-platform-operations"], "status": "handoff-required" },
     "emergency-care": { "owners": ["emergency"], "status": "aligned" },
     "quality-safety": { "owners": ["quality-safety"], "status": "aligned" },
     "clinical-blood": { "owners": ["blood", "imaging"], "status": "legacy-mixed" },
@@ -205,11 +204,11 @@
     {
       "id": "legacy-platform-operations",
       "routePrefixes": ["/api/operations"],
-      "currentRouteSubcontexts": ["operations-command"],
-      "completedRouteSubcontexts": ["operations-dashboard"],
+      "currentRouteSubcontexts": [],
+      "completedRouteSubcontexts": ["operations-dashboard", "operations-command"],
       "targetDomain": "platform-governance/operations",
       "handoffOwners": ["T00", "T02"],
-      "status": "handoff-required"
+      "status": "handoff-complete"
     }
   ],
   "crossSubdomainContracts": [
