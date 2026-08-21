@@ -75,6 +75,14 @@ erDiagram
 
 `config/domain-data-ownership.json` 只登记 83 个集合：platform-governance 32、care 11、public-health 10、clinical 9、integration 7、citizen 6、identity 5、insurance 2、research 1。其余集合按策略为 `legacy-non-authoritative`，禁止直接晋升为生产写模型。
 
+`followups` 继续由 citizen-chronic/T04 拥有；随访事件 outbox、inbox、projection 和 receipt
+仍嵌在该聚合的 `domainRuntime` 中。本切片只增加安全 publisher 端口，没有新集合、DDL、
+migration 或事实源变化。receipt 不保存供应方原始回执 ID、签名或正文，只保存事件关联、
+payload/request/receipt/provider/signature/activation 摘要、occurredAt 和 `accepted|delivered`
+状态；outbox 同步保存外部状态。HTTP dispatch 成功后仍通过既有整体状态写回持久化；批次
+外发或最终整体写回失败时输入快照保持 pending，后续以稳定幂等键重试。缺少独立持久 lease、
+attempt/backoff 和 dead-letter，因此不能把当前结构描述为多实例生产投递仓储。
+
 ## 5. PostgreSQL 结构
 
 已跟踪 SQL 至少定义 13 张生产候选表：

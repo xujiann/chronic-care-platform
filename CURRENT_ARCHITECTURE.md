@@ -87,6 +87,15 @@ flowchart TB
 7. 审计验证已收敛到 `src/identity-security/audit-chain.js` 的 v2 严格端口；内容、链接、结构和重复 ID 任一异常均失败，验证 API/合规报告不再读取时重封。全量状态写入中的审计数组由服务端管理。
 8. 机器 API 授权矩阵扫描全部模块化路由源码的 `requireApiRole` 声明，并对九条高风险接口锁定 owner、角色、范围和用途；CI 对声明数量和高风险唯一性 fail closed。
 9. P1 生产适配器增量保持现有 owner：T01 的 `production-adapters.js` 承担 JWKS/JWT 与 SMS 协议；OTP、发送/登录限流和失败锁定由共享 `auth-security-state-store` 承载，单主机 SQLite 复用 `state_collections`、生产多实例使用组合根长期 PostgreSQL pool；T00 的 PostgreSQL 组合保持 shadow/rehearsal 且 `productionPrimary=false`；连续审计投递复用既有 cutover alert lifecycle 与 operational signal。
+10. T04 的慢病随访事件保留 `citizen-chronic.followup-updated.v1` 和既有 API，新增
+    `src/citizen-chronic/followup-event-publisher.js` 作为签名 HTTPS publisher 端口。默认本地
+    回执只在非生产且未配置远端时可用；生产必须注入独立 activation verifier，环境字符串不
+    能证明启用证据。端口拒绝非 HTTPS/443、回环、私网、链路本地目标和重定向，以稳定的
+    event/payload 幂等键发送，验签后仅向 service 交付私有 capability。机构 dispatch 在读取后、
+    外发前按居民和机构范围过滤，并要求授权/尝试审计先成功持久化，再记录成功/失败结果审计；
+    持久状态只保留可重验摘要及
+    accepted/delivered 状态。当前仍由受权 HTTP dispatch 同步触发，没有 worker、租约、死信
+    或多实例持久投递仓储，因此 `productionReady` 继续为 `false`。
 
 ## 6. T06 五子域治理切片
 

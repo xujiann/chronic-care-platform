@@ -30,5 +30,6 @@
 | [生产身份与短信适配器信任边界](./2026-08-21-production-identity-sms-trust-boundary.md) | Accepted | JWKS/JWT、脱敏 transport、SMS 凭据/幂等/重试/健康及共享 OTP/锁定状态 |
 | [PostgreSQL shadow 合同强化](./2026-08-21-postgresql-shadow-contract-hardening.md) | Accepted | schema 隔离、健康探针、batch/digest/version/tombstone 冲突 |
 | [连续审计投递与耐久 checkpoint](./2026-08-21-continuous-audit-delivery.md) | Accepted | SIEM/WORM、checkpoint v2、既有告警生命周期与 systemd |
+| [慢病随访外部 publisher 协议与失败语义](./2026-08-21-chronic-followup-external-publisher-protocol.md) | Accepted | T04 安全外发、activation、幂等回执、范围、审计与持久证据 |
 
 模板见 [ADR_TEMPLATE.md](./ADR_TEMPLATE.md)。

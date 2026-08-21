@@ -118,6 +118,11 @@ JSON 源快照仍是高扇出依赖，但浏览器和 Pages 只依赖经统一�
 - systemd：PostgreSQL sync/reconcile、platform shadow relay/reconcile、care outbox worker。
 - 领域 worker：referral delivery、emergency signal、insurance payment、public health 等。
 - 平台事件：通用 pending outbox publish runtime。
+- 慢病随访：T04 当前仅有受权 HTTP dispatch；生产依赖 T04 自有签名 HTTPS publisher 和独立
+  activation verifier，未在 T00 组合根注入 verifier 时默认失败关闭。机构范围 allowlist、
+  前置授权审计门禁、publisher 私有 receipt capability 和结果审计均位于该调用链；非生产可用
+  本地模拟。尚未建立
+  worker、持久 lease/checkpoint、退避和死信，不得计作已上线的后台任务。
 - 切换告警 worker：CLI 组合层懒注入中央控制面，库级告警运行时不反向依赖组合根。
 
 没有单一队列产品；不同 worker 各自实现 lease、checkpoint、retry 或 receipt。优点是依赖少，风险是重试语义、观测和运维接口不一致。

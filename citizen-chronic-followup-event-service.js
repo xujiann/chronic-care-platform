@@ -7,10 +7,17 @@ const {
   createDomainEvent,
   publishPendingOutbox
 } = require("./src/platform/events/domain-event-runtime");
+const {
+  FOLLOWUP_EVENT_TYPE,
+  FOLLOWUP_EVENT_VERSION,
+  FollowupEventPublisherError,
+  assertVerifiedFollowupEventPublisherReceipt,
+  createFollowupEventPublisher
+} = require("./src/citizen-chronic/followup-event-publisher");
 
 const DOMAIN = "citizen-chronic";
 const COLLECTION = "followups";
-const EVENT_TYPE = "citizen-chronic.followup-updated.v1";
+const EVENT_TYPE = FOLLOWUP_EVENT_TYPE;
 const CONSUMER_NAME = "citizen-chronic.followup-summary-projection.v1";
 const RUNTIME_FIELD = "domainRuntime";
 
@@ -243,9 +250,10 @@ async function updateFollowupToState(data, input = {}) {
   });
 }
 
-function pendingEvents(state, limit) {
+function pendingEvents(state, limit, aggregateIds = null) {
   const events = [];
   for (const followup of Array.isArray(state.followups) ? state.followups : []) {
+    if (aggregateIds && !aggregateIds.has(String(followup.id))) continue;
     for (const event of runtimeOf(followup).outbox) {
       if (event.deliveryState === "pending") events.push(event);
       if (events.length >= limit) return events;
@@ -262,10 +270,10 @@ function mutateRuntime(state, aggregateId, callback) {
   followup[RUNTIME_FIELD] = runtime;
 }
 
-function createEmbeddedOutbox(state, at) {
+function createEmbeddedOutbox(state, at, aggregateIds = null) {
   return {
     async pending(limit) {
-      return clone(pendingEvents(state, limit));
+      return clone(pendingEvents(state, limit, aggregateIds));
     },
     async markPublished(eventId) {
       const followup = (state.followups || []).find((item) =>
@@ -337,13 +345,29 @@ async function dispatchPendingFollowupEventsToState(data, options = {}) {
   const at = iso(options.at);
   const deliveries = [];
   const processed = [];
-  const publisher = options.publisher || {
-    async publish(envelope) {
-      return { accepted: true, receiptId: `local-followup-receipt:${envelope.eventId}` };
-    }
-  };
+  const aggregateIds = options.aggregateIds instanceof Set
+    ? new Set([...options.aggregateIds].map((id) => String(id)))
+    : null;
+  const publisherEnvironment = String(options.environment || options.env?.NODE_ENV || process.env.NODE_ENV || "")
+    .trim()
+    .toLowerCase();
+  const publisher = options.publisher || createFollowupEventPublisher({
+    env: options.environment === undefined
+      ? (options.env || process.env)
+      : { ...(options.env || process.env), NODE_ENV: options.environment },
+    activationVerifier: options.publisherActivationVerifier,
+    fetchImpl: options.fetchImpl,
+    now: options.publisherNow,
+    resolveAddresses: options.resolvePublisherAddresses
+  });
+  if (!publisher || typeof publisher.publish !== "function") {
+    throw new FollowupEventPublisherError(
+      "FOLLOWUP_EVENT_PUBLISHER_UNAVAILABLE",
+      "followup event publisher port is unavailable"
+    );
+  }
   await publishPendingOutbox({
-    outbox: createEmbeddedOutbox(state, at),
+    outbox: createEmbeddedOutbox(state, at, aggregateIds),
     limit: options.limit || 100,
     publisher: {
       async publish(event) {
@@ -355,13 +379,30 @@ async function dispatchPendingFollowupEventsToState(data, options = {}) {
             const receipt = await publisher.publish(Object.freeze({
               eventId: candidate.id,
               eventType: candidate.type,
-              eventVersion: 1,
+              eventVersion: FOLLOWUP_EVENT_VERSION,
               correlationId: candidate.correlationId,
               payload: clone(candidate.payload)
             }));
             if (!receipt || receipt.accepted !== true || !String(receipt.receiptId || "").trim()) {
-              throw new Error("followup event publisher did not return an accepted stable receipt");
+              throw new FollowupEventPublisherError(
+                "FOLLOWUP_EVENT_PUBLISHER_RECEIPT_INVALID",
+                "followup event publisher did not return an accepted stable receipt",
+                502
+              );
             }
+            const verifiedEvidence = publisherEnvironment === "production"
+              ? assertVerifiedFollowupEventPublisherReceipt(receipt, {
+                eventId: candidate.id,
+                eventType: candidate.type,
+                eventVersion: FOLLOWUP_EVENT_VERSION,
+                correlationId: candidate.correlationId,
+                payload: candidate.payload
+              })
+              : null;
+            const deliveryStatus = new Set(["accepted", "delivered"])
+              .has(String(verifiedEvidence?.deliveryStatus || receipt.status || "").toLowerCase())
+              ? String(verifiedEvidence?.deliveryStatus || receipt.status).toLowerCase()
+              : "accepted";
             const receiptDigest = sha256(`${candidate.id}:${receipt.receiptId}`);
             mutateRuntime(state, candidate.aggregateId, (runtime) => {
               if (!runtime.projections.some((item) => item.eventId === candidate.id)) {
@@ -379,13 +420,25 @@ async function dispatchPendingFollowupEventsToState(data, options = {}) {
                   id: `followup-receipt:${candidate.id}`,
                   eventId: candidate.id,
                   receiptDigest,
+                  evidenceSchema: verifiedEvidence?.schema || "citizen-chronic.followup-event-receipt-evidence.v1",
+                  deliveryStatus,
+                  payloadDigest: verifiedEvidence?.payloadDigest || digest(candidate.payload),
+                  requestBindingDigest: verifiedEvidence?.requestBindingDigest || "",
+                  receiptBindingDigest: verifiedEvidence?.receiptBindingDigest || "",
+                  providerReceiptDigest: verifiedEvidence?.providerReceiptDigest || sha256(receipt.receiptId),
+                  signatureDigest: verifiedEvidence?.signatureDigest || "",
+                  activationDigest: verifiedEvidence?.activationDigest || "",
+                  occurredAt: verifiedEvidence?.occurredAt || "",
                   deliveredAt: at
                 });
               }
               const outboxEvent = runtime.outbox.find((item) => item.id === candidate.id);
-              if (outboxEvent) outboxEvent.receiptDigest = receiptDigest;
+              if (outboxEvent) {
+                outboxEvent.receiptDigest = receiptDigest;
+                outboxEvent.externalDeliveryStatus = deliveryStatus;
+              }
             });
-            deliveries.push({ eventId: candidate.id, duplicate: false, receiptDigest });
+            deliveries.push({ eventId: candidate.id, duplicate: false, receiptDigest, deliveryStatus });
           }
         });
         const result = await consumer.consume(event);
@@ -398,21 +451,25 @@ async function dispatchPendingFollowupEventsToState(data, options = {}) {
     nextData: state,
     processed: Object.freeze(processed),
     deliveries: Object.freeze(deliveries),
-    health: buildFollowupEventHealth(state),
+    health: buildFollowupEventHealth(state, { aggregateIds }),
     productionReady: false
   });
 }
 
-function buildFollowupEventHealth(data = {}) {
+function buildFollowupEventHealth(data = {}, options = {}) {
+  const aggregateIds = options.aggregateIds instanceof Set ? options.aggregateIds : null;
   const summary = {
     outbox: 0,
     pending: 0,
     published: 0,
     completedInbox: 0,
     projections: 0,
-    receipts: 0
+    receipts: 0,
+    acceptedReceipts: 0,
+    deliveredReceipts: 0
   };
   for (const followup of Array.isArray(data.followups) ? data.followups : []) {
+    if (aggregateIds && !aggregateIds.has(String(followup.id))) continue;
     const runtime = runtimeOf(followup);
     summary.outbox += runtime.outbox.length;
     summary.pending += runtime.outbox.filter((item) => item.deliveryState === "pending").length;
@@ -420,6 +477,8 @@ function buildFollowupEventHealth(data = {}) {
     summary.completedInbox += runtime.inbox.filter((item) => item.state === "completed").length;
     summary.projections += runtime.projections.length;
     summary.receipts += runtime.receipts.length;
+    summary.acceptedReceipts += runtime.receipts.filter((item) => item.deliveryStatus === "accepted").length;
+    summary.deliveredReceipts += runtime.receipts.filter((item) => item.deliveryStatus === "delivered").length;
   }
   return Object.freeze({
     ok: summary.pending === 0,

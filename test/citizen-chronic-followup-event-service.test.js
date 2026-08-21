@@ -138,13 +138,18 @@ test("embedded outbox dispatch completes inbox projection and stable receipt onc
   assert.equal(runtime.projections.length, 1);
   assert.equal(runtime.receipts.length, 1);
   assert.match(runtime.receipts[0].receiptDigest, /^[a-f0-9]{64}$/);
+  assert.equal(runtime.receipts[0].deliveryStatus, "accepted");
+  assert.match(runtime.receipts[0].providerReceiptDigest, /^[a-f0-9]{64}$/);
+  assert.equal(Object.hasOwn(runtime.receipts[0], "receiptId"), false);
   assert.deepEqual(dispatched.health.summary, {
     outbox: 1,
     pending: 0,
     published: 1,
     completedInbox: 1,
     projections: 1,
-    receipts: 1
+    receipts: 1,
+    acceptedReceipts: 1,
+    deliveredReceipts: 0
   });
 
   const replayState = structuredClone(dispatched.nextData);

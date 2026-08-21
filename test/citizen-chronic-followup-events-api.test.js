@@ -90,6 +90,9 @@ test("followup API persists aggregate and outbox atomically then dispatches once
   assert.equal(pending.response.status, 200);
   assert.equal(pending.body.ok, false);
   assert.equal(pending.body.summary.pending, 1);
+  assert.equal(pending.body.publisher.mode, "local-simulated");
+  assert.equal(pending.body.publisher.configured, false);
+  assert.equal(pending.body.publisher.productionReady, false);
   assert.equal(pending.body.productionReady, false);
 
   const dispatched = await request(baseUrl, "/api/chronic/followup-events/dispatch", token, {
@@ -105,13 +108,18 @@ test("followup API persists aggregate and outbox atomically then dispatches once
     published: 1,
     completedInbox: 1,
     projections: 1,
-    receipts: 1
+    receipts: 1,
+    acceptedReceipts: 1,
+    deliveredReceipts: 0
   });
   persisted = readDatabase().followups.find((item) => item.id === followup.id);
   assert.equal(persisted.domainRuntime.outbox[0].deliveryState, "published");
   assert.equal(persisted.domainRuntime.inbox[0].state, "completed");
   assert.equal(persisted.domainRuntime.projections.length, 1);
   assert.equal(persisted.domainRuntime.receipts.length, 1);
+  assert.equal(persisted.domainRuntime.receipts[0].deliveryStatus, "accepted");
+  assert.match(persisted.domainRuntime.receipts[0].providerReceiptDigest, /^[a-f0-9]{64}$/);
+  assert.equal(Object.hasOwn(persisted.domainRuntime.receipts[0], "receiptId"), false);
 
   const replay = await request(baseUrl, `/api/followups/${encodeURIComponent(followup.id)}`, token, {
     method: "PATCH",

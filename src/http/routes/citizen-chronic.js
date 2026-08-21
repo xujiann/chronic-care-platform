@@ -5,9 +5,63 @@ const {
   dispatchPendingFollowupEventsToState,
   updateFollowupToState
 } = require("../../../citizen-chronic-followup-event-service");
+const {
+  createFollowupEventPublisher,
+  inspectFollowupEventPublisherReadiness
+} = require("../../citizen-chronic/followup-event-publisher");
 
-function createRouteSegments(runtime) {
-  const { CitizenRecordsPolicy, CitizenRecordsV1, CitizenRecordsV2, PERSONAL_RECORD_PROTECTED_FIELDS, appendDataAccessLog, appendSecurityEvent, applyCitizenLifecycleAction, applyCitizenOperationsAction, buildChronicAcceptanceLedger, buildChronicArchiveStandardization, buildChronicFollowupSummary, buildChronicInstitutionInterfaceReport, buildChronicInteroperabilityProfiles, buildChronicLaunchCoreReport, buildChronicPathwayQualityReport, buildChronicPharmacyInsuranceClosure, buildChronicProductionSafetyEvidenceBridge, buildChronicProductionSafetyReport, buildChronicPublicHealthLoop, buildChronicReferralContinuity, buildChronicRiskStratification, buildCitizenLifecycleActionMessage, buildCitizenLifecycleActions, buildCitizenOperationsCenter, buildCitizenOperationsPublic, canAccessResident, canManageResidentProfile, citizenCareIdempotencyKey, citizenCareReceipt, citizenCareReplay, citizenCareRequestDigest, citizenCareWorkspace, cleanResidentPatch, closeFamilyDoctorChronicAction, collectJson, createHash, dispatchChronicFollowupAction, escalateChronicFollowupAction, ingestChronicDeviceMeasurement, mergeByKey, normalizePersonalRecord, normalizeState, patchBusinessCollectionItem, personIndexForResident, prependAuditTrailEntry, randomUUID, readDatabase, recordChronicLaunchCoreAction, recordChronicPharmacyCallback, recordChronicReferralContinuity, redactSensitiveResponse, requireApiRole, scheduleChronicReminderOutreach, scopeStateForUser, sealAuditTrail, seedCitizenHospitalServiceConfigs, seedCitizenIdentityReviewCases, seedCitizenOperationContents, seedCitizenServiceBlacklist, sendJson, upsertChronicFeedback, upsertResidentExperienceCheckin, validateChronicInteroperabilityMessage, writeDatabase } = runtime;
+const FOLLOWUP_ORGANIZATION_FIELDS = Object.freeze([
+  "orgCode",
+  "institutionCode",
+  "institutionId",
+  "hospitalCode",
+  "createdByOrgCode",
+  "institution",
+  "institutionName",
+  "hospital"
+]);
+
+function followupAggregateIdsForUser(data, user, canAccessResident, rowMatchesOrganizationScope) {
+  if (user?.role === "commission") return null;
+  if (user?.role !== "institution" || !String(user.orgCode || "").trim()) return new Set();
+  return new Set((Array.isArray(data?.followups) ? data.followups : [])
+    .filter((followup) => {
+      const residentId = String(followup?.residentId || "").trim();
+      if (!residentId || !canAccessResident(user, residentId, data)) return false;
+      const explicitlyOrganizationScoped = FOLLOWUP_ORGANIZATION_FIELDS
+        .some((field) => String(followup?.[field] || "").trim());
+      return !explicitlyOrganizationScoped || rowMatchesOrganizationScope(data, user, followup);
+    })
+    .map((followup) => String(followup.id)));
+}
+
+function createRouteSegments(runtime, options = {}) {
+  const { CitizenRecordsPolicy, CitizenRecordsV1, CitizenRecordsV2, PERSONAL_RECORD_PROTECTED_FIELDS, appendDataAccessLog, appendSecurityEvent, applyCitizenLifecycleAction, applyCitizenOperationsAction, buildChronicAcceptanceLedger, buildChronicArchiveStandardization, buildChronicFollowupSummary, buildChronicInstitutionInterfaceReport, buildChronicInteroperabilityProfiles, buildChronicLaunchCoreReport, buildChronicPathwayQualityReport, buildChronicPharmacyInsuranceClosure, buildChronicProductionSafetyEvidenceBridge, buildChronicProductionSafetyReport, buildChronicPublicHealthLoop, buildChronicReferralContinuity, buildChronicRiskStratification, buildCitizenLifecycleActionMessage, buildCitizenLifecycleActions, buildCitizenOperationsCenter, buildCitizenOperationsPublic, canAccessResident, canManageResidentProfile, citizenCareIdempotencyKey, citizenCareReceipt, citizenCareReplay, citizenCareRequestDigest, citizenCareWorkspace, cleanResidentPatch, closeFamilyDoctorChronicAction, collectJson, createHash, dispatchChronicFollowupAction, escalateChronicFollowupAction, ingestChronicDeviceMeasurement, mergeByKey, normalizePersonalRecord, normalizeState, patchBusinessCollectionItem, personIndexForResident, prependAuditTrailEntry, randomUUID, readDatabase, recordChronicLaunchCoreAction, recordChronicPharmacyCallback, recordChronicReferralContinuity, redactSensitiveResponse, requireApiRole, rowMatchesOrganizationScope, scheduleChronicReminderOutreach, scopeStateForUser, sealAuditTrail, seedCitizenHospitalServiceConfigs, seedCitizenIdentityReviewCases, seedCitizenOperationContents, seedCitizenServiceBlacklist, sendJson, upsertChronicFeedback, upsertResidentExperienceCheckin, validateChronicInteroperabilityMessage, writeDatabase } = runtime;
+  const publisherEnvironment = options.env || process.env;
+  const publisherActivationVerifier = options.followupEventPublisherActivationVerifier;
+  const followupEventPublisher = options.followupEventPublisher || createFollowupEventPublisher({
+    activationVerifier: publisherActivationVerifier,
+    env: publisherEnvironment,
+    fetchImpl: options.fetchImpl,
+    now: options.publisherNow,
+    resolveAddresses: options.resolvePublisherAddresses
+  });
+  const recordFollowupDispatchAudit = (user, result, detail, action = "dispatch chronic followup domain events") => {
+    if (typeof appendSecurityEvent !== "function") return false;
+    try {
+      appendSecurityEvent({
+        actor: user?.name,
+        role: user?.role,
+        action,
+        target: "citizen-chronic.followup-events",
+        result,
+        detail
+      });
+      return true;
+    } catch {
+      return false;
+    }
+  };
   return [
     {
       id: "citizen-chronic-01",
@@ -543,29 +597,143 @@ function createRouteSegments(runtime) {
     if (req.method === "GET" && url.pathname === "/api/chronic/followup-events/health") {
         const user = requireApiRole(req, res, ["commission", "institution"], url.pathname);
         if (!user) return true;
-        sendJson(res, 200, buildFollowupEventHealth(readDatabase()));
+        if (user.role === "institution" && !String(user.orgCode || "").trim()) {
+          recordFollowupDispatchAudit(user, "denied", "FOLLOWUP_EVENT_DISPATCH_ORGANIZATION_SCOPE_REQUIRED");
+          sendJson(res, 403, {
+            error: "Forbidden",
+            code: "FOLLOWUP_EVENT_DISPATCH_ORGANIZATION_SCOPE_REQUIRED",
+            message: "followup event scope denied",
+            productionReady: false
+          });
+          return true;
+        }
+        const data = readDatabase();
+        const aggregateIds = followupAggregateIdsForUser(
+          data,
+          user,
+          canAccessResident,
+          rowMatchesOrganizationScope
+        );
+        sendJson(res, 200, {
+          ...buildFollowupEventHealth(data, { aggregateIds }),
+          publisher: inspectFollowupEventPublisherReadiness(publisherEnvironment, {
+            activationVerifier: publisherActivationVerifier
+          })
+        });
         return true;
       }
 
       if (req.method === "POST" && url.pathname === "/api/chronic/followup-events/dispatch") {
         const user = requireApiRole(req, res, ["commission", "institution"], url.pathname);
         if (!user) return true;
-        try {
-          const result = await dispatchPendingFollowupEventsToState(readDatabase());
-          writeDatabase(result.nextData);
-          sendJson(res, 200, {
-            ok: result.health.ok,
-            processed: result.processed,
-            health: result.health,
+        if (user.role === "institution" && !String(user.orgCode || "").trim()) {
+          recordFollowupDispatchAudit(user, "denied", "FOLLOWUP_EVENT_DISPATCH_ORGANIZATION_SCOPE_REQUIRED");
+          sendJson(res, 403, {
+            error: "Forbidden",
+            code: "FOLLOWUP_EVENT_DISPATCH_ORGANIZATION_SCOPE_REQUIRED",
+            message: "followup event scope denied",
             productionReady: false
           });
+          return true;
+        }
+        let data = readDatabase();
+        let aggregateIds = followupAggregateIdsForUser(
+          data,
+          user,
+          canAccessResident,
+          rowMatchesOrganizationScope
+        );
+        if (user.role === "institution" && aggregateIds.size === 0) {
+          recordFollowupDispatchAudit(user, "denied", "FOLLOWUP_EVENT_DISPATCH_RESIDENT_SCOPE_DENIED");
+          sendJson(res, 403, {
+            error: "Forbidden",
+            code: "FOLLOWUP_EVENT_DISPATCH_RESIDENT_SCOPE_DENIED",
+            message: "followup event scope denied",
+            productionReady: false
+          });
+          return true;
+        }
+        if (!recordFollowupDispatchAudit(
+          user,
+          "allowed",
+          `authorized;scope=${aggregateIds ? aggregateIds.size : "commission"}`,
+          "authorize chronic followup domain event dispatch"
+        )) {
+          sendJson(res, 503, {
+            error: "Service Unavailable",
+            code: "FOLLOWUP_EVENT_DISPATCH_AUDIT_UNAVAILABLE",
+            message: "followup domain event dispatch audit unavailable",
+            productionReady: false
+          });
+          return true;
+        }
+        data = readDatabase();
+        aggregateIds = followupAggregateIdsForUser(
+          data,
+          user,
+          canAccessResident,
+          rowMatchesOrganizationScope
+        );
+        if (user.role === "institution" && aggregateIds.size === 0) {
+          recordFollowupDispatchAudit(user, "denied", "FOLLOWUP_EVENT_DISPATCH_SCOPE_CHANGED");
+          sendJson(res, 403, {
+            error: "Forbidden",
+            code: "FOLLOWUP_EVENT_DISPATCH_SCOPE_CHANGED",
+            message: "followup event scope denied",
+            productionReady: false
+          });
+          return true;
+        }
+        let result;
+        try {
+          result = await dispatchPendingFollowupEventsToState(data, {
+            aggregateIds,
+            environment: publisherEnvironment.NODE_ENV,
+            publisher: followupEventPublisher
+          });
         } catch (error) {
-          sendJson(res, 400, {
-            error: "Bad Request",
+          const code = error.code || "FOLLOWUP_EVENT_DISPATCH_FAILED";
+          recordFollowupDispatchAudit(user, "failed", code);
+          const statusCode = Number.isInteger(error.statusCode) ? error.statusCode : 400;
+          sendJson(res, statusCode, {
+            error: statusCode >= 500 ? "Service Unavailable" : "Bad Request",
+            code,
             message: "followup domain event dispatch failed",
             productionReady: false
           });
+          return true;
         }
+        try {
+          writeDatabase(result.nextData);
+        } catch {
+          recordFollowupDispatchAudit(user, "failed", "FOLLOWUP_EVENT_DISPATCH_PERSISTENCE_FAILED");
+          sendJson(res, 503, {
+            error: "Service Unavailable",
+            code: "FOLLOWUP_EVENT_DISPATCH_PERSISTENCE_FAILED",
+            message: "followup domain event dispatch failed",
+            productionReady: false
+          });
+          return true;
+        }
+        if (!recordFollowupDispatchAudit(
+          user,
+          "allowed",
+          `processed=${result.processed.length};scope=${aggregateIds ? aggregateIds.size : "commission"}`
+        )) {
+          sendJson(res, 503, {
+            error: "Service Unavailable",
+            code: "FOLLOWUP_EVENT_DISPATCH_AUDIT_FAILED",
+            message: "followup domain event dispatch audit failed",
+            productionReady: false
+          });
+          return true;
+        }
+        sendJson(res, 200, {
+          ok: result.health.ok,
+          processed: result.processed,
+          health: result.health,
+          productionReady: false
+        });
         return true;
       }
 
