@@ -159,3 +159,34 @@ test("PostgreSQL repository bounds retry attempts and validates schema identifie
   assert.equal(connections, 3);
   assert.throws(() => new PostgresAtomicDocumentRepository({ schema: "bad;drop", pool: {} }), /lowercase SQL identifier/);
 });
+
+test("PostgreSQL repository default retry budget survives sustained serialization contention", async () => {
+  let connections = 0;
+  const delays = [];
+  const repository = new PostgresAtomicDocumentRepository({
+    pool: {
+      async connect() {
+        connections += 1;
+        return {
+          async query(sql) {
+            if (/SELECT payload/.test(sql) && connections <= 5) {
+              const error = new Error("serialization contention");
+              error.code = "40001";
+              throw error;
+            }
+            return { rows: [] };
+          },
+          release() {}
+        };
+      }
+    },
+    retryDelayMs: 2,
+    maxRetryDelayMs: 5,
+    random: () => 0,
+    delay: async (milliseconds) => delays.push(milliseconds)
+  });
+
+  assert.deepEqual(await repository.mutate(() => ({ ok: true })), { ok: true });
+  assert.equal(connections, 6);
+  assert.deepEqual(delays, [1, 2, 2, 2, 2]);
+});

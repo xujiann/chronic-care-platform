@@ -134,8 +134,10 @@ class PostgresAtomicDocumentRepository {
     this.pool = options.pool;
     this.schema = postgresSchemaIdentifier(options.schema);
     this.table = `${this.schema}.auth_security_state`;
-    this.maxAttempts = boundedInteger(options.maxAttempts, 4, 1, 8);
+    this.maxAttempts = boundedInteger(options.maxAttempts, 16, 1, 32);
     this.retryDelayMs = boundedInteger(options.retryDelayMs, 10, 0, 1000);
+    this.maxRetryDelayMs = boundedInteger(options.maxRetryDelayMs, 250, 0, 5000);
+    this.random = options.random || Math.random;
     this.delay = options.delay || ((milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds)));
   }
 
@@ -169,7 +171,12 @@ class PostgresAtomicDocumentRepository {
       } finally {
         client.release();
       }
-      await this.delay(this.retryDelayMs * attempt);
+      const exponentialDelay = Math.min(
+        this.maxRetryDelayMs,
+        this.retryDelayMs * (2 ** Math.min(attempt - 1, 10))
+      );
+      const jitterMultiplier = 0.5 + Math.min(1, Math.max(0, Number(this.random())));
+      await this.delay(Math.floor(exponentialDelay * jitterMultiplier));
     }
     throw lastError;
   }
