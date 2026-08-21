@@ -29,6 +29,7 @@
 | 身份安全 | `src/identity-security/`、`production-adapters.js`、`session-store.js`、`auth-security-state-store.js` | Cookie/CSRF、OIDC/JWKS、SMS、会话仓储、共享 OTP/限流/锁定状态和 v2 审计链验证已模块化 |
 | 平台数据 | `src/platform/data/`、`src/platform/storage/` | 数据所有权、SQLite migration 注册表/runner、PostgreSQL 主存储契约 |
 | 领域事件 | `src/platform/events/`、各领域 worker | outbox/inbox、幂等和后台投递 |
+| 慢病随访 publisher | `citizen-chronic-followup-event-service.js`、`src/citizen-chronic/followup-event-publisher.js` | T04 自有 v1 事件、安全 HTTPS 投递端口、独立 activation verifier 和本地兼容适配；尚无生产 worker/持久 lease |
 | 审计投递 | `src/platform/operations/audit-delivery.js`、`scripts/audit-delivery-worker.js` | SIEM/WORM、checkpoint v2；复用 cutover alert lifecycle，外部门禁保持关闭 |
 | 区域运行 | `src/platform/regional/`、`regions/` | 多地区清单、能力包、复制和发布注册 |
 | 领域实现 | `src/care-coordination/` 等与根目录服务 | 新旧实现并存，边界尚未完全迁移 |
@@ -124,11 +125,22 @@ scripts/platform-cutover-alert-worker.js
   Pages、complete-unit-test、governance-api 和 release-readiness 只消费这些标准入口；
   `test:all` 仍是独立的自动发现回归保护。
 
-## 11. T05 转诊命令 owner
+## 11. 慢病随访 publisher 边界
+
+依赖方向为 `citizen-chronic HTTP route → followup event service → T04 publisher port → HTTPS
+provider`。publisher 只接受 `followupId/status/updatedAt/version` 四个事件 payload 字段，绑定
+event、correlation 和 payload digest；`requestId`/nonce 由 event 与 payload digest 稳定派生，
+允许重试重验供应方返回的完全相同幂等回执。生产先通过独立注入的 activation verifier，再做
+公网解析、HTTPS/443、无重定向和 HMAC 回执校验；service 只接受模块私有 capability，不能信任
+自定义 publisher 的布尔声明。机构 route 在外发前按 resident/org scope 建立 aggregate allowlist
+并先持久化授权/尝试安全审计；审计不可用时不调用 publisher。该边界没有反向依赖
+`server.js`，也未引入 worker、schema 或 T00 运行时装配。
+
+## 12. T05 转诊命令 owner
 
 `src/care-coordination/referral-command-service.js` 是 `referral-order.v1` 的唯一写 owner。`care-coordination` 路由中的直接转诊动作、通用 workflow 兼容分支和统一 task 兼容分支只负责 HTTP 适配与原响应映射，不得直接修改 `referralSystem.referrals`。居民任务消息仍是 owner command 成功后的兼容副作用，不属于转诊聚合事务。
 
-## 12. 健康驾驶舱指标合同
+## 13. 健康驾驶舱指标合同
 
 T02 新增的 `health-dashboard-indicator-contract` 是纯合同/测量模块，依赖既有
 `technical-evidence` 稳定摘要工具，不读取存储、路由或组合根。遗留
