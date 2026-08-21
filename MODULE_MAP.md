@@ -46,16 +46,20 @@
 - `src/platform/regional/region-manifest.js`：18；
 - 公卫密钥环/适配服务：10–13。
 
-## 4. 明确循环依赖
+## 4. 循环依赖收口（ARC-002 本地候选）
 
 ```text
-server.js
-  → src/platform/cutover/pilot-cutover-alert-runtime.js
-  → require("../../../server").pilotCutoverControlPlaneReadiness()
-  → server.js
+scripts/platform-cutover-alert-worker.js
+  ├─→ src/platform/cutover/pilot-cutover-alert-runtime.js
+  └─→ server.js.pilotCutoverControlPlaneReadiness
+          └─→ src/platform/cutover/pilot-cutover-alert-runtime.js
 ```
 
-该模块允许通过 `controlProvider` 注入依赖，但默认实现反向读取组合根。目标应是始终由 T00 注入 provider；本轮只记录，不修改。
+平台运行时不再导入组合根；worker CLI 是仓库内该用例的组合边界，并以懒 provider 复用
+现有控制面实现。库级调用者必须显式提供 provider；缺失、无效或抛错时返回受限错误码、
+`NO-GO` 和非授权投影。架构测试禁止反向依赖恢复，worker 组合测试锁定默认装配；本地候选
+已无该循环且只读 review 无 P0/P1，仍须经 PR 和 main CI 才能关闭 ARC-002。worker 继续加载较大的
+`server.js` 属 ARC-001 残余，不在本切片抽取控制面。
 
 ## 5. 重复与边界重叠
 

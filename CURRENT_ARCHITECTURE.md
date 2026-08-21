@@ -2,7 +2,8 @@
 
 > 实施分支 AS-IS 快照：基于 `main@a15d10dc67a7fd89540d3073ece34b5d8c7b942e`
 > 采集日期：2026-08-20
-> 性质：AS-IS，只描述已存在实现，不表达目标状态或实施授权。
+> 性质：AS-IS，只描述已存在实现，不表达目标状态或实施授权。ARC-002 条目另记录基于
+> `origin/main@fc42833e95156571fb197b16a959708db715f057` 的本地实施候选，尚未合入主线。
 
 ## 1. 系统轮廓
 
@@ -75,7 +76,11 @@ flowchart TB
 1. 静态服务器与 Pages 现按 `config/static-publication.json` 的 44 个入口递归收集显式浏览器资源；未知路径统一 404。
 2. 浏览器和 Service Worker 已迁移到合成的 `data/public-demo.json`；`data/db.json` 不进入静态制品。
 3. `server.js` 仍约 28.2k 行；SQLite migration 已抽离约 550 行，但路由拆分没有同步拆完组合根和领域实现。
-4. `server.js` 与 `src/platform/cutover/pilot-cutover-alert-runtime.js` 存在运行时 `require` 环。
+4. ARC-002 本地实施候选已删除 `pilot-cutover-alert-runtime` 对 `server.js` 的反向
+   `require`：运行时只消费显式 `controlProvider`，worker CLI 在组合边界懒注入现有
+   `pilotCutoverControlPlaneReadiness`。provider 缺失、返回值无效或抛错均投影为受限
+   `controlErrorCode` 和 `NO-GO`，不泄露错误正文；当前静态图不再形成该环，本地只读 review
+   无 P0/P1，待 PR 和 main CI 后关闭主线技术债。
 5. SQLite v1–v14 已迁入 `src/platform/storage/sqlite-migrations.js` 并冻结内容指纹；`STORAGE_SCHEMA_VERSION`、部署检查和测试统一从注册表 head v14 派生。历史 ledger 的 v1–v14 checksum 保持兼容，v15 起写入内容 SHA-256。
 6. TEST-001 候选已建立统一的 `build`、`lint`、`typecheck`、`test:unit`、`test:integration`、`test:smoke` 入口；build 复用静态发布 allowlist 并默认输出到仓库外，unit/integration 完整分区根测试，smoke 独立启动临时 JSON 运行时。lint 仍有 3 个文件的精确遗留规则例外，typecheck 当前只覆盖 6 个治理/安全边界文件。
 7. 审计验证在组合根与留存脚本重复实现；当前 `passed` 不包含链接完整性，普通内容哈希漂移也可能通过，且部分 API 在验证前重封访问日志。

@@ -17,7 +17,13 @@ function parseArgs(argv = process.argv.slice(2)) {
   };
 }
 
-async function run(parsed = parseArgs(), runtime = {}) {
+function createDefaultRuntime() {
+  return Object.freeze({
+    controlProvider: () => require("../server").pilotCutoverControlPlaneReadiness()
+  });
+}
+
+async function run(parsed = parseArgs(), runtime = createDefaultRuntime()) {
   if (parsed.command === "status") {
     const report = buildPilotCutoverAlertControlStatus({
       env: runtime.env || process.env,
@@ -71,4 +77,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { parseArgs, run };
+module.exports = { createDefaultRuntime, parseArgs, run };
