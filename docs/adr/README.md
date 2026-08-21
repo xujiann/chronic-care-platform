@@ -31,5 +31,6 @@
 | [PostgreSQL shadow 合同强化](./2026-08-21-postgresql-shadow-contract-hardening.md) | Accepted | schema 隔离、健康探针、batch/digest/version/tombstone 冲突 |
 | [连续审计投递与耐久 checkpoint](./2026-08-21-continuous-audit-delivery.md) | Accepted | SIEM/WORM、checkpoint v2、既有告警生命周期与 systemd |
 | [转诊写操作统一进入单一命令轨道](./2026-08-21-referral-single-command-track.md) | Accepted | 三条兼容 API、T05 owner command、CAS/幂等与资源范围 |
+| [科研合规导出职责分离与版本化命令](./2026-08-21-research-export-separation-of-duties.md) | Accepted | 导出申请、独立审核、发布证据、CAS、幂等与历史兼容 |
 
 模板见 [ADR_TEMPLATE.md](./ADR_TEMPLATE.md)。
