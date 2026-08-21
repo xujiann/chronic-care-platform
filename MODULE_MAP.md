@@ -29,6 +29,7 @@
 | 身份安全 | `src/identity-security/`、`production-adapters.js`、`session-store.js`、`auth-security-state-store.js` | Cookie/CSRF、OIDC/JWKS、SMS、会话仓储、共享 OTP/限流/锁定状态和 v2 审计链验证已模块化 |
 | 平台数据 | `src/platform/data/`、`src/platform/storage/` | 数据所有权、SQLite migration 注册表/runner、PostgreSQL 主存储契约 |
 | 领域事件 | `src/platform/events/`、各领域 worker | outbox/inbox、幂等和后台投递 |
+| 慢病随访 publisher | `citizen-chronic-followup-event-service.js`、`src/citizen-chronic/followup-event-publisher.js` | T04 自有 v1 事件、安全 HTTPS 投递端口、独立 activation verifier 和本地兼容适配；尚无生产 worker/持久 lease |
 | 审计投递 | `src/platform/operations/audit-delivery.js`、`scripts/audit-delivery-worker.js` | SIEM/WORM、checkpoint v2；复用 cutover alert lifecycle，外部门禁保持关闭 |
 | 区域运行 | `src/platform/regional/`、`regions/` | 多地区清单、能力包、复制和发布注册 |
 | 领域实现 | `src/care-coordination/` 等与根目录服务 | 新旧实现并存，边界尚未完全迁移 |
@@ -138,3 +139,25 @@ scripts/platform-cutover-alert-worker.js
 两个区域共享 GET builder 仍在组合根，`shared-05` 仍是混合路由；本切片只迁移 access command 并最小化 GET review 投影，不宣称区域共享模块已完整独立或已经具备跨进程生产事务。
 
 `config/process-workstreams.json` 对两个新 governance 源文件登记当前可验证的 T00 integration owner；这是跨 owner 接线期的源码责任，不改变 `domain-data-ownership.json` 中四个区域集合的目标 T02 数据 owner。后续正式移交必须在独立 ADR/流程变更中同时更新源码 owner 和运行时边界。
+## 12. 慢病随访 publisher 边界
+
+依赖方向为 `citizen-chronic HTTP route → followup event service → T04 publisher port → HTTPS
+provider`。publisher 只接受 `followupId/status/updatedAt/version` 四个事件 payload 字段，绑定
+event、correlation 和 payload digest；`requestId`/nonce 由 event 与 payload digest 稳定派生，
+允许重试重验供应方返回的完全相同幂等回执。生产先通过独立注入的 activation verifier，再做
+公网解析、HTTPS/443、无重定向和 HMAC 回执校验；service 只接受模块私有 capability，不能信任
+自定义 publisher 的布尔声明。机构 route 在外发前按 resident/org scope 建立 aggregate allowlist
+并先持久化授权/尝试安全审计；审计不可用时不调用 publisher。该边界没有反向依赖
+`server.js`，也未引入 worker、schema 或 T00 运行时装配。
+
+## 13. T05 转诊命令 owner
+
+`src/care-coordination/referral-command-service.js` 是 `referral-order.v1` 的唯一写 owner。`care-coordination` 路由中的直接转诊动作、通用 workflow 兼容分支和统一 task 兼容分支只负责 HTTP 适配与原响应映射，不得直接修改 `referralSystem.referrals`。居民任务消息仍是 owner command 成功后的兼容副作用，不属于转诊聚合事务。
+
+## 14. 健康驾驶舱指标合同
+
+T02 新增的 `health-dashboard-indicator-contract` 是纯合同/测量模块，依赖既有
+`technical-evidence` 稳定摘要工具，不读取存储、路由或组合根。遗留
+`health-dashboard-summary` 仍是大型兼容聚合器，但首个门急诊指标已通过小端口获得可测试的
+定义、测量和 fail-closed 质量语义。历史 `industry-*` ID 继续兼容，并同时公开 canonical
+ID 与弃用 alias；后续指标必须按 owner 逐个接入，不得继续按数组位置复用定义和值。

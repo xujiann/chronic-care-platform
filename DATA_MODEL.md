@@ -75,6 +75,14 @@ erDiagram
 
 `config/domain-data-ownership.json` 只登记 83 个集合：platform-governance 32、care 11、public-health 10、clinical 9、integration 7、citizen 6、identity 5、insurance 2、research 1。其余集合按策略为 `legacy-non-authoritative`，禁止直接晋升为生产写模型。
 
+`followups` 继续由 citizen-chronic/T04 拥有；随访事件 outbox、inbox、projection 和 receipt
+仍嵌在该聚合的 `domainRuntime` 中。本切片只增加安全 publisher 端口，没有新集合、DDL、
+migration 或事实源变化。receipt 不保存供应方原始回执 ID、签名或正文，只保存事件关联、
+payload/request/receipt/provider/signature/activation 摘要、occurredAt 和 `accepted|delivered`
+状态；outbox 同步保存外部状态。HTTP dispatch 成功后仍通过既有整体状态写回持久化；批次
+外发或最终整体写回失败时输入快照保持 pending，后续以稳定幂等键重试。缺少独立持久 lease、
+attempt/backoff 和 dead-letter，因此不能把当前结构描述为多实例生产投递仓储。
+
 ## 5. PostgreSQL 结构
 
 已跟踪 SQL 至少定义 13 张生产候选表：
@@ -86,6 +94,10 @@ erDiagram
 - 急救信号投递：outbox、replay。
 
 此外脚本生成 MPI、collection migration 和 runtime sync SQL；PostgreSQL migration package 同时创建 runtime sync、中央会话与 `auth_security_state` 表。生产是否真实建立这些表取决于外部环境证据，仓库不得宣称已切换。
+
+### 转诊命令持久化
+
+三条转诊 HTTP 写入口共用既有 `referralSystem.referrals`、`referralCommandInbox` 与 `referralOutbox`。一次非重放命令在同一 UoW 中写入聚合新版本、幂等收件箱回执和 `care-coordination.referral-updated.v1` 发件箱事件；旧记录缺少 `version` 时按既有兼容规则解释为 1。REF-01a 不新增表、集合或 migration。
 
 ## 6. 核心数据不可变边界
 
@@ -130,3 +142,11 @@ erDiagram
 新回执保存授权引用/版本、结构化用途、范围、共享包前后版本、幂等键哈希、规范请求摘要、稳定结论码和关联 ID；不保存原始幂等键、客户端备注或自由文本用途。受限数据访问日志保留内部 `residentId` 以支持居民访问历史，但身份证/电话组合 `personIndex` 改为以随机回执 ID 加盐的摘要引用，主体与用途也只保存摘要引用；通用 `dataAccessLogs/securityEvents` 仍受 120 条保留上限约束，长期不可变权威证据是未截断的 `regionalSharingAccessReviews` 回执历史。GET/POST HTTP 响应另经专用 allowlist，不输出居民/授权/摘要载荷。现有 SQLite v1-v14 DDL 不变，集合继续使用 `state_collections` payload，因此本切片不增加 v15 migration；生产回填、核对与回滚证据登记在 `config/regional-sharing-access-data-contract.json`，切换授权仍为 false。
 
 四个区域 owner 集合均为 legacy state writer 的 server-managed 字段：全量提交时只能省略或深相等，省略从现有状态恢复；集合级写入被拒绝。该规则同时保护 receipt 顺序/原值以及 package `version`、`lastAccessReviewId`，避免客户端绕过命令 CAS。演示 reset 仅允许非生产，生产固定失败关闭。
+## 10. 健康驾驶舱指标测量
+
+`population-service-visits.v1` 是代码内版本化逻辑合同，不新增集合、表、DDL 或 migration。
+测量只读取既有 `healthStatistics.dailyServiceReports` 与 `healthStatistics.serviceReports` 聚合，
+不持久化为权威事实。日报必须具备受认可的签名摘要或获批来源版本才可能达到 `ready`；月报
+比例折算明确标记为 estimated/blocked。缺少服务端区域范围、来源水位或完整证据同样失败关闭。
+如后续把测量快照晋升为生产事实，必须先登记数据 owner、分类、reader、write contract，并由
+T00 建立 migration 和回滚证据。

@@ -80,6 +80,16 @@ HTTP request
 - `PUT /api/state` 保持原路径和成功形状。审计数组以及四个 T02 区域共享集合均为服务端管理字段：省略时保留，提交时必须与当前值逐项深相等。区域集合的删除、修改、重排或伪造追加优先返回 `409 REGIONAL_SHARING_SERVER_MANAGED_COLLECTION_CONFLICT`；其他集合的乐观版本冲突仍返回 `409 STORAGE_CONFLICT`。集合级兼容入口对四个区域集合返回 `403 REGIONAL_SHARING_SERVER_MANAGED_COLLECTION_WRITE_DENIED`。
 - `npm run api:authorization-matrix` 从模块化路由源码生成/校验 owner、身份、角色、范围、用途和九条高风险接口唯一性。
 - 身份/SMS HTTP 路径保持不变；组合根已为短信发送生成随机 request ID，适配器现在拒绝缺失幂等 ID，OIDC refresh 返回的 ID token 必须通过 JWKS/claims 验证后才暴露脱敏 claims。
+- `GET /api/chronic/followup-events/health` 兼容增加脱敏 publisher readiness；不返回 endpoint、
+  secret 或外部回执。`POST /api/chronic/followup-events/dispatch` 保持 method/path、角色和成功
+  shape；机构调用仅可看到并投递 resident/org 双重范围内的聚合，拒绝发生在外发前，成功、
+  拒绝、外发失败和最终写回失败均记录安全审计；授权/尝试审计必须先持久化，否则在 publisher
+  调用和领域状态写入前以 `FOLLOWUP_EVENT_DISPATCH_AUDIT_UNAVAILABLE` 失败关闭。非生产继续
+  使用本地回执；生产缺少独立
+  activation verifier、安全 HTTPS/HMAC 配置或可信 receipt capability 时以稳定
+  `FOLLOWUP_EVENT_PUBLISHER_*` 错误失败且 outbox 保持 pending，`productionReady` 始终为
+  `false`。本切片不提供 worker、lease 或多实例 exactly-once 声明。
+- 科研合规导出创建路径保持 `POST /api/research/datasets/:id/compliant-exports`，但新记录只进入 `pending/blocked`；`POST /api/research/compliant-exports/:id/actions` 由 commission 执行独立审核、退回和发布。命令要求 `expectedVersion` 与幂等键，同键异载荷或陈旧版本返回稳定 409；机构列表只返回本主体申请，历史 released 记录保持只读兼容。
 
 ## 7. API 风险与缺失测试
 
@@ -112,3 +122,15 @@ HTTP request
 通用 `PUT /api/state` 不再是区域共享 owner 写端口。`regionalDataSharingScope`、`regionalSharingPackages`、`regionalSharingSnapshots`、`regionalSharingAccessReviews` 只能省略或回传服务端当前精确值；省略会保留，任何客户端删改、重排、伪造追加以及 package `version`/`lastAccessReviewId` 改写均失败关闭。区域命令仍是 packages/access receipts 的唯一业务写入口。
 
 `POST /api/reset` 保留为非生产演示工具；在 `NODE_ENV=production` 时固定返回 `403 DEMO_RESET_DISABLED_IN_PRODUCTION`，不得用于清空区域共享权威回执。
+## 10. T05 转诊命令 API
+
+`POST /api/referrals/:id/actions`、`POST /api/workflow-actions`（`collection=referrals`）与 `POST /api/tasks/:id/actions`（`referrals:*`）继续保留原路径和各自成功响应形状，现统一进入 `referral-order.v1` owner command。三条路径均要求 `Idempotency-Key` 和正整数 `expectedVersion`；冲突、越权、超长字段和 action allowlist 失败返回稳定 `REFERRAL_*` code。权限在幂等回放和版本 CAS 之前执行。
+
+## 11. 健康驾驶舱指标合同 API 投影
+
+`GET /api/health-dashboard/summary` 与
+`GET /api/health-dashboard/industry-governance-indicators` 的 method/path、commission-only
+角色和既有响应字段保持不变。指标条目加法返回 canonical ID、显式 legacy alias、
+`health-dashboard-indicator-contract.v1` 定义及 `population-service-visits.v1` 测量；summary
+加法返回合同版本和阻断测量数。范围只接受服务端运行时注入，未解析范围或未经签名/版本认可的
+来源返回 `blocked` 元数据，不会因报告结构 `ok=true` 被提升为生产证据。

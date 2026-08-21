@@ -229,6 +229,10 @@ function workflowRows(state, collection) {
 }
 
 async function updateWorkflowAction(state, collection, id, updates, note) {
+  const current = workflowRows(state, collection).find((item) => item.id === id);
+  const referralCommandId = collection === "referrals"
+    ? globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`
+    : "";
   const payload = {
     collection,
     id,
@@ -238,14 +242,18 @@ async function updateWorkflowAction(state, collection, id, updates, note) {
     correctionRequired: updates.correctionRequired,
     publicVisible: updates.publicVisible,
     updates,
-    note
+    note,
+    ...(collection === "referrals" ? { expectedVersion: Number(current?.version || 1) } : {})
   };
   if (API_BASE) {
     try {
       const request = window.HealthCityAuth?.authFetch || fetch;
       const response = await request(`${API_BASE}/workflow-actions`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(referralCommandId ? { "Idempotency-Key": referralCommandId } : {})
+        },
         body: JSON.stringify(payload)
       });
       if (response.ok) {

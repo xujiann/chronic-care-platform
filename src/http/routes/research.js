@@ -7,9 +7,26 @@ const {
   canReadResearchDataset,
   normalizeResearchPurpose
 } = require("../research/sandbox-read-model");
+const {
+  ResearchExportWorkflowError,
+  applyCompliantExportAction,
+  createCompliantExportRequest,
+  isExportVisibleToUser
+} = require("../research/compliant-export-workflow");
+
+function sendResearchExportError(sendJson, res, error) {
+  const knownError = error instanceof ResearchExportWorkflowError;
+  const status = knownError ? error.status : 400;
+  const errorName = status === 403 ? "Forbidden" : status === 404 ? "Not Found" : status === 409 ? "Conflict" : "Bad Request";
+  sendJson(res, status, {
+    error: errorName,
+    code: knownError ? error.code : "RESEARCH_EXPORT_INVALID_REQUEST",
+    message: error.message
+  });
+}
 
 function createRouteSegments(runtime) {
-  const { appendResearchAudit, buildResearchSandboxSummary, collectJson, normalizeCompliantDataExport, normalizeResearchApproval, normalizeResearchDatasetApplication, normalizeResearchEvidenceDocument, readDatabase, requireApiRole, requireDatasetSandboxAccess, sendJson, writeDatabase } = runtime;
+  const { appendResearchAudit, buildResearchSandboxSummary, collectJson, normalizeResearchApproval, normalizeResearchDatasetApplication, normalizeResearchEvidenceDocument, readDatabase, requireApiRole, requireDatasetSandboxAccess, sendJson, writeDatabase } = runtime;
   return [
     {
       id: "research-01",
@@ -33,7 +50,9 @@ function createRouteSegments(runtime) {
         const user = requireApiRole(req, res, ["commission", "institution"], "/api/research/compliant-exports");
         if (!user) return true;
         const data = readDatabase();
-        sendJson(res, 200, { exports: Array.isArray(data.compliantDataExports) ? data.compliantDataExports : [] });
+        const exports = (Array.isArray(data.compliantDataExports) ? data.compliantDataExports : [])
+          .filter((item) => isExportVisibleToUser(item, user));
+        sendJson(res, 200, { exports });
         return true;
       }
 
@@ -290,7 +309,13 @@ function createRouteSegments(runtime) {
         const id = decodeURIComponent(researchCompliantExportMatch[1]);
         const index = (data.researchDatasets || []).findIndex((item) => item.id === id);
         if (index < 0) {
-          sendJson(res, 404, { error: "Not Found", message: "Research dataset not found" });
+          sendJson(res, 404, { error: "Not Found", code: "RESEARCH_DATASET_NOT_FOUND", message: "Research dataset not found" });
+          return true;
+        }
+        if (!canReadResearchDataset(user, data.researchDatasets[index])) {
+          appendResearchAudit(data, user, data.researchDatasets[index], "compliant-export-request", "dataset scope denied", "denied");
+          writeDatabase(data);
+          sendJson(res, 403, { error: "Forbidden", code: "RESEARCH_DATASET_SCOPE_DENIED", message: "Dataset is outside the caller research scope" });
           return true;
         }
         if (!requireDatasetSandboxAccess(data.researchDatasets[index])) {
@@ -301,16 +326,60 @@ function createRouteSegments(runtime) {
         }
         try {
           const payload = await collectJson(req);
-          const exportRequest = normalizeCompliantDataExport(payload, user, data.researchDatasets[index]);
+          const exportRequest = createCompliantExportRequest(payload, user, data.researchDatasets[index]);
+          if ((data.compliantDataExports || []).some((item) => item.id === exportRequest.id)) {
+            throw new ResearchExportWorkflowError("RESEARCH_EXPORT_ID_CONFLICT", "Compliant export id already exists", 409);
+          }
           data.compliantDataExports = [
             exportRequest,
             ...(Array.isArray(data.compliantDataExports) ? data.compliantDataExports : [])
           ].slice(0, 120);
-          appendResearchAudit(data, user, data.researchDatasets[index], "compliant-data-export", `${exportRequest.id}:${exportRequest.destination}`);
+          appendResearchAudit(data, user, data.researchDatasets[index], "compliant-export-request", `${exportRequest.id}:${exportRequest.destination}`, "submitted");
           writeDatabase(data);
           sendJson(res, 201, exportRequest);
         } catch (error) {
-          sendJson(res, 400, { error: "Bad Request", message: error.message });
+          appendResearchAudit(data, user, data.researchDatasets[index], "compliant-export-request", error.code || error.message, "denied");
+          writeDatabase(data);
+          sendResearchExportError(sendJson, res, error);
+        }
+        return true;
+      }
+
+      const researchCompliantExportActionMatch = url.pathname.match(/^\/api\/research\/compliant-exports\/([^/]+)\/actions$/);
+      if (req.method === "POST" && researchCompliantExportActionMatch) {
+        const user = requireApiRole(req, res, ["commission"], "/api/research/compliant-exports/:id/actions");
+        if (!user) return true;
+        const data = readDatabase();
+        const id = decodeURIComponent(researchCompliantExportActionMatch[1]);
+        const exportIndex = (data.compliantDataExports || []).findIndex((item) => item.id === id);
+        if (exportIndex < 0) {
+          sendJson(res, 404, { error: "Not Found", code: "RESEARCH_EXPORT_NOT_FOUND", message: "Compliant export not found" });
+          return true;
+        }
+        const currentExport = data.compliantDataExports[exportIndex];
+        const dataset = (data.researchDatasets || []).find((item) => item.id === currentExport.datasetId);
+        if (!dataset) {
+          sendJson(res, 409, { error: "Conflict", code: "RESEARCH_EXPORT_DATASET_MISSING", message: "Export dataset reference is missing" });
+          return true;
+        }
+        try {
+          const payload = await collectJson(req);
+          const result = applyCompliantExportAction(currentExport, payload, user, {
+            commandId: req.headers["idempotency-key"] || payload.commandId
+          });
+          if (result.replayed) {
+            sendJson(res, 200, { ...result.exportRecord, replayed: true });
+            return true;
+          }
+          data.compliantDataExports[exportIndex] = result.exportRecord;
+          const decision = result.exportRecord.decisionHistory.at(-1);
+          appendResearchAudit(data, user, dataset, `compliant-export-${decision.action}`, `${id}:v${result.exportRecord.domainVersion}`, "allowed");
+          writeDatabase(data);
+          sendJson(res, 200, { ...result.exportRecord, replayed: false });
+        } catch (error) {
+          appendResearchAudit(data, user, dataset, "compliant-export-decision", `${id}:${error.code || error.message}`, "denied");
+          writeDatabase(data);
+          sendResearchExportError(sendJson, res, error);
         }
         return true;
       }

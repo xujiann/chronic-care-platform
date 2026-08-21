@@ -118,6 +118,11 @@ JSON 源快照仍是高扇出依赖，但浏览器和 Pages 只依赖经统一�
 - systemd：PostgreSQL sync/reconcile、platform shadow relay/reconcile、care outbox worker。
 - 领域 worker：referral delivery、emergency signal、insurance payment、public health 等。
 - 平台事件：通用 pending outbox publish runtime。
+- 慢病随访：T04 当前仅有受权 HTTP dispatch；生产依赖 T04 自有签名 HTTPS publisher 和独立
+  activation verifier，未在 T00 组合根注入 verifier 时默认失败关闭。机构范围 allowlist、
+  前置授权审计门禁、publisher 私有 receipt capability 和结果审计均位于该调用链；非生产可用
+  本地模拟。尚未建立
+  worker、持久 lease/checkpoint、退避和死信，不得计作已上线的后台任务。
 - 切换告警 worker：CLI 组合层懒注入中央控制面，库级告警运行时不反向依赖组合根。
 
 没有单一队列产品；不同 worker 各自实现 lease、checkpoint、retry 或 receipt。优点是依赖少，风险是重试语义、观测和运维接口不一致。
@@ -169,3 +174,13 @@ JSON 源快照仍是高扇出依赖，但浏览器和 Pages 只依赖经统一�
 数据依赖为 `T02 regionalSharingPackages/accessReviews → resident-authorization-decision.v1 → T04 personalRecords`。反向只允许 T04/identity-security 消费 `regional-sharing-access-receipt.v1`，不得由 T02 写授权事实。单进程 package queue 只保护当前兼容适配器，生产仍因 `productionCutoverAuthorized=false`、非 PostgreSQL 或 atomic repository 缺失而失败关闭；regional site evidence lifecycle 不进入授权决策。
 
 遗留状态写方向被限制为 `commission PUT /api/state → state-data guard → 非区域集合`：四个区域 owner 集合只能省略或深相等，不能流入 `normalizeState/writeDatabase`；`/api/state-collections/:collection` 同样拒绝它们。`POST /api/reset` 只在非生产到达 seed/write，production 在边界失败关闭。
+## 12. T05 转诊命令依赖约束
+
+转诊写依赖方向为 `shared.js / citizen.js → 三条兼容 HTTP 路径 → referral-command-service → DomainRepository → referrals + command inbox + outbox`。领域服务只依赖平台 contract、repository 和 event runtime，不导入 `server.js` 或其他子域内部；HTTP 层注入居民授权和 JSON 存储端口。兼容路由不得绕过 owner command，居民任务消息和安全审计在命令成功后由 HTTP 层保留。
+
+## 13. 健康驾驶舱指标合同依赖
+
+依赖方向为 `health-dashboard-summary → health-dashboard-indicator-contract.v1 →
+technical-evidence.sha256`。合同模块不依赖 `server.js`、HTTP 路由、JSON 文件或数据库实现；
+调用方显式传入人口服务聚合、来源元数据、服务端 scope 与计算时间。T03 继续拥有日报/月报来源，
+T02 只拥有聚合合同和测量投影。当前 runtime 路由仍归 T01，本切片没有移动路由或改变组合顺序。

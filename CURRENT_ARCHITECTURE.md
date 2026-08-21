@@ -87,6 +87,15 @@ flowchart TB
 7. 审计验证已收敛到 `src/identity-security/audit-chain.js` 的 v2 严格端口；内容、链接、结构和重复 ID 任一异常均失败，验证 API/合规报告不再读取时重封。全量状态写入中的审计数组由服务端管理。
 8. 机器 API 授权矩阵扫描全部模块化路由源码的 `requireApiRole` 声明，并对九条高风险接口锁定 owner、角色、范围和用途；CI 对声明数量和高风险唯一性 fail closed。
 9. P1 生产适配器增量保持现有 owner：T01 的 `production-adapters.js` 承担 JWKS/JWT 与 SMS 协议；OTP、发送/登录限流和失败锁定由共享 `auth-security-state-store` 承载，单主机 SQLite 复用 `state_collections`、生产多实例使用组合根长期 PostgreSQL pool；T00 的 PostgreSQL 组合保持 shadow/rehearsal 且 `productionPrimary=false`；连续审计投递复用既有 cutover alert lifecycle 与 operational signal。
+10. T04 的慢病随访事件保留 `citizen-chronic.followup-updated.v1` 和既有 API，新增
+    `src/citizen-chronic/followup-event-publisher.js` 作为签名 HTTPS publisher 端口。默认本地
+    回执只在非生产且未配置远端时可用；生产必须注入独立 activation verifier，环境字符串不
+    能证明启用证据。端口拒绝非 HTTPS/443、回环、私网、链路本地目标和重定向，以稳定的
+    event/payload 幂等键发送，验签后仅向 service 交付私有 capability。机构 dispatch 在读取后、
+    外发前按居民和机构范围过滤，并要求授权/尝试审计先成功持久化，再记录成功/失败结果审计；
+    持久状态只保留可重验摘要及
+    accepted/delivered 状态。当前仍由受权 HTTP dispatch 同步触发，没有 worker、租约、死信
+    或多实例持久投递仓储，因此 `productionReady` 继续为 `false`。
 
 ## 6. T06 五子域治理切片
 
@@ -109,3 +118,17 @@ flowchart TB
 T00 同时在 T02 `state-data` 兼容边界关闭通用写旁路：四个已登记的区域 owner 集合在 `PUT /api/state` 中只能省略或与当前服务端值深相等，集合级 legacy writer 一律拒绝。命令回执不能由 commission 删除、改写、重排或伪造追加，共享包版本和 `lastAccessReviewId` 也不能绕过命令改写。
 
 演示数据重置仍保留旧 path/角色以支持非生产验收，但 production 请求在读取 seed 或写库前返回 `DEMO_RESET_DISABLED_IN_PRODUCTION`；因此 reset 不是生产回执删除入口。
+## 8. T05 转诊单一命令轨道
+
+本实施分支保留 `/api/referrals/:id/actions`、`/api/workflow-actions` 和 `/api/tasks/:id/actions` 三条公开路径及原成功响应形状，但 `collection=referrals` 的写入统一委托 `src/care-coordination/referral-command-service.js`。权限先于 inbox 重放和 CAS；机构按 from/to/org、区县主体按 region、居民按本人或家庭授权校验。聚合、command inbox 和 outbox 继续由既有 UoW 原子提交，未新增 schema、部署进程或转诊核心概念。
+
+## 9. 健康驾驶舱指标治理首切片
+
+`src/platform/governance/health-dashboard-indicator-contract.js` 已建立
+`health-dashboard-indicator-contract.v1`，首个定义为月度门急诊人次
+`population-service-visits.v1`。合同冻结 T02 聚合 owner、T03 来源 owner、公式、类型、
+单位、自然月周期和 `Asia/Shanghai` 时区；测量附带服务端范围、水位、来源版本、质量状态、
+阻断项和稳定摘要。现有两个 API、commission 鉴权和旧字段不变，新元数据通过指标条目和
+summary 加法暴露。当前样例日报缺受认可的签名/版本且运行时未注入区域范围，因此测量保持
+`blocked`，不能作为生产证据。三个历史 `industry-*` ID 由按 canonical ID 键控的显式弃用
+alias 兼容，不再按数组位置改名。

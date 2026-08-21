@@ -14,6 +14,7 @@
 | ARC-003 | 宽接口 | public-health runtime context 160 个依赖 | 组合根和路由同步变化，难形成领域端口 |
 | ARC-004 | 前端超大模块 | 数智医院 app 10.5k、citizen 6k、公卫 4.4k | 全局状态、渲染和流程耦合 |
 | ARC-007 | 临床子域隔离 | 急救、血液、影像、体检首个查询端口已建立，但两个混合路由仍承载写命令；血液 GET 有内存规范化，影像和体检 GET 有审计持久化；operations dashboard 已移交 T02，32 个 command 字面路径仍错位 | 按特征测试逐用例迁移；禁止 dashboard 回流 T06，后续独立移交 command，不把兼容副作用误写成纯查询 |
+| CHR-001 | 慢病随访事件投递 | T04 已有原子内嵌 outbox、幂等 inbox、稳定幂等键、独立 activation verifier、范围过滤、审计和签名 HTTPS publisher；单进程并发可合并，但批次/写回失败会再次发出同幂等键请求 | 仍需 T00/T04 独立任务建立 verifier 组合、持久 worker、lease、attempt/backoff、死信、供应方幂等核对和部署观测；当前不能承诺跨进程 exactly-once，不得关闭生产 Go/No-Go |
 | SEC-004 | XSS 面 | 871 个 HTML sink，CSP 允许 inline | 需可信渲染接口和逐页负向测试 |
 | SEC-005 | 混合会话 | HttpOnly Cookie 已建立，但 localStorage/demo bearer 兼容仍存在 | 降级路径、XSS 后凭据暴露面 |
 | DATA-003 | 集合治理 | JSON 252 个集合，只有 83 个有 owner | 169 个遗留集合不能安全晋升生产 |
@@ -62,6 +63,7 @@
 - 同名文件和新旧目录是重复候选，不是删除证据。
 - 未确认可直接删除的死代码；删除必须有调用图、测试/运行证据和 owner 决策。
 - 英文代码、中文文档、日期化治理文档、readiness/report/audit 命名同时存在。新文件按现行标准命名，旧公共入口不做批量重命名。
+- 转诊聚合原有 direct、workflow、task 三套并行写语义已在 REF-01a 收敛为 T05 owner command；兼容 API 保留，但守卫测试禁止重新直接写 `referralSystem.referrals`。
 
 ## 测试缺口优先顺序
 
@@ -79,3 +81,12 @@
 - 两个区域共享 GET builder 和 `shared-05` 混合路由尚未移交 T02；当前只完成 access command 的唯一实现，不能宣称整个区域共享模块已解耦。
 - 仍需生产级 role × org × region × purpose × scope × revoke 运行矩阵、真实多实例并发冲突、遮罩全量迁移/回滚及不可变外部审计留存证据。
 - 通用 `dataAccessLogs/securityEvents` 仍只有 120 条保留窗口；未截断 access receipt 是当前权威历史，长期 WORM/SIEM 留存仍待生产适配。
+## 健康驾驶舱指标治理状态
+
+- DASH-001 已建立首个版本化指标合同，并消除三个 `industry-*` 兼容 ID 的数组位置映射；
+  alias 仍保留旧展示语义，必须在调用方迁移完成前视为弃用兼容债务。
+- 当前 `population-service-visits.v1` 因来源缺少受认可的签名/版本以及服务端 region scope
+  注入而保持 `blocked`。真实日报 owner 签字、字段字典、水位、迟到修订和质量阈值仍是 P1/现场
+  阻断项；不得以样例 receipt 或仓库测试替代。
+- 其余指标仍是未版本化的展示定义。后续按 T03–T09 数据 owner 逐项建立合同，不能把驾驶舱
+  变成跨域写模型或居民级下钻入口。

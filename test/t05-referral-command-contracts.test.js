@@ -16,6 +16,7 @@ const { createRouteSegments } = require("../src/http/routes/care-coordination");
 function fixture() {
   return {
     residents: [{ id: "r1" }],
+    medicalResources: [{ id: "mr-primary", institution: "社区卫生服务中心", region: "中山区" }],
     referralSystem: {
       referrals: [{
         id: "rf1",
@@ -51,7 +52,7 @@ test("referral command commits aggregate, versioned contract, outbox and inbox i
     commandId: " referral-command-001 ",
     expectedVersion: 1,
     correlationId: "trace-referral-12345678",
-    actor: { username: "county", name: "County Operator", role: "county" },
+    actor: { username: "county", name: "County Operator", role: "county", orgName: "中山区县域医共体", region: "中山区" },
     input: { status: "已接诊", receivingFeedback: "接诊资源已确认" }
   });
 
@@ -75,7 +76,7 @@ test("referral command commits aggregate, versioned contract, outbox and inbox i
     commandId: "referral-command-001",
     expectedVersion: 1,
     correlationId: "trace-retry-12345678",
-    actor: { username: "county", name: "County Operator", role: "county" },
+    actor: { username: "county", name: "County Operator", role: "county", orgName: "中山区县域医共体", region: "中山区" },
     input: { status: "已接诊", receivingFeedback: "接诊资源已确认" }
   });
   assert.equal(replay.replayed, true);
@@ -89,7 +90,7 @@ test("referral command commits aggregate, versioned contract, outbox and inbox i
     commandId: "referral-command-002",
     expectedVersion: 2,
     correlationId: "trace-referral-next-1234",
-    actor: { username: "county", name: "County Operator", role: "county" },
+    actor: { username: "county", name: "County Operator", role: "county", orgName: "中山区县域医共体", region: "中山区" },
     input: { status: "已完成" }
   });
   const lateReplay = await service.update({
@@ -97,7 +98,7 @@ test("referral command commits aggregate, versioned contract, outbox and inbox i
     commandId: "referral-command-001",
     expectedVersion: 1,
     correlationId: "trace-late-retry-1234",
-    actor: { username: "county", name: "County Operator", role: "county" },
+    actor: { username: "county", name: "County Operator", role: "county", orgName: "中山区县域医共体", region: "中山区" },
     input: { status: "已接诊", receivingFeedback: "接诊资源已确认" }
   });
   assert.equal(state.referralSystem.referrals[0].version, 3);
@@ -118,6 +119,8 @@ test("referral command rejects stale versions and idempotency-key intent drift",
       referralId: "rf1",
       commandId: "referral-command-stale",
       expectedVersion: 2,
+      source: "internal",
+      actor: { id: "referral-contract-test", role: "system" },
       input: { status: "已接诊" }
     }),
     (error) => error.code === "REFERRAL_VERSION_CONFLICT" && error.statusCode === 409
@@ -127,6 +130,8 @@ test("referral command rejects stale versions and idempotency-key intent drift",
     referralId: "rf1",
     commandId: "referral-command-drift",
     expectedVersion: 1,
+    source: "internal",
+    actor: { id: "referral-contract-test", role: "system" },
     input: { status: "已接诊" }
   });
   await assert.rejects(
@@ -134,6 +139,8 @@ test("referral command rejects stale versions and idempotency-key intent drift",
       referralId: "rf1",
       commandId: "referral-command-drift",
       expectedVersion: 1,
+      source: "internal",
+      actor: { id: "referral-contract-test", role: "system" },
       input: { status: "已取消" }
     }),
     (error) => error.code === "REFERRAL_COMMAND_IDEMPOTENCY_CONFLICT" && error.statusCode === 409
@@ -157,6 +164,8 @@ test("concurrent duplicate commands commit once across service instances", async
     commandId: "concurrent-referral-command",
     expectedVersion: 1,
     correlationId: "trace-concurrent-1234",
+    source: "internal",
+    actor: { id: "referral-concurrency-test", role: "system" },
     input: { status: "已接诊" }
   };
   const [left, right] = await Promise.all([
@@ -208,7 +217,7 @@ test("T05 route exposes an authorized idempotent referral command", async () => 
       receivingFeedback: "route-level receipt"
     }),
     readDatabase: () => state,
-    requireApiRole: () => ({ username: "county", name: "County Operator", role: "county" }),
+    requireApiRole: () => ({ username: "county", name: "County Operator", role: "county", orgName: "中山区县域医共体", region: "中山区" }),
     sendJson: (res, status, body) => {
       responses.push({ status, body });
       res.statusCode = status;
