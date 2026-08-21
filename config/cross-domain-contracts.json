@@ -32,6 +32,22 @@
       "consumers": ["clinical-specialties", "platform-governance", "integration"],
       "classification": "restricted",
       "requiredFields": ["signalId", "occurredAt", "signalType", "status"]
+    },
+    {
+      "id": "resident-authorization-decision.v1",
+      "version": "1.0.0",
+      "owner": "citizen-chronic",
+      "consumers": ["platform-governance"],
+      "classification": "restricted",
+      "requiredFields": ["authorizationId", "residentId", "granteeId", "purpose", "scopes", "status", "expiresAt", "version"]
+    },
+    {
+      "id": "regional-sharing-access-receipt.v1",
+      "version": "1.0.0",
+      "owner": "platform-governance",
+      "consumers": ["citizen-chronic", "identity-security"],
+      "classification": "restricted",
+      "requiredFields": ["id", "packageId", "residentId", "authorizationId", "authorizationVersion", "decision", "idempotencyKeyHash", "requestDigest", "version"]
     }
   ]
 }

@@ -125,7 +125,21 @@ scripts/platform-cutover-alert-worker.js
   Pages、complete-unit-test、governance-api 和 release-readiness 只消费这些标准入口；
   `test:all` 仍是独立的自动发现回归保护。
 
-## 11. 慢病随访 publisher 边界
+## 11. 区域共享调阅命令
+
+| 模块 | Owner / Process | 类型 | 当前边界 |
+|---|---|---|---|
+| `src/platform/governance/regional-sharing-access-command.js` | 机器 owner T00 integration；目标 platform-governance / T02 | `regional-sharing-access-command.v1` 写用例 | 服务端授权、幂等、应用层 CAS、package queue、回执与审计组装；不导入 `server.js` |
+| `src/platform/governance/resident-authorization-decision-adapter.js` | 机器 owner T00 integration；目标 T02 consumer adapter | `resident-authorization-decision.v1` anti-corruption adapter | 唯一读取 T04 `personalRecords` meta 的边界；命令只消费结构化决策端口 |
+| `src/http/routes/shared.js` 的 `shared-05` | 兼容 HTTP 适配器 | 原 method/path/顺序 | 认证外层、读取/写入端口、兼容响应头；不再拥有旧 review 决策函数 |
+| `src/http/routes/state-data.js` | platform-state / T02；跨 owner 收口 T00 | legacy state 兼容边界 | 四个区域集合只能省略或深相等，拒绝全量/集合级客户端旁路 |
+| `citizen-records-v1/v2` | citizen-chronic / T04 | 授权事实端口 | 提供授权状态与 lifecycle；T02 只读消费，不复制授权模型 |
+| `config/regional-sharing-access-data-contract.json` | T00/T02 治理证据 | 数据晋升合同 | 锁定 owner、跨域合同、无 DDL 迁移理由、回滚和生产 NO-GO |
+
+两个区域共享 GET builder 仍在组合根，`shared-05` 仍是混合路由；本切片只迁移 access command 并最小化 GET review 投影，不宣称区域共享模块已完整独立或已经具备跨进程生产事务。
+
+`config/process-workstreams.json` 对两个新 governance 源文件登记当前可验证的 T00 integration owner；这是跨 owner 接线期的源码责任，不改变 `domain-data-ownership.json` 中四个区域集合的目标 T02 数据 owner。后续正式移交必须在独立 ADR/流程变更中同时更新源码 owner 和运行时边界。
+## 12. 慢病随访 publisher 边界
 
 依赖方向为 `citizen-chronic HTTP route → followup event service → T04 publisher port → HTTPS
 provider`。publisher 只接受 `followupId/status/updatedAt/version` 四个事件 payload 字段，绑定
@@ -136,11 +150,11 @@ event、correlation 和 payload digest；`requestId`/nonce 由 event 与 payload
 并先持久化授权/尝试安全审计；审计不可用时不调用 publisher。该边界没有反向依赖
 `server.js`，也未引入 worker、schema 或 T00 运行时装配。
 
-## 12. T05 转诊命令 owner
+## 13. T05 转诊命令 owner
 
 `src/care-coordination/referral-command-service.js` 是 `referral-order.v1` 的唯一写 owner。`care-coordination` 路由中的直接转诊动作、通用 workflow 兼容分支和统一 task 兼容分支只负责 HTTP 适配与原响应映射，不得直接修改 `referralSystem.referrals`。居民任务消息仍是 owner command 成功后的兼容副作用，不属于转诊聚合事务。
 
-## 13. 健康驾驶舱指标合同
+## 14. 健康驾驶舱指标合同
 
 T02 新增的 `health-dashboard-indicator-contract` 是纯合同/测量模块，依赖既有
 `technical-evidence` 稳定摘要工具，不读取存储、路由或组合根。遗留

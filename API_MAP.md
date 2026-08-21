@@ -77,7 +77,7 @@ HTTP request
 - 错误格式仍由不同路由模块自行构造，存在 `{error}`、`{ok,code,message}` 等多种形态。
 - 审计追加点分散在组合根、路由和领域服务；统一审计契约尚未完全落地。
 - `GET /api/audit/verify` 继续返回 HTTP 200 的可解析业务结果，运行时与留存 CLI 共用 v2 严格验证器；合规报告和留存门禁按相同失败语义传播。
-- `PUT /api/state` 保持原路径和成功形状，但审计数组成为服务端管理字段：省略时保留，提交时必须与当前值完全一致；乐观版本冲突仍优先返回 `409 STORAGE_CONFLICT`。
+- `PUT /api/state` 保持原路径和成功形状。审计数组以及四个 T02 区域共享集合均为服务端管理字段：省略时保留，提交时必须与当前值逐项深相等。区域集合的删除、修改、重排或伪造追加优先返回 `409 REGIONAL_SHARING_SERVER_MANAGED_COLLECTION_CONFLICT`；其他集合的乐观版本冲突仍返回 `409 STORAGE_CONFLICT`。集合级兼容入口对四个区域集合返回 `403 REGIONAL_SHARING_SERVER_MANAGED_COLLECTION_WRITE_DENIED`。
 - `npm run api:authorization-matrix` 从模块化路由源码生成/校验 owner、身份、角色、范围、用途和九条高风险接口唯一性。
 - 身份/SMS HTTP 路径保持不变；组合根已为短信发送生成随机 request ID，适配器现在拒绝缺失幂等 ID，OIDC refresh 返回的 ID token 必须通过 JWKS/claims 验证后才暴露脱敏 claims。
 - `GET /api/chronic/followup-events/health` 兼容增加脱敏 publisher readiness；不返回 endpoint、
@@ -113,11 +113,20 @@ HTTP request
 
 `GET /api/physical-exams` 已通过兼容委托接入 `physical-examination-dashboard-query.v1`。允许角色仍为 citizen、institution、commission；显式 `residentId` 继续按 `allowedResidentIdsForUser` 拒绝越权并记录安全事件。citizen 仍不接收联调、网关和专项分流明细，readiness 只暴露代码状态、质量和阻断数量；管理角色保留完整投影。成功响应继续在既有访问审计持久化之后执行最终脱敏。
 
-## 9. T05 转诊命令 API
+## 9. 区域共享调阅 API
+
+`POST /api/regional-data-sharing/access-reviews` 保持原 method/path、commission/institution 角色声明和 `shared-05` 顺序。institution 继续按精确 `orgCode` 访问来源或目标共享包；commission 在非生产兼容模式保留原有全域服务端范围并增加 `COMMISSION_LEGACY_SCOPE` blocker。成功新建仍返回 201，幂等重放返回 200，授权拒绝返回 403，版本/幂等冲突返回 409，审计或生产仓储不可用返回 503。
+
+生产请求合同为：`Idempotency-Key` 请求头，以及 `packageId`、`authorizationId`、`authorizationVersion`、`expectedVersion`、稳定 `purposeCode` 和与共享包完全相同的 `scopes`。服务端忽略客户端 `decision`、`consentStatus` 和 `note`；请求和持久化证据的过长/畸形字段均失败关闭，不做截断比较。共享包只接受明确 `ready + passed`。命令在 inbox 重放前重新核验 lifecycle、grantee、用途、范围与版本，撤销、失效或版本冲突不得复用历史 allowed 回执。单进程兼容适配器按 `packageId` 串行化 read/execute/write，避免当前全状态写入丢失；生产还必须同时满足 capability、`productionCutoverAuthorized=true`、PostgreSQL 和 atomic repository，当前注入值为 false，因此 generic JSON/SQLite 即使开启 capability 也返回 503。POST 成功/重放响应和 GET `accessReviews` 均经过专用 allowlist，不返回居民标识、授权引用/meta、用途/范围、幂等/请求摘要、关联 ID、主体标识、blocker 或共享包居民绑定载荷。非生产历史缺字段会返回 `legacyCompatibility=true`、稳定 `compatibilityBlockers`、`productionReady=false`，并设置 `Deprecation`、`Warning` 和 `X-Regional-Sharing-Compatibility`。
+
+通用 `PUT /api/state` 不再是区域共享 owner 写端口。`regionalDataSharingScope`、`regionalSharingPackages`、`regionalSharingSnapshots`、`regionalSharingAccessReviews` 只能省略或回传服务端当前精确值；省略会保留，任何客户端删改、重排、伪造追加以及 package `version`/`lastAccessReviewId` 改写均失败关闭。区域命令仍是 packages/access receipts 的唯一业务写入口。
+
+`POST /api/reset` 保留为非生产演示工具；在 `NODE_ENV=production` 时固定返回 `403 DEMO_RESET_DISABLED_IN_PRODUCTION`，不得用于清空区域共享权威回执。
+## 10. T05 转诊命令 API
 
 `POST /api/referrals/:id/actions`、`POST /api/workflow-actions`（`collection=referrals`）与 `POST /api/tasks/:id/actions`（`referrals:*`）继续保留原路径和各自成功响应形状，现统一进入 `referral-order.v1` owner command。三条路径均要求 `Idempotency-Key` 和正整数 `expectedVersion`；冲突、越权、超长字段和 action allowlist 失败返回稳定 `REFERRAL_*` code。权限在幂等回放和版本 CAS 之前执行。
 
-## 10. 健康驾驶舱指标合同 API 投影
+## 11. 健康驾驶舱指标合同 API 投影
 
 `GET /api/health-dashboard/summary` 与
 `GET /api/health-dashboard/industry-governance-indicators` 的 method/path、commission-only

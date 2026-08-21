@@ -1644,12 +1644,15 @@ test("regional data sharing application has runnable entry, API and evidence scr
   assert.match(client, /不合并运行时/);
   assert.match(client, /renderAccessFeedback/);
   assert.match(client, /调阅留痕/);
+  assert.match(client, /allowed:\s*"已调阅"/);
+  assert.match(client, /\["approved", "allowed"\]\.includes\(item\.decision\)/);
   assert.match(server, /seedRegionalDataSharingScope/);
   assert.match(server, /buildRegionalReferralHandoffEvidence/);
   assert.match(server, /buildRegionalHandoffReport/);
   assert.match(server, /renderRegionalHandoffMarkdown/);
   assert.match(server, /referralHandoffReady/);
-  assert.match(server, /createRegionalSharingAccessReview/);
+  assert.match(server, /authorizationState: CitizenRecordsV1\.authorizationState/);
+  assert.match(server, /buildAuthorizationLifecycle: CitizenRecordsV2\.buildAuthorizationLifecycle/);
   assert.match(server, /\/api\/regional-data-sharing\/handoff-report/);
   assert.match(server, /\/api\/regional-data-sharing\/access-reviews/);
   assert.match(script, /buildRegionalDataSharingReport/);

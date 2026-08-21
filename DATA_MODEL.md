@@ -129,7 +129,20 @@ attempt/backoff 和 dead-letter，因此不能把当前结构描述为多实例�
 
 体检 dashboard 查询读取 `personalRecords[category=physical-exam]`、异常案例、联调、专项分流、附件、网关事件和慢病任务等既有投影。7 个体检候选集合仍为 `legacy-non-authoritative`，没有被本切片晋升为生产 Owner；显式居民查询继续由 HTTP 适配器持久化原有访问审计，查询端口不写业务集合，也不改变 schema、migration 或事实源。
 
-## 9. 健康驾驶舱指标测量
+## 9. REG-01A 区域共享数据合同
+
+| 集合/事实 | Owner | 分类 | 本切片语义 |
+|---|---|---|---|
+| `personalRecords` 授权记录 | citizen-chronic | restricted | T02 通过 `resident-authorization-decision.v1` 只读消费；撤销即时生效 |
+| `regionalDataSharingScope` | platform-governance | internal | 区域共享说明与范围投影 |
+| `regionalSharingPackages` | platform-governance | restricted | `version` 是 access command 的应用层 CAS；生产还要求 `regionCode`、`requiredAuthorizationScopes` |
+| `regionalSharingSnapshots` | platform-governance | internal | 共享目录快照，不是授权事实 |
+| `regionalSharingAccessReviews` | platform-governance | restricted | `regional-sharing-access-receipt.v1` 只追加历史；禁止截断、删除或原地改写旧回执 |
+
+新回执保存授权引用/版本、结构化用途、范围、共享包前后版本、幂等键哈希、规范请求摘要、稳定结论码和关联 ID；不保存原始幂等键、客户端备注或自由文本用途。受限数据访问日志保留内部 `residentId` 以支持居民访问历史，但身份证/电话组合 `personIndex` 改为以随机回执 ID 加盐的摘要引用，主体与用途也只保存摘要引用；通用 `dataAccessLogs/securityEvents` 仍受 120 条保留上限约束，长期不可变权威证据是未截断的 `regionalSharingAccessReviews` 回执历史。GET/POST HTTP 响应另经专用 allowlist，不输出居民/授权/摘要载荷。现有 SQLite v1-v14 DDL 不变，集合继续使用 `state_collections` payload，因此本切片不增加 v15 migration；生产回填、核对与回滚证据登记在 `config/regional-sharing-access-data-contract.json`，切换授权仍为 false。
+
+四个区域 owner 集合均为 legacy state writer 的 server-managed 字段：全量提交时只能省略或深相等，省略从现有状态恢复；集合级写入被拒绝。该规则同时保护 receipt 顺序/原值以及 package `version`、`lastAccessReviewId`，避免客户端绕过命令 CAS。演示 reset 仅允许非生产，生产固定失败关闭。
+## 10. 健康驾驶舱指标测量
 
 `population-service-visits.v1` 是代码内版本化逻辑合同，不新增集合、表、DDL 或 migration。
 测量只读取既有 `healthStatistics.dailyServiceReports` 与 `healthStatistics.serviceReports` 聚合，

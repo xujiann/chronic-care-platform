@@ -1,5 +1,6 @@
 "use strict";
 
+const regionalSharingAccessDataContract = require("../../../config/regional-sharing-access-data-contract.json");
 const { createApiRouter } = require("../api-router");
 const { attachRouteSubdomain } = require("../route-subdomains");
 const { CONTEXT_DEFINITIONS } = require("../runtime-contexts");
@@ -398,11 +399,22 @@ function createPlatformApiRouter(runtimeContexts) {
     if (segmentsById.has(segment.id)) throw new TypeError(`duplicate route segment id: ${segment.id}`);
     segmentsById.set(segment.id, segment);
   }
-  for (const segment of shared.createRouteSegments(runtimeContexts.forDomain("shared"))) {
+  for (const segment of shared.createRouteSegments(runtimeContexts.forDomain("shared"), {
+    environment: process.env,
+    regionalContext: runtimeContexts.regional,
+    regionalCapabilityEnabled: authorization_context.configuredRegionalCapabilities(process.env).includes("regionalSharing"),
+    regionalProductionGate: {
+      atomicRepositoryReady: false,
+      productionCutoverAuthorized: regionalSharingAccessDataContract.migration.productionCutoverAuthorized === true,
+      storageEngine: process.env.STORAGE_ENGINE || "json"
+    }
+  })) {
     if (segmentsById.has(segment.id)) throw new TypeError(`duplicate route segment id: ${segment.id}`);
     segmentsById.set(segment.id, segment);
   }
-  for (const segment of state_data.createRouteSegments(runtimeContexts.forDomain("state-data"))) {
+  for (const segment of state_data.createRouteSegments(runtimeContexts.forDomain("state-data"), {
+    environment: process.env
+  })) {
     if (segmentsById.has(segment.id)) throw new TypeError(`duplicate route segment id: ${segment.id}`);
     segmentsById.set(segment.id, segment);
   }

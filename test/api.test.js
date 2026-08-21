@@ -7807,16 +7807,37 @@ test("API authentication, scoping and governance regression suite", async (t) =>
 
     const accessReview = await api(baseUrl, "/api/regional-data-sharing/access-reviews", authorized(hospital.body.token, {
       method: "POST",
+      headers: { "Idempotency-Key": "regional-api-legacy-0001" },
       body: JSON.stringify({
         packageId: "rsp-r2-diabetes",
-        decision: "approved",
+        decision: "denied",
         purpose: "接续糖尿病复查前调阅区域检验报告",
         note: "机构端确认本次调阅范围。"
       })
     }));
     assert.equal(accessReview.response.status, 201);
     assert.equal(accessReview.body.review.packageId, "rsp-r2-diabetes");
+    assert.equal(accessReview.body.review.decision, "allowed");
+    assert.equal(accessReview.body.legacyCompatibility, true);
+    assert.equal(accessReview.body.productionReady, false);
+    assert.equal(accessReview.response.headers.get("x-regional-sharing-compatibility"), "legacy-non-production");
+    assert.equal(JSON.stringify(accessReview.body.review).includes("机构端确认本次调阅范围"), false);
+    assert.equal(JSON.stringify(accessReview.body).includes("DEMO-ID-"), false);
     assert.equal(accessReview.body.package.lastAccessReviewId, accessReview.body.review.id);
+
+    const replayedAccessReview = await api(baseUrl, "/api/regional-data-sharing/access-reviews", authorized(hospital.body.token, {
+      method: "POST",
+      headers: { "Idempotency-Key": "regional-api-legacy-0001" },
+      body: JSON.stringify({
+        packageId: "rsp-r2-diabetes",
+        decision: "approved",
+        purpose: "接续糖尿病复查前调阅区域检验报告",
+        note: "客户端变化不得改变服务端授权结论。"
+      })
+    }));
+    assert.equal(replayedAccessReview.response.status, 200);
+    assert.equal(replayedAccessReview.body.replayed, true);
+    assert.equal(replayedAccessReview.body.review.id, accessReview.body.review.id);
 
     const refreshed = await api(baseUrl, "/api/regional-data-sharing", authorized(hospital.body.token));
     assert.equal(refreshed.body.accessReviews.some((item) => item.id === accessReview.body.review.id), true);
@@ -7832,6 +7853,12 @@ test("API authentication, scoping and governance regression suite", async (t) =>
       body: JSON.stringify({ packageId: "rsp-r3-imaging", decision: "approved", purpose: "越权调阅测试" })
     }));
     assert.equal(deniedPackage.response.status, 403);
+    const deniedAuditState = await api(baseUrl, "/api/state", authorized(commissionToken));
+    const deniedAudit = deniedAuditState.body.securityEvents.find((item) =>
+      item.action === "regional-sharing-access-command.v1" && item.detail === "REGIONAL_SHARING_ORGANIZATION_SCOPE_DENIED"
+    );
+    assert.match(deniedAudit.actor, /^principal:[a-f0-9]{16}$/);
+    assert.equal(JSON.stringify(deniedAudit).includes("越权调阅测试"), false);
 
     const insurance = await login(baseUrl, "insurance");
     const insuranceView = await api(baseUrl, "/api/regional-data-sharing", authorized(insurance.body.token));
@@ -8010,11 +8037,14 @@ test("API authentication, scoping and governance regression suite", async (t) =>
 
   await t.test("allows commission state persistence without losing governance collections", async () => {
     const current = await api(baseUrl, "/api/state", authorized(commissionToken));
+    const payload = structuredClone(current.body);
+    delete payload.securityEvents;
+    delete payload.dataAccessLogs;
     const saved = await api(baseUrl, "/api/state", authorized(commissionToken, {
       method: "PUT",
-      body: JSON.stringify(current.body)
+      body: JSON.stringify(payload)
     }));
-    assert.equal(saved.response.status, 200);
+    assert.equal(saved.response.status, 200, JSON.stringify(saved.body));
     assert.equal(saved.body.applicationCatalog.length, 6);
     assert.equal(saved.body.hospitalInteroperabilityFunctions.length, 6);
     assert.equal(saved.body.institutionCreditEvaluations.length, 3);

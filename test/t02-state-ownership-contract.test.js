@@ -201,11 +201,10 @@ test("legacy full-state conflicts prioritize registered collection owners", asyn
   const payload = {
     ...structuredClone(current),
     residents: [{ id: "r1", name: "stale" }],
-    regionalDataSharingScope: { status: "stale" },
     storageMeta: {
       collectionVersions: {
         residents: 1,
-        regionalDataSharingScope: 1
+        regionalDataSharingScope: 2
       }
     }
   };
@@ -231,4 +230,30 @@ test("legacy full-state conflicts prioritize registered collection owners", asyn
   assert.equal(responseStatus, 409);
   assert.equal(responseBody.code, "STORAGE_CONFLICT");
   assert.equal(responseBody.collection, "residents");
+});
+
+test("production rejects demo reset before seed or storage access", async () => {
+  let responseStatus = null;
+  let responseBody = null;
+  const runtime = {
+    requireApiRole: () => ({ name: "commissioner", role: "commission" }),
+    seedState: () => assert.fail("production reset must not read demo seed"),
+    sendJson: (_res, status, body) => {
+      responseStatus = status;
+      responseBody = body;
+    },
+    writeDatabase: () => assert.fail("production reset must not write state")
+  };
+  const segment = stateDataRoutes.createRouteSegments(runtime, {
+    environment: { NODE_ENV: "production" }
+  })[2];
+
+  await segment.handle(
+    { method: "POST", headers: {} },
+    responseDouble(),
+    new URL("http://local/api/reset")
+  );
+
+  assert.equal(responseStatus, 403);
+  assert.equal(responseBody.code, "DEMO_RESET_DISABLED_IN_PRODUCTION");
 });

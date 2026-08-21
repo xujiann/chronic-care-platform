@@ -1,0 +1,49 @@
+{
+  "schemaVersion": "regional-sharing-access-data-contract-v1",
+  "owner": "platform-governance",
+  "process": "T02",
+  "integrationOwner": "T00",
+  "command": "regional-sharing-access-command.v1",
+  "authorizationSource": {
+    "collection": "personalRecords",
+    "owner": "citizen-chronic",
+    "contract": "resident-authorization-decision.v1",
+    "clientDecisionTrusted": false,
+    "legacyConsentStatusTrusted": false
+  },
+  "ownedCollections": [
+    "regionalDataSharingScope",
+    "regionalSharingPackages",
+    "regionalSharingSnapshots",
+    "regionalSharingAccessReviews"
+  ],
+  "writeContract": {
+    "receipt": "regional-sharing-access-receipt.v1",
+    "appendOnlyHistory": true,
+    "legacyFullStateWrite": "omit-or-deep-equal",
+    "legacyCollectionWriteAllowed": false,
+    "productionResetAllowed": false,
+    "compareAndSwapField": "regionalSharingPackages.version",
+    "idempotency": ["Idempotency-Key SHA-256", "canonical request digest"]
+  },
+  "migration": {
+    "physicalSchemaChange": false,
+    "sqliteMigrationRequired": false,
+    "reason": "The collections already use the state_collections payload; this slice adds governed versioned fields without changing frozen SQLite v1-v14 DDL.",
+    "legacyRows": "read-compatible-non-authoritative",
+    "newWrites": "v1-receipt-and-versioned-package",
+    "productionBackfillRequired": [
+      "regionalSharingPackages.regionCode",
+      "regionalSharingPackages.version",
+      "regionalSharingPackages.requiredAuthorizationScopes",
+      "personalRecords.authorization.meta.granteeId",
+      "personalRecords.authorization.meta.purpose",
+      "personalRecords.authorization.meta.scopes",
+      "personalRecords.authorization.meta.version"
+    ],
+    "productionCutoverAuthorized": false,
+    "atomicRepositoryReady": false,
+    "rollback": "Disable the command capability and preserve existing receipts; never delete or rewrite receipt history."
+  },
+  "productionReady": false
+}

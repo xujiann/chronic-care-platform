@@ -122,6 +122,7 @@ function buildRegionalDataSharingReport(options = {}) {
   const html = options.html ?? readText("regional-data-sharing.html");
   const about = options.about ?? readText("regional-data-sharing-about.html");
   const client = options.client ?? readText("regional-data-sharing.js");
+  const accessCommand = options.accessCommand ?? readText("src/platform/governance/regional-sharing-access-command.js");
   const scope = data.regionalDataSharingScope || {};
   const packages = Array.isArray(data.regionalSharingPackages) ? data.regionalSharingPackages : [];
   const snapshots = data.regionalSharingSnapshots || {};
@@ -140,7 +141,7 @@ function buildRegionalDataSharingReport(options = {}) {
     { id: "regional:statusNorms", passed: packageStatuses.every((status) => statuses.has(status)) && Object.keys(snapshots.statusNorms || {}).length >= 4, detail: packageStatuses.join(",") },
     { id: "regional:contractRefs", passed: contractRefs.length >= 4 && contractRefs.every((id) => contracts.has(id)), detail: [...new Set(contractRefs)].join(",") },
     { id: "regional:accessReviews", passed: reviews.length >= 1 && reviews.every((item) => item.packageId && item.residentId && item.purpose && item.decision), detail: `${reviews.length} reviews` },
-    { id: "regional:apiRoutes", passed: /\/api\/regional-data-sharing/.test(server) && /createRegionalSharingAccessReview/.test(server), detail: "GET and POST regional routes present" },
+    { id: "regional:apiRoutes", passed: /\/api\/regional-data-sharing/.test(server) && /regionalSharingAccessCommand\.execute/.test(server) && /regional-sharing-access-command\.v1/.test(accessCommand), detail: "GET routes and server-owned access command present" },
     { id: "regional:apiHandoff", passed: /buildRegionalReferralHandoffEvidence/.test(server) && /referralHandoffReady/.test(server) && /referralHandoff/.test(client), detail: "API returns referral handoff evidence per package" },
     { id: "regional:handoffReportApi", passed: /\/api\/regional-data-sharing\/handoff-report/.test(server) && /buildRegionalHandoffReport/.test(server) && /renderRegionalHandoffMarkdown/.test(server), detail: "runtime referral handoff report route present" },
     { id: "regional:handoffEvidence", passed: handoffReady >= 1 && packages.every((item) => handoffByPackage.get(item.id)?.total === 6), detail: `${handoffReady}/${packages.length} packages ready for referral handoff` },
@@ -162,6 +163,13 @@ function buildRegionalDataSharingReport(options = {}) {
   ];
   return {
     ok: checks.every((item) => item.passed),
+    productionReady: false,
+    productionBlockers: [
+      "regional-sharing-production-data-backfill",
+      "postgresql-atomic-command-repository",
+      "masked-migration-and-rollback-rehearsal",
+      "site-authorization-and-audit-acceptance"
+    ],
     generatedAt: new Date().toISOString(),
     scope: {
       name: scope.name || "",
@@ -201,6 +209,7 @@ function renderMarkdown(report) {
     "",
     `- 生成时间：${report.generatedAt}`,
     `- 结果：${report.ok ? "通过" : "未通过"}`,
+    `- 生产就绪：${report.productionReady ? "是" : "否（配置/代码检查不代表现场生产授权）"}`,
     `- 共享包：${report.summary.packages}`,
     `- 可共享包：${report.summary.ready}`,
     `- 调阅留痕：${report.summary.accessReviews}`,

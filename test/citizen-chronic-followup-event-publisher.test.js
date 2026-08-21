@@ -455,6 +455,7 @@ test("batch middle failure rolls back local state and exact receipts make the re
 
 test("concurrent dispatches coalesce in one process and retain stable cross-process idempotency", async () => {
   const staged = await stagedState();
+  const dispatchAt = "2030-08-21T02:01:00.000Z";
   let fetchCalls = 0;
   const publisher = signedPublisher({
     fetchImpl: async (_url, options) => {
@@ -464,8 +465,8 @@ test("concurrent dispatches coalesce in one process and retain stable cross-proc
     }
   });
   const [left, right] = await Promise.all([
-    dispatchPendingFollowupEventsToState(staged.nextData, { environment: "production", publisher }),
-    dispatchPendingFollowupEventsToState(staged.nextData, { environment: "production", publisher })
+    dispatchPendingFollowupEventsToState(staged.nextData, { at: dispatchAt, environment: "production", publisher }),
+    dispatchPendingFollowupEventsToState(staged.nextData, { at: dispatchAt, environment: "production", publisher })
   ]);
   assert.equal(fetchCalls, 1);
   assert.equal(left.nextData.followups[0][RUNTIME_FIELD].outbox[0].deliveryState, "published");

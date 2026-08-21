@@ -1,9 +1,29 @@
 "use strict";
 
+const { createResidentAuthorizationDecisionAdapter } = require("../../platform/governance/resident-authorization-decision-adapter");
+const { COMMAND_ID: REGIONAL_SHARING_ACCESS_COMMAND_ID, createRegionalSharingAccessCommand, projectRegionalSharingAccessResponse, projectRegionalSharingReadResponse, sha256: regionalSharingSha256, withRegionalSharingPackageWriteLock } = require("../../platform/governance/regional-sharing-access-command");
 const { protectSharedRouteSegments } = require("../shared/route-policy");
 
-function createRouteSegments(runtime) {
-  const { BloodClinicalProduction, EmergencyModuleGate, SERVICE_ORDER_SOURCE_COLLECTIONS, T10SpecialtyModuleGovernance, appendDataAccessLog, appendSecurityEvent, applyPilotInterfaceReviewAction, buildConsortiumPerformanceReport, buildDataGovernanceOverview, buildDataQualityIssues, buildDataQualityScorecard, buildDrugConsumableSupervision, buildDrugTraceabilityEvidenceSubmission, buildMasterDataDirectory, buildMobileExperience, buildMultiPracticeRegistry, buildObservabilityAlertCenter, buildPilotAcceptanceCenter, buildPriorityApplicationTemplates, buildRegionalDataSharingView, buildRegionalHandoffReport, buildServiceAcceptanceSummary, buildServiceOrderSummary, buildSpecialtyCutoverPack, buildT10PlatformBlockedReadiness, calculateCreditEvaluations, canAccessResident, canAccessServiceOrder, canReadT10InstitutionModules, collectJson, createRegionalSharingAccessReview, dispatchAlert, normalizeServiceOrders, normalizeState, randomUUID, readDatabase, redactSensitiveResponse, requireApiRole, resealAuditTrail, scopeStateForUser, sealAuditTrail, seedAccessibilityChecklist, seedMobileExperienceSettings, sendJson, sendT10SpecialtyModuleError, trustedT10Institution, updateDrugConsumableSupervision, upsertAlertDeliveryIncident, validateAlert, writeDatabase } = runtime;
+function createRouteSegments(runtime, options = {}) {
+  const { BloodClinicalProduction, EmergencyModuleGate, SERVICE_ORDER_SOURCE_COLLECTIONS, T10SpecialtyModuleGovernance, appendDataAccessLog, appendSecurityEvent, applyPilotInterfaceReviewAction, authorizationState, buildAuthorizationLifecycle, buildConsortiumPerformanceReport, buildDataGovernanceOverview, buildDataQualityIssues, buildDataQualityScorecard, buildDrugConsumableSupervision, buildDrugTraceabilityEvidenceSubmission, buildMasterDataDirectory, buildMobileExperience, buildMultiPracticeRegistry, buildObservabilityAlertCenter, buildPilotAcceptanceCenter, buildPriorityApplicationTemplates, buildRegionalDataSharingView, buildRegionalHandoffReport, buildServiceAcceptanceSummary, buildServiceOrderSummary, buildSpecialtyCutoverPack, buildT10PlatformBlockedReadiness, calculateCreditEvaluations, canAccessResident, canAccessServiceOrder, canReadT10InstitutionModules, collectJson, dispatchAlert, normalizeServiceOrders, normalizeState, prependAuditTrailEntry, randomUUID, readDatabase, redactSensitiveResponse, requireApiRole, resealAuditTrail, scopeStateForUser, sealAuditTrail, seedAccessibilityChecklist, seedMobileExperienceSettings, sendJson, sendT10SpecialtyModuleError, trustedT10Institution, updateDrugConsumableSupervision, upsertAlertDeliveryIncident, validateAlert, writeDatabase } = runtime;
+  const residentAuthorizationDecision = createResidentAuthorizationDecisionAdapter({
+    authorizationState,
+    buildAuthorizationLifecycle
+  });
+  const regionalSharingAccessCommand = createRegionalSharingAccessCommand({
+    appendDataAccessLog,
+    canAccessResident,
+    createId: randomUUID,
+    prependAuditTrailEntry,
+    readAuthorizationDecision: residentAuthorizationDecision.decide
+  }, {
+    activeRegionCode: options.regionalContext?.regionCode,
+    atomicRepository: options.regionalProductionGate?.atomicRepositoryReady,
+    capabilityEnabled: options.regionalCapabilityEnabled,
+    environment: options.environment,
+    productionCutoverAuthorized: options.regionalProductionGate?.productionCutoverAuthorized,
+    storageEngine: options.regionalProductionGate?.storageEngine
+  });
   const segments = [
     {
       id: "shared-01",
@@ -503,7 +523,8 @@ function createRouteSegments(runtime) {
     if (req.method === "GET" && url.pathname === "/api/regional-data-sharing") {
         const user = requireApiRole(req, res, ["commission", "institution"], "/api/regional-data-sharing");
         if (!user) return true;
-        sendJson(res, 200, redactSensitiveResponse(buildRegionalDataSharingView(readDatabase(), user), user));
+        const view = projectRegionalSharingReadResponse(buildRegionalDataSharingView(readDatabase(), user));
+        sendJson(res, 200, redactSensitiveResponse(view, user));
         return true;
       }
 
@@ -526,8 +547,41 @@ function createRouteSegments(runtime) {
       if (req.method === "POST" && url.pathname === "/api/regional-data-sharing/access-reviews") {
         const user = requireApiRole(req, res, ["commission", "institution"], "/api/regional-data-sharing/access-reviews");
         if (!user) return true;
-        const result = createRegionalSharingAccessReview(readDatabase(), await collectJson(req), user);
-        sendJson(res, result.status, redactSensitiveResponse(result.body, user));
+        try {
+          const payload = await collectJson(req);
+          const result = await withRegionalSharingPackageWriteLock(payload?.packageId, async () => {
+            const commandResult = regionalSharingAccessCommand.execute(readDatabase(), payload, user, {
+              correlationId: req.correlationId,
+              idempotencyKey: req.headers["idempotency-key"]
+            });
+            if (commandResult.nextData) writeDatabase(commandResult.nextData);
+            return commandResult;
+          });
+          if (!result.nextData && !result.replayed && result.status >= 400) {
+            appendSecurityEvent({
+              actor: `principal:${regionalSharingSha256(user.id || user.accountId || user.username || user.role).slice(0, 16)}`,
+              role: user.role,
+              action: REGIONAL_SHARING_ACCESS_COMMAND_ID,
+              target: "regional-sharing-access",
+              result: "denied",
+              detail: result.body.code
+            });
+          }
+          if (result.body.legacyCompatibility) {
+            res.setHeader("Deprecation", "true");
+            res.setHeader("Warning", '299 - "regional sharing legacy compatibility is not production-ready"');
+            res.setHeader("X-Regional-Sharing-Compatibility", "legacy-non-production");
+          }
+          sendJson(res, result.status, projectRegionalSharingAccessResponse(result.body));
+        } catch {
+          sendJson(res, 503, {
+            ok: false,
+            error: "Service Unavailable",
+            code: "REGIONAL_SHARING_AUDIT_UNAVAILABLE",
+            message: "regional sharing audit is unavailable",
+            productionReady: false
+          });
+        }
         return true;
       }
         return false;

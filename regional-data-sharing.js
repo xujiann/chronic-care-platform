@@ -34,6 +34,7 @@ const contractLabels = {
 
 const decisionLabels = {
   approved: "已调阅",
+  allowed: "已调阅",
   denied: "暂不调阅"
 };
 
@@ -718,7 +719,7 @@ function renderRegionalReviews(reviews) {
   const packages = regionalState.data?.packages || [];
   document.querySelector("#regional-sharing-reviews").innerHTML = reviews.slice(0, 10).map((item) => `
     <div class="priority-row ${item.id === regionalState.lastReviewId ? "is-selected" : ""}">
-      <span class="badge ${item.decision === "approved" ? "success" : "warning"}">${decisionLabel(item.decision)}</span>
+      <span class="badge ${["approved", "allowed"].includes(item.decision) ? "success" : "warning"}">${decisionLabel(item.decision)}</span>
       <div>
         <strong>${packageTitle(item.packageId, packages)}${item.id === regionalState.lastReviewId ? " · 最新" : ""}</strong>
         <p>${item.organization || item.actor} · ${item.purpose}</p>

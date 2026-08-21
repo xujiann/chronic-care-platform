@@ -124,7 +124,7 @@
     "personalRecords": {
       "owner": "citizen-chronic",
       "classification": "restricted",
-      "readers": ["care-coordination", "clinical-specialties"]
+      "readers": ["care-coordination", "clinical-specialties", "platform-governance"]
     },
     "followups": {
       "owner": "citizen-chronic",
@@ -290,6 +290,26 @@
       "owner": "platform-governance",
       "classification": "internal",
       "readers": ["research"]
+    },
+    "regionalDataSharingScope": {
+      "owner": "platform-governance",
+      "classification": "internal",
+      "readers": ["care-coordination", "clinical-specialties"]
+    },
+    "regionalSharingPackages": {
+      "owner": "platform-governance",
+      "classification": "restricted",
+      "readers": ["care-coordination", "citizen-chronic", "clinical-specialties"]
+    },
+    "regionalSharingSnapshots": {
+      "owner": "platform-governance",
+      "classification": "internal",
+      "readers": ["care-coordination", "clinical-specialties"]
+    },
+    "regionalSharingAccessReviews": {
+      "owner": "platform-governance",
+      "classification": "restricted",
+      "readers": ["citizen-chronic", "identity-security"]
     },
     "commercialCryptoCapabilities": {
       "owner": "platform-governance",

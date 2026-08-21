@@ -10961,21 +10961,40 @@ function sendStorageConflict(res, error) {
 
 function collectJson(req, maxLength = 2_000_000) {
   return new Promise((resolve, reject) => {
-    let body = "";
+    const chunks = [];
+    let byteLength = 0;
+    let settled = false;
+
+    const rejectOnce = (error, destroyRequest = false) => {
+      if (settled) return;
+      settled = true;
+      chunks.length = 0;
+      reject(error);
+      if (destroyRequest && !req.destroyed) req.destroy();
+    };
+
     req.on("data", (chunk) => {
-      body += chunk;
-      if (body.length > maxLength) {
-        req.destroy();
-        reject(new Error("请求体过大"));
+      if (settled) return;
+      const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+      byteLength += buffer.length;
+      if (byteLength > maxLength) {
+        rejectOnce(new Error("请求体过大"), true);
+        return;
       }
+      chunks.push(buffer);
     });
     req.on("end", () => {
+      if (settled) return;
+      settled = true;
       try {
+        const body = Buffer.concat(chunks, byteLength).toString("utf8");
         resolve(body ? JSON.parse(body) : {});
       } catch (error) {
         reject(error);
       }
     });
+    req.on("aborted", () => rejectOnce(new Error("请求体传输中断")));
+    req.on("error", (error) => rejectOnce(error));
   });
 }
 
@@ -14038,57 +14057,6 @@ function renderRegionalHandoffMarkdown(report) {
     "| --- | --- | --- | --- | --- | --- |",
     ...rows.map((row) => `| ${row.join(" | ")} |`)
   ].join("\n");
-}
-
-function createRegionalSharingAccessReview(data, payload, user) {
-  const packages = normalizeRegionalSharingPackages(data.regionalSharingPackages || seedRegionalSharingPackages());
-  const packageId = String(payload.packageId || "").trim();
-  const index = packages.findIndex((item) => item.id === packageId);
-  if (index < 0) return { status: 404, body: { error: "Not Found", message: "regional sharing package not found" } };
-  if (!canAccessRegionalSharingPackage(user, packages[index])) {
-    appendSecurityEvent({ actor: user.name, role: user.role, action: "regional sharing access review", target: packageId, result: "denied", detail: "organization scope denied" });
-    return { status: 403, body: { error: "Forbidden", message: "organization scope denied" } };
-  }
-  if (!canAccessResident(user, packages[index].residentId, data)) {
-    appendSecurityEvent({ actor: user.name, role: user.role, action: "regional sharing access review", target: packages[index].residentId, result: "denied", detail: "resident scope denied" });
-    return { status: 403, body: { error: "Forbidden", message: "resident scope denied" } };
-  }
-  const now = new Date().toISOString();
-  const decision = String(payload.decision || "approved").trim();
-  const review = {
-    id: `rsar-${randomUUID()}`,
-    packageId,
-    residentId: packages[index].residentId,
-    actor: user.name,
-    role: user.role,
-    organization: user.orgName || "",
-    purpose: String(payload.purpose || "regional diagnosis data sharing").trim(),
-    decision,
-    status: decision === "approved" ? "completed" : "denied",
-    at: now,
-    note: String(payload.note || "").trim()
-  };
-  packages[index] = {
-    ...packages[index],
-    status: decision === "approved" ? normalizeRegionalSharingStatus({ ...packages[index], status: "ready" }) : packages[index].status,
-    lastSharedAt: decision === "approved" ? now : packages[index].lastSharedAt,
-    lastAccessReviewId: review.id
-  };
-  data.regionalSharingPackages = packages;
-  data.regionalSharingAccessReviews = [review, ...(Array.isArray(data.regionalSharingAccessReviews) ? data.regionalSharingAccessReviews : [])].slice(0, 200);
-  appendDataAccessLog(data, user, packages[index].residentId, "regionalDataSharing", review.purpose, decision === "approved" ? "允许" : "拒绝");
-  data.securityEvents = prependAuditTrailEntry(data.securityEvents, {
-    id: randomUUID(),
-    at: new Date().toLocaleString("zh-CN", { hour12: false }),
-    actor: user.name,
-    role: user.role,
-    action: "regional sharing access review",
-    target: packageId,
-    result: decision === "approved" ? "allowed" : "denied",
-    detail: review.purpose
-  });
-  writeDatabase(data);
-  return { status: 201, body: { review, package: packages[index] } };
 }
 
 function personIndexFromParts(idCard, phone) {
@@ -19589,22 +19557,24 @@ function isTransientAnonymousSecurityEvent(event) {
     event.detail === "未登录或会话已过期";
 }
 
-function appendDataAccessLog(data, user, residentId, scope, purpose, result = "允许") {
+function appendDataAccessLog(data, user, residentId, scope, purpose, result = "允许", options = {}) {
   const residentMap = new Map(data.residents.map((resident) => [resident.id, resident]));
+  const hasPersonIndexOverride = Object.hasOwn(options, "personIndex");
+  const limit = Number.isInteger(options.limit) && options.limit > 0 ? Math.min(options.limit, 120) : 120;
   data.dataAccessLogs = resealAuditTrail([
     {
       id: randomUUID(),
       residentId,
-      personIndex: personIndexForResident(residentMap, residentId),
-      at: new Date().toLocaleString("zh-CN", { hour12: false }),
-      actor: user?.name || "anonymous",
+      personIndex: hasPersonIndexOverride ? String(options.personIndex || "") : personIndexForResident(residentMap, residentId),
+      at: options.at || new Date().toLocaleString("zh-CN", { hour12: false }),
+      actor: options.actor || user?.name || "anonymous",
       role: user?.roleName || user?.role || "anonymous",
       scope,
       purpose,
       result
     },
     ...(Array.isArray(data.dataAccessLogs) ? data.dataAccessLogs : [])
-  ].slice(0, 120));
+  ].slice(0, limit));
 }
 
 function normalizePublicHealthEventAction(event, payload = {}, user = {}) {
@@ -27453,6 +27423,8 @@ function createRuntimeCapabilitySource() {
   CitizenRecordsPolicy,
   CitizenRecordsV1,
   CitizenRecordsV2,
+  authorizationState: CitizenRecordsV1.authorizationState,
+  buildAuthorizationLifecycle: CitizenRecordsV2.buildAuthorizationLifecycle,
   DiseasePaymentGrouperContract,
   DiseasePaymentIntake,
   DiseasePaymentService,
@@ -27728,7 +27700,6 @@ function createRuntimeCapabilitySource() {
   createProductionDatabaseCutoverRun,
   createReferralTeleconsultationEscalationMessage,
   createReferralTeleconsultationJointTestTasks,
-  createRegionalSharingAccessReview,
   createSession,
   createTaskMessage,
   currentSession,
@@ -28227,6 +28198,7 @@ module.exports = {
   createCareServiceRuntimeDependencies,
   createPublicHealthDirectReportRuntimeDependencies,
   cleanupRuntimeSessions,
+  collectJson,
   digitalHospitalClientCertificate,
   digitalHospitalWorkerFingerprints,
   ensureDatabase,

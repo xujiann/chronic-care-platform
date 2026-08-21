@@ -167,11 +167,18 @@ JSON 源快照仍是高扇出依赖，但浏览器和 Pages 只依赖经统一�
 
 医院运行 dashboard 的依赖方向现为 `platform-governance/operations-dashboard HTTP route → 注入的既有 operations builders / BloodEventHub 只读投影`。T06 已删除该子上下文以及仅由它使用的 observability、production operations 和 runtime metrics 依赖；builder、组合根、数据和响应未移动。`operations-command` 及其写依赖继续留在 T06 兼容边界，后续必须单独移交。
 
-## 11. T05 转诊命令依赖约束
+## 11. 区域共享调阅依赖方向
+
+当前方向为 `shared-05 兼容 HTTP 适配器 → regional-sharing-access-command.v1（目标 T02） → resident-authorization-decision.v1 anti-corruption adapter → T04 授权状态/lifecycle`，居民范围、审计和持久化继续作为注入端口。T00 integration 拥有本次跨 owner 接线；命令不直接读取 `personalRecords.meta`、不导入 `server.js`，旧 `createRegionalSharingAccessReview` 已从组合根和 shared runtime context 删除。
+
+数据依赖为 `T02 regionalSharingPackages/accessReviews → resident-authorization-decision.v1 → T04 personalRecords`。反向只允许 T04/identity-security 消费 `regional-sharing-access-receipt.v1`，不得由 T02 写授权事实。单进程 package queue 只保护当前兼容适配器，生产仍因 `productionCutoverAuthorized=false`、非 PostgreSQL 或 atomic repository 缺失而失败关闭；regional site evidence lifecycle 不进入授权决策。
+
+遗留状态写方向被限制为 `commission PUT /api/state → state-data guard → 非区域集合`：四个区域 owner 集合只能省略或深相等，不能流入 `normalizeState/writeDatabase`；`/api/state-collections/:collection` 同样拒绝它们。`POST /api/reset` 只在非生产到达 seed/write，production 在边界失败关闭。
+## 12. T05 转诊命令依赖约束
 
 转诊写依赖方向为 `shared.js / citizen.js → 三条兼容 HTTP 路径 → referral-command-service → DomainRepository → referrals + command inbox + outbox`。领域服务只依赖平台 contract、repository 和 event runtime，不导入 `server.js` 或其他子域内部；HTTP 层注入居民授权和 JSON 存储端口。兼容路由不得绕过 owner command，居民任务消息和安全审计在命令成功后由 HTTP 层保留。
 
-## 12. 健康驾驶舱指标合同依赖
+## 13. 健康驾驶舱指标合同依赖
 
 依赖方向为 `health-dashboard-summary → health-dashboard-indicator-contract.v1 →
 technical-evidence.sha256`。合同模块不依赖 `server.js`、HTTP 路由、JSON 文件或数据库实现；

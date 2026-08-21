@@ -107,6 +107,18 @@ test("regional context is optional and remains outside domain capability project
   assert.equal("regionCode" in withRegion.forDomain("integration"), false);
 });
 
+test("state-data receives production environment only from the composition boundary", () => {
+  const routeIndex = fs.readFileSync(path.join(ROOT, "src", "http", "routes", "index.js"), "utf8");
+  const stateDataRoute = fs.readFileSync(path.join(ROOT, "src", "http", "routes", "state-data.js"), "utf8");
+  assert.match(
+    routeIndex,
+    /state_data\.createRouteSegments\(runtimeContexts\.forDomain\("state-data"\),\s*\{\s*environment:\s*process\.env\s*\}\)/
+  );
+  assert.match(stateDataRoute, /options\.environment\?\.NODE_ENV/);
+  assert.doesNotMatch(stateDataRoute, /process\.env/);
+  assert.equal(CONTEXT_DEFINITIONS["state-data"].dependencies.includes("environment"), false);
+});
+
 test("subdomain contexts are independent frozen projections", () => {
   const definition = require("../src/http/runtime-contexts/context-factory").defineRuntimeContext({
     domain: "example",
