@@ -192,7 +192,6 @@
   ],
   "routeSubcontextAssignments": {
     "imaging-cloud": { "owners": ["imaging"], "status": "aligned" },
-    "operations-dashboard": { "owners": ["legacy-platform-operations"], "status": "handoff-required" },
     "operations-command": { "owners": ["legacy-platform-operations"], "status": "handoff-required" },
     "emergency-care": { "owners": ["emergency"], "status": "aligned" },
     "quality-safety": { "owners": ["quality-safety"], "status": "aligned" },
@@ -206,7 +205,8 @@
     {
       "id": "legacy-platform-operations",
       "routePrefixes": ["/api/operations"],
-      "currentRouteSubcontexts": ["operations-dashboard", "operations-command"],
+      "currentRouteSubcontexts": ["operations-command"],
+      "completedRouteSubcontexts": ["operations-dashboard"],
       "targetDomain": "platform-governance/operations",
       "handoffOwners": ["T00", "T02"],
       "status": "handoff-required"

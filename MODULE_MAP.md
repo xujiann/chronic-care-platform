@@ -8,11 +8,11 @@
 |---|---|---:|---:|---|
 | T00 | regional / runtime composition | 2 | 3 | 组合根、区域运行时、全局顺序和协议；组合根本身不作为领域路由域 |
 | T01 | runtime / identity-security | 8 | 31 | 健康、指标、登录、会话、OIDC/SMS、授权和安全控制 |
-| T02 | platform-governance / state-data | 14 | 76 | 平台治理、证据、状态适配、迁移与发布控制 |
+| T02 | platform-governance / state-data | 15 | 77 | 平台治理、证据、状态适配、迁移与发布控制；含已移交的医院运行 dashboard |
 | T03 | public-health | 4 | 49 | 监测、直报、出生死亡和公卫运营 |
 | T04 | citizen-chronic | 7 | 34 | 居民档案、家庭授权、慢病管理 |
 | T05 | care-coordination | 10 | 32 | 挂号、转诊、护理、陪诊和履约 |
-| T06 | clinical-specialties | 10 | 73 | 急救、用血、影像、体检和质量安全 |
+| T06 | clinical-specialties | 9 | 72 | 急救、用血、影像、体检和质量安全；operations command 仍为待移交历史错位 |
 | T07 | insurance-payment | 4 | 27 | 医保、支付、退款和凭证 |
 | T08 | integration | 3 | 13 | 外部网关、签名回调和交换 |
 | T09 | research / shared | 14 | 30 | 科研沙箱、组合查询和确实跨域的体验 |
@@ -99,7 +99,7 @@ scripts/platform-cutover-alert-worker.js
 | physical-examination | T06/physical-examination | 7 | dashboard 查询已进入目标源码根；写命令仍与 blood-innovation 混合 |
 | quality-safety | T06/quality-safety | 14 | 写模型限定为质量自有数据 |
 
-另有 33 个 `/api/operations` 字面路径属于历史错位，目标为 `platform-governance/operations`。五子域治理注册表不改变现有路由顺序或部署方式。
+原有 33 个 `/api/operations` 字面路径中，`GET /api/operations/dashboard` 已移交 `platform-governance/operations-dashboard`；剩余 32 个仍属于历史错位的 `operations-command`，目标为 `platform-governance/operations`。移交只替换原全局 manifest 插槽的 owner segment，没有改变公开路由顺序或部署方式。
 
 首个标准接口为 `emergency-dashboard-query.v1`：路由完成角色校验和脱敏，查询用例通过 `buildEmergencyDashboard` 与 `readBloodCoordination` 两个注入端口组合只读结果。其余急救写用例仍由遗留模块承担。
 
