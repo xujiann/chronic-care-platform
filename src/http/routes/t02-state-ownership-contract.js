@@ -109,6 +109,15 @@ const PLATFORM_WRITE_CONTRACTS = Object.freeze({
       platformWorkItems: "platform-governance",
       securityEvents: "platform-governance"
     })
+  }),
+  "regional-sharing-access-command": Object.freeze({
+    id: "platform-governance.regional-sharing-access-command-write.v1",
+    collections: Object.freeze({
+      dataAccessLogs: "platform-governance",
+      regionalSharingAccessReviews: "platform-governance",
+      regionalSharingPackages: "platform-governance",
+      securityEvents: "platform-governance"
+    })
   })
 });
 

@@ -1,5 +1,7 @@
 "use strict";
 
+const { isDeepStrictEqual } = require("node:util");
+
 const {
   LEGACY_FULL_STATE_CONTRACT,
   changedCollections,
@@ -8,6 +10,25 @@ const {
   setLegacyWriteHeaders,
   setOwnedWriteHeaders
 } = require("./t02-state-ownership-contract");
+
+const SERVER_MANAGED_REGIONAL_COLLECTIONS = Object.freeze([
+  "regionalDataSharingScope",
+  "regionalSharingPackages",
+  "regionalSharingSnapshots",
+  "regionalSharingAccessReviews"
+]);
+
+function serverManagedRegionalState(currentData = {}) {
+  return Object.fromEntries(SERVER_MANAGED_REGIONAL_COLLECTIONS
+    .filter((collection) => Object.hasOwn(currentData, collection))
+    .map((collection) => [collection, currentData[collection]]));
+}
+
+function firstServerManagedRegionalConflict(currentData = {}, payload = {}) {
+  return SERVER_MANAGED_REGIONAL_COLLECTIONS.find((collection) =>
+    Object.hasOwn(payload, collection) && !isDeepStrictEqual(payload[collection], currentData[collection])
+  ) || null;
+}
 
 function firstVersionConflict(currentData, payload) {
   const expectedVersions = payload?.storageMeta?.collectionVersions || {};
@@ -29,7 +50,7 @@ function firstVersionConflict(currentData, payload) {
   return null;
 }
 
-function createRouteSegments(runtime) {
+function createRouteSegments(runtime, options = {}) {
   const { COLLECTION_WRITE_KEYS, auditTrailRowsMatch, collectJson, normalizeState, prependAuditTrailEntry, randomUUID, readDatabase, redactSensitiveResponse, requireApiRole, scopeStateForUser, seedState, sendJson, storageMeta, verifyAuditTrail, writeDatabase } = runtime;
   return [
     {
@@ -66,7 +87,21 @@ function createRouteSegments(runtime) {
           });
           return true;
         }
-        const versionConflict = firstVersionConflict(currentData, payload);
+        const regionalConflict = firstServerManagedRegionalConflict(currentData, payload);
+        if (regionalConflict) {
+          sendJson(res, 409, {
+            error: "Conflict",
+            code: "REGIONAL_SHARING_SERVER_MANAGED_COLLECTION_CONFLICT",
+            message: "区域共享集合由服务端命令管理，提交值必须省略或与当前值完全一致。",
+            collection: regionalConflict
+          });
+          return true;
+        }
+        const effectivePayload = {
+          ...payload,
+          ...serverManagedRegionalState(currentData)
+        };
+        const versionConflict = firstVersionConflict(currentData, effectivePayload);
         if (versionConflict) {
           sendJson(res, 409, {
             error: "Conflict",
@@ -102,7 +137,7 @@ function createRouteSegments(runtime) {
           return true;
         }
         const data = normalizeState({
-          ...payload,
+          ...effectivePayload,
           securityEvents: currentData.securityEvents,
           dataAccessLogs: currentData.dataAccessLogs
         });
@@ -142,6 +177,15 @@ function createRouteSegments(runtime) {
         const user = requireApiRole(req, res, ["commission"], "/api/state-collections/:collection");
         if (!user) return true;
         const collection = decodeURIComponent(url.pathname.replace("/api/state-collections/", "")).trim();
+        if (SERVER_MANAGED_REGIONAL_COLLECTIONS.includes(collection)) {
+          sendJson(res, 403, {
+            error: "Forbidden",
+            code: "REGIONAL_SHARING_SERVER_MANAGED_COLLECTION_WRITE_DENIED",
+            message: "区域共享集合只能通过其 owner command 写入。",
+            collection
+          });
+          return true;
+        }
         if (!COLLECTION_WRITE_KEYS.has(collection)) {
           sendJson(res, 400, { error: "Bad Request", message: "不支持集合级保存该数据集合" });
           return true;
@@ -189,6 +233,14 @@ function createRouteSegments(runtime) {
     if (req.method === "POST" && url.pathname === "/api/reset") {
         const user = requireApiRole(req, res, ["commission"], "/api/reset");
         if (!user) return true;
+        if (String(options.environment?.NODE_ENV || "").toLowerCase() === "production") {
+          sendJson(res, 403, {
+            error: "Forbidden",
+            code: "DEMO_RESET_DISABLED_IN_PRODUCTION",
+            message: "演示数据重置在生产环境中不可用。"
+          });
+          return true;
+        }
         const data = seedState();
         setLegacyWriteHeaders(res, {
           ...LEGACY_FULL_STATE_CONTRACT,
@@ -228,4 +280,9 @@ function createRouteSegments(runtime) {
   ];
 }
 
-module.exports = { createRouteSegments };
+module.exports = {
+  SERVER_MANAGED_REGIONAL_COLLECTIONS,
+  createRouteSegments,
+  firstServerManagedRegionalConflict,
+  serverManagedRegionalState
+};

@@ -54,6 +54,7 @@
 | SEC-007 | 2026-08-21 | OIDC ID token 使用 JWKS 验签与完整 trust claims；SMS 生产凭据、随机幂等键、有界重试和健康探针 fail closed | RS/PS/ES、issuer/audience/expiry/nonce、重试稳定性和日志脱敏专项 |
 | PG-001 | 2026-08-21 | PostgreSQL schema 隔离、目标 probe、outbox CAS、batch 内容绑定和等版本/tombstone 冲突回滚 | PG/session/identity repository 专项与负向事务测试 |
 | OPS-001 | 2026-08-21 | 连续审计投递使用安全 SIEM/WORM adapter、checkpoint v2 和既有 cutover alert lifecycle | TLS/receipt/retry/WORM/rollback/lock/systemd 专项 |
+| SEC-008 | 2026-08-21 | 区域共享 access command 改为服务端授权，复用 `personalRecords`，加入机构/地区/用途/范围/版本、幂等摘要、应用层 CAS、撤销即时拒绝和脱敏审计；state-data 关闭四个 owner 集合与生产 reset 旁路 | 严格/legacy、客户端决定忽略、冲突、撤销、重放、append-only、删改/重排/伪造追加、package CAS 旁路、生产 reset、审计失败与所有权专项 |
 
 ## 重复、死代码和命名结论
 
@@ -69,3 +70,12 @@
 3. 前端 sink 的可信输入/恶意输入回归。
 4. 将覆盖率从 `server.js` 扩展到新增 `src/` 安全、存储和 worker 模块。
 5. 在真实 provider/PostgreSQL/SIEM/WORM 环境重跑合同并封存受控证据引用。
+
+## REG-01A 剩余债务
+
+- `regionalSharingPackages` 与回执仍通过全状态 JSON/SQLite payload 写入；模块级 package queue 已消除当前单进程并发丢写，但不提供跨进程事务，生产必须绑定 PostgreSQL atomic repository，当前门禁继续 NO-GO。
+- legacy full-state writer 已拒绝区域集合删改并在省略时保留，生产 reset 也已关闭；非生产 demo reset 仍会恢复 seed，因此演示环境不提供跨 reset 的永久保全，不能作为法定生产 WORM 证据。
+- 历史共享包缺少 `regionCode`、`version`、`requiredAuthorizationScopes`，历史授权缺少 grantee/purpose/scopes/version；非生产兼容不能替代回填与核对。
+- 两个区域共享 GET builder 和 `shared-05` 混合路由尚未移交 T02；当前只完成 access command 的唯一实现，不能宣称整个区域共享模块已解耦。
+- 仍需生产级 role × org × region × purpose × scope × revoke 运行矩阵、真实多实例并发冲突、遮罩全量迁移/回滚及不可变外部审计留存证据。
+- 通用 `dataAccessLogs/securityEvents` 仍只有 120 条保留窗口；未截断 access receipt 是当前权威历史，长期 WORM/SIEM 留存仍待生产适配。
