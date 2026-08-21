@@ -17,7 +17,6 @@
 | ARC-007 | 临床子域隔离 | 急救、血液、影像、体检首个查询端口已建立，但两个混合路由仍承载写命令；血液 GET 有内存规范化，影像和体检 GET 有审计持久化，operations 仍错位 | 按特征测试逐用例迁移；禁止新增混合依赖或把兼容副作用误写成纯查询 |
 | SEC-004 | XSS 面 | 871 个 HTML sink，CSP 允许 inline | 需可信渲染接口和逐页负向测试 |
 | SEC-005 | 混合会话 | HttpOnly Cookie 已建立，但 localStorage/demo bearer 兼容仍存在 | 降级路径、XSS 后凭据暴露面 |
-| SEC-006 | OTP 状态 | 验证码和失败锁定仍使用进程内 Map | 多实例/重启下状态不一致 |
 | DATA-003 | 集合治理 | JSON 252 个集合，只有 83 个有 owner | 169 个遗留集合不能安全晋升生产 |
 | TEST-002 | 覆盖率 | c8 只 include `server.js`，固定测试清单 | 新 `src/` 模块和浏览器代码不在覆盖率结论中 |
 | TEST-003 | 安全负向测试 | 已建立源码、配置、环境模板、Git 元数据、文档和 `data/db.json` 拒绝矩阵 | 后续新增敏感类别必须扩展矩阵 |
@@ -51,8 +50,9 @@
 | DATA-002 | 2026-08-20 | v1–v14 独立注册并冻结内容指纹，保留历史 ledger；v15+ ledger 写内容 SHA-256，runner 拒绝连续性/name/checksum 漂移 | 空库、v11 升级、重跑、指纹/ledger 漂移、v15 checksum、失败回滚与 schema fingerprint 测试 |
 | TEST-001 | 2026-08-20 | 建立 build/lint/typecheck/unit/integration/smoke 标准入口并映射 CI/Pages；test:all 语义不变 | 标准门禁契约、完整测试分区、隔离 smoke、静态发布链、CI 映射和全量回归 |
 | SEC-003 | 2026-08-20 | v2 验证器统一运行时/留存语义；内容、链接、结构、重复 ID 严格失败；全量 state 写入不能修改服务端审计数组 | 普通字段、首中尾链接、删除、插入、重排、结构和 API 拒绝回归 |
-| SEC-004 | 2026-08-21 | OIDC ID token 使用 JWKS 验签与完整 trust claims；SMS 生产凭据、随机幂等键、有界重试和健康探针 fail closed | RS/PS/ES、issuer/audience/expiry/nonce、重试稳定性和日志脱敏专项 |
-| DATA-003 | 2026-08-21 | PostgreSQL schema 隔离、目标 probe、outbox CAS、batch 内容绑定和等版本/tombstone 冲突回滚 | PG/session/identity repository 专项与负向事务测试 |
+| SEC-006 | 2026-08-21 | OTP、发送/登录限流和失败锁定迁入共享认证安全状态；生产多实例强制 PostgreSQL，签发/消费/撤销原子化 | SQLite 跨实例、PG 序列化重试、TTL、尝试耗尽、重启、并发单次消费与真实 PG CI 合同 |
+| SEC-007 | 2026-08-21 | OIDC ID token 使用 JWKS 验签与完整 trust claims；SMS 生产凭据、随机幂等键、有界重试和健康探针 fail closed | RS/PS/ES、issuer/audience/expiry/nonce、重试稳定性和日志脱敏专项 |
+| PG-001 | 2026-08-21 | PostgreSQL schema 隔离、目标 probe、outbox CAS、batch 内容绑定和等版本/tombstone 冲突回滚 | PG/session/identity repository 专项与负向事务测试 |
 | OPS-001 | 2026-08-21 | 连续审计投递使用安全 SIEM/WORM adapter、checkpoint v2 和既有 cutover alert lifecycle | TLS/receipt/retry/WORM/rollback/lock/systemd 专项 |
 
 ## 重复、死代码和命名结论
@@ -64,9 +64,9 @@
 
 ## 测试缺口优先顺序
 
-1. 审计链任意内容/链接断裂均按 ADR 语义判定。
-2. 后续 v15+ migration 的数据回填、前滚恢复和多历史版本 fixture。
-3. OTP/锁定在多实例、重启、并发下的一致性。
-4. role × permission × resident/institution/region 数据范围矩阵。
-5. 组合根循环移除前后的启动、注入和故障测试。
-6. 前端 sink 的可信输入/恶意输入回归。
+1. 后续 v15+ migration 的数据回填、前滚恢复和多历史版本 fixture。
+2. role × permission × resident/institution/region 数据范围矩阵。
+3. 组合根循环移除前后的启动、注入和故障测试。
+4. 前端 sink 的可信输入/恶意输入回归。
+5. 将覆盖率从 `server.js` 扩展到新增 `src/` 安全、存储和 worker 模块。
+6. 在真实 provider/PostgreSQL/SIEM/WORM 环境重跑合同并封存受控证据引用。

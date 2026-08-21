@@ -63,7 +63,7 @@ HTTP request
 |---|---|---|
 | HIS / EMR / LIS / PACS | HTTPS、FHIR R4、DICOMweb、签名事件 | T08 契约，真实联调仍是外部阻断项 |
 | OIDC 身份源 | issuer/userinfo/token/revoke | T01，生产必须真实 provider 与绑定目录 |
-| SMS 网关 | HTTPS + token + 签名回执 | T01，OTP/失败状态仍有进程内部分 |
+| SMS 网关 | HTTPS + bearer token + 签名回执 | T01；OTP、发送/登录限流和失败锁定已进入共享认证安全状态仓储，生产多实例要求 PostgreSQL |
 | PostgreSQL | TLS verify-full、outbox/reconcile | 迁移期禁止请求路径双写 |
 | Orthanc / OHIF / HAPI FHIR | Solution A Compose | 专科集成演示与受控部署 |
 | 对象存储 | 引用/摘要、签名访问 | 不得在仓库存真实凭据或原始敏感对象 |

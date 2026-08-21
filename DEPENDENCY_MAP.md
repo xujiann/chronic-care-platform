@@ -92,13 +92,15 @@ SQLite schema 依赖现为 `server.js → sqlite-migrations → node:sqlite/sess
 
 JSON 源快照仍是高扇出依赖，但浏览器和 Pages 只依赖经统一纯函数转换后的公开演示契约；任何结构变化仍需验证脱敏、页面兼容、报告和初始化路径。
 
+身份安全状态依赖方向为 `identity route → auth-security-state-store → SQLite state_collections / PostgreSQL auth_security_state`。组合根为会话与认证状态注入同一长期 PostgreSQL pool，仓储只借用连接且不关闭调用方拥有的 pool；发送验证码固定为限流、原子签发、供应商发送，失败时只撤销本次 OTP。
+
 ## 6. 外部系统
 
 | 外部依赖 | 主要模块 | 失败边界 |
 |---|---|---|
 | PostgreSQL | platform storage、session、领域 repository | TLS、schema、CAS、outbox、核对 |
 | HIS/EMR/LIS/PACS | T08、care、clinical | 现场地址、凭据、证书、字段与回执 |
-| OIDC/SMS | T01 identity-security | provider 可用性、绑定、重放、回调验签 |
+| OIDC/SMS | T01 identity-security | provider 可用性、绑定、重放、回调验签及共享 OTP/限流/锁定状态 |
 | HAPI FHIR/Orthanc/OHIF | Solution A、clinical | 容器版本、认证、DICOM/FHIR 兼容 |
 | 对象存储 | secure object storage | 引用、摘要、签名 URL、保留期 |
 | GitHub Actions/Pages | CI 与静态站 | 分支保护、制品、外部 5xx |

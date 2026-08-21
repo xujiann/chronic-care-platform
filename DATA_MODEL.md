@@ -13,6 +13,8 @@
 | 生产目标 | PostgreSQL | 声明为 system-of-record，fallback write=false |
 | 专项状态 | 会话、数智医院执行、shadow checkpoint/receipt | 可使用独立 SQLite/PostgreSQL 表，生命周期独立 |
 
+认证安全状态在单主机 SQLite 中复用 `state_collections[auth-security-state-v1]`，该内部键从业务快照、集合版本和 PostgreSQL shadow outbox 中排除；生产多实例使用 `${POSTGRES_SCHEMA}.auth_security_state`。两种实现只持久化主体 HMAC 摘要、验证码摘要、TTL、计数与锁定元数据，不保存明文手机号或验证码。
+
 ## 2. SQLite Schema
 
 主存储 migration 位于 `src/platform/storage/sqlite-migrations.js` 的版本化注册表，当前实际与公开 head 均为 v14。包括 `schema_migrations` 在内，主 SQLite 逻辑上创建 30 张表：
@@ -83,7 +85,7 @@ erDiagram
 - 转诊投递：outbox、replay；
 - 急救信号投递：outbox、replay。
 
-此外脚本生成 MPI、collection migration 和 runtime sync SQL。生产是否真实建立这些表取决于外部环境证据，仓库不得宣称已切换。
+此外脚本生成 MPI、collection migration 和 runtime sync SQL；PostgreSQL migration package 同时创建 runtime sync、中央会话与 `auth_security_state` 表。生产是否真实建立这些表取决于外部环境证据，仓库不得宣称已切换。
 
 ## 6. 核心数据不可变边界
 
