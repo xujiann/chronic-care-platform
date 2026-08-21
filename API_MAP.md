@@ -107,3 +107,12 @@ HTTP request
 ## 9. T05 转诊命令 API
 
 `POST /api/referrals/:id/actions`、`POST /api/workflow-actions`（`collection=referrals`）与 `POST /api/tasks/:id/actions`（`referrals:*`）继续保留原路径和各自成功响应形状，现统一进入 `referral-order.v1` owner command。三条路径均要求 `Idempotency-Key` 和正整数 `expectedVersion`；冲突、越权、超长字段和 action allowlist 失败返回稳定 `REFERRAL_*` code。权限在幂等回放和版本 CAS 之前执行。
+
+## 10. 健康驾驶舱指标合同 API 投影
+
+`GET /api/health-dashboard/summary` 与
+`GET /api/health-dashboard/industry-governance-indicators` 的 method/path、commission-only
+角色和既有响应字段保持不变。指标条目加法返回 canonical ID、显式 legacy alias、
+`health-dashboard-indicator-contract.v1` 定义及 `population-service-visits.v1` 测量；summary
+加法返回合同版本和阻断测量数。范围只接受服务端运行时注入，未解析范围或未经签名/版本认可的
+来源返回 `blocked` 元数据，不会因报告结构 `ok=true` 被提升为生产证据。

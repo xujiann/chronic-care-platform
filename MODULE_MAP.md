@@ -127,3 +127,11 @@ scripts/platform-cutover-alert-worker.js
 ## 11. T05 转诊命令 owner
 
 `src/care-coordination/referral-command-service.js` 是 `referral-order.v1` 的唯一写 owner。`care-coordination` 路由中的直接转诊动作、通用 workflow 兼容分支和统一 task 兼容分支只负责 HTTP 适配与原响应映射，不得直接修改 `referralSystem.referrals`。居民任务消息仍是 owner command 成功后的兼容副作用，不属于转诊聚合事务。
+
+## 12. 健康驾驶舱指标合同
+
+T02 新增的 `health-dashboard-indicator-contract` 是纯合同/测量模块，依赖既有
+`technical-evidence` 稳定摘要工具，不读取存储、路由或组合根。遗留
+`health-dashboard-summary` 仍是大型兼容聚合器，但首个门急诊指标已通过小端口获得可测试的
+定义、测量和 fail-closed 质量语义。历史 `industry-*` ID 继续兼容，并同时公开 canonical
+ID 与弃用 alias；后续指标必须按 owner 逐个接入，不得继续按数组位置复用定义和值。

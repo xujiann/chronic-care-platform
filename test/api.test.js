@@ -495,9 +495,15 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(industryGovernanceIndicators.response.status, 200);
     assert.equal(industryGovernanceIndicators.body.ok, true);
     assert.equal(industryGovernanceIndicators.body.summary.indicators, 8);
+    assert.equal(industryGovernanceIndicators.body.summary.contractVersion, "health-dashboard-indicator-contract.v1");
     assert.equal(industryGovernanceIndicators.body.periodViews.length, 2);
     assert.equal(industryGovernanceIndicators.body.indicators.some((item) => item.id === "industry-disease-reporting" && item.sourceSystems.includes("HIS/EMR")), true);
     assert.equal(industryGovernanceIndicators.body.indicators.every((item) => item.reports.length === 2 && item.drilldown.href), true);
+    const governedVisits = industryGovernanceIndicators.body.indicators.find((item) => item.canonicalId === "performance-public-hospital");
+    assert.equal(governedVisits.contract.id, "population-service-visits.v1");
+    assert.equal(governedVisits.measurement.schemaVersion, "health-dashboard-indicator-contract.v1");
+    assert.equal(governedVisits.measurement.value.type, "integer");
+    assert.equal(governedVisits.measurement.qualityStatus, "blocked");
 
     const deniedIndustryGovernanceIndicators = await api(baseUrl, "/api/health-dashboard/industry-governance-indicators", authorized(residentPhoneLogin.body.token));
     assert.equal(deniedIndustryGovernanceIndicators.response.status, 403);

@@ -7,6 +7,12 @@ const DEFAULT_OUTPUT = path.join(ROOT, "release", "health-dashboard-summary.json
 const DEFAULT_MARKDOWN = path.join(ROOT, "release", "health-dashboard-summary.md");
 
 const APPLICATIONS = require("../health-dashboard-applications");
+const {
+  CONTRACT_VERSION: INDICATOR_CONTRACT_VERSION,
+  POPULATION_SERVICE_VISITS_CONTRACT,
+  buildPopulationServiceVisitsMeasurement,
+  legacyAliasFor
+} = require("../src/platform/governance/health-dashboard-indicator-contract");
 const DASHBOARD_APPLICATION_ID = "health-dashboard";
 const DOCUMENTATION_RULE = {
   aboutPage: "about.html",
@@ -1380,33 +1386,47 @@ function buildIndicatorCenter(context = {}) {
     "experience-certificate-service": "coordination",
     "interface-launch-readiness": "safety"
   };
-  const compatibilityIds = [
-    "industry-physical-exam",
-    "industry-appointment-reconciliation",
-    "industry-disease-reporting"
-  ];
-  const enriched = indicators.map((item, index) => {
+  const populationServiceVisitsMeasurement = buildPopulationServiceVisitsMeasurement({
+    populationServiceBoard,
+    healthStatistics: context.healthStatistics,
+    scope: context.indicatorScope,
+    computedAt: context.computedAt
+  });
+  const enriched = indicators.map((item) => {
     const sourceCollections = String(item.source || "")
       .split("/")
       .map((value) => value.trim())
       .filter(Boolean);
-    const id = compatibilityIds[index] || item.id;
-    const status = index === 0 ? "blocked" : item.status;
-    const drilldown = index === 1 ? { ...item.drilldown, href: "./citizen.html" } : item.drilldown;
+    const legacyAlias = legacyAliasFor(item.id);
+    const id = legacyAlias?.id || item.id;
+    const status = legacyAlias?.statusOverride || item.status;
+    const drilldown = legacyAlias?.drilldownHref
+      ? { ...item.drilldown, href: legacyAlias.drilldownHref }
+      : item.drilldown;
     const reportValue = item.currentValue || "pending";
+    const governedIndicator = item.id === "performance-public-hospital"
+      ? {
+        contract: POPULATION_SERVICE_VISITS_CONTRACT,
+        measurement: populationServiceVisitsMeasurement
+      }
+      : {};
     return {
       ...item,
       id,
-      name: index === 0 ? "健康体检覆盖" : item.name,
+      canonicalId: item.id,
+      canonicalName: item.name,
+      name: legacyAlias?.displayName || item.name,
       status,
       category: "专项监管",
       sourceCollections: sourceCollections.length ? sourceCollections : ["healthDashboardSummary"],
-      sourceSystems: index === 2 ? ["HIS/EMR", "LIS", "CDC reporting gateway"] : [item.owner || "health administration source system"],
+      sourceSystems: legacyAlias?.sourceSystems || [item.owner || "health administration source system"],
       reports: [
         { id: "month", label: "Monthly", value: reportValue, status },
         { id: "year", label: "Yearly", value: reportValue, status }
       ],
       drilldown,
+      legacyAlias,
+      ...governedIndicator,
       reformCategory: categoryByIndicator[item.id] || "operation",
       dimensionName: dimensionLookup[item.dimension]?.name || item.dimension,
       dimensionOwner: dimensionLookup[item.dimension]?.owner || item.owner
@@ -1426,6 +1446,9 @@ function buildIndicatorCenter(context = {}) {
     summary: {
       indicators: enriched.length,
       dimensions: dimensions.length,
+      contractVersion: INDICATOR_CONTRACT_VERSION,
+      governedMeasurements: 1,
+      blockedMeasurements: populationServiceVisitsMeasurement.qualityStatus === "blocked" ? 1 : 0,
       ready: enriched.filter((item) => item.status === "ready").length,
       watch: enriched.filter((item) => item.status === "watch").length,
       blocked: enriched.filter((item) => item.status === "blocked").length,
@@ -1447,6 +1470,9 @@ function buildIndicatorCenter(context = {}) {
     categories,
     periodViews,
     indicators: enriched,
+    contracts: [POPULATION_SERVICE_VISITS_CONTRACT],
+    measurements: [populationServiceVisitsMeasurement],
+    legacyAliases: enriched.filter((item) => item.legacyAlias).map((item) => item.legacyAlias),
     releaseEvidence: [
       { id: "indicator-center-summary", name: "指标中心摘要", evidence: "healthDashboardSummary.indicatorCenter" },
       { id: "indicator-center-page", name: "驾驶舱指标中心页面", evidence: "health-dashboard.html#dashboard-indicator-center" },
@@ -1640,7 +1666,18 @@ function buildHealthDashboardSummary(options = {}) {
   const productionReadinessGate = buildProductionReadinessGate(productionDeploymentPlan, { interfaceRows, siteEvidencePackage, siteIssueLedger });
   const jurisdictionScope = buildJurisdictionScope(data, { openActions, applications: sourceApplications });
   const actionClosureTrend = buildActionClosureTrend(taskActions, { openActions });
-  const indicatorCenter = buildIndicatorCenter({ applications: sourceApplications, actionClosureTrend, populationServiceBoard, certificateExchange, riskDrilldowns, siteEvidencePackage, productionReadinessGate });
+  const indicatorCenter = buildIndicatorCenter({
+    applications: sourceApplications,
+    actionClosureTrend,
+    populationServiceBoard,
+    certificateExchange,
+    riskDrilldowns,
+    siteEvidencePackage,
+    productionReadinessGate,
+    healthStatistics: data.healthStatistics,
+    indicatorScope: options.indicatorScope,
+    computedAt: options.computedAt
+  });
   const functionalReport = buildFunctionalReport({ applications: sourceApplications, openActions, actionClosureTrend, populationServiceBoard, certificateExchange, riskDrilldowns, siteEvidencePackage, jurisdictionScope, interfaceRows, evidenceRecords, siteDependencies, productionReadinessGate, indicatorCenter });
   const departmentFunctionMatrix = functionalReport.departmentFunctionMatrix || [];
   const cityCountyFunctionMatrix = functionalReport.cityCountyFunctionMatrix || [];

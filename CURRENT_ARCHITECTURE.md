@@ -103,3 +103,14 @@ flowchart TB
 ## 7. T05 转诊单一命令轨道
 
 本实施分支保留 `/api/referrals/:id/actions`、`/api/workflow-actions` 和 `/api/tasks/:id/actions` 三条公开路径及原成功响应形状，但 `collection=referrals` 的写入统一委托 `src/care-coordination/referral-command-service.js`。权限先于 inbox 重放和 CAS；机构按 from/to/org、区县主体按 region、居民按本人或家庭授权校验。聚合、command inbox 和 outbox 继续由既有 UoW 原子提交，未新增 schema、部署进程或转诊核心概念。
+
+## 8. 健康驾驶舱指标治理首切片
+
+`src/platform/governance/health-dashboard-indicator-contract.js` 已建立
+`health-dashboard-indicator-contract.v1`，首个定义为月度门急诊人次
+`population-service-visits.v1`。合同冻结 T02 聚合 owner、T03 来源 owner、公式、类型、
+单位、自然月周期和 `Asia/Shanghai` 时区；测量附带服务端范围、水位、来源版本、质量状态、
+阻断项和稳定摘要。现有两个 API、commission 鉴权和旧字段不变，新元数据通过指标条目和
+summary 加法暴露。当前样例日报缺受认可的签名/版本且运行时未注入区域范围，因此测量保持
+`blocked`，不能作为生产证据。三个历史 `industry-*` ID 由按 canonical ID 键控的显式弃用
+alias 兼容，不再按数组位置改名。
