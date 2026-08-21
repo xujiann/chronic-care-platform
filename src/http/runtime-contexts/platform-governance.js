@@ -14,6 +14,7 @@ const SUBDOMAIN_DEPENDENCIES = Object.freeze({
   "mutual-recognition-overview": Object.freeze(["buildPhase2MutualRecognitionOverview","readDatabase","requireApiRole","sendJson"]),
   "mutual-recognition-decision": Object.freeze(["buildPhase2MutualRecognitionOverview","collectJson","randomUUID","readDatabase","requireApiRole","reviewMutualRecognitionRecord","sendJson","upsertPhase2MutualRecognitionCitation","writeDatabase"]),
   "productization-center": Object.freeze(["appendSecurityEvent","applyPlatformWorkItemAction","applyPlatformWorkItemV2GovernanceAction","buildPlatformEnhancementCockpit","buildPlatformProductOperationsCockpit","buildPlatformProductizationCenter","collectJson","readDatabase","registerInstitutionIntegrationProfile","requireApiRole","runInstitutionSyntheticJointTest","sendJson","writeDatabase"]),
+  "operations-dashboard": Object.freeze(["BloodEventHub","buildHospitalOperationsDashboard","buildObservabilityAlertCenter","buildProductionOperationsCenter","buildRuntimeMetrics","readDatabase","requireApiRole","sendJson"]),
 });
 const DEPENDENCIES = Object.freeze([...new Set(Object.values(SUBDOMAIN_DEPENDENCIES).flat())].sort());
 
