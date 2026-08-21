@@ -3,7 +3,6 @@
 const runtimeContextFactory = require("../runtime-contexts/context-factory");
 const clinicalContext = require("../runtime-contexts/clinical-specialties");
 const segment01 = require("./clinical-specialties/imaging-cloud");
-const segment03 = require("./clinical-specialties/operations-command");
 const segment04 = require("./clinical-specialties/emergency-care");
 const segment05 = require("./clinical-specialties/quality-safety");
 const segment06 = require("./clinical-specialties/clinical-blood");
@@ -14,8 +13,7 @@ const segment10 = require("./clinical-specialties/blood-innovation");
 
 const DOMAIN = "clinical-specialties";
 const SUBDOMAIN_SEGMENTS = Object.freeze([
-  ["imaging-cloud", segment01], ["operations-command", segment03],
-  ["emergency-care", segment04],
+  ["imaging-cloud", segment01], ["emergency-care", segment04],
   ["quality-safety", segment05], ["clinical-blood", segment06],
   ["mutual-recognition-ingest", segment07], ["mutual-recognition-review", segment08],
   ["emergency-signals", segment09], ["blood-innovation", segment10]

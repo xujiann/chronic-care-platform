@@ -1,6 +1,6 @@
 # TECH DEBT — 主线技术债与风险台账
 
-> 实施分支 AS-IS 快照：基于 `main@a15d10d`。严重级别表示建议治理优先级；已关闭项以专项测试及 PR/main CI 为回归依据。
+> 实施分支 AS-IS 快照：基于 `main@4fcdd61`。严重级别表示建议治理优先级；已关闭项以专项测试及 PR/main CI 为回归依据。
 
 ## P0 — 必须先决策
 
@@ -13,7 +13,7 @@
 | ARC-001 | 超大组合根 | `server.js` 约 28.2k 行 | 变更冲突、初始化耦合、难隔离测试 |
 | ARC-003 | 宽接口 | public-health runtime context 160 个依赖 | 组合根和路由同步变化，难形成领域端口 |
 | ARC-004 | 前端超大模块 | 数智医院 app 10.5k、citizen 6k、公卫 4.4k | 全局状态、渲染和流程耦合 |
-| ARC-007 | 临床子域隔离 | 急救、血液、影像、体检首个查询端口已建立，但两个混合路由仍承载写命令；血液 GET 有内存规范化，影像和体检 GET 有审计持久化；operations dashboard 已移交 T02，32 个 command 字面路径仍错位 | 按特征测试逐用例迁移；禁止 dashboard 回流 T06，后续独立移交 command，不把兼容副作用误写成纯查询 |
+| ARC-007 | 临床子域隔离 | 急救、血液、影像、体检首个查询端口已建立，但两个混合路由仍承载写命令；血液 GET 有内存规范化，影像和体检 GET 有审计持久化；33 个 operations 字面路径已全部移交 T02 | 按特征测试逐用例迁移；禁止 operations 回流 T06，不把兼容副作用误写成纯查询 |
 | CHR-001 | 慢病随访事件投递 | T04 已有原子内嵌 outbox、幂等 inbox、稳定幂等键、独立 activation verifier、范围过滤、审计和签名 HTTPS publisher；单进程并发可合并，但批次/写回失败会再次发出同幂等键请求 | 仍需 T00/T04 独立任务建立 verifier 组合、持久 worker、lease、attempt/backoff、死信、供应方幂等核对和部署观测；当前不能承诺跨进程 exactly-once，不得关闭生产 Go/No-Go |
 | SEC-004 | XSS 面 | 871 个 HTML sink，CSP 允许 inline | 需可信渲染接口和逐页负向测试 |
 | SEC-005 | 混合会话 | HttpOnly Cookie 已建立，但 localStorage/demo bearer 兼容仍存在 | 降级路径、XSS 后凭据暴露面 |
@@ -30,11 +30,13 @@
 |---|---|---|---|
 | ARC-005 | shared 边界 | 12 个路由段、50 个上下文依赖 | 新逻辑优先回归所属领域 |
 | ARC-006 | 同名模块 | 根目录与 `src/` 有 6 组同名 | 文档明确前端/服务端/迁移角色，不做全仓改名 |
+| ARC-008 | operations 跨域写入 | OPS-02 为保持兼容，将 T06 的既有直写整体移入 T02；其中 `resourceDispatchRequests`、`taskMessages` 的机器 Owner 仍是 T05 care-coordination | 后续仅在独立 ADR/切片中改为 T05 owner port 或版本化事件；在完成行为矩阵前不得直接改写副作用 |
 | API-001 | 错误契约 | 多种 JSON 错误格式 | 新 API 使用版本化标准错误接口 |
 | API-002 | 接口目录 | 368+ API 缺完整机器目录 | 逐域补 owner/角色/范围/幂等/审计元数据 |
 | JOB-001 | Worker 一致性 | 多套 worker/retry/checkpoint 语义 | 建立共同任务状态和观测契约 |
 | TEST-006 | 静态基线与测试性能 | lint 对 2 个前端文件的 16 个重复键、`test/api.test.js` 的 3 个不可达块保留精确例外；typecheck 仅覆盖 6 个治理/安全文件；集成首批 API 契约在并发负载下约 174 秒 | 逐规则/逐目录消除例外并扩大类型基线；拆分超大 API 测试和测量 CI 时长，不降低断言或超时门禁 |
 | TEST-005 | 浏览器一致性 | Windows 本地配置优先系统 Chrome；完整 36 项中小程序超时恢复用例可受前序共享服务状态影响，而同文件 13/13、单例 1/1、CI Chromium 36/36 通过 | 后续独立测试任务统一本地/CI 浏览器选择并隔离 E2E 服务状态，不在数据治理切片中修改业务代码 |
+| TEST-007 | operations 命令行为矩阵 | 32 条路径已有唯一 Owner、静态等价、路由顺序、依赖、授权矩阵和代表性读写/审计保护；直接运行时行为约覆盖 7/32 条 | 在拆分 699 行 handler 或治理 ARC-008 前，补齐每条 action 的 role/scope、deny-before-read、响应、写入与审计顺序契约 |
 | DOC-001 | 历史文档 | 205 份 Markdown，历史快照与当前规则并存 | 标明 snapshot/current/superseded，不删除历史证据 |
 | REPO-001 | 跟踪制品 | `output/pdf` 有 3 个 PDF | 明确生成源、是否保留及禁止手工编辑 |
 

@@ -40,12 +40,17 @@ test("clinical specialty governance defines exactly five bounded subdomains", ()
 });
 
 test("all current clinical API literals have one subdomain or explicit handoff owner", () => {
+  const registry = loadClinicalSubdomainRegistry(ROOT);
   const report = validateClinicalSubdomainRegistry(ROOT);
   assert.deepEqual(report.issues, []);
   assert.equal(report.ok, true);
   assert.equal(report.routeLiteralCount > 70, true);
   EXPECTED_SUBDOMAINS.forEach((id) => assert.equal(report.routeCounts[id] > 0, true, id));
-  assert.equal(report.routeCounts["legacy-platform-operations"] > 0, true);
+  assert.equal(report.routeCounts["legacy-platform-operations"], 0);
+  const operations = registry.legacyRouteAreas.find((item) => item.id === "legacy-platform-operations");
+  assert.deepEqual(operations.currentRouteSubcontexts, []);
+  assert.deepEqual(operations.completedRouteSubcontexts, ["operations-dashboard", "operations-command"]);
+  assert.equal(operations.status, "handoff-complete");
 });
 
 test("route prefix matching respects path boundaries", () => {

@@ -150,3 +150,13 @@ attempt/backoff 和 dead-letter，因此不能把当前结构描述为多实例�
 比例折算明确标记为 estimated/blocked。缺少服务端区域范围、来源水位或完整证据同样失败关闭。
 如后续把测量快照晋升为生产事实，必须先登记数据 owner、分类、reader、write contract，并由
 T00 建立 migration 和回滚证据。
+
+## 11. OPS-02 医院运行命令移交的数据不变量
+
+`operations-command` 从 T06 路由目录迁至 T02 platform-governance 只改变源码和运行时上下文
+Owner。原 handler 的 `readDatabase`、`writeDatabase`、集合名称、120/80 条兼容窗口、
+安全审计与平台过程审计顺序均保持逐字兼容；没有新增表、集合、字段、DDL、migration、
+双写或生产事实源。因此本切片不改变 SQLite v14、JSON/SQLite/PostgreSQL 拓扑或核心数据定义。
+其中对 `resourceDispatchRequests`、`taskMessages` 的直写是从 T06 原样迁移的既有跨域债务，
+两者机器 Owner 仍为 T05 care-coordination；本切片不把运行时路由 Owner 迁移误写为数据 Owner
+迁移，后续必须通过独立 ADR 和 T05 owner port/版本化事件治理。

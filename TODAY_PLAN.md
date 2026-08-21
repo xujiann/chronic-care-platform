@@ -543,3 +543,67 @@ T00 已批准方案 2、provider 缺失时的脱敏 NO-GO 语义及上述兼容�
 - API method/path、鉴权、数据范围、数据库、schema、migration、audit/journal 语义、依赖、CI、
   systemd 与部署拓扑均未修改；`API_MAP.md`、`DATA_MODEL.md` 无事实变化。未触碰
   `data/db.json`、SQLite、生成报告、PDF、归档或发布制品。
+
+## 2026-08-22 T00/T02 OPS-02 医院运行命令边界移交
+
+### 早间检查
+
+- 主业务工作树存在用户修改且当前分支领先远端，未执行 pull、stash、reset 或 clean；
+- 在干净的独立 T00 工作树执行 `git pull --ff-only`，其文件树与
+  `origin/main@4fcdd61d9d098ad199eb86d69bc3a5e1e4637f40` 完全一致；
+- PR #140 已合并，9 项 PR 检查、合并后 main CI 与 Pages 均成功，当前无开放 PR；
+- 已阅读 `ROADMAP.md`、`ARCHITECTURE.md`、`AGENTS.md`、工程治理、六张 AS-IS 地图、
+  模块标准/重构安全网以及临床五子域相关 Accepted ADR。
+
+### 目标与依据
+
+- Owner：T00 integration 执行跨域接线，目标运行时 owner 为 T02 platform-governance；
+- 依据：Accepted 临床五子域 ADR、`ROADMAP.md` 7A、`TECH_DEBT.md` ARC-007；
+- 目标：把仍错位在 T06 的 `operations-command` 原子移交到 T02，关闭 32 条
+  `/api/operations/*` 命令/治理接口的领域归属偏差。
+
+### 批准范围
+
+1. 将 `operations-command` 路由源码迁至 `src/http/routes/platform-governance/`；
+2. 在原 `ROUTE_ORDER` 插槽替换 owner segment，保持请求优先级不变；
+3. 将现有 20 项依赖从 clinical runtime context 移到 platform-governance context；
+4. 移除 T06 facade/子上下文归属，更新 route-subdomain 与临床五子域机器事实；
+5. 增加唯一 owner、禁止回流、依赖完整性、鉴权和代表性读写行为测试；
+6. 同步六张地图、模块分类、路线图和既有 ADR 实施状态。
+
+### 非目标
+
+- 不重构约 699 行 handler 内部业务，不改 method/path、角色、状态码、响应或副作用；
+- 不改变数据集合、Schema、migration、存储事实源、生产 capability 或部署拓扑；
+- 不同时实施 REG-01B PostgreSQL 原子仓储或 CHR-002 持久 worker；
+- 不生成或伪造任何现场 Go/No-Go 证据。
+
+### 风险、回滚与测试
+
+- 主要风险是路由顺序漂移、20 项依赖漏迁、动态路由重复、写入/审计行为变化和 T06 回流；
+- 以原插槽替换、特征测试、唯一源码扫描和 process/architecture/routes 门禁控制；
+- 回滚为整切片恢复旧 owner segment、facade 和 runtime context；不涉及数据回滚；
+- 完成前运行专项测试、`routes:check/routes:test`、`architecture:test`、
+  `process:verify/process:test`、`platform:iterations:test`、`build`、`lint`、`typecheck`、
+  unit、integration、smoke、`test:all`，并执行独立 `/review`。
+
+本方向已由用户于 2026-08-22 批准。运行时原子移交、测试保护和治理文档已完成，当前进入
+全量门禁与独立 review 收口；尚未提交、推送或创建 PR。
+
+### 本地验收与 review 结果
+
+- 32 条命令/治理路径在原全局插槽唯一归属 T02；20 项运行时依赖完整迁移，T06 operations
+  路由归零；新旧 handler 标准化比较除 route id/domain 外完全一致。
+- OPS-02 专项与相邻回归 19/19、授权矩阵 588 条声明/0 错误、`routes:check` 64 个文件、
+  `routes:test` 17/17、`architecture:test` 37/37、`process:test` 8/8、
+  `platform:iterations:test` 90/90 均通过；`process:verify -- --base=origin/main` 检查 24 个文件、
+  8 个跨 Owner 保护路径、0 违规。
+- 标准门禁 `build`（132 个静态文件，输出位于系统临时目录）、`lint`、`typecheck`、`check`、
+  unit 9/9 批、integration 2/2 批、smoke 5/5 全部通过；完整 `test:all` 11/11 批 0 失败，
+  Playwright E2E 36/36 通过。
+- 完整依赖树和生产依赖分别通过官方 registry 审计，均为 0 vulnerabilities；本机 npmmirror
+  不实现 audit endpoint，因此只对审计命令临时指定 registry，未修改 npm 配置或依赖。
+- 独立只读 review 无 P0/P1、无阻断项；P2 的跨域直写与逐路径行为覆盖缺口已分别登记为
+  ARC-008、TEST-007，并在 DATA_MODEL/ADR 中明确后续治理边界。
+- 未触碰 `data/db.json`、SQLite/WAL/SHM、生成报告、归档或发布制品；未修改 schema、migration、
+  CI、部署拓扑或生产 Go/No-Go 状态。

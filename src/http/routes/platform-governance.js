@@ -16,7 +16,8 @@ const SEGMENTS = Object.freeze([
   { subdomain: "mutual-recognition-overview", route: require("./platform-governance/mutual-recognition-overview") },
   { subdomain: "mutual-recognition-decision", route: require("./platform-governance/mutual-recognition-decision") },
   { subdomain: "productization-center", route: require("./platform-governance/productization-center") },
-  { subdomain: "operations-dashboard", route: require("./platform-governance/operations-dashboard") }
+  { subdomain: "operations-dashboard", route: require("./platform-governance/operations-dashboard") },
+  { subdomain: "operations-command", route: require("./platform-governance/operations-command") }
 ]);
 
 function createRouteSegments(runtime) {

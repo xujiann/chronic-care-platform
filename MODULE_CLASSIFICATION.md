@@ -40,7 +40,7 @@
 | public-health | T03 | C | 上下文 160 项，前端/脚本/外部运行时庞大 |
 | citizen-chronic | T04 | C | 浏览器文件 6k 行、上下文 64 项 |
 | care-coordination | T05 | C | 路由文件 2.1k 行、上下文 102 项 |
-| clinical-specialties | T06 | C | 领域过宽，包含急救/血液/影像/体检/质安；operations dashboard 已移出，command 兼容入口仍待移交 |
+| clinical-specialties | T06 | C | 领域仍含急救/血液/影像/体检/质安，但 operations dashboard 与 command 均已移出 |
 | clinical five-subdomain governance | T06 | B | 五个 Owner/API 边界已机器登记，源码、数据和 CI 隔离尚未完成 |
 | emergency dashboard query | T06/emergency | B | 首个只读用例已通过小端口隔离并具备特征/单元测试；其余急救仍是遗留边界 |
 | blood dashboard query | T06/blood | B | 首个查询用例已隔离角色范围并具备特征/单元测试；仍接收宽快照并保留内存规范化兼容 |

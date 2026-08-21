@@ -47,5 +47,7 @@
 - 第三切片：`GET /api/blood-system` 已通过 `blood-dashboard-query.v1` 迁入血液目标源码根，保持 commission/institution 范围、状态码和遗留内存规范化顺序，不新增持久化。
 - 第四切片：`GET /api/imaging-cloud` 已通过 `imaging-dashboard-query.v1` 迁入影像目标源码根，公开响应净化也归位影像子域；保持原角色、居民范围、访问审计和状态码。
 - 第五切片：`GET /api/physical-exams` 已通过 `physical-examination-dashboard-query.v1` 迁入体检目标源码根，保持原角色投影、居民范围、访问审计、最终脱敏和状态码。
-- OPS-01：`GET /api/operations/dashboard` 已由 T00 从 T06 原子移交 T02 `platform-governance/operations-dashboard`，保持 method/path、commission 角色、响应和全局 manifest 插槽；T06 删除对应子上下文及三个不再使用的依赖，并以唯一归属和禁止回流测试保护。`operations-command` 未移动。
-- 尚未实施：五个临床子域路由移动、完整运行时上下文拆分、中央数据 Owner 晋升、独立 CI、数据库拆分和独立部署；operations command 仍待单独 handoff。
+- OPS-01：`GET /api/operations/dashboard` 已由 T00 从 T06 原子移交 T02 `platform-governance/operations-dashboard`，保持 method/path、commission 角色、响应和全局 manifest 插槽；T06 删除对应子上下文及三个不再使用的依赖，并以唯一归属和禁止回流测试保护。
+- OPS-02：其余 32 个 `/api/operations` 字面路径已由 T00 从 T06 原子移交 T02 `platform-governance/operations-command`；原 20 项依赖和全局 manifest 插槽整体迁移，handler 除 route id/domain 外逐字不变，method/path、角色、状态码、响应、写库和审计语义保持兼容。T06 的 operations 路由计数归零，机器注册表标记 handoff complete。
+- OPS-02 保留了既有 `resourceDispatchRequests`、`taskMessages` 跨域直写，数据机器 Owner 仍为 T05 care-coordination；该兼容债由 TECH_DEBT ARC-008 跟踪，后续 owner port/事件治理必须另立 ADR，不属于本次路由归属移交。
+- 尚未实施：五个临床子域路由全面移动、完整运行时上下文拆分、中央数据 Owner 晋升、独立 CI、数据库拆分和独立部署；operations 大 handler 的后续用例端口拆分也不属于本次原子移交。
