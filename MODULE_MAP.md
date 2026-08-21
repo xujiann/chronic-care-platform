@@ -123,3 +123,7 @@ scripts/platform-cutover-alert-worker.js
 - `eslint.config.js` 与 `jsconfig.typecheck.json` 是渐进式静态质量边界，不拥有业务接口。
   Pages、complete-unit-test、governance-api 和 release-readiness 只消费这些标准入口；
   `test:all` 仍是独立的自动发现回归保护。
+
+## 11. T05 转诊命令 owner
+
+`src/care-coordination/referral-command-service.js` 是 `referral-order.v1` 的唯一写 owner。`care-coordination` 路由中的直接转诊动作、通用 workflow 兼容分支和统一 task 兼容分支只负责 HTTP 适配与原响应映射，不得直接修改 `referralSystem.referrals`。居民任务消息仍是 owner command 成功后的兼容副作用，不属于转诊聚合事务。

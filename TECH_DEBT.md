@@ -61,6 +61,7 @@
 - 同名文件和新旧目录是重复候选，不是删除证据。
 - 未确认可直接删除的死代码；删除必须有调用图、测试/运行证据和 owner 决策。
 - 英文代码、中文文档、日期化治理文档、readiness/report/audit 命名同时存在。新文件按现行标准命名，旧公共入口不做批量重命名。
+- 转诊聚合原有 direct、workflow、task 三套并行写语义已在 REF-01a 收敛为 T05 owner command；兼容 API 保留，但守卫测试禁止重新直接写 `referralSystem.referrals`。
 
 ## 测试缺口优先顺序
 
