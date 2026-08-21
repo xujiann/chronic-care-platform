@@ -123,3 +123,11 @@ scripts/platform-cutover-alert-worker.js
 - `eslint.config.js` 与 `jsconfig.typecheck.json` 是渐进式静态质量边界，不拥有业务接口。
   Pages、complete-unit-test、governance-api 和 release-readiness 只消费这些标准入口；
   `test:all` 仍是独立的自动发现回归保护。
+
+## 11. 健康驾驶舱指标合同
+
+T02 新增的 `health-dashboard-indicator-contract` 是纯合同/测量模块，依赖既有
+`technical-evidence` 稳定摘要工具，不读取存储、路由或组合根。遗留
+`health-dashboard-summary` 仍是大型兼容聚合器，但首个门急诊指标已通过小端口获得可测试的
+定义、测量和 fail-closed 质量语义。历史 `industry-*` ID 继续兼容，并同时公开 canonical
+ID 与弃用 alias；后续指标必须按 owner 逐个接入，不得继续按数组位置复用定义和值。

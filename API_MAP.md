@@ -102,3 +102,12 @@ HTTP request
 `GET /api/imaging-cloud` 已通过兼容委托接入 `imaging-dashboard-query.v1`。允许角色仍为 commission、institution、county、citizen；显式 `residentId` 继续通过 `canAccessResident`，拒绝时记录安全事件并返回净化后的 403。成功响应仍为 200，先执行既有角色脱敏，再递归删除凭据、签名 URL、物理路径和内部连接字段；带居民过滤的成功调阅仍持久化既有数据访问审计。
 
 `GET /api/physical-exams` 已通过兼容委托接入 `physical-examination-dashboard-query.v1`。允许角色仍为 citizen、institution、commission；显式 `residentId` 继续按 `allowedResidentIdsForUser` 拒绝越权并记录安全事件。citizen 仍不接收联调、网关和专项分流明细，readiness 只暴露代码状态、质量和阻断数量；管理角色保留完整投影。成功响应继续在既有访问审计持久化之后执行最终脱敏。
+
+## 9. 健康驾驶舱指标合同 API 投影
+
+`GET /api/health-dashboard/summary` 与
+`GET /api/health-dashboard/industry-governance-indicators` 的 method/path、commission-only
+角色和既有响应字段保持不变。指标条目加法返回 canonical ID、显式 legacy alias、
+`health-dashboard-indicator-contract.v1` 定义及 `population-service-visits.v1` 测量；summary
+加法返回合同版本和阻断测量数。范围只接受服务端运行时注入，未解析范围或未经签名/版本认可的
+来源返回 `blocked` 元数据，不会因报告结构 `ok=true` 被提升为生产证据。

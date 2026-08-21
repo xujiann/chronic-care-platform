@@ -24,6 +24,7 @@
 | 6A | OTP/锁定共享状态 | 已纳入生产身份 ADR；#131 候选已完成 P1 代码增量，待最新 PR/main CI | 保持 SQLite 单主机、PostgreSQL 多实例及原子消费/限流/锁定契约；真实 PG 由 CI 和现场重跑 |
 | 7 | 运行时上下文瘦身 | 候选 / P1 | 按领域子端口，逐块迁移，不重写 server |
 | 7A | 临床五个可治理子域 | 治理切片完成，急救/血液/影像/体检首用例已迁移；operations dashboard 已由 T00 移交 T02 / P1 | Accepted ADR；保持协议兼容，按子域逐用例迁移；operations command 另行移交 |
+| 7B | 健康驾驶舱版本化指标 | 首个 `population-service-visits.v1` 合同已建立 / P1 | 由 T03 确认来源版本与签名证据、由 T00 注入服务端 region scope；其余指标按 owner 逐项接入 |
 | 8 | JSON 169 个遗留集合治理 | 候选 / P1 | owner 分类、使用证据、晋升/归档/迁移批次 |
 | 9 | 前端可信渲染与 CSP | 待 ADR / P1 | sink 清单、兼容策略、逐页 E2E/负向测试 |
 | 10 | CI/worker/部署依赖治理 | CI 风险域拆分已合入并经 main 验证，供应链/worker 仍候选 / P2 | 不降低 required checks；继续评审 Action 固定和 worker 观测契约 |
