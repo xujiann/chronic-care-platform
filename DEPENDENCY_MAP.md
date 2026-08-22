@@ -78,10 +78,10 @@ TypeScript 与 Node 类型仅用于开发门禁；lockfile audit 已修复 c8 �
   任何普通 API 调用前清除旧 localStorage token，Cookie 与 Authorization 并存时服务端也选择
   Cookie。bearer-only 兼容 token 仅存在页面内存，不跨重载恢复。
 - 发现 871 处 `innerHTML=` / `insertAdjacentHTML` 类写入；最高为 citizen 94、app 90、public-health 78、platform 72。
-- 集中响应头端口保留兼容 CSP 的 `script/style 'unsafe-inline'` 以避免一次性破坏页面，同时下发不含
-  `unsafe-inline`/`unsafe-eval` 的严格 Report-Only 目标；不得把兼容基线描述为 CSP 已关闭。
-- 显式发布图的机器清单当前包含 37 个 P0 inline script、8 个 P1 inline style block 和 13 个
-  P1 style attribute；event handler、javascript URL 与 eval 类当前为 0，CI/构建按指纹拒绝新增 P0/P1。
+- 37 个页面内联守卫/脚本已汇入 `page-auth-bootstrap.js`、`mobile-preview.js` 等外部依赖；8 个样式块和
+  13 个样式属性已汇入外部 CSS/class，显式发布图的 P0/P1 静态风险现为 0，CI/构建拒绝新增。
+- 集中响应头端口暂保留兼容 CSP 的 `script/style 'unsafe-inline'`，并下发不含 `unsafe-inline`/`unsafe-eval`
+  的严格 Report-Only 目标；动态 CSSOM、全角色浏览器回归和真实托管验证完成前不得描述为 CSP 已关闭。
 - Service Worker 缓存应用壳以及生成的 `data/public-demo.json`，缓存版本已从 v59 提升到 v60 以撤销旧快照缓存。
 
 ## 5. 数据依赖

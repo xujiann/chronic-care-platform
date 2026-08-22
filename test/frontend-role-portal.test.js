@@ -34,9 +34,9 @@ test("legacy page role guards cannot grant roles outside the central policy", ()
   for (const [page, entry] of Object.entries(policy.pageCatalog)) {
     if (page.includes("/")) continue;
     const source = read(page);
-    const match = source.match(/requireRole\(\s*(\[[^\]]+\])/);
+    const match = source.match(/<script[^>]+src="\.\/page-auth-bootstrap\.js"[^>]+data-roles="([^"]+)"/);
     if (!match) continue;
-    const declared = JSON.parse(match[1].replace(/'/g, "\""));
+    const declared = match[1].split(",").map((role) => role.trim()).filter(Boolean);
     for (const role of declared) assert.ok(entry.roles.includes(role), `${page} declares ${role} outside central policy`);
   }
 });
@@ -100,7 +100,7 @@ test("cookie-only protected pages hydrate context before the fail-closed access 
   assert.match(source, /reason: "INVALID_AUTH_CONTEXT"/);
 });
 
-test("all legacy inline HTML guards defer to pending cookie hydration and central policy", () => {
+test("all external page guards defer to pending cookie hydration and central policy", () => {
   const authSource = read("auth.js");
   assert.match(authSource, /authContextState = API_BASE \? "pending" : "ready"/);
   assert.match(authSource, /setAttribute\("data-auth-resolved", "pending"\)/);
@@ -111,14 +111,14 @@ test("all legacy inline HTML guards defer to pending cookie hydration and centra
 
   const guardedPages = fs.readdirSync(ROOT)
     .filter((name) => name.endsWith(".html"))
-    .filter((name) => /HealthCityAuth\.require(?:Role|AccountType)/.test(read(name)));
+    .filter((name) => /src="\.\/page-auth-bootstrap\.js"/.test(read(name)));
   assert.ok(guardedPages.length >= 30);
   for (const page of guardedPages) {
     const source = read(page);
     const policyIndex = source.indexOf("access-control-policy.js");
     const authIndex = source.indexOf("auth.js");
-    const guardIndex = source.search(/HealthCityAuth\.require(?:Role|AccountType)/);
-    assert.ok(policyIndex >= 0 && policyIndex < authIndex && authIndex < guardIndex, `${page} must load policy and auth before its legacy guard`);
+    const guardIndex = source.indexOf("page-auth-bootstrap.js");
+    assert.ok(policyIndex >= 0 && policyIndex < authIndex && authIndex < guardIndex, `${page} must load policy and auth before its external guard`);
   }
 });
 

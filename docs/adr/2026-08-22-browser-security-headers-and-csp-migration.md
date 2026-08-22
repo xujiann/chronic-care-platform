@@ -7,7 +7,7 @@
 
 ## Problem
 
-浏览器响应头原本以内联函数存在于 `server.js`，Node 动态服务与静态发布没有共同的机器合同。兼容 CSP 允许 `script-src 'unsafe-inline'` 和 `style-src 'unsafe-inline'`；当前显式发布图仍包含 37 个 P0 可执行内联脚本以及 21 个 P1 内联样式块/样式属性。直接启用不含 `unsafe-inline` 的严格 CSP 会破坏页面，而继续只保留兼容 CSP 会掩盖 SEC-004 尚未关闭的事实。仓库也缺少 fail-closed 清单阻止新增内联事件处理器、`eval` 或其他高风险构造。
+浏览器响应头原本以内联函数存在于 `server.js`，Node 动态服务与静态发布没有共同的机器合同。兼容 CSP 允许 `script-src 'unsafe-inline'` 和 `style-src 'unsafe-inline'`；决策时显式发布图包含 37 个 P0 可执行内联脚本以及 21 个 P1 内联样式块/样式属性。直接启用不含 `unsafe-inline` 的严格 CSP 会破坏页面，而继续只保留兼容 CSP 会掩盖 SEC-004 尚未关闭的事实。仓库也缺少 fail-closed 清单阻止新增内联事件处理器、`eval` 或其他高风险构造。
 
 ## Options
 
@@ -38,6 +38,10 @@
 ## Recommendation
 
 采用方案 3。集中端口固定提供 `nosniff`、`Referrer-Policy`、`Permissions-Policy`、同源 frame 策略和生产 HSTS；兼容 CSP 继续强制但不得描述为严格 CSP，严格目标只用 `Content-Security-Policy-Report-Only`。P0/P1 基线必须只减不增。生产就绪条件至少包括：P0/P1 资产风险归零或逐项受控例外、严格 CSP 强制后的全角色 E2E、动态和静态托管响应头独立验证、无未关闭高危发现以及正式安全评估。
+
+### 第二阶段状态（2026-08-22）
+
+显式发布图原有 37 个可执行内联脚本、8 个内联样式块和 13 个样式属性已迁至外部脚本、外部样式表和受控 class，P0/P1 静态风险基线为 0。角色/账户守卫统一由 `page-auth-bootstrap.js` 承载，并以行为测试保持原有加载顺序和失败关闭语义。此结果只完成第二阶段的静态迁移，不授权提前进入第三/四阶段：动态 CSSOM、全角色浏览器与恶意输入回归、真实托管响应头和独立安全评估仍未完成，因此兼容 `unsafe-inline` 保留、严格策略仍为 Report-Only、`productionReady=false`。
 
 ## Phased enforcement and rollback
 

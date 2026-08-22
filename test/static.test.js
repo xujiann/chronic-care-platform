@@ -12,6 +12,20 @@ function read(file) {
   return fs.readFileSync(path.join(ROOT, file), "utf8");
 }
 
+function assertPageGuard(file, roles, accountTypes = []) {
+  const source = read(file);
+  assert.match(source, /<script[^>]+src="\.\/page-auth-bootstrap\.js"/);
+  const roleMatch = source.match(/<script[^>]+src="\.\/page-auth-bootstrap\.js"[^>]+data-roles="([^"]+)"/);
+  const declaredRoles = roleMatch[1].split(",").map((role) => role.trim()).filter(Boolean);
+  roles.forEach((role) => assert.ok(declaredRoles.includes(role), `${file} 缺少 ${role} 页面守卫`));
+  if (accountTypes.length) {
+    const accountMatch = source.match(/data-account-types="([^"]+)"/);
+    assert.ok(accountMatch, `${file} 缺少账户类型守卫`);
+    const declaredTypes = accountMatch[1].split(",").map((type) => type.trim()).filter(Boolean);
+    accountTypes.forEach((type) => assert.ok(declaredTypes.includes(type), `${file} 缺少 ${type} 账户守卫`));
+  }
+}
+
 let serverRuntimeSource;
 
 function readServerRuntime() {
@@ -38,11 +52,9 @@ test("role pages keep explicit page guards", () => {
     "quality-safety.html": ["commission"]
   };
   Object.entries(guards).forEach(([file, roles]) => {
-    roles.forEach((role) => {
-      assert.match(read(file), new RegExp(`requireRole\\([^\\)]*\\"${role}\\"`), `${file} 缺少 ${role} 页面守卫`);
-    });
+    assertPageGuard(file, roles);
   });
-  assert.match(read("digital-hospital-self-assessment.html"), /requireRole\(\["commission", "institution"\]\)/);
+  assertPageGuard("digital-hospital-self-assessment.html", ["commission", "institution"]);
 });
 
 test("server-backed pages hydrate cookie authorization and reject expired sessions", () => {
@@ -222,7 +234,7 @@ test("about page documents doctor multi-practice policy boundaries", () => {
   assert.doesNotMatch(doctorAssets, /锟|�|鍖|鎵|鐐|寰|宸|绛|澶|鏆/);
   assert.deepEqual([...accessPolicy.pageCatalog["doctor.html"].roles], ["institution"]);
   assert.deepEqual([...accessPolicy.pageCatalog["doctor.html"].accountTypes], ["doctor"]);
-  assert.match(doctorHtml, /requireAccountType\(\["doctor"\]\)/);
+  assertPageGuard("doctor.html", ["institution"], ["doctor"]);
   assert.match(read("auth.js"), /function requireAccountType/);
   assert.match(read("auth.js"), /home: "doctor\.html", doctorId: "doc-liu"/);
   assert.match(about, /医生账户与多点执业政策说明/);
@@ -870,7 +882,7 @@ test("health dashboard about page documents policies data boundary and site cuto
   const js = read("health-dashboard-about.js");
   const auth = read("auth.js");
 
-  assert.match(html, /requireRole\(\["commission"\]\)/);
+  assertPageGuard("health-dashboard-about.html", ["commission"]);
   assert.match(html, /health-dashboard-about\.js/);
   assert.match(html, /data-dashboard-about-section="runtime-report"/);
   assert.match(html, /dashboard-about-function-report/);
@@ -1883,7 +1895,7 @@ test("platform and workbench expose P2 governance and runtime panels", () => {
   assert.match(operationsHtml, /operation-alert-queue/);
   assert.match(operationsHtml, /dispatch-form/);
   assert.match(operationsHtml, /reconciliation-reviews/);
-  assert.match(operationsAboutHtml, /requireRole\(\["commission"\]\)/);
+  assertPageGuard("operations-about.html", ["commission"]);
   assert.match(operationsAboutHtml, /政策依据、业务边界与发布说明/);
   assert.match(operationsAboutHtml, /国家二级公立医院绩效监测操作手册/);
   assert.match(operationsAboutHtml, /国家三级公立医院绩效监测操作手册/);
@@ -2681,7 +2693,7 @@ test("digital hospital standards platform exposes standards center workflow and 
   const readiness = read("scripts/digital-hospital-standards-readiness.js");
   const server = readServerRuntime();
   assert.match(html, /数智医院标准平台/);
-  assert.match(html, /requireRole\(\["commission"\]\)/);
+  assertPageGuard("digital-hospital-standards.html", ["commission"]);
   assert.match(html, /data-digital-hospital-section="standard-center"/);
   assert.match(html, /data-digital-hospital-section="policy-register"/);
   assert.match(html, /data-digital-hospital-section="control-matrix"/);
@@ -2703,7 +2715,7 @@ test("digital hospital standards platform exposes standards center workflow and 
   assert.match(selfAssessmentHtml, /digital-self-assessment-review-filter/);
   assert.match(selfAssessmentHtml, /digital-self-assessment-dispute-indicators/);
   assert.match(selfAssessmentHtml, /digital-self-assessment-opinion-ref/);
-  assert.match(selfAssessmentHtml, /requireRole\(\["commission", "institution"\]\)/);
+  assertPageGuard("digital-hospital-self-assessment.html", ["commission", "institution"]);
   assert.match(selfAssessmentUi, /DIGITAL_SELF_ASSESSMENT_ENDPOINT/);
   assert.match(selfAssessmentUi, /recordDigitalSelfAssessmentAction/);
   assert.match(selfAssessmentUi, /assignDigitalSelfAssessment/);
@@ -3054,13 +3066,16 @@ test("citizen portal exposes eight-stage lifecycle health management", () => {
 test("citizen portal exposes PWA install and offline shell assets", () => {
   const citizenHtml = read("citizen.html");
   const citizenJs = read("citizen.js");
-  const mobilePreviewHtml = read("mobile-preview.html");
+  const mobilePreviewPage = read("mobile-preview.html");
+  const mobilePreviewHtml = `${mobilePreviewPage}\n${read("mobile-preview.js")}`;
   const mobilePreviewCss = read("mobile-preview.css");
   const readme = read("README.md");
   const manifest = JSON.parse(read("manifest.webmanifest"));
   const serviceWorker = read("service-worker.js");
   assert.match(citizenHtml, /rel="manifest"/);
-  assert.match(citizenHtml, /serviceWorker\.register\("\.\/service-worker\.js"\)/);
+  assert.match(citizenHtml, /service-worker-registration\.js/);
+  assert.match(read("service-worker-registration.js"), /serviceWorker\.register\("\.\/service-worker\.js"\)/);
+  assert.match(mobilePreviewPage, /mobile-preview\.js/);
   assert.match(citizenHtml, /citizen-records-v1\.js\?v=20260724auth3/);
   assert.match(citizenHtml, /citizen-records-v2\.js\?v=20260725care16/);
   assert.match(citizenHtml, /citizen\.js\?v=20260728next4/);
@@ -3502,7 +3517,7 @@ test("citizen portal exposes medical escort appointment workflow", () => {
   assert.match(read("scripts/escort-service-readiness.js"), /escort:launchOwnerChecklist/);
   assert.match(read("scripts/escort-service-readiness.js"), /escort:productionBlockers/);
   assert.match(read("scripts/escort-service-readiness.js"), /escort:deploymentPlan/);
-  assert.match(escortHtml, /requireRole\(\["commission", "institution"\]\)/);
+  assertPageGuard("escort.html", ["commission", "institution"]);
   assert.match(escortJs, /data-escort-hospital/);
   assert.match(escortJs, /hospital-handoff/);
   assert.match(escortJs, /updateEscortHospitalHandoff/);
@@ -4836,7 +4851,7 @@ test("digital hospital P0-P1 pilot evaluation workbench is wired", () => {
   ["pilot-operations", "catalog", "collection", "evidence", "preassessment", "rectification", "boundary"].forEach((section) => {
     assert.match(html, new RegExp(`data-digital-evaluation-section="${section}"`));
   });
-  assert.match(html, /requireRole\(\["commission", "institution"\]\)/);
+  assertPageGuard("digital-hospital-evaluation.html", ["commission", "institution"]);
   assert.match(ui, /run-preassessment/);
   assert.match(ui, /refreshBoard/);
   assert.match(ui, /submit-readiness/);
