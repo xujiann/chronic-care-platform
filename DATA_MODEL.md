@@ -185,3 +185,9 @@ worker 的 `append-only-audit-source-v2` 通过单调 `sequence` cursor 读取
 source/sink contract、目标摘要、cursor/source hash 与 receipt 摘要；checkpoint v2 snapshot 不静默提升。
 已淘汰历史不可恢复，未签名 receipt、外部单调 anchor、真实 WORM/KMS/保留和现场验收仍是 NO-GO；
 `productionReady` 固定为 `false`，本切片不切换 PostgreSQL 主库。
+
+## 13. 生产 API 目录数据边界
+
+`production-api-catalog-v1` 是从路由源码与授权矩阵即时派生的治理元数据，不新增 JSON 集合、SQLite/PostgreSQL 表、字段、DDL、migration、outbox 或生产事实源。默认命令只向标准输出返回计数摘要，完整目录也只包含 method/path、owner、身份/角色/范围、幂等观察、生产阻断和源码位置；禁止加入凭据、真实 endpoint、患者标识、provider payload 或外部回执。
+
+目录中的 `source-marker-observed` 不是幂等执行证据，`NO-GO` 也不是可被写入业务状态的生命周期字段。真实 API 联调和现场证据仍由各领域既有权威模型管理，不能回写或反向污染该派生目录。

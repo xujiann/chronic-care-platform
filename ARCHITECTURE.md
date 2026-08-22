@@ -41,3 +41,4 @@
 - v1–v14 SQLite migration 语义冻结，后续采用独立、内容指纹化 migration。
 - 核心数据采用 closed-world 定义，不随功能任务创建平行概念。
 - 静态内容安全边界已按 Accepted ADR 实施并合入 `main@6c18221`；Node 与 Pages 共用显式发布清单，浏览器只消费合成脱敏快照。
+- 生产 API 目录从现有 route source inventory 与授权矩阵派生；所有条目默认 `NO-GO`，静态幂等标记和仓库门禁不构成生产证据。
