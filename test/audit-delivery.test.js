@@ -7,6 +7,8 @@ const path = require("node:path");
 const { spawnSync } = require("node:child_process");
 const test = require("node:test");
 const { auditHashFor } = require("../src/identity-security/audit-chain");
+const { AUDIT_DELIVERY_SOURCE_CONTRACT } = require("../src/identity-security/audit-delivery-source");
+const { applySqliteMigrations } = require("../src/platform/storage/sqlite-migrations");
 const {
   assessAuditDeliveryConfig,
   auditWriteFailureSignal,
@@ -40,6 +42,36 @@ function createAuditDatabase(file) {
   db.exec("CREATE TABLE state_collections (key TEXT PRIMARY KEY, payload TEXT NOT NULL)");
   const insert = db.prepare("INSERT INTO state_collections (key, payload) VALUES (?, ?)");
   for (const trail of ["securityEvents", "dataAccessLogs"]) insert.run(trail, JSON.stringify(seal(RECORDS.filter((item) => item.trail === trail).map((item) => item.record))));
+  db.close();
+}
+
+function createAppendOnlyAuditDatabase(file) {
+  const { DatabaseSync } = require("node:sqlite");
+  const db = new DatabaseSync(file);
+  applySqliteMigrations(db, { targetVersion: 14 });
+  const insert = db.prepare("INSERT INTO state_collections (key, payload, updated_at, version) VALUES (?, ?, ?, 1)");
+  insert.run("securityEvents", JSON.stringify(seal([{
+    id: "event-append-1",
+    at: "2026-08-22T01:00:00.000Z",
+    action: "login",
+    result: "allowed",
+    role: "administrator",
+    actor: "sensitive-actor-account",
+    target: "identity-console",
+    detail: "sensitive free text"
+  }])), "2026-08-22T02:00:00.000Z");
+  insert.run("dataAccessLogs", JSON.stringify(seal([{
+    id: "access-append-1",
+    at: "2026-08-22T01:01:00.000Z",
+    result: "allowed",
+    role: "doctor",
+    actor: "doctor-account-secret",
+    personIndex: "person-index-secret",
+    residentId: "resident-secret",
+    scope: "clinical-record",
+    purpose: "sensitive purpose"
+  }])), "2026-08-22T02:00:00.000Z");
+  applySqliteMigrations(db);
   db.close();
 }
 
@@ -111,7 +143,7 @@ test("production preflight requires one external target dedicated identity and e
     SIEM_AUDIT_CLIENT_CERT_FILE: "C:\\secrets\\audit-client.pem",
     SIEM_AUDIT_CLIENT_KEY_FILE: "C:\\secrets\\audit-client.key",
     AUDIT_DELIVERY_CHECKPOINT_PATH: "C:\\health-data\\audit-state\\checkpoint.json",
-    AUDIT_DELIVERY_SOURCE_CONTRACT: "append-only-outbox-v2",
+    AUDIT_DELIVERY_SOURCE_CONTRACT: "append-only-audit-source-v2",
     AUDIT_DELIVERY_SERVICE_USER: "health-audit",
     AUDIT_DELIVERY_SERVICE_GROUP: "health-audit",
     PLATFORM_PILOT_CUTOVER_ALERT_JOURNAL_FILE: "C:\\health-data\\audit-state\\alerts.json"
@@ -259,7 +291,7 @@ test("production process identity binds the exact service UID and GID", () => {
     SIEM_AUDIT_SIGNING_SECRET: "a".repeat(32),
     SIEM_AUDIT_TLS_MODE: "system",
     AUDIT_DELIVERY_CHECKPOINT_PATH: path.resolve(os.tmpdir(), "audit-checkpoint.json"),
-    AUDIT_DELIVERY_SOURCE_CONTRACT: "append-only-outbox-v2",
+    AUDIT_DELIVERY_SOURCE_CONTRACT: "append-only-audit-source-v2",
     AUDIT_DELIVERY_SERVICE_USER: "health-audit",
     AUDIT_DELIVERY_SERVICE_GROUP: "health-audit",
     AUDIT_DELIVERY_SERVICE_UID: "1001",
@@ -403,6 +435,102 @@ test("worker checkpoint v2 prevents redelivery rollback corruption and concurren
   const release = acquireWorkerLock(checkpointFile);
   await assert.rejects(runWorker({ sqliteFile, checkpointFile, adapter, env: {} }), { code: "AUDIT_DELIVERY_WORKER_LOCKED" });
   release();
+});
+
+test("append-only worker advances checkpoint v3 by committed source cursor and binds each batch", async (t) => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "audit-worker-v3-"));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const sqliteFile = path.join(directory, "audit.sqlite");
+  const checkpointFile = path.join(directory, "checkpoint.json");
+  createAppendOnlyAuditDatabase(sqliteFile);
+  const batches = [];
+  const adapter = {
+    status: () => ({ type: "test-sink" }),
+    async deliver(batch) {
+      batches.push(batch);
+      return {
+        receiptId: `receipt-${batches.length}`,
+        batchId: batch.batchId,
+        digest: batch.digest,
+        recordCount: batch.recordCount,
+        acknowledgedAt: "2026-08-22T04:00:00.000Z"
+      };
+    }
+  };
+  const env = {
+    AUDIT_DELIVERY_SOURCE_CONTRACT,
+    AUDIT_DELIVERY_BATCH_SIZE: "1"
+  };
+
+  const first = await runWorker({ sqliteFile, checkpointFile, adapter, env });
+  assert.equal(first.ok, true);
+  assert.equal(first.delivered, 1);
+  assert.equal(first.pendingBefore, 2);
+  assert.equal(first.pendingAfter, 1);
+  assert.equal(first.sourceCursor, 1);
+  assert.equal(first.productionReady, false);
+  const firstPayload = JSON.parse(batches[0].payload);
+  assert.equal(firstPayload.schemaVersion, "audit-delivery-v2");
+  assert.deepEqual(firstPayload.source, {
+    contract: AUDIT_DELIVERY_SOURCE_CONTRACT,
+    startCursor: 1,
+    endCursor: 1,
+    sourceHeadHash: batches[0].source.sourceHeadHash
+  });
+  assert.equal(JSON.stringify(firstPayload).includes("sensitive-actor-account"), false);
+  assert.equal(JSON.stringify(firstPayload).includes("sensitive free text"), false);
+
+  const firstCheckpoint = readCheckpoint(checkpointFile, { sourceContract: AUDIT_DELIVERY_SOURCE_CONTRACT });
+  assert.equal(firstCheckpoint.schemaVersion, "audit-delivery-checkpoint-v3");
+  assert.equal(firstCheckpoint.sourceCursor, 1);
+  assert.match(firstCheckpoint.sourceHeadHash, /^[a-f0-9]{64}$/);
+  assert.match(firstCheckpoint.targetDigest, /^[a-f0-9]{64}$/);
+  assert.match(firstCheckpoint.lastReceiptDigest, /^[a-f0-9]{64}$/);
+
+  const second = await runWorker({ sqliteFile, checkpointFile, adapter, env });
+  assert.equal(second.sourceCursor, 2);
+  assert.equal(second.pendingAfter, 0);
+  await runWorker({ sqliteFile, checkpointFile, adapter, env });
+  assert.equal(batches.length, 2, "an acknowledged cursor must not be redelivered");
+});
+
+test("append-only worker never promotes checkpoint v2 and never advances a failed cursor", async (t) => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "audit-worker-v3-guard-"));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const sqliteFile = path.join(directory, "audit.sqlite");
+  const checkpointFile = path.join(directory, "checkpoint.json");
+  createAppendOnlyAuditDatabase(sqliteFile);
+
+  await runWorker({
+    sqliteFile,
+    checkpointFile,
+    adapter: { async deliver(batch) { return { receiptId: "v2", batchId: batch.batchId, digest: batch.digest, recordCount: batch.recordCount, acknowledgedAt: new Date().toISOString() }; } },
+    env: {}
+  });
+  await assert.rejects(runWorker({
+    sqliteFile,
+    checkpointFile,
+    adapter: { async deliver() { throw new Error("must not deliver"); } },
+    env: { AUDIT_DELIVERY_SOURCE_CONTRACT }
+  }), { code: "AUDIT_CHECKPOINT_MIGRATION_REQUIRED" });
+
+  fs.rmSync(checkpointFile);
+  fs.rmSync(`${checkpointFile}.head`);
+  const failed = await runWorker({
+    sqliteFile,
+    checkpointFile,
+    adapter: {
+      status: () => ({ type: "test-sink" }),
+      async deliver() { throw Object.assign(new Error("target unavailable"), { code: "TARGET_UNAVAILABLE" }); }
+    },
+    env: { AUDIT_DELIVERY_SOURCE_CONTRACT, AUDIT_DELIVERY_BATCH_SIZE: "1" }
+  });
+  assert.equal(failed.ok, false);
+  assert.equal(failed.sourceCursor, 0);
+  const checkpoint = readCheckpoint(checkpointFile, { sourceContract: AUDIT_DELIVERY_SOURCE_CONTRACT });
+  assert.equal(checkpoint.sourceCursor, 0);
+  assert.equal(checkpoint.sourceHeadHash, "");
+  assert.equal(checkpoint.incidentOpen, true);
 });
 
 test("checkpoint write failures emit a metadata-only operational control signal", async (t) => {

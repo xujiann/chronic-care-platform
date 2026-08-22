@@ -16,10 +16,16 @@ const {
   stableStringify
 } = require("../src/platform/operations/audit-delivery");
 const { verifyAuditTrail } = require("../src/identity-security/audit-chain");
+const {
+  AUDIT_DELIVERY_SOURCE_CONTRACT,
+  readAuditDeliverySourceBatch
+} = require("../src/identity-security/audit-delivery-source");
 
 const ROOT = path.resolve(__dirname, "..");
 const TRAILS = Object.freeze(["securityEvents", "dataAccessLogs"]);
-const CHECKPOINT_SCHEMA = "audit-delivery-checkpoint-v2";
+const SNAPSHOT_SOURCE_CONTRACT = "snapshot-rehearsal-v1";
+const CHECKPOINT_SCHEMA_V2 = "audit-delivery-checkpoint-v2";
+const CHECKPOINT_SCHEMA_V3 = "audit-delivery-checkpoint-v3";
 const HEAD_SCHEMA = "audit-delivery-checkpoint-head-v1";
 const HEX = /^[a-f0-9]{64}$/;
 
@@ -51,6 +57,22 @@ function isWithin(parent, child) {
 }
 
 function checkpointProjection(value) {
+  if (value.schemaVersion === CHECKPOINT_SCHEMA_V3) {
+    return {
+      schemaVersion: value.schemaVersion,
+      sequence: value.sequence,
+      previousCheckpointDigest: value.previousCheckpointDigest,
+      sourceContract: value.sourceContract,
+      sinkContract: value.sinkContract,
+      targetDigest: value.targetDigest,
+      sourceCursor: value.sourceCursor,
+      sourceHeadHash: value.sourceHeadHash,
+      lastReceiptDigest: value.lastReceiptDigest,
+      incidentOpen: value.incidentOpen,
+      receipts: value.receipts,
+      updatedAt: value.updatedAt
+    };
+  }
   return { schemaVersion: value.schemaVersion, sequence: value.sequence, previousCheckpointDigest: value.previousCheckpointDigest, deliveredDigests: value.deliveredDigests, incidentOpen: value.incidentOpen, receipts: value.receipts, updatedAt: value.updatedAt };
 }
 
@@ -58,17 +80,49 @@ function headProjection(value) {
   return { schemaVersion: value.schemaVersion, sequence: value.sequence, checkpointDigest: value.checkpointDigest };
 }
 
-function emptyCheckpoint() {
-  return { schemaVersion: CHECKPOINT_SCHEMA, sequence: 0, previousCheckpointDigest: "", checkpointDigest: "", deliveredDigests: [], incidentOpen: false, receipts: [], updatedAt: "" };
+function emptyCheckpoint(options = {}) {
+  if (options.sourceContract === AUDIT_DELIVERY_SOURCE_CONTRACT) {
+    return {
+      schemaVersion: CHECKPOINT_SCHEMA_V3,
+      sequence: 0,
+      previousCheckpointDigest: "",
+      checkpointDigest: "",
+      sourceContract: AUDIT_DELIVERY_SOURCE_CONTRACT,
+      sinkContract: String(options.sinkContract || "audit-delivery-v1"),
+      targetDigest: String(options.targetDigest || ""),
+      sourceCursor: 0,
+      sourceHeadHash: "",
+      lastReceiptDigest: "",
+      incidentOpen: false,
+      receipts: [],
+      updatedAt: ""
+    };
+  }
+  return { schemaVersion: CHECKPOINT_SCHEMA_V2, sequence: 0, previousCheckpointDigest: "", checkpointDigest: "", deliveredDigests: [], incidentOpen: false, receipts: [], updatedAt: "" };
 }
 
-function validateCheckpoint(value) {
-  if (!value || value.schemaVersion !== CHECKPOINT_SCHEMA || !Number.isInteger(value.sequence) || value.sequence < 1
+function validateCheckpoint(value, options = {}) {
+  const versionValid = value?.schemaVersion === CHECKPOINT_SCHEMA_V2 || value?.schemaVersion === CHECKPOINT_SCHEMA_V3;
+  if (!value || !versionValid || !Number.isInteger(value.sequence) || value.sequence < 1
     || (value.sequence > 1 && !HEX.test(String(value.previousCheckpointDigest || "")))
-    || !Array.isArray(value.deliveredDigests) || value.deliveredDigests.some((item) => !HEX.test(String(item)))
     || !Array.isArray(value.receipts) || !Number.isFinite(Date.parse(value.updatedAt || ""))
     || !HEX.test(String(value.checkpointDigest || "")) || typeof value.incidentOpen !== "boolean") {
     throw checkpointError("AUDIT_CHECKPOINT_CORRUPT", "audit delivery checkpoint is malformed");
+  }
+  if (value.schemaVersion === CHECKPOINT_SCHEMA_V2
+    && (!Array.isArray(value.deliveredDigests) || value.deliveredDigests.some((item) => !HEX.test(String(item))))) {
+    throw checkpointError("AUDIT_CHECKPOINT_CORRUPT", "audit delivery checkpoint is malformed");
+  }
+  if (value.schemaVersion === CHECKPOINT_SCHEMA_V3
+    && (value.sourceContract !== AUDIT_DELIVERY_SOURCE_CONTRACT
+      || value.sinkContract !== String(options.sinkContract || value.sinkContract)
+      || !HEX.test(String(value.targetDigest || ""))
+      || value.targetDigest !== String(options.targetDigest || value.targetDigest)
+      || !Number.isSafeInteger(value.sourceCursor)
+      || value.sourceCursor < 0
+      || (value.sourceCursor > 0 && !HEX.test(String(value.sourceHeadHash || "")))
+      || (value.lastReceiptDigest && !HEX.test(String(value.lastReceiptDigest))))) {
+    throw checkpointError("AUDIT_CHECKPOINT_BINDING_INVALID", "audit delivery checkpoint binding is invalid");
   }
   if (value.checkpointDigest !== sha256(stableStringify(checkpointProjection(value)))) throw checkpointError("AUDIT_CHECKPOINT_CORRUPT", "audit delivery checkpoint digest is invalid");
   for (const receipt of value.receipts) {
@@ -86,13 +140,20 @@ function readJson(file, label) {
   try { return JSON.parse(fs.readFileSync(file, "utf8")); } catch { throw checkpointError("AUDIT_CHECKPOINT_CORRUPT", `${label} is not valid JSON`); }
 }
 
-function readCheckpoint(file) {
+function readCheckpoint(file, options = {}) {
   const headFile = `${file}.head`;
   const exists = fs.existsSync(file);
   const headExists = fs.existsSync(headFile);
-  if (!exists && !headExists) return emptyCheckpoint();
+  if (!exists && !headExists) return emptyCheckpoint(options);
   if (!exists || !headExists) throw checkpointError("AUDIT_CHECKPOINT_ROLLBACK_DETECTED", "checkpoint and durable head must exist together");
-  const value = validateCheckpoint(readJson(file, "audit delivery checkpoint"));
+  const raw = readJson(file, "audit delivery checkpoint");
+  if (options.sourceContract === AUDIT_DELIVERY_SOURCE_CONTRACT && raw?.schemaVersion === CHECKPOINT_SCHEMA_V2) {
+    throw checkpointError("AUDIT_CHECKPOINT_MIGRATION_REQUIRED", "snapshot checkpoint v2 cannot be promoted to append-only checkpoint v3");
+  }
+  if (options.sourceContract !== AUDIT_DELIVERY_SOURCE_CONTRACT && raw?.schemaVersion === CHECKPOINT_SCHEMA_V3) {
+    throw checkpointError("AUDIT_CHECKPOINT_SOURCE_CONTRACT_MISMATCH", "append-only checkpoint v3 cannot be used by snapshot rehearsal");
+  }
+  const value = validateCheckpoint(raw, options);
   const head = readJson(headFile, "audit delivery checkpoint head");
   if (head?.schemaVersion !== HEAD_SCHEMA || !Number.isInteger(head.sequence) || !HEX.test(String(head.checkpointDigest || "")) || !HEX.test(String(head.headDigest || "")) || head.headDigest !== sha256(stableStringify(headProjection(head)))) {
     throw checkpointError("AUDIT_CHECKPOINT_CORRUPT", "audit delivery checkpoint head is invalid");
@@ -119,8 +180,23 @@ function atomicWrite(file, body) {
 
 function writeCheckpoint(file, checkpoint) {
   fs.mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 });
-  const next = {
-    schemaVersion: CHECKPOINT_SCHEMA,
+  const appendOnly = checkpoint.schemaVersion === CHECKPOINT_SCHEMA_V3
+    || checkpoint.sourceContract === AUDIT_DELIVERY_SOURCE_CONTRACT;
+  const next = appendOnly ? {
+    schemaVersion: CHECKPOINT_SCHEMA_V3,
+    sequence: Number(checkpoint.sequence || 0) + 1,
+    previousCheckpointDigest: checkpoint.previousCheckpointDigest || "",
+    sourceContract: AUDIT_DELIVERY_SOURCE_CONTRACT,
+    sinkContract: String(checkpoint.sinkContract || "audit-delivery-v1"),
+    targetDigest: String(checkpoint.targetDigest || ""),
+    sourceCursor: Number(checkpoint.sourceCursor || 0),
+    sourceHeadHash: String(checkpoint.sourceHeadHash || ""),
+    lastReceiptDigest: String(checkpoint.lastReceiptDigest || ""),
+    incidentOpen: checkpoint.incidentOpen === true,
+    receipts: (checkpoint.receipts || []).slice(-1000),
+    updatedAt: checkpoint.updatedAt || new Date().toISOString()
+  } : {
+    schemaVersion: CHECKPOINT_SCHEMA_V2,
     sequence: Number(checkpoint.sequence || 0) + 1,
     previousCheckpointDigest: checkpoint.previousCheckpointDigest || "",
     deliveredDigests: (checkpoint.deliveredDigests || []).slice(-10000),
@@ -129,7 +205,7 @@ function writeCheckpoint(file, checkpoint) {
     updatedAt: checkpoint.updatedAt || new Date().toISOString()
   };
   next.checkpointDigest = sha256(stableStringify(checkpointProjection(next)));
-  validateCheckpoint(next);
+  validateCheckpoint(next, { sinkContract: next.sinkContract, targetDigest: next.targetDigest });
   atomicWrite(file, `${JSON.stringify(next)}\n`);
   const head = { schemaVersion: HEAD_SCHEMA, sequence: next.sequence, checkpointDigest: next.checkpointDigest };
   head.headDigest = sha256(stableStringify(headProjection(head)));
@@ -177,11 +253,26 @@ function createConfiguredAdapter(env = process.env) {
   return siem ? createSiemAuditAdapter({ env }) : createWormAuditAdapter({ directory: worm });
 }
 
+function auditDeliveryTargetDigest(env, adapterKind) {
+  const target = adapterKind === "siem-https"
+    ? String(env.SIEM_AUDIT_ENDPOINT || "").trim()
+    : adapterKind === "worm-filesystem"
+      ? path.resolve(String(env.AUDIT_WORM_DIRECTORY || "."))
+      : adapterKind;
+  return sha256(stableStringify({ sinkContract: "audit-delivery-v1", adapterKind, target }));
+}
+
 async function runWorker(options = {}) {
   const env = options.env || process.env;
   const production = isProductionEnvironment(env);
+  const sourceContract = String(env.AUDIT_DELIVERY_SOURCE_CONTRACT || SNAPSHOT_SOURCE_CONTRACT).trim();
   if (production) {
-    const assessment = assessAuditDeliveryConfig(env, { root: ROOT, checkFilesystem: true, checkProcessIdentity: true });
+    const assessment = assessAuditDeliveryConfig(env, {
+      root: ROOT,
+      checkFilesystem: true,
+      checkProcessIdentity: true,
+      sourceContinuityImplemented: sourceContract === AUDIT_DELIVERY_SOURCE_CONTRACT
+    });
     if (!assessment.ready) {
       const error = checkpointError("AUDIT_DELIVERY_PREFLIGHT_FAILED", "continuous audit delivery production preflight failed closed");
       error.failedChecks = assessment.checks.filter((item) => !item.passed).map((item) => item.id);
@@ -194,24 +285,69 @@ async function runWorker(options = {}) {
   const checkpointFile = path.resolve(checkpointInput);
   const releaseLock = acquireWorkerLock(checkpointFile);
   try {
-    const checkpoint = readCheckpoint(checkpointFile);
-    const pending = loadAuditRecords(path.resolve(sqliteInput), checkpoint.deliveredDigests);
-    const selected = pending.slice(0, Math.min(1000, Math.max(1, Number(env.AUDIT_DELIVERY_BATCH_SIZE || 200) || 200)));
     const adapter = options.adapter || createConfiguredAdapter(env);
     const adapterKind = String(adapter.status?.().type || "custom");
+    const sinkContract = "audit-delivery-v1";
+    const targetDigest = options.targetDigest || auditDeliveryTargetDigest(env, adapterKind);
+    const checkpointOptions = { sourceContract, sinkContract, targetDigest };
+    const checkpoint = readCheckpoint(checkpointFile, checkpointOptions);
+    const batchSize = Math.min(1000, Math.max(1, Number(env.AUDIT_DELIVERY_BATCH_SIZE || 200) || 200));
+    const source = sourceContract === AUDIT_DELIVERY_SOURCE_CONTRACT
+      ? readAuditDeliverySourceBatch(path.resolve(sqliteInput), {
+        afterCursor: checkpoint.sourceCursor,
+        expectedSourceHeadHash: checkpoint.sourceHeadHash,
+        limit: batchSize
+      })
+      : null;
+    const pending = source
+      ? source.records
+      : loadAuditRecords(path.resolve(sqliteInput), checkpoint.deliveredDigests);
+    const selected = source ? pending : pending.slice(0, batchSize);
     const lifecycle = options.lifecycle || (env.PLATFORM_PILOT_CUTOVER_ALERT_JOURNAL_FILE
       ? createPilotCutoverAuditLifecycleBridge({ adapterKind, file: path.resolve(env.PLATFORM_PILOT_CUTOVER_ALERT_JOURNAL_FILE), actorAccount: env.AUDIT_DELIVERY_SERVICE_USER || "audit-delivery-worker" })
       : null);
-    const result = await runAuditDeliveryCycle({ adapter, records: selected.map(({ trail, record }) => ({ trail, record })), previousIncidentOpen: checkpoint.incidentOpen, lifecycle });
+    const result = await runAuditDeliveryCycle({
+      adapter,
+      records: selected.map(({ trail, record }) => ({ trail, record })),
+      previousIncidentOpen: checkpoint.incidentOpen,
+      lifecycle,
+      sourceBinding: source && selected.length ? {
+        contract: source.contract,
+        startCursor: source.startCursor,
+        endCursor: source.endCursor,
+        sourceHeadHash: source.sourceHeadHash
+      } : undefined
+    });
     if (!result.ok && typeof options.emitOperationalSignal === "function") {
       await options.emitOperationalSignal(auditWriteFailureSignal({ code: result.errorCode }));
     }
-    const next = {
+    const receiptEntry = result.receipt ? {
+      receiptId: result.receipt.receiptId,
+      batchId: result.receipt.batchId,
+      digest: result.receipt.digest,
+      recordCount: result.receipt.recordCount,
+      acknowledgedAt: result.receipt.acknowledgedAt || new Date().toISOString()
+    } : null;
+    const next = source ? {
+      schemaVersion: CHECKPOINT_SCHEMA_V3,
+      sequence: checkpoint.sequence,
+      previousCheckpointDigest: checkpoint.checkpointDigest,
+      sourceContract: AUDIT_DELIVERY_SOURCE_CONTRACT,
+      sinkContract,
+      targetDigest,
+      sourceCursor: result.ok ? source.endCursor : checkpoint.sourceCursor,
+      sourceHeadHash: result.ok ? source.sourceHeadHash : checkpoint.sourceHeadHash,
+      lastReceiptDigest: receiptEntry ? sha256(stableStringify(receiptEntry)) : checkpoint.lastReceiptDigest,
+      incidentOpen: !result.ok,
+      receipts: receiptEntry ? [...checkpoint.receipts, receiptEntry] : checkpoint.receipts,
+      updatedAt: new Date().toISOString()
+    } : {
+      schemaVersion: CHECKPOINT_SCHEMA_V2,
       sequence: checkpoint.sequence,
       previousCheckpointDigest: checkpoint.checkpointDigest,
       deliveredDigests: result.ok ? [...checkpoint.deliveredDigests, ...selected.map((item) => item.recordDigest)] : checkpoint.deliveredDigests,
       incidentOpen: !result.ok,
-      receipts: result.receipt ? [...checkpoint.receipts, { receiptId: result.receipt.receiptId, batchId: result.receipt.batchId, digest: result.receipt.digest, recordCount: result.receipt.recordCount, acknowledgedAt: result.receipt.acknowledgedAt || new Date().toISOString() }] : checkpoint.receipts,
+      receipts: receiptEntry ? [...checkpoint.receipts, receiptEntry] : checkpoint.receipts,
       updatedAt: new Date().toISOString()
     };
     try { (options.writeCheckpoint || writeCheckpoint)(checkpointFile, next); } catch (error) {
@@ -219,7 +355,18 @@ async function runWorker(options = {}) {
       if (typeof options.emitOperationalSignal === "function") await options.emitOperationalSignal(signal);
       throw Object.assign(error, { operationalSignal: signal, operationalSignalEmitted: typeof options.emitOperationalSignal === "function" });
     }
-    return { ...result, pendingBefore: pending.length, pendingAfter: result.ok ? pending.length - selected.length : pending.length, productionReady: false };
+    const pendingBefore = source ? source.databaseHeadCursor - checkpoint.sourceCursor : pending.length;
+    const pendingAfter = source
+      ? source.databaseHeadCursor - (result.ok ? source.endCursor : checkpoint.sourceCursor)
+      : result.ok ? pending.length - selected.length : pending.length;
+    return {
+      ...result,
+      pendingBefore,
+      pendingAfter,
+      sourceContract,
+      sourceCursor: source ? (result.ok ? source.endCursor : checkpoint.sourceCursor) : null,
+      productionReady: false
+    };
   } finally { releaseLock(); }
 }
 

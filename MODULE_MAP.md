@@ -30,7 +30,7 @@
 | 平台数据 | `src/platform/data/`、`src/platform/storage/` | 数据所有权、SQLite migration 注册表/runner、PostgreSQL 主存储契约 |
 | 领域事件 | `src/platform/events/`、各领域 worker | outbox/inbox、幂等和后台投递 |
 | 慢病随访 publisher | `citizen-chronic-followup-event-service.js`、`src/citizen-chronic/followup-event-publisher.js` | T04 自有 v1 事件、安全 HTTPS 投递端口、独立 activation verifier 和本地兼容适配；尚无生产 worker/持久 lease |
-| 审计投递 | `src/platform/operations/audit-delivery.js`、`scripts/audit-delivery-worker.js`、`scripts/audit-delivery-preflight.js`、`deploy/audit-delivery-worker.*.template` | 部署包纳入完整依赖闭包，preflight/runtime 共用 activation-v1 检查并复用 cutover alert lifecycle；当前仅 rehearsal，append-only source、可信 receipt、外部 checkpoint anchor 和 WORM capability 未完成前生产失败关闭 |
+| 审计投递 | `src/identity-security/audit-delivery-source.js`、`src/platform/operations/audit-delivery.js`、`scripts/audit-delivery-worker.js`、`scripts/audit-delivery-preflight.js` | v15 同事务 append-only source、最小投影、cursor 批次和 checkpoint v3 已实现；v2 snapshot 不静默提升，可信 receipt、外部 anchor 和真实 WORM capability 仍使生产失败关闭 |
 | 安全对象存储端口 | `secure-object-storage.js`、`scripts/object-storage-readiness.js` | T00 管版本化请求/响应信任、精确 Origin/TTL、严格回执和生产门禁；T08 附件路由在兼容容量达到 500 条时先失败关闭，不再静默淘汰既有元数据；持久命令、无损分页和对账仍未建立 |
 | 区域运行 | `src/platform/regional/`、`regions/` | 多地区清单、能力包、复制和发布注册 |
 | 领域实现 | `src/care-coordination/` 等与根目录服务 | 新旧实现并存，边界尚未完全迁移 |
@@ -113,7 +113,7 @@ scripts/platform-cutover-alert-worker.js
 
 ## 9. SQLite migration 模块
 
-`src/platform/storage/sqlite-migrations.js` 是 T00 管理的单一注册表和执行入口。`server.js` 只消费 `SQLITE_SCHEMA_HEAD` 与 `applySqliteMigrations`；部署检查、生产数据库 readiness 和发布报告消费同一注册表校验结果。v1–v14 定义保持原执行顺序和历史 ledger checksum，独立冻结指纹阻止源码漂移；v15 及以后必须使用内容指纹作为 ledger checksum。该模块不拥有业务数据，不允许领域模块绕过注册表执行 DDL。
+`src/platform/storage/sqlite-migrations.js` 是 T00 管理的单一注册表和执行入口。`server.js` 只消费 `SQLITE_SCHEMA_HEAD` 与 `applySqliteMigrations`；部署检查、生产数据库 readiness 和发布报告消费同一注册表校验结果。v1–v14 保持历史 ledger checksum 并冻结源码指纹；v15 使用内容指纹追加 append-only 审计 source，head 为 15。任何后续 DDL 必须从 v16 连续追加，不允许领域模块绕过注册表。
 
 ## 10. 标准工程门禁模块
 

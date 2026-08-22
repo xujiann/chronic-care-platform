@@ -4,8 +4,8 @@
 
 ## 1. Schema Head
 
-- SQLite migration 注册表：v1–v14，位于 `src/platform/storage/sqlite-migrations.js`。
-- 运行时公开常量：`STORAGE_SCHEMA_VERSION = SQLITE_SCHEMA_HEAD = 14`。
+- SQLite migration 注册表：v1–v15，位于 `src/platform/storage/sqlite-migrations.js`。
+- 运行时公开常量：`STORAGE_SCHEMA_VERSION = SQLITE_SCHEMA_HEAD = 15`。
 - migration ledger：`schema_migrations`。
 - v1–v14 ledger checksum 保持历史兼容，源码内容由冻结 SHA-256 保护；v15+ ledger checksum 为内容 SHA-256。
 - PostgreSQL：5 份跟踪 SQL，共 13 张显式候选表；另有脚本生成的迁移包/MPI 结构。
@@ -28,6 +28,7 @@
 | 12 | public-health signal keys | modernization idempotency keys |
 | 13 | respiratory lifecycle replay | request/event/audit key 表 |
 | 14 | official exchange replay | receipt/audit key 表 |
+| 15 | append-only continuous audit source | `audit_delivery_source_events`、stream/time 索引和禁止 UPDATE/DELETE 触发器 |
 
 完整表分组与关系见 `DATA_MODEL.md`。
 
@@ -48,4 +49,4 @@
 - v1–v14 现场 ledger 无法追溯当年实际执行源码，因此不得重算或改写历史行；冻结注册表防止今后源码漂移。
 - schema fingerprint 用于确定性比较空库与受支持升级 fixture，不替代生产数据核对、备份或现场迁移证据。
 - 专项 SQLite 表不共享同一个版本台账，不能纳入主 schema head。
-- v15+ 仍需按新需求补业务数据回填、核对和前滚恢复证据，不能只凭 DDL 测试上线。
+- v15 只将严格验证通过的当前审计窗口登记为 `historical_baseline`，不声称恢复已淘汰历史；v16+ 仍需按新需求补回填、核对和前滚恢复证据。

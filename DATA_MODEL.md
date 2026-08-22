@@ -17,11 +17,12 @@
 
 ## 2. SQLite Schema
 
-主存储 migration 位于 `src/platform/storage/sqlite-migrations.js` 的版本化注册表，当前实际与公开 head 均为 v14。包括 `schema_migrations` 在内，主 SQLite 逻辑上创建 30 张表：
+主存储 migration 位于 `src/platform/storage/sqlite-migrations.js` 的版本化注册表，当前实际与公开 head 均为 v15。包括 `schema_migrations` 在内，主 SQLite 逻辑上创建 31 张表：
 
 | 组 | 表 |
 |---|---|
 | 集合与审计 | `state_collections`、`storage_events`、`schema_migrations` |
+| 连续审计来源 | `audit_delivery_source_events` |
 | 身份主索引镜像 | `residents`、`accounts`、`account_members`、`person_indexes` |
 | 个人记录镜像 | `personal_records` |
 | 慢病与服务镜像 | `chronic_records`、`followup_records`、`insurance_claim_records`、`certificate_records`、`care_order_records`、`medication_pickup_records`、`county_workflow_records` |
@@ -58,8 +59,8 @@ erDiagram
 - 为兼容既有数据库，v1–v14 ledger checksum 继续使用历史 `version:name` 摘要；对应源码内容另由 14 个冻结 SHA-256 和注册表校验保护，禁止改写。
 - v15 及以后 ledger checksum 使用包含 version、name、owner、apply 实现和显式依赖的内容 SHA-256；新版本必须连续追加。
 - runner 在执行新迁移前校验已应用 ledger 是注册表的连续前缀，name/checksum 漂移会 fail-closed；单个迁移失败时 DDL 与 ledger 行一并回滚。
-- `STORAGE_SCHEMA_VERSION`、`storageMeta`、部署检查、生产 readiness 和发布报告统一从 `SQLITE_SCHEMA_HEAD` 派生，当前为 14。
-- 自动化测试覆盖空库 0→14、v11→14、重复执行、冻结指纹、ledger 漂移、未来 v15 内容 checksum 和失败回滚；schema fingerprint 用于比较升级结果与空库结果。
+- `STORAGE_SCHEMA_VERSION`、`storageMeta`、部署检查、生产 readiness 和发布报告统一从 `SQLITE_SCHEMA_HEAD` 派生，当前为 15。
+- 自动化测试覆盖空库 0→15、v11→15、重复执行、冻结指纹、ledger 漂移、未来 v16 内容 checksum 和失败回滚；schema fingerprint 用于比较升级结果与空库结果。
 
 专项 SQLite 表仍有独立生命周期和台账，不得误计入主 schema head；生产 PostgreSQL 是否已迁移仍必须由现场证据证明。
 
@@ -118,7 +119,7 @@ legal-hold）不会再为新记录让位；这只关闭静默数据丢失，不�
 
 ## 7. 主要风险
 
-- `DATA-001`、`DATA-002` 已在本切片关闭：公开 head 已统一为 v14，历史源码由冻结内容指纹保护，v15+ ledger 使用内容 checksum。
+- `DATA-001`、`DATA-002` 已关闭：公开 head 已统一为 v15，历史 v1–v14 源码由冻结内容指纹保护，v15+ ledger 使用内容 checksum。
 - `DATA-003`：252 个 JSON 集合仅 83 个有生产所有权，遗留数据边界巨大。
 - `DATA-004`：JSON 快照同时承担页面数据、种子和报告输入，多角色耦合。
 - `DATA-005`：大量 `payload` JSON 关系没有数据库约束，只能靠应用验证。
@@ -147,7 +148,7 @@ legal-hold）不会再为新记录让位；这只关闭静默数据丢失，不�
 | `regionalSharingSnapshots` | platform-governance | internal | 共享目录快照，不是授权事实 |
 | `regionalSharingAccessReviews` | platform-governance | restricted | `regional-sharing-access-receipt.v1` 只追加历史；禁止截断、删除或原地改写旧回执 |
 
-新回执保存授权引用/版本、结构化用途、范围、共享包前后版本、幂等键哈希、规范请求摘要、稳定结论码和关联 ID；不保存原始幂等键、客户端备注或自由文本用途。受限数据访问日志保留内部 `residentId` 以支持居民访问历史，但身份证/电话组合 `personIndex` 改为以随机回执 ID 加盐的摘要引用，主体与用途也只保存摘要引用；通用 `dataAccessLogs/securityEvents` 仍受 120 条保留上限约束，长期不可变权威证据是未截断的 `regionalSharingAccessReviews` 回执历史。GET/POST HTTP 响应另经专用 allowlist，不输出居民/授权/摘要载荷。现有 SQLite v1-v14 DDL 不变，集合继续使用 `state_collections` payload，因此本切片不增加 v15 migration；生产回填、核对与回滚证据登记在 `config/regional-sharing-access-data-contract.json`，切换授权仍为 false。
+区域共享回执保存授权引用/版本、结构化用途、范围、共享包版本和稳定摘要；不保存原始幂等键或自由文本用途。展示集合 `dataAccessLogs/securityEvents` 仍受 120 条上限约束，v15 source 只保留它们今后的最小投影；区域共享的权威业务回执仍是未截断的 `regionalSharingAccessReviews`。区域切片本身未增 DDL；当前主 schema 因连续审计来源已进至 v15，其生产切换授权仍为 false。
 
 四个区域 owner 集合均为 legacy state writer 的 server-managed 字段：全量提交时只能省略或深相等，省略从现有状态恢复；集合级写入被拒绝。该规则同时保护 receipt 顺序/原值以及 package `version`、`lastAccessReviewId`，避免客户端绕过命令 CAS。演示 reset 仅允许非生产，生产固定失败关闭。
 ## 10. 健康驾驶舱指标测量
@@ -163,20 +164,19 @@ T00 建立 migration 和回滚证据。
 
 `operations-command` 从 T06 路由目录迁至 T02 platform-governance 只改变源码和运行时上下文
 Owner。原 handler 的 `readDatabase`、`writeDatabase`、集合名称、120/80 条兼容窗口、
-安全审计与平台过程审计顺序均保持逐字兼容；没有新增表、集合、字段、DDL、migration、
-双写或生产事实源。因此本切片不改变 SQLite v14、JSON/SQLite/PostgreSQL 拓扑或核心数据定义。
+区域共享切片的安全审计与过程审计顺序保持兼容；后续连续审计切片只新增 v15 source 表和同事务 hook，不改变 JSON/SQLite/PostgreSQL 主从拓扑，也不授权 PostgreSQL 主切换。
 其中对 `resourceDispatchRequests`、`taskMessages` 的直写是从 T06 原样迁移的既有跨域债务，
 两者机器 Owner 仍为 T05 care-coordination；本切片不把运行时路由 Owner 迁移误写为数据 Owner
 迁移，后续必须通过独立 ADR 和 T05 owner port/版本化事件治理。
 
 ## 12. 连续审计来源的 AS-IS 边界
 
-当前 `audit-delivery-worker` 从 SQLite `state_collections` 读取 `securityEvents` 与
-`dataAccessLogs` 展示投影。两条通用链最多保留 120 条，窗口淘汰时剩余记录会重封，因此它们
-既不是无损 append-only source，也不提供稳定单调 cursor：高频事件可能在 timer 读取前消失，
-未淘汰记录也可能因摘要变化被重复投递。checkpoint v2 只记录投递摘要，不能修复来源缺口。
+`audit_delivery_source_events` 是 SQLite v15 新增的 append-only 来源。`server.js` 在既有平台状态
+`BEGIN/COMMIT` 内严格验证新旧 `securityEvents/dataAccessLogs`，以稳定 event ID 和去除链字段后的
+source digest 核对现存行，同 ID 异内容失败关闭，新事件按时间顺序追加；UPDATE/DELETE 触发器拒绝常规改写。
 
-本轮没有新增表、集合、字段、DDL 或 migration；`AUDIT_DELIVERY_SOURCE_CONTRACT` 仍固定为
-`snapshot-rehearsal-v1` 并在生产失败关闭。后续 `append-only-outbox-v2` 必须通过独立 ADR、
-SQLite/PostgreSQL migration、事务内写入、单调 cursor、回填/回滚与 Data Owner 字段最小化评审
-后，才可成为核心审计投递事实源。
+worker 的 `append-only-audit-source-v2` 通过单调 `sequence` cursor 读取
+`audit-delivery-minimal-projection-v1`，批次绑定 start/end cursor 与 source head。checkpoint v3 同时绑定
+source/sink contract、目标摘要、cursor/source hash 与 receipt 摘要；checkpoint v2 snapshot 不静默提升。
+已淘汰历史不可恢复，未签名 receipt、外部单调 anchor、真实 WORM/KMS/保留和现场验收仍是 NO-GO；
+`productionReady` 固定为 `false`，本切片不切换 PostgreSQL 主库。

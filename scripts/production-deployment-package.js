@@ -13,6 +13,7 @@ const AUDIT_DELIVERY_RUNTIME_FILES = [
   "scripts/audit-delivery-preflight.js",
   "src/platform/operations/audit-delivery.js",
   "src/identity-security/audit-chain.js",
+  "src/identity-security/audit-delivery-source.js",
   "src/platform/cutover/pilot-cutover-alert-lifecycle.js",
   "src/platform/governance/technical-evidence.js",
   "deploy/audit-delivery-worker.service.template",
@@ -171,7 +172,7 @@ function buildProductionDeploymentPackage(options = {}) {
         "AUDIT_DELIVERY_SERVICE_GID",
         "PLATFORM_PILOT_CUTOVER_ALERT_JOURNAL_FILE"
       ],
-      sourceContract: "append-only-outbox-v2-required",
+      sourceContract: "append-only-audit-source-v2",
       productionReady: false
     }],
     template: "deploy/chronic-care-platform.service.template"

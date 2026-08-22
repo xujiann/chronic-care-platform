@@ -45,6 +45,10 @@ const {
 } = require("./src/platform/storage/sqlite-migrations");
 const { createHash, createHmac, pbkdf2Sync, randomUUID, timingSafeEqual } = require("crypto");
 const { auditHashFor, verifyAuditTrail } = require("./src/identity-security/audit-chain");
+const {
+  AUDIT_TRAILS: AUDIT_DELIVERY_SOURCE_TRAILS,
+  appendAuditDeliverySourceChanges
+} = require("./src/identity-security/audit-delivery-source");
 const { MemorySessionStore, PostgresSessionStore, SqliteSessionStore } = require("./session-store");
 const { createAuthSecurityStateStore } = require("./auth-security-state-store");
 const {
@@ -7754,8 +7758,17 @@ function writeSqliteState(
     const incomingKeys = new Set(entries.map(([key]) => key));
     const existingRows = db.prepare("SELECT key, payload, version FROM state_collections").all();
     const businessExistingRows = existingRows.filter((row) => !RUNTIME_INTERNAL_COLLECTION_KEYS.has(row.key));
+    const existingByKey = new Map(businessExistingRows.map((row) => [row.key, row.payload]));
+    const previousAuditState = Object.fromEntries(AUDIT_DELIVERY_SOURCE_TRAILS.map((trail) => {
+      const payload = existingByKey.get(trail);
+      return [trail, payload ? JSON.parse(payload) : []];
+    }));
+    appendAuditDeliverySourceChanges(db, previousAuditState, normalized, {
+      recordedAt: now,
+      historicalBaseline: event === "migrate-json-snapshot"
+    });
     const postgresSyncChanges = POSTGRES_SYNC_MODE === "outbox" ? buildCollectionChanges(businessExistingRows, entries) : [];
-    const existingPayloads = new Map(businessExistingRows.map((row) => [row.key, row.payload]));
+    const existingPayloads = existingByKey;
     const deleteStatement = db.prepare("DELETE FROM state_collections WHERE key = ?");
     existingPayloads.forEach((_, key) => {
       if (!incomingKeys.has(key)) deleteStatement.run(key);

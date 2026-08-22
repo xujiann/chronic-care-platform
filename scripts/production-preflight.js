@@ -118,7 +118,8 @@ async function buildProductionPreflight(options = {}) {
   });
   const auditDeliveryAssessment = options.auditDeliveryAssessment || assessAuditDeliveryConfig(env, {
     root,
-    checkFilesystem: options.checkFilesystem !== false
+    checkFilesystem: options.checkFilesystem !== false,
+    sourceContinuityImplemented: env.AUDIT_DELIVERY_SOURCE_CONTRACT === "append-only-audit-source-v2"
   });
   const bindings = deploymentBindingChecks(env, manifest);
   const launchSmoke = options.launchSmoke || await buildLaunchSmokeReport({

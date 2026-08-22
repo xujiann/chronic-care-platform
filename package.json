@@ -102,7 +102,7 @@
     "storage:inspect": "node scripts/storage-admin.js inspect",
     "identity:contract": "node scripts/identity-contract.js",
     "audit:retention": "node scripts/audit-retention.js",
-    "audit:delivery:test": "node --test test/audit-delivery.test.js",
+    "audit:delivery:test": "node --test test/audit-delivery.test.js test/audit-delivery-source.test.js",
     "audit:delivery:preflight": "node scripts/audit-delivery-preflight.js",
     "data-quality:report": "node scripts/data-quality-report.js",
     "digital-hospital:standards-readiness": "node scripts/digital-hospital-standards-readiness.js",
