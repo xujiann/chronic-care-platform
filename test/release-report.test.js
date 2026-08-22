@@ -166,7 +166,8 @@ test("release report validates demo and production environment profiles", () => 
       AUDIT_EXPORT_PATH: "/var/log/chronic-care-platform/audit"
     }
   });
-  assert.equal(production.passed, true);
+  assert.equal(production.passed, false);
+  assert.equal(production.checks.some((item) => item.name === "env:AUDIT_DELIVERY.activation" && !item.passed), true);
   assert.equal(production.cutoverChecklist.some((item) => item.id === "cutover-identity" && item.passed), true);
   assert.equal(production.cutoverChecklist.some((item) => item.id === "cutover-audit-retention" && item.passed), true);
   assert.equal(production.cutoverChecklist.some((item) => item.id === "cutover-storage-adapter" && item.passed), true);
@@ -272,7 +273,8 @@ test("release report summarizes repository readiness and renders markdown", () =
   });
   assert.equal(report.ok, true);
   assert.equal(report.summary.failed, 0);
-  assert.equal(report.summary.warnings, 1);
+  assert.equal(report.summary.warnings, 2);
+  assert.equal(report.checks.some((item) => item.name === "env:AUDIT_DELIVERY.activation" && !item.passed && item.severity === "warn"), true);
   assert.equal(report.checks.some((item) => item.name === "productionReleaseEvidence:formalGate" && !item.passed && item.severity === "warn"), true);
   assert.equal(report.checks.some((item) => item.name === "monitoring:alertRouting" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "monitoring:productionBoundary" && item.passed), true);

@@ -6,10 +6,12 @@ const path = require("node:path");
 const { createHash } = require("node:crypto");
 const { DatabaseSync } = require("node:sqlite");
 const {
+  assessAuditDeliveryConfig,
   auditWriteFailureSignal,
   createPilotCutoverAuditLifecycleBridge,
   createSiemAuditAdapter,
   createWormAuditAdapter,
+  isProductionEnvironment,
   runAuditDeliveryCycle,
   stableStringify
 } = require("../src/platform/operations/audit-delivery");
@@ -27,6 +29,20 @@ function sha256(value) {
 
 function checkpointError(code, message) {
   return Object.assign(new Error(message), { code });
+}
+
+function createOperationalSignalEmitter(stream = process.stderr) {
+  return (signal) => {
+    const safeSignal = {
+      id: String(signal?.id || "audit-write-failure").slice(0, 80),
+      healthy: signal?.healthy === true,
+      severity: ["warning", "critical"].includes(signal?.severity) ? signal.severity : "critical",
+      errorCode: String(signal?.errorCode || "AUDIT_DELIVERY_FAILED").slice(0, 120),
+      errorDigest: String(signal?.errorDigest || "").slice(0, 80),
+      metadataOnly: true
+    };
+    stream.write(`${JSON.stringify({ schemaVersion: "audit-delivery-operational-signal-v1", signal: safeSignal })}\n`);
+  };
 }
 
 function isWithin(parent, child) {
@@ -163,7 +179,15 @@ function createConfiguredAdapter(env = process.env) {
 
 async function runWorker(options = {}) {
   const env = options.env || process.env;
-  const production = String(env.NODE_ENV || "").toLowerCase() === "production";
+  const production = isProductionEnvironment(env);
+  if (production) {
+    const assessment = assessAuditDeliveryConfig(env, { root: ROOT, checkFilesystem: true, checkProcessIdentity: true });
+    if (!assessment.ready) {
+      const error = checkpointError("AUDIT_DELIVERY_PREFLIGHT_FAILED", "continuous audit delivery production preflight failed closed");
+      error.failedChecks = assessment.checks.filter((item) => !item.passed).map((item) => item.id);
+      throw error;
+    }
+  }
   const sqliteInput = options.sqliteFile || path.join(env.DATA_DIR || path.join(ROOT, "data"), "health-city.sqlite");
   const checkpointInput = options.checkpointFile || env.AUDIT_DELIVERY_CHECKPOINT_PATH || path.join(ROOT, "tmp", "audit-delivery-checkpoint.json");
   if (production && (!path.isAbsolute(sqliteInput) || !path.isAbsolute(checkpointInput) || isWithin(ROOT, path.resolve(checkpointInput)))) throw checkpointError("AUDIT_DELIVERY_PATH_INVALID", "production audit paths must be absolute and checkpoint must be outside the release");
@@ -179,7 +203,7 @@ async function runWorker(options = {}) {
       ? createPilotCutoverAuditLifecycleBridge({ adapterKind, file: path.resolve(env.PLATFORM_PILOT_CUTOVER_ALERT_JOURNAL_FILE), actorAccount: env.AUDIT_DELIVERY_SERVICE_USER || "audit-delivery-worker" })
       : null);
     const result = await runAuditDeliveryCycle({ adapter, records: selected.map(({ trail, record }) => ({ trail, record })), previousIncidentOpen: checkpoint.incidentOpen, lifecycle });
-    if (!result.ok && adapterKind === "worm-filesystem" && typeof options.emitOperationalSignal === "function") {
+    if (!result.ok && typeof options.emitOperationalSignal === "function") {
       await options.emitOperationalSignal(auditWriteFailureSignal({ code: result.errorCode }));
     }
     const next = {
@@ -193,12 +217,22 @@ async function runWorker(options = {}) {
     try { (options.writeCheckpoint || writeCheckpoint)(checkpointFile, next); } catch (error) {
       const signal = auditWriteFailureSignal(error);
       if (typeof options.emitOperationalSignal === "function") await options.emitOperationalSignal(signal);
-      throw Object.assign(error, { operationalSignal: signal });
+      throw Object.assign(error, { operationalSignal: signal, operationalSignalEmitted: typeof options.emitOperationalSignal === "function" });
     }
     return { ...result, pendingBefore: pending.length, pendingAfter: result.ok ? pending.length - selected.length : pending.length, productionReady: false };
   } finally { releaseLock(); }
 }
 
-if (require.main === module) runWorker().then((result) => { process.stdout.write(`${JSON.stringify({ ok: result.ok, delivered: result.delivered, pendingAfter: result.pendingAfter, incidentTransition: result.incidentTransition, errorCode: result.errorCode || "" })}\n`); if (!result.ok) process.exitCode = 1; }).catch((error) => { process.stderr.write(`${String(error.code || "AUDIT_DELIVERY_WORKER_FAILED")}\n`); process.exitCode = 1; });
+if (require.main === module) {
+  const emitOperationalSignal = createOperationalSignalEmitter(process.stderr);
+  runWorker({ emitOperationalSignal }).then((result) => {
+    process.stdout.write(`${JSON.stringify({ ok: result.ok, delivered: result.delivered, pendingAfter: result.pendingAfter, incidentTransition: result.incidentTransition, errorCode: result.errorCode || "" })}\n`);
+    if (!result.ok) process.exitCode = 1;
+  }).catch((error) => {
+    if (error.operationalSignalEmitted !== true) emitOperationalSignal(auditWriteFailureSignal(error));
+    process.stderr.write(`${String(error.code || "AUDIT_DELIVERY_WORKER_FAILED")}\n`);
+    process.exitCode = 1;
+  });
+}
 
-module.exports = { acquireWorkerLock, createConfiguredAdapter, loadAuditRecords, readCheckpoint, runWorker, writeCheckpoint };
+module.exports = { acquireWorkerLock, createConfiguredAdapter, createOperationalSignalEmitter, loadAuditRecords, readCheckpoint, runWorker, writeCheckpoint };

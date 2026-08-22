@@ -8,6 +8,17 @@ const ROOT = path.resolve(__dirname, "..");
 const DEFAULT_OUTPUT = path.join(ROOT, "release", "production-deployment-package.json");
 const DEFAULT_MARKDOWN = path.join(ROOT, "release", "production-deployment-package.md");
 const ALLOWED_RUNTIME_EXTENSIONS = new Set([".js", ".json", ".html", ".css", ".svg", ".webmanifest"]);
+const AUDIT_DELIVERY_RUNTIME_FILES = [
+  "scripts/audit-delivery-worker.js",
+  "scripts/audit-delivery-preflight.js",
+  "src/platform/operations/audit-delivery.js",
+  "src/identity-security/audit-chain.js",
+  "src/platform/cutover/pilot-cutover-alert-lifecycle.js",
+  "src/platform/governance/technical-evidence.js",
+  "deploy/audit-delivery-worker.service.template",
+  "deploy/audit-delivery-worker.timer.template",
+  "deploy/platform-production-adapters.env.template"
+];
 const REQUIRED_RUNTIME_FILES = [
   "server.js",
   "src/http/api-router.js",
@@ -19,13 +30,15 @@ const REQUIRED_RUNTIME_FILES = [
   "manifest.webmanifest",
   "deploy/postgres-primary-storage-schema.sql",
   "scripts/postgres-sync-worker.js",
-  "scripts/postgres-shadow-reconcile.js"
+  "scripts/postgres-shadow-reconcile.js",
+  ...AUDIT_DELIVERY_RUNTIME_FILES
 ];
 const ADDITIONAL_RUNTIME_FILES = [
   "config/regions.json",
   "deploy/postgres-primary-storage-schema.sql",
   "scripts/postgres-sync-worker.js",
-  "scripts/postgres-shadow-reconcile.js"
+  "scripts/postgres-shadow-reconcile.js",
+  ...AUDIT_DELIVERY_RUNTIME_FILES
 ];
 const RUNTIME_DIRECTORIES = ["src/http", "src/platform/regional", "src/platform/storage", "regions"];
 const EXCLUDED_RUNTIME_FILES = new Set(["playwright.config.js"]);
@@ -42,6 +55,7 @@ const SECRET_CONTRACT = [
   ["FINANCIAL_GATEWAY_SECRET", "payment insurance and certificate signing"],
   ["FINANCIAL_CALLBACK_SECRET", "payment insurance and certificate callback verification"],
   ["SIEM_SIGNING_SECRET", "SIEM alert signing"],
+  ["SIEM_AUDIT_SIGNING_SECRET", "continuous audit request signing"],
   ["ALERT_WEBHOOK_SECRET", "operations webhook signing"],
   ["DEPLOYMENT_ARTIFACT_DIGEST", "immutable artifact registry digest"]
 ].map(([name, purpose]) => ({
@@ -135,6 +149,31 @@ function buildProductionDeploymentPackage(options = {}) {
       { route: "/api/system/readiness", expectedStatus: 200, purpose: "operations-readiness-evidence", authentication: "commission" },
       { route: "/api/metrics", expectedStatus: 200, purpose: "operations-metrics", authentication: "commission" }
     ],
+    backgroundJobs: [{
+      id: "continuous-audit-delivery",
+      entrypoint: "node scripts/audit-delivery-worker.js",
+      preflight: "npm run audit:delivery:preflight",
+      serviceTemplate: "deploy/audit-delivery-worker.service.template",
+      timerTemplate: "deploy/audit-delivery-worker.timer.template",
+      configurationTemplate: "deploy/platform-production-adapters.env.template",
+      configurationVariables: [
+        "SIEM_AUDIT_ENDPOINT",
+        "SIEM_AUDIT_TLS_MODE",
+        "SIEM_AUDIT_CA_FILE",
+        "SIEM_AUDIT_CLIENT_CERT_FILE",
+        "SIEM_AUDIT_CLIENT_KEY_FILE",
+        "AUDIT_WORM_DIRECTORY",
+        "AUDIT_DELIVERY_CHECKPOINT_PATH",
+        "AUDIT_DELIVERY_SOURCE_CONTRACT",
+        "AUDIT_DELIVERY_SERVICE_USER",
+        "AUDIT_DELIVERY_SERVICE_GROUP",
+        "AUDIT_DELIVERY_SERVICE_UID",
+        "AUDIT_DELIVERY_SERVICE_GID",
+        "PLATFORM_PILOT_CUTOVER_ALERT_JOURNAL_FILE"
+      ],
+      sourceContract: "append-only-outbox-v2-required",
+      productionReady: false
+    }],
     template: "deploy/chronic-care-platform.service.template"
   };
   const rollbackContract = {
@@ -156,7 +195,7 @@ function buildProductionDeploymentPackage(options = {}) {
     check("deploymentPackage:runtimeFiles", files.length >= 30 && REQUIRED_RUNTIME_FILES.every((name) => files.some((item) => item.path === name)), `${files.length} runtime files with required entrypoints`),
     check("deploymentPackage:digest", /^[a-f0-9]{64}$/.test(digest) && files.every((item) => /^[a-f0-9]{64}$/.test(item.sha256)), `sha256:${digest}`),
     check("deploymentPackage:secretBoundary", secretContract.valuesPersisted === false && secretContract.variables.length >= 10 && secretContract.variables.every((item) => item.name && item.persistedInArtifact === false && !("value" in item)), `${secretContract.variables.length} secret references; values persisted false`),
-    check("deploymentPackage:processContract", processContract.healthChecks.length === 4 && processContract.healthChecks.some((item) => item.route === "/api/live" && item.purpose === "process-liveness" && item.authentication === "none") && processContract.healthChecks.some((item) => item.route === "/api/health" && item.purpose === "dependency-readiness" && item.authentication === "none") && processContract.restartPolicy === "on-failure" && processContract.gracefulShutdownSeconds >= 30, `${processContract.supervisor} / ${processContract.healthChecks.length} health checks`),
+    check("deploymentPackage:processContract", processContract.healthChecks.length === 4 && processContract.healthChecks.some((item) => item.route === "/api/live" && item.purpose === "process-liveness" && item.authentication === "none") && processContract.healthChecks.some((item) => item.route === "/api/health" && item.purpose === "dependency-readiness" && item.authentication === "none") && processContract.restartPolicy === "on-failure" && processContract.gracefulShutdownSeconds >= 30 && processContract.backgroundJobs.some((item) => item.id === "continuous-audit-delivery" && item.productionReady === false), `${processContract.supervisor} / ${processContract.healthChecks.length} health checks / ${processContract.backgroundJobs.length} background jobs`),
     check("deploymentPackage:rollbackContract", rollbackContract.requirePreviousArtifactDigest && rollbackContract.requireStorageBackup && rollbackContract.rollbackCommand.includes("rollback:snapshot"), "previous digest, storage backup and post-rollback health are mandatory"),
     check("deploymentPackage:provenance", Boolean(source.commit) && (!strict || !source.dirty), `${source.commit} / ${source.dirty ? "working tree dirty" : "working tree clean"}${strict ? " / strict" : ""}`)
   ];
@@ -188,6 +227,7 @@ function buildProductionDeploymentPackage(options = {}) {
       "target domain and TLS certificate chain",
       "service account, filesystem permissions and writable data directory",
       "previous artifact digest plus storage backup",
+      "append-only audit outbox, trusted response receipt and external checkpoint anchor",
       "production preflight, smoke, rollback rehearsal and signed cutover approval"
     ],
     checks
@@ -219,6 +259,7 @@ function verifyProductionDeploymentPackage(manifest, options = {}) {
     check("deploymentVerify:files", expectedFiles.length >= 30 && missing.length === 0 && mismatched.length === 0, `${expectedFiles.length} expected / ${missing.length} missing / ${mismatched.length} mismatched`),
     check("deploymentVerify:digest", expectedDigest === currentDigest, `expected sha256:${expectedDigest} / current sha256:${currentDigest}`),
     check("deploymentVerify:secretBoundary", secretValuesAbsent && prohibitedPaths.length === 0, prohibitedPaths.join(",") || "secret values and prohibited files absent"),
+    check("deploymentVerify:auditWorker", AUDIT_DELIVERY_RUNTIME_FILES.every((required) => expectedFiles.some((item) => item.path === required)) && manifest?.processContract?.backgroundJobs?.some((item) => item.id === "continuous-audit-delivery" && item.productionReady === false && item.preflight === "npm run audit:delivery:preflight" && item.configurationTemplate === "deploy/platform-production-adapters.env.template" && item.configurationVariables?.includes("AUDIT_DELIVERY_SOURCE_CONTRACT") && item.configurationVariables?.includes("PLATFORM_PILOT_CUTOVER_ALERT_JOURNAL_FILE")) && manifest?.secretContract?.variables?.some((item) => item.name === "SIEM_AUDIT_SIGNING_SECRET" && !("value" in item)), "continuous audit dependency closure, process, configuration and secret references are mandatory"),
     check("deploymentVerify:rollback", manifest?.rollbackContract?.requirePreviousArtifactDigest === true && manifest?.rollbackContract?.requireStorageBackup === true, "rollback prerequisites declared")
   ];
   return {

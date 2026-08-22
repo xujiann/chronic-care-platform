@@ -278,6 +278,8 @@ npm.cmd run hybrid:deployment-readiness
 
 `audit:retention` 会生成 `release/audit-retention-report.json` 与 `release/audit-retention-report.md`，离线验证安全事件和数据访问日志哈希链，记录导出摘要、保全目标和安全验收台账；默认 `release:report` 在演示环境使用发布包内审计报告作为本地归档目标，生产切换仍必须通过 `AUDIT_EXPORT_PATH` 或 `SIEM_ENDPOINT` 绑定真实保全路径。
 
+连续审计投递是独立 T00 worker，不等同于上述离线留存或告警 SIEM。部署包已包含 worker、preflight、直接依赖和 systemd service/timer；`npm run audit:delivery:preflight` 与 production worker 共用失败关闭检查，真实 CLI 失败只向 journal 输出 metadata-only signal。当前来源仍是最多 120 条且会重封的展示快照，本地 checkpoint/head、未独立验签的 receipt 和 filesystem WORM 也不构成生产耐久证明，因此 `snapshot-rehearsal-v1` 只允许联调，生产状态继续 NO-GO。
+
 `integration:readiness` 会生成 `release/integration-readiness-report.json` 与 `release/integration-readiness-report.md`，检查 P0 接口台账、HIS/EMR/LIS/PACS/医保/证照/统计契约、幂等键、签名和重试策略，并把身份、主索引、安全审计等 P0 覆盖关系纳入发布取证。
 
 `integration:control` 会只读检查 T01-T11 的登记 worktree、统一基线、分支提交、未提交文件和对 `server.js`、`portal.css`、`package.json`、`README.md`、`scripts/release-report.js` 的公共文件占用，并读取 `integration/intake-decisions.json` 中与候选 commit 精确绑定的 T00 审查决定，生成 `release/integration-control-ledger.json` 与 `release/integration-control-ledger.md`。分支新增提交后，旧决定自动转为 `review-stale`，必须重新完成代码审查和定向回归；只有结构检查、commit 绑定接收决定及声明依赖全部通过才进入 `merge-ready`。决定中的 `acceptedCandidateHeads` 只记录已经接收的历史候选，使后续候选被阻塞时仍可验证既有发布回执，但不会把历史接收状态继承给当前 HEAD。`integration/publication-receipts.json` 另行保存经过实际核验的 main/Pages 静态发布回执，包括来源候选、发布提交、CI/Pages run、HTTP 200 资源及内容标记；台账会校验这些回执的提交格式、来源、资源路径、状态和标记完整性，但明确保持 `productionReady=false`，历史回执不代替实时网络探测或生产验收。默认模式用于持续生成台账；`integration:control:gate` 在任一专业线缺失、基线漂移、工作树未清理、触碰 T00 公共文件、审查未接收或专业线尚未全部集成时返回失败。

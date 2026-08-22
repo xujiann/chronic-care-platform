@@ -709,3 +709,45 @@ T00 已批准方案 2、provider 缺失时的脱敏 NO-GO 语义及上述兼容�
   Chromium E2E 36/36 均通过，流式修复后的受影响专项与 API 已完整重跑；
 - 生产依赖与全部依赖使用 npm 官方 audit API 复核均为 0 漏洞；未触碰受保护数据、SQLite/WAL/SHM、
   release/report/PDF/归档产物，所有生产授权与切换标志仍为 `false`。
+
+## 2026-08-22 T00 生产基础设施第三切片：连续审计部署信任合同 A
+
+### 基线与审批
+
+- 对象存储网关信任合同已通过 PR #143 合并到 `main@b546b0c2`，main CI 与 Pages 成功；
+- 从最新 main 创建独立工作树和分支 `process/t00-continuous-audit-deployment-v1-20260822`，用户原工作树不变；
+- 已阅读六张架构地图、模块标准、工程治理和连续审计 Accepted ADR；用户已批准按推荐顺序持续实施且无需逐项提示；
+- 双路只读审计确认当前 worker 仍轮询最多 120 条且会重封的展示快照，不能证明无损连续投递，因此本轮只建立部署信任合同并保持生产失败关闭。
+
+### 今日目标
+
+1. 将 worker、preflight、adapter、审计链、告警生命周期及 systemd 模板的完整运行依赖闭包纳入不可变部署包；
+2. 在部署包声明独立后台进程、启动前 preflight、专用账号、最小可写路径、超时和 timer 合同；
+3. 统一 preflight 与 production worker 的 URL、TLS、秘密、文件、账号、告警出口和来源连续性校验；
+4. 真实 CLI 对投递、checkpoint、完整性、配置和锁错误默认输出有界、metadata-only operational signal；
+5. 将连续审计配置加入环境矩阵、secret contract、全局 production preflight、release 环境门禁与部署文档；
+6. 明确阻断 snapshot source、未签可信回执、未绑定目标 checkpoint、非外部单调锚和本地 rehearsal WORM，始终保持 `productionReady=false`。
+
+### 非目标
+
+- 不把当前 120 条展示快照称为连续审计事实源，不启用生产 worker；
+- 不在本切片新增 audit outbox Schema/migration，不修改 HTTP API、鉴权、业务表或审计记录内容；
+- 不实现可信响应验签、目标切换回放、lease/fencing 或外部单调 checkpoint 锚；
+- 不把 0700/0400 本地目录称为法定 WORM，不连接真实 SIEM/WORM；
+- 不直接编辑 `data/db.json`、SQLite/WAL/SHM，不生成 release/report/PDF/归档产物，不制造现场证据。
+
+### 风险、回滚与验证
+
+- 主要风险是部署包漏掉间接依赖、preflight 与 runtime 语义漂移、stderr 泄露原始异常以及错误放行 snapshot source；
+- 测试先锁定制品闭包、生产 NO-GO、TLS/占位秘密/URL、worker 旁路和 CLI metadata-only 信号，再实施；
+- 回滚为整切片回退，不涉及数据或制品恢复；
+- 完成前运行连续审计、deployment、environment、release、production preflight 专项，随后执行 build、lint、typecheck、unit、integration、smoke、test:all、浏览器 E2E、治理门禁和独立只读 review。
+
+### 实施与验收结果
+
+- 不可变部署包已纳入连续审计 worker、共享 preflight、adapter 及其间接依赖、systemd service/timer 和统一环境模板，并声明独立后台进程、启动前检查、超时、最小可写路径与非生产就绪边界；
+- preflight、worker 与 SIEM transport 统一复用生产环境、HTTPS/TLS、密钥、真实路径、专用用户名及 UID/GID、来源连续性和外部目标合同；配置空白、路径别名和容器直接启动均失败关闭；
+- 实际 CLI 对配置、锁、完整性、投递及 checkpoint 失败只输出有界 metadata-only operational signal，部署包、环境矩阵、secret contract、production preflight、release 门禁、文档与架构地图同步完成；
+- 当前 120 条展示快照不是连续事实源，可信签名回执、目标绑定、外部单调 checkpoint 锚与真实 WORM 能力仍未实现，因此模块维持 C 类、`productionReady=false` 与生产 NO-GO；
+- 先后完成 build、lint、typecheck、unit、integration、smoke、`test:all`、Chromium E2E 36/36、路由 64、架构 37、流程保护、平台六迭代及专项回归；最终边界修复后再次通过 build、lint、typecheck、unit 全批次和受影响专项 40/40；
+- 未修改 Schema、migration、API、鉴权、业务数据、SQLite/WAL/SHM 或受保护生成产物，用户原工作树保持不变。

@@ -22,6 +22,19 @@ test("environment matrix validates demo staging and production gates", () => {
   assert.equal(report.profiles.filter((item) => item.id !== "demo").every((item) => ["OBJECT_STORAGE_GATEWAY_URL", "OBJECT_STORAGE_BUCKET", "OBJECT_STORAGE_SIGNING_SECRET", "OBJECT_STORAGE_GATEWAY_CONTRACT_VERSION", "OBJECT_STORAGE_RECEIPT_SIGNING_SECRET", "OBJECT_STORAGE_UPLOAD_URL_ALLOWED_ORIGINS", "OBJECT_STORAGE_DOWNLOAD_URL_ALLOWED_ORIGINS"].every((variable) => item.requiredVars.includes(variable))), true);
   assert.equal(report.profiles.filter((item) => item.id !== "demo").every((item) => ["FINANCIAL_GATEWAY_SECRET", "FINANCIAL_CALLBACK_SECRET", "PAYMENT_GATEWAY_URL", "INSURANCE_GATEWAY_URL", "CERTIFICATE_GATEWAY_URL"].every((variable) => item.requiredVars.includes(variable))), true);
   assert.equal(report.profiles.filter((item) => item.id !== "demo").every((item) => ["SIEM_ENDPOINT", "SIEM_SIGNING_SECRET"].every((variable) => item.requiredVars.includes(variable))), true);
+  assert.equal(report.profiles.filter((item) => item.id !== "demo").every((item) => [
+    "SIEM_AUDIT_ENDPOINT",
+    "SIEM_AUDIT_SIGNING_SECRET",
+    "SIEM_AUDIT_TLS_MODE",
+    "AUDIT_WORM_DIRECTORY",
+    "AUDIT_DELIVERY_CHECKPOINT_PATH",
+    "AUDIT_DELIVERY_SOURCE_CONTRACT",
+    "AUDIT_DELIVERY_SERVICE_USER",
+    "AUDIT_DELIVERY_SERVICE_GROUP",
+    "AUDIT_DELIVERY_SERVICE_UID",
+    "AUDIT_DELIVERY_SERVICE_GID",
+    "PLATFORM_PILOT_CUTOVER_ALERT_JOURNAL_FILE"
+  ].every((variable) => item.requiredVars.includes(variable))), true);
   assert.equal(report.profiles.filter((item) => item.id !== "demo").every((item) => ["DEPLOYMENT_SECRET_PROVIDER", "DEPLOYMENT_RELEASE_ID", "DEPLOYMENT_ARTIFACT_DIGEST"].every((variable) => item.requiredVars.includes(variable))), true);
   assert.equal(report.profiles.filter((item) => item.id !== "demo").every((item) => ["POSTGRES_SYNC_MODE", "POSTGRES_SSL_MODE"].every((variable) => item.requiredVars.includes(variable))), true);
   assert.equal(report.profiles.every((item) => ["SESSION_TOPOLOGY", "SESSION_EXPIRED_RETENTION_DAYS", "SESSION_REVOKED_RETENTION_DAYS", "SESSION_CLEANUP_INTERVAL_MS"].every((variable) => item.requiredVars.includes(variable))), true);

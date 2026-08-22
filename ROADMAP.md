@@ -20,7 +20,7 @@
 | 3 | Schema v14/v11 一致与 migration 指纹 | 已合入 `main@026762f`（PR #129）/ P1 | 后续 v15+ 按冻结规则追加，并保持空库/升级/重跑/失败回滚门禁 |
 | 4 | 标准 build/lint/typecheck/unit/integration/smoke 入口 | 已合入 `main@fc42833`（PR #130）；PR/main CI 与 Pages 验证通过 / P1 | 保持 test:all 语义；逐步扩大 lint/typecheck 基线并治理测试时长 |
 | 5 | 移除组合根循环依赖 | 已合入 `main@21d8f3c`（PR #132）；PR/main CI 与 Pages 验证通过 / P1 | ARC-002 已关闭；后续组合根瘦身归 ARC-001，不扩大本切片 |
-| 6 | 生产身份/SMS、PostgreSQL shadow、连续审计投递 | Accepted ADR；#131 候选已完成 P1 代码增量，待最新 PR/main CI | 真实 provider/PG/SIEM/WORM 联调与现场证据继续 NO-GO |
+| 6 | 生产身份/SMS、PostgreSQL shadow、连续审计投递 | 身份/SMS 与 PG shadow 已合入；连续审计部署信任合同 A 已纳入制品、preflight、systemd 与默认信号，当前候选待 PR/main CI | 事务内 append-only audit outbox、可信 receipt、target/checkpoint binding、外部单调锚、真实 provider/PG/SIEM/WORM 与现场证据继续 NO-GO |
 | 6A | OTP/锁定共享状态 | 已纳入生产身份 ADR；#131 候选已完成 P1 代码增量，待最新 PR/main CI | 保持 SQLite 单主机、PostgreSQL 多实例及原子消费/限流/锁定契约；真实 PG 由 CI 和现场重跑 |
 | 7 | 运行时上下文瘦身 | 候选 / P1 | 按领域子端口，逐块迁移，不重写 server |
 | 7A | 临床五个可治理子域 | 治理切片完成，急救/血液/影像/体检首用例已迁移；operations dashboard 与 command 已由 T00 移交 T02 / P1 | Accepted ADR；保持协议兼容，继续按五子域逐用例迁移并禁止 operations 回流 T06 |

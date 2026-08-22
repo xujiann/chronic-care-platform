@@ -162,3 +162,15 @@ Owner。原 handler 的 `readDatabase`、`writeDatabase`、集合名称、120/80
 其中对 `resourceDispatchRequests`、`taskMessages` 的直写是从 T06 原样迁移的既有跨域债务，
 两者机器 Owner 仍为 T05 care-coordination；本切片不把运行时路由 Owner 迁移误写为数据 Owner
 迁移，后续必须通过独立 ADR 和 T05 owner port/版本化事件治理。
+
+## 12. 连续审计来源的 AS-IS 边界
+
+当前 `audit-delivery-worker` 从 SQLite `state_collections` 读取 `securityEvents` 与
+`dataAccessLogs` 展示投影。两条通用链最多保留 120 条，窗口淘汰时剩余记录会重封，因此它们
+既不是无损 append-only source，也不提供稳定单调 cursor：高频事件可能在 timer 读取前消失，
+未淘汰记录也可能因摘要变化被重复投递。checkpoint v2 只记录投递摘要，不能修复来源缺口。
+
+本轮没有新增表、集合、字段、DDL 或 migration；`AUDIT_DELIVERY_SOURCE_CONTRACT` 仍固定为
+`snapshot-rehearsal-v1` 并在生产失败关闭。后续 `append-only-outbox-v2` 必须通过独立 ADR、
+SQLite/PostgreSQL migration、事务内写入、单调 cursor、回填/回滚与 Data Owner 字段最小化评审
+后，才可成为核心审计投递事实源。

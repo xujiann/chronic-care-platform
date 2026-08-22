@@ -91,6 +91,12 @@ function passingSoftwareOptions(manifest, registry) {
       passed: true,
       checks: [{ name: "env:fixture", passed: true, severity: "error", category: "environment" }]
     },
+    auditDeliveryAssessment: {
+      ready: true,
+      productionReady: true,
+      checks: [{ id: "audit-delivery:test-fixture", passed: true }],
+      boundary: "test fixture only"
+    },
     launchSmoke: {
       ok: true,
       baseUrl: "https://health.example.gov.cn",
@@ -128,6 +134,28 @@ test("production preflight is fail-closed when controlled production evidence is
   assert.equal(report.blockers.some((item) => item.id === "preflight:external-registry-attestation"), true);
   assert.equal(report.blockers.some((item) => item.id === "preflight:production-evidence-validation"), true);
   assert.match(renderMarkdown(report), /Production decision: NO-GO/);
+});
+
+test("legacy audit retention variables cannot substitute for continuous audit deployment readiness", async () => {
+  const manifest = manifestFixture();
+  const registry = registryFixture(manifest);
+  const options = passingSoftwareOptions(manifest, registry);
+  delete options.auditDeliveryAssessment;
+  options.env = {
+    ...options.env,
+    AUDIT_EXPORT_PATH: "/var/log/chronic-care-platform/audit",
+    SIEM_ENDPOINT: "https://siem.example.gov.cn/ingest",
+    SIEM_SIGNING_SECRET: "a".repeat(32)
+  };
+  const report = await buildProductionPreflight({
+    ...options,
+    productionEvidence: { ok: false, status: "no-go-evidence-incomplete" },
+    evidenceRecords: {}
+  });
+
+  assert.equal(report.runtimeConfigured, false);
+  assert.equal(report.productionReady, false);
+  assert.equal(report.checks.some((item) => item.id === "preflight:audit-delivery" && !item.passed), true);
 });
 
 test("a claimed evidence result remains blocked when release id or artifact digest drifts", async () => {
