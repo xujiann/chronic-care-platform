@@ -119,7 +119,7 @@
   },
   "riskBaseline": {
     "schemaVersion": 2,
-    "sourceRevision": "origin/main@67e91414 + process/t00-browser-risk-inventory-v2-20260822",
+    "sourceRevision": "origin/main@07968862 + process/t06-blood-trusted-rendering-20260823",
     "failClosedPriorities": [
       "P0",
       "P1"
@@ -137,9 +137,6 @@
       {"asset":"blood-go-live.js","type":"dom-inner-html","priority":"P0","fingerprint":"0f75dfa72679cceedafeefb4ac98ff6cfde2118b5c819b2c7d27f9818727a901","count":8},
       {"asset":"blood-innovation.js","type":"dom-inner-html","priority":"P0","fingerprint":"a13b590ae59a4fdc4baa333fc6f650d85bb852844b4a078cac1d526b95b58f5b","count":10},
       {"asset":"blood-recall.js","type":"dom-inner-html","priority":"P0","fingerprint":"ea5a288748163da7cd6f760c115e3596f0c5e3ca56233d3ab2fb67e70c199427","count":2},
-      {"asset":"blood.js","type":"cssom-property-mutation","priority":"P1","fingerprint":"ce733f0965ae095daa152e981d33d628a4cf241cbaf47f5ae684936677553836","count":2},
-      {"asset":"blood.js","type":"dom-inner-html","priority":"P0","fingerprint":"a261c37da484ecdca53b5c6a532f2e2fa97eb1e575c73eb5308735030f600daf","count":25},
-      {"asset":"blood.js","type":"dynamic-html-style-attribute","priority":"P1","fingerprint":"20ced4e6cf98e80b3f059df5ffbea999a10e2d13970e13f4e3270973c6b1af8e","count":1},
       {"asset":"citizen.js","type":"cssom-property-mutation","priority":"P1","fingerprint":"19574e6338f5b225b316455cb69fe05ed719a4badd8d398ecf6fc58a01d48af7","count":3},
       {"asset":"citizen.js","type":"cssom-set-property","priority":"P1","fingerprint":"a9a6ce74ed33426beb667fa57917760b39e06d50b014f5522ca6ef1e39efef77","count":1},
       {"asset":"citizen.js","type":"dom-inner-html","priority":"P0","fingerprint":"88eb1fb0dbd0e960cd2d487a2251a0d1c4d9c75554ce9e97ef0f6e04cf3990b7","count":94},

@@ -92,6 +92,10 @@ Schema、生产事实或安全评估证据。Inventory v2 风险基线只保存�
 凭据。新增、替换或数量漂移会使构建失败；风险减少需在评审后更新合同，但不产生 migration 或
 数据 Owner 变化。
 
+T06 血液主工作台可信渲染只改变浏览器节点构造：接口响应字段仍按既有 API 投影读取，但一律进入
+文本节点或受控 `dataset`，不创建新的业务集合、缓存、Schema、migration 或审计事实。相应风险基线
+由 1013 个 occurrence 净减至 985 个；该基线变化是代码安全治理元数据，不是生产数据迁移证据。
+
 `followups` 继续由 citizen-chronic/T04 拥有；随访事件 outbox、inbox、projection 和 receipt
 仍嵌在该聚合的 `domainRuntime` 中。本切片只增加安全 publisher 端口，没有新集合、DDL、
 migration 或事实源变化。receipt 不保存供应方原始回执 ID、签名或正文，只保存事件关联、

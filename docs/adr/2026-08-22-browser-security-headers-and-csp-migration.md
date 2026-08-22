@@ -47,6 +47,10 @@
 
 显式发布图的治理清单扩展到 DOM HTML、动态 URL、动态 HTML style、CSSOM 和 runtime style element：当前精确 occurrence 为 896、69、48，分别覆盖 44、18、15 个资产。每个资产/类型以规范化源行 occurrence 集合生成稳定 SHA-256；数量增长、同数量替换、新资产或新类型均失败关闭，风险减少也必须显式刷新基线接受评审。该词法清单不分析数据来源和净化效果，不修改任何 sink、响应头或 CSP enforcement；兼容 CSP、严格 Report-Only 和 `productionReady=false` 均保持不变。
 
+### 血液主工作台可信渲染试点（2026-08-23）
+
+T06 将 `blood.js` 的 25 个 `innerHTML`、2 个 CSSOM display mutation 和 1 个模板 style 属性迁为显式 DOM、`textContent`、`replaceChildren` 和固定 class；表格、状态、按钮及接口字段均由节点类型表达，恶意 API 字段只显示为文本。Inventory v2 因真实减少刷新为 871 个 DOM HTML、69 个动态 URL和45 个动态样式风险，分别覆盖 43、18、14 个资产。该页面试点不代表其他血液资产或全平台已安全，也不改变兼容 CSP、严格 Report-Only、真实托管验证和 `productionReady=false`。
+
 ## Phased enforcement and rollback
 
 1. 第一阶段：集中端口、兼容 CSP + 严格 Report-Only、风险清单、CI 增量拒绝；固定 `productionReady=false`。
