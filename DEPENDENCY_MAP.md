@@ -72,6 +72,9 @@ TypeScript 与 Node 类型仅用于开发门禁；lockfile audit 已修复 c8 �
 
 - 44 个 HTML 页面和根目录脚本通过全局加载顺序共享状态。
 - `auth.js`、`shared.js`、`platform-api-client.js`、`platform-shell.js` 是主要共享边界。
+- 动态浏览器凭据方向为 `HttpOnly Cookie → /api/auth/context → 脱敏身份投影`；`auth.js` 在
+  任何普通 API 调用前清除旧 localStorage token，Cookie 与 Authorization 并存时服务端也选择
+  Cookie。bearer-only 兼容 token 仅存在页面内存，不跨重载恢复。
 - 发现 871 处 `innerHTML=` / `insertAdjacentHTML` 类写入；最高为 citizen 94、app 90、public-health 78、platform 72。
 - CSP 允许 `script-src 'unsafe-inline'` 和 `style-src 'unsafe-inline'`。
 - Service Worker 缓存应用壳以及生成的 `data/public-demo.json`，缓存版本已从 v59 提升到 v60 以撤销旧快照缓存。
@@ -100,6 +103,10 @@ SQLite schema 依赖现为 `server.js → sqlite-migrations → node:sqlite/sess
 JSON 源快照仍是高扇出依赖，但浏览器和 Pages 只依赖经统一纯函数转换后的公开演示契约；任何结构变化仍需验证脱敏、页面兼容、报告和初始化路径。
 
 身份安全状态依赖方向为 `identity route → auth-security-state-store → SQLite state_collections / PostgreSQL auth_security_state`。组合根为会话与认证状态注入同一长期 PostgreSQL pool，仓储只借用连接且不关闭调用方拥有的 pool；发送验证码固定为限流、原子签发、供应商发送，失败时只撤销本次 OTP。
+
+生产会话 transport 的依赖方向为 `环境配置 → runtime-identity-policy → Cookie/Bearer 解析`。
+`AUTH_SESSION_TRANSPORT=bearer|hybrid` 不能单独启用生产 Bearer，必须同时显式设置
+`AUTH_BEARER_COMPATIBILITY=enabled`；即使显式启用，readiness 仍返回 NO-GO blocker。
 
 ## 6. 外部系统
 

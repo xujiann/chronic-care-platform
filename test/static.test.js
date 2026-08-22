@@ -47,8 +47,9 @@ test("role pages keep explicit page guards", () => {
 
 test("server-backed pages hydrate cookie authorization and reject expired sessions", () => {
   const auth = read("auth.js");
-  assert.match(auth, /fetch\(`\$\{API_BASE\}\/auth\/context`, \{ method: "GET", credentials: "same-origin" \}\)/);
-  assert.match(auth, /delete session\.token/);
+  assert.match(auth, /: await fetch\(`\$\{API_BASE\}\/auth\/context`, \{ method: "GET", credentials: "same-origin" \}\)/);
+  assert.match(auth, /SCRIPT_READABLE_CREDENTIAL_FIELDS\.forEach\(\(field\) => delete safe\[field\]\)/);
+  assert.doesNotMatch(auth, /token:\s*payload\.token/);
   assert.match(auth, /localStorage\.removeItem\(SESSION_KEY\)/);
   assert.match(auth, /redirect=\$\{encodeURIComponent\(currentPage\(\)\)\}&expired=1/);
 });

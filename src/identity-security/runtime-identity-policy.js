@@ -251,27 +251,38 @@ function parseCookies(header) {
 
 function sessionTransport(env = process.env) {
   const configured = text(env.AUTH_SESSION_TRANSPORT).toLowerCase();
+  const production = isProduction(env);
+  const bearerCompatibilityExplicitlyEnabled = text(env.AUTH_BEARER_COMPATIBILITY).toLowerCase() === "enabled";
+  const bearerCompatibilityRequested = configured === "bearer" || configured === "hybrid" || bearerCompatibilityExplicitlyEnabled;
   const cookieEnabled = configured === "cookie" || configured === "hybrid" || !configured;
-  const bearerEnabled = configured === "bearer" || configured === "hybrid"
-    || (!isProduction(env) && configured !== "cookie")
-    || text(env.AUTH_BEARER_COMPATIBILITY).toLowerCase() === "enabled";
-  return { cookieEnabled, bearerEnabled, mode: cookieEnabled ? (bearerEnabled ? "hybrid" : "cookie") : "bearer" };
+  const bearerEnabled = production
+    ? bearerCompatibilityExplicitlyEnabled
+    : configured !== "cookie";
+  const mode = cookieEnabled ? (bearerEnabled ? "hybrid" : "cookie") : (bearerEnabled ? "bearer" : "disabled");
+  return {
+    cookieEnabled,
+    bearerEnabled,
+    mode,
+    bearerCompatibilityRequested,
+    bearerCompatibilityExplicitlyEnabled,
+    productionConfigurationValid: !production || !bearerCompatibilityRequested || bearerCompatibilityExplicitlyEnabled
+  };
 }
 
 function sessionFromRequest(req, currentSession, env = process.env) {
   const transport = sessionTransport(env);
   const authorization = text(req?.headers?.authorization);
-  if (authorization && !transport.bearerEnabled) {
-    throw new IdentityPolicyError("BEARER_AUTH_DISABLED", "bearer authentication is disabled for this runtime", 401);
-  }
-  let source = authorization ? "bearer" : "none";
+  const cookieToken = transport.cookieEnabled ? parseCookies(req?.headers?.cookie)[SESSION_COOKIE_NAME] : "";
+  let source = "none";
   let request = req;
-  if (!authorization && transport.cookieEnabled) {
-    const token = parseCookies(req?.headers?.cookie)[SESSION_COOKIE_NAME];
-    if (token) {
-      source = "cookie";
-      request = { ...req, headers: { ...(req.headers || {}), authorization: `Bearer ${token}` } };
+  if (cookieToken) {
+    source = "cookie";
+    request = { ...req, headers: { ...(req.headers || {}), authorization: `Bearer ${cookieToken}` } };
+  } else if (authorization) {
+    if (!transport.bearerEnabled) {
+      throw new IdentityPolicyError("BEARER_AUTH_DISABLED", "bearer authentication is disabled for this runtime", 401);
     }
+    source = "bearer";
   }
   return { session: currentSession(request), source, transport };
 }
@@ -379,6 +390,7 @@ function securityReadiness(env = process.env) {
     && text(env.SAML_NAME_ID_FORMAT).includes("persistent");
   const blockers = [
     ...(!transport.cookieEnabled ? ["production cookie session transport is not enabled"] : []),
+    ...(!transport.productionConfigurationValid ? ["production bearer compatibility requires AUTH_BEARER_COMPATIBILITY=enabled"] : []),
     ...(transport.bearerEnabled && isProduction(env) ? ["production bearer compatibility remains enabled"] : []),
     ...(!csrfSecret(env) ? ["CSRF/session signing secret is not configured"] : []),
     ...(!samlStrict ? ["SAML strict signing, audience and persistent subject contract is incomplete"] : []),

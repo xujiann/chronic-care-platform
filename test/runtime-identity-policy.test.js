@@ -18,6 +18,7 @@ const {
   securityReadiness,
   sessionFromRequest,
   sessionResponse,
+  sessionTransport,
   validateLiveSession,
   validateLocalAccount
 } = require("../src/identity-security/runtime-identity-policy");
@@ -141,6 +142,53 @@ test("production sessions use secure HttpOnly cookies and omit bearer unless exp
 
   clearSessionCookies(response, env);
   assert.equal(response.getHeader("Set-Cookie").some((item) => item.includes("Max-Age=0")), true);
+});
+
+test("cookie context wins over a stale bearer when both credentials are present", () => {
+  const env = { NODE_ENV: "production", SESSION_SECRET: "a-production-session-secret-that-is-long-enough" };
+  let resolvedAuthorization = "";
+  const resolved = sessionFromRequest({
+    method: "GET",
+    headers: {
+      authorization: "Bearer stale-script-readable-token",
+      cookie: `${SESSION_COOKIE_NAME}=current-cookie-session`
+    }
+  }, (request) => {
+    resolvedAuthorization = request.headers.authorization;
+    return { sessionId: "cookie-session", user: fixture().authUsers[0] };
+  }, env);
+
+  assert.equal(resolved.source, "cookie");
+  assert.equal(resolvedAuthorization, "Bearer current-cookie-session");
+});
+
+test("production bearer and hybrid modes require the explicit compatibility gate and remain NO-GO", () => {
+  const base = { NODE_ENV: "production", SESSION_SECRET: "a-production-session-secret-that-is-long-enough" };
+  for (const mode of ["bearer", "hybrid"]) {
+    const env = { ...base, AUTH_SESSION_TRANSPORT: mode };
+    const transport = sessionTransport(env);
+    assert.equal(transport.bearerEnabled, false, `${mode} must not bypass the compatibility gate`);
+    assert.equal(transport.productionConfigurationValid, false);
+    assert.equal(Object.hasOwn(sessionResponse({ token: "must-not-leak", user: fixture().authUsers[0] }, env), "token"), false);
+    assert.throws(
+      () => sessionFromRequest({ headers: { authorization: "Bearer rejected" } }, () => null, env),
+      (error) => error.code === "BEARER_AUTH_DISABLED"
+    );
+    const readiness = securityReadiness(env);
+    assert.equal(readiness.productionReady, false);
+    assert.equal(readiness.blockers.includes("production bearer compatibility requires AUTH_BEARER_COMPATIBILITY=enabled"), true);
+  }
+
+  const explicitlyEnabled = {
+    ...base,
+    AUTH_SESSION_TRANSPORT: "hybrid",
+    AUTH_BEARER_COMPATIBILITY: "enabled"
+  };
+  assert.equal(sessionTransport(explicitlyEnabled).bearerEnabled, true);
+  assert.equal(sessionResponse({ token: "explicit-compatibility-token", user: fixture().authUsers[0] }, explicitlyEnabled).token, "explicit-compatibility-token");
+  const readiness = securityReadiness(explicitlyEnabled);
+  assert.equal(readiness.productionReady, false);
+  assert.equal(readiness.blockers.includes("production bearer compatibility remains enabled"), true);
 });
 
 test("cookie mutation requires matching signed double-submit CSRF token", () => {

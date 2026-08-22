@@ -15,6 +15,11 @@
 
 认证安全状态在单主机 SQLite 中复用 `state_collections[auth-security-state-v1]`，该内部键从业务快照、集合版本和 PostgreSQL shadow outbox 中排除；生产多实例使用 `${POSTGRES_SCHEMA}.auth_security_state`。两种实现只持久化主体 HMAC 摘要、验证码摘要、TTL、计数与锁定元数据，不保存明文手机号或验证码。
 
+浏览器 `localStorage[health-city-auth-session]` 只保留非凭据身份/授权投影或静态演示状态，
+不再保存服务端 `token`、access/refresh/id token、bearer 或 Authorization 值。HttpOnly Cookie
+是动态浏览器会话凭据；显式 bearer-only 兼容只在当前页面内存中短暂持有 token，页面重载不恢复，
+且生产始终保持 NO-GO。本切片不新增表、集合、字段或 migration。
+
 ## 2. SQLite Schema
 
 主存储 migration 位于 `src/platform/storage/sqlite-migrations.js` 的版本化注册表，当前实际与公开 head 均为 v15。包括 `schema_migrations` 在内，主 SQLite 逻辑上创建 31 张表：
