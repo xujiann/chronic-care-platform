@@ -51,6 +51,14 @@
 
 T06 将 `blood.js` 的 25 个 `innerHTML`、2 个 CSSOM display mutation 和 1 个模板 style 属性迁为显式 DOM、`textContent`、`replaceChildren` 和固定 class；表格、状态、按钮及接口字段均由节点类型表达，恶意 API 字段只显示为文本。Inventory v2 因真实减少刷新为 871 个 DOM HTML、69 个动态 URL和45 个动态样式风险，分别覆盖 43、18、14 个资产。该页面试点不代表其他血液资产或全平台已安全，也不改变兼容 CSP、严格 Report-Only、真实托管验证和 `productionReady=false`。
 
+### Safe URL 首批迁移状态（2026-08-23）
+
+后续 Accepted Safe URL ADR 将可证明的 internal navigation、object-storage、`tel:120` 和同源 blob
+download 收敛到 `browser-safe-url-policy.v1`，动态 URL occurrence 从 69 降至 35。当前 4 项是公共
+端口内受控 sink，29 个模板 URL 与 2 个缺可信 OHIF exact-Origin allowlist 的导航继续
+`review-required`。这不改变本 ADR 的分阶段 CSP 决策：兼容 CSP、严格 Report-Only、外部托管验证和
+`productionReady=false` 保持不变。
+
 ## Phased enforcement and rollback
 
 1. 第一阶段：集中端口、兼容 CSP + 严格 Report-Only、风险清单、CI 增量拒绝；固定 `productionReady=false`。

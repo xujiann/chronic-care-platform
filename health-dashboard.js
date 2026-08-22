@@ -1696,7 +1696,10 @@ function renderIndustryGovernanceIndicatorCenter(center) {
     exportButton.addEventListener("click", () => {
       const blob = new Blob([JSON.stringify(center, null, 2)], { type: "application/json" });
       const link = document.createElement("a");
-      link.href = URL.createObjectURL(blob);
+      window.HealthBrowserSafeUrl.setElementUrl(link, "href", URL.createObjectURL(blob), {
+        capability: "blob-download",
+        baseUrl: location.href
+      });
       link.download = `industry-governance-indicators-${period?.value || "current"}.json`;
       link.click();
       URL.revokeObjectURL(link.href);
@@ -2352,7 +2355,10 @@ function exportDashboardSummary(summary) {
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
   const link = document.createElement("a");
   const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-  link.href = URL.createObjectURL(blob);
+  window.HealthBrowserSafeUrl.setElementUrl(link, "href", URL.createObjectURL(blob), {
+    capability: "blob-download",
+    baseUrl: location.href
+  });
   link.download = `health-dashboard-summary-${stamp}.json`;
   document.body.appendChild(link);
   link.click();

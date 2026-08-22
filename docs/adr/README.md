@@ -26,6 +26,7 @@
 | [临床专科五个可治理子域](./2026-08-18-clinical-five-governed-subdomains.md) | Accepted | 急救、血液、影像、体检、质量安全的开发边界 |
 | [静态内容安全边界](./2026-08-18-static-content-security-boundary.md) | Accepted | 已合入 `main@6c18221`；发布 allowlist、数据和缓存隔离 |
 | [浏览器安全响应头与 CSP 分批强制](./2026-08-22-browser-security-headers-and-csp-migration.md) | Accepted | 集中响应头端口、兼容 CSP、严格 Report-Only 目标、资产风险基线与生产 NO-GO |
+| [浏览器动态 URL 统一进入 Safe URL Port](./2026-08-23-browser-safe-url-policy.md) | Accepted | internal/official/object-storage/tel/blob 能力、稳定错误、exact-Origin 与分批 URL sink 迁移 |
 | [审计链失败语义与兼容迁移](./2026-08-19-audit-chain-failure-semantics.md) | Accepted | v2 严格验证、服务端管理审计字段、失败传播和受控旧链迁移 |
 | [切换告警运行时采用显式控制面 Provider 注入](./2026-08-20-pilot-cutover-alert-provider-injection.md) | Accepted | 已合入 `main@21d8f3c`（PR #132）；显式 provider、默认拒绝投影与反向依赖守卫 |
 | [生产身份与短信适配器信任边界](./2026-08-21-production-identity-sms-trust-boundary.md) | Accepted | JWKS/JWT、脱敏 transport、SMS 凭据/幂等/重试/健康及共享 OTP/锁定状态 |

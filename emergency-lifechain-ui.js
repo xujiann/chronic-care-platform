@@ -1,5 +1,14 @@
 const LIFE_CHAIN_API = location.protocol === "file:" ? "" : "/api/emergency";
 
+function lifeChainSafeTelephone(target) {
+  if (!window.HealthBrowserSafeUrl) throw Object.assign(new Error("browser safe URL policy is unavailable"), { code: "SAFE_URL_POLICY_UNAVAILABLE" });
+  return window.HealthBrowserSafeUrl.navigate(target, {
+    capability: "tel",
+    allowedPhoneNumbers: ["120"],
+    mode: "assign"
+  });
+}
+
 function lifeChainEscape(value) { return String(value ?? "").replace(/[&<>'"]/g, (char) => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", "'":"&#39;", '"':"&quot;" }[char])); }
 async function lifeChainRequest(path, options = {}) {
   const authFetch = window.HealthCityAuth?.authFetch || fetch;
@@ -63,7 +72,7 @@ async function submitLifeChainForm(event) {
     const result = await lifeChainRequest(pathByForm[form.id], { method:"POST", body:JSON.stringify(payload) });
     lifeChainMessage(form.id === "lifechain-device-sos-form" ? (result.submission?.deduplicated ? "Duplicate device signal was suppressed; the original SOS remains in the 120 information queue." : "Pre-authorized device SOS submitted to the 120 information queue.") : "Life-chain authorization information saved.");
     await loadLifeChain();
-    if (form.id === "lifechain-device-sos-form" && !result.submission?.deduplicated && result.callInstruction?.telUri) location.href = result.callInstruction.telUri;
+    if (form.id === "lifechain-device-sos-form" && !result.submission?.deduplicated && result.callInstruction?.telUri) lifeChainSafeTelephone(result.callInstruction.telUri);
   } catch (error) { lifeChainMessage(error.message, true); }
 }
 

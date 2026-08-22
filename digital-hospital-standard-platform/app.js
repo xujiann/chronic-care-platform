@@ -1780,7 +1780,10 @@
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
-    link.href = url;
+    window.HealthBrowserSafeUrl.setElementUrl(link, "href", url, {
+      capability: "blob-download",
+      baseUrl: location.href
+    });
     link.download = `${state.selectedHospital}-${state.task.id}-${kind}.json`;
     document.body.appendChild(link);
     link.click();
@@ -1882,7 +1885,10 @@
     const blob = new Blob([content], { type });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
-    link.href = url;
+    window.HealthBrowserSafeUrl.setElementUrl(link, "href", url, {
+      capability: "blob-download",
+      baseUrl: location.href
+    });
     link.download = `digital-hospital-public-health-incidents.${format}`;
     document.body.appendChild(link);
     link.click();

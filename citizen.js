@@ -1110,13 +1110,13 @@ function updateServicePanes() {
     const active = link.dataset.serviceTab === activeServiceTab;
     link.classList.toggle("active", active);
     link.setAttribute("aria-current", active ? "page" : "false");
-    link.setAttribute("href", citizenPageHref(link.dataset.serviceTab));
+    window.HealthBrowserSafeUrl.setElementUrl(link, "href", citizenPageHref(link.dataset.serviceTab), { capability: "internal-navigation" });
   });
   document.querySelectorAll("[data-mobile-service-tab]").forEach((link) => {
     const active = link.dataset.mobileServiceTab === activeServiceTab;
     link.classList.toggle("active", active);
     link.setAttribute("aria-current", active ? "page" : "false");
-    link.setAttribute("href", citizenPageHref(link.dataset.mobileServiceTab));
+    window.HealthBrowserSafeUrl.setElementUrl(link, "href", citizenPageHref(link.dataset.mobileServiceTab), { capability: "internal-navigation", baseUrl: location });
     const badge = link.querySelector("small");
     const tab = launchedTabs.find((item) => item.key === link.dataset.mobileServiceTab);
     if (tab) link.dataset.mobileServiceCount = String(serviceNavigationMeta(tab).featureCount);
@@ -2654,7 +2654,7 @@ function exportCitizenAccessReview(residentId) {
   const csv = `\uFEFF${headers.map(safeCsvCell).join(",")}\r\n${rows.map((row) => fields.map((field) => safeCsvCell(row[field])).join(",")).join("\r\n")}`;
   const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
   const link = document.createElement("a");
-  link.href = url;
+  window.HealthBrowserSafeUrl.setElementUrl(link, "href", url, { capability: "blob-download", baseUrl: location });
   link.download = `resident-access-review-${residentId}-${new Date().toISOString().slice(0, 10)}.csv`;
   link.click();
   URL.revokeObjectURL(url);
@@ -2673,7 +2673,7 @@ function exportCitizenAuthorizationReceipts(residentId) {
   const csv = `\uFEFF${headers.map(safeCsvCell).join(",")}\r\n${rows.map((row) => fields.map((field) => safeCsvCell(row[field])).join(",")).join("\r\n")}`;
   const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
   const link = document.createElement("a");
-  link.href = url;
+  window.HealthBrowserSafeUrl.setElementUrl(link, "href", url, { capability: "blob-download", baseUrl: location });
   link.download = `resident-authorization-receipts-${residentId}-${new Date().toISOString().slice(0, 10)}.csv`;
   link.click();
   URL.revokeObjectURL(url);
@@ -2749,7 +2749,7 @@ async function exportCitizenHealthRecord(residentId, categories) {
   const payload = JSON.stringify(sealedArchive, null, 2).replace(/</g, "\\u003c");
   const url = URL.createObjectURL(new Blob([payload], { type: "application/json;charset=utf-8" }));
   const link = document.createElement("a");
-  link.href = url;
+  window.HealthBrowserSafeUrl.setElementUrl(link, "href", url, { capability: "blob-download", baseUrl: location });
   link.download = `resident-health-record-${new Date().toISOString().slice(0, 10)}.json`;
   link.click();
   URL.revokeObjectURL(url);
@@ -3103,7 +3103,7 @@ function handleCitizenRecordsV3Action(action) {
   if (!intent || intent.writes) throw new Error("该居民操作未通过安全校验");
   if (intent.authorizationDraft) openCitizenRecordsV3Authorization(intent);
   else if (intent.targetSelector) focusCitizenRecordsV3Target(intent.targetSelector);
-  else if (intent.page) window.location.href = citizenPageHref(intent.page);
+  else if (intent.page) window.HealthBrowserSafeUrl.navigate(citizenPageHref(intent.page), { capability: "internal-navigation", baseUrl: location, mode: "assign" });
   showToast(intent.announcement);
 }
 
@@ -3112,7 +3112,7 @@ function handleCitizenRecordsV3CareTaskAction(taskId, taskType) {
   if (!intent || intent.writes) throw new Error("该健康任务未通过安全校验");
   if (intent.authorizationId) openAuthorizationRenewal(intent.authorizationId);
   else if (intent.targetSelector) focusCitizenRecordsV3Target(intent.targetSelector);
-  else if (intent.page) window.location.href = citizenPageHref(intent.page);
+  else if (intent.page) window.HealthBrowserSafeUrl.navigate(citizenPageHref(intent.page), { capability: "internal-navigation", baseUrl: location, mode: "assign" });
   showToast(intent.announcement);
 }
 
@@ -5852,7 +5852,7 @@ async function openCitizenImagingViewer(studyId) {
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(payload.message || "影像调阅凭据获取失败");
     const credential = window.CitizenRecordsV2.validateControlledCredential(payload, accessIntent, controlledCredentialOptions());
-    window.location.assign(credential.url);
+    window.HealthBrowserSafeUrl.navigate(credential.url, { capability: "object-storage", ...controlledCredentialOptions(), mode: "assign" });
   } catch (error) {
     showToast(error.message || "影像调阅失败，请稍后重试");
   }
@@ -5886,7 +5886,7 @@ async function downloadCitizenAttachment(attachmentId) {
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(payload.message || "附件短时下载凭据获取失败");
     const credential = window.CitizenRecordsV2.validateControlledCredential(payload, accessIntent, controlledCredentialOptions());
-    window.location.assign(credential.url);
+    window.HealthBrowserSafeUrl.navigate(credential.url, { capability: "object-storage", ...controlledCredentialOptions(), mode: "assign" });
   } catch (error) {
     showToast(error.message || "附件下载失败，请稍后重试");
   }

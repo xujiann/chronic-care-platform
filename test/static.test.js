@@ -3213,9 +3213,9 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   assert.match(mobilePreviewHtml, /page=\$\{service\}/);
   assert.match(mobilePreviewHtml, /launch=1/);
   assert.match(mobilePreviewHtml, /const entryUrl = citizenPreviewSrc\(activePreviewService\)/);
-  assert.match(mobilePreviewHtml, /previewDirectEntry\.href = entryUrl/);
+  assert.match(mobilePreviewHtml, /HealthBrowserSafeUrl\.setElementUrl\(previewDirectEntry, "href", entryUrl/);
   assert.match(mobilePreviewHtml, /const birthEntryUrl = birthHealthPreviewSrc\(\)/);
-  assert.match(mobilePreviewHtml, /previewBirthEntry\.href = birthEntryUrl/);
+  assert.match(mobilePreviewHtml, /HealthBrowserSafeUrl\.setElementUrl\(previewBirthEntry, "href", birthEntryUrl/);
   assert.match(mobilePreviewHtml, /previewBirthEntry\.dataset\.previewEntry/);
   assert.match(mobilePreviewHtml, /previewBirthEntry\.setAttribute\("aria-label"/);
   assert.match(mobilePreviewHtml, /birth-health-summary-strip/);

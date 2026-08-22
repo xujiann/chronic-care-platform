@@ -5,6 +5,19 @@ let emergencyProductionCenter;
 let emergencyEvidencePackage;
 let emergencyAedMap;
 
+function emergencySafeUrlPort() {
+  if (!window.HealthBrowserSafeUrl) throw Object.assign(new Error("browser safe URL policy is unavailable"), { code: "SAFE_URL_POLICY_UNAVAILABLE" });
+  return window.HealthBrowserSafeUrl;
+}
+
+function openEmergencyTelephone(target) {
+  return emergencySafeUrlPort().navigate(target, {
+    capability: "tel",
+    allowedPhoneNumbers: ["120"],
+    mode: "assign"
+  });
+}
+
 document.addEventListener("DOMContentLoaded", async () => {
   ["emergency-call-form","emergency-sos-form","dispatch-form","vehicle-form","clinical-form","hospital-form","handover-form"].forEach((id) => document.querySelector(`#${id}`)?.addEventListener("submit", submitForm));
   document.querySelector("#aed-map-form")?.addEventListener("submit", loadAedMap);
@@ -122,7 +135,10 @@ async function downloadEvidencePackage(eventId, format) {
     const blob = await response.blob();
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
-    link.href = url;
+    emergencySafeUrlPort().setElementUrl(link, "href", url, {
+      capability: "blob-download",
+      baseUrl: location.href
+    });
     link.download = `${emergencyEvidencePackage?.eventNo || eventId}-evidence-package.${format === "markdown" ? "md" : "json"}`;
     link.click();
     URL.revokeObjectURL(url);
@@ -139,13 +155,13 @@ async function submitForm(event) {
   try {
     if (form.id === "emergency-call-form") {
       await request("/calls", { method:"POST", body:JSON.stringify(payload) });
-      location.href = "tel:120";
+      openEmergencyTelephone("tel:120");
     } else if (form.id === "emergency-sos-form") {
       const result = await request("/sos", { method:"POST", body:JSON.stringify(payload) });
       showMessage("Confirmed SOS submitted. Confirm the system call to reach 120.", false);
       await loadDashboard();
       await loadAedMap();
-      if (result.callInstruction?.telUri) location.href = result.callInstruction.telUri;
+      if (result.callInstruction?.telUri) openEmergencyTelephone(result.callInstruction.telUri);
       return;
     } else {
       const eventId = payload.eventId; delete payload.eventId;
