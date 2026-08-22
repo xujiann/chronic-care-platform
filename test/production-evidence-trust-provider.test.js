@@ -253,7 +253,9 @@ test("production preflight uses the controlled provider without test-only verifi
   assert.equal(report.productionEvidenceTrustProvider.source, "controlled-files");
   assert.equal(report.productionEvidenceTrustProvider.verified, true);
   assert.equal(report.productionEvidenceTrustProvider.productionReady, true);
-  assert.equal(report.externalEvidenceReady, true);
+  assert.equal(report.externalEvidenceReady, false);
+  assert.equal(report.cutoverActionEvidence.productionReady, false);
+  assert.equal(report.blockers.some((item) => item.id === "preflight:cutover-action-evidence"), true);
   assert.equal(report.productionReady, false);
   assert.equal(report.decision, "NO-GO");
 });

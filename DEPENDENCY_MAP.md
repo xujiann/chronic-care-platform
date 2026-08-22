@@ -253,3 +253,10 @@ AS-IS。T08 route owner 不能反向推断 data owner，T00 技术端口不能�
 records 转为稳定摘要绑定，再投影到既有 externalTrustVerifier 两个布尔输出。缺 provider 或任一验证失败
 不回退到结构 evidence validator。deployment package 与 release-readiness CI 显式包含并测试该闭包，
 `productionReady=false` 继续由完整 preflight 决定。
+
+## 生产切换行动证据依赖方向
+
+依赖方向为 `committed definitions → external signed envelope → production-evidence-trust-provider 通用端口 →
+v2 evaluator → strict preflight → protected manual workflow → digest-only receipt`。definitions 与 evaluator
+不依赖组合根或业务存储；provider 私钥、真实信任锚和现场证据始终在仓库外。评估失败只输出稳定 code
+与摘要，不反向写回定义文件；workflow 不反向取得现场审批或部署权威。

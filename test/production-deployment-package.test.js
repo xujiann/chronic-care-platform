@@ -73,7 +73,8 @@ test("production deployment package hashes runtime files without persisting secr
     assert.deepEqual(manifest.processContract.productionPreflight.configurationVariables, [
       "PRODUCTION_EVIDENCE_TRUST_ANCHORS_FILE",
       "PRODUCTION_EVIDENCE_TRUST_ANCHORS_SHA256",
-      "PRODUCTION_EVIDENCE_TRUST_ENVELOPE_FILE"
+      "PRODUCTION_EVIDENCE_TRUST_ENVELOPE_FILE",
+      "PRODUCTION_CUTOVER_ACTION_EVIDENCE_DIR"
     ]);
     assert.equal(manifest.secretContract.variables.some((item) => item.name === "CITIZEN_CHRONIC_FOLLOWUP_PUBLISHER_HMAC_SECRET" && !("value" in item)), true);
     assert.match(

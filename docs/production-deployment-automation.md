@@ -41,6 +41,7 @@ DEPLOYMENT_SECRET_ENV_FILE=<root-owned-secret-file-or-provider-mount>
 PRODUCTION_EVIDENCE_TRUST_ANCHORS_FILE=<absolute-regular-file>
 PRODUCTION_EVIDENCE_TRUST_ANCHORS_SHA256=sha256:<64-hex-anchor-bundle-digest>
 PRODUCTION_EVIDENCE_TRUST_ENVELOPE_FILE=<absolute-regular-file>
+PRODUCTION_CUTOVER_ACTION_EVIDENCE_DIR=<absolute-controlled-directory>
 ```
 
 trust bundle 只含 Ed25519 公钥、key/signer/role、状态和有效期；envelope 只含受控引用、摘要、
@@ -57,6 +58,17 @@ npm.cmd run production:preflight:strict -- --package=<package-json> --registry=<
 provider 成功仅解除 external trust verifier 的软件装配阻断。缺失、过期、未来时间、撤销 key、重复
 signer、错签或任何 release/artifact/evidence/registry 漂移都会失败关闭；audit、live probe、备份、
 worker、现场证据和最终审批仍必须全部通过。
+
+行动目录必须为普通非 symlink 目录，并按 definitions-only 台账精确提供 14 个 `<action-id>.json`；每份
+envelope 由 `action-evidence-custodian` 与 `independent-release-verifier` 两个独立 signer 签署，绑定前态
+转换、证据/指纹/命令回执摘要、release 与 artifact。`production-promotion.yml` 只允许 `main` 手工触发，
+依赖 GitHub `production` environment 和专用 `self-hosted, production-promotion` runner。工作流成功时只
+上传 `production-promotion-receipt.json`，不上传原始 preflight、证据或签名，也不执行现场部署。
+
+受保护 environment 还必须配置绝对、只读的 `PRODUCTION_DEPLOYMENT_PACKAGE_FILE`、
+`PRODUCTION_RELEASE_REGISTRY_FILE`、`PRODUCTION_CONFIG_ENV_FILE`、`PRODUCTION_RELEASE_EVIDENCE_DIR`、
+`PRODUCTION_CUTOVER_ACTION_EVIDENCE_DIR`、anchor/envelope 路径变量，并以 environment secret 注入独立
+anchor digest pin。仓库不提供这些真实值；缺任一值时工作流失败关闭。
 
 `.env`、私钥、证书私钥容器和 `secrets.*` 不得进入制品。TLS 证书、公钥链和非敏感信任锚可以由基础设施层挂载，但私钥必须留在受控密钥系统。
 

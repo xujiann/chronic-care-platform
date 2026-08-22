@@ -31,10 +31,12 @@ function actionReferences(source) {
 test("repository workflows pin official action versions to audited commit SHAs", () => {
   const ci = workflow("ci.yml");
   const pages = workflow("pages.yml");
-  const references = actionReferences(`${ci}\n${pages}`);
+  const promotion = workflow("production-promotion.yml");
+  const allWorkflows = `${ci}\n${pages}\n${promotion}`;
+  const references = actionReferences(allWorkflows);
 
-  assert.equal(references.length, 18);
-  assert.doesNotMatch(`${ci}\n${pages}`, /^\s*uses:\s+actions\/[^@\s]+@v\d+(?:\s+#.*)?$/gm);
+  assert.equal(references.length, 21);
+  assert.doesNotMatch(allWorkflows, /^\s*uses:\s+actions\/[^@\s]+@v\d+(?:\s+#.*)?$/gm);
   references.forEach(({ action, reference, version }) => {
     assert.ok(PINNED_ACTIONS[action], `unexpected GitHub Action: ${action}`);
     assert.match(reference, /^[a-f0-9]{40}$/, `${action} must use a full commit SHA`);
@@ -46,6 +48,7 @@ test("repository workflows pin official action versions to audited commit SHAs",
   assert.match(ci, /regional-foundation:/);
   assert.match(ci, /npm run regional:status -- --region=template/);
   assert.match(ci, /npm run regional:status -- --region=210200/);
+  assert.match(promotion, /node-version:\s*24/);
 });
 
 test("Pages workflow keeps deployment permissions scoped to the deploy job", () => {

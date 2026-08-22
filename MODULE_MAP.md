@@ -209,3 +209,10 @@ Accepted、data owner 与兼容策略获人类批准后才能进入逐切片实�
 适配层只把当前 deployment manifest、registry entry 与五份 evidence records 投影为摘要绑定，并返回既有
 `registryAttestationVerified/productionEvidenceVerified` 两个布尔结果。私钥、证据正文和 provider 原始错误
 不进入模块输出；后续 action evidence 应复用此通用验签端口，不得复制第二套 Ed25519 实现。
+
+## 19. 生产切换行动证据模块
+
+`production-cutover-action-register.js` 现在分为 definitions-only 静态报告和 evidence-derived 动态评估。
+前者永远不能产生 production readiness；后者直接复用第 18 节共享验签端口，只输出 action ID、摘要、
+时间窗和稳定错误码。`production-promotion-receipt.js` 只在 strict GO 后生成 create-once 摘要凭证；两者
+均不依赖 `server.js`、数据库或领域路由，也不拥有现场证据正文。

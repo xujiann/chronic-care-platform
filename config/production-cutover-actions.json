@@ -1,8 +1,11 @@
 {
-  "schemaVersion": "production-cutover-actions-v1",
-  "asOf": "2026-08-03",
+  "schemaVersion": "production-cutover-action-definitions-v2",
+  "asOf": "2026-08-23",
+  "reviewAfter": "2026-11-23",
   "policy": {
     "defaultDecision": "NO-GO",
+    "definitionStatusIsAuthoritative": false,
+    "effectiveStatusSource": "externally-verified release-bound evidence decisions only",
     "evidenceBoundary": "Only controlled references and digests may be committed; credentials, secrets, tokens and patient data are forbidden."
   },
   "cutoverActions": [
@@ -10,7 +13,6 @@
       "id": "cutover-env-file",
       "owner": "platform-ops",
       "issue": 51,
-      "status": "blocked-external",
       "blocker": "The target production environment and immutable release identity are not available in the repository.",
       "requiredEvidence": ["production environment validation receipt", "release id and immutable artifact digest"],
       "verificationCommands": ["npm run env:check:production", "npm run production-db:readiness"]
@@ -19,7 +21,6 @@
       "id": "cutover-identity",
       "owner": "identity-integration",
       "issue": 52,
-      "status": "blocked-external",
       "blocker": "Government identity, institution directory and SMS gateway joint testing has not been signed.",
       "requiredEvidence": ["identity provider joint-test receipt", "directory mapping receipt", "SMS gateway receipt"],
       "verificationCommands": ["npm run identity:contract", "npm run security:production-readiness"]
@@ -28,7 +29,6 @@
       "id": "cutover-audit-retention",
       "owner": "security-admin",
       "issue": 52,
-      "status": "blocked-external",
       "blocker": "The production audit export target, retention policy and access review are not signed.",
       "requiredEvidence": ["audit export receipt", "retention approval", "access audit approval"],
       "verificationCommands": ["npm run audit:retention", "npm run security:production-readiness"]
@@ -37,7 +37,6 @@
       "id": "cutover-storage-adapter",
       "owner": "data-platform",
       "issue": 51,
-      "status": "blocked-external",
       "blocker": "Production persistence, native backup and rollback rehearsal require target infrastructure.",
       "requiredEvidence": ["migration receipt", "native backup receipt", "rollback rehearsal receipt"],
       "verificationCommands": ["npm run production-db:readiness", "npm run postgres:migration-verify"]
@@ -46,7 +45,6 @@
       "id": "cutover-institution-interfaces",
       "owner": "institution-integration",
       "issue": 53,
-      "status": "blocked-external",
       "blocker": "Target-site HIS, EMR, LIS, PACS and referral interfaces are not jointly accepted.",
       "requiredEvidence": ["signed interface joint-test record", "failure compensation and rollback record"],
       "verificationCommands": ["npm run integration:readiness", "npm run interface:mapping"]
@@ -55,7 +53,6 @@
       "id": "cutover-chronic-launch-core",
       "owner": "chronic-followup",
       "issue": 53,
-      "status": "blocked-external",
       "blocker": "The chronic-care launch core, pharmacy callback and resident check-in are not accepted on site.",
       "requiredEvidence": ["chronic launch closure receipt", "pharmacy callback receipt", "resident check-in receipt"],
       "verificationCommands": ["npm run chronic:institution-interfaces", "npm run chronic:launch-core"]
@@ -64,7 +61,6 @@
       "id": "cutover-insurance-certificate",
       "owner": "cross-agency-integration",
       "issue": 54,
-      "status": "blocked-external",
       "blocker": "Insurance settlement, electronic certificate and statistics exchange require upstream acceptance.",
       "requiredEvidence": ["insurance settlement acceptance", "electronic certificate acceptance", "statistics exchange receipt"],
       "verificationCommands": ["npm run insurance-payment:acceptance", "npm run insurance-payment:evidence"]
@@ -73,7 +69,6 @@
       "id": "cutover-monitoring",
       "owner": "platform-ops",
       "issue": 55,
-      "status": "blocked-external",
       "blocker": "Production SIEM or webhook routes, on-call escalation and drill receipts are absent.",
       "requiredEvidence": ["verified alert route receipt", "on-call escalation receipt", "monitoring drill receipt"],
       "verificationCommands": ["npm run monitoring:readiness", "npm run operations:readiness"]
@@ -82,7 +77,6 @@
       "id": "cutover-dr-rehearsal",
       "owner": "data-platform",
       "issue": 51,
-      "status": "blocked-external",
       "blocker": "Cross-site recovery, RTO and RPO require a signed production-grade rehearsal.",
       "requiredEvidence": ["cross-site restore receipt", "RTO and RPO measurement", "DR signoff"],
       "verificationCommands": ["npm run production-db:readiness", "npm run production:go-no-go-readiness"]
@@ -93,7 +87,6 @@
       "id": "security-assessment",
       "owner": "security-compliance",
       "issue": 52,
-      "status": "blocked-external",
       "requiredEvidence": ["classified protection report", "commercial crypto report", "penetration test report"],
       "verificationCommands": ["npm run production-release:evidence:readiness"]
     },
@@ -101,7 +94,6 @@
       "id": "monitoring-drill",
       "owner": "platform-ops",
       "issue": 55,
-      "status": "blocked-external",
       "requiredEvidence": ["delivery, retry, escalation and recovery drill receipts"],
       "verificationCommands": ["npm run production-release:evidence:readiness"]
     },
@@ -109,7 +101,6 @@
       "id": "dr-rehearsal",
       "owner": "data-platform",
       "issue": 51,
-      "status": "blocked-external",
       "requiredEvidence": ["backup and restore rehearsal record", "independent DR verification"],
       "verificationCommands": ["npm run production-release:evidence:readiness"]
     },
@@ -117,7 +108,6 @@
       "id": "site-acceptance",
       "owner": "project-office",
       "issue": 55,
-      "status": "blocked-external",
       "requiredEvidence": ["ten P0 site acceptance records", "pilot hospital authorization"],
       "verificationCommands": ["npm run production-release:evidence:readiness"]
     },
@@ -125,7 +115,6 @@
       "id": "go-no-go",
       "owner": "cutover-committee",
       "issue": 55,
-      "status": "blocked-external",
       "requiredEvidence": ["four-party independent approvals", "final decision bound to the current evidence fingerprint"],
       "verificationCommands": ["npm run production-release:evidence:readiness", "npm run production:go-no-go-readiness"]
     }

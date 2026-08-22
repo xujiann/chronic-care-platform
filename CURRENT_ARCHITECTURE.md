@@ -193,3 +193,12 @@ bundle SHA-256 固定 Ed25519 公钥集合，并验证 active/revoked/retired �
 24 小时时窗以及 release/source/artifact/evidence/registry 精确绑定。CLI 缺少或无法验证任一材料时只返回
 稳定脱敏原因并保持 NO-GO；结构正确的 synthetic evidence 不能替代外部签名。本切片不改变 Runtime
 Go/No-Go、公开 API、数据库或最终生产授权。
+
+## 2026-08-23 生产切换行动证据 v2
+
+`config/production-cutover-actions.json` 只保留 14 项行动定义，已删除可手工宣称完成的 `status`。
+`production-cutover-action-evaluation-v2` 只从外部可信 provider 返回的当前 release/artifact 绑定决定派生
+effective status；缺记录、provider、有效期、转换历史、命令回执摘要或独立 signer 时均保持 `NO-GO`。
+仓库不保存原始现场证据、签名或命令输出。strict preflight 已把 14/14 验证作为额外必要条件；
+`production-promotion.yml` 仅允许 main 上手工触发、production environment 与专用 self-hosted label，
+通过后只生成不可覆盖的 digest-only eligibility receipt，不宣称部署已执行。

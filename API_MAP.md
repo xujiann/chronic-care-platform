@@ -193,3 +193,10 @@ implementation 和 production promotion 全部失败关闭。真实 provider end
 继续兼容但不会进入部署配置。CLI 顶层异常、provider 不可用和验签失败只返回稳定脱敏 code，不回显
 绝对路径、信任材料或外部错误正文。provider 验证通过仍只是 preflight 的一个必要条件，不能直接记录
 Runtime Go/No-Go 或生产授权。
+
+## 16. 生产切换行动证据接口边界
+
+本切片不新增或改变 HTTP API。`production:actions:check` 只验证 definitions-only 台账；v2 evaluator 复用
+T00 pinned-anchor Ed25519 端口消费仓库外 `<action-id>.json` envelope，并只返回 digest-only 决定投影。
+任何本地 `status`、无签名 fixture 或未绑定当前 release/artifact 的记录都不能解除 strict preflight；
+manual production workflow 也不调用业务 API 或执行部署。
