@@ -26,7 +26,7 @@
 | 7A | 临床五个可治理子域 | 治理切片完成，急救/血液/影像/体检首用例已迁移；operations dashboard 与 command 已由 T00 移交 T02 / P1 | Accepted ADR；保持协议兼容，继续按五子域逐用例迁移并禁止 operations 回流 T06 |
 | 7B | 健康驾驶舱版本化指标 | 首个 `population-service-visits.v1` 合同已建立 / P1 | 由 T03 确认来源版本与签名证据、由 T00 注入服务端 region scope；其余指标按 owner 逐项接入 |
 | 7C | 生产 API 机器目录 | 已合并授权矩阵与字面 route inventory，594 项全部 NO-GO / P1 | T01–T09 逐 owner 复核 7 个运行时策略、14 个自定义鉴权和 233 个未观察到幂等标记的写接口；不得用源码标记替代行为测试 |
-| 8 | JSON 169 个遗留集合治理 | 候选 / P1 | owner 分类、使用证据、晋升/归档/迁移批次 |
+| 8 | JSON/SQLite state collection 治理 | DATA-003 首切片完成：252/252 状态完整，188 review-required、1 quarantined / P1 | 按 DATA-008 分 owner 确认、归档或 migration 晋升；process owner 证据不得自动变成 data owner |
 | 9 | 前端可信渲染与 CSP | Accepted ADR；集中响应头与严格 Report-Only 已建立，37 个脚本和 21 个样式风险已外移，显式发布图 P0/P1 静态风险为 0 / P1 | 验证动态 CSSOM、全角色浏览器和恶意输入；真实托管头验证与独立安全评估后才移除兼容 `unsafe-inline` 并强制严格 CSP |
 | 10 | CI/worker/部署依赖治理 | CI 风险域拆分已合入并经 main 验证；Action 完整 SHA 固定已形成 T00 候选，worker 仍候选 / P2 | 不降低 required checks；合入后持续按官方 tag 升级并核验 commit SHA，继续评审 worker 观测契约 |
 | 11 | 居民小程序制品凭证扫描消除哈希误报 | 已完成 / P2 | JSON 仅扫描语义字符串值并精确跳过两个字段中的合法 SHA-256；非 JSON 保留文本扫描；真实演示凭证与伪造摘要负向测试已建立 |

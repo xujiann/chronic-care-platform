@@ -30,6 +30,7 @@
 | [切换告警运行时采用显式控制面 Provider 注入](./2026-08-20-pilot-cutover-alert-provider-injection.md) | Accepted | 已合入 `main@21d8f3c`（PR #132）；显式 provider、默认拒绝投影与反向依赖守卫 |
 | [生产身份与短信适配器信任边界](./2026-08-21-production-identity-sms-trust-boundary.md) | Accepted | JWKS/JWT、脱敏 transport、SMS 凭据/幂等/重试/健康及共享 OTP/锁定状态 |
 | [生产 API 目录从现有授权清单派生并默认拒绝](./2026-08-22-production-api-catalog.md) | Accepted | method/path/owner/auth/scope/idempotency/生产状态机器目录与 CI 门禁 |
+| [JSON/SQLite State Collection 的 Owner 与隔离治理](./2026-08-22-state-collection-ownership-and-quarantine.md) | Accepted | 252/252 集合状态、源码使用证据、owner/共享边界、隔离和生产晋升失败关闭 |
 | [PostgreSQL shadow 合同强化](./2026-08-21-postgresql-shadow-contract-hardening.md) | Accepted | schema 隔离、健康探针、batch/digest/version/tombstone 冲突 |
 | [Solution A 容器部署采用安全默认值与不可变镜像](./2026-08-22-solution-a-secure-container-defaults.md) | Accepted | 容器镜像、Orthanc 认证、DICOM 绑定和生产失败关闭门禁 |
 | [连续审计投递与耐久 checkpoint](./2026-08-21-continuous-audit-delivery.md) | Accepted | SIEM/WORM rehearsal、checkpoint v2、部署信任合同 A；append-only source/可信 receipt/外部 anchor 前生产 NO-GO |

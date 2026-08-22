@@ -152,3 +152,11 @@ HTTP request
 `health-dashboard-indicator-contract.v1` 定义及 `population-service-visits.v1` 测量；summary
 加法返回合同版本和阻断测量数。范围只接受服务端运行时注入，未解析范围或未经签名/版本认可的
 来源返回 `blocked` 元数据，不会因报告结构 `ok=true` 被提升为生产证据。
+
+## 12. State collection 治理与 API 边界
+
+DATA-003 不新增、删除或改变任何 HTTP method/path、鉴权、角色、scope、错误、幂等或审计语义。
+`data:collection-governance:verify` 是仓库 CLI/CI 门禁，只读取受跟踪源码、owner/process 配置、核心
+定义和开发快照名称；不暴露治理目录为 API，也不允许 `shared`、`state-data` 或引用某集合的路由
+process 自动成为数据 owner。252 个集合的 `productionPromotionAllowed` 均为 `false`，仓库成功检查
+不改变生产 API 目录的全量 `NO-GO`。

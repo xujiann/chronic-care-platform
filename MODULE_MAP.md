@@ -27,7 +27,7 @@
 | 路由器 | `src/http/api-router.js`、`src/http/routes/index.js` | 固定顺序、ID 唯一、响应短路，结构清楚 |
 | 运行时上下文 | `src/http/runtime-contexts/` | 领域依赖列表显式，但 public-health 160 项、care 102 项，接口过宽 |
 | 身份安全 | `src/identity-security/`、`production-adapters.js`、`session-store.js`、`auth-security-state-store.js` | Cookie/CSRF、OIDC/JWKS、SMS、会话仓储、共享 OTP/限流/锁定状态和 v2 审计链验证已模块化；生产 bearer/hybrid 受显式兼容门禁约束并保持 NO-GO |
-| 平台数据 | `src/platform/data/`、`src/platform/storage/` | 数据所有权、SQLite migration 注册表/runner、PostgreSQL 主存储契约 |
+| 平台数据 | `src/platform/data/`、`src/platform/storage/` | 数据所有权、SQLite migration 注册表/runner、PostgreSQL 主存储契约；集合治理对 252/252 个快照集合给出 owner/system/review/quarantine 状态 |
 | 领域事件 | `src/platform/events/`、各领域 worker | outbox/inbox、幂等和后台投递 |
 | 慢病随访 publisher | `citizen-chronic-followup-event-service.js`、`src/citizen-chronic/followup-event-publisher.js` | T04 自有 v1 事件、安全 HTTPS 投递端口、独立 activation verifier 和本地兼容适配；尚无生产 worker/持久 lease |
 | 审计投递 | `src/identity-security/audit-delivery-source.js`、`src/platform/operations/audit-delivery.js`、`scripts/audit-delivery-worker.js`、`scripts/audit-delivery-preflight.js` | v15 同事务 append-only source、最小投影、cursor 批次和 checkpoint v3 已实现；v2 snapshot 不静默提升，可信 receipt、外部 anchor 和真实 WORM capability 仍使生产失败关闭 |
@@ -69,7 +69,9 @@ scripts/platform-cutover-alert-worker.js
 
 - 根目录与 `src/` 存在同名模块：`blood-innovation`、`digital-hospital-governance`、`imaging-cloud`、`public-health`、`quality-safety`、`shared`。部分是前端/后端同名，部分是迁移期并存；命名本身不足以判定死代码。
 - `server.js` 内仍有大量种子、规范化、存储和领域函数，而相同领域也已在 `src/` 建立模块。
-- 252 个 JSON 集合中仅 83 个进入数据所有权清单；其余被策略标为 legacy-non-authoritative。
+- 数据 owner 清单现有 87 个合同，其中 60 个存在于 252 集合快照；另有 3 个系统集合。其余 189 个
+  不复制 owner：188 个精确源码引用登记为 `review-required`，1 个种子专有集合登记为
+  `legacy-quarantined`，全部禁止生产晋升。
 - 许多 readiness/report 脚本重复读取 `data/db.json` 并各自产生报告，证据生成接口尚未统一。
 - 静态发布与 storage-admin 原有脱敏逻辑已收敛到同一纯函数；其他报告脚本的重复读取仍未治理。
 - `server.js` 与 `scripts/audit-retention.js` 已统一消费 `src/identity-security/audit-chain.js`；审计验证不再保留两份平行语义。
@@ -163,3 +165,12 @@ T02 新增的 `health-dashboard-indicator-contract` 是纯合同/测量模块，
 `health-dashboard-summary` 仍是大型兼容聚合器，但首个门急诊指标已通过小端口获得可测试的
 定义、测量和 fail-closed 质量语义。历史 `industry-*` ID 继续兼容，并同时公开 canonical
 ID 与弃用 alias；后续指标必须按 owner 逐个接入，不得继续按数组位置复用定义和值。
+
+## 15. State collection 治理模块
+
+`src/platform/data/collection-governance.js` 继续是唯一集合治理纯逻辑；
+`scripts/data-collection-governance.js` 从 Git 跟踪的 599 个 JS/HTML 运行时源派生精确引用，并复用
+`process-worktree` 的路径 owner 解析。`config/state-collection-governance.json` 只记录无数据 owner
+集合的 `review-required`/`legacy-quarantined` 状态，不复制 `domain-data-ownership`。源码 process
+owner、文件引用和 closed-world 核心概念匹配只是证据，不能自动晋升为数据 owner。该 B 类模块
+不读写业务数据库，不改变 runtime state，也不生成仓库内报告；原 release 报告命令继续保留。

@@ -79,7 +79,12 @@ erDiagram
 
 静态页面不再直接读取该文件。Node 静态服务按源文件 mtime/size 合成 `data/public-demo.json`；Pages 在仓库外临时目录生成同名制品，Service Worker 只缓存该脱敏结果。
 
-`config/domain-data-ownership.json` 只登记 83 个集合：platform-governance 32、care 11、public-health 10、clinical 9、integration 7、citizen 6、identity 5、insurance 2、research 1。其余集合按策略为 `legacy-non-authoritative`，禁止直接晋升为生产写模型。
+`config/domain-data-ownership.json` 当前登记 87 个 owner 合同，其中 60 个集合存在于当前 252
+集合快照；27 个合同集合当前不在快照。另有 `dataAccessLogs`、`platformProcessAudit`、
+`securityEvents` 3 个既有系统集合。剩余 189 个无 owner 集合全部进入显式治理状态：188 个在
+599 个受跟踪 JS/HTML 运行时源中观察到精确标识符引用，标为 `review-required`；
+`dalianHealthStatistics2025` 未观察到运行时源码引用，标为 `legacy-quarantined`。静态引用不能证明
+生产实际读写，process owner 也不能推断数据 owner；189 个集合均禁止生产写入和晋升。
 
 根目录 `browser-security-policy.json` 是公开的静态发布/响应头治理合同，不是业务集合、数据库
 Schema、生产事实或安全评估证据。其风险基线只保存公开资产路径、风险类型、优先级、数量和规范化
@@ -130,7 +135,10 @@ legal-hold）不会再为新记录让位；这只关闭静默数据丢失，不�
 ## 7. 主要风险
 
 - `DATA-001`、`DATA-002` 已关闭：公开 head 已统一为 v15，历史 v1–v14 源码由冻结内容指纹保护，v15+ ledger 使用内容 checksum。
-- `DATA-003`：252 个 JSON 集合仅 83 个有生产所有权，遗留数据边界巨大。
+- `DATA-003` 已关闭“未分类”缺口：252/252 集合具有唯一机器状态，未知 owner 不被伪造，新增/删除、
+  重复登记、源码使用漂移和生产晋升由 CI 失败关闭。
+- `DATA-008`：188 个 `review-required` 和 1 个 `legacy-quarantined` 集合仍没有可证明的数据 owner；
+  后续只能按 owner 批次确认、归档或通过版本化合同/migration 晋升。
 - `DATA-004`：JSON 快照同时承担页面数据、种子和报告输入，多角色耦合。
 - `DATA-005`：大量 `payload` JSON 关系没有数据库约束，只能靠应用验证。
 - `DATA-006`：已由显式发布清单、合成脱敏快照、旧缓存版本撤销和敏感路径负向测试缓解；仓库历史与源快照的数据分类仍需单独治理。

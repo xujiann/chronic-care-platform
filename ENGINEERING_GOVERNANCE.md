@@ -82,6 +82,7 @@ LEGACY CODE → TEST PROTECTION → REFACTOR
 | 全量自动发现 | `npm run test:all` |
 | 路由 | `npm run routes:check`、`npm run routes:test` |
 | API 治理 | `npm run api:authorization-matrix`、`npm run api:production-catalog` |
+| 集合治理 | `npm run data:collection-governance:verify`（只读；不生成 release 报告） |
 | 架构 | `npm run architecture:test` |
 | 所有权 | `npm run process:verify`、`npm run process:test` |
 | 平台迭代 | `npm run platform:iterations:test` |
@@ -94,6 +95,9 @@ LEGACY CODE → TEST PROTECTION → REFACTOR
 覆盖仓库 JavaScript，但对 3 个已登记遗留文件保留精确规则级例外；`typecheck`
 是 6 个治理/安全边界文件的增量基线，不得表述为全仓类型检查。扩大基线时应先清债，
 不得用全局关闭规则换取通过。
+
+DATA-003 的只读集合治理验证映射到 governance-api，并由 architecture test 运行专项负向测试；
+它补充 TEST-001，不改变 unit/integration/smoke 分区，也不把仓库通过结果解释为生产批准。
 
 ## 9. 变更风险门禁
 

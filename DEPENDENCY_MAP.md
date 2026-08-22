@@ -107,6 +107,12 @@ SQLite schema 依赖现为 `server.js → sqlite-migrations → node:sqlite/sess
 
 JSON 源快照仍是高扇出依赖，但浏览器和 Pages 只依赖经统一纯函数转换后的公开演示契约；任何结构变化仍需验证脱敏、页面兼容、报告和初始化路径。
 
+集合治理依赖方向为 `data/db.json 顶层名称 + Git 跟踪运行时源码 + process ownership +
+CORE_DATA_DEFINITIONS → collection-governance → CI/release 治理投影`。数据 owner 只从
+`domain-data-ownership` 和既有系统合同读取；源码引用的 T00–T09 process owner 只作为 review
+证据，固定 `ownerInferenceAllowed=false`。治理模块不反向依赖 `server.js`，只把它作为被扫描文本，
+也不写 JSON/SQLite/PostgreSQL。
+
 身份安全状态依赖方向为 `identity route → auth-security-state-store → SQLite state_collections / PostgreSQL auth_security_state`。组合根为会话与认证状态注入同一长期 PostgreSQL pool，仓储只借用连接且不关闭调用方拥有的 pool；发送验证码固定为限流、原子签发、供应商发送，失败时只撤销本次 OTP。
 
 生产会话 transport 的依赖方向为 `环境配置 → runtime-identity-policy → Cookie/Bearer 解析`。
@@ -155,6 +161,8 @@ JSON 源快照仍是高扇出依赖，但浏览器和 Pages 只依赖经统一�
 - 主分支必需检查名称仍为 `complete-unit-test` 与 `test`。聚合 test 使用 `always()`
   并要求三个风险域结果全部为 success，失败、取消和跳过均 fail-closed。
 - governance-api 先校验声明级授权矩阵，再校验其派生的生产 API 目录；目录只依赖既有 `routeSourceFiles` 和授权输出，不依赖组合根、数据库或外部系统，也不生成仓库制品。
+- governance-api 同时执行 `data:collection-governance:verify`；新集合、陈旧/重复状态、owner/reader
+  边界、源码使用状态漂移或任何生产晋升标志都会失败，命令默认只输出摘要且不写 release。
 - GitHub Actions 的 checkout、Node、Pages 和 artifact 引用均固定到经官方仓库
   `refs/tags/vN` 核验的完整 commit SHA，并保留 `# vN` 注释供升级评审；契约测试禁止
   `actions/*@vN` 标签引用回流。

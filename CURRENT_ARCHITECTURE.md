@@ -83,7 +83,7 @@ flowchart TB
    `controlErrorCode` 和 `NO-GO`，不泄露错误正文；当前静态图不再形成该环。PR #132、
    required checks、合并后 main CI 与 Pages 均已通过，主线 ARC-002 已关闭。
 5. SQLite v1–v14 已冻结内容指纹，v15 追加 append-only 连续审计 source；`STORAGE_SCHEMA_VERSION`、部署检查和测试统一从注册表 head v15 派生。历史 ledger 的 v1–v14 checksum 保持兼容，v15 起写入内容 SHA-256。
-6. TEST-001 候选已建立统一的 `build`、`lint`、`typecheck`、`test:unit`、`test:integration`、`test:smoke` 入口；build 复用静态发布 allowlist 并默认输出到仓库外，unit/integration 完整分区根测试，smoke 独立启动临时 JSON 运行时。lint 仍有 3 个文件的精确遗留规则例外，typecheck 当前只覆盖 6 个治理/安全边界文件。
+6. TEST-001 候选已建立统一的 `build`、`lint`、`typecheck`、`test:unit`、`test:integration`、`test:smoke` 入口；build 复用静态发布 allowlist 并默认输出到仓库外，unit/integration 完整分区根测试，smoke 独立启动临时 JSON 运行时。治理 CI 另执行 `data:collection-governance:verify`，以源码、owner 和隔离清单漂移失败关闭；lint 仍有 3 个文件的精确遗留规则例外，typecheck 当前只覆盖 6 个治理/安全边界文件。
 7. 审计验证已收敛到 `src/identity-security/audit-chain.js` 的 v2 严格端口；内容、链接、结构和重复 ID 任一异常均失败，验证 API/合规报告不再读取时重封。全量状态写入中的审计数组由服务端管理。
 8. 机器 API 授权矩阵扫描全部模块化路由源码的 588 条 `requireApiRole`/显式公共声明，并对九条高风险接口锁定 owner、角色、范围和用途；`production-api-catalog-v1` 再与 372 个字面条件路由取并集，形成 594 个唯一接口条目（587 个字面路由、7 个运行时策略），补充自定义鉴权缺口、幂等观察和生产状态。CI 对源集合、目录唯一性、必要字段和高风险唯一性 fail closed；全部目录条目保持 `NO-GO`，静态标记不替代运行时/现场证据。
 9. P1 生产适配器增量保持现有 owner：T01 的 `production-adapters.js` 承担 JWKS/JWT 与 SMS 协议；OTP、发送/登录限流和失败锁定由共享 `auth-security-state-store` 承载，单主机 SQLite 复用 `state_collections`、生产多实例使用组合根长期 PostgreSQL pool；T00 的 PostgreSQL 组合保持 shadow/rehearsal 且 `productionPrimary=false`，受控迁移评估继续失败关闭。连续审计已使用 v15 同事务 append-only source、最小投影和 checkpoint v3，worker/preflight/systemd 已进入部署制品；未签名 receipt、外部单调 anchor、真实 WORM/KMS 与现场证据使 `productionReady=false` 继续失败关闭。
@@ -114,6 +114,12 @@ flowchart TB
     静态风险基线现为 0，CI 和静态构建拒绝新增高风险。兼容 CSP 暂时仍含 `unsafe-inline`，严格目标
     仅以 Report-Only 下发，因为动态 CSSOM/全角色运行时回归、真实托管响应头、独立扫描和现场验收
     均未证明，`productionReady` 保持 `false`。
+13. DATA-003 首个仓库内治理切片复用现有 `collection-governance`，不新建第二份 owner 清单。
+    当前快照 252 个集合已全部获得机器状态：60 个命中 87 个数据 owner 合同，3 个为既有系统
+    集合，188 个源码精确引用但 owner 未明确的集合标为 `review-required`，1 个仅存在种子的集合
+    标为 `legacy-quarantined`。静态扫描覆盖 599 个受跟踪 JS/HTML 运行时源；process owner 只作为
+    review 证据且固定禁止推断数据 owner。新增/删除、重复状态、引用漂移、非 owner 域和生产晋升
+    都在 CI 失败关闭；本切片没有修改 JSON/SQLite、schema、API 或运行时，仍为 `NO-GO`。
 
 ## 6. T06 五子域治理切片
 

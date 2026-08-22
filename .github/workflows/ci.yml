@@ -122,6 +122,8 @@ jobs:
         run: node --test test/process-worktree.test.js
       - name: Test modular-monolith architecture contracts
         run: npm run architecture:test
+      - name: Verify state collection ownership and quarantine boundary
+        run: npm run data:collection-governance:verify
       - name: Verify parallel development-line contracts
         run: npm run development-lines:check && npm run development-lines:test && npm run development-lines:readiness
       - name: Run standard lint and incremental type checks

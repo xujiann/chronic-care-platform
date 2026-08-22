@@ -42,3 +42,5 @@
 - 核心数据采用 closed-world 定义，不随功能任务创建平行概念。
 - 静态内容安全边界已按 Accepted ADR 实施并合入 `main@6c18221`；Node 与 Pages 共用显式发布清单，浏览器只消费合成脱敏快照。
 - 生产 API 目录从现有 route source inventory 与授权矩阵派生；所有条目默认 `NO-GO`，静态幂等标记和仓库门禁不构成生产证据。
+- State collection 数据 owner 只来自现有 owner/system 合同；process owner 和源码引用仅作为证据。
+  无明确 owner 的集合必须显式 `review-required` 或 `legacy-quarantined`，仓库检查不能授权生产晋升。
