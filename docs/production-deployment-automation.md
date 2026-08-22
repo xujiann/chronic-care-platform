@@ -35,6 +35,29 @@ DEPLOYMENT_APP_DIR=<read-only-release-directory>
 DEPLOYMENT_SECRET_ENV_FILE=<root-owned-secret-file-or-provider-mount>
 ```
 
+严格生产预检还需要部署方在仓库外挂载两份 metadata-only JSON，并独立固定 trust-anchor bundle：
+
+```text
+PRODUCTION_EVIDENCE_TRUST_ANCHORS_FILE=<absolute-regular-file>
+PRODUCTION_EVIDENCE_TRUST_ANCHORS_SHA256=sha256:<64-hex-anchor-bundle-digest>
+PRODUCTION_EVIDENCE_TRUST_ENVELOPE_FILE=<absolute-regular-file>
+```
+
+trust bundle 只含 Ed25519 公钥、key/signer/role、状态和有效期；envelope 只含受控引用、摘要、
+release/artifact/evidence/registry 绑定和两个独立角色的 base64url 签名。两者必须是服务账号只读的
+普通非符号链接文件且不超过 1 MiB。私钥、原始证据、provider 响应、患者数据和凭据不得进入文件、
+环境模板、部署包或报告。anchor 文件摘要必须由独立配置/密钥管理面注入，不能从同一文件旁路读取。
+
+部署前按当前 package、registry 和 evidence directory 执行：
+
+```powershell
+npm.cmd run production:preflight:strict -- --package=<package-json> --registry=<registry-json> --evidence-dir=<controlled-evidence-directory> --config-env=<production-env-file>
+```
+
+provider 成功仅解除 external trust verifier 的软件装配阻断。缺失、过期、未来时间、撤销 key、重复
+signer、错签或任何 release/artifact/evidence/registry 漂移都会失败关闭；audit、live probe、备份、
+worker、现场证据和最终审批仍必须全部通过。
+
 `.env`、私钥、证书私钥容器和 `secrets.*` 不得进入制品。TLS 证书、公钥链和非敏感信任锚可以由基础设施层挂载，但私钥必须留在受控密钥系统。
 
 ## 正式生产边界

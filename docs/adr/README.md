@@ -29,6 +29,7 @@
 | [浏览器动态 URL 统一进入 Safe URL Port](./2026-08-23-browser-safe-url-policy.md) | Accepted | internal/official/object-storage/tel/blob 能力、稳定错误、exact-Origin 与分批 URL sink 迁移 |
 | [审计链失败语义与兼容迁移](./2026-08-19-audit-chain-failure-semantics.md) | Accepted | v2 严格验证、服务端管理审计字段、失败传播和受控旧链迁移 |
 | [切换告警运行时采用显式控制面 Provider 注入](./2026-08-20-pilot-cutover-alert-provider-injection.md) | Accepted | 已合入 `main@21d8f3c`（PR #132）；显式 provider、默认拒绝投影与反向依赖守卫 |
+| [严格生产预检采用可部署的签名证据 Trust Provider](./2026-08-23-production-evidence-trust-provider.md) | Accepted | 既有 externalTrustVerifier 的受控文件装配、Ed25519 双角色验签、release/artifact/evidence/registry 绑定与默认 NO-GO |
 | [生产身份与短信适配器信任边界](./2026-08-21-production-identity-sms-trust-boundary.md) | Accepted | JWKS/JWT、脱敏 transport、SMS 凭据/幂等/重试/健康及共享 OTP/锁定状态 |
 | [生产 API 目录从现有授权清单派生并默认拒绝](./2026-08-22-production-api-catalog.md) | Accepted | method/path/owner/auth/scope/idempotency/生产状态机器目录与 CI 门禁 |
 | [JSON/SQLite State Collection 的 Owner 与隔离治理](./2026-08-22-state-collection-ownership-and-quarantine.md) | Accepted | 252/252 集合状态、源码使用证据、owner/共享边界、隔离和生产晋升失败关闭 |

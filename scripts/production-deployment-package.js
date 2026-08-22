@@ -30,6 +30,11 @@ const CHRONIC_FOLLOWUP_DISPATCH_RUNTIME_FILES = [
   "deploy/chronic-followup-dispatch-worker.timer.template",
   "deploy/chronic-followup-dispatch-worker.env.template"
 ];
+const PRODUCTION_EVIDENCE_TRUST_RUNTIME_FILES = [
+  "scripts/production-preflight.js",
+  "scripts/production-release-evidence-readiness.js",
+  "src/platform/governance/production-evidence-trust-provider.js"
+];
 const REQUIRED_RUNTIME_FILES = [
   "server.js",
   "browser-security-policy.json",
@@ -44,7 +49,8 @@ const REQUIRED_RUNTIME_FILES = [
   "scripts/postgres-sync-worker.js",
   "scripts/postgres-shadow-reconcile.js",
   ...AUDIT_DELIVERY_RUNTIME_FILES,
-  ...CHRONIC_FOLLOWUP_DISPATCH_RUNTIME_FILES
+  ...CHRONIC_FOLLOWUP_DISPATCH_RUNTIME_FILES,
+  ...PRODUCTION_EVIDENCE_TRUST_RUNTIME_FILES
 ];
 const ADDITIONAL_RUNTIME_FILES = [
   "browser-security-policy.json",
@@ -53,7 +59,8 @@ const ADDITIONAL_RUNTIME_FILES = [
   "scripts/postgres-sync-worker.js",
   "scripts/postgres-shadow-reconcile.js",
   ...AUDIT_DELIVERY_RUNTIME_FILES,
-  ...CHRONIC_FOLLOWUP_DISPATCH_RUNTIME_FILES
+  ...CHRONIC_FOLLOWUP_DISPATCH_RUNTIME_FILES,
+  ...PRODUCTION_EVIDENCE_TRUST_RUNTIME_FILES
 ];
 const RUNTIME_DIRECTORIES = ["src/http", "src/platform/regional", "src/platform/storage", "regions"];
 const EXCLUDED_RUNTIME_FILES = new Set(["playwright.config.js"]);
@@ -165,6 +172,18 @@ function buildProductionDeploymentPackage(options = {}) {
       { route: "/api/system/readiness", expectedStatus: 200, purpose: "operations-readiness-evidence", authentication: "commission" },
       { route: "/api/metrics", expectedStatus: 200, purpose: "operations-metrics", authentication: "commission" }
     ],
+    productionPreflight: {
+      entrypoint: "node scripts/production-preflight.js --strict",
+      trustContract: "platform-governance.production-evidence-trust-decision.v1",
+      configurationTemplate: "deploy/platform-production-adapters.env.template",
+      configurationVariables: [
+        "PRODUCTION_EVIDENCE_TRUST_ANCHORS_FILE",
+        "PRODUCTION_EVIDENCE_TRUST_ANCHORS_SHA256",
+        "PRODUCTION_EVIDENCE_TRUST_ENVELOPE_FILE"
+      ],
+      externalEvidenceRequired: true,
+      productionReady: false
+    },
     backgroundJobs: [{
       id: "continuous-audit-delivery",
       entrypoint: "node scripts/audit-delivery-worker.js",
@@ -233,7 +252,7 @@ function buildProductionDeploymentPackage(options = {}) {
     check("deploymentPackage:runtimeFiles", files.length >= 30 && REQUIRED_RUNTIME_FILES.every((name) => files.some((item) => item.path === name)), `${files.length} runtime files with required entrypoints`),
     check("deploymentPackage:digest", /^[a-f0-9]{64}$/.test(digest) && files.every((item) => /^[a-f0-9]{64}$/.test(item.sha256)), `sha256:${digest}`),
     check("deploymentPackage:secretBoundary", secretContract.valuesPersisted === false && secretContract.variables.length >= 10 && secretContract.variables.every((item) => item.name && item.persistedInArtifact === false && !("value" in item)), `${secretContract.variables.length} secret references; values persisted false`),
-    check("deploymentPackage:processContract", processContract.healthChecks.length === 4 && processContract.healthChecks.some((item) => item.route === "/api/live" && item.purpose === "process-liveness" && item.authentication === "none") && processContract.healthChecks.some((item) => item.route === "/api/health" && item.purpose === "dependency-readiness" && item.authentication === "none") && processContract.restartPolicy === "on-failure" && processContract.gracefulShutdownSeconds >= 30 && processContract.backgroundJobs.some((item) => item.id === "continuous-audit-delivery" && item.productionReady === false) && processContract.backgroundJobs.some((item) => item.id === "chronic-followup-durable-dispatch" && item.productionReady === false), `${processContract.supervisor} / ${processContract.healthChecks.length} health checks / ${processContract.backgroundJobs.length} background jobs`),
+    check("deploymentPackage:processContract", processContract.healthChecks.length === 4 && processContract.healthChecks.some((item) => item.route === "/api/live" && item.purpose === "process-liveness" && item.authentication === "none") && processContract.healthChecks.some((item) => item.route === "/api/health" && item.purpose === "dependency-readiness" && item.authentication === "none") && processContract.restartPolicy === "on-failure" && processContract.gracefulShutdownSeconds >= 30 && processContract.productionPreflight.productionReady === false && processContract.backgroundJobs.some((item) => item.id === "continuous-audit-delivery" && item.productionReady === false) && processContract.backgroundJobs.some((item) => item.id === "chronic-followup-durable-dispatch" && item.productionReady === false), `${processContract.supervisor} / ${processContract.healthChecks.length} health checks / ${processContract.backgroundJobs.length} background jobs`),
     check("deploymentPackage:rollbackContract", rollbackContract.requirePreviousArtifactDigest && rollbackContract.requireStorageBackup && rollbackContract.rollbackCommand.includes("rollback:snapshot"), "previous digest, storage backup and post-rollback health are mandatory"),
     check("deploymentPackage:provenance", Boolean(source.commit) && (!strict || !source.dirty), `${source.commit} / ${source.dirty ? "working tree dirty" : "working tree clean"}${strict ? " / strict" : ""}`)
   ];
@@ -299,6 +318,7 @@ function verifyProductionDeploymentPackage(manifest, options = {}) {
     check("deploymentVerify:secretBoundary", secretValuesAbsent && prohibitedPaths.length === 0, prohibitedPaths.join(",") || "secret values and prohibited files absent"),
     check("deploymentVerify:auditWorker", AUDIT_DELIVERY_RUNTIME_FILES.every((required) => expectedFiles.some((item) => item.path === required)) && manifest?.processContract?.backgroundJobs?.some((item) => item.id === "continuous-audit-delivery" && item.productionReady === false && item.preflight === "npm run audit:delivery:preflight" && item.configurationTemplate === "deploy/platform-production-adapters.env.template" && item.configurationVariables?.includes("AUDIT_DELIVERY_SOURCE_CONTRACT") && item.configurationVariables?.includes("PLATFORM_PILOT_CUTOVER_ALERT_JOURNAL_FILE")) && manifest?.secretContract?.variables?.some((item) => item.name === "SIEM_AUDIT_SIGNING_SECRET" && !("value" in item)), "continuous audit dependency closure, process, configuration and secret references are mandatory"),
     check("deploymentVerify:chronicFollowupWorker", CHRONIC_FOLLOWUP_DISPATCH_RUNTIME_FILES.every((required) => expectedFiles.some((item) => item.path === required)) && manifest?.processContract?.backgroundJobs?.some((item) => item.id === "chronic-followup-durable-dispatch" && item.productionReady === false && item.preflight === "npm run chronic:followup-dispatch-preflight" && item.sourceContract === "citizen-chronic.followup-dispatch-outbox.v1" && ["DATA_DIR", "CITIZEN_CHRONIC_FOLLOWUP_DISPATCH_SQLITE_FILE", "CITIZEN_CHRONIC_FOLLOWUP_PUBLISHER_HMAC_SECRET", "CITIZEN_CHRONIC_FOLLOWUP_ACTIVATION_REGISTRY_FILE", "CITIZEN_CHRONIC_FOLLOWUP_ACTIVATION_PUBLIC_KEY_FILE", "CITIZEN_CHRONIC_FOLLOWUP_ACTIVATION_PUBLIC_KEY_SHA256"].every((name) => item.configurationVariables?.includes(name))) && manifest?.secretContract?.variables?.some((item) => item.name === "CITIZEN_CHRONIC_FOLLOWUP_PUBLISHER_HMAC_SECRET" && !("value" in item)), "chronic followup durable worker, canonical SQLite source, activation trust and secret references are mandatory"),
+    check("deploymentVerify:productionEvidenceTrust", PRODUCTION_EVIDENCE_TRUST_RUNTIME_FILES.every((required) => expectedFiles.some((item) => item.path === required)) && manifest?.processContract?.productionPreflight?.entrypoint === "node scripts/production-preflight.js --strict" && manifest?.processContract?.productionPreflight?.trustContract === "platform-governance.production-evidence-trust-decision.v1" && manifest?.processContract?.productionPreflight?.productionReady === false && ["PRODUCTION_EVIDENCE_TRUST_ANCHORS_FILE", "PRODUCTION_EVIDENCE_TRUST_ANCHORS_SHA256", "PRODUCTION_EVIDENCE_TRUST_ENVELOPE_FILE"].every((name) => manifest?.processContract?.productionPreflight?.configurationVariables?.includes(name)), "strict preflight includes the pinned Ed25519 production evidence trust provider and remains NO-GO by default"),
     check("deploymentVerify:rollback", manifest?.rollbackContract?.requirePreviousArtifactDigest === true && manifest?.rollbackContract?.requireStorageBackup === true, "rollback prerequisites declared")
   ];
   return {
@@ -399,6 +419,7 @@ if (require.main === module) {
 }
 
 module.exports = {
+  PRODUCTION_EVIDENCE_TRUST_RUNTIME_FILES,
   SECRET_CONTRACT,
   artifactDigest,
   buildProductionDeploymentPackage,

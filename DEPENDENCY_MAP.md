@@ -244,3 +244,12 @@ T00 集成分支承载。
 enqueue → T00 fenced worker → gateway`，另由 lossless keyset scan 驱动 reconcile/readiness。该目标不是
 AS-IS。T08 route owner 不能反向推断 data owner，T00 技术端口不能取得业务事实所有权；在 owner 与兼容
 策略批准前，所有 v17/runtime/API/promotion 依赖均保持 blocked。
+
+## Production evidence trust 依赖方向
+
+依赖方向为 `production-preflight CLI → production-evidence-trust-provider → technical-evidence + node:crypto/fs`。
+部署方只注入外部 anchor/envelope 绝对路径和 anchor bundle digest；provider 不依赖 `server.js`、HTTP、
+数据库或外部网络。production 专用适配复用通用 `verifySignedEnvelope`，把 manifest、registry 与 evidence
+records 转为稳定摘要绑定，再投影到既有 externalTrustVerifier 两个布尔输出。缺 provider 或任一验证失败
+不回退到结构 evidence validator。deployment package 与 release-readiness CI 显式包含并测试该闭包，
+`productionReady=false` 继续由完整 preflight 决定。

@@ -45,6 +45,8 @@
 - State collection 数据 owner 只来自现有 owner/system 合同；process owner 和源码引用仅作为证据。
   无明确 owner 的集合必须显式 `review-required` 或 `legacy-quarantined`，仓库检查不能授权生产晋升。
 - 关键内部边界按 identity、audit、object storage、API governance 独立测量覆盖率；原 server.js 门禁保持不变，基线只能持平或提高，临时覆盖报告不构成生产证据。
+- strict production preflight 通过 T00 受控文件 provider 装配既有 external trust verifier；只接受独立
+  pin 的 Ed25519 anchor bundle、双角色签名和当前 release/artifact/evidence/registry 绑定，默认继续 NO-GO。
 
 ## Proposed 方向（不授权实施）
 

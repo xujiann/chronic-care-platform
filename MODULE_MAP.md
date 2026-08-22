@@ -39,6 +39,7 @@
 | 演示脱敏 | `src/platform/data/public-demo-snapshot.js` | 服务端合成、Pages 构建和 storage-admin 共用纯函数，凭据字段删除、个人姓名/身份/联系字段稳定掩码 |
 | API 生产目录 | `routeSourceFiles` + `api-authentication-evidence` + `api-idempotency-evidence` → `api-authorization-matrix-v3` → `production-api-catalog-v3` | 13 项认证证据绑定 owner、机制、凭据来源、replay/CSRF、scope 与负向测试；原 13 个未分类 key 中 12 个真实入口已客观分类，1 个公卫词法误配已删除，未分类认证为 0。幂等仍只有 SMS callback pilot，332 个写接口缺行为证明，333 项复核，全部生产 NO-GO |
 | 内部边界覆盖治理 | `config/internal-boundary-coverage.json` → `scripts/internal-boundary-coverage.js` | 复用现有 c8/测试，按 identity、audit、object storage、API authentication/catalog/authorization 四组锁定真实基线和负向证据；报告仅写临时目录 |
+| 生产证据信任 provider | `src/platform/governance/production-evidence-trust-provider.js` → `scripts/production-preflight.js` | T00 通用 signed-envelope/anchor 验证端口与 production decision 适配；CLI 可部署装配，双角色 Ed25519、pin、撤销、时窗和发布上下文失败关闭；不拥有生产授权 |
 
 ## 3. 依赖宽度
 
@@ -200,3 +201,11 @@ owner、文件引用和 closed-world 核心概念匹配只是证据，不能自�
 建议目标边界是 `T08 owner command/API → T00 structured repository + durable worker → gateway`，但只有 ADR
 Accepted、data owner 与兼容策略获人类批准后才能进入逐切片实现。Proposed 台账不能替代
 `config/domain-data-ownership.json`，也不能把 T08 route owner 自动解释为 data owner。
+
+## 18. Production evidence trust provider
+
+`production-evidence-trust-provider` 是 T00 的 B 类外部适配模块。通用端口导出稳定 envelope subject、
+逐 signer signature payload、bounded JSON reader、anchor validator 和 `verifySignedEnvelope`；production
+适配层只把当前 deployment manifest、registry entry 与五份 evidence records 投影为摘要绑定，并返回既有
+`registryAttestationVerified/productionEvidenceVerified` 两个布尔结果。私钥、证据正文和 provider 原始错误
+不进入模块输出；后续 action evidence 应复用此通用验签端口，不得复制第二套 Ed25519 实现。

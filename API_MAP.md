@@ -185,3 +185,11 @@ process 自动成为数据 owner。252 个集合的 `productionPromotionAllowed`
 机器治理 CLI 不是 HTTP API。ADR 未 Accepted 或 data owner/v1-v2 兼容策略未确认时，v17、runtime/API
 implementation 和 production promotion 全部失败关闭。真实 provider endpoint、凭据、回执、capability
 与现场验收继续是外部 NO-GO 边界。
+
+## 15. 严格生产预检 provider（无 HTTP 变化）
+
+本切片没有新增或改变任何 HTTP method/path、身份、角色、scope、错误、幂等或审计事件。
+`npm run production:preflight:strict` 在既有 CLI 内自动装配外部 signed-envelope provider；显式测试注入
+继续兼容但不会进入部署配置。CLI 顶层异常、provider 不可用和验签失败只返回稳定脱敏 code，不回显
+绝对路径、信任材料或外部错误正文。provider 验证通过仍只是 preflight 的一个必要条件，不能直接记录
+Runtime Go/No-Go 或生产授权。
