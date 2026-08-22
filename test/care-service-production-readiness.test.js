@@ -102,6 +102,10 @@ function productionEnv(overrides = {}) {
     OBJECT_STORAGE_GATEWAY_URL: "https://storage.health.gov.cn",
     OBJECT_STORAGE_BUCKET: "care-evidence",
     OBJECT_STORAGE_SIGNING_SECRET: SECRET,
+    OBJECT_STORAGE_GATEWAY_CONTRACT_VERSION: "object-storage-gateway-trust-v1",
+    OBJECT_STORAGE_RECEIPT_SIGNING_SECRET: "production-object-storage-receipt-secret-fedcba9876543210",
+    OBJECT_STORAGE_UPLOAD_URL_ALLOWED_ORIGINS: "https://storage.health.gov.cn",
+    OBJECT_STORAGE_DOWNLOAD_URL_ALLOWED_ORIGINS: "https://storage.health.gov.cn",
     PAYMENT_GATEWAY_URL: "https://payment.health.gov.cn",
     PAYMENT_GATEWAY_SECRET: SECRET,
     PAYMENT_CALLBACK_SECRET: SECRET,
@@ -221,6 +225,20 @@ test("fresh probe receipts cannot make placeholder or loopback targets productio
   assert.equal(report.runtimeReady, false);
   assert.equal(report.blockers.some((item) => item.id === "runtime:identity"), true);
   assert.equal(report.blockers.some((item) => item.id === "runtime:sms"), true);
+  assert.equal(report.productionReady, false);
+});
+
+test("fresh object storage probes cannot bypass an incomplete response trust contract", (t) => {
+  const configured = productionEnv({ OBJECT_STORAGE_RECEIPT_SIGNING_SECRET: "" });
+  const report = buildCareServiceProductionReadiness({
+    env: withApprovedCutoverEvidence(t, withHealthyDependencyEvidence(t, configured)),
+    data: {},
+    at: AT,
+    platformIntegrated: true
+  });
+  assert.equal(report.dependencyEvidence.ok, true);
+  assert.equal(report.runtimeReady, false);
+  assert.equal(report.blockers.some((item) => item.id === "runtime:object-storage"), true);
   assert.equal(report.productionReady, false);
 });
 

@@ -659,3 +659,53 @@ T00 已批准方案 2、provider 缺失时的脱敏 NO-GO 语义及上述兼容�
   依赖审计均返回 0；
 - 独立只读复核确认原 2 个 P1 与 1 个 P2 全部关闭，最终无 P0/P1/P2；未触碰受保护数据、SQLite、
   release/report/PDF/归档产物，所有生产授权与运行时切换标志仍为 `false`。
+
+## 2026-08-22 T00 生产基础设施第二切片：对象存储网关信任合同 v1
+
+### 基线与决策
+
+- PostgreSQL 容量/故障转移门禁已通过 PR #142 合并到 `main@5b922716`，main CI 与 Pages 成功；
+- 从该最新 main 创建独立工作树和分支 `process/t00-object-storage-trust-v1-20260822`，用户原工作树不变；
+- 双路只读审计确认必须复用现有 `secure-object-storage.js`，并先建立 ADR；用户已批准按推荐顺序继续；
+- Accepted ADR 选择显式、厂商中立的响应信任合同 v1，生产环境不允许 legacy 降级。
+
+### 今日目标
+
+1. 为所有 v1 网关响应增加独立 HMAC 验签、contract/request/status/time/body 绑定和有界时钟偏差；
+2. 对上传、下载签名 URL 分别执行 exact-Origin、HTTPS、userinfo/fragment 和 TTL 失败关闭校验；
+3. 对 upload、complete、download、lifecycle 响应执行 bucket/attachment/object/version/action 精确绑定；
+4. complete 必须提供非空对象版本、扫描时间和扫描回执；lifecycle 必须提供显式 applied 回执；
+5. 同步环境模板、密钥合同、环境矩阵、release/readiness、部署文档和架构地图；
+6. 始终保持 `productionReady=false`，不制造外部能力或现场验收证据。
+
+### 非目标
+
+- 不修改 T08 附件路由、公开 API、鉴权、数据库 Schema、migration 或附件历史数据；
+- 不处理 `secureAttachments.slice(0, 500)` 静默淘汰；
+- 不处理请求路径外部副作用与本地写入的双写，不新增 retry/outbox/worker/对账；
+- 不接入厂商 SDK，不实现 KMS/WORM/multipart/DICOM 专扫、备份恢复、容量证明或现场签字；
+- 不直接编辑 `data/db.json`、SQLite/WAL/SHM，不生成 release/report/PDF/归档产物。
+
+### 风险、兼容、回滚与验证
+
+- 网关必须先兼容输出 v1；非生产缺 version 时保留 legacy，显式 v1 与所有 production 调用严格验证；
+- 回滚只回退应用制品并保留网关 v1 输出，禁止生产通过关闭验签绕过；
+- 测试先证明当前任意 Origin、过期 URL、无绑定完成响应和空 lifecycle 响应会被放行，再实现修复；
+- 执行对象存储、readiness、release、environment、deployment 专项以及 build、lint、typecheck、unit、
+  integration、smoke、`test:all`、浏览器 E2E和独立只读 review；PR/main CI 与 Pages 必须全部通过。
+
+### 实施与验收结果
+
+- 在既有 `secure-object-storage.js` 边界完成 v1 请求/响应双向 HMAC、原始 body 摘要、request/status/time/
+  operation 绑定、exact-Origin 与 TTL 校验、严格完成/生命周期回执和稳定脱敏错误；响应按 1 MiB 上限
+  流式读取，超限立即取消，不先完整缓冲；
+- care-service 现场 probe 摘要绑定 gateway、bucket、contract 和分方向规范化 Origin，密钥值不进入摘要；
+- 环境模板、环境矩阵、release/deployment/readiness、生产运维文档、Accepted ADR、ADR 台账和五份受影响
+  架构地图已同步；无 Schema、migration、公开路由或 T08 路由改动，`DATA_MODEL.md` 无需变化；
+- 首轮独立审查发现 3 个 P1、3 个 P2，全部关闭；最终审查另发现响应体先完整缓冲的 1 个 P2，修复后
+  最终复核为 P0/P1/P2 均 0；
+- 最终代码状态通过 build、lint、typecheck、对象存储/依赖证据/readiness 专项 30/30 和 API 44/44；
+  修复前的同一切片完整 unit、integration、smoke、`test:all`、路由、架构、流程、ownership、平台迭代、
+  Chromium E2E 36/36 均通过，流式修复后的受影响专项与 API 已完整重跑；
+- 生产依赖与全部依赖使用 npm 官方 audit API 复核均为 0 漏洞；未触碰受保护数据、SQLite/WAL/SHM、
+  release/report/PDF/归档产物，所有生产授权与切换标志仍为 `false`。

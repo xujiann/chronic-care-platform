@@ -38,6 +38,7 @@ const SECRET_CONTRACT = [
   ["SMS_DELIVERY_CALLBACK_SECRET", "resident SMS delivery callback verification"],
   ["HOSPITAL_ADAPTER_SECRET", "hospital connector signing"],
   ["OBJECT_STORAGE_SIGNING_SECRET", "object storage request signing"],
+  ["OBJECT_STORAGE_RECEIPT_SIGNING_SECRET", "object storage gateway response verification"],
   ["FINANCIAL_GATEWAY_SECRET", "payment insurance and certificate signing"],
   ["FINANCIAL_CALLBACK_SECRET", "payment insurance and certificate callback verification"],
   ["SIEM_SIGNING_SECRET", "SIEM alert signing"],

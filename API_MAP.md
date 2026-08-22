@@ -66,7 +66,7 @@ HTTP request
 | SMS 网关 | HTTPS + bearer token + 签名回执 | T01；OTP、发送/登录限流和失败锁定已进入共享认证安全状态仓储，生产多实例要求 PostgreSQL |
 | PostgreSQL | TLS verify-full、outbox/reconcile | 迁移期禁止请求路径双写 |
 | Orthanc / OHIF / HAPI FHIR | Solution A Compose | 专科集成演示与受控部署 |
-| 对象存储 | 引用/摘要、签名访问 | 不得在仓库存真实凭据或原始敏感对象 |
+| 对象存储 | HTTPS 请求 HMAC；`object-storage-gateway-trust-v1` 原始响应 HMAC；上传/下载 exact-Origin + TTL；完成/生命周期显式回执 | 生产不允许 legacy 回退；请求与响应密钥分离，不得在仓库、API、日志或报告暴露真实凭据、签名 URL、原始敏感对象、provider 内部 receipt ID 或上游错误正文 |
 
 ## 6. 错误、幂等与审计
 

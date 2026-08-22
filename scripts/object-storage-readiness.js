@@ -31,7 +31,10 @@ function buildObjectStorageReadiness(options = {}) {
     { id: "integrity-scan", markers: ["finalizeObjectUpload", "checksum verification failed", "malware scan did not pass"] },
     { id: "download-intent", markers: ["createObjectDownloadIntent", "downloadTtlSeconds", "download-intents"] },
     { id: "lifecycle", markers: ["applyObjectLifecycle", "legal-hold", "release-hold", "immutable"] },
-    { id: "gateway-security", markers: ["HMAC-SHA256", "X-Signature", "OBJECT_STORAGE_SIGNING_SECRET", "must use HTTPS in production"] }
+    { id: "gateway-security", markers: ["HMAC-SHA256", "X-Signature", "OBJECT_STORAGE_SIGNING_SECRET", "must use HTTPS in production"] },
+    { id: "gateway-response-trust", markers: ["signGatewayResponse", "verifyGatewayResponse", "parseRfc3339Instant", "OBJECT_STORAGE_RECEIPT_SIGNING_SECRET", "object-storage-response-v1"] },
+    { id: "signed-url-boundary", markers: ["OBJECT_STORAGE_UPLOAD_URL_ALLOWED_ORIGINS", "OBJECT_STORAGE_DOWNLOAD_URL_ALLOWED_ORIGINS", "validateSignedIntentUrl", "OBJECT_STORAGE_INTENT_EXPIRY_INVALID"] },
+    { id: "explicit-receipts", markers: ["scanReceiptId", "receiptId", "OBJECT_STORAGE_COMPLETION_RECEIPT_INVALID", "OBJECT_STORAGE_LIFECYCLE_RECEIPT_INVALID", "OBJECT_STORAGE_OBJECT_VERSION_REQUIRED", "OBJECT_STORAGE_MALWARE_SCAN_NOT_CLEAN"] }
   ].map((item) => ({ ...item, passed: item.markers.every((marker) => adapterSource.includes(marker)) }));
   const apiRoutes = [
     "/api/attachments/storage",
@@ -47,6 +50,12 @@ function buildObjectStorageReadiness(options = {}) {
     "OBJECT_STORAGE_GATEWAY_URL",
     "OBJECT_STORAGE_BUCKET",
     "OBJECT_STORAGE_SIGNING_SECRET",
+    "OBJECT_STORAGE_GATEWAY_CONTRACT_VERSION",
+    "OBJECT_STORAGE_RECEIPT_SIGNING_SECRET",
+    "OBJECT_STORAGE_UPLOAD_URL_ALLOWED_ORIGINS",
+    "OBJECT_STORAGE_DOWNLOAD_URL_ALLOWED_ORIGINS",
+    "OBJECT_STORAGE_UPLOAD_TTL_SECONDS",
+    "OBJECT_STORAGE_RESPONSE_MAX_SKEW_SECONDS",
     "OBJECT_STORAGE_TIMEOUT_MS",
     "OBJECT_STORAGE_MAX_BYTES",
     "OBJECT_STORAGE_DOWNLOAD_TTL_SECONDS"
@@ -57,7 +66,7 @@ function buildObjectStorageReadiness(options = {}) {
     { id: "objectStorage:api", passed: apiRoutes.every((item) => item.passed), detail: `${apiRoutes.filter((item) => item.passed).length}/${apiRoutes.length} runtime API groups` },
     { id: "objectStorage:dataModel", passed: serverSource.includes("secureAttachments") && serverSource.includes("canAccessSecureAttachment"), detail: `${attachmentRecords.length} persisted attachment metadata rows in snapshot` },
     { id: "objectStorage:environment", passed: envVariables.every((marker) => environment.includes(marker)), detail: `${envVariables.filter((marker) => environment.includes(marker)).length}/${envVariables.length} environment variables documented` },
-    { id: "objectStorage:boundary", passed: ["适配器基础通过不等于真实附件存储已经正式验收", "WORM/对象锁", "病毒库更新", "备份恢复"].every((marker) => documentation.includes(marker)), detail: "real bucket, malware, immutable retention and acceptance boundaries documented" },
+    { id: "objectStorage:boundary", passed: ["适配器基础", "不等于真实附件存储已经正式验收", "不允许回退到旧响应契约", "WORM/对象锁", "病毒库更新", "备份恢复"].every((marker) => documentation.includes(marker)), detail: "gateway trust migration, real bucket, malware, immutable retention and acceptance boundaries documented" },
     { id: "objectStorage:releaseWiring", passed: Boolean(pkg.scripts?.["object-storage:readiness"]) && releaseSource.includes("buildObjectStorageReadiness") && deploySource.includes("objectStorageReadiness") && manifestSource.includes("object-storage-readiness-report"), detail: "package, release report, deploy check and manifest wiring" }
   ];
   return {

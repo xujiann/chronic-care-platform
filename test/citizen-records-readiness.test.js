@@ -42,7 +42,11 @@ test("production gate opens only with public integration and non-placeholder evi
     PACS_ADAPTER_URL: "https://pacs.health.gov.cn/events",
     OBJECT_STORAGE_GATEWAY_URL: "https://storage.health.gov.cn/api",
     OBJECT_STORAGE_BUCKET: "citizen-health-records",
-    OBJECT_STORAGE_SIGNING_SECRET: "secret-from-kms",
+    OBJECT_STORAGE_SIGNING_SECRET: "citizen-object-storage-request-secret-0123456789abcdef",
+    OBJECT_STORAGE_GATEWAY_CONTRACT_VERSION: "object-storage-gateway-trust-v1",
+    OBJECT_STORAGE_RECEIPT_SIGNING_SECRET: "citizen-object-storage-receipt-secret-fedcba9876543210",
+    OBJECT_STORAGE_UPLOAD_URL_ALLOWED_ORIGINS: "https://storage.health.gov.cn",
+    OBJECT_STORAGE_DOWNLOAD_URL_ALLOWED_ORIGINS: "https://storage.health.gov.cn",
     SIEM_ENDPOINT: "https://siem.health.gov.cn/ingest",
     CITIZEN_RELATIONSHIP_PROVIDER_URL: "https://identity.health.gov.cn/relationships",
     CITIZEN_AUTHORIZATION_LEGAL_APPROVAL: "LEGAL-2026-071",
@@ -57,6 +61,19 @@ test("production gate opens only with public integration and non-placeholder evi
     productionReady: true
   });
   assert.deepEqual(report.blockers, []);
+});
+
+test("object storage evidence requires the versioned response trust contract", () => {
+  const report = assessCitizenRecordsReadiness({
+    root: ROOT,
+    env: {
+      OBJECT_STORAGE_GATEWAY_URL: "https://storage.health.gov.cn/api",
+      OBJECT_STORAGE_BUCKET: "citizen-health-records",
+      OBJECT_STORAGE_SIGNING_SECRET: "citizen-object-storage-request-secret-0123456789abcdef"
+    }
+  });
+  assert.equal(report.externalChecks.some((item) => item.id === "object-storage" && !item.passed), true);
+  assert.equal(report.summary.productionReady, false);
 });
 
 test("placeholder evidence never satisfies a production gate", () => {

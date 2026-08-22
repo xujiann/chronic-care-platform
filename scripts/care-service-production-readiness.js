@@ -8,6 +8,7 @@ const path = require("node:path");
 const Runtime = require("../care-service-runtime");
 const CutoverEvidence = require("../care-service-cutover-evidence");
 const DependencyEvidence = require("../care-service-dependency-evidence");
+const { objectStorageCenter } = require("../secure-object-storage");
 
 const ROOT = path.resolve(__dirname, "..");
 const DEFAULT_JSON = path.join(ROOT, "release", "care-service-production-readiness.json");
@@ -220,6 +221,7 @@ function buildEnvironmentChecks(env, dependencyEvidence) {
     .map((item) => item.trim())
     .filter(Boolean);
   const databaseReady = storageEngine === "sqlite";
+  const secureObjectStorage = objectStorageCenter(env);
   const healthyDependencies = new Set(dependencyEvidence.healthyDependencies || []);
   const probesReady = (...dependencies) => dependencies.every((dependency) => healthyDependencies.has(dependency));
   const probeDetail = (...dependencies) => {
@@ -265,12 +267,10 @@ function buildEnvironmentChecks(env, dependencyEvidence) {
     check(
       "runtime:object-storage",
       "clinical evidence object storage",
-      httpsUrl(env.OBJECT_STORAGE_GATEWAY_URL) && Boolean(env.OBJECT_STORAGE_BUCKET)
-        && secretReady(env.OBJECT_STORAGE_SIGNING_SECRET)
-        && probesReady("object-storage"),
-      env.OBJECT_STORAGE_GATEWAY_URL ? probeDetail("object-storage") : "missing",
+      secureObjectStorage.adapterReady && probesReady("object-storage"),
+      secureObjectStorage.adapterReady ? probeDetail("object-storage") : secureObjectStorage.blockers.join("; "),
       "存储运维",
-      "configure HTTPS object storage, bucket, signing secret, retention and malware scan"
+      "configure object-storage-gateway-trust-v1, independent request/receipt keys, exact upload/download origins, retention and malware scan"
     ),
     check(
       "runtime:financial",

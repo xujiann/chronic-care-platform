@@ -35,6 +35,7 @@ test("production deployment package hashes runtime files without persisting secr
     assert.equal(manifest.artifact.files.some((item) => item.path === "regions/210200/manifest.json"), true);
     assert.equal(manifest.artifact.files.some((item) => item.path === ".env"), false);
     assert.equal(manifest.secretContract.variables.every((item) => item.persistedInArtifact === false && !("value" in item)), true);
+    assert.equal(manifest.secretContract.variables.some((item) => item.name === "OBJECT_STORAGE_RECEIPT_SIGNING_SECRET" && item.purpose === "object storage gateway response verification"), true);
     assert.equal(manifest.processContract.healthChecks.some((item) => item.route === "/api/live" && item.purpose === "process-liveness" && item.authentication === "none"), true);
     assert.equal(manifest.processContract.healthChecks.some((item) => item.route === "/api/health" && item.purpose === "dependency-readiness" && item.authentication === "none"), true);
     assert.equal(manifest.processContract.healthChecks.filter((item) => item.authentication === "commission").length, 2);
