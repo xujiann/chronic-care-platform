@@ -81,7 +81,7 @@ LEGACY CODE → TEST PROTECTION → REFACTOR
 | 语法 | `npm run check` |
 | 全量自动发现 | `npm run test:all` |
 | 路由 | `npm run routes:check`、`npm run routes:test` |
-| API 治理 | `npm run api:authorization-matrix`、`npm run api:production-catalog` |
+| API 治理 | `npm run api:authorization-matrix`、`npm run api:production-catalog`、`npm run api:idempotency-evidence` |
 | 集合治理 | `npm run data:collection-governance:verify`（只读；不生成 release 报告） |
 | 关键内部边界覆盖 | `npm run test:coverage:boundaries` |
 | 架构 | `npm run architecture:test` |
@@ -103,6 +103,8 @@ DATA-003 的只读集合治理验证映射到 governance-api，并由 architectu
 原 `server.js` 的 c8 85/85/55 门禁保持不变。runtime identity、audit chain/source、object
 storage trust 与 API catalog/authorization 使用独立覆盖组，冻结当前真实基线并绑定安全负向矩阵；
 后续只能持平或提高。覆盖原始数据和报告只写临时目录，不得提交，也不能替代生产现场证据。
+
+API-IDEM-001 在 TEST PROTECTION 层新增幂等证据专项：源码 marker 只作观察，写接口只有在 owner、行为合同、实现锚点与可执行负向测试全部一致时才能标为 `behavior-verified`；该标签不等于生产就绪或分布式 exactly-once。
 
 ## 9. 变更风险门禁
 

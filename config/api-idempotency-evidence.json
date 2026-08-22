@@ -1,0 +1,80 @@
+{
+  "schemaVersion": "api-idempotency-evidence-v1",
+  "policy": {
+    "sourceMarkersAreBehaviorProof": false,
+    "unregisteredWriteStatus": "behavior-proof-required",
+    "productionPromotionAllowed": false
+  },
+  "contracts": [
+    {
+      "contractId": "identity-security.sms-delivery-callback-idempotency.v1",
+      "key": "POST /api/auth/sms-delivery-callback",
+      "method": "POST",
+      "path": "/api/auth/sms-delivery-callback",
+      "owner": "T01",
+      "domain": "identity-security",
+      "purpose": "receive-protected-external-callback",
+      "authentication": {
+        "required": true,
+        "mechanism": "hmac-sha256-signed-external-callback",
+        "principalType": "sms-provider"
+      },
+      "authorization": {
+        "model": "verified-external-provider-message-scope",
+        "roles": [],
+        "dataScope": "provider-message-delivery"
+      },
+      "idempotency": {
+        "key": "eventId",
+        "payloadBinding": [
+          "providerMessageId",
+          "status",
+          "occurredAt",
+          "providerCode",
+          "failureReason"
+        ],
+        "exactReplay": "returns-persisted-event-with-idempotentReplay-true",
+        "conflictingReuse": "SMS_CALLBACK_EVENT_CONFLICT",
+        "persistenceScope": "current-sms-delivery-ledger",
+        "distributedExactlyOnceClaimed": false
+      },
+      "implementationEvidence": [
+        {
+          "file": "production-adapters.js",
+          "anchors": [
+            "function applySmsDeliveryCallback(data, verifiedCallback)",
+            "SMS_CALLBACK_EVENT_CONFLICT",
+            "idempotentReplay: true"
+          ]
+        },
+        {
+          "file": "src/http/routes/identity-security.js",
+          "anchors": [
+            "POST\" && url.pathname === \"/api/auth/sms-delivery-callback",
+            "verifySmsDeliveryCallback(payload",
+            "idempotentReplay: result.idempotentReplay"
+          ]
+        }
+      ],
+      "testEvidence": [
+        {
+          "file": "test/production-adapters.test.js",
+          "anchors": [
+            "SMS delivery ledger is idempotent and does not regress terminal state",
+            "assert.equal(duplicate.idempotentReplay, true)",
+            "SMS_CALLBACK_EVENT_CONFLICT"
+          ]
+        },
+        {
+          "file": "test/api.test.js",
+          "anchors": [
+            "const callbackReplay = await api(baseUrl, \"/api/auth/sms-delivery-callback\"",
+            "assert.equal(callbackReplay.body.idempotentReplay, true)"
+          ]
+        }
+      ],
+      "productionReady": false,
+      "externalEvidenceRequired": true
+    }
+  ]
+}

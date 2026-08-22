@@ -49,6 +49,7 @@
     "routes:test": "node --test test/http-route-modularization.test.js test/http-runtime-contexts.test.js test/cross-domain-foundation-contract.test.js",
     "api:authorization-matrix": "node scripts/api-authorization-matrix.js --check",
     "api:production-catalog": "node scripts/production-api-catalog.js --check",
+    "api:idempotency-evidence": "node scripts/api-idempotency-evidence.js --check && node --test test/api-idempotency-evidence.test.js && node --test --test-name-pattern=\"SMS delivery ledger is idempotent and does not regress terminal state\" test/production-adapters.test.js",
     "architecture:test": "node --test test/platform-architecture-foundation.test.js test/frontend-platform-shell.test.js test/service-extraction-governance.test.js test/platform-runtime-composition.test.js test/data-collection-governance.test.js test/platform-nonfunctional-readiness.test.js test/data-promotion-center.test.js test/platform-work-item-center.test.js test/institution-integration-center.test.js test/regional-product-assembly.test.js test/platform-productization-ui.test.js test/platform-productization-route.test.js test/platform-productization-readiness.test.js",
     "process:list": "node scripts/process-worktree.js list",
     "process:plan": "node scripts/process-worktree.js plan",

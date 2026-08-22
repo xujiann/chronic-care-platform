@@ -3,6 +3,7 @@
 
 const path = require("node:path");
 const { DOMAIN_OWNERS, buildMatrix, readRouteSources, validateMatrix } = require("./api-authorization-matrix");
+const { DEFAULT_REGISTRY, evidenceByKey, validateEvidenceRegistry } = require("./api-idempotency-evidence");
 
 const ROOT = path.resolve(__dirname, "..");
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
@@ -86,16 +87,26 @@ function declarationWindow(route, indexedSources) {
   return lines.slice(start, end).join("\n");
 }
 
-function idempotencyFor(method, declarations, indexedSources) {
+function idempotencyFor(method, declarations, indexedSources, contract = null) {
   if (SAFE_METHODS.has(method)) {
-    return Object.freeze({ required: false, status: "not-required-safe-method", mechanisms: [] });
+    return Object.freeze({ required: false, status: "not-required-safe-method", mechanisms: [], behaviorEvidence: { status: "not-required-safe-method", contractId: null } });
   }
   const combined = declarations.map((route) => declarationWindow(route, indexedSources)).join("\n");
   const mechanisms = IDEMPOTENCY_MARKERS.filter((marker) => marker.pattern.test(combined)).map((marker) => marker.id);
   return Object.freeze({
     required: true,
     status: mechanisms.length ? "source-marker-observed" : "not-observed",
-    mechanisms
+    mechanisms,
+    behaviorEvidence: contract ? {
+      status: "behavior-verified",
+      contractId: contract.contractId,
+      owner: contract.owner,
+      persistenceScope: contract.idempotency.persistenceScope,
+      distributedExactlyOnceClaimed: false
+    } : {
+      status: "behavior-proof-required",
+      contractId: null
+    }
   });
 }
 
@@ -108,7 +119,7 @@ function groupRoutes(routes) {
   return grouped;
 }
 
-function buildCatalogEntry(declarations, indexedSources) {
+function buildCatalogEntry(declarations, indexedSources, contracts) {
   const first = declarations[0];
   const owners = [...new Set(declarations.map((route) => route.owner))].sort();
   const domains = [...new Set(declarations.map((route) => route.domain))].sort();
@@ -117,7 +128,9 @@ function buildCatalogEntry(declarations, indexedSources) {
   const dataScopes = [...new Set(declarations.map((route) => route.dataScope))].sort();
   const identityRequiredValues = [...new Set(declarations.map((route) => route.identity.required))];
   const mechanisms = [...new Set(declarations.map((route) => route.identity.mechanism))].sort();
-  const idempotency = idempotencyFor(first.method, declarations, indexedSources);
+  const principalTypes = [...new Set(declarations.map((route) => route.identity.principalType).filter(Boolean))].sort();
+  const authorizationModels = [...new Set(declarations.map((route) => route.authorizationModel).filter(Boolean))].sort();
+  const idempotency = idempotencyFor(first.method, declarations, indexedSources, contracts.get(first.key));
   const routeResolution = first.path.startsWith("/api/") && first.method !== "ANY" ? "literal" : "runtime-policy";
   const internalBlockers = [];
   if (owners.length !== 1) internalBlockers.push("multiple-route-owners");
@@ -131,9 +144,13 @@ function buildCatalogEntry(declarations, indexedSources) {
   if (idempotency.required && idempotency.status === "not-observed") {
     internalBlockers.push("idempotency-not-observed-in-route-source");
   }
+  if (idempotency.required && idempotency.behaviorEvidence.status !== "behavior-verified") {
+    internalBlockers.push("idempotency-behavior-proof-required");
+  }
   const authorizationVariants = declarations.map((route) => ({
     roles: [...route.roles].sort(),
     dataScope: route.dataScope,
+    authorizationModel: route.authorizationModel || "platform-rbac",
     source: route.source
   }));
   return {
@@ -146,12 +163,14 @@ function buildCatalogEntry(declarations, indexedSources) {
     purpose: purposes.length === 1 ? purposes[0] : "multiple",
     authentication: {
       required: identityRequiredValues.length === 1 ? identityRequiredValues[0] : null,
-      mechanisms
+      mechanisms,
+      principalTypes
     },
     authorization: {
       roles,
       dataScopes,
-      rolesOrScope: roles.length ? "roles-and-resource-scope" : "public-no-role",
+      rolesOrScope: roles.length ? "roles-and-resource-scope" : authorizationModels.length === 1 ? authorizationModels[0] : "public-no-role",
+      models: authorizationModels,
       variants: authorizationVariants
     },
     idempotency,
@@ -169,11 +188,11 @@ function buildCatalogEntry(declarations, indexedSources) {
   };
 }
 
-function buildInventoryOnlyEntry(route, indexedSources) {
+function buildInventoryOnlyEntry(route, indexedSources, contracts) {
   const declarations = route.sources.map((source) => ({ source }));
   const domain = domainForSource(route.sources[0]);
   const owner = DOMAIN_OWNERS[domain] || "T00-review-required";
-  const idempotency = idempotencyFor(route.method, declarations, indexedSources);
+  const idempotency = idempotencyFor(route.method, declarations, indexedSources, contracts.get(route.key));
   const blockers = [
     "missing-authorization-matrix-declaration",
     "authentication-policy-not-classified"
@@ -181,6 +200,7 @@ function buildInventoryOnlyEntry(route, indexedSources) {
   if (idempotency.required && idempotency.status === "not-observed") {
     blockers.push("idempotency-not-observed-in-route-source");
   }
+  if (idempotency.required && idempotency.behaviorEvidence.status !== "behavior-verified") blockers.push("idempotency-behavior-proof-required");
   return {
     key: route.key,
     method: route.method,
@@ -216,8 +236,9 @@ function buildInventoryOnlyEntry(route, indexedSources) {
 
 function buildProductionApiCatalog(matrix = buildMatrix(), sourceFiles = readRouteSources()) {
   const indexedSources = sourceIndex(sourceFiles);
+  const contracts = evidenceByKey();
   const entriesByKey = new Map([...groupRoutes(matrix.routes).values()]
-    .map((declarations) => buildCatalogEntry(declarations, indexedSources))
+    .map((declarations) => buildCatalogEntry(declarations, indexedSources, contracts))
     .map((entry) => [entry.key, entry]));
   const routeInventory = buildLiteralRouteInventory(sourceFiles);
   for (const route of routeInventory) {
@@ -226,21 +247,23 @@ function buildProductionApiCatalog(matrix = buildMatrix(), sourceFiles = readRou
       catalogEntry.routeInventorySources = route.sources;
       catalogEntry.sourceCoverage = "authorization-matrix-and-route-inventory";
     } else {
-      entriesByKey.set(route.key, buildInventoryOnlyEntry(route, indexedSources));
+      entriesByKey.set(route.key, buildInventoryOnlyEntry(route, indexedSources, contracts));
     }
   }
   const entries = [...entriesByKey.values()].sort((left, right) => left.key.localeCompare(right.key));
   return {
-    schemaVersion: "production-api-catalog-v1",
+    schemaVersion: "production-api-catalog-v2",
     generatedFrom: {
       authorizationMatrix: matrix.schemaVersion,
       routeSources: matrix.generatedFrom,
+      idempotencyEvidence: DEFAULT_REGISTRY.schemaVersion,
       ownership: "existing authorization matrix owner mapping and process workstream governance"
     },
     policy: {
       productionDefault: "NO-GO",
       safeMethods: [...SAFE_METHODS],
-      writeIdempotencyEvidence: "source-marker-observation-only",
+      sourceMarkersAreBehaviorProof: false,
+      writeIdempotencyEvidence: "explicit-behavior-contract-and-executable-test-evidence",
       externalEvidenceCanBeGeneratedByRepository: false
     },
     summary: {
@@ -256,6 +279,8 @@ function buildProductionApiCatalog(matrix = buildMatrix(), sourceFiles = readRou
       writeRoutes: entries.filter((entry) => entry.idempotency.required).length,
       writeIdempotencyObserved: entries.filter((entry) => entry.idempotency.status === "source-marker-observed").length,
       writeIdempotencyNotObserved: entries.filter((entry) => entry.idempotency.status === "not-observed").length,
+      writeIdempotencyBehaviorVerified: entries.filter((entry) => entry.idempotency.behaviorEvidence.status === "behavior-verified").length,
+      writeIdempotencyBehaviorProofRequired: entries.filter((entry) => entry.idempotency.behaviorEvidence.status === "behavior-proof-required").length,
       reviewRequired: entries.filter((entry) => entry.production.repositoryReview === "review-required").length,
       productionNoGo: entries.filter((entry) => entry.production.status === "NO-GO").length
     },
@@ -265,7 +290,8 @@ function buildProductionApiCatalog(matrix = buildMatrix(), sourceFiles = readRou
 
 function validateProductionApiCatalog(catalog, matrix = buildMatrix(), sourceFiles = readRouteSources()) {
   const errors = validateMatrix(matrix).map((error) => `authorization matrix: ${error}`);
-  if (catalog.schemaVersion !== "production-api-catalog-v1") errors.push("unsupported production API catalog schema");
+  errors.push(...validateEvidenceRegistry().map((error) => `idempotency evidence: ${error}`));
+  if (catalog.schemaVersion !== "production-api-catalog-v2") errors.push("unsupported production API catalog schema");
   if (catalog.generatedFrom?.authorizationMatrix !== matrix.schemaVersion) errors.push("authorization matrix source version drift");
   const keys = new Set();
   for (const entry of catalog.entries || []) {
@@ -278,7 +304,7 @@ function validateProductionApiCatalog(catalog, matrix = buildMatrix(), sourceFil
     if (!entry.authentication || !Object.hasOwn(entry.authentication, "required") || ![true, false, null].includes(entry.authentication.required)) {
       errors.push(`API has no authentication classification: ${entry.key}`);
     }
-    if (entry.authentication?.required === true && (!Array.isArray(entry.authorization?.roles) || entry.authorization.roles.length === 0)) {
+    if (entry.authentication?.required === true && (!Array.isArray(entry.authorization?.roles) || entry.authorization.roles.length === 0) && entry.authorization?.models?.length !== 1) {
       errors.push(`protected API has no role or scope policy: ${entry.key}`);
     }
     if (entry.authentication?.required === null && (!entry.production?.blockers?.includes("authentication-policy-not-classified") || entry.production?.repositoryReview !== "review-required")) {
@@ -289,6 +315,13 @@ function validateProductionApiCatalog(catalog, matrix = buildMatrix(), sourceFil
     }
     if (!entry.idempotency || typeof entry.idempotency.required !== "boolean" || !entry.idempotency.status) {
       errors.push(`API has no idempotency classification: ${entry.key}`);
+    }
+    if (entry.idempotency?.required && !["behavior-verified", "behavior-proof-required"].includes(entry.idempotency.behaviorEvidence?.status)) errors.push(`write API has no behavior evidence status: ${entry.key}`);
+    if (entry.idempotency?.required && entry.idempotency.behaviorEvidence?.status === "behavior-proof-required" && (!entry.production?.blockers?.includes("idempotency-behavior-proof-required") || entry.production?.repositoryReview !== "review-required")) errors.push(`unverified write API must remain review-required: ${entry.key}`);
+    if (entry.idempotency?.behaviorEvidence?.status === "behavior-verified") {
+      const contract = evidenceByKey().get(entry.key);
+      if (!contract || entry.idempotency.behaviorEvidence.contractId !== contract.contractId || entry.owner !== contract.owner) errors.push(`behavior verification lacks a matching governed contract: ${entry.key}`);
+      if (entry.idempotency.behaviorEvidence.distributedExactlyOnceClaimed !== false) errors.push(`behavior verification must not claim distributed exactly-once: ${entry.key}`);
     }
     if (entry.production?.status !== "NO-GO" || entry.production?.productionReady !== false || entry.production?.externalEvidenceRequired !== true) {
       errors.push(`API production status must fail closed: ${entry.key}`);
@@ -306,6 +339,12 @@ function validateProductionApiCatalog(catalog, matrix = buildMatrix(), sourceFil
   if (catalog.summary?.entries !== keys.size) errors.push("catalog entry summary drift");
   if (catalog.summary?.declarations !== matrix.routes.length) errors.push("catalog declaration summary drift");
   if (catalog.summary?.productionNoGo !== keys.size) errors.push("not every catalog entry is production NO-GO");
+  if (catalog.summary?.writeIdempotencyBehaviorVerified !== DEFAULT_REGISTRY.contracts.length) errors.push("behavior-verified idempotency summary drift");
+  if ((catalog.summary?.writeIdempotencyBehaviorVerified || 0) + (catalog.summary?.writeIdempotencyBehaviorProofRequired || 0) !== catalog.summary?.writeRoutes) errors.push("write behavior evidence summary drift");
+  if (catalog.summary?.writeIdempotencyObserved !== (catalog.entries || []).filter((entry) => entry.idempotency?.status === "source-marker-observed").length) errors.push("source-marker observed summary drift");
+  if (catalog.summary?.writeIdempotencyNotObserved !== (catalog.entries || []).filter((entry) => entry.idempotency?.status === "not-observed").length) errors.push("source-marker not-observed summary drift");
+  if (catalog.summary?.writeIdempotencyBehaviorProofRequired !== (catalog.entries || []).filter((entry) => entry.idempotency?.behaviorEvidence?.status === "behavior-proof-required").length) errors.push("behavior-proof-required summary drift");
+  if (catalog.summary?.reviewRequired !== (catalog.entries || []).filter((entry) => entry.production?.repositoryReview === "review-required").length) errors.push("review-required summary drift");
   if ((catalog.summary?.publicRoutes || 0) !== 5) errors.push("explicit public API register drift");
   if (catalog.summary?.entries !== expectedKeys.size) errors.push("catalog source-union summary drift");
   if ((catalog.summary?.entries || 0) < 550) errors.push("production API catalog count unexpectedly low");

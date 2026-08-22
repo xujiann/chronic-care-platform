@@ -201,9 +201,9 @@ source/sink contract、目标摘要、cursor/source hash 与 receipt 摘要；ch
 
 ## 13. 生产 API 目录数据边界
 
-`production-api-catalog-v1` 是从路由源码与授权矩阵即时派生的治理元数据，不新增 JSON 集合、SQLite/PostgreSQL 表、字段、DDL、migration、outbox 或生产事实源。默认命令只向标准输出返回计数摘要，完整目录也只包含 method/path、owner、身份/角色/范围、幂等观察、生产阻断和源码位置；禁止加入凭据、真实 endpoint、患者标识、provider payload 或外部回执。
+`production-api-catalog-v2` 是从路由源码、授权矩阵与小型行为证据注册表即时派生的治理元数据，不新增 JSON 集合、SQLite/PostgreSQL 表、字段、DDL、migration、outbox 或生产事实源。`config/api-idempotency-evidence.json` 只登记已验证 endpoint 合同，不复制 594 项路由清单；首项仅引用既有 SMS 回调实现/测试锚点。默认命令只向标准输出返回计数摘要；禁止加入凭据、真实 endpoint、患者标识、provider payload 或外部回执。
 
-目录中的 `source-marker-observed` 不是幂等执行证据，`NO-GO` 也不是可被写入业务状态的生命周期字段。真实 API 联调和现场证据仍由各领域既有权威模型管理，不能回写或反向污染该派生目录。
+目录中的 `source-marker-observed` 不是幂等执行证据；只有注册表合同、实现锚点和可执行测试证据全部验证通过才标记 `behavior-verified`。该状态只证明当前仓库行为，不证明跨实例 exactly-once 或生产耐久性；`NO-GO` 也不是可被写入业务状态的生命周期字段。真实 API 联调和现场证据仍由各领域既有权威模型管理，不能回写或反向污染该派生目录。
 
 ## 14. 内部边界覆盖率数据边界
 

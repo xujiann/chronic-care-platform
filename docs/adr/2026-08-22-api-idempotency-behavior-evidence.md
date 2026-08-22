@@ -1,0 +1,49 @@
+# ADR：API 幂等行为证据必须显式登记且默认拒绝
+
+- 状态：Accepted
+- 日期：2026-08-22
+- Owner：T00 证据门禁；T01 首个身份/SMS pilot 行为 owner
+- 影响范围：生产 API 目录、外部回调鉴权分类、CI、测试与六张地图
+
+## Problem
+
+`production-api-catalog-v1` 能观察写接口附近的 `idempotent`、`nonce`、request ID 等字符串，但目录曾仅在完全未观察到标记时增加复核阻断。这会让“源码出现过相关词”在目录状态上等同于“幂等行为已由测试验证”，无法区分精确重放、同键异载荷、多实例耐久性和现场生产证据。既有 SMS delivery callback 已有 HMAC、事件级去重和行为测试，却仍被归入未分类自定义鉴权。
+
+## Options
+
+1. 保持源码标记启发式，把观察到标记的写接口视为仓库内已完成。
+2. 为全部写接口人工维护第二份完整幂等清单。
+3. 保留源码观察字段，另建只登记已验证 endpoint 的小型行为证据合同；未登记写接口一律 `behavior-proof-required`，从单一 SMS callback vertical pilot 开始。
+
+## Advantages
+
+- 方案 1 成本最低，不增加配置。
+- 方案 2 可以一次性记录所有接口的理想状态。
+- 方案 3 不复制路由目录；合同同时绑定 owner、认证模型、幂等键、载荷绑定、实现锚点与可执行测试，并允许逐 owner 小步扩展。
+- 外部 HMAC principal 与平台 session/RBAC 分开表达，不创造并不存在的平台角色。
+
+## Disadvantages
+
+- 方案 1 会持续产生虚假的完成信号。
+- 方案 2 容易漂移，并诱使维护者为凑齐清单猜测 owner 或行为。
+- 方案 3 会让当前 `review-required` 数量上升，因为过去观察到标记但无行为合同的接口重新失败关闭。
+- 文件/测试锚点只能证明受控仓库证据存在，不能证明测试在真实分布式生产环境通过。
+
+## Migration cost
+
+低到中等。目录 schema 从 v1 加法升级到 v2，增加一个小型证据注册表、验证 CLI、负向测试和 governance-api CI 步骤；授权矩阵加入一条既有 SMS callback 的 custom external authentication 声明。HTTP method/path、响应、数据写入、schema、migration、运行时依赖和部署拓扑不变。
+
+## Risk
+
+- 行为测试可能覆盖单进程内存/JSON ledger 而非多实例原子写，因此合同必须显式保持 `distributedExactlyOnceClaimed=false`。
+- HMAC nonce 防重放与业务 `eventId` 幂等不是同一保证，目录不能合并二者。
+- 测试锚点可能随合理重命名漂移；漂移应触发 owner 复核并更新合同，而不是静默放行。
+- 仓库验证通过仍缺真实 provider、密钥托管、网络、耐久数据库、审计留存与现场签字。
+
+## Recommendation
+
+采用方案 3。`production-api-catalog-v2` 同时保留 `source-marker-observed/not-observed` 与独立的 `behavior-verified/behavior-proof-required`。源码标记永远不能自动晋升行为状态；只有机器合同、owner、实现锚点和可执行测试证据一致时才允许 `behavior-verified`。
+
+首个且唯一 pilot 为 `POST /api/auth/sms-delivery-callback`：T01 owner，认证机制为 HMAC-SHA256 签名外部 SMS provider，授权范围为 provider message delivery；业务幂等键为 `eventId`，精确重放返回既有事件，同键异载荷返回 `SMS_CALLBACK_EVENT_CONFLICT`。该结论只适用于当前 ledger 行为，不宣称分布式 exactly-once。
+
+所有条目继续固定 `NO-GO`、`productionReady=false` 和外部现场证据阻断。后续扩展必须由相应 owner 提供行为合同和真实负向测试；不得用批量源码扫描结果、注释或猜测 owner 填充注册表。

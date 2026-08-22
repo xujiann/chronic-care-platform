@@ -140,6 +140,8 @@ jobs:
         run: npm run api:production-catalog
       - name: Verify internal boundary coverage baselines
         run: npm run test:coverage:boundaries
+      - name: Verify API idempotency behavior evidence
+        run: npm run api:idempotency-evidence
       - name: Run blood system readiness gate
         run: npm run blood-system:readiness
       - name: Run emergency collaboration API gate
