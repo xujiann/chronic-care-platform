@@ -41,7 +41,9 @@ HTTP request
 ## 3. 认证与会话 API
 
 - 服务端支持签名会话、HttpOnly Cookie、SameSite、CSRF token、SQLite/PostgreSQL 会话仓储和撤销。
-- 浏览器通过 `/api/auth/context` 升级到服务端 Cookie 上下文；旧 bearer/local demo 状态仍保留在 `localStorage` 兼容路径。
+- 浏览器通过 `/api/auth/context` 升级到服务端 Cookie 上下文；服务端登录响应中的 bearer/token
+  不写入 `localStorage`，启动和上下文失败都会清理陈旧脚本凭据。静态非生产演示仍可保存不含
+  凭据的本地身份状态。
 - 外部身份支持 OIDC exchange/refresh/revoke；居民手机登录支持 SMS provider 和签名 delivery callback。
 - 生产策略对 session secret、存储、保留期、外部 provider 和 demo 模式执行 fail-closed 检查。
 - 页面级授权由 `access-control-policy.js` 与静态页面守卫执行；API 仍必须独立执行主体、角色、权限和资源范围验证。
@@ -50,7 +52,7 @@ HTTP request
 
 | 层 | 实现 | 风险 |
 |---|---|---|
-| 身份 | 签名 token、Cookie、session store | 兼容 bearer/demo 路径扩大状态空间 |
+| 身份 | 签名 token、Cookie、session store | Cookie 优先；显式 bearer 兼容仍扩大状态空间并保持 NO-GO |
 | 角色/权限 | authorization runtime、`requireApiRole`、permission set | 大量路由逐段调用，策略一致性依赖测试 |
 | 数据范围 | `canAccessResident`、机构/区域过滤、delegation | 规则分散在组合根和领域函数 |
 | 页面/资产 | static page guard + access control policy + static asset policy | HTML 先受发布清单约束再执行页面角色策略；非 HTML 只能命中同一显式资源图 |
@@ -85,6 +87,10 @@ HTTP request
   500 条或更多记录时返回 `507 SECURE_ATTACHMENT_METADATA_CAPACITY_EXCEEDED`，且不调用对象
   存储网关、不写数据库、不返回附件标识、文件名、对象地址或容量明细。第 500 条可正常创建，
   既有元数据不再通过数组截断被删除；持久命令和分页仓储仍是后续生产闭环。
+- Cookie 与 Authorization 同时存在时，服务端以 Cookie 会话解析身份并应用 CSRF 规则；生产
+  `bearer`/`hybrid` 配置若未同时设置 `AUTH_BEARER_COMPATIBILITY=enabled`，Bearer 请求以
+  `BEARER_AUTH_DISABLED` 失败关闭且登录响应不返回 token。显式打开兼容仍不改变
+  `productionReady=false`。
 - `GET /api/chronic/followup-events/health` 兼容增加脱敏 publisher readiness；不返回 endpoint、
   secret 或外部回执。`POST /api/chronic/followup-events/dispatch` 保持 method/path、角色和成功
   shape；机构调用仅可看到并投递 resident/org 双重范围内的聚合，拒绝发生在外发前，成功、
@@ -103,7 +109,8 @@ HTTP request
 - `API-003`：错误响应契约不统一，调用方需要理解多个格式。
 - `API-004`：`shared` 有 12 个路由段，容易成为跨域逻辑聚集点。
 - `API-005`：已通过 Pages/Node 共用显式资源图和敏感路径拒绝矩阵缓解；后续新增页面资源必须同步更新清单并通过构建验证。
-- `API-006`：浏览器 Cookie 与 legacy localStorage/bearer 双路径增加兼容和降级风险。
+- `API-006`：服务端 token 的 localStorage 双路径已关闭；显式 bearer-only/hybrid 兼容仍增加
+  请求来源、CSRF 与运维状态空间，因此生产继续作为阻断项。
 - `API-007`：外部接口的生产可用性、证书、密钥和回执只能由现场证据证明。
 
 ## 8. 临床五子域 API 归属

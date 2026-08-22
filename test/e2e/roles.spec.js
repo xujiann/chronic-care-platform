@@ -34,7 +34,11 @@ async function apiLogin(request, username) {
     data: { username, password: "123456" }
   });
   expect(response.ok()).toBe(true);
-  return (await response.json()).token;
+  await response.json();
+  const authenticatedStorage = await request.storageState();
+  const authenticatedCsrf = authenticatedStorage.cookies.find((cookie) => cookie.name === "health_platform_csrf")?.value || "";
+  expect(authenticatedCsrf).not.toBe("");
+  return { "x-csrf-token": authenticatedCsrf };
 }
 
 test("five identity types receive only their policy menu and reject a forbidden direct link", async ({ page }) => {
@@ -375,17 +379,17 @@ test("institution and insurance accounts land on their own modules", async ({ pa
 test("institution retries its own appointment callback dead letter", async ({ page, request }, testInfo) => {
   test.setTimeout(60_000);
   await page.setViewportSize({ width: 390, height: 844 });
-  const citizenToken = await apiLogin(request, "citizen");
-  const hospitalToken = await apiLogin(request, "hospital");
-  const dashboardResponse = await request.get("/api/registrations/dashboard", { headers: { Authorization: `Bearer ${citizenToken}` } });
+  const citizenHeaders = await apiLogin(request, "citizen");
+  const dashboardResponse = await request.get("/api/registrations/dashboard");
   const dashboard = await dashboardResponse.json();
   const schedule = dashboard.schedules.find((item) => item.hospitalCode === "MR1");
   const orderResponse = await request.post("/api/registrations/orders", {
-    headers: { Authorization: `Bearer ${citizenToken}` },
+    headers: citizenHeaders,
     data: { residentId: "r1", scheduleId: schedule.id, visitType: "onsite", reason: "E2E callback remediation" }
   });
   expect(orderResponse.status()).toBe(201);
   const order = await orderResponse.json();
+  const hospitalHeaders = await apiLogin(request, "hospital");
   const callback = (eventType, sequence) => ({
     contractId: "appointment-order-v1",
     idempotencyKey: `e2e-remediation-${order.id}-${sequence}`,
@@ -399,7 +403,7 @@ test("institution retries its own appointment callback dead letter", async ({ pa
   });
   const postCallback = async (payload) => request.post("/api/integration/events", {
     headers: {
-      Authorization: `Bearer ${hospitalToken}`,
+      ...hospitalHeaders,
       "x-integration-signature": integrationSignature(payload)
     },
     data: payload
@@ -440,16 +444,16 @@ test("institution retries its own appointment callback dead letter", async ({ pa
 test("institution assigns and resolves an appointment reconciliation case", async ({ page, request }, testInfo) => {
   test.setTimeout(60_000);
   await page.setViewportSize({ width: 390, height: 844 });
-  const citizenToken = await apiLogin(request, "citizen");
-  const hospitalToken = await apiLogin(request, "hospital");
-  const dashboard = await (await request.get("/api/registrations/dashboard", { headers: { Authorization: `Bearer ${citizenToken}` } })).json();
+  const citizenHeaders = await apiLogin(request, "citizen");
+  const dashboard = await (await request.get("/api/registrations/dashboard")).json();
   const schedule = dashboard.schedules.find((item) => item.hospitalCode === "MR1");
   const orderResponse = await request.post("/api/registrations/orders", {
-    headers: { Authorization: `Bearer ${citizenToken}` },
+    headers: citizenHeaders,
     data: { residentId: "r1", scheduleId: schedule.id, visitType: "onsite", reason: "E2E manual reconciliation" }
   });
   expect(orderResponse.status()).toBe(201);
   const order = await orderResponse.json();
+  const hospitalHeaders = await apiLogin(request, "hospital");
   const callback = {
     contractId: "appointment-order-v1",
     idempotencyKey: `e2e-manual-${order.id}`,
@@ -462,14 +466,14 @@ test("institution assigns and resolves an appointment reconciliation case", asyn
     occurredAt: "2026-07-10T16:30:00.000Z"
   };
   const deadLetterResponse = await request.post("/api/integration/events", {
-    headers: { Authorization: `Bearer ${hospitalToken}`, "x-integration-signature": integrationSignature(callback) },
+    headers: { ...hospitalHeaders, "x-integration-signature": integrationSignature(callback) },
     data: callback
   });
   expect(deadLetterResponse.status()).toBe(202);
   const deadLetter = await deadLetterResponse.json();
   for (let attempt = 1; attempt <= 3; attempt += 1) {
     const retryResponse = await request.post(`/api/registrations/integration-events/${deadLetter.id}/retry`, {
-      headers: { Authorization: `Bearer ${hospitalToken}` },
+      headers: hospitalHeaders,
       data: { note: `E2E exhausted retry ${attempt}` }
     });
     expect(retryResponse.status()).toBe(200);
@@ -507,13 +511,13 @@ test("institution assigns and resolves an appointment reconciliation case", asyn
 test("hospital disruption notice is accepted by the resident on mobile", async ({ page, request }, testInfo) => {
   test.setTimeout(60_000);
   await page.setViewportSize({ width: 390, height: 844 });
-  const citizenToken = await apiLogin(request, "citizen");
-  const dashboard = await (await request.get("/api/registrations/dashboard", { headers: { Authorization: `Bearer ${citizenToken}` } })).json();
+  const citizenHeaders = await apiLogin(request, "citizen");
+  const dashboard = await (await request.get("/api/registrations/dashboard")).json();
   const currentSchedule = dashboard.schedules.find((item) => item.id === "reg-sch-cardio-am");
   const replacementSchedule = dashboard.schedules.find((item) => item.id !== currentSchedule.id && item.hospitalCode === currentSchedule.hospitalCode && item.departmentCode === currentSchedule.departmentCode && item.remaining > 0);
   expect(replacementSchedule).toBeTruthy();
   const orderResponse = await request.post("/api/registrations/orders", {
-    headers: { Authorization: `Bearer ${citizenToken}` },
+    headers: citizenHeaders,
     data: { residentId: "r1", scheduleId: currentSchedule.id, visitType: "onsite", reason: "E2E hospital schedule disruption" }
   });
   expect(orderResponse.status()).toBe(201);
@@ -565,9 +569,7 @@ test("hospital disruption notice is accepted by the resident on mobile", async (
 test("full appointment schedule automatically promotes the first waitlist resident", async ({ page, request }, testInfo) => {
   test.setTimeout(60_000);
   await page.setViewportSize({ width: 390, height: 844 });
-  const loginResponse = await request.post("/api/auth/login", { data: { username: "citizen", password: "123456" } });
-  expect(loginResponse.ok()).toBe(true);
-  const citizenToken = (await loginResponse.json()).token;
+  const citizenHeaders = await apiLogin(request, "citizen");
 
   await login(page, "citizen", "citizen.html");
   await page.goto("/citizen.html?client=app&page=registration#service-registration");
@@ -581,7 +583,7 @@ test("full appointment schedule automatically promotes the first waitlist reside
   await expect(waitingCard).toContainText("当前第 1 位");
 
   const releaseResponse = await request.post("/api/registrations/orders/reg-r4-waitlist-capacity/cancel", {
-    headers: { Authorization: `Bearer ${citizenToken}` },
+    headers: citizenHeaders,
     data: { reason: "E2E cancellation releases the full schedule slot" }
   });
   expect(releaseResponse.status()).toBe(200);

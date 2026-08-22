@@ -1,5 +1,6 @@
 (function () {
   const SESSION_KEY = "health-city-auth-session";
+  const SCRIPT_READABLE_CREDENTIAL_FIELDS = new Set(["token", "accessToken", "refreshToken", "idToken", "bearerToken", "authorization"]);
   const API_BASE = isStaticPreview() ? "" : "/api";
   const DEMO_SMS_CODE = "888888";
   const DELEGATION_SENSITIVE_PERMISSIONS = new Set([
@@ -11,6 +12,7 @@
   const ACCEPTED_STEP_UP_LEVELS = new Set(["aal2", "aal3", "substantial", "high", "l2", "l3"]);
   const DEFAULT_STEP_UP_MAX_AGE_MS = 15 * 60 * 1000;
   let authContextState = API_BASE ? "pending" : "ready";
+  let volatileBearerToken = "";
   document.documentElement?.setAttribute("data-auth-resolved", "pending");
   const pendingStyle = document.createElement?.("style");
   if (pendingStyle && document.head) {
@@ -39,6 +41,58 @@
   ];
 
   const accessPolicy = window.HealthAccessPolicy;
+  if (API_BASE) clearStoredBrowserCredentials();
+
+  function readStoredSession() {
+    const saved = localStorage.getItem(SESSION_KEY);
+    if (!saved) return null;
+    const session = JSON.parse(saved);
+    return session && typeof session === "object" ? session : null;
+  }
+
+  function withoutScriptReadableCredentials(session = {}) {
+    const safe = { ...session };
+    SCRIPT_READABLE_CREDENTIAL_FIELDS.forEach((field) => delete safe[field]);
+    return safe;
+  }
+
+  function persistBrowserSession(session) {
+    localStorage.setItem(SESSION_KEY, JSON.stringify(withoutScriptReadableCredentials(session)));
+  }
+
+  function clearStoredBrowserCredentials() {
+    try {
+      const session = readStoredSession();
+      if (!session) return;
+      const safe = withoutScriptReadableCredentials(session);
+      if (JSON.stringify(safe) !== JSON.stringify(session)) persistBrowserSession(safe);
+    } catch (error) {
+      localStorage.removeItem(SESSION_KEY);
+    }
+  }
+
+  function clearBrowserSession() {
+    volatileBearerToken = "";
+    localStorage.removeItem(SESSION_KEY);
+  }
+
+  async function establishServerSession(payload, authMode) {
+    const bearerOnly = payload.transport === "bearer";
+    volatileBearerToken = bearerOnly ? String(payload.token || "") : "";
+    const session = {
+      ...payload.user,
+      expiresAt: payload.expiresAt,
+      loginAt: new Date().toISOString(),
+      authMode: bearerOnly ? "server-bearer" : authMode
+    };
+    persistBrowserSession(session);
+    const contextResult = await refreshAuthContext({ useBearer: bearerOnly });
+    if (!contextResult.ok) {
+      clearBrowserSession();
+      return { ok: false, message: "授权上下文初始化失败，已阻止进入系统" };
+    }
+    return { ok: true, user: contextResult.user };
+  }
 
   async function login(username, password) {
     if (API_BASE) {
@@ -51,20 +105,7 @@
         });
         const payload = await response.json().catch(() => ({}));
         if (response.ok && payload.ok) {
-          const session = {
-            ...payload.user,
-            token: payload.token,
-            expiresAt: payload.expiresAt,
-            loginAt: new Date().toISOString(),
-            authMode: "server"
-          };
-          localStorage.setItem(SESSION_KEY, JSON.stringify(session));
-          const contextResult = await refreshAuthContext();
-          if (!contextResult.ok) {
-            localStorage.removeItem(SESSION_KEY);
-            return { ok: false, message: "授权上下文初始化失败，已阻止进入系统" };
-          }
-          return { ok: true, user: contextResult.user };
+          return establishServerSession(payload, "server-cookie");
         }
         if (response.status === 401 || response.status === 403) {
           return { ok: false, message: payload.message || "账号或密码不正确" };
@@ -80,7 +121,7 @@
     const session = sanitizeUser(user);
     session.loginAt = new Date().toISOString();
     session.authMode = "local";
-    localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+    persistBrowserSession(session);
     return { ok: true, user: session };
   }
 
@@ -97,20 +138,7 @@
         });
         const payload = await response.json().catch(() => ({}));
         if (response.ok && payload.ok) {
-          const session = {
-            ...payload.user,
-            token: payload.token,
-            expiresAt: payload.expiresAt,
-            loginAt: new Date().toISOString(),
-            authMode: "server-phone"
-          };
-          localStorage.setItem(SESSION_KEY, JSON.stringify(session));
-          const contextResult = await refreshAuthContext();
-          if (!contextResult.ok) {
-            localStorage.removeItem(SESSION_KEY);
-            return { ok: false, message: "授权上下文初始化失败，已阻止进入系统" };
-          }
-          return { ok: true, user: contextResult.user };
+          return establishServerSession(payload, "server-cookie-phone");
         }
         if (response.status === 401 || response.status === 403 || response.status === 404 || response.status === 423) {
           return { ok: false, message: payload.message || "手机号或验证码不正确" };
@@ -126,7 +154,7 @@
     const session = sanitizeUser(user);
     session.loginAt = new Date().toISOString();
     session.authMode = "local-phone";
-    localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+    persistBrowserSession(session);
     return { ok: true, user: session };
   }
 
@@ -288,8 +316,7 @@
 
   function getUser() {
     try {
-      const saved = localStorage.getItem(SESSION_KEY);
-      const user = saved ? JSON.parse(saved) : null;
+      const user = readStoredSession();
       return user && window.HealthRegionalContext ? window.HealthRegionalContext.localize(user) : user;
     } catch (error) {
       return null;
@@ -297,7 +324,7 @@
   }
 
   function getToken() {
-    return getUser()?.token || "";
+    return API_BASE ? volatileBearerToken : "";
   }
 
   function readCookie(name) {
@@ -327,15 +354,28 @@
     });
   }
 
-  async function refreshAuthContext() {
+  async function refreshAuthContext(options = {}) {
     if (!API_BASE) return { ok: true, user: getUser(), source: "demo" };
+    const useBearer = options.useBearer === true && Boolean(volatileBearerToken);
+    if (!useBearer) {
+      volatileBearerToken = "";
+      clearStoredBrowserCredentials();
+    }
     try {
       // Context hydration intentionally relies on the HttpOnly browser session.
       // A stale legacy bearer in localStorage must never override a valid cookie.
-      const response = await fetch(`${API_BASE}/auth/context`, { method: "GET", credentials: "same-origin" });
+      const response = useBearer
+        ? await authFetch(`${API_BASE}/auth/context`, { method: "GET" })
+        : await fetch(`${API_BASE}/auth/context`, { method: "GET", credentials: "same-origin" });
       const payload = await response.json().catch(() => ({}));
-      if (!response.ok || !payload.ok || !payload.user) return { ok: false, status: response.status };
+      if (!response.ok || !payload.ok || !payload.user) {
+        authContextState = "failed";
+        clearBrowserSession();
+        return { ok: false, status: response.status };
+      }
       if (![payload.permissions, payload.regionalCapabilities, payload.pages, payload.menus].every(Array.isArray)) {
+        authContextState = "failed";
+        clearBrowserSession();
         return { ok: false, status: response.status, reason: "INVALID_AUTH_CONTEXT" };
       }
       const previous = getUser() || {};
@@ -351,16 +391,16 @@
         productionReady: payload.productionReady === true,
         expiresAt: payload.expiresAt || payload.user.expiresAt || previous.expiresAt,
         authContextVersion: payload.version || payload.schemaVersion || "auth-context-v1",
-        authMode: "server-cookie"
+        authMode: useBearer ? "server-bearer" : "server-cookie"
       };
       // The context endpoint upgrades the browser to the HttpOnly cookie session.
       // Do not keep a script-readable bearer token after that hand-off.
-      delete session.token;
-      localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+      persistBrowserSession(session);
       authContextState = "ready";
       return { ok: true, user: session, source: "server" };
     } catch (error) {
       authContextState = "failed";
+      clearBrowserSession();
       return { ok: false, status: 0 };
     }
   }
@@ -373,7 +413,7 @@
         // Local session state must still be cleared when the server is unavailable.
       }
     }
-    localStorage.removeItem(SESSION_KEY);
+    clearBrowserSession();
     window.location.href = localHref("login.html");
   }
 
@@ -393,7 +433,7 @@
       return false;
     }
     if (user.expiresAt && new Date(user.expiresAt).getTime() < Date.now()) {
-      localStorage.removeItem(SESSION_KEY);
+      clearBrowserSession();
       window.location.replace(`${localHref("login.html")}?redirect=${encodeURIComponent(currentPage())}&expired=1`);
       return false;
     }
@@ -484,7 +524,7 @@
       const contextResult = await refreshAuthContext();
       if (!contextResult.ok) {
         authContextState = "failed";
-        localStorage.removeItem(SESSION_KEY);
+        clearBrowserSession();
       }
     }
     if (!enforceCurrentPageAccess()) return false;

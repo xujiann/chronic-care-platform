@@ -82,9 +82,9 @@ test("auth client initializes the server authorization context before navigation
   assert.match(source, /HealthAccessPolicy/);
   assert.match(source, /pageName\.endsWith\("\.html"\) && !canAccessPage/);
   assert.doesNotMatch(source, /return !allowed \|\| allowed\.includes/);
-  const contextBody = source.slice(source.indexOf("async function refreshAuthContext()"), source.indexOf("async function logout()"));
-  assert.match(contextBody, /fetch\(`\$\{API_BASE\}\/auth\/context`, \{ method: "GET", credentials: "same-origin" \}\)/);
-  assert.doesNotMatch(contextBody, /authFetch\(/);
+  const contextBody = source.slice(source.indexOf("async function refreshAuthContext("), source.indexOf("async function logout()"));
+  assert.match(contextBody, /if \(!useBearer\) \{[\s\S]*?clearStoredBrowserCredentials\(\)/);
+  assert.match(contextBody, /: await fetch\(`\$\{API_BASE\}\/auth\/context`, \{ method: "GET", credentials: "same-origin" \}\)/);
 });
 
 test("cookie-only protected pages hydrate context before the fail-closed access decision", () => {
@@ -94,7 +94,7 @@ test("cookie-only protected pages hydrate context before the fail-closed access 
   const initializer = source.slice(start, end);
   assert.ok(start >= 0 && end > start);
   assert.ok(initializer.indexOf("await refreshAuthContext()") < initializer.indexOf("enforceCurrentPageAccess()"));
-  assert.match(initializer, /if \(!contextResult\.ok\) \{[\s\S]*?localStorage\.removeItem\(SESSION_KEY\)/);
+  assert.match(initializer, /if \(!contextResult\.ok\) \{[\s\S]*?clearBrowserSession\(\)/);
   assert.doesNotMatch(source.slice(source.indexOf("window.HealthCityAuth =")), /\n\s*enforceCurrentPageAccess\(\);/);
   assert.match(source, /every\(Array\.isArray\)/);
   assert.match(source, /reason: "INVALID_AUTH_CONTEXT"/);
@@ -130,6 +130,7 @@ test("cookie sessions always call server logout and discard script-readable bear
   assert.match(logout, /if \(API_BASE\)/);
   assert.match(logout, /await authFetch\(`\$\{API_BASE\}\/auth\/logout`/);
   assert.doesNotMatch(logout, /user\?\.token|user\.token/);
-  assert.match(source, /delete session\.token/);
+  assert.match(source, /SCRIPT_READABLE_CREDENTIAL_FIELDS\.forEach\(\(field\) => delete safe\[field\]\)/);
+  assert.doesNotMatch(source, /token:\s*payload\.token/);
   assert.match(read("login.js"), /if \(auth\.getUser\(\)\) \{[\s\S]*?auth\.refreshAuthContext\(\)/);
 });
