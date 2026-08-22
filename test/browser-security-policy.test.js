@@ -12,6 +12,7 @@ const {
   loadBrowserSecurityPolicy
 } = require("../src/http/browser-security-policy");
 const {
+  riskBaselineFromInventory,
   scanBrowserSecurityInventory,
   verifyBrowserSecurityInventory
 } = require("../src/http/browser-security-inventory");
@@ -54,22 +55,40 @@ test("central browser header port keeps the target CSP report-only and productio
   ]);
 });
 
-test("published browser assets match the governed inline and eval risk baseline", () => {
+test("published browser assets match the exact Inventory v2 fail-closed baseline", () => {
   const policy = loadBrowserSecurityPolicy();
   const assets = collectPublicAssets(ROOT, loadStaticPublicationContract());
   const inventory = scanBrowserSecurityInventory({ root: ROOT, assets });
   const verification = verifyBrowserSecurityInventory(inventory, policy.riskBaseline);
 
   assert.equal(verification.ok, true);
-  assert.equal(inventory.summary.total, 0);
-  assert.equal(inventory.summary.byPriority.P0, 0);
-  assert.equal(inventory.summary.byPriority.P1, 0);
+  assert.equal(inventory.schemaVersion, 2);
+  assert.equal(inventory.contractId, "browser-security-risk-inventory.v2");
+  assert.equal(inventory.summary.total, 1013);
+  assert.equal(inventory.summary.byPriority.P0, 965);
+  assert.equal(inventory.summary.byPriority.P1, 48);
   assert.equal(inventory.summary.byPriority.P2, 0);
+  assert.equal(inventory.findings.length, 92);
   assert.equal(inventory.summary.byType["inline-script"], 0);
   assert.equal(inventory.summary.byType["inline-style-block"], 0);
   assert.equal(inventory.summary.byType["style-attribute"], 0);
   assert.equal(inventory.summary.byType["event-handler"], 0);
   assert.equal(inventory.summary.byType["eval-call"], 0);
+  assert.equal(inventory.summary.byType["dom-inner-html"], 891);
+  assert.equal(inventory.summary.byType["dom-insert-adjacent-html"], 5);
+  assert.equal(inventory.summary.byType["dynamic-html-url-attribute"], 31);
+  assert.equal(inventory.summary.byType["dom-url-property"], 24);
+  assert.equal(inventory.summary.byType["dom-url-attribute"], 2);
+  assert.equal(inventory.summary.byType["navigation-call"], 12);
+  assert.equal(inventory.summary.byType["dynamic-html-style-attribute"], 31);
+  assert.equal(inventory.summary.byType["cssom-property-mutation"], 14);
+  assert.equal(inventory.summary.byType["cssom-set-property"], 2);
+  assert.equal(inventory.summary.byType["runtime-style-element"], 1);
+  assert.equal(new Set(inventory.findings.filter((item) => ["dom-inner-html", "dom-insert-adjacent-html"].includes(item.type)).map((item) => item.asset)).size, 44);
+  assert.equal(new Set(inventory.findings.filter((item) => ["dynamic-html-style-attribute", "cssom-property-mutation", "cssom-set-property", "runtime-style-element"].includes(item.type)).map((item) => item.asset)).size, 15);
+  assert.equal(new Set(inventory.findings.filter((item) => ["dynamic-html-url-attribute", "dom-url-property", "dom-url-attribute", "navigation-call"].includes(item.type)).map((item) => item.asset)).size, 18);
+  assert.equal(policy.riskBaseline.schemaVersion, 2);
+  assert.equal(policy.riskBaseline.findings.reduce((sum, item) => sum + item.count, 0), 1013);
   assert.equal(inventory.riskTypes["event-handler"].priority, "P0");
   assert.equal(inventory.riskTypes["eval-call"].priority, "P0");
   assert.equal(policy.productionReady, false);
@@ -83,10 +102,18 @@ test("inventory verification fails closed on a newly introduced high-risk browse
       "<button onclick=\"runUnsafe()\" style=\"display:block\">open</button>",
       "<script>eval('runUnsafe()')</script>"
     ].join("\n"));
-    fs.writeFileSync(path.join(temporaryRoot, "unsafe.js"), "eval('x'); new Function('x'); setTimeout('x', 1);");
+    fs.writeFileSync(path.join(temporaryRoot, "unsafe.js"), [
+      "eval('x'); new Function('x'); setTimeout('x', 1);",
+      "node.innerHTML = payload; node.insertAdjacentHTML('beforeend', payload); node.outerHTML = payload;",
+      "document.write(payload); range.createContextualFragment(payload); frame.srcdoc = payload;",
+      "node.setAttribute('onclick', payload);",
+      "const markup = `<a href=\"${url}\" style=\"color:${color}\">open</a>`;",
+      "link.href = url; link.setAttribute('src', url); window.open(url);",
+      "node.style.color = color; node.style.setProperty('--tone', color); document.createElement('style');"
+    ].join("\n"));
     const inventory = scanBrowserSecurityInventory({ root: temporaryRoot, assets: ["index.html", "unsafe.js"] });
     const verification = verifyBrowserSecurityInventory(inventory, {
-      schemaVersion: 1,
+      schemaVersion: 2,
       sourceRevision: "synthetic-empty-baseline",
       failClosedPriorities: ["P0", "P1"],
       findings: []
@@ -100,8 +127,51 @@ test("inventory verification fails closed on a newly introduced high-risk browse
       "style-attribute",
       "eval-call",
       "function-constructor",
-      "string-timer"
+      "string-timer",
+      "dom-inner-html",
+      "dom-insert-adjacent-html",
+      "dom-outer-html",
+      "dom-document-write",
+      "dom-contextual-fragment",
+      "dom-srcdoc",
+      "dom-event-attribute",
+      "dynamic-html-url-attribute",
+      "dom-url-property",
+      "dom-url-attribute",
+      "navigation-call",
+      "dynamic-html-style-attribute",
+      "cssom-property-mutation",
+      "cssom-set-property",
+      "runtime-style-element"
     ]));
+  } finally {
+    fs.rmSync(temporaryRoot, { recursive: true, force: true });
+  }
+});
+
+test("Inventory v2 rejects same-count sink replacement and count growth", () => {
+  const temporaryRoot = fs.mkdtempSync(path.join(os.tmpdir(), "browser-security-drift-"));
+  try {
+    const asset = path.join(temporaryRoot, "app.js");
+    fs.writeFileSync(asset, "panel.innerHTML = trustedMarkup;\n");
+    const baselineInventory = scanBrowserSecurityInventory({ root: temporaryRoot, assets: ["app.js"] });
+    const baseline = riskBaselineFromInventory(baselineInventory, "synthetic-v2");
+
+    fs.writeFileSync(asset, "panel.innerHTML = unreviewedMarkup;\n");
+    const replacement = verifyBrowserSecurityInventory(
+      scanBrowserSecurityInventory({ root: temporaryRoot, assets: ["app.js"] }),
+      baseline
+    );
+    assert.equal(replacement.ok, false);
+    assert.equal(replacement.violations[0].count, 1);
+
+    fs.writeFileSync(asset, "panel.innerHTML = trustedMarkup;\nother.innerHTML = payload;\n");
+    const growth = verifyBrowserSecurityInventory(
+      scanBrowserSecurityInventory({ root: temporaryRoot, assets: ["app.js"] }),
+      baseline
+    );
+    assert.equal(growth.ok, false);
+    assert.equal(growth.violations[0].count, 2);
   } finally {
     fs.rmSync(temporaryRoot, { recursive: true, force: true });
   }
@@ -113,6 +183,7 @@ test("CI and static publication keep the browser security gate wired", () => {
   const publication = JSON.parse(fs.readFileSync(path.join(ROOT, "config", "static-publication.json"), "utf8"));
 
   assert.equal(packageJson.scripts["security:browser:verify"], "node scripts/browser-security-inventory.js verify");
+  assert.match(ci, /Verify static publication boundary and Browser Inventory v2/);
   assert.match(ci, /npm run security:browser:verify/);
   assert.equal(publication.seedAssets.includes("browser-security-policy.json"), true);
 });

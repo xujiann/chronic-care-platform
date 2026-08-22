@@ -87,9 +87,10 @@ erDiagram
 生产实际读写，process owner 也不能推断数据 owner；189 个集合均禁止生产写入和晋升。
 
 根目录 `browser-security-policy.json` 是公开的静态发布/响应头治理合同，不是业务集合、数据库
-Schema、生产事实或安全评估证据。其风险基线只保存公开资产路径、风险类型、优先级、数量和规范化
-片段 SHA-256，不保存页面正文、用户数据、CSP 上报、Cookie 或凭据。新增高风险会使构建失败；风险
-减少需在评审后更新合同，但不产生 migration 或数据 Owner 变化。
+Schema、生产事实或安全评估证据。Inventory v2 风险基线只保存公开资产路径、风险类型、优先级、
+精确 occurrence 数量和规范化源行聚合 SHA-256，不保存页面正文、用户数据、CSP 上报、Cookie 或
+凭据。新增、替换或数量漂移会使构建失败；风险减少需在评审后更新合同，但不产生 migration 或
+数据 Owner 变化。
 
 `followups` 继续由 citizen-chronic/T04 拥有；随访事件 outbox、inbox、projection 和 receipt
 仍嵌在该聚合的 `domainRuntime` 中。本切片只增加安全 publisher 端口，没有新集合、DDL、

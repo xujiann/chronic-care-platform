@@ -21,7 +21,7 @@ function loadBrowserSecurityPolicy(file = DEFAULT_POLICY_FILE) {
   if (/unsafe-eval/.test(compatibilityCsp)) throw new Error("Compatibility CSP cannot allow eval execution");
   if (!/script-src-attr 'none'/.test(compatibilityCsp)) throw new Error("Compatibility CSP must reject inline event handlers");
   if (!policy.productionHsts || !/^max-age=\d+/.test(policy.productionHsts)) throw new Error("Production HSTS policy is required");
-  if (policy.riskBaseline?.schemaVersion !== 1 || !Array.isArray(policy.riskBaseline.findings)) {
+  if (policy.riskBaseline?.schemaVersion !== 2 || !Array.isArray(policy.riskBaseline.findings)) {
     throw new Error("Browser security risk baseline is required");
   }
   if (policy.productionReady !== false || policy.staticHosting?.productionReady !== false) {
