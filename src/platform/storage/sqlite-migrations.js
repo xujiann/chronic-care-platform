@@ -2,6 +2,11 @@
 
 const { createHash } = require("node:crypto");
 const { createSqliteSessionSchema } = require("../../../session-store");
+const {
+  auditDeliverySourceMigrationFingerprintDependencies,
+  backfillAuditDeliverySourceFromCollections,
+  createAuditDeliverySourceSchema
+} = require("../../identity-security/audit-delivery-source");
 
 const MIGRATION_OWNER = "T00/data-governance";
 const FROZEN_LEGACY_MAX_VERSION = 14;
@@ -543,6 +548,19 @@ const MIGRATION_DEFINITIONS = [
           updated_at TEXT NOT NULL
         );
       `);
+    }
+  },
+  {
+    version: 15,
+    name: "add append-only continuous audit delivery source",
+    fingerprintDependencies: [
+      createAuditDeliverySourceSchema,
+      backfillAuditDeliverySourceFromCollections,
+      ...auditDeliverySourceMigrationFingerprintDependencies
+    ],
+    apply(db) {
+      createAuditDeliverySourceSchema(db);
+      backfillAuditDeliverySourceFromCollections(db);
     }
   }
 ].map((migration) => ({ ...migration, owner: MIGRATION_OWNER }));

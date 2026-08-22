@@ -6,6 +6,7 @@ const test = require("node:test");
 const { buildReleaseReport, parseArgs, renderCutoverMarkdown, renderMarkdown, renderServiceAcceptanceMarkdown, renderStorageModelMarkdown, validateProductionConfig, writeOutput } = require("../scripts/release-report");
 
 const ROOT = path.resolve(__dirname, "..");
+const EXTERNAL_TEST_ROOT = path.join(path.parse(ROOT).root, "health-data");
 
 test("release report validates demo and production environment profiles", () => {
   const demo = validateProductionConfig({
@@ -19,6 +20,19 @@ test("release report validates demo and production environment profiles", () => 
   });
   assert.equal(demo.passed, true);
   assert.equal(demo.checks.some((item) => item.name === "env:SESSION_SECRETS.productionQuality" && item.severity === "warn"), true);
+
+  const appendOnlySource = validateProductionConfig({
+    profile: "demo",
+    env: {
+      NODE_ENV: "staging",
+      AUDIT_WORM_DIRECTORY: path.join(EXTERNAL_TEST_ROOT, "audit-worm"),
+      AUDIT_DELIVERY_CHECKPOINT_PATH: path.join(EXTERNAL_TEST_ROOT, "audit-state", "checkpoint.json"),
+      AUDIT_DELIVERY_SOURCE_CONTRACT: "append-only-audit-source-v2",
+      AUDIT_DELIVERY_SERVICE_USER: "health-audit",
+      AUDIT_DELIVERY_SERVICE_GROUP: "health-audit"
+    }
+  });
+  assert.equal(appendOnlySource.checks.some((item) => item.name === "env:AUDIT_DELIVERY.activation" && item.passed), true);
 
   const failedProduction = validateProductionConfig({
     profile: "production",
@@ -494,7 +508,7 @@ test("release report summarizes repository readiness and renders markdown", () =
   assert.equal(report.checks.some((item) => item.name === "productionDb:migrationPackage" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "productionDb:migrationBoundary" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "productionDb:sqliteMigrationRegistry" && item.passed), true);
-  assert.equal(report.productionDbReadiness.sqliteMigrationRegistry.head, 14);
+  assert.equal(report.productionDbReadiness.sqliteMigrationRegistry.head, 15);
   assert.equal(report.productionDbReadiness.postgresMigrationPackage.manifest.mode, "manifest");
   assert.equal(report.checks.some((item) => item.name === "productionDb:transactionalOutbox" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "productionDb:idempotentWorker" && item.passed), true);

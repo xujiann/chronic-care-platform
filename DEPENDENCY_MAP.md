@@ -110,7 +110,7 @@ JSON 源快照仍是高扇出依赖，但浏览器和 Pages 只依赖经统一�
 | OIDC/SMS | T01 identity-security | provider 可用性、绑定、重放、回调验签及共享 OTP/限流/锁定状态 |
 | HAPI FHIR/Orthanc/OHIF | Solution A、clinical | 容器版本、认证、DICOM/FHIR 兼容 |
 | 对象存储 | `secure-object-storage.js`（T00 共享端口）→ T08 现有附件 caller → 厂商中立网关 | 生产缺 v1 合同、独立响应密钥、精确上传/下载 Origin、响应签名/时间窗/请求对象绑定或显式扫描/生命周期回执即失败关闭；附件元数据达到 500 条时也在网关调用前失败关闭并保留全部既有行；真实桶/KMS/WORM/扫描/备份/容量、无损分页和外部调用—本地写入对账仍阻断上线 |
-| 连续审计 | `state_collections` 展示快照 → `audit-delivery-worker` → SIEM 或 filesystem rehearsal WORM；失败复用 cutover alert journal 与 systemd journal | 部署依赖闭包和启动前检查已显式；当前快照只有 120 条窗口且重封，不能作为无损 source，SIEM receipt、target/checkpoint binding、外部单调锚与真实 WORM capability 仍阻断生产 |
+| 连续审计 | `server.js` SQLite 事务 → `audit_delivery_source_events` → source repository/cursor → `audit-delivery-worker` → SIEM 或 filesystem rehearsal WORM | v15 append-only source、最小投影、批次 source binding 和 checkpoint v3 已显式；可信 SIEM receipt、外部单调锚与真实 WORM/KMS capability 仍阻断生产 |
 | GitHub Actions/Pages | CI 与静态站 | 分支保护、制品、外部 5xx |
 
 ## 7. 后台任务
@@ -119,7 +119,7 @@ JSON 源快照仍是高扇出依赖，但浏览器和 Pages 只依赖经统一�
 - systemd：PostgreSQL sync/reconcile、platform shadow relay/reconcile、care outbox worker。
 - 领域 worker：referral delivery、emergency signal、insurance payment、public health 等。
 - 平台事件：通用 pending outbox publish runtime。
-- 连续审计：独立 oneshot + timer 已进入部署合同；生产 preflight 在 append-only outbox、可信 receipt 与外部 anchor 未完成时拒绝启动。
+- 连续审计：独立 oneshot + timer 已进入部署合同；`append-only-audit-source-v2` 的仓库内 continuity 已实现，生产仍因可信 receipt、外部 anchor、真实 WORM 与现场证据拒绝解锁。
 - 慢病随访：T04 当前仅有受权 HTTP dispatch；生产依赖 T04 自有签名 HTTPS publisher 和独立
   activation verifier，未在 T00 组合根注入 verifier 时默认失败关闭。机构范围 allowlist、
   前置授权审计门禁、publisher 私有 receipt capability 和结果审计均位于该调用链；非生产可用

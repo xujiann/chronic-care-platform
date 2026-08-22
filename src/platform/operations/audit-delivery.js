@@ -10,6 +10,7 @@ const { appendPilotCutoverAlertEvent } = require("../cutover/pilot-cutover-alert
 const MAX_RECEIPT_BYTES = 64 * 1024;
 const MAX_TLS_FILE_BYTES = 2 * 1024 * 1024;
 const SAFE_BATCH_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$/;
+const APPEND_ONLY_SOURCE_CONTRACT = "append-only-audit-source-v2";
 
 function stableStringify(value) {
   if (Array.isArray(value)) return `[${value.map(stableStringify).join(",")}]`;
@@ -25,13 +26,36 @@ function deliveryError(code, message, retryable = false) {
   return Object.assign(new Error(message), { code, retryable });
 }
 
+function normalizeSourceBinding(value) {
+  if (!value) return null;
+  const startCursor = Number(value.startCursor);
+  const endCursor = Number(value.endCursor);
+  const sourceHeadHash = String(value.sourceHeadHash || "").trim().toLowerCase();
+  if (value.contract !== APPEND_ONLY_SOURCE_CONTRACT
+    || !Number.isSafeInteger(startCursor)
+    || startCursor < 1
+    || !Number.isSafeInteger(endCursor)
+    || endCursor < startCursor
+    || !/^[a-f0-9]{64}$/.test(sourceHeadHash)) {
+    throw deliveryError("AUDIT_SOURCE_BINDING_INVALID", "audit delivery source binding is invalid");
+  }
+  return Object.freeze({
+    contract: APPEND_ONLY_SOURCE_CONTRACT,
+    startCursor,
+    endCursor,
+    sourceHeadHash
+  });
+}
+
 function buildAuditBatch(records = [], options = {}) {
   const normalized = records.map((item) => ({ trail: String(item.trail || ""), record: item.record }));
-  const payload = stableStringify({ schemaVersion: "audit-delivery-v1", records: normalized });
+  const source = normalizeSourceBinding(options.sourceBinding);
+  const schemaVersion = source ? "audit-delivery-v2" : "audit-delivery-v1";
+  const payload = stableStringify({ schemaVersion, ...(source ? { source } : {}), records: normalized });
   const digest = sha256(payload);
   const batchId = options.batchId || `audit-${digest.slice(0, 32)}`;
   if (!SAFE_BATCH_ID.test(batchId)) throw deliveryError("AUDIT_BATCH_ID_INVALID", "audit batch id is invalid");
-  return Object.freeze({ schemaVersion: "audit-delivery-v1", batchId, createdAt: options.createdAt || new Date().toISOString(), recordCount: normalized.length, payload, digest });
+  return Object.freeze({ schemaVersion, batchId, createdAt: options.createdAt || new Date().toISOString(), recordCount: normalized.length, payload, digest, ...(source ? { source } : {}) });
 }
 
 function assertTlsVerification(env = {}) {
@@ -119,7 +143,7 @@ function fsyncDirectory(directory) {
 }
 
 function immutableWormProjection(value) {
-  return { schemaVersion: value.schemaVersion, batchId: value.batchId, recordCount: value.recordCount, digest: value.digest, records: value.records };
+  return { schemaVersion: value.schemaVersion, batchId: value.batchId, recordCount: value.recordCount, digest: value.digest, ...(value.source ? { source: value.source } : {}), records: value.records };
 }
 
 function createWormAuditAdapter(options = {}) {
@@ -133,7 +157,8 @@ function createWormAuditAdapter(options = {}) {
       fs.mkdirSync(directory, { recursive: true, mode: 0o700 });
       assertSecureDirectory(directory);
       const target = path.join(directory, `${batch.batchId}.json`);
-      const bodyValue = { schemaVersion: batch.schemaVersion, batchId: batch.batchId, createdAt: batch.createdAt, recordCount: batch.recordCount, digest: batch.digest, records: JSON.parse(batch.payload).records };
+      const payload = JSON.parse(batch.payload);
+      const bodyValue = { schemaVersion: batch.schemaVersion, batchId: batch.batchId, createdAt: batch.createdAt, recordCount: batch.recordCount, digest: batch.digest, ...(payload.source ? { source: payload.source } : {}), records: payload.records };
       try {
         const descriptor = fs.openSync(target, "wx", 0o400);
         try { fs.writeFileSync(descriptor, `${JSON.stringify(bodyValue)}\n`, "utf8"); fs.fsyncSync(descriptor); } finally { fs.closeSync(descriptor); }
@@ -311,8 +336,8 @@ function assessAuditDeliveryConfig(env = {}, options = {}) {
     { id: "audit-delivery:process-identity", passed: processIdentityReady },
     { id: "audit-delivery:tls-verification", passed: tlsVerified },
     { id: "audit-delivery:source-continuity", passed: production
-      ? sourceContract === "append-only-outbox-v2" && options.sourceContinuityImplemented === true
-      : sourceContract === "snapshot-rehearsal-v1" || (sourceContract === "append-only-outbox-v2" && options.sourceContinuityImplemented === true) }
+      ? sourceContract === APPEND_ONLY_SOURCE_CONTRACT && options.sourceContinuityImplemented === true
+      : sourceContract === "snapshot-rehearsal-v1" || (sourceContract === APPEND_ONLY_SOURCE_CONTRACT && options.sourceContinuityImplemented === true) }
   ];
   if (endpoint) checks.push(
     { id: "audit-delivery:siem-url", passed: validSiemEndpoint(endpoint) },

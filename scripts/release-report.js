@@ -281,7 +281,10 @@ function validateProductionConfig(options = {}) {
     env.ALERT_WEBHOOK_URL ? env.ALERT_WEBHOOK_SECRET || env.ALERTING_SIGNING_SECRET : ""
   ].filter((_, index) => index === 0 ? Boolean(env.SIEM_ENDPOINT) : Boolean(env.ALERT_WEBHOOK_URL));
   const configuredAlertInputs = alertRouting.routes.filter((item) => item.endpointConfigured);
-  const auditDeliveryAssessment = assessAuditDeliveryConfig(env, { root: ROOT });
+  const auditDeliveryAssessment = assessAuditDeliveryConfig(env, {
+    root: ROOT,
+    sourceContinuityImplemented: env.AUDIT_DELIVERY_SOURCE_CONTRACT === "append-only-audit-source-v2"
+  });
 
   const checks = [
     check("env:file", envFileExists, envFileExists ? envFile : `${envFile} missing`, strict ? "error" : "warn", "environment"),

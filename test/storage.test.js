@@ -3,6 +3,7 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const test = require("node:test");
+const { auditHashFor } = require("../src/identity-security/audit-chain");
 
 const ROOT = path.resolve(__dirname, "..");
 let sqliteAvailable = true;
@@ -21,6 +22,16 @@ function withDatabase(storage, callback) {
   }
 }
 
+function sealAuditRows(rows) {
+  let previousAuditHash = "";
+  return rows.slice().reverse().map((row) => {
+    const item = { ...row, previousAuditHash };
+    item.auditHash = auditHashFor(item);
+    previousAuditHash = item.auditHash;
+    return item;
+  }).reverse();
+}
+
 test("SQLite migrations are idempotent and collection versions change only on writes", { skip: !sqliteAvailable }, () => {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "health-platform-storage-"));
   fs.copyFileSync(path.join(ROOT, "data", "db.json"), path.join(dataDir, "db.json"));
@@ -34,7 +45,7 @@ test("SQLite migrations are idempotent and collection versions change only on wr
 
     withDatabase(storage, (db) => {
       const migrations = db.prepare("SELECT version, name, checksum FROM schema_migrations ORDER BY version").all();
-      assert.deepEqual(migrations.map((item) => Number(item.version)), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]);
+      assert.deepEqual(migrations.map((item) => Number(item.version)), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]);
       assert.ok(migrations.every((item) => item.name && /^[a-f0-9]{64}$/.test(item.checksum)));
 
       const columns = db.prepare("PRAGMA table_info(state_collections)").all().map((item) => item.name);
@@ -73,6 +84,12 @@ test("SQLite migrations are idempotent and collection versions change only on wr
       ].forEach((tableName) => {
         assert.ok(tableNames.includes(tableName), `${tableName} mirror table should exist`);
       });
+      const auditSourceBaseline = db.prepare(`
+        SELECT COUNT(*) AS total, SUM(historical_baseline) AS baseline
+        FROM audit_delivery_source_events
+      `).get();
+      assert.equal(Number(auditSourceBaseline.total) > 0, true);
+      assert.equal(Number(auditSourceBaseline.baseline), Number(auditSourceBaseline.total));
     });
 
     const currentState = storage.readDatabase();
@@ -232,8 +249,43 @@ test("SQLite migrations are idempotent and collection versions change only on wr
       orphanServiceState.careOrders[0].residentId = "missing-resident";
       storage.writeDatabase(orphanServiceState);
     }, /FOREIGN KEY constraint failed/);
+
+    const atomicAuditState = storage.readDatabase();
+    const originalSecondResident = {
+      idCard: atomicAuditState.residents[1].idCard,
+      phone: atomicAuditState.residents[1].phone
+    };
+    atomicAuditState.securityEvents = sealAuditRows([{
+      id: "audit-source-transaction-hook-test",
+      at: "2026-08-22T03:00:00.000Z",
+      action: "test-transaction-hook",
+      result: "allowed",
+      role: "test-role",
+      actor: "test-actor",
+      target: "test-target"
+    }, ...atomicAuditState.securityEvents]);
+    atomicAuditState.residents[1].idCard = atomicAuditState.residents[0].idCard;
+    atomicAuditState.residents[1].phone = atomicAuditState.residents[0].phone;
+    assert.throws(() => storage.writeDatabase(atomicAuditState), /UNIQUE constraint failed/);
+    withDatabase(storage, (db) => {
+      assert.equal(
+        db.prepare("SELECT sequence FROM audit_delivery_source_events WHERE source_event_id = ?")
+          .get("audit-source-transaction-hook-test"),
+        undefined,
+        "a later state-write failure must roll back the audit source append"
+      );
+    });
+    atomicAuditState.residents[1].idCard = originalSecondResident.idCard;
+    atomicAuditState.residents[1].phone = originalSecondResident.phone;
+    storage.writeDatabase(atomicAuditState);
+    withDatabase(storage, (db) => {
+      const source = db.prepare("SELECT historical_baseline FROM audit_delivery_source_events WHERE source_event_id = ?")
+        .get("audit-source-transaction-hook-test");
+      assert.equal(Number(source.historical_baseline), 0);
+    });
+
     const meta = storage.storageMeta();
-    assert.equal(meta.schemaVersion, 14);
+    assert.equal(meta.schemaVersion, 15);
     assert.equal(meta.postgresSync.reconciliation.status, "never");
     assert.equal(meta.postgresSync.reconciliation.cases.unresolved, 0);
     assert.deepEqual(meta.sqliteProfile, {

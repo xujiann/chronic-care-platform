@@ -11,7 +11,7 @@
   "runtime": {
     "serverFile": "server.js",
     "maximumServerLines": 28750,
-    "maximumServerRequires": 128,
+    "maximumServerRequires": 129,
     "requiredCompositionModules": [
       "src/http/platform-runtime-composition.js",
       "src/http/platform-request-handler.js",

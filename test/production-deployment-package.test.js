@@ -36,6 +36,7 @@ test("production deployment package hashes runtime files without persisting secr
       "scripts/audit-delivery-preflight.js",
       "src/platform/operations/audit-delivery.js",
       "src/identity-security/audit-chain.js",
+      "src/identity-security/audit-delivery-source.js",
       "src/platform/cutover/pilot-cutover-alert-lifecycle.js",
       "src/platform/governance/technical-evidence.js",
       "deploy/audit-delivery-worker.service.template",
@@ -49,6 +50,11 @@ test("production deployment package hashes runtime files without persisting secr
     assert.equal(manifest.secretContract.variables.some((item) => item.name === "OBJECT_STORAGE_RECEIPT_SIGNING_SECRET" && item.purpose === "object storage gateway response verification"), true);
     assert.equal(manifest.secretContract.variables.some((item) => item.name === "SIEM_AUDIT_SIGNING_SECRET" && item.purpose === "continuous audit request signing"), true);
     assert.equal(manifest.processContract.backgroundJobs.some((item) => item.id === "continuous-audit-delivery" && item.productionReady === false && item.preflight === "npm run audit:delivery:preflight"), true);
+    assert.equal(manifest.processContract.backgroundJobs.find((item) => item.id === "continuous-audit-delivery").sourceContract, "append-only-audit-source-v2");
+    assert.match(
+      fs.readFileSync(path.join(ROOT, "deploy", "platform-production-adapters.env.template"), "utf8"),
+      /^AUDIT_DELIVERY_SOURCE_CONTRACT=append-only-audit-source-v2$/m
+    );
     assert.equal(manifest.processContract.backgroundJobs.some((item) => item.id === "continuous-audit-delivery" && item.configurationTemplate === "deploy/platform-production-adapters.env.template" && item.configurationVariables.includes("AUDIT_DELIVERY_SOURCE_CONTRACT") && item.configurationVariables.includes("AUDIT_DELIVERY_SERVICE_UID") && item.configurationVariables.includes("AUDIT_DELIVERY_SERVICE_GID") && item.configurationVariables.includes("PLATFORM_PILOT_CUTOVER_ALERT_JOURNAL_FILE")), true);
     assert.equal(manifest.processContract.healthChecks.some((item) => item.route === "/api/live" && item.purpose === "process-liveness" && item.authentication === "none"), true);
     assert.equal(manifest.processContract.healthChecks.some((item) => item.route === "/api/health" && item.purpose === "dependency-readiness" && item.authentication === "none"), true);

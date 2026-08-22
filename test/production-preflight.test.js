@@ -158,6 +158,32 @@ test("legacy audit retention variables cannot substitute for continuous audit de
   assert.equal(report.checks.some((item) => item.id === "preflight:audit-delivery" && !item.passed), true);
 });
 
+test("production preflight recognizes the exact append-only source contract without lifting external gates", async () => {
+  const manifest = manifestFixture();
+  const registry = registryFixture(manifest);
+  const options = passingSoftwareOptions(manifest, registry);
+  delete options.auditDeliveryAssessment;
+  options.checkFilesystem = false;
+  options.env = {
+    ...options.env,
+    NODE_ENV: "staging",
+    AUDIT_WORM_DIRECTORY: path.resolve("C:/health-data/audit-worm"),
+    AUDIT_DELIVERY_CHECKPOINT_PATH: path.resolve("C:/health-data/audit-state/checkpoint.json"),
+    AUDIT_DELIVERY_SOURCE_CONTRACT: "append-only-audit-source-v2",
+    AUDIT_DELIVERY_SERVICE_USER: "health-audit",
+    AUDIT_DELIVERY_SERVICE_GROUP: "health-audit"
+  };
+  const report = await buildProductionPreflight({
+    ...options,
+    productionEvidence: { ok: false, status: "no-go-evidence-incomplete" },
+    evidenceRecords: {}
+  });
+
+  assert.equal(report.auditDeliveryAssessment.checks.some((item) => item.id === "audit-delivery:source-continuity" && item.passed), true);
+  assert.equal(report.auditDeliveryAssessment.productionReady, false);
+  assert.equal(report.productionReady, false);
+});
+
 test("a claimed evidence result remains blocked when release id or artifact digest drifts", async () => {
   const manifest = manifestFixture();
   const registry = registryFixture(manifest, {
