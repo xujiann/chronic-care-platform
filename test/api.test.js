@@ -12,6 +12,7 @@ const { signHospitalRequest, stableStringify: stableHospitalStringify } = requir
 const { signFinancialCallback, signFinancialRequest, stableStringify: stableFinancialStringify } = require("../financial-gateways");
 const { signAlertRequest, stableStringify: stableAlertStringify } = require("../observability-alerting");
 const { signExecutionCallback } = require("../digital-hospital-execution-security");
+const { signGatewayResponse } = require("../secure-object-storage");
 const NursingEscortDomain = require("../nursing-escort-domain");
 
 async function waitForHealth(baseUrl) {
@@ -6233,26 +6234,76 @@ test("API authentication, scoping and governance regression suite", async (t) =>
   await t.test("secures attachment upload completion download and lifecycle through object storage", async (t) => {
     const storageRequests = [];
     let scanStatus = "clean";
+    const receiptSecret = "api-test-object-storage-receipt-secret-v1";
+    const sendStorageResponse = (response, requestBody, fields) => {
+      const responseBody = {
+        schemaVersion: "object-storage-gateway-response-v1",
+        requestId: requestBody.requestId,
+        operation: requestBody.operation,
+        bucket: requestBody.bucket,
+        attachmentId: requestBody.attachmentId,
+        objectKey: requestBody.objectKey,
+        ...fields
+      };
+      const responseText = JSON.stringify(responseBody);
+      const timestamp = new Date().toISOString();
+      response.writeHead(200, {
+        "Content-Type": "application/json",
+        "X-Object-Storage-Contract": "object-storage-gateway-trust-v1",
+        "X-Request-Id": requestBody.requestId,
+        "X-Timestamp": timestamp,
+        "X-Signature-Algorithm": "HMAC-SHA256",
+        "X-Signature": signGatewayResponse(responseText, receiptSecret, {
+          operation: requestBody.operation,
+          status: 200,
+          timestamp,
+          requestId: requestBody.requestId
+        })
+      });
+      response.end(responseText);
+    };
     const storageMock = http.createServer(async (request, response) => {
       const chunks = [];
       for await (const chunk of request) chunks.push(chunk);
       const bodyText = Buffer.concat(chunks).toString("utf8");
       const body = JSON.parse(bodyText);
       storageRequests.push({ path: request.url, headers: request.headers, body });
-      response.writeHead(200, { "Content-Type": "application/json" });
       if (request.url === "/storage/upload-intents") {
-        response.end(JSON.stringify({ uploadId: `upload-${body.attachmentId}`, uploadUrl: `http://127.0.0.1:${storageMock.address().port}/direct-upload/${body.attachmentId}`, expiresAt: "2026-07-11T05:00:00.000Z" }));
+        sendStorageResponse(response, body, {
+          uploadId: `upload-${body.attachmentId}`,
+          uploadUrl: `http://127.0.0.1:${storageMock.address().port}/direct-upload/${body.attachmentId}`,
+          expiresAt: new Date(Date.now() + 10 * 60 * 1000).toISOString()
+        });
         return;
       }
       if (request.url === "/storage/objects/complete") {
-        response.end(JSON.stringify({ sizeBytes: body.expectedSizeBytes, checksumSha256: body.expectedChecksumSha256, scanStatus, scannedAt: "2026-07-11T04:10:00.000Z", objectVersion: `version-${body.attachmentId}` }));
+        sendStorageResponse(response, body, {
+          uploadId: body.uploadId,
+          sizeBytes: body.expectedSizeBytes,
+          checksumSha256: body.expectedChecksumSha256,
+          scanStatus,
+          scannedAt: new Date().toISOString(),
+          scanReceiptId: `scan-receipt-${body.attachmentId}`,
+          objectVersion: `version-${body.attachmentId}`
+        });
         return;
       }
       if (request.url === "/storage/download-intents") {
-        response.end(JSON.stringify({ downloadUrl: `http://127.0.0.1:${storageMock.address().port}/short-download/${body.attachmentId}`, expiresAt: "2026-07-11T04:15:00.000Z" }));
+        sendStorageResponse(response, body, {
+          objectVersion: body.objectVersion,
+          downloadUrl: `http://127.0.0.1:${storageMock.address().port}/short-download/${body.attachmentId}`,
+          expiresAt: new Date(Date.now() + 4 * 60 * 1000).toISOString()
+        });
         return;
       }
-      response.end(JSON.stringify({ accepted: true, status: "accepted", effectiveAt: "2026-07-11T04:12:00.000Z" }));
+      sendStorageResponse(response, body, {
+        objectVersion: body.objectVersion,
+        action: body.action,
+        accepted: true,
+        status: "applied",
+        receiptId: `lifecycle-receipt-${body.attachmentId}`,
+        effectiveAt: new Date().toISOString()
+      });
     });
     storageMock.listen(0, "127.0.0.1");
     await once(storageMock, "listening");
@@ -6260,11 +6311,19 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     process.env.OBJECT_STORAGE_GATEWAY_URL = `http://127.0.0.1:${storagePort}/storage/`;
     process.env.OBJECT_STORAGE_BUCKET = "api-test-attachments";
     process.env.OBJECT_STORAGE_SIGNING_SECRET = "api-test-object-storage-signing-secret";
+    process.env.OBJECT_STORAGE_GATEWAY_CONTRACT_VERSION = "object-storage-gateway-trust-v1";
+    process.env.OBJECT_STORAGE_RECEIPT_SIGNING_SECRET = receiptSecret;
+    process.env.OBJECT_STORAGE_UPLOAD_URL_ALLOWED_ORIGINS = `http://127.0.0.1:${storagePort}`;
+    process.env.OBJECT_STORAGE_DOWNLOAD_URL_ALLOWED_ORIGINS = `http://127.0.0.1:${storagePort}`;
     process.env.OBJECT_STORAGE_TOKEN = "api-test-object-storage-token";
     t.after(async () => {
       delete process.env.OBJECT_STORAGE_GATEWAY_URL;
       delete process.env.OBJECT_STORAGE_BUCKET;
       delete process.env.OBJECT_STORAGE_SIGNING_SECRET;
+      delete process.env.OBJECT_STORAGE_GATEWAY_CONTRACT_VERSION;
+      delete process.env.OBJECT_STORAGE_RECEIPT_SIGNING_SECRET;
+      delete process.env.OBJECT_STORAGE_UPLOAD_URL_ALLOWED_ORIGINS;
+      delete process.env.OBJECT_STORAGE_DOWNLOAD_URL_ALLOWED_ORIGINS;
       delete process.env.OBJECT_STORAGE_TOKEN;
       storageMock.closeAllConnections?.();
       await new Promise((resolve) => storageMock.close(resolve));
@@ -6311,6 +6370,7 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(uploadIntent.body.attachment.uploadId, undefined);
     assert.equal(uploadIntent.body.uploadIntent.uploadUrl.includes("direct-upload"), true);
     assert.equal(storageRequests[0].headers["x-signature-algorithm"], "HMAC-SHA256");
+    assert.equal(storageRequests[0].headers["x-object-storage-contract"], "object-storage-gateway-trust-v1");
 
     const attachmentId = uploadIntent.body.attachment.id;
     const deniedInstitutionList = await api(baseUrl, "/api/attachments?residentId=r1", authorized(institution.body.token));
@@ -6325,6 +6385,7 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(completed.body.attachment.status, "active");
     assert.equal(completed.body.attachment.scanStatus, "clean");
     assert.equal(completed.body.attachment.checksumSha256, "c".repeat(64));
+    assert.equal(completed.body.receipt.scanReceiptId, undefined);
 
     const download = await api(baseUrl, `/api/attachments/${attachmentId}/download-intent`, authorized(citizen.body.token, {
       method: "POST",
@@ -6340,6 +6401,7 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     }));
     assert.equal(legalHold.response.status, 200);
     assert.equal(legalHold.body.attachment.legalHold, true);
+    assert.equal(legalHold.body.receipt.receiptId, undefined);
 
     const immutableDelete = await api(baseUrl, `/api/attachments/${attachmentId}/actions`, authorized(commission.body.token, {
       method: "POST",
@@ -6347,7 +6409,8 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     }));
     assert.equal(immutableDelete.response.status, 409);
 
-    scanStatus = "infected";
+    const providerScanText = "provider-secret-internal-stack";
+    scanStatus = providerScanText;
     const infectedIntent = await api(baseUrl, "/api/attachments/upload-intents", authorized(citizen.body.token, {
       method: "POST",
       body: JSON.stringify({ ...uploadPayload, filename: "suspicious-report.pdf", checksumSha256: "d".repeat(64) })
@@ -6361,6 +6424,7 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(infectedCompletion.body.attachment.status, "quarantined");
     assert.equal(infectedCompletion.body.attachment.scanStatus, "blocked");
     assert.equal(infectedCompletion.body.attachment.storageQuarantineStatus, "accepted");
+    assert.equal(JSON.stringify(infectedCompletion.body).includes(providerScanText), false);
 
     const blockedDownload = await api(baseUrl, `/api/attachments/${infectedIntent.body.attachment.id}/download-intent`, authorized(citizen.body.token, {
       method: "POST",

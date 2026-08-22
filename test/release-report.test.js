@@ -38,6 +38,7 @@ test("release report validates demo and production environment profiles", () => 
   assert.equal(failedProduction.checks.some((item) => item.name === "env:AUDIT.retentionTarget" && !item.passed), true);
   assert.equal(failedProduction.checks.some((item) => item.name === "env:ALERTING.routes" && !item.passed), true);
   assert.equal(failedProduction.checks.some((item) => item.name === "env:ALERTING.secretQuality" && !item.passed), true);
+  assert.equal(failedProduction.checks.some((item) => item.name === "env:OBJECT_STORAGE.trustContract" && !item.passed), true);
   assert.equal(failedProduction.cutoverChecklist.some((item) => item.id === "cutover-secrets" && !item.passed), true);
   assert.equal(failedProduction.cutoverChecklist.some((item) => item.id === "cutover-identity" && !item.passed), true);
 
@@ -94,6 +95,10 @@ test("release report validates demo and production environment profiles", () => 
       OBJECT_STORAGE_GATEWAY_URL: "https://storage.example.internal/api/",
       OBJECT_STORAGE_BUCKET: "health-attachments",
       OBJECT_STORAGE_SIGNING_SECRET: "0123456789abcdef0123456789abcdef",
+      OBJECT_STORAGE_GATEWAY_CONTRACT_VERSION: "object-storage-gateway-trust-v1",
+      OBJECT_STORAGE_RECEIPT_SIGNING_SECRET: "fedcba9876543210fedcba9876543210",
+      OBJECT_STORAGE_UPLOAD_URL_ALLOWED_ORIGINS: "https://storage.example.internal",
+      OBJECT_STORAGE_DOWNLOAD_URL_ALLOWED_ORIGINS: "https://storage.example.internal",
       FINANCIAL_GATEWAY_SECRET: "0123456789abcdef0123456789abcdef",
       FINANCIAL_CALLBACK_SECRET: "abcdef0123456789abcdef0123456789",
       PAYMENT_GATEWAY_URL: "https://payment.example.internal/transactions",
@@ -144,6 +149,10 @@ test("release report validates demo and production environment profiles", () => 
       OBJECT_STORAGE_GATEWAY_URL: "https://storage.example.internal/api/",
       OBJECT_STORAGE_BUCKET: "health-attachments",
       OBJECT_STORAGE_SIGNING_SECRET: "0123456789abcdef0123456789abcdef",
+      OBJECT_STORAGE_GATEWAY_CONTRACT_VERSION: "object-storage-gateway-trust-v1",
+      OBJECT_STORAGE_RECEIPT_SIGNING_SECRET: "fedcba9876543210fedcba9876543210",
+      OBJECT_STORAGE_UPLOAD_URL_ALLOWED_ORIGINS: "https://storage.example.internal",
+      OBJECT_STORAGE_DOWNLOAD_URL_ALLOWED_ORIGINS: "https://storage.example.internal",
       FINANCIAL_GATEWAY_SECRET: "0123456789abcdef0123456789abcdef",
       FINANCIAL_CALLBACK_SECRET: "abcdef0123456789abcdef0123456789",
       PAYMENT_GATEWAY_URL: "https://payment.example.internal/transactions",
@@ -177,6 +186,9 @@ test("release report validates demo and production environment profiles", () => 
   assert.equal(production.checks.some((item) => item.name === "env:HOSPITAL.secretQuality" && item.passed), true);
   assert.equal(production.checks.some((item) => item.name === "env:OBJECT_STORAGE.adapter" && item.passed), true);
   assert.equal(production.checks.some((item) => item.name === "env:OBJECT_STORAGE.secretQuality" && item.passed), true);
+  assert.equal(production.checks.some((item) => item.name === "env:OBJECT_STORAGE.trustContract" && item.passed), true);
+  assert.equal(production.checks.some((item) => item.name === "env:OBJECT_STORAGE.receiptSecretQuality" && item.passed), true);
+  assert.equal(production.checks.some((item) => item.name === "env:OBJECT_STORAGE.directionKeys" && item.passed), true);
   assert.equal(production.checks.some((item) => item.name === "env:FINANCIAL.gateways" && item.passed), true);
   assert.equal(production.checks.some((item) => item.name === "env:FINANCIAL.secretQuality" && item.passed), true);
   assert.equal(production.checks.some((item) => item.name === "env:FINANCIAL.callbacks" && item.passed), true);

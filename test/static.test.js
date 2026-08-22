@@ -4547,6 +4547,11 @@ test("secure object storage enforces integrity scan authorization and retention 
   assert.match(adapter, /finalizeObjectUpload/);
   assert.match(adapter, /createObjectDownloadIntent/);
   assert.match(adapter, /malware scan did not pass/);
+  assert.match(adapter, /verifyGatewayResponse/);
+  assert.match(adapter, /OBJECT_STORAGE_RESPONSE_SIGNATURE_INVALID/);
+  assert.match(adapter, /OBJECT_STORAGE_SIGNED_URL_ORIGIN_DENIED/);
+  assert.match(adapter, /OBJECT_STORAGE_COMPLETION_RECEIPT_INVALID/);
+  assert.match(adapter, /OBJECT_STORAGE_LIFECYCLE_RECEIPT_INVALID/);
   assert.match(adapter, /legal-hold/);
   assert.match(server, /secureAttachments/);
   assert.match(server, /\/api\/attachments\/upload-intents/);
@@ -4557,6 +4562,10 @@ test("secure object storage enforces integrity scan authorization and retention 
   assert.match(documentation, /适配器基础通过不等于真实附件存储已经正式验收/);
   assert.match(environment, /OBJECT_STORAGE_GATEWAY_URL/);
   assert.match(environment, /OBJECT_STORAGE_SIGNING_SECRET/);
+  assert.match(environment, /OBJECT_STORAGE_GATEWAY_CONTRACT_VERSION/);
+  assert.match(environment, /OBJECT_STORAGE_RECEIPT_SIGNING_SECRET/);
+  assert.match(environment, /OBJECT_STORAGE_UPLOAD_URL_ALLOWED_ORIGINS/);
+  assert.match(environment, /OBJECT_STORAGE_DOWNLOAD_URL_ALLOWED_ORIGINS/);
   assert.match(read("package.json"), /object-storage:readiness/);
   assert.match(read("scripts/release-report.js"), /objectStorage:productionBoundary/);
   assert.match(read("scripts/release-artifact-manifest.js"), /object-storage-readiness-report\.json/);

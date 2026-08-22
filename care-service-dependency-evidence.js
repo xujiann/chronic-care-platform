@@ -51,8 +51,22 @@ function safeUrlTarget(value) {
   }
 }
 
+function canonicalOriginBindings(value, label) {
+  return String(value || "").split(",").map((item) => item.trim()).filter(Boolean).map((item) => {
+    try {
+      const url = new URL(item);
+      if (!new Set(["http:", "https:"]).has(url.protocol)) throw new Error("invalid exact origin protocol");
+      if (url.username || url.password || (url.pathname && url.pathname !== "/") || url.search || url.hash) throw new Error("invalid exact origin");
+      return `${label}:${url.origin}`;
+    } catch {
+      return `${label}:invalid:${sha256(item)}`;
+    }
+  }).sort();
+}
+
 function dependencyTargets(env = {}) {
   const storageEngine = text(env.STORAGE_ENGINE, 40).toLowerCase();
+  const objectStorageContract = text(env.OBJECT_STORAGE_GATEWAY_CONTRACT_VERSION, 120).toLowerCase();
   return {
     storage: [
       storageEngine,
@@ -64,7 +78,13 @@ function dependencyTargets(env = {}) {
     sms: [safeUrlTarget(env.SMS_GATEWAY_URL), text(env.SMS_TEMPLATE_ID, 240)],
     his: [safeUrlTarget(env.HIS_ADAPTER_URL)],
     appointment: [safeUrlTarget(env.APPOINTMENT_ADAPTER_URL)],
-    "object-storage": [safeUrlTarget(env.OBJECT_STORAGE_GATEWAY_URL), text(env.OBJECT_STORAGE_BUCKET, 240)],
+    "object-storage": [
+      safeUrlTarget(env.OBJECT_STORAGE_GATEWAY_URL),
+      text(env.OBJECT_STORAGE_BUCKET, 240),
+      ...(objectStorageContract ? [`contract:${objectStorageContract}`] : []),
+      ...canonicalOriginBindings(env.OBJECT_STORAGE_UPLOAD_URL_ALLOWED_ORIGINS, "upload-origin"),
+      ...canonicalOriginBindings(env.OBJECT_STORAGE_DOWNLOAD_URL_ALLOWED_ORIGINS, "download-origin")
+    ],
     payment: [safeUrlTarget(env.PAYMENT_GATEWAY_URL)],
     insurance: [safeUrlTarget(env.INSURANCE_GATEWAY_URL)],
     certificate: [safeUrlTarget(env.CERTIFICATE_GATEWAY_URL)],

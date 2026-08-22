@@ -31,6 +31,9 @@ function dependencyEnv() {
     APPOINTMENT_ADAPTER_URL: "https://appointment.hospital.cn/events",
     OBJECT_STORAGE_GATEWAY_URL: "https://storage.health.gov.cn",
     OBJECT_STORAGE_BUCKET: "care-evidence",
+    OBJECT_STORAGE_GATEWAY_CONTRACT_VERSION: "object-storage-gateway-trust-v1",
+    OBJECT_STORAGE_UPLOAD_URL_ALLOWED_ORIGINS: "https://upload.storage.health.gov.cn",
+    OBJECT_STORAGE_DOWNLOAD_URL_ALLOWED_ORIGINS: "https://download.storage.health.gov.cn",
     PAYMENT_GATEWAY_URL: "https://payment.health.gov.cn",
     INSURANCE_GATEWAY_URL: "https://insurance.health.gov.cn",
     CERTIFICATE_GATEWAY_URL: "https://certificate.health.gov.cn",
@@ -89,6 +92,25 @@ test("dependency evidence strips database credentials before deriving its target
   const first = dependencyEnv();
   const second = { ...first, DATABASE_URL: first.DATABASE_URL.replace("care-password", "rotated-password") };
   assert.equal(targetDigestForDependency(first, "storage"), targetDigestForDependency(second, "storage"));
+});
+
+test("object storage probe binding changes with contract or exact origins without binding secrets", () => {
+  const baseline = dependencyEnv();
+  const contractDrift = { ...baseline, OBJECT_STORAGE_GATEWAY_CONTRACT_VERSION: "legacy" };
+  const originDrift = { ...baseline, OBJECT_STORAGE_DOWNLOAD_URL_ALLOWED_ORIGINS: "https://other.storage.health.gov.cn" };
+  const invalidOriginScheme = { ...baseline, OBJECT_STORAGE_DOWNLOAD_URL_ALLOWED_ORIGINS: "file://storage.health.gov.cn" };
+  const rotatedSecrets = {
+    ...baseline,
+    OBJECT_STORAGE_SIGNING_SECRET: "rotated-request-secret",
+    OBJECT_STORAGE_RECEIPT_SIGNING_SECRET: "rotated-receipt-secret"
+  };
+  const digest = targetDigestForDependency(baseline, "object-storage");
+  assert.notEqual(digest, targetDigestForDependency(contractDrift, "object-storage"));
+  assert.notEqual(digest, targetDigestForDependency(originDrift, "object-storage"));
+  assert.notEqual(digest, targetDigestForDependency(invalidOriginScheme, "object-storage"));
+  assert.equal(digest, targetDigestForDependency(rotatedSecrets, "object-storage"));
+  const result = validate(validManifest(baseline), originDrift);
+  assert.equal(result.errors.some((item) => item.code === "CARE_DEPENDENCY_EVIDENCE_TARGET_MISMATCH" && item.dependency === "object-storage"), true);
 });
 
 test("dependency evidence rejects stale unhealthy expired and cross-target probes", () => {

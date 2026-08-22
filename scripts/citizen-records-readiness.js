@@ -2,6 +2,7 @@
 const { readRuntimeSource } = require("../src/http/runtime-source");
 const fs = require("node:fs");
 const path = require("node:path");
+const { objectStorageCenter } = require("../secure-object-storage");
 
 const ROOT = path.resolve(__dirname, "..");
 
@@ -104,8 +105,8 @@ function assessCitizenRecordsReadiness(options = {}) {
     },
     {
       id: "object-storage",
-      label: "对象存储网关与签名密钥",
-      passed: ["OBJECT_STORAGE_GATEWAY_URL", "OBJECT_STORAGE_BUCKET", "OBJECT_STORAGE_SIGNING_SECRET"].every((key) => evidenceValue(env[key]))
+      label: "对象存储网关响应信任合同",
+      passed: objectStorageCenter({ ...env, NODE_ENV: "production" }).adapterReady
     },
     {
       id: "audit-retention",

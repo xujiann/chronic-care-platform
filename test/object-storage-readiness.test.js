@@ -15,6 +15,9 @@ test("object storage readiness separates adapter foundation from production acce
   assert.equal(report.summary.controlsReady, report.summary.controls);
   assert.equal(report.summary.apiGroupsReady, report.summary.apiGroups);
   assert.equal(report.controls.every((item) => item.passed), true);
+  assert.equal(report.controls.some((item) => item.id === "gateway-response-trust" && item.passed), true);
+  assert.equal(report.controls.some((item) => item.id === "signed-url-boundary" && item.passed), true);
+  assert.equal(report.controls.some((item) => item.id === "explicit-receipts" && item.passed), true);
   assert.equal(report.apiRoutes.every((item) => item.passed), true);
   assert.equal(report.blockers.length, 8);
 });
@@ -24,6 +27,16 @@ test("object storage readiness fails when malware enforcement is removed", () =>
   const report = buildObjectStorageReadiness({ adapterSource: source });
   assert.equal(report.ok, false);
   assert.equal(report.checks.some((item) => item.id === "objectStorage:controls" && !item.passed), true);
+});
+
+test("object storage readiness fails when response trust or URL boundary enforcement is removed", () => {
+  const source = fs.readFileSync(path.join(ROOT, "secure-object-storage.js"), "utf8")
+    .replaceAll("verifyGatewayResponse", "response verification removed")
+    .replaceAll("OBJECT_STORAGE_UPLOAD_URL_ALLOWED_ORIGINS", "upload origin marker removed");
+  const report = buildObjectStorageReadiness({ adapterSource: source });
+  assert.equal(report.ok, false);
+  assert.equal(report.controls.some((item) => item.id === "gateway-response-trust" && !item.passed), true);
+  assert.equal(report.controls.some((item) => item.id === "signed-url-boundary" && !item.passed), true);
 });
 
 test("object storage readiness renders and writes release artifacts", (t) => {

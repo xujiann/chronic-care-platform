@@ -15,6 +15,7 @@
 | ARC-004 | 前端超大模块 | 数智医院 app 10.5k、citizen 6k、公卫 4.4k | 全局状态、渲染和流程耦合 |
 | ARC-007 | 临床子域隔离 | 急救、血液、影像、体检首个查询端口已建立，但两个混合路由仍承载写命令；血液 GET 有内存规范化，影像和体检 GET 有审计持久化；33 个 operations 字面路径已全部移交 T02 | 按特征测试逐用例迁移；禁止 operations 回流 T06，不把兼容副作用误写成纯查询 |
 | CHR-001 | 慢病随访事件投递 | T04 已有原子内嵌 outbox、幂等 inbox、稳定幂等键、独立 activation verifier、范围过滤、审计和签名 HTTPS publisher；单进程并发可合并，但批次/写回失败会再次发出同幂等键请求 | 仍需 T00/T04 独立任务建立 verifier 组合、持久 worker、lease、attempt/backoff、死信、供应方幂等核对和部署观测；当前不能承诺跨进程 exactly-once，不得关闭生产 Go/No-Go |
+| OBJ-001 | 对象存储生产闭环 | 应用侧 v1 响应信任已建立，但 `secureAttachments.slice(0, 500)` 会静默淘汰元数据；外部 upload/complete/lifecycle 成功后再写本地状态，缺少 outbox、幂等收敛、失败对账和补偿；网关能力尚无签名声明 | 可能产生外部对象与权威元数据不一致、证据丢失或误判 WORM/扫描能力；后续分别建立无损分页/保留策略、请求外事务的持久命令轨道与对账 worker、版本化能力证明，禁止在请求路径直接双写 |
 | SEC-004 | XSS 面 | 871 个 HTML sink，CSP 允许 inline | 需可信渲染接口和逐页负向测试 |
 | SEC-005 | 混合会话 | HttpOnly Cookie 已建立，但 localStorage/demo bearer 兼容仍存在 | 降级路径、XSS 后凭据暴露面 |
 | DATA-003 | 集合治理 | JSON 252 个集合，只有 83 个有 owner | 169 个遗留集合不能安全晋升生产 |
@@ -58,6 +59,7 @@
 | PG-001 | 2026-08-21 | PostgreSQL schema 隔离、目标 probe、outbox CAS、batch 内容绑定和等版本/tombstone 冲突回滚 | PG/session/identity repository 专项与负向事务测试 |
 | OPS-001 | 2026-08-21 | 连续审计投递使用安全 SIEM/WORM adapter、checkpoint v2 和既有 cutover alert lifecycle | TLS/receipt/retry/WORM/rollback/lock/systemd 专项 |
 | SEC-008 | 2026-08-21 | 区域共享 access command 改为服务端授权，复用 `personalRecords`，加入机构/地区/用途/范围/版本、幂等摘要、应用层 CAS、撤销即时拒绝和脱敏审计；state-data 关闭四个 owner 集合与生产 reset 旁路 | 严格/legacy、客户端决定忽略、冲突、撤销、重放、append-only、删改/重排/伪造追加、package CAS 旁路、生产 reset、审计失败与所有权专项 |
+| SEC-009 | 2026-08-22 | 对象存储生产端口采用 v1 原始响应 HMAC、独立方向密钥、request/object/version 绑定、上传/下载精确 Origin 与 TTL、RFC3339 时间和显式扫描/生命周期回执；生产配置不完整时在 fetch 前失败关闭，legacy 仅限非生产未启用版本的迁移路径；现场 probe digest 绑定合同与 Origin | 独立已知签名向量；未签名/错签/陈旧/错配响应、空/漂移版本、恶意 Origin、userinfo/fragment、非标准时间、过期/超长 URL、缺失回执、类型强制和上游错误泄露负向及 v1 API 集成测试；readiness、发布环境、部署密钥合同与 ADR 同步 |
 
 ## 重复、死代码和命名结论
 
