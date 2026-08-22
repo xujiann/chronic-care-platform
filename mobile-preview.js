@@ -92,11 +92,17 @@ const renderPreviewDirectEntry = () => {
   const entryUrl = citizenPreviewSrc(activePreviewService);
   const absoluteEntryUrl = new URL(entryUrl, location.href).href;
   const birthEntryUrl = birthHealthPreviewSrc();
-  previewBirthEntry.href = birthEntryUrl;
+  window.HealthBrowserSafeUrl.setElementUrl(previewBirthEntry, "href", birthEntryUrl, {
+    capability: "internal-navigation",
+    baseUrl: location.href
+  });
   previewBirthEntry.dataset.previewEntry = new URL(birthEntryUrl, location.href).href;
   previewBirthEntry.textContent = `${previewClientLabels[activePreviewClient]} · 出生健康直达`;
   previewBirthEntry.setAttribute("aria-label", previewBirthEntry.textContent);
-  previewDirectEntry.href = entryUrl;
+  window.HealthBrowserSafeUrl.setElementUrl(previewDirectEntry, "href", entryUrl, {
+    capability: "internal-navigation",
+    baseUrl: location.href
+  });
   previewEntryUrl.value = absoluteEntryUrl;
   previewCopyEntry.dataset.previewEntry = absoluteEntryUrl;
   previewCopyEntry.textContent = "复制入口";
@@ -224,7 +230,10 @@ const setPreviewService = (service, options = {}) => {
   if (options.syncUrl === false) renderPreviewStatus();
   if (options.reload !== false) {
     previewReadinessFrame.textContent = "手机框：加载中";
-    frame.src = citizenPreviewSrc(service);
+    window.HealthBrowserSafeUrl.setElementUrl(frame, "src", citizenPreviewSrc(service), {
+      capability: "internal-navigation",
+      baseUrl: location.href
+    });
   }
 };
 const setPreviewClient = (client, options = {}) => {
@@ -280,7 +289,10 @@ clientButtons.forEach((button) => {
 });
 document.querySelector("#preview-refresh").addEventListener("click", () => {
   previewReadinessFrame.textContent = "手机框：加载中";
-  frame.src = frame.src;
+  window.HealthBrowserSafeUrl.setElementUrl(frame, "src", frame.getAttribute("src") || citizenPreviewSrc(activePreviewService), {
+    capability: "internal-navigation",
+    baseUrl: location.href
+  });
 });
 previewCompactToggle.addEventListener("click", () => {
   isCompactPreview = !isCompactPreview;

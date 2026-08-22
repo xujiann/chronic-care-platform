@@ -414,12 +414,33 @@
       }
     }
     clearBrowserSession();
-    window.location.href = localHref("login.html");
+    navigateInternal(localHref("login.html"), "assign");
   }
 
   function localHref(page) {
     const prefix = /\/digital-hospital-standard-platform\//.test(location.pathname) ? "../" : "./";
     return `${prefix}${String(page || "").replace(/^\.\//, "")}`;
+  }
+
+  function safeUrlPort() {
+    if (!window.HealthBrowserSafeUrl) {
+      const error = new Error("browser safe URL policy is unavailable");
+      error.code = "SAFE_URL_POLICY_UNAVAILABLE";
+      throw error;
+    }
+    return window.HealthBrowserSafeUrl;
+  }
+
+  function internalUrlOptions() {
+    return { capability: "internal-navigation", baseUrl: location.href };
+  }
+
+  function navigateInternal(target, mode) {
+    return safeUrlPort().navigate(target, { ...internalUrlOptions(), mode });
+  }
+
+  function setInternalHref(element, target) {
+    return safeUrlPort().setElementUrl(element, "href", target, internalUrlOptions());
   }
 
   function requireRole(roles) {
@@ -429,17 +450,17 @@
     const allowed = Array.isArray(roles) ? roles : [roles];
     const user = getUser();
     if (!user) {
-      window.location.replace(`${localHref("login.html")}?redirect=${encodeURIComponent(currentPage())}`);
+      navigateInternal(`${localHref("login.html")}?redirect=${encodeURIComponent(currentPage())}`, "replace");
       return false;
     }
     if (user.expiresAt && new Date(user.expiresAt).getTime() < Date.now()) {
       clearBrowserSession();
-      window.location.replace(`${localHref("login.html")}?redirect=${encodeURIComponent(currentPage())}&expired=1`);
+      navigateInternal(`${localHref("login.html")}?redirect=${encodeURIComponent(currentPage())}&expired=1`, "replace");
       return false;
     }
     if (!allowed.includes(user.role) || !canAccessPage(currentPage(), user)) {
       const target = accessPolicy?.homeForUser(user) || "health-city.html";
-      window.location.replace(`${localHref(target)}?denied=${encodeURIComponent(currentPage())}`);
+      navigateInternal(`${localHref(target)}?denied=${encodeURIComponent(currentPage())}`, "replace");
       return false;
     }
     return true;
@@ -450,12 +471,12 @@
     const allowed = Array.isArray(types) ? types : [types];
     const user = getUser();
     if (!user) {
-      window.location.replace(`${localHref("login.html")}?redirect=${encodeURIComponent(currentPage())}`);
+      navigateInternal(`${localHref("login.html")}?redirect=${encodeURIComponent(currentPage())}`, "replace");
       return false;
     }
     if (!allowed.includes(normalizeAccountType(user)) || !canAccessPage(currentPage(), user)) {
       const target = accessPolicy?.homeForUser(user) || "health-city.html";
-      window.location.replace(`${localHref(target)}?denied=${encodeURIComponent(currentPage())}`);
+      navigateInternal(`${localHref(target)}?denied=${encodeURIComponent(currentPage())}`, "replace");
       return false;
     }
     return true;
@@ -477,7 +498,7 @@
     const denied = params.get("denied");
     const deniedPage = denied ? accessPolicy?.normalizePageName(denied) : "";
     const deniedQuery = deniedPage ? `?denied=${encodeURIComponent(deniedPage)}` : "";
-    window.location.href = `${localHref(target)}${deniedQuery}`;
+    navigateInternal(`${localHref(target)}${deniedQuery}`, "assign");
   }
 
   function normalizePageName(href) {
@@ -507,11 +528,11 @@
       return true;
     }
     if (!user || decision?.reason === "LOGIN_REQUIRED") {
-      window.location.replace(`${localHref("login.html")}?redirect=${encodeURIComponent(currentPage())}`);
+      navigateInternal(`${localHref("login.html")}?redirect=${encodeURIComponent(currentPage())}`, "replace");
       return false;
     }
     const target = accessPolicy?.homeForUser(user) || "health-city.html";
-    window.location.replace(`${localHref(target)}?denied=${encodeURIComponent(currentPage())}`);
+    navigateInternal(`${localHref(target)}?denied=${encodeURIComponent(currentPage())}`, "replace");
     return false;
   }
 
@@ -581,7 +602,7 @@
       detail.textContent = `${displayAuthText(user.roleName)} · ${displayAuthText(user.orgName || "未绑定机构")} · ${displayAuthText(user.dataScope || "默认范围")} · ${String(user.authMode || "").startsWith("server") ? "安全服务端会话" : "本地演示"} · ${new Date(user.loginAt || Date.now()).toLocaleString("zh-CN")}`;
       (accessPolicy?.pagesForUser(user) || []).forEach(({ page: href, label }) => {
         const link = document.createElement("a");
-        link.href = localHref(href);
+        setInternalHref(link, localHref(href));
         link.textContent = label;
         nav.append(link);
       });
@@ -594,7 +615,7 @@
       name.textContent = "未登录";
       detail.textContent = "请先选择角色进入健康城市系统";
       const loginLink = document.createElement("a");
-      loginLink.href = `${localHref("login.html")}?redirect=${encodeURIComponent(currentPage())}`;
+      setInternalHref(loginLink, `${localHref("login.html")}?redirect=${encodeURIComponent(currentPage())}`);
       loginLink.textContent = "登录";
       nav.append(loginLink);
     }

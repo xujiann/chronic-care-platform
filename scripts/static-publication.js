@@ -76,6 +76,8 @@ function buildStaticPublication(options = {}) {
       ...browserSecurityReadiness({ policy: browserSecurityPolicy }),
       inventory: browserSecurityInventory.summary,
       baselineRevision: browserSecurityPolicy.riskBaseline.sourceRevision,
+      safeUrlContractId: browserSecurityPolicy.safeUrl.contractId,
+      safeUrlReviewRequiredOccurrences: browserSecurityPolicy.safeUrl.reviewRequiredOccurrences,
       externalHeaderApplicationRequired: browserSecurityPolicy.staticHosting.headerApplicationRequired === true
     },
     files

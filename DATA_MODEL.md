@@ -96,6 +96,11 @@ T06 血液主工作台可信渲染只改变浏览器节点构造：接口响应�
 文本节点或受控 `dataset`，不创建新的业务集合、缓存、Schema、migration 或审计事实。相应风险基线
 由 1013 个 occurrence 净减至 985 个；该基线变化是代码安全治理元数据，不是生产数据迁移证据。
 
+`browser-safe-url-policy.v1` 只处理浏览器 URL 能力决定，不创建集合、字段、表、DDL、migration 或
+事实源。exact-Origin allowlist 由调用方的既有受控配置提供，不保存签名 URL、对象 key、居民标识、
+电话事件或外部 provider 回执；当前 Inventory 中 31 个 `review-required` occurrence 也只是源码治理
+状态，不能写回业务数据或作为生产放行证据。
+
 `followups` 继续由 citizen-chronic/T04 拥有；随访事件 outbox、inbox、projection 和 receipt
 仍嵌在该聚合的 `domainRuntime` 中。本切片只增加安全 publisher 端口，没有新集合、DDL、
 migration 或事实源变化。receipt 不保存供应方原始回执 ID、签名或正文，只保存事件关联、

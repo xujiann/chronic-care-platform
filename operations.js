@@ -2874,7 +2874,10 @@ function downloadText(filename, text) {
   const blob = new Blob([`\ufeff${text}`], { type: "text/markdown;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
-  link.href = url;
+  window.HealthBrowserSafeUrl.setElementUrl(link, "href", url, {
+    capability: "blob-download",
+    baseUrl: location.href
+  });
   link.download = filename;
   document.body.appendChild(link);
   link.click();

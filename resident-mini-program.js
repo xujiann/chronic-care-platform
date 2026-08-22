@@ -6,6 +6,7 @@
   const DeliveryPolicy = window.ResidentMiniProgramDeliveryPolicy;
   const adapter = window.ResidentMiniProgramAdapter.createAdapter(window);
   const auth = window.HealthCityAuth;
+  const SafeUrl = window.HealthBrowserSafeUrl;
   const SESSION_KEY = "health-city-auth-session";
   const SESSION_CHECK_INTERVAL = 30 * 1000;
   const configuredTimeout = Number(window.__RESIDENT_MINI_PROGRAM_TIMEOUT_MS__ || 8000);
@@ -1026,7 +1027,15 @@
     } finally {
       clearLocalSession();
       state.subjectKey = "";
-      location.replace("./login.html?loggedOut=1");
+      if (SafeUrl) {
+        SafeUrl.navigate("./login.html?loggedOut=1", {
+          capability: "internal-navigation",
+          baseUrl: location.href,
+          mode: "replace"
+        });
+      } else {
+        document.documentElement.setAttribute("data-safe-url-error", "SAFE_URL_POLICY_UNAVAILABLE");
+      }
     }
   }
 

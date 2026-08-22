@@ -2,11 +2,14 @@
   const api = factory(
     typeof module === "object" && module.exports
       ? require("./citizen-records-v1")
-      : root?.CitizenRecordsV1
+      : root?.CitizenRecordsV1,
+    typeof module === "object" && module.exports
+      ? require("./browser-safe-url")
+      : root?.HealthBrowserSafeUrl
   );
   if (typeof module === "object" && module.exports) module.exports = api;
   if (root) root.CitizenRecordsV2 = api;
-})(typeof window !== "undefined" ? window : globalThis, function (CitizenRecordsV1) {
+})(typeof window !== "undefined" ? window : globalThis, function (CitizenRecordsV1, BrowserSafeUrl) {
   "use strict";
 
   const ACCESS_SCOPES = new Set([
@@ -781,31 +784,29 @@
       throw new Error("短时凭据范围不匹配");
     }
     const baseUrl = cleanText(options.baseUrl || "https://resident.invalid/", 1000);
-    let parsed;
+    let safeUrl;
     try {
-      parsed = new URL(rawUrl, baseUrl);
-    } catch {
-      throw new Error("短时凭据地址格式不正确");
+      const baseOrigin = new URL(baseUrl).origin;
+      safeUrl = BrowserSafeUrl.resolve(rawUrl, {
+        capability: "object-storage",
+        baseUrl,
+        allowedOrigins: Array.isArray(options.allowedOrigins) && options.allowedOrigins.length
+          ? options.allowedOrigins
+          : [baseOrigin],
+        allowHttpLocalhost: options.allowHttpLocalhost === true
+      });
+    } catch (cause) {
+      const messages = {
+        SAFE_URL_INVALID: "短时凭据地址格式不正确",
+        SAFE_URL_PROTOCOL_DENIED: "短时凭据地址必须使用 HTTPS",
+        SAFE_URL_ORIGIN_DENIED: "短时凭据地址不在允许域名内"
+      };
+      const error = new Error(messages[cause?.code] || "短时凭据地址不符合安全策略");
+      error.code = cause?.code || "SAFE_URL_INVALID";
+      throw error;
     }
-    const localhostHttp = parsed.protocol === "http:" && /^(localhost|127\.0\.0\.1|\[::1\])$/i.test(parsed.hostname);
-    if (parsed.protocol !== "https:" && !(options.allowHttpLocalhost && localhostHttp)) {
-      throw new Error("短时凭据地址必须使用 HTTPS");
-    }
-    const baseOrigin = new URL(baseUrl).origin;
-    const allowedOrigins = new Set(
-      (Array.isArray(options.allowedOrigins) && options.allowedOrigins.length ? options.allowedOrigins : [baseOrigin])
-        .map((item) => {
-          try {
-            return new URL(item, baseUrl).origin;
-          } catch {
-            return "";
-          }
-        })
-        .filter(Boolean)
-    );
-    if (!allowedOrigins.has(parsed.origin)) throw new Error("短时凭据地址不在允许域名内");
     return {
-      url: parsed.href,
+      url: safeUrl.href,
       expiresAt: expiresAt.toISOString(),
       oneTime: true,
       auditRef,
