@@ -154,3 +154,8 @@ PLAN 前不得编码；批准只覆盖明示范围。任何阶段失败都回到
 生产切换行动配置只能描述定义，禁止在 Git 中保存权威完成状态。effective status 必须从受控外部证据
 经可信 provider 派生，绑定当前 release/artifact、有效期、转换历史、命令回执摘要和独立角色；原始证据、
 签名、凭据及现场输出不得进入仓库或发布包。
+
+生产晋级只能从 `main` 手工触发受保护 `production` environment，并在标记为
+`self-hosted, production-promotion` 的受控 runner 上执行 immutable package verify 与 strict preflight。
+仓库工作流只上传 digest-only、create-once 的 eligibility receipt；它不执行生产部署，也不替代 environment
+reviewer、变更审批、现场签收或回滚指令。

@@ -51,6 +51,12 @@ release/artifact、前态转换、命令回执和角色独立性验证时，派�
 `verified-for-bound-release`。该派生结果仍不是最终生产授权，必须作为 strict preflight 的额外必要条件；
 缺失 provider、记录或任一绑定时默认 `NO-GO`。真实签名、现场证据和 protected-environment 审批不由仓库生成。
 
+实现固定复用 `production-evidence-trust-provider` 的 stable envelope/signature payload、pinned anchor bundle、
+bounded regular-file reader 与 Ed25519 验签，不建立第二套密码语义。purpose 固定为
+`production-cutover-action-verification.v2`，签名角色固定为 `action-evidence-custodian` 和
+`independent-release-verifier`。protected manual workflow 只在完整 strict GO 后生成 digest-only receipt，
+并明确记录 `deploymentExecuted=false` 与 `externalAuthorizationRequired=true`。
+
 ## Rollback
 
 整体回滚 v2 evaluator 与 preflight 接线，并恢复 v1 结构；回滚期间生产保持 `NO-GO`。不得只恢复可编辑

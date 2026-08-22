@@ -18,7 +18,9 @@
     "scripts/test-all.js",
     "src/http/static-asset-policy.js",
     "src/platform/data/public-demo-snapshot.js",
-    "src/platform/governance/production-evidence-trust-provider.js"
+    "src/platform/governance/production-evidence-trust-provider.js",
+    "scripts/production-cutover-action-register.js",
+    "scripts/production-promotion-receipt.js"
   ],
   "exclude": [
     "node_modules",

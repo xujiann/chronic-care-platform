@@ -12,6 +12,11 @@ const {
 } = require("../src/platform/governance/production-evidence-trust-provider");
 
 const { buildLaunchSmokeReport } = require("./launch-smoke");
+const {
+  buildEffectiveActionReport,
+  loadRegister: loadCutoverActionRegister,
+  resolveCutoverActionEvidenceProvider
+} = require("./production-cutover-action-register");
 const { verifyProductionDeploymentPackage } = require("./production-deployment-package");
 const {
   GATE_DEFINITIONS,
@@ -166,6 +171,19 @@ async function buildProductionPreflight(options = {}) {
     evidenceRecords: productionEvidence.records
   });
   const evidenceReleaseBound = evidenceBoundToRelease(productionEvidence.records, manifest);
+  const cutoverActionRegister = options.cutoverActionRegister || loadCutoverActionRegister();
+  const cutoverActions = [
+    ...(cutoverActionRegister.cutoverActions || []),
+    ...(cutoverActionRegister.evidenceActions || [])
+  ];
+  const cutoverActionProvider = resolveCutoverActionEvidenceProvider(env, cutoverActions, options);
+  const cutoverActionEvidence = await buildEffectiveActionReport(cutoverActionRegister, {
+    manifest,
+    evidenceRecords: cutoverActionProvider.records,
+    evidenceErrors: cutoverActionProvider.errors,
+    externalEvidenceVerifier: cutoverActionProvider.verifier,
+    now: options.now
+  });
   const followupExternalEvidenceVerified = productionEvidence.report?.ok === true
     && productionEvidence.report?.status === "go-decision-evidence-validated"
     && evidenceReleaseBound
@@ -222,7 +240,8 @@ async function buildProductionPreflight(options = {}) {
   const externalChecks = [
     check("preflight:external-registry-attestation", validExternalAttestation(registryEntry?.externalAttestation) && externalTrust.registryAttestationVerified, externalTrust.registryAttestationVerified ? registryEntry?.externalAttestation?.evidenceRef : externalTrust.detail, "external-evidence"),
     check("preflight:production-evidence-validation", productionEvidence.report?.ok === true && productionEvidence.report?.status === "go-decision-evidence-validated" && externalTrust.productionEvidenceVerified, externalTrust.productionEvidenceVerified ? productionEvidence.report?.status : externalTrust.detail, "external-evidence"),
-    check("preflight:production-evidence-release-binding", evidenceReleaseBound, evidenceReleaseBound ? `${manifest.releaseId}/${manifest.artifact.digest}` : "every required evidence document must match the current release id and artifact digest", "external-evidence")
+    check("preflight:production-evidence-release-binding", evidenceReleaseBound, evidenceReleaseBound ? `${manifest.releaseId}/${manifest.artifact.digest}` : "every required evidence document must match the current release id and artifact digest", "external-evidence"),
+    check("preflight:cutover-action-evidence", cutoverActionEvidence.productionReady === true, cutoverActionEvidence.productionReady ? `${cutoverActionEvidence.summary.verified}/${cutoverActionEvidence.summary.actions} actions / ${cutoverActionEvidence.reportDigest}` : `${cutoverActionEvidence.summary.blocked}/${cutoverActionEvidence.summary.actions} actions blocked`, "external-evidence")
   ];
   const checks = [...softwareChecks, ...runtimeChecks, ...liveChecks, ...externalChecks];
   const softwareReady = softwareChecks.every((item) => item.passed);
@@ -305,11 +324,23 @@ async function buildProductionPreflight(options = {}) {
       reasonCode: productionEvidenceTrustProvider.inspection.reasonCode || "",
       signerCount: Number(productionEvidenceTrustProvider.inspection.signerCount || 0),
       roles: productionEvidenceTrustProvider.inspection.roles || [],
+      envelopeDigest: productionEvidenceTrustProvider.inspection.envelopeDigest || "",
       verified: externalTrust.registryAttestationVerified === true
         && externalTrust.productionEvidenceVerified === true,
       productionReady: externalTrust.registryAttestationVerified === true
         && externalTrust.productionEvidenceVerified === true,
       boundary: "Provider verification is necessary but cannot authorize production without every preflight gate."
+    },
+    cutoverActionEvidence: {
+      contract: cutoverActionEvidence.schemaVersion,
+      configured: cutoverActionProvider.configured === true,
+      source: cutoverActionProvider.source,
+      releaseId: cutoverActionEvidence.releaseId,
+      artifactDigest: cutoverActionEvidence.artifactDigest,
+      reportDigest: cutoverActionEvidence.reportDigest,
+      summary: cutoverActionEvidence.summary,
+      productionReady: cutoverActionEvidence.productionReady === true,
+      boundary: cutoverActionEvidence.boundary
     },
     checks,
     blockers: checks.filter((item) => !item.passed).map((item) => ({

@@ -213,5 +213,6 @@ Accepted、data owner 与兼容策略获人类批准后才能进入逐切片实�
 ## 19. 生产切换行动证据模块
 
 `production-cutover-action-register.js` 现在分为 definitions-only 静态报告和 evidence-derived 动态评估。
-前者永远不能产生 production readiness；后者依赖外部 verifier 端口，只输出 action ID、摘要、时间窗和
-稳定错误码。它不依赖 `server.js`、数据库或领域路由，不拥有现场证据正文。
+前者永远不能产生 production readiness；后者直接复用第 18 节共享验签端口，只输出 action ID、摘要、
+时间窗和稳定错误码。`production-promotion-receipt.js` 只在 strict GO 后生成 create-once 摘要凭证；两者
+均不依赖 `server.js`、数据库或领域路由，也不拥有现场证据正文。

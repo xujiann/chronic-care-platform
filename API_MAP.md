@@ -196,6 +196,7 @@ Runtime Go/No-Go 或生产授权。
 
 ## 16. 生产切换行动证据接口边界
 
-本切片不新增或改变 HTTP API。`production:actions:check` 只验证 definitions-only 台账；v2 evaluator 通过
-进程内 external verifier 端口消费仓库外 envelope，并只返回 digest-only 决定投影。任何本地 `status`、
-无签名 fixture 或未绑定当前 release/artifact 的记录都不能解除 strict preflight。
+本切片不新增或改变 HTTP API。`production:actions:check` 只验证 definitions-only 台账；v2 evaluator 复用
+T00 pinned-anchor Ed25519 端口消费仓库外 `<action-id>.json` envelope，并只返回 digest-only 决定投影。
+任何本地 `status`、无签名 fixture 或未绑定当前 release/artifact 的记录都不能解除 strict preflight；
+manual production workflow 也不调用业务 API 或执行部署。

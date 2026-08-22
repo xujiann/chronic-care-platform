@@ -462,3 +462,11 @@ Use `drug-consumable-about.html` as the role-facing scope, policy-source, eviden
 Use `docs/production-go-live-requirements.md` as the platform-level launch requirements baseline. It covers site-owned inputs, real interface joint testing, production database migration, identity and SMS integration, HIS/EMR/LIS/PACS, insurance, certificate sharing, security compliance, monitoring, backup/restore rehearsal, blocking conditions, and final signoff evidence.
 
 Use `docs/on-site-launch-materials.md` as the field material collection checklist before formal go-live. The checklist maps GLM/CIT evidence IDs to owners, acceptance criteria, archive locations, resident mobile validation, gray release controls, and hard blocking conditions.
+
+## Protected production promotion preflight
+
+`.github/workflows/production-promotion.yml` is manual-only and can run only from `main` through the protected
+`production` environment on a runner labeled `self-hosted, production-promotion`. It verifies the immutable deployment
+package, the signed production evidence decision and all 14 signed cutover-action decisions before issuing a
+create-once digest-only receipt. It does not deploy the platform or replace external change approval, environment
+reviewers, target credentials, joint testing, site acceptance or rollback execution.

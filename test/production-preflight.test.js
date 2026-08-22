@@ -9,6 +9,10 @@ const {
   verifyProductionDeploymentPackage
 } = require("../scripts/production-deployment-package");
 const { GATE_DEFINITIONS } = require("../scripts/production-release-evidence-readiness");
+const {
+  EVIDENCE_SCHEMA,
+  loadRegister: loadCutoverActionRegister
+} = require("../scripts/production-cutover-action-register");
 const { emptyRegistry } = require("../scripts/release-registry");
 const {
   buildProductionPreflight,
@@ -111,6 +115,37 @@ function passingSoftwareOptions(manifest, registry) {
         { id: "live:health", category: "live", passed: true, detail: "HTTP 200" }
       ]
     }
+  };
+}
+
+function verifiedCutoverActionOptions(manifest) {
+  const register = loadCutoverActionRegister();
+  const actions = [...register.cutoverActions, ...register.evidenceActions];
+  return {
+    now: "2026-08-23T08:00:00.000Z",
+    cutoverActionRegister: register,
+    cutoverActionEvidenceRecords: Object.fromEntries(actions.map((action) => [action.id, { opaque: action.id }])),
+    externalActionEvidenceVerifier: async ({ action }) => ({
+      schemaVersion: EVIDENCE_SCHEMA,
+      verified: true,
+      decisionId: `decision-${action.id}`,
+      actionId: action.id,
+      releaseId: manifest.releaseId,
+      artifactDigest: manifest.artifact.digest,
+      previousState: "evidence-submitted",
+      effectiveState: "verified",
+      previousTransitionDigest: `sha256:${"b".repeat(64)}`,
+      evidenceRef: `controlled://cutover/${action.id}`,
+      evidenceDigest: `sha256:${"c".repeat(64)}`,
+      evidenceFingerprint: `sha256:${"d".repeat(64)}`,
+      commandReceiptDigest: `sha256:${"e".repeat(64)}`,
+      envelopeDigest: `sha256:${"f".repeat(64)}`,
+      verifiedAt: "2026-08-23T07:00:00.000Z",
+      validUntil: "2026-08-23T09:00:00.000Z",
+      evidenceProducerRole: "site-evidence-custodian",
+      verifierRole: "independent-release-verifier",
+      signerIds: [`custodian:${action.id}`, `verifier:${action.id}`]
+    })
   };
 }
 
@@ -225,6 +260,7 @@ test("externally verified release-bound evidence can open the durable followup r
   });
   const report = await buildProductionPreflight({
     ...options,
+    ...verifiedCutoverActionOptions(manifest),
     followupActivationProvider: { configured: true, productionReady: false },
     productionEvidence: evidence,
     evidenceRecords: records,
@@ -242,6 +278,7 @@ test("externally verified release-bound evidence can open the durable followup r
   };
   const drifted = await buildProductionPreflight({
     ...options,
+    ...verifiedCutoverActionOptions(manifest),
     followupActivationProvider: { configured: true, productionReady: false },
     productionEvidence: evidence,
     evidenceRecords: records,

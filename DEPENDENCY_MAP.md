@@ -256,6 +256,7 @@ records 转为稳定摘要绑定，再投影到既有 externalTrustVerifier 两�
 
 ## 生产切换行动证据依赖方向
 
-依赖方向为 `committed definitions → external signed envelope → deployable trust provider → v2 evaluator →
-strict preflight/provenance`。definitions 与 evaluator 不依赖组合根或业务存储；provider 私钥、真实信任锚和
-现场证据始终在仓库外。评估失败只输出稳定 code 与摘要，不反向写回定义文件。
+依赖方向为 `committed definitions → external signed envelope → production-evidence-trust-provider 通用端口 →
+v2 evaluator → strict preflight → protected manual workflow → digest-only receipt`。definitions 与 evaluator
+不依赖组合根或业务存储；provider 私钥、真实信任锚和现场证据始终在仓库外。评估失败只输出稳定 code
+与摘要，不反向写回定义文件；workflow 不反向取得现场审批或部署权威。

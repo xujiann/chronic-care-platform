@@ -257,6 +257,8 @@ head v16、PostgreSQL 结构、`data/db.json` 或任何 data owner。
 ## 18. 生产切换行动证据数据边界
 
 仓库内 JSON 是 `production-cutover-action-definitions-v2` 定义，不是状态事实。权威 effective status 来自
-仓库外签名 envelope 经可信 provider 验证后的摘要化决定，绑定 action、release、artifact、前态转换、
+仓库外每行动一个 `<action-id>.json` 签名 envelope，经共享 Ed25519 trust provider 验证后的摘要化决定，
+绑定 action、release、artifact、前态转换、
 证据/指纹/命令回执 digest、有效期和独立 signer。评估报告不含 envelope、现场正文、凭据或患者数据，
-也不新增集合、表、DDL 或 migration。
+也不新增集合、表、DDL 或 migration。promotion receipt 只保存 preflight、production envelope、14 项行动
+报告和 artifact 的摘要，且明确 `deploymentExecuted=false`。
