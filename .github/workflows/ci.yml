@@ -248,6 +248,8 @@ jobs:
         run: npm run production:go-no-go-readiness
       - name: Verify production external action register
         run: npm run production:actions:check
+      - name: Verify production evidence trust provider
+        run: npm run production-release:trust:test
       - name: Generate medical quality and safety report
         run: npm run quality-safety:report
       - name: Generate drug consumable readiness report

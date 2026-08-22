@@ -65,6 +65,7 @@
 | DATA-003 | 2026-08-22 | 复用既有 collection governance，对 252/252 集合建立唯一 owner/system/review/quarantine 状态；87 个 owner 合同不被复制，源码 process owner 不推断数据 owner，生产晋升固定失败关闭 | 完整性、唯一性、陈旧/冲突、owner/reader/shared 边界、源码引用漂移、核心概念匹配、生产晋升负向与治理 CI |
 | API-IDEM-001 | 2026-08-22 | `production-api-catalog-v2` 将 source marker 与行为证明分层；SMS callback 复用既有事件 ledger/测试成为唯一 pilot，并分类为 HMAC 外部 principal | 合同唯一性、owner/route/实现/测试锚点、伪造 marker 晋升、生产晋升和 distributed exactly-once 否定断言；CI 执行专项行为测试 |
 | API-AUTH-001 | 2026-08-23 | `api-authentication-evidence-v1` 为 13 个客观可证入口登记 owner、mechanism、credential source、required/optional/none、replay/CSRF、scope 和负向测试；原 13 个未分类 key 中 12 个真实入口已闭合，1 个跨 handler 虚假 POST 已删除，目录升级 v3 | 唯一性、owner/route、credential、replay-CSRF、实现/测试锚点、T10 401/403、相邻 handler 误配、证据伪造和生产 promotion 负向；所有 593 项继续 NO-GO |
+| SEC-010 | 2026-08-23 | strict production preflight 不再只能靠测试注入 externalTrustVerifier；可部署 provider 使用 pinned anchor bundle、Ed25519 双角色签名、撤销/时窗和 release/source/artifact/evidence/registry 精确绑定，默认仍 NO-GO | generic signed-envelope 负向矩阵、CLI 自动装配、synthetic fixture 不提升全局生产状态、deployment package/env/CI 合同与脱敏错误 |
 
 ## 重复、死代码和命名结论
 

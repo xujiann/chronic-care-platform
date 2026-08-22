@@ -16,7 +16,8 @@
     "scripts/static-publication.js",
     "scripts/test-all.js",
     "src/http/static-asset-policy.js",
-    "src/platform/data/public-demo-snapshot.js"
+    "src/platform/data/public-demo-snapshot.js",
+    "src/platform/governance/production-evidence-trust-provider.js"
   ],
   "exclude": [
     "node_modules",

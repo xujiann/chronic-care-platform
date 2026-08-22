@@ -31,6 +31,7 @@
 | 10 | CI/worker/部署依赖治理 | CI 风险域拆分已合入并经 main 验证；Action 完整 SHA 固定已形成 T00 候选，worker 仍候选 / P2 | 不降低 required checks；合入后持续按官方 tag 升级并核验 commit SHA，继续评审 worker 观测契约 |
 | 11 | 居民小程序制品凭证扫描消除哈希误报 | 已完成 / P2 | JSON 仅扫描语义字符串值并精确跳过两个字段中的合法 SHA-256；非 JSON 保留文本扫描；真实演示凭证与伪造摘要负向测试已建立 |
 | 12 | 对象存储结构化元数据与耐久命令轨道 | Proposed OBJ-ADR-002；仅完成机器 decision/action register、v17 冲突预留和 CI fail-closed 治理 / P1 | 人类确认 T08 data owner 与 v1/v2 兼容策略，ADR 转 Accepted 后才可按 v17→全量回填/冻结→异步 API→fenced worker→无损分页→持久 reconcile→readiness 的独立切片实施；真实 provider/KMS/WORM/扫描/容量/备份/现场证据继续 NO-GO |
+| 13 | 严格生产预检证据信任装配 | Accepted ADR；T00 pinned-anchor/Ed25519 双角色 provider、CLI 自动装配、deployment package/env/CI 和负向矩阵已形成 / P0 | 真实 anchor/envelope、独立 signer、权限/轮换、外部 evidence 与现场执行继续由生产环境提供；provider 成功不替代完整 preflight 或最终人类授权 |
 
 ## 每日任务模板
 

@@ -245,3 +245,11 @@ head 为 v16。Proposed ADR 仅为未来 v17 预留
 失败关闭，通过后冻结遗留写入，不允许结构化表与 collection 在请求路径双写。列表候选使用绑定 scope、
 排序版本和 high-water mark 的 keyset cursor，不能以 500 条数组切片或 offset 替代。上述均非当前 schema
 事实或生产授权；data owner 与 API 兼容仍需人类确认。
+
+## 17. 生产证据信任材料的数据边界
+
+`platform-governance.evidence-trust-anchors.v1` 与 signed envelope 均是仓库外、metadata-only 的部署输入，
+不是业务集合、数据库事实、migration 或生产证据正文。anchor bundle 只含公钥、摘要、角色、状态和有效期；
+envelope 只含受控引用、SHA-256、release/artifact/evidence/registry 绑定与签名。preflight 只输出 decision ID、
+envelope digest、角色和 signer 数量，不持久化文件、绝对路径、公钥正文或原始错误。本切片不改变 SQLite
+head v16、PostgreSQL 结构、`data/db.json` 或任何 data owner。

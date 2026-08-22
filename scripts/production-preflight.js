@@ -6,6 +6,10 @@ const path = require("node:path");
 const { assessAuditDeliveryConfig } = require("../src/platform/operations/audit-delivery");
 const { inspectFollowupDispatchWorkerReadiness } = require("../src/citizen-chronic/followup-dispatch-worker");
 const { inspectFollowupActivationProvider } = require("../src/citizen-chronic/followup-dispatch-activation-provider");
+const {
+  createFileBackedProductionEvidenceTrustVerifier,
+  inspectProductionEvidenceTrustProvider
+} = require("../src/platform/governance/production-evidence-trust-provider");
 
 const { buildLaunchSmokeReport } = require("./launch-smoke");
 const { verifyProductionDeploymentPackage } = require("./production-deployment-package");
@@ -101,6 +105,38 @@ async function verifyExternalTrust(options, context) {
   }
 }
 
+function resolveProductionEvidenceTrustProvider(env, options = {}) {
+  const inspection = options.productionEvidenceTrustProvider
+    || inspectProductionEvidenceTrustProvider(env, { now: options.now });
+  if (typeof options.externalTrustVerifier === "function") {
+    return Object.freeze({ inspection, verifier: options.externalTrustVerifier, source: "injected" });
+  }
+  if (inspection.configured !== true) {
+    return Object.freeze({ inspection, verifier: undefined, source: "unavailable" });
+  }
+  try {
+    return Object.freeze({
+      inspection,
+      verifier: createFileBackedProductionEvidenceTrustVerifier({ env, now: options.now }),
+      source: "controlled-files"
+    });
+  } catch {
+    return Object.freeze({
+      inspection: Object.freeze({
+        contract: inspection.contract,
+        configured: false,
+        errorCode: "PRODUCTION_EVIDENCE_TRUST_PROVIDER_UNAVAILABLE",
+        reasonCode: "PRODUCTION_EVIDENCE_TRUST_MATERIAL_UNAVAILABLE",
+        detail: "production evidence trust provider failed closed",
+        externalEvidenceRequired: true,
+        productionReady: false
+      }),
+      verifier: undefined,
+      source: "unavailable"
+    });
+  }
+}
+
 async function buildProductionPreflight(options = {}) {
   const root = options.root || ROOT;
   const manifest = options.manifest || JSON.parse(fs.readFileSync(options.packagePath || DEFAULT_PACKAGE, "utf8"));
@@ -119,7 +155,10 @@ async function buildProductionPreflight(options = {}) {
     env
   });
   const productionEvidence = loadProductionEvidence(options);
-  const externalTrust = await verifyExternalTrust(options, {
+  const productionEvidenceTrustProvider = resolveProductionEvidenceTrustProvider(env, options);
+  const externalTrust = await verifyExternalTrust({
+    externalTrustVerifier: productionEvidenceTrustProvider.verifier
+  }, {
     manifest,
     registryEntry: registry.entries?.find((item) => item.releaseId === manifest.releaseId) || null,
     registryVerification,
@@ -259,6 +298,19 @@ async function buildProductionPreflight(options = {}) {
       releaseBound: evidenceReleaseBound,
       externallyVerified: externalTrust.productionEvidenceVerified
     },
+    productionEvidenceTrustProvider: {
+      contract: productionEvidenceTrustProvider.inspection.contract,
+      configured: productionEvidenceTrustProvider.inspection.configured === true,
+      source: productionEvidenceTrustProvider.source,
+      reasonCode: productionEvidenceTrustProvider.inspection.reasonCode || "",
+      signerCount: Number(productionEvidenceTrustProvider.inspection.signerCount || 0),
+      roles: productionEvidenceTrustProvider.inspection.roles || [],
+      verified: externalTrust.registryAttestationVerified === true
+        && externalTrust.productionEvidenceVerified === true,
+      productionReady: externalTrust.registryAttestationVerified === true
+        && externalTrust.productionEvidenceVerified === true,
+      boundary: "Provider verification is necessary but cannot authorize production without every preflight gate."
+    },
     checks,
     blockers: checks.filter((item) => !item.passed).map((item) => ({
       id: item.id,
@@ -332,8 +384,11 @@ async function runCli() {
 }
 
 if (require.main === module) {
-  runCli().catch((error) => {
-    console.error(error.message);
+  runCli().catch(() => {
+    console.error(JSON.stringify({
+      code: "PRODUCTION_PREFLIGHT_FAILED_CLOSED",
+      message: "production preflight failed closed"
+    }));
     process.exitCode = 1;
   });
 }
@@ -345,6 +400,7 @@ module.exports = {
   loadProductionEvidence,
   parseArgs,
   renderMarkdown,
+  resolveProductionEvidenceTrustProvider,
   verifyExternalTrust,
   writeOutput
 };

@@ -184,3 +184,12 @@ T00 technical storage/worker owner、版本化异步 API v2、v17 结构化表�
 reconcile 和 evidence-driven readiness。data owner 与 v1/v2 兼容策略仍待人类确认；机器门禁要求所有
 implementation/promotion 标志为 false、行动保持 blocked，并在治理 CI 失败关闭。该治理切片不改变
 `domain-data-ownership`、migration、runtime、API、数据或生产 `NO-GO`。
+
+## 2026-08-23 严格生产预检证据信任装配
+
+`production-preflight` 的既有 `externalTrustVerifier` 注入点已有可部署 T00 文件型 provider：从仓库外
+受控绝对路径读取不超过 1 MiB 的普通非 symlink trust-anchor bundle 与 signed envelope，以独立配置的
+bundle SHA-256 固定 Ed25519 公钥集合，并验证 active/revoked/retired 生命周期、双角色独立 signer、
+24 小时时窗以及 release/source/artifact/evidence/registry 精确绑定。CLI 缺少或无法验证任一材料时只返回
+稳定脱敏原因并保持 NO-GO；结构正确的 synthetic evidence 不能替代外部签名。本切片不改变 Runtime
+Go/No-Go、公开 API、数据库或最终生产授权。

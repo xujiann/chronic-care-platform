@@ -53,6 +53,11 @@ test("production deployment package hashes runtime files without persisting secr
       "deploy/chronic-followup-dispatch-worker.timer.template",
       "deploy/chronic-followup-dispatch-worker.env.template"
     ].forEach((runtimeFile) => assert.equal(manifest.artifact.files.some((item) => item.path === runtimeFile), true, runtimeFile));
+    [
+      "scripts/production-preflight.js",
+      "scripts/production-release-evidence-readiness.js",
+      "src/platform/governance/production-evidence-trust-provider.js"
+    ].forEach((runtimeFile) => assert.equal(manifest.artifact.files.some((item) => item.path === runtimeFile), true, runtimeFile));
     assert.equal(manifest.artifact.files.some((item) => item.path === "regions/template/manifest.json"), true);
     assert.equal(manifest.artifact.files.some((item) => item.path === "regions/210200/manifest.json"), true);
     assert.equal(manifest.artifact.files.some((item) => item.path === ".env"), false);
@@ -62,6 +67,14 @@ test("production deployment package hashes runtime files without persisting secr
     assert.equal(manifest.processContract.backgroundJobs.some((item) => item.id === "continuous-audit-delivery" && item.productionReady === false && item.preflight === "npm run audit:delivery:preflight"), true);
     assert.equal(manifest.processContract.backgroundJobs.find((item) => item.id === "continuous-audit-delivery").sourceContract, "append-only-audit-source-v2");
     assert.equal(manifest.processContract.backgroundJobs.some((item) => item.id === "chronic-followup-durable-dispatch" && item.preflight === "npm run chronic:followup-dispatch-preflight" && item.sourceContract === "citizen-chronic.followup-dispatch-outbox.v1" && item.productionReady === false && ["DATA_DIR", "CITIZEN_CHRONIC_FOLLOWUP_DISPATCH_SQLITE_FILE", "CITIZEN_CHRONIC_FOLLOWUP_ACTIVATION_REGISTRY_FILE", "CITIZEN_CHRONIC_FOLLOWUP_ACTIVATION_PUBLIC_KEY_FILE", "CITIZEN_CHRONIC_FOLLOWUP_ACTIVATION_PUBLIC_KEY_SHA256"].every((name) => item.configurationVariables.includes(name))), true);
+    assert.equal(manifest.processContract.productionPreflight.entrypoint, "node scripts/production-preflight.js --strict");
+    assert.equal(manifest.processContract.productionPreflight.trustContract, "platform-governance.production-evidence-trust-decision.v1");
+    assert.equal(manifest.processContract.productionPreflight.productionReady, false);
+    assert.deepEqual(manifest.processContract.productionPreflight.configurationVariables, [
+      "PRODUCTION_EVIDENCE_TRUST_ANCHORS_FILE",
+      "PRODUCTION_EVIDENCE_TRUST_ANCHORS_SHA256",
+      "PRODUCTION_EVIDENCE_TRUST_ENVELOPE_FILE"
+    ]);
     assert.equal(manifest.secretContract.variables.some((item) => item.name === "CITIZEN_CHRONIC_FOLLOWUP_PUBLISHER_HMAC_SECRET" && !("value" in item)), true);
     assert.match(
       fs.readFileSync(path.join(ROOT, "deploy", "platform-production-adapters.env.template"), "utf8"),
@@ -102,6 +115,12 @@ test("deployment package verification detects file digest tampering", () => {
   assert.equal(workerFailed.ok, false);
   assert.equal(workerFailed.checks.some((item) => item.id === "deploymentVerify:auditWorker" && !item.passed), true);
   assert.equal(workerFailed.checks.some((item) => item.id === "deploymentVerify:chronicFollowupWorker" && !item.passed), true);
+
+  const missingTrustProvider = structuredClone(manifest);
+  missingTrustProvider.processContract.productionPreflight.configurationVariables = [];
+  const trustProviderFailed = verifyProductionDeploymentPackage(missingTrustProvider);
+  assert.equal(trustProviderFailed.ok, false);
+  assert.equal(trustProviderFailed.checks.some((item) => item.id === "deploymentVerify:productionEvidenceTrust" && !item.passed), true);
 });
 
 test("deployment package renders writes and parses CLI flags", (t) => {
