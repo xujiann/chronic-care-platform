@@ -59,3 +59,10 @@
 - governance-api 执行 fail-closed 检查：ADR/台账漂移、v17 被占用、owner 被推断、行动提前或任何
   migration/runtime/API/promotion 标志误启用均失败。
 - 下一步不是直接编码；先完成人类决策和 ADR Acceptance，再按每个可回滚阶段独立审批。
+
+## 2026-08-23 生产切换行动证据 v2
+
+- 已把 14 项配置降为 definitions-only，禁止提交 `status` 作为完成事实。
+- 已建立外部 verifier 驱动的 release/artifact/time/transition/role/digest 评估与负向测试。
+- 下一步把可部署 trust provider 与 v2 action evaluation 接入 strict preflight、发布 provenance 和受保护的
+  手动 promotion workflow；真实 envelope、信任锚、审批和现场执行继续外置。

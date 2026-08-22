@@ -12,6 +12,7 @@
   },
   "include": [
     "scripts/run-standard-test-suite.js",
+    "scripts/production-cutover-action-register.js",
     "scripts/standard-build.js",
     "scripts/static-publication.js",
     "scripts/test-all.js",
