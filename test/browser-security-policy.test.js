@@ -48,7 +48,7 @@ test("central browser header port keeps the target CSP report-only and productio
   assert.equal(readiness.staticHostingReady, false);
   assert.deepEqual(readiness.blockers, [
     "CSP_REPORT_ONLY",
-    "INLINE_BROWSER_RISK_BASELINE_OPEN",
+    "DYNAMIC_BROWSER_STYLE_VALIDATION_REQUIRED",
     "STATIC_HOST_RESPONSE_HEADERS_REQUIRE_EXTERNAL_ENFORCEMENT",
     "INDEPENDENT_BROWSER_SECURITY_ASSESSMENT_REQUIRED"
   ]);
@@ -61,13 +61,13 @@ test("published browser assets match the governed inline and eval risk baseline"
   const verification = verifyBrowserSecurityInventory(inventory, policy.riskBaseline);
 
   assert.equal(verification.ok, true);
-  assert.equal(inventory.summary.total, 58);
-  assert.equal(inventory.summary.byPriority.P0, 37);
-  assert.equal(inventory.summary.byPriority.P1, 21);
+  assert.equal(inventory.summary.total, 0);
+  assert.equal(inventory.summary.byPriority.P0, 0);
+  assert.equal(inventory.summary.byPriority.P1, 0);
   assert.equal(inventory.summary.byPriority.P2, 0);
-  assert.equal(inventory.summary.byType["inline-script"], 37);
-  assert.equal(inventory.summary.byType["inline-style-block"], 8);
-  assert.equal(inventory.summary.byType["style-attribute"], 13);
+  assert.equal(inventory.summary.byType["inline-script"], 0);
+  assert.equal(inventory.summary.byType["inline-style-block"], 0);
+  assert.equal(inventory.summary.byType["style-attribute"], 0);
   assert.equal(inventory.summary.byType["event-handler"], 0);
   assert.equal(inventory.summary.byType["eval-call"], 0);
   assert.equal(inventory.riskTypes["event-handler"].priority, "P0");

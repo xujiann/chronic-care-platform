@@ -493,6 +493,7 @@ test("static cutover preview page exposes T10 tracks and release-artifact fallba
   const root = path.resolve(__dirname, "..");
   const html = fs.readFileSync(path.join(root, "t10-specialty-cutover.html"), "utf8");
   const client = fs.readFileSync(path.join(root, "t10-specialty-cutover.js"), "utf8");
+  const pageCss = fs.readFileSync(path.join(root, "t10-specialty-cutover-inline.css"), "utf8");
 
   assert.match(html, /T10专项上线割接总控/);
   assert.match(html, /灰度演练、回退与值守计划/);
@@ -512,8 +513,9 @@ test("static cutover preview page exposes T10 tracks and release-artifact fallba
   assert.match(html, /observation-signal-board/);
   assert.match(html, /runtime-smoke-plan/);
   assert.match(html, /t10-specialty-cutover\.js\?v=external-action-workflow/);
-  assert.match(html, /overflow-wrap:\s*anywhere/);
-  assert.match(html, /scroll-margin-top:\s*200px/);
+  assert.match(html, /t10-specialty-cutover-inline\.css/);
+  assert.match(pageCss, /overflow-wrap:\s*anywhere/);
+  assert.match(pageCss, /scroll-margin-top:\s*200px/);
   assert.match(html, /emergency\.html/);
   assert.match(html, /blood\.html/);
   assert.match(html, /imaging-cloud\.html/);

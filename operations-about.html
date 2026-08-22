@@ -7,7 +7,7 @@
     <link rel="stylesheet" href="./portal.css" />
     <script src="./access-control-policy.js"></script>
     <script src="./auth.js"></script>
-    <script>window.HealthCityAuth.requireRole(["commission"])</script>
+    <script src="./page-auth-bootstrap.js" data-roles="commission"></script>
   </head>
   <body>
     <main class="portal-shell operations-about-page">
@@ -161,8 +161,6 @@
         </div>
       </section>
     </main>
-    <script>
-      window.HealthCityAuth.renderSessionBar();
-    </script>
+    <script src="./page-auth-bootstrap.js" data-auth-action="render-session-bar"></script>
   </body>
 </html>

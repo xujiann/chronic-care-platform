@@ -8,7 +8,7 @@
 
 1. HTML、JavaScript、CSS、JSON、404 和重定向后的最终响应均核对 `nosniff`、frame、referrer、permissions 与 CSP。
 2. HTTPS 生产域核对 HSTS；不要在未知子域影响范围时擅自加入 `preload`。
-3. 严格 CSP 在遗留风险归零前仅 Report-Only；兼容 CSP 中的 `unsafe-inline` 是阻断项，不是豁免证明。
+3. 显式发布图 P0/P1 静态风险已归零；动态 CSSOM、全角色浏览器和真实托管验证完成前严格 CSP 仍仅 Report-Only，兼容 CSP 中的 `unsafe-inline` 是阻断项，不是豁免证明。
 4. 不得添加 `unsafe-eval`、`*` 脚本源、任意 frame 或外部报告接收端，除非另有 Accepted ADR、数据分类和安全评审。
 5. 现场抓取、浏览器报告、渗透测试和整改证据保存在受控系统；仓库只登记摘要/引用，不保存凭据、Cookie、令牌或患者数据。
 

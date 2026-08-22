@@ -198,7 +198,8 @@ test("体检系统静态入口包含角色守卫与健康档案同步提示", ()
   const root = path.join(__dirname, "..");
   const html = fs.readFileSync(path.join(root, "physical-examination.html"), "utf8");
   const citizen = fs.readFileSync(path.join(root, "citizen.html"), "utf8");
-  assert.match(html, /requireRole\(\["commission", "institution", "citizen"\]\)/);
+  assert.match(html, /page-auth-bootstrap\.js/);
+  assert.match(html, /data-roles="commission,institution,citizen"/);
   assert.match(html, /physical-exam-import-form/);
   assert.match(html, /physical-exam-readiness/);
   assert.match(html, /机构联调验收/);

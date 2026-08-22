@@ -35,7 +35,7 @@
 | 区域运行 | `src/platform/regional/`、`regions/` | 多地区清单、能力包、复制和发布注册 |
 | 领域实现 | `src/care-coordination/` 等与根目录服务 | 新旧实现并存，边界尚未完全迁移 |
 | 前端共享 | `auth.js`、`shared.js`、`platform-api-client.js`、`platform-shell.js` | 身份上下文、API 调用、壳和设计系统；服务端 token 不进入 localStorage，Cookie 上下文优先，陈旧凭据启动即清理 |
-| 静态发布与浏览器安全 | `src/http/static-asset-policy.js`、`src/http/static-content-runtime.js`、`src/http/browser-security-policy.js`、`src/http/browser-security-inventory.js`、`scripts/static-publication.js` | 44 个入口、递归资源图、Pages 制品和服务端读取共用默认拒绝契约；集中响应头与 P0/P1 风险基线已建立，严格 CSP 仍是 Report-Only，生产 NO-GO |
+| 静态发布与浏览器安全 | `src/http/static-asset-policy.js`、`src/http/static-content-runtime.js`、`src/http/browser-security-policy.js`、`src/http/browser-security-inventory.js`、`page-auth-bootstrap.js`、`scripts/static-publication.js` | 44 个入口、递归资源图、Pages 制品和服务端读取共用默认拒绝契约；页面守卫使用外部标准接口，显式发布图 P0/P1 静态风险为 0；严格 CSP 仍是 Report-Only，生产 NO-GO |
 | 演示脱敏 | `src/platform/data/public-demo-snapshot.js` | 服务端合成、Pages 构建和 storage-admin 共用纯函数，凭据字段删除、个人姓名/身份/联系字段稳定掩码 |
 | API 生产目录 | `routeSourceFiles` + `scripts/api-authorization-matrix.js` → `scripts/production-api-catalog.js` | 字面路由与声明级授权事实合并为 endpoint 级 owner/auth/scope/idempotency/生产状态；249 项保留治理复核，全部生产 NO-GO |
 

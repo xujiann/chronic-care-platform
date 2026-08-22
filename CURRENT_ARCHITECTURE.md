@@ -109,11 +109,11 @@ flowchart TB
     供应商能力证明仍是后续债务。
 12. SEC-004 第一切片把 `server.js` 的浏览器响应头抽到
     `src/http/browser-security-policy.js`，动态 HTML、静态资源、API、下载与错误响应继续复用同一端口。
-    现有兼容 CSP 仍强制同源 base/frame、禁止 object 与脚本事件属性，但为保持 44 个页面兼容继续
-    允许 inline 脚本/样式；不含 `unsafe-inline`/`unsafe-eval` 的目标策略仅以 Report-Only 下发。
-    显式发布图的机器基线当前登记 37 个 P0 inline script 与 21 个 P1 inline style/style attribute，
-    CI 和静态构建按资产/类型/片段指纹拒绝新增高风险。静态制品携带同一策略合同，但真实托管响应头、
-    严格 CSP、独立扫描和现场验收均未证明，`productionReady` 保持 `false`。
+    第二切片把 37 个可执行内联脚本统一迁至外部脚本，把 8 个内联样式块和 13 个样式属性迁至外部
+    CSS/class；页面角色与账户守卫由 `page-auth-bootstrap.js` 复用同一标准接口。显式发布图的 P0/P1
+    静态风险基线现为 0，CI 和静态构建拒绝新增高风险。兼容 CSP 暂时仍含 `unsafe-inline`，严格目标
+    仅以 Report-Only 下发，因为动态 CSSOM/全角色运行时回归、真实托管响应头、独立扫描和现场验收
+    均未证明，`productionReady` 保持 `false`。
 
 ## 6. T06 五子域治理切片
 
