@@ -131,7 +131,7 @@ jobs:
       - name: Check legacy JavaScript syntax baseline
         run: npm run check
       - name: Verify static publication security boundary
-        run: npm run static:check && npm run static:test
+        run: npm run static:check && npm run security:browser:verify && npm run static:test
       - name: Verify API authorization matrix
         run: npm run api:authorization-matrix
       - name: Verify production API catalog

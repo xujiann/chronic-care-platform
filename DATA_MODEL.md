@@ -81,6 +81,11 @@ erDiagram
 
 `config/domain-data-ownership.json` 只登记 83 个集合：platform-governance 32、care 11、public-health 10、clinical 9、integration 7、citizen 6、identity 5、insurance 2、research 1。其余集合按策略为 `legacy-non-authoritative`，禁止直接晋升为生产写模型。
 
+根目录 `browser-security-policy.json` 是公开的静态发布/响应头治理合同，不是业务集合、数据库
+Schema、生产事实或安全评估证据。其风险基线只保存公开资产路径、风险类型、优先级、数量和规范化
+片段 SHA-256，不保存页面正文、用户数据、CSP 上报、Cookie 或凭据。新增高风险会使构建失败；风险
+减少需在评审后更新合同，但不产生 migration 或数据 Owner 变化。
+
 `followups` 继续由 citizen-chronic/T04 拥有；随访事件 outbox、inbox、projection 和 receipt
 仍嵌在该聚合的 `domainRuntime` 中。本切片只增加安全 publisher 端口，没有新集合、DDL、
 migration 或事实源变化。receipt 不保存供应方原始回执 ID、签名或正文，只保存事件关联、

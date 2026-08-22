@@ -238,6 +238,7 @@ function buildIdentityContract(options = {}) {
   const productionEvidence = options.productionEvidence || {};
   const adapterSource = options.adapterSource ?? readText("production-adapters.js");
   const serverSource = options.serverSource ?? readRuntimeSource(ROOT);
+  const browserSecurityPolicySource = options.browserSecurityPolicySource ?? readText("browser-security-policy.json");
   const sessionStoreSource = options.sessionStoreSource ?? readText("session-store.js");
   const runtimeIdentityPolicySource = options.runtimeIdentityPolicySource ?? readText("src/identity-security/runtime-identity-policy.js");
   const authSource = options.authSource ?? readText("auth.js");
@@ -361,7 +362,9 @@ function buildIdentityContract(options = {}) {
       sessionRetention: ["cleanupRuntimeSessions", "scheduleSessionCleanup", "/api/auth/sessions/cleanup", "SESSION_CLEANUP_CONFIRMATION_REQUIRED", "PRODUCTION_SESSION_RETENTION_INVALID"].every((marker) => serverSource.includes(marker)) && ["cleanup(options", "deletedExpired", "deletedRevoked"].every((marker) => sessionStoreSource.includes(marker)) && ["SESSION_EXPIRED_RETENTION_DAYS", "SESSION_REVOKED_RETENTION_DAYS", "SESSION_CLEANUP_INTERVAL_MS"].every((marker) => envTemplate.includes(marker)) && platformSource.includes("会话保留"),
       browserFailClosed: authSource.includes("认证服务暂不可用，请稍后重试"),
       residentScope: ["applyResidentScope", "canManageResidentProfile", "INSURANCE_RESIDENT_COLLECTIONS", "COUNTY_RESIDENT_COLLECTIONS"].every((marker) => serverSource.includes(marker)),
-      contentSecurity: serverSource.includes("script-src-attr 'none'") && [bloodBusinessSource, bloodRecallSource].every((source) => source.includes("escapeHtml")),
+      contentSecurity: serverSource.includes("createBrowserSecurityHeaders")
+        && ["script-src-attr", "report-only", "CSP_REPORT_ONLY"].every((marker) => browserSecurityPolicySource.includes(marker))
+        && [bloodBusinessSource, bloodRecallSource].every((source) => source.includes("escapeHtml")),
       boundary: ["生产安全边界", "集中式会话", "不再回退到本地演示账号"].every((marker) => adapterDocument.includes(marker))
     }
   };

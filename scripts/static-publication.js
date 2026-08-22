@@ -5,6 +5,8 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { buildPublicDemoSnapshot } = require("../src/platform/data/public-demo-snapshot");
 const { collectPublicAssets, loadStaticPublicationContract } = require("../src/http/static-asset-policy");
+const { browserSecurityReadiness, loadBrowserSecurityPolicy } = require("../src/http/browser-security-policy");
+const { scanBrowserSecurityInventory, verifyBrowserSecurityInventory } = require("../src/http/browser-security-inventory");
 
 const ROOT = path.resolve(__dirname, "..");
 
@@ -42,6 +44,12 @@ function buildStaticPublication(options = {}) {
   const output = resolveOutput(options.output);
   const contract = options.contract || loadStaticPublicationContract();
   const assets = collectPublicAssets(ROOT, contract);
+  const browserSecurityPolicy = loadBrowserSecurityPolicy();
+  const browserSecurityInventory = scanBrowserSecurityInventory({ root: ROOT, assets });
+  const browserSecurityVerification = verifyBrowserSecurityInventory(browserSecurityInventory, browserSecurityPolicy.riskBaseline);
+  if (!browserSecurityVerification.ok) {
+    throw new Error(`Browser security inventory rejected: ${browserSecurityVerification.code}`);
+  }
   const generatedAt = options.generatedAt || new Date().toISOString();
   fs.mkdirSync(output, { recursive: true });
 
@@ -64,6 +72,12 @@ function buildStaticPublication(options = {}) {
     schemaVersion: 1,
     generatedAt,
     profile: "public-static",
+    browserSecurity: {
+      ...browserSecurityReadiness({ policy: browserSecurityPolicy }),
+      inventory: browserSecurityInventory.summary,
+      baselineRevision: browserSecurityPolicy.riskBaseline.sourceRevision,
+      externalHeaderApplicationRequired: browserSecurityPolicy.staticHosting.headerApplicationRequired === true
+    },
     files
   };
   return { output, manifest };

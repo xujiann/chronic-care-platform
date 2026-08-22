@@ -54,10 +54,11 @@ https://xujiann.github.io/chronic-care-platform/
 - 静态演示数据。
 - 居民端本地上传和授权记录。
 
-Pages 工作流会在仓库外的临时目录生成脱敏演示快照，并拒绝把仓库根目录、`data/db.json`、服务端源码、未明确列入清单的配置、文档或元数据作为静态制品。可先只读检查资产清单：
+Pages 工作流会在仓库外的临时目录生成脱敏演示快照，并拒绝把仓库根目录、`data/db.json`、服务端源码、未明确列入清单的配置、文档或元数据作为静态制品。制品显式包含公开的 `browser-security-policy.json`，用于声明托管层必须应用的响应头、严格 CSP Report-Only 目标和遗留风险基线；该文件存在不证明真实静态响应头已生效，生产静态入口仍需托管/CDN 配置和独立抓取验收。可先只读检查资产清单：
 
 ```powershell
 npm.cmd run static:inventory
+npm.cmd run security:browser:verify
 ```
 
 需要本地验证 Pages 制品时，必须把输出放在仓库外的空目录：
@@ -81,6 +82,7 @@ node scripts/static-publication.js build --output=C:\temp\health-platform-pages
 
 - `package.json`
 - `server.js`
+- `browser-security-policy.json`
 - `data/db.json`
 - `data/health-city.sqlite` 或生产数据库连接配置。
 

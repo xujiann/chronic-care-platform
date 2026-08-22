@@ -17,7 +17,7 @@
 | CHR-001 | 慢病随访事件投递 | T04 已有原子内嵌 outbox、幂等 inbox、稳定幂等键、独立 activation verifier、范围过滤、审计和签名 HTTPS publisher；单进程并发可合并，但批次/写回失败会再次发出同幂等键请求 | 仍需 T00/T04 独立任务建立 verifier 组合、持久 worker、lease、attempt/backoff、死信、供应方幂等核对和部署观测；当前不能承诺跨进程 exactly-once，不得关闭生产 Go/No-Go |
 | OBJ-001 | 对象存储生产闭环 | 应用侧 v1 响应信任已建立；500 条兼容上限已改为网关调用前失败关闭，既有 immutable/legal-hold 元数据不再被静默淘汰，但仍无无损分页仓储；外部 upload/complete/lifecycle 成功后再写本地状态，缺少 outbox、幂等收敛、失败对账和补偿；网关能力尚无签名声明 | 容量耗尽现在表现为明确不可用而非静默丢证据；外部对象与权威元数据仍可能不一致。后续分别建立无损分页/保留策略、请求外事务的持久命令轨道与对账 worker、版本化能力证明，禁止在请求路径直接双写 |
 | OPS-001 | 连续审计耐久信任 | 仓库内来源缺口已关闭：v15 同事务 append-only source、最小投影、cursor 批次、target/source 绑定和 checkpoint v3 已有专项测试；已淘汰历史不可恢复，checkpoint/head 仍在同一本地信任域，SIEM receipt 未独立验签，filesystem 仅是 WORM rehearsal | 继续 NO-GO：需真实签名耐久 receipt、外部单调 anchor、WORM/KMS/保留与恢复能力、Data Owner 投影审批、专用账号及现场验收 |
-| SEC-004 | XSS 面 | 871 个 HTML sink，CSP 允许 inline | 需可信渲染接口和逐页负向测试 |
+| SEC-004 | XSS / CSP 面 | 第一治理切片已集中响应头，保留兼容 CSP 并增加严格 Report-Only；显式发布图基线为 37 个 P0 inline script、21 个 P1 inline style/style attribute，event-handler/eval 当前为 0 且 CI 拒绝新增。871 个 HTML sink 尚未逐一进入可信渲染端口，静态托管响应头也无现场证据 | 按页面逐批外移脚本/样式并补恶意输入/E2E；P0/P1 归零后才强制严格 CSP；真实动态/静态响应头、独立扫描和渗透验收前继续 NO-GO |
 | SEC-005 | 混合会话 | 服务端 token 已禁止写入 localStorage，Cookie/Authorization 并存时 Cookie 优先，旧凭据自动清理；生产 bearer/hybrid 需显式兼容门禁并保持 NO-GO，静态演示仅保存无凭据身份状态 | bearer-only 仍有页面内存凭据、刷新即失效和额外运维状态；XSS/CSP 风险及真实 Cookie/CSRF 现场验证尚未关闭 |
 | DATA-003 | 集合治理 | JSON 252 个集合，只有 83 个有 owner | 169 个遗留集合不能安全晋升生产 |
 | TEST-002 | 覆盖率 | c8 只 include `server.js`，固定测试清单 | 新 `src/` 模块和浏览器代码不在覆盖率结论中 |

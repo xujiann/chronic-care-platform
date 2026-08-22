@@ -22,6 +22,7 @@ const AUDIT_DELIVERY_RUNTIME_FILES = [
 ];
 const REQUIRED_RUNTIME_FILES = [
   "server.js",
+  "browser-security-policy.json",
   "src/http/api-router.js",
   "src/http/routes/index.js",
   "session-store.js",
@@ -35,6 +36,7 @@ const REQUIRED_RUNTIME_FILES = [
   ...AUDIT_DELIVERY_RUNTIME_FILES
 ];
 const ADDITIONAL_RUNTIME_FILES = [
+  "browser-security-policy.json",
   "config/regions.json",
   "deploy/postgres-primary-storage-schema.sql",
   "scripts/postgres-sync-worker.js",

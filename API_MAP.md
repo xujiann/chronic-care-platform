@@ -6,6 +6,7 @@
 
 ```text
 HTTP request
+  → browser-security-headers.v1（兼容 CSP + 严格 Report-Only；生产 HSTS）
   → platform request handler
   → cookie/session hydration
   → createPlatformApiRouter(runtime)
@@ -75,6 +76,9 @@ HTTP request
 - router 未命中统一 404；存储冲突和 session store 不可用有专用错误转换。
 - 健康/存储元数据的既有 `schemaVersion` 字段形状保持不变，值由 SQLite 注册表 head 派生，当前为 15；未新增或删除 API 路径、角色、权限或审计动作。
 - 静态未知/敏感路径统一 404；`GET/HEAD /data/public-demo.json` 返回合成脱敏数据，`/data/db.json`、源码、配置和仓库元数据不可发布。
+- HTML、静态资源、JSON/API、下载与错误响应由集中端口下发 `nosniff`、frame、referrer、
+  permissions 与 CSP。兼容 CSP 仍含 `unsafe-inline`，严格目标只为 Report-Only；因此响应头存在不等于
+  SEC-004 已关闭。生产 HSTS 只由生产运行时生成，真实 TLS 终止层仍需现场核验。
 - 多个领域具有 HMAC、nonce、时间窗、CAS、outbox 和 replay 记录。
 - 错误格式仍由不同路由模块自行构造，存在 `{error}`、`{ok,code,message}` 等多种形态。
 - 审计追加点分散在组合根、路由和领域服务；统一审计契约尚未完全落地。

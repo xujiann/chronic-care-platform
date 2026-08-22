@@ -48,6 +48,7 @@
     "workbench.html"
   ],
   "seedAssets": [
+    "browser-security-policy.json",
     "config/disease-payment/templates/local-drg-package.template.json",
     "config/disease-payment/templates/local-dip-package.template.json",
     "manifest.webmanifest",

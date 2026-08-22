@@ -23,6 +23,7 @@ test("production deployment package hashes runtime files without persisting secr
     assert.equal(manifest.productionReady, false);
     assert.match(manifest.artifact.digest, /^sha256:[a-f0-9]{64}$/);
     assert.equal(manifest.artifact.files.some((item) => item.path === "server.js"), true);
+    assert.equal(manifest.artifact.files.some((item) => item.path === "browser-security-policy.json"), true);
     assert.equal(manifest.artifact.files.some((item) => item.path === "src/http/api-router.js"), true);
     assert.equal(manifest.artifact.files.some((item) => item.path === "src/http/routes/index.js"), true);
     assert.equal(manifest.artifact.files.some((item) => item.path === "src/http/routes/public-health.js"), true);

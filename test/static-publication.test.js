@@ -69,7 +69,13 @@ test("static publication build writes a sanitized standalone Pages artifact", ()
     const result = buildStaticPublication({ output, generatedAt: "2026-08-18T00:00:00.000Z" });
     const published = JSON.parse(fs.readFileSync(path.join(output, "data", "public-demo.json"), "utf8"));
     assert.equal(result.manifest.profile, "public-static");
+    assert.equal(result.manifest.browserSecurity.contractId, "browser-security-headers.v1");
+    assert.equal(result.manifest.browserSecurity.cspMode, "report-only");
+    assert.equal(result.manifest.browserSecurity.productionReady, false);
+    assert.equal(result.manifest.browserSecurity.externalHeaderApplicationRequired, true);
+    assert.equal(result.manifest.browserSecurity.inventory.total, 58);
     assert.deepEqual(listFiles(output).sort(), result.manifest.files.map((file) => file.path).sort());
+    assert.equal(fs.existsSync(path.join(output, "browser-security-policy.json")), true);
     assert.equal(fs.existsSync(path.join(output, "index.html")), true);
     assert.equal(fs.existsSync(path.join(output, "server.js")), false);
     assert.equal(fs.existsSync(path.join(output, "package.json")), false);
