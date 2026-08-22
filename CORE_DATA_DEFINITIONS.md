@@ -33,3 +33,10 @@
 3. 是否需要新的跨域读/写契约，而不是新建副本？
 4. 是否涉及敏感字段、最小必要和保留期？
 5. 是否有旧 ID 映射、数据迁移和兼容窗口？
+
+## State collection 治理投影
+
+集合治理 CLI 只对表中英文概念名做保守的精确单复数匹配，作为 closed-world review 证据；当前
+匹配 `accounts→Account`、`residents→Resident`、`integrationContracts→IntegrationContract`、
+`serviceOrders→ServiceOrder`。匹配不创建 owner、不证明语义等价，也不授权生产晋升；未匹配集合
+更不能据名称猜测概念。概念/主键/owner 变化仍必须遵守本文件的 ADR、migration、核对和回滚规则。

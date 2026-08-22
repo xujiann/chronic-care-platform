@@ -10,6 +10,8 @@
 6. 更新 schema head 时同步运行时常量、检查脚本、测试和 `DATABASE_SCHEMA.md`。
 7. 生产写模型必须先登记 data owner 和版本化写契约。
 8. 请求路径不得执行 SQLite/PostgreSQL 双写；使用事务 outbox。
+9. 新增或引用 state collection 必须同步 `state-collection-governance`；未知 owner 只能进入
+   `review-required`/`legacy-quarantined`，不得用 route/process owner 自动推断数据 owner。
 
 ## 2. Migration 必备结构
 
@@ -48,6 +50,9 @@
 ① 输出 schema → ② 分析关系 → ③ 核对实际使用 → ④ 维护 `DATA_MODEL.md` → ⑤ 加固 migration 体系 → ⑥ 冻结核心表/定义 → ⑦ 新需求按新标准 → ⑧ 旧结构渐进迁移。
 
 ①–④已完成主线重验；⑤已由 Accepted ADR 和独立 migration 注册表实施，⑥由 v1–v14 冻结指纹、`CORE_DATA_DEFINITIONS.md` 与 owner 规则共同约束。⑦–⑧继续按新 migration 标准和逐批数据核对实施，不得回写历史版本。
+
+DATA-003 已为 252/252 个当前 state collection 建立机器状态与源码使用证据；这只关闭未分类缺口。
+188 个 review-required 与 1 个 quarantine 仍须按 owner 批次确认、归档或迁移，不能因 CI 通过晋升。
 
 ### 当前兼容约束
 

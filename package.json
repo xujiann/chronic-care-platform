@@ -163,6 +163,7 @@
     "product-operations:readiness": "node scripts/product-operations-readiness.js",
     "product-regional:enhancement-readiness": "node scripts/product-regional-enhancement-readiness.js",
     "data:collection-governance": "node scripts/data-collection-governance.js --write",
+    "data:collection-governance:verify": "node scripts/data-collection-governance.js --verify",
     "data:collection-governance:test": "node --test test/data-collection-governance.test.js",
     "evaluation:evidence": "node scripts/evaluation-evidence.js",
     "release:manifest": "node scripts/release-artifact-manifest.js",

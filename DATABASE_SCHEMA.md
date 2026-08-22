@@ -50,3 +50,6 @@
 - schema fingerprint 用于确定性比较空库与受支持升级 fixture，不替代生产数据核对、备份或现场迁移证据。
 - 专项 SQLite 表不共享同一个版本台账，不能纳入主 schema head。
 - v15 只将严格验证通过的当前审计窗口登记为 `historical_baseline`，不声称恢复已淘汰历史；v16+ 仍需按新需求补回填、核对和前滚恢复证据。
+- DATA-003 不改变 schema head、表、列、索引、trigger 或 migration。当前 252 个 JSON/SQLite state
+  collection 名称由治理 CLI 只读核对：60 个命中 owner 合同、3 个系统集合、188 个
+  `review-required`、1 个 `legacy-quarantined`；所有生产晋升仍需新 migration/回滚与现场证据。
