@@ -105,7 +105,7 @@ JSON 源快照仍是高扇出依赖，但浏览器和 Pages 只依赖经统一�
 
 | 外部依赖 | 主要模块 | 失败边界 |
 |---|---|---|
-| PostgreSQL | platform storage、session、领域 repository | TLS、schema、CAS、outbox、核对 |
+| PostgreSQL | platform storage、session、领域 repository | TLS、schema、CAS、outbox、核对、容量与故障切换元数据门禁 |
 | HIS/EMR/LIS/PACS | T08、care、clinical | 现场地址、凭据、证书、字段与回执 |
 | OIDC/SMS | T01 identity-security | provider 可用性、绑定、重放、回调验签及共享 OTP/限流/锁定状态 |
 | HAPI FHIR/Orthanc/OHIF | Solution A、clinical | 容器版本、认证、DICOM/FHIR 兼容 |

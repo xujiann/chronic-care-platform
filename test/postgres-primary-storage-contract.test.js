@@ -333,10 +333,9 @@ test("shadow reconciliation is payload-free and reports version and digest diffe
   assert.doesNotMatch(JSON.stringify(report), /"enabled"/);
 });
 
-test("transition assessment requires migration, reconciliation, drained outbox, recovery and fallback evidence", () => {
-  const config = buildPostgresPrimaryStorageConfig(evidenceEnv("primary-write"));
+function completeTransitionEvidence() {
   const sourceDigest = "a".repeat(64);
-  const complete = {
+  return {
     requestedMode: "primary-write",
     migration: {
       status: "verified",
@@ -359,6 +358,30 @@ test("transition assessment requires migration, reconciliation, drained outbox, 
       measuredRpoSeconds: 20,
       targetRpoSeconds: 30
     },
+    capacity: {
+      status: "verified",
+      profileRef: "controlled://database/capacity-profile-2026-08-22",
+      evidenceRef: "controlled://database/capacity-result-2026-08-22",
+      targetRecords: 1_000_000,
+      testedRecords: 1_200_000,
+      targetConcurrency: 200,
+      measuredConcurrency: 240,
+      targetThroughputPerSecond: 500,
+      measuredThroughputPerSecond: 560,
+      targetP95LatencyMs: 300,
+      measuredP95LatencyMs: 220,
+      targetP99LatencyMs: 800,
+      measuredP99LatencyMs: 640,
+      criticalFindingsOpen: 0
+    },
+    failover: {
+      status: "verified",
+      evidenceRef: "controlled://database/failover-2026-08-22",
+      targetFailoverSeconds: 120,
+      measuredFailoverSeconds: 75,
+      dataLossObserved: false,
+      criticalFindingsOpen: 0
+    },
     fallback: {
       status: "verified",
       target: "sqlite",
@@ -366,6 +389,11 @@ test("transition assessment requires migration, reconciliation, drained outbox, 
       evidenceRef: "fallback:2026-08-06"
     }
   };
+}
+
+test("transition assessment requires migration, reconciliation, drained outbox, recovery, capacity, failover and fallback evidence", () => {
+  const config = buildPostgresPrimaryStorageConfig(evidenceEnv("primary-write"));
+  const complete = completeTransitionEvidence();
   const ready = buildTransitionAssessment(complete, config);
   assert.equal(ready.readyForControlledRehearsal, true);
   assert.equal(ready.blockers.length, 0);
@@ -382,4 +410,120 @@ test("transition assessment requires migration, reconciliation, drained outbox, 
   assert.equal(blocked.readyForControlledRehearsal, false);
   assert.deepEqual(blocked.blockers, ["reconciliation", "outbox", "backup-and-recovery"]);
   assert.equal(blocked.productionPrimary, false);
+});
+
+test("transition assessment fails closed on missing capacity, failover and blank numeric evidence", () => {
+  const config = buildPostgresPrimaryStorageConfig(evidenceEnv("primary-read"));
+  const complete = { ...completeTransitionEvidence(), requestedMode: "primary-read" };
+
+  const missing = buildTransitionAssessment({
+    ...complete,
+    capacity: undefined,
+    failover: undefined
+  }, config);
+  assert.equal(missing.readyForControlledRehearsal, false);
+  assert.deepEqual(missing.blockers, ["capacity-and-failover"]);
+
+  const blank = buildTransitionAssessment({
+    ...complete,
+    delivery: { pending: "", retry: " ", failed: null },
+    recovery: {
+      ...complete.recovery,
+      measuredRtoSeconds: "",
+      targetRtoSeconds: " ",
+      measuredRpoSeconds: Number.NaN,
+      targetRpoSeconds: Number.POSITIVE_INFINITY
+    },
+    capacity: {
+      ...complete.capacity,
+      testedRecords: "",
+      measuredThroughputPerSecond: Number.POSITIVE_INFINITY,
+      criticalFindingsOpen: -1
+    },
+    failover: {
+      ...complete.failover,
+      measuredFailoverSeconds: "",
+      dataLossObserved: true
+    }
+  }, config);
+  assert.equal(blank.readyForControlledRehearsal, false);
+  assert.deepEqual(blank.blockers, ["outbox", "backup-and-recovery", "capacity-and-failover"]);
+  assert.equal(blank.activationAuthorized, false);
+  assert.equal(blank.productionReady, false);
+  assert.equal(blank.productionPrimary, false);
+  assert.equal(blank.runtimeCutoverEnabled, false);
+});
+
+test("transition assessment rejects coercible counts, non-canonical metrics and non-string evidence references", () => {
+  const config = buildPostgresPrimaryStorageConfig(evidenceEnv("primary-write"));
+  const complete = completeTransitionEvidence();
+  const cases = [
+    ["blank migration count", { migration: { ...complete.migration, sourceCollections: "" } }, "migration"],
+    ["infinite migration counts", {
+      migration: { ...complete.migration, sourceCollections: Number.POSITIVE_INFINITY, targetCollections: Number.POSITIVE_INFINITY }
+    }, "migration"],
+    ["fractional migration counts", {
+      migration: { ...complete.migration, sourceCollections: 1.5, targetCollections: 1.5 }
+    }, "migration"],
+    ["exponent migration counts", {
+      migration: { ...complete.migration, sourceCollections: "1e2", targetCollections: "1e2" }
+    }, "migration"],
+    ["blank reconciliation count", {
+      reconciliation: { ...complete.reconciliation, mismatched: "" }
+    }, "reconciliation"],
+    ["whitespace reconciliation count", {
+      reconciliation: { ...complete.reconciliation, unresolvedCases: " " }
+    }, "reconciliation"],
+    ["hexadecimal outbox count", { delivery: { ...complete.delivery, pending: "0x0" } }, "outbox"],
+    ["hexadecimal capacity count", {
+      capacity: { ...complete.capacity, targetRecords: "0xF4240" }
+    }, "capacity-and-failover"],
+    ["exponent throughput", {
+      capacity: { ...complete.capacity, targetThroughputPerSecond: "5e2" }
+    }, "capacity-and-failover"],
+    ["boolean capacity profile reference", {
+      capacity: { ...complete.capacity, profileRef: true }
+    }, "capacity-and-failover"],
+    ["object capacity evidence reference", {
+      capacity: { ...complete.capacity, evidenceRef: {} }
+    }, "capacity-and-failover"],
+    ["numeric failover evidence reference", {
+      failover: { ...complete.failover, evidenceRef: 1234 }
+    }, "capacity-and-failover"]
+  ];
+
+  cases.forEach(([label, overrides, blocker]) => {
+    const assessment = buildTransitionAssessment({ ...complete, ...overrides }, config);
+    assert.equal(assessment.readyForControlledRehearsal, false, label);
+    assert.deepEqual(assessment.blockers, [blocker], label);
+    assert.equal(assessment.activationAuthorized, false, label);
+    assert.equal(assessment.productionPrimary, false, label);
+  });
+});
+
+test("capacity and failover gates reject unmet targets, untrusted references and open findings", () => {
+  const config = buildPostgresPrimaryStorageConfig(evidenceEnv("primary-write"));
+  const complete = completeTransitionEvidence();
+  const cases = [
+    ["capacity status", { capacity: { ...complete.capacity, status: "pending" } }],
+    ["capacity profile reference", { capacity: { ...complete.capacity, profileRef: "bad\nreference" } }],
+    ["tested records", { capacity: { ...complete.capacity, testedRecords: complete.capacity.targetRecords - 1 } }],
+    ["measured concurrency", { capacity: { ...complete.capacity, measuredConcurrency: complete.capacity.targetConcurrency - 1 } }],
+    ["measured throughput", { capacity: { ...complete.capacity, measuredThroughputPerSecond: complete.capacity.targetThroughputPerSecond - 1 } }],
+    ["P95 latency", { capacity: { ...complete.capacity, measuredP95LatencyMs: complete.capacity.targetP95LatencyMs + 1 } }],
+    ["P99 latency", { capacity: { ...complete.capacity, measuredP99LatencyMs: complete.capacity.targetP99LatencyMs + 1 } }],
+    ["capacity critical finding", { capacity: { ...complete.capacity, criticalFindingsOpen: 1 } }],
+    ["failover status", { failover: { ...complete.failover, status: "failed" } }],
+    ["failover evidence reference", { failover: { ...complete.failover, evidenceRef: "" } }],
+    ["failover duration", { failover: { ...complete.failover, measuredFailoverSeconds: complete.failover.targetFailoverSeconds + 1 } }],
+    ["failover data loss", { failover: { ...complete.failover, dataLossObserved: true } }],
+    ["failover critical finding", { failover: { ...complete.failover, criticalFindingsOpen: 1 } }]
+  ];
+
+  cases.forEach(([label, overrides]) => {
+    const assessment = buildTransitionAssessment({ ...complete, ...overrides }, config);
+    assert.equal(assessment.readyForControlledRehearsal, false, label);
+    assert.deepEqual(assessment.blockers, ["capacity-and-failover"], label);
+    assert.equal(assessment.productionPrimary, false, label);
+  });
 });

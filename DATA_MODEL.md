@@ -95,6 +95,8 @@ attempt/backoff 和 dead-letter，因此不能把当前结构描述为多实例�
 
 此外脚本生成 MPI、collection migration 和 runtime sync SQL；PostgreSQL migration package 同时创建 runtime sync、中央会话与 `auth_security_state` 表。生产是否真实建立这些表取决于外部环境证据，仓库不得宣称已切换。
 
+主存储受控迁移评估现在要求迁移/核对/outbox/备份恢复之外，还必须提供容量 profile 与结果引用、达到目标的数据量/并发/吞吐、受限 P95/P99、验证通过的故障切换、无数据丢失和零未关闭严重问题。它只消费元数据，不保存测试载荷或凭据；即使全部通过也固定保持 `productionPrimary=false` 和 `runtimeCutoverEnabled=false`。
+
 ### 转诊命令持久化
 
 三条转诊 HTTP 写入口共用既有 `referralSystem.referrals`、`referralCommandInbox` 与 `referralOutbox`。一次非重放命令在同一 UoW 中写入聚合新版本、幂等收件箱回执和 `care-coordination.referral-updated.v1` 发件箱事件；旧记录缺少 `version` 时按既有兼容规则解释为 1。REF-01a 不新增表、集合或 migration。

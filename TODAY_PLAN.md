@@ -607,3 +607,55 @@ T00 已批准方案 2、provider 缺失时的脱敏 NO-GO 语义及上述兼容�
   ARC-008、TEST-007，并在 DATA_MODEL/ADR 中明确后续治理边界。
 - 未触碰 `data/db.json`、SQLite/WAL/SHM、生成报告、归档或发布制品；未修改 schema、migration、
   CI、部署拓扑或生产 Go/No-Go 状态。
+
+## 2026-08-22 T00 生产基础设施第一切片：PostgreSQL 容量与故障转移门禁
+
+### 早间检查与审批
+
+- 主业务工作树包含用户修改且明显落后于主线，未执行 pull、stash、reset 或 clean；
+- 从 `origin/main@b99b934cd6087a7c852ac4a8a44653c25c2cfe61` 创建独立干净工作树与分支
+  `process/t00-production-foundation-wave1-20260822`；当前 main CI 与 Pages 成功、无开放 PR；
+- 已阅读 `ROADMAP.md`、`ARCHITECTURE.md`、`AGENTS.md`、工程治理、六张架构地图、数据库与模块
+  标准，以及 PostgreSQL shadow/core schema 等相关 Accepted ADR；
+- 用户已批准按推荐实施顺序继续开发。本切片沿用既有 Accepted 决策，只补齐已经声明的数据库
+  迁移门禁，不改变数据库事实源或切换授权。
+
+### 今日目标
+
+1. 在现有 `buildTransitionAssessment()` 增加独立的容量与故障转移失败关闭检查；
+2. 修复恢复、outbox 等数值字段把空字符串隐式视为零的旁路；
+3. 用受控证据引用、目标/实测容量、延迟、故障切换时长、数据丢失和严重问题数形成供应商中立契约；
+4. 同步 PostgreSQL 主存储文档和 production database readiness 的机器门禁；
+5. 始终保留 `activationAuthorized=false`、`productionReady=false`、`productionPrimary=false`、
+   `runtimeCutoverEnabled=false` 与 `requestPathWrite=false`。
+
+### 非目标
+
+- 不执行 `pg_dump`、`pg_restore`、真实故障转移、备份恢复或 switchback；
+- 不启用 PostgreSQL 主读写，不修改主服务 `STORAGE_ENGINE`，不合并两套既有 adapter；
+- 不修改 Schema、migration、API、鉴权、审计、CI、依赖或部署拓扑；
+- 不直接编辑 `data/db.json`、SQLite/WAL/SHM，不生成 release/report/PDF/归档产物；
+- 不制造容量、灾备、现场验收或 Go/No-Go 证据。
+
+### 风险、回滚与验证
+
+- 风险：新数值校验过松会让空值通过，过严会拒绝既有合法零实测值；因此目标值必须为有限正数，
+  实测值允许有限非负数，并用空白、`NaN`、`Infinity`、负数和数据丢失场景锁定语义；
+- 回滚：整切片回退即可恢复原评估逻辑，无数据或制品恢复步骤；
+- 测试：先增加失败测试，再运行 PostgreSQL 主存储/driver/production readiness 专项，随后执行
+  build、lint、typecheck、unit、integration、smoke、routes、architecture、process、platform、
+  `test:all` 和独立只读 review；PR/main required checks 必须全部通过。
+
+### 实施与验收结果
+
+- 测试先行确认旧实现会放行缺失容量/故障转移证据；实现后 PostgreSQL storage、driver 与
+  production database readiness 专项 `25/25` 通过；
+- 审查发现并关闭 migration/reconciliation/outbox 的 JavaScript 数值强制转换旁路，以及布尔、
+  对象、数字被误当作证据引用的类型旁路；空白、`Infinity`、分数、十六进制、指数形式和非字符串
+  引用均有回归测试；
+- build、lint、typecheck、check、routes、architecture、process、platform、unit、integration、smoke
+  全部通过；`process:verify -- --base=origin/main` 检查 9 个文件、0 个违规；
+- 修复后 `test:all` 11 个批次全部通过，Playwright 浏览器 E2E `36/36` 通过；完整依赖审计和仅生产
+  依赖审计均返回 0；
+- 独立只读复核确认原 2 个 P1 与 1 个 P2 全部关闭，最终无 P0/P1/P2；未触碰受保护数据、SQLite、
+  release/report/PDF/归档产物，所有生产授权与运行时切换标志仍为 `false`。
