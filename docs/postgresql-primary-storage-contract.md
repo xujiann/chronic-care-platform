@@ -164,7 +164,15 @@ psql "$env:DATABASE_URL" `
 3. 最近核对为 `matched`，无差异和未关闭工单。
 4. outbox 的 pending、retry、failed 均为零。
 5. 原生备份和恢复已验证，实测 RTO/RPO 不超过目标。
-6. 已验证切回 SQLite 且未观察到数据丢失。
+6. 容量测试达到已批准的数据量、并发和吞吐目标，P95/P99 延迟不超过目标，且无未关闭严重问题；
+   故障切换已验证、耗时不超过目标且未观察到数据丢失。
+7. 已验证切回 SQLite 且未观察到数据丢失。
+
+容量与故障切换只接收元数据和受控证据引用，不接收测试数据、日志正文、连接串或凭据。
+`capacity.profileRef`、`capacity.evidenceRef` 和 `failover.evidenceRef` 必须是 4 至 240 字符且不含
+换行的字符串受控引用；目标数值必须为规范十进制有限正数，实测耗时和延迟必须为规范十进制
+有限非负数，集合、计数、数据量、并发和严重问题数还必须为安全整数。空字符串、空白、
+`NaN`、`Infinity`、负数、十六进制或指数形式、未验证状态、数据丢失或未关闭严重问题均失败关闭。
 
 即使全部通过，`activationAuthorized`、`productionReady` 和
 `productionPrimary` 仍为 `false`。正式启用必须由 T00 在中央装配根接线，

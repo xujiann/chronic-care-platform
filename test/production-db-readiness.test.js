@@ -44,6 +44,10 @@ test("production database readiness validates migration and rehearsal evidence",
   assert.equal(report.checks.some((item) => item.id === "production-db:shadowReconciliation" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "production-db:primaryReadRehearsal" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "production-db:productionAdapter" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "production-db:transitionAssessmentBoundary" && item.passed), true);
+  assert.equal(report.postgresTransitionAssessment.readyForControlledRehearsal, false);
+  assert.equal(report.postgresTransitionAssessment.blockers.includes("capacity-and-failover"), true);
+  assert.equal(report.postgresTransitionAssessment.productionPrimary, false);
   assert.equal(report.checks.some((item) => item.id === "production-db:reconciliationCaseWorkflow" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "production-db:reconciliationOperationsUi" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "production-db:prometheusSlo" && item.passed), true);

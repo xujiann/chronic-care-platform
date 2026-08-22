@@ -17,6 +17,7 @@ const STORAGE_MODES = Object.freeze({
 const VALID_STORAGE_MODES = new Set(Object.values(STORAGE_MODES));
 const COLLECTION_PATTERN = /^[A-Za-z][A-Za-z0-9_-]{0,239}$/;
 const SHA256_PATTERN = /^[a-f0-9]{64}$/;
+const DECIMAL_METRIC_PATTERN = /^-?(?:0|[1-9]\d*)(?:\.\d+)?$/;
 
 class PostgresPrimaryStorageContractError extends Error {
   constructor(message, code, statusCode = 400, details = undefined) {
@@ -37,8 +38,36 @@ function clean(value, maxLength = 240) {
 }
 
 function validEvidenceRef(value) {
-  const reference = clean(value);
-  return reference.length >= 4 && !/[\r\n]/.test(reference);
+  if (typeof value !== "string") return false;
+  const reference = value.trim();
+  return reference.length >= 4 && reference.length <= 240 && !/[\r\n]/.test(reference);
+}
+
+function finiteMetric(value) {
+  if (typeof value === "string" && !DECIMAL_METRIC_PATTERN.test(value.trim())) return null;
+  if (typeof value !== "number" && typeof value !== "string") return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function nonNegativeMetric(value) {
+  const parsed = finiteMetric(value);
+  return parsed !== null && parsed >= 0 ? parsed : null;
+}
+
+function positiveMetric(value) {
+  const parsed = finiteMetric(value);
+  return parsed !== null && parsed > 0 ? parsed : null;
+}
+
+function positiveIntegerMetric(value) {
+  const parsed = positiveMetric(value);
+  return parsed !== null && Number.isSafeInteger(parsed) ? parsed : null;
+}
+
+function nonNegativeIntegerMetric(value) {
+  const parsed = nonNegativeMetric(value);
+  return parsed !== null && Number.isSafeInteger(parsed) ? parsed : null;
 }
 
 function validPostgresUrl(value) {
@@ -366,7 +395,34 @@ function buildTransitionAssessment(input = {}, config = buildPostgresPrimaryStor
   const reconciliation = input.reconciliation || {};
   const delivery = input.delivery || {};
   const recovery = input.recovery || {};
+  const capacity = input.capacity || {};
+  const failover = input.failover || {};
   const fallback = input.fallback || {};
+  const migrationSourceCollections = positiveIntegerMetric(migration.sourceCollections);
+  const migrationTargetCollections = positiveIntegerMetric(migration.targetCollections);
+  const reconciliationMismatched = nonNegativeIntegerMetric(reconciliation.mismatched);
+  const reconciliationUnresolvedCases = nonNegativeIntegerMetric(reconciliation.unresolvedCases);
+  const deliveryPending = nonNegativeIntegerMetric(delivery.pending);
+  const deliveryRetry = nonNegativeIntegerMetric(delivery.retry);
+  const deliveryFailed = nonNegativeIntegerMetric(delivery.failed);
+  const measuredRtoSeconds = nonNegativeMetric(recovery.measuredRtoSeconds);
+  const targetRtoSeconds = positiveMetric(recovery.targetRtoSeconds);
+  const measuredRpoSeconds = nonNegativeMetric(recovery.measuredRpoSeconds);
+  const targetRpoSeconds = positiveMetric(recovery.targetRpoSeconds);
+  const targetRecords = positiveIntegerMetric(capacity.targetRecords);
+  const testedRecords = positiveIntegerMetric(capacity.testedRecords);
+  const targetConcurrency = positiveIntegerMetric(capacity.targetConcurrency);
+  const measuredConcurrency = positiveIntegerMetric(capacity.measuredConcurrency);
+  const targetThroughputPerSecond = positiveMetric(capacity.targetThroughputPerSecond);
+  const measuredThroughputPerSecond = positiveMetric(capacity.measuredThroughputPerSecond);
+  const targetP95LatencyMs = positiveMetric(capacity.targetP95LatencyMs);
+  const measuredP95LatencyMs = nonNegativeMetric(capacity.measuredP95LatencyMs);
+  const targetP99LatencyMs = positiveMetric(capacity.targetP99LatencyMs);
+  const measuredP99LatencyMs = nonNegativeMetric(capacity.measuredP99LatencyMs);
+  const capacityCriticalFindings = nonNegativeIntegerMetric(capacity.criticalFindingsOpen);
+  const targetFailoverSeconds = positiveMetric(failover.targetFailoverSeconds);
+  const measuredFailoverSeconds = nonNegativeMetric(failover.measuredFailoverSeconds);
+  const failoverCriticalFindings = nonNegativeIntegerMetric(failover.criticalFindingsOpen);
   const checks = [
     {
       id: "configuration",
@@ -375,31 +431,63 @@ function buildTransitionAssessment(input = {}, config = buildPostgresPrimaryStor
     {
       id: "migration",
       passed: migration.status === "verified"
-        && Number(migration.sourceCollections) > 0
-        && Number(migration.sourceCollections) === Number(migration.targetCollections)
+        && migrationSourceCollections !== null
+        && migrationTargetCollections !== null
+        && migrationSourceCollections === migrationTargetCollections
         && SHA256_PATTERN.test(clean(migration.sourceDigest, 80).toLowerCase())
         && clean(migration.sourceDigest, 80).toLowerCase() === clean(migration.targetDigest, 80).toLowerCase()
     },
     {
       id: "reconciliation",
       passed: reconciliation.status === "matched"
-        && Number(reconciliation.mismatched) === 0
-        && Number(reconciliation.unresolvedCases) === 0
+        && reconciliationMismatched === 0
+        && reconciliationUnresolvedCases === 0
     },
     {
       id: "outbox",
-      passed: Number(delivery.pending) === 0
-        && Number(delivery.retry) === 0
-        && Number(delivery.failed) === 0
+      passed: deliveryPending === 0
+        && deliveryRetry === 0
+        && deliveryFailed === 0
     },
     {
       id: "backup-and-recovery",
       passed: recovery.backupStatus === "verified"
         && recovery.restoreStatus === "verified"
-        && Number(recovery.measuredRtoSeconds) >= 0
-        && Number(recovery.measuredRtoSeconds) <= Number(recovery.targetRtoSeconds)
-        && Number(recovery.measuredRpoSeconds) >= 0
-        && Number(recovery.measuredRpoSeconds) <= Number(recovery.targetRpoSeconds)
+        && measuredRtoSeconds !== null
+        && targetRtoSeconds !== null
+        && measuredRtoSeconds <= targetRtoSeconds
+        && measuredRpoSeconds !== null
+        && targetRpoSeconds !== null
+        && measuredRpoSeconds <= targetRpoSeconds
+    },
+    {
+      id: "capacity-and-failover",
+      passed: capacity.status === "verified"
+        && validEvidenceRef(capacity.profileRef)
+        && validEvidenceRef(capacity.evidenceRef)
+        && targetRecords !== null
+        && testedRecords !== null
+        && testedRecords >= targetRecords
+        && targetConcurrency !== null
+        && measuredConcurrency !== null
+        && measuredConcurrency >= targetConcurrency
+        && targetThroughputPerSecond !== null
+        && measuredThroughputPerSecond !== null
+        && measuredThroughputPerSecond >= targetThroughputPerSecond
+        && targetP95LatencyMs !== null
+        && measuredP95LatencyMs !== null
+        && measuredP95LatencyMs <= targetP95LatencyMs
+        && targetP99LatencyMs !== null
+        && measuredP99LatencyMs !== null
+        && measuredP99LatencyMs <= targetP99LatencyMs
+        && capacityCriticalFindings === 0
+        && failover.status === "verified"
+        && validEvidenceRef(failover.evidenceRef)
+        && targetFailoverSeconds !== null
+        && measuredFailoverSeconds !== null
+        && measuredFailoverSeconds <= targetFailoverSeconds
+        && failover.dataLossObserved === false
+        && failoverCriticalFindings === 0
     },
     {
       id: "fallback",

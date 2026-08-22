@@ -7,6 +7,7 @@ const { inspectStorageModel } = require("./storage-admin");
 const { buildPostgresMigrationPackage } = require("./postgres-migration-package");
 const {
   buildPostgresPrimaryStorageConfig,
+  buildTransitionAssessment,
   safeConfigStatus
 } = require("../src/platform/storage/postgres-primary-storage-contract");
 const {
@@ -309,7 +310,9 @@ function buildProductionDbReadinessReport(options = {}) {
   const json = storageModel.jsonSnapshot || {};
   const sqlite = storageModel.sqlite || {};
   const requiredScripts = ["storage:backup", "storage:inspect", "storage:assess", "rollback:snapshot", "postgres:migration-package", "postgres:migration-verify", "postgres:sync-worker", "postgres:sync-bootstrap", "postgres:shadow-reconcile", "postgres:primary-read-rehearsal", "postgres:adapter-status", "postgres:adapter-verify", "postgres:primary-storage-contract:check", "postgres:primary-storage-contract:test", "release:report"];
-  const postgresPrimaryStorage = safeConfigStatus(buildPostgresPrimaryStorageConfig(options.env || process.env));
+  const postgresPrimaryStorageConfig = buildPostgresPrimaryStorageConfig(options.env || process.env);
+  const postgresPrimaryStorage = safeConfigStatus(postgresPrimaryStorageConfig);
+  const postgresTransitionAssessment = buildTransitionAssessment({ requestedMode: "primary-read" }, postgresPrimaryStorageConfig);
   const migrationEvidence = {
     currentAdapter: "sqlite-wal-json-snapshot",
     targetAdapter: "postgresql",
@@ -400,6 +403,16 @@ function buildProductionDbReadinessReport(options = {}) {
         && postgresPrimaryStorage.externalEvidenceVerified === false,
       detail: `mode=${postgresPrimaryStorage.mode}; modeReady=${postgresPrimaryStorage.modeReady}; productionPrimary=false; runtimeCutoverEnabled=false`
     },
+    {
+      id: "production-db:transitionAssessmentBoundary",
+      passed: postgresTransitionAssessment.readyForControlledRehearsal === false
+        && postgresTransitionAssessment.blockers.includes("capacity-and-failover")
+        && postgresTransitionAssessment.activationAuthorized === false
+        && postgresTransitionAssessment.productionReady === false
+        && postgresTransitionAssessment.productionPrimary === false
+        && postgresTransitionAssessment.runtimeCutoverEnabled === false,
+      detail: `blocked=${postgresTransitionAssessment.blockers.join(",")}; activationAuthorized=false; productionPrimary=false`
+    },
     { id: "production-db:reconciliationCaseWorkflow", passed: postgresRuntimeSync.reconciliationCaseWorkflow, detail: "commission-only history and case APIs enforce assignment, matched-run clearance, evidence-backed resolution and automatic reopening" },
     { id: "production-db:reconciliationOperationsUi", passed: postgresRuntimeSync.reconciliationOperationsUi, detail: "platform cutover center exposes commission-only case ownership, acknowledgement, comments, verified closure, reopening and reconciliation history" },
     { id: "production-db:prometheusSlo", passed: postgresRuntimeSync.prometheusSlo, detail: "configurable backlog, pending age, reconciliation freshness, unresolved case and failed batch SLOs are Prometheus-scrapeable" },
@@ -418,6 +431,7 @@ function buildProductionDbReadinessReport(options = {}) {
     postgresMigrationPackage,
     postgresRuntimeSync,
     postgresPrimaryStorage,
+    postgresTransitionAssessment,
     checks
   };
 }
