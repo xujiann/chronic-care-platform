@@ -82,7 +82,7 @@ flowchart TB
    `pilotCutoverControlPlaneReadiness`。provider 缺失、返回值无效或抛错均投影为受限
    `controlErrorCode` 和 `NO-GO`，不泄露错误正文；当前静态图不再形成该环。PR #132、
    required checks、合并后 main CI 与 Pages 均已通过，主线 ARC-002 已关闭。
-5. SQLite v1–v14 已冻结内容指纹，v15 追加 append-only 连续审计 source；`STORAGE_SCHEMA_VERSION`、部署检查和测试统一从注册表 head v15 派生。历史 ledger 的 v1–v14 checksum 保持兼容，v15 起写入内容 SHA-256。
+5. SQLite v1–v14 已冻结内容指纹，v15 追加 append-only 连续审计 source，v16 追加慢病随访 durable outbox；`STORAGE_SCHEMA_VERSION`、部署检查和测试统一从注册表 head v16 派生。历史 ledger 的 v1–v14 checksum 保持兼容，v15 起写入内容 SHA-256。
 6. TEST-001 已建立统一的 `build`、`lint`、`typecheck`、`test:unit`、`test:integration`、`test:smoke` 入口；build 复用静态发布 allowlist 并默认输出到仓库外，unit/integration 完整分区根测试，smoke 独立启动临时 JSON 运行时。治理 CI 执行 `data:collection-governance:verify`，以源码、owner 和隔离清单漂移失败关闭；原 `server.js` c8 门禁保持 85/85/55，另以四个独立组锁定 runtime identity、audit chain/source、object storage trust 与 API catalog/authorization 的真实覆盖基线和负向矩阵，报告只存在临时目录。lint 仍有 3 个文件的精确遗留规则例外，typecheck 当前只覆盖 6 个治理/安全边界文件。
 7. 审计验证已收敛到 `src/identity-security/audit-chain.js` 的 v2 严格端口；内容、链接、结构和重复 ID 任一异常均失败，验证 API/合规报告不再读取时重封。全量状态写入中的审计数组由服务端管理。
 8. 机器 API 授权矩阵扫描全部模块化路由源码的 588 条 `requireApiRole`/显式公共声明，并对九条高风险接口锁定 owner、角色、范围和用途；`production-api-catalog-v1` 再与 372 个字面条件路由取并集，形成 594 个唯一接口条目（587 个字面路由、7 个运行时策略），补充自定义鉴权缺口、幂等观察和生产状态。CI 对源集合、目录唯一性、必要字段和高风险唯一性 fail closed；全部目录条目保持 `NO-GO`，静态标记不替代运行时/现场证据。
@@ -90,15 +90,13 @@ flowchart TB
    浏览器服务端登录不再把 token/bearer 写入 `localStorage`；Cookie 上下文在服务端和浏览器
    水合链路均优先，旧脚本可读 token 会在上下文请求前清除。生产 bearer/hybrid 只有显式
    `AUTH_BEARER_COMPATIBILITY=enabled` 才能启用，启用后仍固定形成 `NO-GO` blocker。
-10. T04 的慢病随访事件保留 `citizen-chronic.followup-updated.v1` 和既有 API，新增
-    `src/citizen-chronic/followup-event-publisher.js` 作为签名 HTTPS publisher 端口。默认本地
-    回执只在非生产且未配置远端时可用；生产必须注入独立 activation verifier，环境字符串不
-    能证明启用证据。端口拒绝非 HTTPS/443、回环、私网、链路本地目标和重定向，以稳定的
-    event/payload 幂等键发送，验签后仅向 service 交付私有 capability。机构 dispatch 在读取后、
-    外发前按居民和机构范围过滤，并要求授权/尝试审计先成功持久化，再记录成功/失败结果审计；
-    持久状态只保留可重验摘要及
-    accepted/delivered 状态。当前仍由受权 HTTP dispatch 同步触发，没有 worker、租约、死信
-    或多实例持久投递仓储，因此 `productionReady` 继续为 `false`。
+10. T04 的慢病随访事件保留 `citizen-chronic.followup-updated.v1` 和既有 API，T00 在同一 SQLite
+    事务中写入 v16 专用 outbox。HTTP dispatch 只在真实 durable queue 可用且健康时确认排队，请求路径
+    不再调用外部系统。独立 worker 使用 lease owner/token hash/version/expiry fencing、有界退避、死信和
+    digest-only replay；completion/failure 被 stale fence 拒绝时记录摘要化 outcome 并继续批次。可部署的
+    file-backed provider 验证外部 Ed25519 签名 activation decision，但真实 decision、endpoint、凭据、可信回执和
+    现场验收仍外置，因此当前 `productionReady=false`；有效外部 trust verifier 可通过当前
+    release/artifact 绑定的正式证据驱动中央 preflight，无需再改代码。
 11. T00 共享对象存储端口新增 `object-storage-gateway-trust-v1`。生产配置缺少合同版本、独立响应
     验签密钥或上传/下载 exact-Origin 白名单时，在发起网络请求前失败关闭；响应先按原始 body 验证
     HMAC、时间窗和 request ID，再绑定 operation、bucket、attachment、object/version。上传/下载
@@ -156,3 +154,11 @@ T00 同时在 T02 `state-data` 兼容边界关闭通用写旁路：四个已登�
 summary 加法暴露。当前样例日报缺受认可的签名/版本且运行时未注入区域范围，因此测量保持
 `blocked`，不能作为生产证据。三个历史 `industry-*` ID 由按 canonical ID 键控的显式弃用
 alias 兼容，不再按数组位置改名。
+
+## 2026-08-22 慢病随访耐久外部投递增量
+
+T04 的随访 PATCH 仍在聚合内生成 `citizen-chronic.followup-updated.v1`；T00 在同一 SQLite 写事务中
+把事件插入/核对 v16 专用 outbox。HTTP dispatch 已变为本地排队确认，不再同步访问外部。独立 worker
+完成 lease、外发、回执摘要、退避、死信与 replay；生产 endpoint/凭据/activation/可信回执/现场验收
+未由仓库提供，当前 `productionReady=false`；中央 preflight 已可消费外部验证且绑定当前发布的
+正式证据解除该门禁。PostgreSQL 主切换不在本切片。

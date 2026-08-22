@@ -212,3 +212,12 @@ CORE_DATA_DEFINITIONS → collection-governance → CI/release 治理投影`。�
 technical-evidence.sha256`。合同模块不依赖 `server.js`、HTTP 路由、JSON 文件或数据库实现；
 调用方显式传入人口服务聚合、来源元数据、服务端 scope 与计算时间。T03 继续拥有日报/月报来源，
 T02 只拥有聚合合同和测量投影。当前 runtime 路由仍归 T01，本切片没有移动路由或改变组合顺序。
+
+## 慢病随访投递依赖方向
+
+`T04 followup PATCH → T00 SQLite state transaction → v16 followup dispatch outbox → 独立 worker →
+T04 signed publisher → 外部系统`。反向写回请求路由已移除；worker 网络调用不持有 SQLite 事务。
+worker 依赖 repository 端口和 publisher 端口，repository 不依赖 HTTP。部署/preflight 只读取合同与配置状态，
+不能生成 activation 或可信回执。worker 复用 canonical `DATA_DIR/health-city.sqlite`，显式路径漂移启动失败；
+activation provider 只验证仓库外 registry 的逐事件 Ed25519 签名决定，不持有审批私钥。跨 T04/T00 的改动由
+T00 集成分支承载。

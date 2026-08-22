@@ -1,0 +1,17 @@
+[Unit]
+Description=Chronic followup durable dispatch worker
+After=network-online.target chronic-care-platform.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=__SERVICE_USER__
+Group=__SERVICE_GROUP__
+WorkingDirectory=__APP_DIR__
+EnvironmentFile=__SECRET_ENV_FILE__
+ExecStart=__NODE_BINARY__ scripts/chronic-followup-dispatch-worker.js
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=__DATA_DIR__

@@ -1,0 +1,12 @@
+[Unit]
+Description=Schedule chronic followup durable dispatch worker
+
+[Timer]
+OnBootSec=20s
+OnUnitActiveSec=15s
+AccuracySec=1s
+Persistent=true
+Unit=chronic-followup-dispatch-worker.service
+
+[Install]
+WantedBy=timers.target

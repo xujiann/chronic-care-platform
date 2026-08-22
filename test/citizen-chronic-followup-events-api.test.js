@@ -6,6 +6,9 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const test = require("node:test");
+const { DatabaseSync } = require("node:sqlite");
+const { createSqliteFollowupDispatchRepository } = require("../src/citizen-chronic/followup-dispatch-outbox");
+const { runFollowupDispatchWorker } = require("../src/citizen-chronic/followup-dispatch-worker");
 
 const ROOT = path.resolve(__dirname, "..");
 
@@ -30,7 +33,7 @@ async function login(baseUrl, username) {
   return result.body.token;
 }
 
-test("followup API persists aggregate and outbox atomically then dispatches once", async (t) => {
+test("followup API persists aggregate and durable outbox atomically while worker dispatches separately", async (t) => {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "citizen-chronic-events-api-"));
   fs.copyFileSync(path.join(ROOT, "data", "db.json"), path.join(dataDir, "db.json"));
   const envKeys = ["NODE_ENV", "DATA_DIR", "STORAGE_ENGINE", "SESSION_SECRETS", "SESSION_STORE"];
@@ -93,6 +96,8 @@ test("followup API persists aggregate and outbox atomically then dispatches once
   assert.equal(pending.body.publisher.mode, "local-simulated");
   assert.equal(pending.body.publisher.configured, false);
   assert.equal(pending.body.publisher.productionReady, false);
+  assert.equal(pending.body.durableQueue.counts.pending, 1);
+  assert.equal(pending.body.durableQueue.requestPathExternalDispatch, false);
   assert.equal(pending.body.productionReady, false);
 
   const dispatched = await request(baseUrl, "/api/chronic/followup-events/dispatch", token, {
@@ -100,26 +105,37 @@ test("followup API persists aggregate and outbox atomically then dispatches once
   });
   assert.equal(dispatched.response.status, 200, JSON.stringify(dispatched.body));
   assert.equal(dispatched.body.ok, true);
-  assert.equal(dispatched.body.processed.length, 1);
-  assert.equal(dispatched.body.processed[0].processed, true);
+  assert.equal(dispatched.body.processed.length, 0);
+  assert.equal(dispatched.body.queued, 1);
+  assert.equal(dispatched.body.dispatchMode, "durable-worker");
+  assert.equal(dispatched.body.requestPathExternalDispatch, false);
   assert.deepEqual(dispatched.body.health.summary, {
     outbox: 1,
-    pending: 0,
-    published: 1,
-    completedInbox: 1,
-    projections: 1,
-    receipts: 1,
-    acceptedReceipts: 1,
+    pending: 1,
+    published: 0,
+    completedInbox: 0,
+    projections: 0,
+    receipts: 0,
+    acceptedReceipts: 0,
     deliveredReceipts: 0
   });
   persisted = readDatabase().followups.find((item) => item.id === followup.id);
-  assert.equal(persisted.domainRuntime.outbox[0].deliveryState, "published");
-  assert.equal(persisted.domainRuntime.inbox[0].state, "completed");
-  assert.equal(persisted.domainRuntime.projections.length, 1);
-  assert.equal(persisted.domainRuntime.receipts.length, 1);
-  assert.equal(persisted.domainRuntime.receipts[0].deliveryStatus, "accepted");
-  assert.match(persisted.domainRuntime.receipts[0].providerReceiptDigest, /^[a-f0-9]{64}$/);
-  assert.equal(Object.hasOwn(persisted.domainRuntime.receipts[0], "receiptId"), false);
+  assert.equal(persisted.domainRuntime.outbox[0].deliveryState, "pending");
+
+  const db = new DatabaseSync(path.join(dataDir, "health-city.sqlite"));
+  try {
+    const repository = createSqliteFollowupDispatchRepository(db);
+    const worker = await runFollowupDispatchWorker({
+      repository,
+      env: { NODE_ENV: "test" },
+      workerId: "api-test-worker",
+      publisher: { async publish(envelope) { return { accepted: true, receiptId: `local:${envelope.eventId}`, status: "accepted" }; } }
+    });
+    assert.equal(worker.delivered, 1);
+    assert.equal(repository.health().counts.delivered, 1);
+  } finally {
+    db.close();
+  }
 
   const replay = await request(baseUrl, `/api/followups/${encodeURIComponent(followup.id)}`, token, {
     method: "PATCH",

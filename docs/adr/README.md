@@ -38,6 +38,7 @@
 | [对象存储网关采用版本化响应信任合同 v1](./2026-08-22-object-storage-gateway-trust-v1.md) | Accepted | 独立响应验签、请求/对象绑定、签名 URL Origin/TTL 与严格回执 |
 | [区域共享调阅命令以居民授权事实为唯一许可依据](./2026-08-21-regional-sharing-access-command.md) | Accepted | T00 integration、目标 T02、T04 授权事实、幂等/CAS、不可变回执与生产 NO-GO |
 | [慢病随访外部 publisher 协议与失败语义](./2026-08-21-chronic-followup-external-publisher-protocol.md) | Accepted | T04 安全外发、activation、幂等回执、范围、审计与持久证据 |
+| [慢病随访耐久 outbox 与独立 worker](./2026-08-22-chronic-followup-durable-dispatch-outbox.md) | Accepted | SQLite v16 同事务 enqueue、租约 fencing、重试/死信/replay、请求路径隔离与生产 NO-GO |
 | [转诊写操作统一进入单一命令轨道](./2026-08-21-referral-single-command-track.md) | Accepted | 三条兼容 API、T05 owner command、CAS/幂等与资源范围 |
 | [科研合规导出职责分离与版本化命令](./2026-08-21-research-export-separation-of-duties.md) | Accepted | 导出申请、独立审核、发布证据、CAS、幂等与历史兼容 |
 

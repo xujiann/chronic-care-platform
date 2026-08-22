@@ -71,7 +71,7 @@ test("SQLite v15 backfills only the verified current window as an immutable mini
     applySqliteMigrations(db, { targetVersion: 14 });
     insertStateCollections(db, fixtureState());
 
-    const result = applySqliteMigrations(db);
+    const result = applySqliteMigrations(db, { targetVersion: 15 });
     assert.equal(result.head, 15);
     assert.equal(result.applied, 1);
 

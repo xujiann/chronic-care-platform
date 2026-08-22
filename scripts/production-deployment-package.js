@@ -20,6 +20,16 @@ const AUDIT_DELIVERY_RUNTIME_FILES = [
   "deploy/audit-delivery-worker.timer.template",
   "deploy/platform-production-adapters.env.template"
 ];
+const CHRONIC_FOLLOWUP_DISPATCH_RUNTIME_FILES = [
+  "scripts/chronic-followup-dispatch-worker.js",
+  "src/citizen-chronic/followup-dispatch-outbox.js",
+  "src/citizen-chronic/followup-dispatch-worker.js",
+  "src/citizen-chronic/followup-dispatch-activation-provider.js",
+  "src/citizen-chronic/followup-event-publisher.js",
+  "deploy/chronic-followup-dispatch-worker.service.template",
+  "deploy/chronic-followup-dispatch-worker.timer.template",
+  "deploy/chronic-followup-dispatch-worker.env.template"
+];
 const REQUIRED_RUNTIME_FILES = [
   "server.js",
   "browser-security-policy.json",
@@ -33,7 +43,8 @@ const REQUIRED_RUNTIME_FILES = [
   "deploy/postgres-primary-storage-schema.sql",
   "scripts/postgres-sync-worker.js",
   "scripts/postgres-shadow-reconcile.js",
-  ...AUDIT_DELIVERY_RUNTIME_FILES
+  ...AUDIT_DELIVERY_RUNTIME_FILES,
+  ...CHRONIC_FOLLOWUP_DISPATCH_RUNTIME_FILES
 ];
 const ADDITIONAL_RUNTIME_FILES = [
   "browser-security-policy.json",
@@ -41,7 +52,8 @@ const ADDITIONAL_RUNTIME_FILES = [
   "deploy/postgres-primary-storage-schema.sql",
   "scripts/postgres-sync-worker.js",
   "scripts/postgres-shadow-reconcile.js",
-  ...AUDIT_DELIVERY_RUNTIME_FILES
+  ...AUDIT_DELIVERY_RUNTIME_FILES,
+  ...CHRONIC_FOLLOWUP_DISPATCH_RUNTIME_FILES
 ];
 const RUNTIME_DIRECTORIES = ["src/http", "src/platform/regional", "src/platform/storage", "regions"];
 const EXCLUDED_RUNTIME_FILES = new Set(["playwright.config.js"]);
@@ -59,6 +71,7 @@ const SECRET_CONTRACT = [
   ["FINANCIAL_CALLBACK_SECRET", "payment insurance and certificate callback verification"],
   ["SIEM_SIGNING_SECRET", "SIEM alert signing"],
   ["SIEM_AUDIT_SIGNING_SECRET", "continuous audit request signing"],
+  ["CITIZEN_CHRONIC_FOLLOWUP_PUBLISHER_HMAC_SECRET", "chronic followup external dispatch and receipt verification"],
   ["ALERT_WEBHOOK_SECRET", "operations webhook signing"],
   ["DEPLOYMENT_ARTIFACT_DIGEST", "immutable artifact registry digest"]
 ].map(([name, purpose]) => ({
@@ -176,6 +189,28 @@ function buildProductionDeploymentPackage(options = {}) {
       ],
       sourceContract: "append-only-audit-source-v2",
       productionReady: false
+    }, {
+      id: "chronic-followup-durable-dispatch",
+      entrypoint: "node scripts/chronic-followup-dispatch-worker.js",
+      preflight: "npm run chronic:followup-dispatch-preflight",
+      serviceTemplate: "deploy/chronic-followup-dispatch-worker.service.template",
+      timerTemplate: "deploy/chronic-followup-dispatch-worker.timer.template",
+      configurationTemplate: "deploy/chronic-followup-dispatch-worker.env.template",
+      configurationVariables: [
+        "DATA_DIR",
+        "CITIZEN_CHRONIC_FOLLOWUP_DISPATCH_SQLITE_FILE",
+        "CITIZEN_CHRONIC_FOLLOWUP_DISPATCH_WORKER_ID",
+        "CITIZEN_CHRONIC_FOLLOWUP_DISPATCH_LIMIT",
+        "CITIZEN_CHRONIC_FOLLOWUP_DISPATCH_LEASE_SECONDS",
+        "CITIZEN_CHRONIC_FOLLOWUP_DISPATCH_BASE_BACKOFF_SECONDS",
+        "CITIZEN_CHRONIC_FOLLOWUP_PUBLISHER_URL",
+        "CITIZEN_CHRONIC_FOLLOWUP_PUBLISHER_HMAC_SECRET",
+        "CITIZEN_CHRONIC_FOLLOWUP_ACTIVATION_REGISTRY_FILE",
+        "CITIZEN_CHRONIC_FOLLOWUP_ACTIVATION_PUBLIC_KEY_FILE",
+        "CITIZEN_CHRONIC_FOLLOWUP_ACTIVATION_PUBLIC_KEY_SHA256"
+      ],
+      sourceContract: "citizen-chronic.followup-dispatch-outbox.v1",
+      productionReady: false
     }],
     template: "deploy/chronic-care-platform.service.template"
   };
@@ -198,7 +233,7 @@ function buildProductionDeploymentPackage(options = {}) {
     check("deploymentPackage:runtimeFiles", files.length >= 30 && REQUIRED_RUNTIME_FILES.every((name) => files.some((item) => item.path === name)), `${files.length} runtime files with required entrypoints`),
     check("deploymentPackage:digest", /^[a-f0-9]{64}$/.test(digest) && files.every((item) => /^[a-f0-9]{64}$/.test(item.sha256)), `sha256:${digest}`),
     check("deploymentPackage:secretBoundary", secretContract.valuesPersisted === false && secretContract.variables.length >= 10 && secretContract.variables.every((item) => item.name && item.persistedInArtifact === false && !("value" in item)), `${secretContract.variables.length} secret references; values persisted false`),
-    check("deploymentPackage:processContract", processContract.healthChecks.length === 4 && processContract.healthChecks.some((item) => item.route === "/api/live" && item.purpose === "process-liveness" && item.authentication === "none") && processContract.healthChecks.some((item) => item.route === "/api/health" && item.purpose === "dependency-readiness" && item.authentication === "none") && processContract.restartPolicy === "on-failure" && processContract.gracefulShutdownSeconds >= 30 && processContract.backgroundJobs.some((item) => item.id === "continuous-audit-delivery" && item.productionReady === false), `${processContract.supervisor} / ${processContract.healthChecks.length} health checks / ${processContract.backgroundJobs.length} background jobs`),
+    check("deploymentPackage:processContract", processContract.healthChecks.length === 4 && processContract.healthChecks.some((item) => item.route === "/api/live" && item.purpose === "process-liveness" && item.authentication === "none") && processContract.healthChecks.some((item) => item.route === "/api/health" && item.purpose === "dependency-readiness" && item.authentication === "none") && processContract.restartPolicy === "on-failure" && processContract.gracefulShutdownSeconds >= 30 && processContract.backgroundJobs.some((item) => item.id === "continuous-audit-delivery" && item.productionReady === false) && processContract.backgroundJobs.some((item) => item.id === "chronic-followup-durable-dispatch" && item.productionReady === false), `${processContract.supervisor} / ${processContract.healthChecks.length} health checks / ${processContract.backgroundJobs.length} background jobs`),
     check("deploymentPackage:rollbackContract", rollbackContract.requirePreviousArtifactDigest && rollbackContract.requireStorageBackup && rollbackContract.rollbackCommand.includes("rollback:snapshot"), "previous digest, storage backup and post-rollback health are mandatory"),
     check("deploymentPackage:provenance", Boolean(source.commit) && (!strict || !source.dirty), `${source.commit} / ${source.dirty ? "working tree dirty" : "working tree clean"}${strict ? " / strict" : ""}`)
   ];
@@ -263,6 +298,7 @@ function verifyProductionDeploymentPackage(manifest, options = {}) {
     check("deploymentVerify:digest", expectedDigest === currentDigest, `expected sha256:${expectedDigest} / current sha256:${currentDigest}`),
     check("deploymentVerify:secretBoundary", secretValuesAbsent && prohibitedPaths.length === 0, prohibitedPaths.join(",") || "secret values and prohibited files absent"),
     check("deploymentVerify:auditWorker", AUDIT_DELIVERY_RUNTIME_FILES.every((required) => expectedFiles.some((item) => item.path === required)) && manifest?.processContract?.backgroundJobs?.some((item) => item.id === "continuous-audit-delivery" && item.productionReady === false && item.preflight === "npm run audit:delivery:preflight" && item.configurationTemplate === "deploy/platform-production-adapters.env.template" && item.configurationVariables?.includes("AUDIT_DELIVERY_SOURCE_CONTRACT") && item.configurationVariables?.includes("PLATFORM_PILOT_CUTOVER_ALERT_JOURNAL_FILE")) && manifest?.secretContract?.variables?.some((item) => item.name === "SIEM_AUDIT_SIGNING_SECRET" && !("value" in item)), "continuous audit dependency closure, process, configuration and secret references are mandatory"),
+    check("deploymentVerify:chronicFollowupWorker", CHRONIC_FOLLOWUP_DISPATCH_RUNTIME_FILES.every((required) => expectedFiles.some((item) => item.path === required)) && manifest?.processContract?.backgroundJobs?.some((item) => item.id === "chronic-followup-durable-dispatch" && item.productionReady === false && item.preflight === "npm run chronic:followup-dispatch-preflight" && item.sourceContract === "citizen-chronic.followup-dispatch-outbox.v1" && ["DATA_DIR", "CITIZEN_CHRONIC_FOLLOWUP_DISPATCH_SQLITE_FILE", "CITIZEN_CHRONIC_FOLLOWUP_PUBLISHER_HMAC_SECRET", "CITIZEN_CHRONIC_FOLLOWUP_ACTIVATION_REGISTRY_FILE", "CITIZEN_CHRONIC_FOLLOWUP_ACTIVATION_PUBLIC_KEY_FILE", "CITIZEN_CHRONIC_FOLLOWUP_ACTIVATION_PUBLIC_KEY_SHA256"].every((name) => item.configurationVariables?.includes(name))) && manifest?.secretContract?.variables?.some((item) => item.name === "CITIZEN_CHRONIC_FOLLOWUP_PUBLISHER_HMAC_SECRET" && !("value" in item)), "chronic followup durable worker, canonical SQLite source, activation trust and secret references are mandatory"),
     check("deploymentVerify:rollback", manifest?.rollbackContract?.requirePreviousArtifactDigest === true && manifest?.rollbackContract?.requireStorageBackup === true, "rollback prerequisites declared")
   ];
   return {

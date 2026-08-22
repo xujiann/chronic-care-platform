@@ -42,7 +42,9 @@ const {
 } = require("./src/platform/cutover/pilot-cutover-alert-runtime");
 const {
   SQLITE_SCHEMA_HEAD,
-  applySqliteMigrations
+  appendFollowupDispatchOutboxChanges,
+  applySqliteMigrations,
+  createSqliteFollowupDispatchRepository
 } = require("./src/platform/storage/sqlite-migrations");
 const { createHash, createHmac, pbkdf2Sync, randomUUID, timingSafeEqual } = require("crypto");
 const { auditHashFor, verifyAuditTrail } = require("./src/identity-security/audit-chain");
@@ -7768,6 +7770,16 @@ function writeSqliteState(
       recordedAt: now,
       historicalBaseline: event === "migrate-json-snapshot"
     });
+    const previousFollowupsPayload = existingByKey.get("followups");
+    appendFollowupDispatchOutboxChanges(
+      db,
+      { followups: previousFollowupsPayload ? JSON.parse(previousFollowupsPayload) : [] },
+      normalized,
+      {
+        recordedAt: now,
+        historicalBaseline: event === "migrate-json-snapshot"
+      }
+    );
     const postgresSyncChanges = POSTGRES_SYNC_MODE === "outbox" ? buildCollectionChanges(businessExistingRows, entries) : [];
     const existingPayloads = existingByKey;
     const deleteStatement = db.prepare("DELETE FROM state_collections WHERE key = ?");
@@ -7796,6 +7808,29 @@ function writeSqliteState(
   } catch (error) {
     db.exec("ROLLBACK");
     throw error;
+  } finally {
+    db.close();
+  }
+}
+
+function readFollowupDispatchOutboxHealth() {
+  if (!shouldUseSqlite()) {
+    return {
+      contract: "citizen-chronic.followup-dispatch-outbox.v1",
+      counts: { pending: 0, leased: 0, delivered: 0, "dead-letter": 0 },
+      healthy: false,
+      durableStorageAvailable: false,
+      requestPathExternalDispatch: false,
+      productionReady: false
+    };
+  }
+  const db = openSqliteDatabase();
+  try {
+    return {
+      ...createSqliteFollowupDispatchRepository(db).health(),
+      durableStorageAvailable: true,
+      productionReady: false
+    };
   } finally {
     db.close();
   }
@@ -27886,6 +27921,7 @@ function createRuntimeCapabilitySource() {
   qualitySafetySlaState,
   randomUUID,
   readDatabase,
+  readFollowupDispatchOutboxHealth,
   readLatestPostgresReconciliation,
   readPostgresReconciliationCase,
   readPostgresReconciliationRun,
@@ -28209,6 +28245,7 @@ module.exports = {
   ensureDatabase,
   issuePhoneVerificationCode,
   openSqliteDatabase,
+  readFollowupDispatchOutboxHealth,
   productionSessionSecretErrors,
   productionSessionRetentionErrors,
   productionSessionStoreErrors,

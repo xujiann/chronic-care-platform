@@ -484,6 +484,7 @@ test("institution dispatch filters resident and organization scope before publis
     canAccessResident: (_user, residentId) => residentId === "resident-1",
     rowMatchesOrganizationScope: () => true,
     readDatabase: () => persisted,
+    readFollowupDispatchOutboxHealth: () => ({ counts: { pending: 2 }, healthy: true, durableStorageAvailable: true, requestPathExternalDispatch: false, productionReady: false }),
     requireApiRole: () => ({ name: "Institution A", role: "institution", orgCode: "ORG-A" }),
     sendJson(res, statusCode, body) {
       res.statusCode = statusCode;
@@ -508,9 +509,11 @@ test("institution dispatch filters resident and organization scope before publis
     new URL("https://platform.example.test/api/chronic/followup-events/dispatch")
   );
   assert.equal(response.statusCode, 200);
-  assert.equal(response.body.processed.length, 1);
-  assert.equal(publisherCalls, 1);
-  assert.equal(persisted.followups[0][RUNTIME_FIELD].outbox[0].deliveryState, "published");
+  assert.equal(response.body.processed.length, 0);
+  assert.equal(response.body.queued, 1);
+  assert.equal(response.body.requestPathExternalDispatch, false);
+  assert.equal(publisherCalls, 0);
+  assert.equal(persisted.followups[0][RUNTIME_FIELD].outbox[0].deliveryState, "pending");
   assert.equal(persisted.followups[1][RUNTIME_FIELD].outbox[0].deliveryState, "pending");
   assert.equal(audits.at(-1).result, "allowed");
 
@@ -551,12 +554,38 @@ test("institution dispatch filters resident and organization scope before publis
   assert.equal(missingOrgResponse.statusCode, 403);
   assert.equal(reads, 0);
   assert.equal(publisherCalls, 0);
+
+  const unavailableAudits = [];
+  const unavailableResponse = {};
+  const unavailableSegment = createRouteSegments({
+    ...baseRuntime,
+    appendSecurityEvent: (event) => unavailableAudits.push(event),
+    readFollowupDispatchOutboxHealth: () => ({
+      counts: { pending: 0 },
+      healthy: false,
+      durableStorageAvailable: false,
+      requestPathExternalDispatch: false,
+      productionReady: false
+    })
+  }, {
+    env: { NODE_ENV: "test" },
+    followupEventPublisher: scopedPublisher
+  }).find((candidate) => candidate.id === "citizen-chronic-06");
+  await unavailableSegment.handle(
+    { method: "POST", headers: {} },
+    unavailableResponse,
+    new URL("https://platform.example.test/api/chronic/followup-events/dispatch")
+  );
+  assert.equal(unavailableResponse.statusCode, 503);
+  assert.equal(unavailableResponse.body.code, "FOLLOWUP_EVENT_DISPATCH_DURABLE_QUEUE_UNAVAILABLE");
+  assert.equal(unavailableResponse.body.accepted, undefined);
+  assert.equal(unavailableAudits.some((item) => item.result === "allowed" || item.result === "accepted"), false);
+  assert.equal(unavailableAudits.at(-1).result, "denied");
 });
 
-test("final persistence failure leaves pending state and retry revalidates the exact provider receipt", async () => {
+test("dispatch request never calls provider or performs a second persistence write", async () => {
   const staged = await stagedState();
   let persisted = staged.nextData;
-  let failWrite = true;
   const audits = [];
   const idempotencyKeys = [];
   let providerReceipt;
@@ -573,18 +602,13 @@ test("final persistence failure leaves pending state and retry revalidates the e
     canAccessResident: () => true,
     rowMatchesOrganizationScope: () => true,
     readDatabase: () => persisted,
+    readFollowupDispatchOutboxHealth: () => ({ counts: { pending: 1 }, healthy: true, durableStorageAvailable: true, requestPathExternalDispatch: false, productionReady: false }),
     requireApiRole: () => ({ name: "Commission Operator", role: "commission", orgCode: "ORG-COMMISSION" }),
     sendJson(res, statusCode, body) {
       res.statusCode = statusCode;
       res.body = body;
     },
-    writeDatabase(next) {
-      if (failWrite) {
-        failWrite = false;
-        throw new Error("private persistence diagnostic");
-      }
-      persisted = next;
-    }
+    writeDatabase() { throw new Error("request path must not write delivery results"); }
   };
   const segment = createRouteSegments(runtime, {
     env: ENV,
@@ -592,26 +616,17 @@ test("final persistence failure leaves pending state and retry revalidates the e
     followupEventPublisherActivationVerifier: activationVerifier()
   }).find((candidate) => candidate.id === "citizen-chronic-06");
 
-  const failed = {};
+  const accepted = {};
   await segment.handle(
     { method: "POST", headers: {} },
-    failed,
+    accepted,
     new URL("https://platform.example.test/api/chronic/followup-events/dispatch")
   );
-  assert.equal(failed.statusCode, 503);
-  assert.equal(failed.body.code, "FOLLOWUP_EVENT_DISPATCH_PERSISTENCE_FAILED");
+  assert.equal(accepted.statusCode, 200);
+  assert.equal(accepted.body.dispatchMode, "durable-worker");
+  assert.equal(accepted.body.requestPathExternalDispatch, false);
   assert.equal(persisted.followups[0][RUNTIME_FIELD].outbox[0].deliveryState, "pending");
-  assert.equal(audits.at(-1).result, "failed");
-
-  const retried = {};
-  await segment.handle(
-    { method: "POST", headers: {} },
-    retried,
-    new URL("https://platform.example.test/api/chronic/followup-events/dispatch")
-  );
-  assert.equal(retried.statusCode, 200);
-  assert.equal(persisted.followups[0][RUNTIME_FIELD].outbox[0].deliveryState, "published");
-  assert.equal(idempotencyKeys[0], idempotencyKeys[1]);
+  assert.equal(idempotencyKeys.length, 0);
   assert.equal(audits.at(-1).result, "allowed");
 });
 
@@ -628,6 +643,7 @@ test("dispatch fails closed before publisher and state write when the authorizat
     canAccessResident: () => true,
     rowMatchesOrganizationScope: () => true,
     readDatabase: () => staged.nextData,
+    readFollowupDispatchOutboxHealth: () => ({ counts: { pending: 1 }, healthy: true, durableStorageAvailable: true }),
     requireApiRole: () => ({ name: "Commission Operator", role: "commission" }),
     sendJson(res, statusCode, body) {
       res.statusCode = statusCode;
@@ -656,7 +672,7 @@ test("dispatch fails closed before publisher and state write when the authorizat
   assert.deepEqual(staged.nextData, before);
 });
 
-test("production dispatch API remains fail-closed without T00 activation composition", async () => {
+test("production dispatch API queues locally without reaching the unapproved provider", async () => {
   const staged = await stagedState();
   const before = structuredClone(staged.nextData);
   const audits = [];
@@ -667,6 +683,7 @@ test("production dispatch API remains fail-closed without T00 activation composi
     canAccessResident: () => true,
     rowMatchesOrganizationScope: () => true,
     readDatabase: () => staged.nextData,
+    readFollowupDispatchOutboxHealth: () => ({ counts: { pending: 1 }, healthy: true, durableStorageAvailable: true, requestPathExternalDispatch: false, productionReady: false }),
     writeDatabase: () => { writes += 1; },
     requireApiRole: () => ({ name: "Commission Operator", role: "commission" }),
     sendJson(res, statusCode, body) {
@@ -684,10 +701,11 @@ test("production dispatch API remains fail-closed without T00 activation composi
     response,
     new URL("https://platform.example.test/api/chronic/followup-events/dispatch")
   );
-  assert.equal(response.statusCode, 503);
-  assert.equal(response.body.code, "FOLLOWUP_EVENT_PUBLISHER_ACTIVATION_VERIFIER_REQUIRED");
+  assert.equal(response.statusCode, 200);
+  assert.equal(response.body.dispatchMode, "durable-worker");
+  assert.equal(response.body.requestPathExternalDispatch, false);
   assert.equal(writes, 0);
-  assert.equal(audits.at(-1).result, "failed");
+  assert.equal(audits.at(-1).result, "allowed");
   assert.deepEqual(staged.nextData, before);
 });
 

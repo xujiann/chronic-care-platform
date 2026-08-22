@@ -74,7 +74,7 @@ HTTP request
 ## 6. 错误、幂等与审计
 
 - router 未命中统一 404；存储冲突和 session store 不可用有专用错误转换。
-- 健康/存储元数据的既有 `schemaVersion` 字段形状保持不变，值由 SQLite 注册表 head 派生，当前为 15；未新增或删除 API 路径、角色、权限或审计动作。
+- 健康/存储元数据的既有 `schemaVersion` 字段形状保持不变，值由 SQLite 注册表 head 派生，当前为 16。
 - 静态未知/敏感路径统一 404；`GET/HEAD /data/public-demo.json` 返回合成脱敏数据，`/data/db.json`、源码、配置和仓库元数据不可发布。
 - HTML、静态资源、JSON/API、下载与错误响应由集中端口下发 `nosniff`、frame、referrer、
   permissions 与 CSP。显式发布图的内联脚本/样式静态风险已归零，但兼容 CSP 仍含 `unsafe-inline`，
@@ -97,15 +97,11 @@ HTTP request
   `bearer`/`hybrid` 配置若未同时设置 `AUTH_BEARER_COMPATIBILITY=enabled`，Bearer 请求以
   `BEARER_AUTH_DISABLED` 失败关闭且登录响应不返回 token。显式打开兼容仍不改变
   `productionReady=false`。
-- `GET /api/chronic/followup-events/health` 兼容增加脱敏 publisher readiness；不返回 endpoint、
-  secret 或外部回执。`POST /api/chronic/followup-events/dispatch` 保持 method/path、角色和成功
-  shape；机构调用仅可看到并投递 resident/org 双重范围内的聚合，拒绝发生在外发前，成功、
-  拒绝、外发失败和最终写回失败均记录安全审计；授权/尝试审计必须先持久化，否则在 publisher
-  调用和领域状态写入前以 `FOLLOWUP_EVENT_DISPATCH_AUDIT_UNAVAILABLE` 失败关闭。非生产继续
-  使用本地回执；生产缺少独立
-  activation verifier、安全 HTTPS/HMAC 配置或可信 receipt capability 时以稳定
-  `FOLLOWUP_EVENT_PUBLISHER_*` 错误失败且 outbox 保持 pending，`productionReady` 始终为
-  `false`。本切片不提供 worker、lease 或多实例 exactly-once 声明。
+- `GET /api/chronic/followup-events/health` 兼容增加脱敏 publisher 与 durable queue readiness；不返回 endpoint、
+  secret 或外部回执。`POST /api/chronic/followup-events/dispatch` 保持 method/path 与角色，但只确认已由
+  SQLite v16 耐久队列承接的本地事件，请求路径不再调用 publisher。内部必须读取真实 durable health；
+  非 SQLite、队列不可用或不健康时以 `503 FOLLOWUP_EVENT_DISPATCH_DURABLE_QUEUE_UNAVAILABLE`
+  失败关闭且不记录 allowed/accepted。机构响应继续隐藏全局队列计数，但不影响内部真实判定。
 - 科研合规导出创建路径保持 `POST /api/research/datasets/:id/compliant-exports`，但新记录只进入 `pending/blocked`；`POST /api/research/compliant-exports/:id/actions` 由 commission 执行独立审核、退回和发布。命令要求 `expectedVersion` 与幂等键，同键异载荷或陈旧版本返回稳定 409；机构列表只返回本主体申请，历史 released 记录保持只读兼容。
 
 ## 7. API 风险与缺失测试
@@ -161,3 +157,13 @@ DATA-003 不新增、删除或改变任何 HTTP method/path、鉴权、角色、
 定义和开发快照名称；不暴露治理目录为 API，也不允许 `shared`、`state-data` 或引用某集合的路由
 process 自动成为数据 owner。252 个集合的 `productionPromotionAllowed` 均为 `false`，仓库成功检查
 不改变生产 API 目录的全量 `NO-GO`。
+
+## 13. 慢病随访事件接口变化
+
+- `PATCH /api/followups/:id`：method/path/角色/幂等保持兼容；SQLite 模式下业务状态与 v16 enqueue 同事务。
+- `GET /api/chronic/followup-events/health`：commission 可见全局 durable queue 计数；institution 仅见自身
+  聚合 pending 与 `not-disclosed` 队列边界，避免跨机构泄露。
+- `POST /api/chronic/followup-events/dispatch`：保留路径但仅返回 `dispatchMode=durable-worker`、queued 和
+  `requestPathExternalDispatch=false`；不调用 provider、不写 delivery 结果。durable queue 不可用或不健康时
+  返回 503，institution 虽不获取全局计数，仍使用同一真实健康判定。
+- 人工 dead-letter replay 仅经受控 CLI digest 参数执行，尚未新增公网 HTTP 管理接口。

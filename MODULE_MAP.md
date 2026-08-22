@@ -29,7 +29,7 @@
 | 身份安全 | `src/identity-security/`、`production-adapters.js`、`session-store.js`、`auth-security-state-store.js` | Cookie/CSRF、OIDC/JWKS、SMS、会话仓储、共享 OTP/限流/锁定状态和 v2 审计链验证已模块化；生产 bearer/hybrid 受显式兼容门禁约束并保持 NO-GO |
 | 平台数据 | `src/platform/data/`、`src/platform/storage/` | 数据所有权、SQLite migration 注册表/runner、PostgreSQL 主存储契约；集合治理对 252/252 个快照集合给出 owner/system/review/quarantine 状态 |
 | 领域事件 | `src/platform/events/`、各领域 worker | outbox/inbox、幂等和后台投递 |
-| 慢病随访 publisher | `citizen-chronic-followup-event-service.js`、`src/citizen-chronic/followup-event-publisher.js` | T04 自有 v1 事件、安全 HTTPS 投递端口、独立 activation verifier 和本地兼容适配；尚无生产 worker/持久 lease |
+| 慢病随访 durable dispatch | `citizen-chronic-followup-event-service.js`、`src/citizen-chronic/followup-event-publisher.js`、`followup-dispatch-*` | T04 v1 事件/投递语义 + T00 SQLite v16/outbox/worker/部署装配；真实外部 activation decision、回执与现场启用仍 NO-GO |
 | 审计投递 | `src/identity-security/audit-delivery-source.js`、`src/platform/operations/audit-delivery.js`、`scripts/audit-delivery-worker.js`、`scripts/audit-delivery-preflight.js` | v15 同事务 append-only source、最小投影、cursor 批次和 checkpoint v3 已实现；v2 snapshot 不静默提升，可信 receipt、外部 anchor 和真实 WORM capability 仍使生产失败关闭 |
 | 安全对象存储端口 | `secure-object-storage.js`、`scripts/object-storage-readiness.js` | T00 管版本化请求/响应信任、精确 Origin/TTL、严格回执和生产门禁；T08 附件路由在兼容容量达到 500 条时先失败关闭，不再静默淘汰既有元数据；持久命令、无损分页和对账仍未建立 |
 | 区域运行 | `src/platform/regional/`、`regions/` | 多地区清单、能力包、复制和发布注册 |
@@ -117,7 +117,7 @@ scripts/platform-cutover-alert-worker.js
 
 ## 9. SQLite migration 模块
 
-`src/platform/storage/sqlite-migrations.js` 是 T00 管理的单一注册表和执行入口。`server.js` 只消费 `SQLITE_SCHEMA_HEAD` 与 `applySqliteMigrations`；部署检查、生产数据库 readiness 和发布报告消费同一注册表校验结果。v1–v14 保持历史 ledger checksum 并冻结源码指纹；v15 使用内容指纹追加 append-only 审计 source，head 为 15。任何后续 DDL 必须从 v16 连续追加，不允许领域模块绕过注册表。
+`src/platform/storage/sqlite-migrations.js` 是 T00 管理的单一注册表和执行入口。`server.js` 与部署/readiness/发布报告消费同一注册表结果。v1–v14 保持历史 ledger checksum 并冻结源码指纹；v15 追加 append-only 审计 source，v16 追加慢病随访 durable outbox，当前 head 为 16。任何后续 DDL 必须从 v17 连续追加，不允许领域模块绕过注册表。
 
 ## 10. 标准工程门禁模块
 
@@ -177,3 +177,13 @@ ID 与弃用 alias；后续指标必须按 owner 逐个接入，不得继续按�
 集合的 `review-required`/`legacy-quarantined` 状态，不复制 `domain-data-ownership`。源码 process
 owner、文件引用和 closed-world 核心概念匹配只是证据，不能自动晋升为数据 owner。该 B 类模块
 不读写业务数据库，不改变 runtime state，也不生成仓库内报告；原 release 报告命令继续保留。
+
+## 16. 慢病随访 durable dispatch 模块
+
+- T04：`followup-event-service`、`followup-event-publisher`、`followup-dispatch-outbox` 合同与
+  `followup-dispatch-worker` 状态机语义。
+- T00：SQLite v16 注册、`server.js` 事务 hook、worker CLI、生产 preflight、部署包与 systemd/env 合同。
+- 信任适配：`followup-dispatch-activation-provider` 校验仓库外 registry 与固定 Ed25519 公钥摘要；审批私钥和
+  实际决定不进入仓库。
+- 边界：HTTP 路由只提交/查询本地队列；worker 才能调用 publisher。内嵌 outbox 保留 API 兼容，专用
+  SQLite outbox 是外部投递权威状态。跨主机 PostgreSQL 实现尚不存在。

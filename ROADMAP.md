@@ -17,7 +17,7 @@
 | 0 | T00 治理基线迁移 | 已合入 `main@58e05e5` | 按每日循环持续维护 |
 | 1 | 静态内容 allowlist 与快照隔离 | 已合入 `main@6c18221`；PR/main CI 与 Pages 验证通过 | 持续执行清单审查、负向测试与缓存版本治理 |
 | 2 | 审计链失败语义 | Accepted ADR；#131 候选已实施，待最新 PR/main CI / P0 | 持续运行严格验证、全量写入拒绝和外部历史链 preflight；真实历史链迁移继续 NO-GO |
-| 3 | Schema migration 与指纹 | v1–v14 冻结，v15 append-only audit source 已追加并通过空库/v11 升级/重跑/回滚门禁 / P1 | 后续 v16+ 按冻结规则追加，生产迁移仍需备份、核对和现场证据 |
+| 3 | Schema migration 与指纹 | v1–v14 冻结，v15 append-only audit source、v16 慢病随访 durable outbox 已追加并覆盖空库/v11 升级/重跑/回滚门禁 / P1 | 后续 v17+ 按冻结规则追加，生产迁移仍需备份、核对和现场证据 |
 | 4 | 标准 build/lint/typecheck/unit/integration/smoke 入口 | 已合入 `main@fc42833`（PR #130）；内部边界覆盖候选另锁定 identity/audit/object storage/API governance 四组真实基线 / P1 | 保持 test:all 与原 server.js 85/85/55 语义；覆盖阈值只升不降，报告只留临时目录；逐步扩大 lint/typecheck 基线并治理测试时长 |
 | 5 | 移除组合根循环依赖 | 已合入 `main@21d8f3c`（PR #132）；PR/main CI 与 Pages 验证通过 / P1 | ARC-002 已关闭；后续组合根瘦身归 ARC-001，不扩大本切片 |
 | 6 | 生产身份/SMS、PostgreSQL shadow、连续审计投递 | 身份/SMS 与 PG shadow 已存在；连续审计已完成 v15 同事务 append-only source、最小投影、cursor/source binding 和 checkpoint v3，部署/preflight 默认精确合同 / P1 | 可信签名 receipt、外部单调锚、真实 provider/PG/SIEM/WORM/KMS、恢复演练和现场证据继续 NO-GO；不做 PG 主切换 |
@@ -41,3 +41,11 @@
 - 测试计划与完成条件。
 
 输出 PLAN 后停止编码，等待方向审批。
+
+## 2026-08-22 慢病随访 durable dispatch
+
+- 已形成候选：SQLite v16 事务 enqueue、租约 fencing、有界退避、死信、digest-only replay、worker CLI、
+  preflight/readiness、部署包与 systemd 合同。
+- 下一现场阶段：绑定真实 endpoint/secret provider/activation trust files 与外部签名 decision，核验供应方幂等与签名回执，启用服务
+  和告警并完成故障/恢复/死信 replay/回滚演练。
+- PostgreSQL 多节点主存储需另立 ADR/migration；在外部证据完成前保持 production NO-GO。

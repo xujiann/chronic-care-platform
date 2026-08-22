@@ -97,6 +97,11 @@ function passingSoftwareOptions(manifest, registry) {
       checks: [{ id: "audit-delivery:test-fixture", passed: true }],
       boundary: "test fixture only"
     },
+    followupDispatchAssessment: {
+      configured: true,
+      productionReady: true,
+      checks: [{ id: "followup-dispatch:test-fixture", passed: true }]
+    },
     launchSmoke: {
       ok: true,
       baseUrl: "https://health.example.gov.cn",
@@ -156,6 +161,96 @@ test("legacy audit retention variables cannot substitute for continuous audit de
   assert.equal(report.runtimeConfigured, false);
   assert.equal(report.productionReady, false);
   assert.equal(report.checks.some((item) => item.id === "preflight:audit-delivery" && !item.passed), true);
+});
+
+test("durable followup worker remains NO-GO without real activation and receipt trust", async () => {
+  const manifest = manifestFixture();
+  const registry = registryFixture(manifest);
+  const options = passingSoftwareOptions(manifest, registry);
+  delete options.followupDispatchAssessment;
+  options.env = {
+    ...options.env,
+    NODE_ENV: "production",
+    CITIZEN_CHRONIC_FOLLOWUP_DISPATCH_SQLITE_FILE: "/var/lib/chronic-care-platform/health-city.sqlite",
+    CITIZEN_CHRONIC_FOLLOWUP_DISPATCH_WORKER_ID: "chronic-followup-worker",
+    CITIZEN_CHRONIC_FOLLOWUP_PUBLISHER_URL: "https://followup.example.gov.cn/events",
+    CITIZEN_CHRONIC_FOLLOWUP_PUBLISHER_HMAC_SECRET: "a".repeat(32)
+  };
+  const report = await buildProductionPreflight({
+    ...options,
+    productionEvidence: { ok: false, status: "no-go-evidence-incomplete" },
+    evidenceRecords: {}
+  });
+  assert.equal(report.followupDispatchAssessment.configured, false);
+  assert.equal(report.followupDispatchAssessment.productionReady, false);
+  assert.equal(report.checks.some((item) => item.id === "preflight:chronic-followup-dispatch" && !item.passed), true);
+  assert.equal(report.decision, "NO-GO");
+});
+
+test("externally verified release-bound evidence can open the durable followup runtime gate without a code change", async () => {
+  const manifest = manifestFixture();
+  const registry = registryFixture(manifest, {
+    externalAttestation: {
+      required: true,
+      recorded: true,
+      evidenceRef: "controlled://registry/preflight-001",
+      evidenceDigest: `sha256:${"e".repeat(64)}`,
+      recordedAt: "2026-08-22T08:00:00.000Z",
+      recordedBy: "external-release-verifier"
+    }
+  });
+  const options = passingSoftwareOptions(manifest, registry);
+  delete options.followupDispatchAssessment;
+  options.env = {
+    ...options.env,
+    NODE_ENV: "production",
+    CITIZEN_CHRONIC_FOLLOWUP_DISPATCH_SQLITE_FILE: "/var/lib/chronic-care-platform/health-city.sqlite",
+    CITIZEN_CHRONIC_FOLLOWUP_DISPATCH_WORKER_ID: "chronic-followup-worker",
+    CITIZEN_CHRONIC_FOLLOWUP_PUBLISHER_URL: "https://followup.example.gov.cn/events",
+    CITIZEN_CHRONIC_FOLLOWUP_PUBLISHER_HMAC_SECRET: "a".repeat(32)
+  };
+  const records = Object.fromEntries(GATE_DEFINITIONS.map((definition) => [
+    definition.file,
+    { releaseId: manifest.releaseId, artifactDigest: manifest.artifact.digest }
+  ]));
+  const evidence = {
+    ok: true,
+    status: "go-decision-evidence-validated",
+    evidenceFingerprint: "externally-verified-test-fixture"
+  };
+  const externalTrustVerifier = async () => ({
+    registryAttestationVerified: true,
+    productionEvidenceVerified: true,
+    detail: "verified outside repository"
+  });
+  const report = await buildProductionPreflight({
+    ...options,
+    followupActivationProvider: { configured: true, productionReady: false },
+    productionEvidence: evidence,
+    evidenceRecords: records,
+    externalTrustVerifier
+  });
+  assert.equal(report.followupDispatchAssessment.configured, true);
+  assert.equal(report.followupDispatchAssessment.externalEvidenceVerified, true);
+  assert.equal(report.followupDispatchAssessment.productionReady, true);
+  assert.equal(report.checks.find((item) => item.id === "preflight:chronic-followup-dispatch").passed, true);
+  assert.equal(report.productionReady, true);
+
+  records[GATE_DEFINITIONS[0].file] = {
+    releaseId: "different-release",
+    artifactDigest: manifest.artifact.digest
+  };
+  const drifted = await buildProductionPreflight({
+    ...options,
+    followupActivationProvider: { configured: true, productionReady: false },
+    productionEvidence: evidence,
+    evidenceRecords: records,
+    externalTrustVerifier
+  });
+  assert.equal(drifted.followupDispatchAssessment.configured, true);
+  assert.equal(drifted.followupDispatchAssessment.externalEvidenceVerified, false);
+  assert.equal(drifted.followupDispatchAssessment.productionReady, false);
+  assert.equal(drifted.productionReady, false);
 });
 
 test("production preflight recognizes the exact append-only source contract without lifting external gates", async () => {
