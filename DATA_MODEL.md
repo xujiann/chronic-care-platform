@@ -268,3 +268,12 @@ head v16、PostgreSQL 结构、`data/db.json` 或任何 data owner。
 证据/指纹/命令回执 digest、有效期和独立 signer。评估报告不含 envelope、现场正文、凭据或患者数据，
 也不新增集合、表、DDL 或 migration。promotion receipt 只保存 preflight、production envelope、14 项行动
 报告和 artifact 的摘要，且明确 `deploymentExecuted=false`。
+
+## 19. 生产 preflight decision receipt 不可变绑定（运行时投影）
+
+本切片没有新增数据库表、collection 或 migration。受信 receipt 是外部权威候选产生的短时输入，当前只在
+进程内验证，不写入 `data/db.json` 或 SQLite。不可变合同为
+`contract + receiptId + decision=GO + releaseId + sha256 artifactDigest + evidenceFingerprint + issuedAt + expiresAt`；
+verifier verdict 还必须精确回显前三项绑定和 receiptId，并提供 `verifiedAt`、`verifierId`、
+`singleUseEnforced=true`、`replayDetected=false`。验证后的对象由进程内 trust marker 标记，序列化、重建或
+伪造的普通对象不再可信。未来若引入耐久 nonce/replay ledger，必须另立 Accepted ADR、migration 和恢复测试。

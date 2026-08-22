@@ -205,3 +205,11 @@ Runtime Go/No-Go 或生产授权。
 T00 pinned-anchor Ed25519 端口消费仓库外 `<action-id>.json` envelope，并只返回 digest-only 决定投影。
 任何本地 `status`、无签名 fixture 或未绑定当前 release/artifact 的记录都不能解除 strict preflight；
 manual production workflow 也不调用业务 API 或执行部署。
+
+## 17. 全局 Go/No-Go 受信 receipt 响应语义
+
+现有 `/api/production-go-no-go/*` method/path、鉴权和写操作形状未新增或改名。center 响应新增/强化
+`goNoGo:trustedPreflightDecision` prerequisite 与脱敏 `trustedPreflightDecision` 投影；缺失、漂移、过期、
+未来时间、重放或 verifier 异常只暴露稳定代码，不返回 provider 错误正文。写入普通 evidenceRef、DR
+布尔或 synthetic `verified:true` 对象不能晋升生产状态。唯一授权系统和 receipt 获取 API 尚未确定，
+不得把 Proposed ADR 或测试 fixture 登记为生产签发接口。

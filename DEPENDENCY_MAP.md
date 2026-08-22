@@ -264,3 +264,11 @@ records 转为稳定摘要绑定，再投影到既有 externalTrustVerifier 两�
 v2 evaluator → strict preflight → protected manual workflow → digest-only receipt`。definitions 与 evaluator
 不依赖组合根或业务存储；provider 私钥、真实信任锚和现场证据始终在仓库外。评估失败只输出稳定 code
 与摘要，不反向写回定义文件；workflow 不反向取得现场审批或部署权威。
+
+## 生产 Go/No-Go 受信 receipt 依赖方向
+
+当前依赖固定为 `server composition → production-go-no-go domain → production-preflight-decision-receipt trust port
+→ explicitly injected external verifier`。domain 只接受由 trust port 在当前进程创建的验证投影；trust port
+不依赖 `server.js`、数据库、release 文件或环境布尔，避免本地事实反向成为授权权威。默认组合没有
+external verifier，所以依赖缺失时稳定失败关闭。未来外部 CAB/provider、信任根和耐久 anti-replay store
+只能从 composition 边界注入，不得让领域模型依赖具体供应方 SDK；该依赖仍待 Accepted ADR。

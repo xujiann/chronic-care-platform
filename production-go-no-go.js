@@ -1,6 +1,10 @@
 "use strict";
 
 const { createHash } = require("node:crypto");
+const {
+  assessProductionPreflightDecisionReceipt,
+  isVerifiedProductionPreflightDecision
+} = require("./production-preflight-decision-receipt");
 
 const APPROVAL_ROLES = ["business", "information", "operations", "security"];
 const REQUIRED_P0_BLOCKERS = Array.from({ length: 10 }, (_, index) => `P0-${String(index + 1).padStart(2, "0")}`);
@@ -48,20 +52,33 @@ function buildProductionGoNoGoCenter(data = {}, evidence = {}, securityCenter = 
   const cutoverRows = Array.isArray(evidence.cutoverChecklist) ? evidence.cutoverChecklist : [];
   const cutoverIds = new Set(cutoverRows.map((item) => item.id).filter(Boolean));
   const productionSmoke = isProductionSmoke(launchSmoke);
-  const checks = [
+  const prerequisiteEvidenceChecks = [
     check("goNoGo:siteAcceptances", allP0Accepted, `${siteAcceptanceIds.length}/10 unique P0 blockers site accepted`),
     check("goNoGo:securityOpinion", securityCenter.productionGate?.securityOpinionRecorded === true, `${securityCenter.summary?.approvedReleaseOpinions || 0}/${securityCenter.summary?.releaseApprovals || 0} security opinions`),
     check("goNoGo:launchSmoke", productionSmoke && launchSmoke.ok === true && Number(launchSmoke.summary?.failed || 0) === 0 && Number(launchSmoke.summary?.liveChecks || 0) >= 2, `${launchSmoke.summary?.passed || 0}/${launchSmoke.summary?.total || 0} smoke checks; ${launchSmoke.summary?.liveChecks || 0} live; production target ${productionSmoke ? "verified" : "missing"}`),
     check("goNoGo:cutoverChecklist", evidence.cutoverProfile === "production" && cutoverRows.length === 10 && cutoverIds.size === 10 && cutoverRows.every((item) => item.passed === true), `${cutoverRows.filter((item) => item.passed).length}/10 cutover checks; profile ${evidence.cutoverProfile || "missing"}`),
     check("goNoGo:drSignoff", evidence.drRehearsalSigned === true, evidence.drRehearsalSigned ? "signed DR rehearsal evidence present" : "CUTOVER_DR_REHEARSAL_SIGNOFF missing")
   ];
-  const prerequisiteReady = checks.every((item) => item.passed);
   const evidenceFingerprint = createHash("sha256").update(JSON.stringify({
-    checks,
+    checks: prerequisiteEvidenceChecks,
     siteAcceptanceIds,
     securityApprovedAt: (securityCenter.approvals || []).map((item) => item.approvedAt || "").sort(),
     launchSmokeGeneratedAt: launchSmoke.generatedAt || ""
   })).digest("hex");
+  const trustedReceipt = evidence.trustedPreflightDecision || {};
+  const trustedReceiptCurrent = isVerifiedProductionPreflightDecision(trustedReceipt)
+    && trustedReceipt.contract === "production-preflight-decision-receipt.v1"
+    && trustedReceipt.verified === true
+    && trustedReceipt.evidenceFingerprint === evidenceFingerprint;
+  const checks = [
+    ...prerequisiteEvidenceChecks,
+    check(
+      "goNoGo:trustedPreflightDecision",
+      trustedReceiptCurrent,
+      trustedReceiptCurrent ? "trusted, current and replay-protected preflight GO receipt verified" : String(trustedReceipt.code || "trusted preflight GO receipt missing")
+    )
+  ];
+  const prerequisiteReady = checks.every((item) => item.passed);
   const approvals = normalizeApprovals(data.productionGoNoGoApprovals);
   const approved = approvals.filter((item) => item.status === "approved" && item.approvedBy && item.evidenceFingerprint === evidenceFingerprint);
   const staleApprovals = approvals.filter((item) => item.status === "approved" && item.approvedBy && item.evidenceFingerprint && item.evidenceFingerprint !== evidenceFingerprint);
@@ -101,6 +118,11 @@ function buildProductionGoNoGoCenter(data = {}, evidence = {}, securityCenter = 
     staleApprovals,
     decision,
     evidenceFingerprint,
+    trustedPreflightDecision: trustedReceiptCurrent ? trustedReceipt : {
+      contract: "production-preflight-decision-receipt.v1",
+      verified: false,
+      code: String(trustedReceipt.code || "trusted-receipt-missing")
+    },
     gate: {
       p0BlockerId: "P0-10",
       softwareControlReady: true,
@@ -172,6 +194,7 @@ function normalizeProductionGoNoGoDecision(payload = {}, user = {}, center, opti
 module.exports = {
   APPROVAL_ROLES,
   REQUIRED_P0_BLOCKERS,
+  assessProductionPreflightDecisionReceipt,
   buildProductionGoNoGoCenter,
   normalizeProductionGoNoGoApprovalAction,
   normalizeProductionGoNoGoDecision,

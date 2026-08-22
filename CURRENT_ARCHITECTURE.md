@@ -206,3 +206,12 @@ effective status；缺记录、provider、有效期、转换历史、命令回�
 仓库不保存原始现场证据、签名或命令输出。strict preflight 已把 14/14 验证作为额外必要条件；
 `production-promotion.yml` 仅允许 main 上手工触发、production environment 与专用 self-hosted label，
 通过后只生成不可覆盖的 digest-only eligibility receipt，不宣称部署已执行。
+
+## 2026-08-23 生产 Go/No-Go 受信 receipt 边界（AS-IS）
+
+`buildRuntimeProductionGoNoGoCenter()` 现先从五类本地事实计算当前 `evidenceFingerprint`，再通过显式
+`preflightDecisionReceipt + preflightDecisionVerifier` 端口验证第六项 prerequisite。receipt 必须精确绑定
+当前 `releaseId`、`sha256:` 制品摘要和证据指纹，并在有效期内由 verifier 确认 single-use 且未重放。
+默认 server 未配置 verifier，因此本地 launch/cutover JSON、DR 布尔、普通 evidenceRef、四方签字和
+历史 GO 都不能单独形成 `productionGoRecorded=true`。唯一外部生产授权权威仍待 Proposed ADR 人工接受，
+真实签发、信任根、耐久防重放和现场验收未完成，平台保持 `NO-GO`。

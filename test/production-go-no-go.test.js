@@ -7,6 +7,45 @@ const {
   normalizeProductionGoNoGoDecision,
   seedProductionGoNoGoApprovals
 } = require("../production-go-no-go");
+const { assessProductionPreflightDecisionReceipt } = require("../production-preflight-decision-receipt");
+
+const RELEASE_ID = "release-2026-08-23-001";
+const ARTIFACT_DIGEST = `sha256:${"a".repeat(64)}`;
+const NOW = "2026-08-23T08:00:00.000Z";
+
+function verifierFor(receipt) {
+  return () => ({
+    verified: true,
+    verifierId: "change-authority-verifier",
+    receiptId: receipt.receiptId,
+    releaseId: receipt.releaseId,
+    artifactDigest: receipt.artifactDigest,
+    evidenceFingerprint: receipt.evidenceFingerprint,
+    replayDetected: false,
+    singleUseEnforced: true,
+    verifiedAt: "2026-08-23T07:55:00.000Z"
+  });
+}
+
+function addTrustedReceipt(fixture) {
+  const preliminary = buildProductionGoNoGoCenter(fixture.data, fixture.evidence, fixture.security);
+  const receipt = {
+    contract: "production-preflight-decision-receipt.v1",
+    receiptId: "receipt-20260823-0001",
+    decision: "GO",
+    releaseId: RELEASE_ID,
+    artifactDigest: ARTIFACT_DIGEST,
+    evidenceFingerprint: preliminary.evidenceFingerprint,
+    issuedAt: "2026-08-23T07:50:00.000Z",
+    expiresAt: "2026-08-23T08:10:00.000Z"
+  };
+  fixture.evidence.trustedPreflightDecision = assessProductionPreflightDecisionReceipt(receipt, {
+    releaseId: RELEASE_ID,
+    artifactDigest: ARTIFACT_DIGEST,
+    evidenceFingerprint: preliminary.evidenceFingerprint
+  }, { now: NOW, verifier: verifierFor(receipt) });
+  return fixture;
+}
 
 function eligibleFixture() {
   const data = {
@@ -24,7 +63,7 @@ function eligibleFixture() {
     drRehearsalSigned: true
   };
   const security = { summary: { approvedReleaseOpinions: 2, releaseApprovals: 2 }, productionGate: { securityOpinionRecorded: true } };
-  return { data, evidence, security };
+  return addTrustedReceipt({ data, evidence, security });
 }
 
 test("global go/no-go remains blocked when real cutover prerequisites are missing", () => {
@@ -75,6 +114,19 @@ test("demo and local smoke evidence never opens the prerequisite gate", () => {
   fixture.evidence.cutoverProfile = "demo";
   center = buildProductionGoNoGoCenter(fixture.data, fixture.evidence, fixture.security);
   assert.equal(center.checks.find((item) => item.id === "goNoGo:cutoverChecklist").passed, false);
+});
+
+test("legacy synthetic trusted projection cannot open production GO", () => {
+  const fixture = eligibleFixture();
+  fixture.evidence.trustedPreflightDecision = {
+    contract: "production-preflight-decision-receipt.v1",
+    verified: true,
+    code: "trusted-receipt-verified",
+    evidenceFingerprint: buildProductionGoNoGoCenter(fixture.data, fixture.evidence, fixture.security).evidenceFingerprint
+  };
+  const center = buildProductionGoNoGoCenter(fixture.data, fixture.evidence, fixture.security);
+  assert.equal(center.checks.find((item) => item.id === "goNoGo:trustedPreflightDecision").passed, false);
+  assert.equal(center.gate.productionGoRecorded, false);
 });
 
 test("GO decision requires four independent approvals and explicit confirmation", () => {
@@ -140,7 +192,8 @@ test("evidence drift invalidates old approvals until signers re-approve", () => 
   }));
   fixture.evidence.launchSmoke.generatedAt = "2026-07-20T01:30:00.000Z";
   const center = buildProductionGoNoGoCenter(fixture.data, fixture.evidence, fixture.security);
-  assert.equal(center.summary.prerequisiteReady, true);
+  assert.equal(center.summary.prerequisiteReady, false);
+  assert.equal(center.checks.find((item) => item.id === "goNoGo:trustedPreflightDecision").passed, false);
   assert.equal(center.summary.approvalsRecorded, 0);
   assert.equal(center.summary.staleApprovals, 4);
   assert.equal(center.gate.formalDecisionEligible, false);

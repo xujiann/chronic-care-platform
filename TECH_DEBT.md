@@ -23,6 +23,7 @@
 | TEST-002 | 覆盖率 | 原 `server.js` c8 门禁之外，identity、audit、object-storage trust 与 API governance 四组已建立独立真实基线和负向矩阵 | 其余 `src/` 模块和浏览器代码仍不在覆盖率结论中；按风险分组扩展，不得降低既有阈值 |
 | TEST-003 | 安全负向测试 | 已建立源码、配置、环境模板、Git 元数据、文档和 `data/db.json` 拒绝矩阵 | 后续新增敏感类别必须扩展矩阵 |
 | GOV-001 | 规则冲突 | 基线中的路由工作流仍写旧集成分支/旧 baseline；本 T00 已校准，待合入关闭 | 操作人员可能走错误合入路径 |
+| GOV-002 | 生产授权权威 | runtime 已拒绝仅凭本地 JSON、DR 布尔、普通 evidenceRef 或 synthetic GO 放行，并要求 release/digest/fingerprint/有效期/anti-replay/verifier 的受信 receipt；ADR 仍为 Proposed | 唯一外部签发权威、信任根轮换、耐久 nonce ledger、provider 可用性/灾备和现场验收仍待人工接受；此前生产 false-positive 已关闭，但生产继续 NO-GO |
 
 ## P2 — 触及时改善
 

@@ -10,6 +10,8 @@ test("global go/no-go readiness validates software controls while preserving run
   assert.equal(report.center.gate.softwareControlReady, true);
   assert.equal(report.center.gate.productionGoRecorded, false);
   assert.equal(report.checks.some((item) => item.id === "goNoGoReadiness:evidenceDrift" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "goNoGoReadiness:trustedReceipt" && item.passed), true);
+  assert.equal(report.center.checks.some((item) => item.id === "goNoGo:trustedPreflightDecision" && !item.passed), true);
   assert.match(renderMarkdown(report), /Runtime prerequisites/);
   assert.match(renderMarkdown(report), /Stale approvals/);
 });
