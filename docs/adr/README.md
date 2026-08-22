@@ -41,6 +41,7 @@
 | [连续审计采用 append-only source v2](./2026-08-22-append-only-audit-source-v2.md) | Accepted | SQLite v15 事务内审计来源、稳定 cursor、最小投影与 checkpoint v3；外部信任仍 NO-GO |
 | [对象存储网关采用版本化响应信任合同 v1](./2026-08-22-object-storage-gateway-trust-v1.md) | Accepted | 独立响应验签、请求/对象绑定、签名 URL Origin/TTL 与严格回执 |
 | [对象存储采用结构化元数据与耐久异步命令轨道 v2](./2026-08-23-object-storage-durable-command-and-metadata-v2.md) | Proposed | T08 data owner/T00 technical owner 建议、SQLite v17 候选、异步 API、worker、分页、对账与默认 NO-GO；不授权实施 |
+| [Worker 统一脱敏观测合同 v1](./2026-08-23-worker-observability-contract-v1.md) | Accepted | 12 个现有 worker profile 的兼容投影、部署入口漂移门禁与固定生产非授权；不统一业务状态机 |
 | [生产切换行动状态由外部可信证据派生](./2026-08-23-production-cutover-action-derived-status-v2.md) | Accepted | definitions-only 台账、release/artifact 绑定、有效期、转换历史、职责分离与 strict preflight |
 | [生产 Go/No-Go 采用受信 preflight decision receipt 边界](./2026-08-23-production-go-no-go-trusted-receipt-boundary.md) | Proposed | 关闭本地证据误放行；唯一外部授权权威、签发/验签与耐久防重放仍待人工接受 |
 | [区域共享调阅命令以居民授权事实为唯一许可依据](./2026-08-21-regional-sharing-access-command.md) | Accepted | T00 integration、目标 T02、T04 授权事实、幂等/CAS、不可变回执与生产 NO-GO |

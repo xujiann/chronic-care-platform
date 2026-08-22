@@ -215,3 +215,11 @@ effective status；缺记录、provider、有效期、转换历史、命令回�
 默认 server 未配置 verifier，因此本地 launch/cutover JSON、DR 布尔、普通 evidenceRef、四方签字和
 历史 GO 都不能单独形成 `productionGoRecorded=true`。唯一外部生产授权权威仍待 Proposed ADR 人工接受，
 真实签发、信任根、耐久防重放和现场验收未完成，平台保持 `NO-GO`。
+
+## 2026-08-23 Worker 兼容观测层
+
+AS-IS 仍是多套独立 worker 状态机：12 个 profile 分别保留自己的 retry、lease、checkpoint、receipt 和终态，
+没有引入单一队列或共同任务状态。T00 新增 `platform-worker-observability.v1`，在现有报告上附加闭集、
+metadata-only 投影；worker/run 只输出 SHA-256 摘要，错误只输出稳定 code，完整业务报告不进入投影摘要。
+部署模板发现的 9 个 server-side 入口均由机器清单登记和 CI 校验。该层固定生产非授权；浏览器 Service
+Worker、外部数字医院注册及仍为 Proposed 的对象存储 v2 worker 不在运行合同内。

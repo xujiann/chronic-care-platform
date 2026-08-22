@@ -283,3 +283,10 @@ verifier verdict 还必须精确回显前三项绑定和 receiptId，并提供 `
 标准测试 runner 只把批次和套件的 `durationMs` 输出到进程/CI 日志，不写 `data/db.json`、SQLite、
 PostgreSQL、release、报告或归档产物。API 热点隔离配置只登记受跟踪测试文件路径，不包含业务数据、
 患者信息、凭据或生产证据，也不改变任何 schema、migration、集合 owner 或事实源。
+
+## 21. Worker 观测投影不是数据模型
+
+`platform-worker-observability.v1` 是进程内返回值，不新增集合、SQLite/PostgreSQL 表、DDL、migration、
+data owner 或权威事实。`sourceReportDigest` 只对已脱敏的 profile/outcome/time/identity digest/count/error code
+输入计算，不对业务报告正文、患者数据、凭据或 lease token 计算可关联摘要。本切片保持 schema head v16
+和所有核心表冻结；后续若要持久化指标或日志，必须由独立 owner/留存/访问控制决策处理。

@@ -13,6 +13,7 @@ const {
   projectDirectReportDelivery,
   recordDirectReportDeliveryOutcomeToState
 } = require("./public-health-direct-report-outbox-service");
+const { attachWorkerObservability } = require("./src/platform/operations/worker-observability-contract");
 
 function clean(value, maximum = 240) {
   return String(value ?? "").trim().replace(/[\r\n\t]+/g, " ").slice(0, maximum);
@@ -168,7 +169,7 @@ async function runTransactionalDirectReportWorkerCycle(repository, options = {})
     if (!result) break;
     deliveries.push(result.delivery);
   }
-  return {
+  return attachWorkerObservability("public-health-direct-report", {
     generatedAt: startedAt,
     processed: deliveries.length,
     awaitingCallback: deliveries.filter((item) => item.state === "awaiting-callback").length,
@@ -176,7 +177,7 @@ async function runTransactionalDirectReportWorkerCycle(repository, options = {})
     deadLetters: deliveries.filter((item) => item.state === "dead-letter").length,
     deliveries,
     productionReady: false
-  };
+  }, { observedAt: startedAt });
 }
 
 async function processDirectReportDelivery(options = {}) {
@@ -278,14 +279,14 @@ async function runDirectReportWorkerCycle(options = {}) {
     currentData = result.nextData;
     results.push(result.delivery);
   }
-  return {
+  return attachWorkerObservability("public-health-direct-report", {
     generatedAt: startedAt,
     due: due.length,
     processed: results.length,
     deliveries: results,
     nextData: currentData,
     productionReady: false
-  };
+  }, { observedAt: startedAt });
 }
 
 module.exports = {

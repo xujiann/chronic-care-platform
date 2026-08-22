@@ -1,0 +1,387 @@
+{
+  "schemaVersion": "platform-worker-semantics-inventory-v1",
+  "contractVersion": "platform-worker-observability.v1",
+  "productionAuthorization": "never",
+  "profiles": [
+    {
+      "id": "postgres-shadow-sync",
+      "ownerProcess": "T00",
+      "entrypoints": ["scripts/postgres-sync-worker.js"],
+      "implementationSources": ["postgres-runtime-sync.js"],
+      "stateMachine": "postgres-sync-outbox-v1",
+      "deliveryGuarantee": "at-least-once-shadow-apply",
+      "retryModel": "pending-retry-with-bounded-exponential-delay",
+      "leaseModel": "status-cas-no-explicit-lease",
+      "checkpointModel": "outbox-batch-status-and-reconciliation-ledger",
+      "terminalStates": ["delivered", "failed"],
+      "observability": {
+        "workerIdentityPaths": [],
+        "runIdentityPaths": [],
+        "observedAtPaths": [],
+        "okPaths": ["ok"],
+        "skippedPaths": [],
+        "statusPaths": [],
+        "countPaths": {
+          "claimed": ["processed"],
+          "succeeded": ["delivered"],
+          "retryScheduled": [],
+          "deadLettered": [],
+          "persistenceRejected": [],
+          "failed": ["failed"]
+        },
+        "errorCollections": []
+      }
+    },
+    {
+      "id": "domain-shadow-relay",
+      "ownerProcess": "T00",
+      "entrypoints": ["scripts/platform-shadow-relay.js"],
+      "implementationSources": ["src/platform/operations/shadow-outbox-relay.js", "src/platform/operations/domain-shadow-relay-runtime.js"],
+      "stateMachine": "monotonic-shadow-relay-v1",
+      "deliveryGuarantee": "idempotent-shadow-copy",
+      "retryModel": "timer-reinvocation-after-failure",
+      "leaseModel": "single-checkpoint-writer",
+      "checkpointModel": "monotonic-sqlite-sequence-checkpoint",
+      "terminalStates": ["relayed", "reconciled", "mismatch", "failed"],
+      "observability": {
+        "workerIdentityPaths": [],
+        "runIdentityPaths": ["relayId"],
+        "observedAtPaths": [],
+        "okPaths": ["ok"],
+        "skippedPaths": [],
+        "statusPaths": [],
+        "countPaths": {
+          "claimed": ["relayed"],
+          "succeeded": ["relayed"],
+          "retryScheduled": [],
+          "deadLettered": [],
+          "persistenceRejected": [],
+          "failed": []
+        },
+        "errorCollections": [
+          { "path": "outcomes", "codePaths": ["errorCode"] }
+        ]
+      }
+    },
+    {
+      "id": "postgres-shadow-reconciliation",
+      "ownerProcess": "T00",
+      "entrypoints": ["scripts/postgres-shadow-reconcile.js"],
+      "implementationSources": ["postgres-runtime-sync.js"],
+      "stateMachine": "postgres-shadow-reconciliation-v1",
+      "deliveryGuarantee": "read-only-digest-reconciliation",
+      "retryModel": "timer-reinvocation-after-failure",
+      "leaseModel": "single-run-no-lease",
+      "checkpointModel": "append-only-reconciliation-run-and-case-ledger",
+      "terminalStates": ["matched", "mismatched", "error"],
+      "observability": {
+        "workerIdentityPaths": [],
+        "runIdentityPaths": ["runId"],
+        "observedAtPaths": ["checkedAt"],
+        "okPaths": ["ok"],
+        "skippedPaths": [],
+        "statusPaths": ["status"],
+        "countPaths": {
+          "claimed": ["summary.localCollections"],
+          "succeeded": ["summary.matched"],
+          "retryScheduled": [],
+          "deadLettered": [],
+          "persistenceRejected": [],
+          "failed": ["summary.mismatched"]
+        },
+        "errorCollections": [
+          { "path": "$", "codePaths": ["errorCode"] }
+        ]
+      }
+    },
+    {
+      "id": "cutover-alert-delivery",
+      "ownerProcess": "T00",
+      "entrypoints": ["scripts/platform-cutover-alert-worker.js"],
+      "implementationSources": ["src/platform/cutover/pilot-cutover-alert-runtime.js"],
+      "stateMachine": "pilot-cutover-alert-lifecycle-v1",
+      "deliveryGuarantee": "bounded-retry-alert-delivery",
+      "retryModel": "adapter-specific-bounded-attempts",
+      "leaseModel": "single-run-no-lease",
+      "checkpointModel": "append-only-alert-journal",
+      "terminalStates": ["completed", "blocked"],
+      "observability": {
+        "workerIdentityPaths": [],
+        "runIdentityPaths": [],
+        "observedAtPaths": ["evaluatedAt"],
+        "okPaths": [],
+        "skippedPaths": [],
+        "statusPaths": ["status"],
+        "countPaths": {
+          "claimed": ["candidates"],
+          "succeeded": ["delivered"],
+          "retryScheduled": [],
+          "deadLettered": [],
+          "persistenceRejected": [],
+          "failed": ["failed"]
+        },
+        "errorCollections": [
+          { "path": "results", "codePaths": ["error.code"] }
+        ]
+      }
+    },
+    {
+      "id": "care-service-outbox",
+      "ownerProcess": "T05",
+      "entrypoints": ["scripts/care-service-outbox-worker.js"],
+      "implementationSources": ["care-service-runtime.js"],
+      "stateMachine": "care-service-transactional-outbox-v1",
+      "deliveryGuarantee": "at-least-once",
+      "retryModel": "bounded-exponential-backoff",
+      "leaseModel": "worker-and-attempt-bound-lease",
+      "checkpointModel": "transactional-event-state-and-dead-letter-ledger",
+      "terminalStates": ["delivered", "dead-letter"],
+      "observability": {
+        "workerIdentityPaths": ["workerId"],
+        "runIdentityPaths": ["runId"],
+        "observedAtPaths": [],
+        "okPaths": ["ok"],
+        "skippedPaths": ["skipped"],
+        "statusPaths": [],
+        "countPaths": {
+          "claimed": ["claimed"],
+          "succeeded": ["delivered"],
+          "retryScheduled": ["retried"],
+          "deadLettered": ["deadLetters"],
+          "persistenceRejected": [],
+          "failed": []
+        },
+        "errorCollections": [
+          { "path": "resultCodes", "codePaths": ["errorCode"] }
+        ]
+      }
+    },
+    {
+      "id": "continuous-audit-delivery",
+      "ownerProcess": "T00",
+      "entrypoints": ["scripts/audit-delivery-worker.js"],
+      "implementationSources": ["src/platform/operations/audit-delivery.js", "src/identity-security/audit-delivery-source.js"],
+      "stateMachine": "append-only-audit-source-v2",
+      "deliveryGuarantee": "at-least-once-with-bound-receipt",
+      "retryModel": "bounded-retry-after-or-exponential-backoff",
+      "leaseModel": "exclusive-checkpoint-file-lock",
+      "checkpointModel": "source-cursor-checkpoint-v3",
+      "terminalStates": ["acknowledged", "incident-open"],
+      "observability": {
+        "workerIdentityPaths": [],
+        "runIdentityPaths": [],
+        "observedAtPaths": [],
+        "okPaths": ["ok"],
+        "skippedPaths": [],
+        "statusPaths": [],
+        "countPaths": {
+          "claimed": ["pendingBefore"],
+          "succeeded": ["delivered"],
+          "retryScheduled": [],
+          "deadLettered": [],
+          "persistenceRejected": [],
+          "failed": []
+        },
+        "errorCollections": [
+          { "path": "$", "codePaths": ["errorCode"] }
+        ]
+      }
+    },
+    {
+      "id": "chronic-followup-dispatch",
+      "ownerProcess": "T04",
+      "entrypoints": ["scripts/chronic-followup-dispatch-worker.js"],
+      "implementationSources": ["src/citizen-chronic/followup-dispatch-worker.js", "src/citizen-chronic/followup-dispatch-outbox.js"],
+      "stateMachine": "citizen-chronic.followup-dispatch-worker.v1",
+      "deliveryGuarantee": "at-least-once",
+      "retryModel": "bounded-exponential-backoff-with-manual-dead-letter-replay",
+      "leaseModel": "owner-token-digest-version-expiry-fencing",
+      "checkpointModel": "sqlite-v16-authoritative-delivery-row-and-replay-ledger",
+      "terminalStates": ["delivered", "dead-letter", "persistence-rejected"],
+      "observability": {
+        "workerIdentityPaths": ["workerIdDigest"],
+        "runIdentityPaths": [],
+        "observedAtPaths": [],
+        "okPaths": [],
+        "skippedPaths": [],
+        "statusPaths": [],
+        "countPaths": {
+          "claimed": ["claimed"],
+          "succeeded": ["delivered"],
+          "retryScheduled": ["retryScheduled"],
+          "deadLettered": ["deadLettered"],
+          "persistenceRejected": ["persistenceRejected"],
+          "failed": []
+        },
+        "errorCollections": []
+      }
+    },
+    {
+      "id": "public-health-direct-report",
+      "ownerProcess": "T03",
+      "entrypoints": ["scripts/public-health-direct-report-worker.js"],
+      "implementationSources": ["public-health-direct-report-worker.js", "public-health-direct-report-outbox-service.js"],
+      "stateMachine": "public-health-direct-report-outbox-v1",
+      "deliveryGuarantee": "at-least-once-until-signed-callback",
+      "retryModel": "bounded-policy-retry-and-dead-letter",
+      "leaseModel": "worker-token-expiry-and-version-cas",
+      "checkpointModel": "transactional-delivery-state-and-callback-receipt",
+      "terminalStates": ["awaiting-callback", "completed", "dead-letter"],
+      "observability": {
+        "workerIdentityPaths": ["workerId"],
+        "runIdentityPaths": [],
+        "observedAtPaths": [],
+        "okPaths": ["ok"],
+        "skippedPaths": ["skipped"],
+        "statusPaths": [],
+        "countPaths": {
+          "claimed": ["processed"],
+          "succeeded": ["awaitingCallback"],
+          "retryScheduled": ["retryScheduled"],
+          "deadLettered": ["deadLetters"],
+          "persistenceRejected": [],
+          "failed": []
+        },
+        "errorCollections": [
+          { "path": "deliveries", "codePaths": ["failureCode", "lastFailure.code"] }
+        ]
+      }
+    },
+    {
+      "id": "referral-delivery",
+      "ownerProcess": "T05",
+      "entrypoints": ["scripts/production-adapter-runtime.js"],
+      "implementationSources": ["src/care-coordination/referral-delivery-worker.js", "src/care-coordination/referral-delivery-postgres-repository.js"],
+      "stateMachine": "care-coordination.referral-delivery-v1",
+      "deliveryGuarantee": "at-least-once",
+      "retryModel": "repository-backoff-plus-bounded-ack-retry",
+      "leaseModel": "owner-token-digest-version-expiry-fencing",
+      "checkpointModel": "postgres-delivery-row-and-replay-ledger",
+      "terminalStates": ["delivered", "dead-letter", "stale-lease", "ack-failed"],
+      "observability": {
+        "workerIdentityPaths": ["workerId"],
+        "runIdentityPaths": ["runId"],
+        "observedAtPaths": [],
+        "okPaths": [],
+        "skippedPaths": [],
+        "statusPaths": [],
+        "countPaths": {
+          "claimed": ["claimed"],
+          "succeeded": ["counts.delivered"],
+          "retryScheduled": ["counts.pending"],
+          "deadLettered": ["counts.dead-letter"],
+          "persistenceRejected": ["counts.stale-lease", "counts.ack-failed"],
+          "failed": []
+        },
+        "errorCollections": [
+          { "path": "outcomes", "codePaths": ["errorCode"] }
+        ]
+      }
+    },
+    {
+      "id": "emergency-signal-delivery",
+      "ownerProcess": "T06",
+      "entrypoints": ["scripts/production-adapter-runtime.js"],
+      "implementationSources": ["src/clinical-specialties/emergency-signal-delivery-worker.js", "src/clinical-specialties/emergency-signal-delivery-postgres.js"],
+      "stateMachine": "clinical-specialties.emergency-signal-delivery-v1",
+      "deliveryGuarantee": "at-least-once",
+      "retryModel": "repository-backoff-plus-bounded-ack-retry",
+      "leaseModel": "owner-token-digest-generation-expiry-fencing",
+      "checkpointModel": "postgres-delivery-row-and-replay-ledger",
+      "terminalStates": ["published", "dead-letter"],
+      "observability": {
+        "workerIdentityPaths": ["workerId"],
+        "runIdentityPaths": ["runId"],
+        "observedAtPaths": [],
+        "okPaths": ["ok"],
+        "skippedPaths": [],
+        "statusPaths": [],
+        "countPaths": {
+          "claimed": ["summary.claimed"],
+          "succeeded": ["summary.published"],
+          "retryScheduled": ["summary.retrying"],
+          "deadLettered": ["summary.deadLettered"],
+          "persistenceRejected": [],
+          "failed": []
+        },
+        "errorCollections": [
+          { "path": "results", "codePaths": ["errorCode"] }
+        ]
+      }
+    },
+    {
+      "id": "insurance-payment-outbox",
+      "ownerProcess": "T07",
+      "entrypoints": [],
+      "implementationSources": ["insurance-payment-outbox-worker.js"],
+      "stateMachine": "insurance-payment-outbox-batch-v1",
+      "deliveryGuarantee": "at-least-once",
+      "retryModel": "repository-bounded-retry-and-dead-letter",
+      "leaseModel": "worker-and-lease-token-fencing",
+      "checkpointModel": "domain-outbox-status",
+      "terminalStates": ["published", "dead-letter", "published-acknowledgement-pending", "failure-record-unknown"],
+      "observability": {
+        "workerIdentityPaths": ["workerId"],
+        "runIdentityPaths": [],
+        "observedAtPaths": ["finishedAt", "startedAt"],
+        "okPaths": [],
+        "skippedPaths": [],
+        "statusPaths": ["health.status"],
+        "countPaths": {
+          "claimed": ["claimed"],
+          "succeeded": ["published"],
+          "retryScheduled": [],
+          "deadLettered": ["health.counts.dead-letter"],
+          "persistenceRejected": ["acknowledgementPending"],
+          "failed": ["failed"]
+        },
+        "errorCollections": [
+          { "path": "outcomes", "codePaths": ["errorCode"] }
+        ]
+      }
+    },
+    {
+      "id": "public-health-external-dispatch",
+      "ownerProcess": "T03",
+      "entrypoints": [],
+      "implementationSources": ["public-health-external-worker.js"],
+      "stateMachine": "public-health-external-dispatch-v1",
+      "deliveryGuarantee": "at-least-once",
+      "retryModel": "lane-resilience-policy",
+      "leaseModel": "worker-token-version-and-lane-control-cas",
+      "checkpointModel": "durable-dispatch-attempt-state",
+      "terminalStates": ["delivered", "retry-scheduled", "dead-letter"],
+      "observability": {
+        "workerIdentityPaths": [],
+        "runIdentityPaths": [],
+        "observedAtPaths": ["generatedAt"],
+        "okPaths": [],
+        "skippedPaths": [],
+        "statusPaths": [],
+        "countPaths": {
+          "claimed": ["due"],
+          "succeeded": ["processed"],
+          "retryScheduled": [],
+          "deadLettered": [],
+          "persistenceRejected": [],
+          "failed": []
+        },
+        "errorCollections": []
+      }
+    }
+  ],
+  "excludedWorkerLikeAssets": [
+    {
+      "path": "service-worker.js",
+      "reason": "browser cache worker; it is governed by the static publication and browser security contracts, not the server-side job contract"
+    },
+    {
+      "path": "POST /api/digital-hospital/execution/workers",
+      "reason": "external execution-worker registration API; the external worker implementation and site identity remain outside this repository"
+    },
+    {
+      "path": "object-storage-command-worker-v2",
+      "reason": "Proposed ADR only; runtime implementation is explicitly forbidden before owner and compatibility decisions are accepted"
+    }
+  ]
+}

@@ -6,6 +6,7 @@ const {
   enqueuePostgresSyncBaseline,
   runPostgresShadowReconciliation
 } = require("../postgres-runtime-sync");
+const { attachWorkerObservability } = require("../src/platform/operations/worker-observability-contract");
 
 function parseArgs(argv = process.argv.slice(2)) {
   const [command = "reconcile", ...rawFlags] = argv;
@@ -65,7 +66,10 @@ async function runCli() {
     return result;
   }
   if (command !== "reconcile") throw new Error(`Unsupported PostgreSQL shadow command=${command}`);
-  const report = await runPostgresShadowReconciliation({ mode, sqliteFile: flags["sqlite-file"] });
+  const sourceReport = await runPostgresShadowReconciliation({ mode, sqliteFile: flags["sqlite-file"] });
+  const report = attachWorkerObservability("postgres-shadow-reconciliation", sourceReport, {
+    observedAt: sourceReport.checkedAt || new Date().toISOString()
+  });
   writeOutput(report, flags);
   console.log(JSON.stringify(report, null, 2));
   if (!report.ok) process.exitCode = 1;

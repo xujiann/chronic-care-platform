@@ -11,6 +11,7 @@ const {
   loadDirectReportActivationControl,
   publicDirectReportControlStatus
 } = require("../public-health-direct-report-control-package");
+const { attachWorkerObservability } = require("../src/platform/operations/worker-observability-contract");
 
 const ROOT = path.resolve(__dirname, "..");
 
@@ -117,12 +118,12 @@ async function runWorkerOnce(options = {}) {
   const env = options.env || process.env;
   const configuration = workerConfiguration(env);
   if (!configuration.enabled) {
-    return {
+    return attachWorkerObservability("public-health-direct-report", {
       ok: true,
       skipped: true,
       reason: "PUBLIC_HEALTH_DIRECT_REPORT_WORKER_ENABLED is not enabled",
       status: publicWorkerStatus(env)
-    };
+    }, { observedAt: new Date().toISOString() });
   }
   if (!configuration.workerId) {
     throw workerError(
@@ -161,7 +162,7 @@ async function runWorkerOnce(options = {}) {
       env
     }
   });
-  return {
+  return attachWorkerObservability("public-health-direct-report", {
     ok: cycle.deadLetters === 0,
     skipped: false,
     workerId: configuration.workerId,
@@ -177,7 +178,7 @@ async function runWorkerOnce(options = {}) {
       failureCode: item.lastFailure?.code || ""
     })),
     productionReady: false
-  };
+  }, { observedAt: cycle.generatedAt || new Date().toISOString() });
 }
 
 async function main(argv = process.argv.slice(2)) {

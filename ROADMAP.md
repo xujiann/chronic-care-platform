@@ -28,7 +28,7 @@
 | 7C | 生产 API 机器目录 | v3 已分离 custom auth 证据、源码观察与幂等行为证据；13 项认证合同覆盖原 13 个未分类 key 中的 12 个真实入口，1 个公卫跨 handler 误配已删除，未分类认证为 0，593 项全部 NO-GO / P1 | 逐 owner 复核 7 个运行时策略和 332 个缺幂等行为证明的写接口，不得用源码标记或猜测 owner 替代行为测试；保持跨 handler 词法漂移负测 |
 | 8 | JSON/SQLite state collection 治理 | DATA-003 首切片完成：252/252 状态完整，188 review-required、1 quarantined / P1 | 按 DATA-008 分 owner 确认、归档或 migration 晋升；process owner 证据不得自动变成 data owner |
 | 9 | 前端可信渲染与 CSP | Accepted ADR；37 个脚本和 21 个静态样式风险已外移；血液主工作台完成可信 DOM/text 试点，Safe URL port 首批将动态 URL 从 69 降至 35，Inventory v2 锁定 871 个 DOM HTML、35 个动态 URL、45 个动态样式风险且禁止增加/替换 / P1 | 逐项治理 29 个模板 URL、2 个缺可信 OHIF allowlist 的导航、HTML 来源/编码/净化和动态 CSSOM；完成全角色恶意输入、真实托管头与独立安全评估后才移除兼容 `unsafe-inline` 并强制严格 CSP |
-| 10 | CI/worker/部署依赖治理 | CI 风险域拆分已合入并经 main 验证；Action 完整 SHA 固定已形成 T00 候选，worker 仍候选 / P2 | 不降低 required checks；合入后持续按官方 tag 升级并核验 commit SHA，继续评审 worker 观测契约 |
+| 10 | CI/worker/部署依赖治理 | CI 风险域拆分和 Action 完整 SHA 固定已建立；12 个 worker profile 的 v1 脱敏兼容观测、9 个部署入口漂移门禁与部署包闭包已完成 / P2 | 持续按官方 tag 升级并核验 commit SHA；新增 worker 必须登记并复用 v1。真实采集器、告警路由、服务启用和现场验收继续外置 |
 | 11 | 居民小程序制品凭证扫描消除哈希误报 | 已完成 / P2 | JSON 仅扫描语义字符串值并精确跳过两个字段中的合法 SHA-256；非 JSON 保留文本扫描；真实演示凭证与伪造摘要负向测试已建立 |
 | 12 | 对象存储结构化元数据与耐久命令轨道 | Proposed OBJ-ADR-002；仅完成机器 decision/action register、v17 冲突预留和 CI fail-closed 治理 / P1 | 人类确认 T08 data owner 与 v1/v2 兼容策略，ADR 转 Accepted 后才可按 v17→全量回填/冻结→异步 API→fenced worker→无损分页→持久 reconcile→readiness 的独立切片实施；真实 provider/KMS/WORM/扫描/容量/备份/现场证据继续 NO-GO |
 | 13 | 严格生产预检证据信任装配 | Accepted ADR；T00 pinned-anchor/Ed25519 双角色 provider、CLI 自动装配、deployment package/env/CI 和负向矩阵已形成 / P0 | 真实 anchor/envelope、独立 signer、权限/轮换、外部 evidence 与现场执行继续由生产环境提供；provider 成功不替代完整 preflight 或最终人类授权 |

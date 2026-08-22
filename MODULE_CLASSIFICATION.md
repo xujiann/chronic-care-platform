@@ -77,7 +77,7 @@
 | JSON 静态快照（生产事实源用途） | D | 与生产 PostgreSQL 目标冲突，安全风险高 |
 | SQLite migration 注册表/runner | B | 已独立、连续、事务化；v1–v14 指纹冻结，v15+ 内容 checksum，专项回归齐备 |
 | PostgreSQL primary/outbox contracts | B | fail closed、CAS、TLS、核对测试较强 |
-| 领域 worker 集合 | B/C | 功能可测但状态/观测接口不统一 |
+| 领域 worker 集合 | B/C | 业务状态机仍按领域渐进治理；共同观测已通过 v1 兼容投影、语义清单和部署入口漂移门禁标准化，不要求重写 |
 
 ## 标签使用
 

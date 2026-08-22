@@ -1,6 +1,7 @@
 "use strict";
 
 const Persistence = require("./insurance-payment-persistence");
+const { attachWorkerObservability } = require("./src/platform/operations/worker-observability-contract");
 
 const DEFAULT_PUBLISH_TIMEOUT_MS = 10_000;
 
@@ -175,7 +176,7 @@ async function runInsurancePaymentOutboxBatch(repositoryInput, publisher, option
   }
   const status = await repository.outboxStatus();
   const health = buildOutboxHealth(status, options.healthThresholds);
-  return {
+  return attachWorkerObservability("insurance-payment-outbox", {
     schema: "insurance-payment-outbox-batch-v1",
     workerId,
     startedAt,
@@ -189,7 +190,7 @@ async function runInsurancePaymentOutboxBatch(repositoryInput, publisher, option
     payloadsExposed: false,
     credentialsPersisted: false,
     deliveryGuarantee: "at-least-once; consumers must deduplicate by eventId"
-  };
+  }, { observedAt: options.finishedAt || new Date().toISOString() });
 }
 
 module.exports = {

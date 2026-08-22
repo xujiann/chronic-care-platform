@@ -58,6 +58,10 @@ test("production deployment package hashes runtime files without persisting secr
       "scripts/production-release-evidence-readiness.js",
       "src/platform/governance/production-evidence-trust-provider.js"
     ].forEach((runtimeFile) => assert.equal(manifest.artifact.files.some((item) => item.path === runtimeFile), true, runtimeFile));
+    [
+      "config/worker-observability-contract.json",
+      "src/platform/operations/worker-observability-contract.js"
+    ].forEach((runtimeFile) => assert.equal(manifest.artifact.files.some((item) => item.path === runtimeFile), true, runtimeFile));
     assert.equal(manifest.artifact.files.some((item) => item.path === "regions/template/manifest.json"), true);
     assert.equal(manifest.artifact.files.some((item) => item.path === "regions/210200/manifest.json"), true);
     assert.equal(manifest.artifact.files.some((item) => item.path === ".env"), false);

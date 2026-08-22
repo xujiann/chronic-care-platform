@@ -34,7 +34,7 @@
 | ARC-008 | operations 跨域写入 | OPS-02 为保持兼容，将 T06 的既有直写整体移入 T02；其中 `resourceDispatchRequests`、`taskMessages` 的机器 Owner 仍是 T05 care-coordination | 后续仅在独立 ADR/切片中改为 T05 owner port 或版本化事件；在完成行为矩阵前不得直接改写副作用 |
 | API-001 | 错误契约 | 多种 JSON 错误格式 | 新 API 使用版本化标准错误接口 |
 | API-002 | 接口目录复核 | v3 合并 601 条授权声明与 371 个字面条件路由，形成 593 项；13 项认证证据覆盖 SMS 和原 13 个未分类 key 中的 12 个真实入口，T10 已有直接拒绝证据，公卫跨 handler 虚假 POST 已删除，未分类认证为 0；7 个运行时策略和 332 个无幂等行为证明写接口使 333 项保持 review-required | 逐 owner 补 route/action、身份、幂等、CAS、错误与审计合同，保持跨 handler 解析回归测试，禁止把字符串标记或猜测 owner 当成证明 |
-| JOB-001 | Worker 一致性 | 多套 worker/retry/checkpoint 语义 | 建立共同任务状态和观测契约 |
+| JOB-001 | Worker 一致性 | 12 个既有 worker profile、9 个部署入口已建立 `platform-worker-observability.v1` 脱敏兼容投影；领域 state/retry/lease/checkpoint/receipt 仍各自权威，仓库不据此推导生产授权 | 后续接入真实指标/日志采集器与告警路由前，必须另行确认 owner、留存、访问控制和现场启用证据；不得把兼容投影演变为统一领域状态机 |
 | TEST-006 | 静态基线与测试性能 | 已关闭 `test/api.test.js` 的全文件 `no-unreachable` 例外：3 段原不可达断言改为具名显式 skip 债务；typecheck 去重并从主线实际 9 个唯一文件扩大至 13 个；本机 Node 24 三次单文件采样约 294–371 秒，现作为独立 integration 热点批次输出 batch/suite 耗时。suite 成员、顺序、断言、超时、CI job 预算与 required checks 均未降低 | 剩余两个前端文件 16 个重复键需先补 shadow-map 行为测试再消除；3 个显式 skip 必须由 T05 owner 逐块重验后恢复执行；API 巨型夹具仍需按共享服务生命周期拆分，耗时数据先观察多次 CI 分布，不凭单机样本设门槛 |
 | TEST-005 | 浏览器一致性 | Windows 本地配置优先系统 Chrome；完整 36 项中小程序超时恢复用例可受前序共享服务状态影响，而同文件 13/13、单例 1/1、CI Chromium 36/36 通过 | 后续独立测试任务统一本地/CI 浏览器选择并隔离 E2E 服务状态，不在数据治理切片中修改业务代码 |
 | DOC-001 | 历史文档 | 205 份 Markdown，历史快照与当前规则并存 | 标明 snapshot/current/superseded，不删除历史证据 |
@@ -51,6 +51,7 @@
 | DATA-001 | 2026-08-22 | `STORAGE_SCHEMA_VERSION`、storageMeta、部署/readiness/release 门禁统一派生注册表 head v16 | 静态契约、storage、部署、生产就绪与发布报告测试 |
 | DATA-002 | 2026-08-22 | v1–v14 独立注册并冻结内容指纹，v15+ ledger 写内容 SHA-256，runner 拒绝连续性/name/checksum 漂移 | 空库、v11/v15 升级、重跑、指纹/ledger 漂移、v15/v16 checksum、未来 v17 与失败回滚测试 |
 | TEST-001 | 2026-08-22 | 建立 build/lint/typecheck/unit/integration/smoke 标准入口并映射 CI/Pages；test:all 与原 server.js 85/85/55 覆盖门禁语义不变；governance-api 静态发布链包含 Safe URL port、Browser Inventory v2，并在 2026-08-23 增加对象存储 Proposed ADR fail-closed 验证 | 标准门禁契约、完整测试分区、隔离 smoke、静态发布链、Inventory v2 精确 occurrence/指纹与 synthetic 负向矩阵、Safe URL 模块/Playwright 恶意协议和 Origin 拒绝、CI 映射、独立内部边界覆盖和全量回归；对象存储专项拒绝未批准 v17/runtime/API/promotion、owner 推断和 ADR/行动台账漂移 |
+| JOB-001 | 2026-08-23 | 盘点 12 套真实 worker 语义并建立 `platform-worker-observability.v1` 兼容投影；保留各业务 state/retry/lease/checkpoint/receipt，未创造第二状态机 | 9 个部署入口自动发现、登记/接入漂移、未知 profile、字段扩宽、敏感正文/原始身份/lease token 泄露和生产误授权负向测试；真实采集、告警与现场验收仍外置 |
 | TEST-002 | 2026-08-22 | 为 runtime identity、audit chain/source、object storage trust、API catalog/authorization 建立四个独立 c8 组并冻结当前真实基线；报告只存在临时目录 | 配置/脚本治理测试锁定阈值不得降低，要求每组至少一条直接负向合同，并绑定生产身份不可信模式、篡改、缺鉴权、路径漂移、幂等缺失和生产误 promotion 矩阵 |
 | ARC-002 | 2026-08-21 | alert runtime 改为显式 provider，worker 在组合边界懒注入既有 readiness；静态环由 1 降为 0，并已通过 PR #132 与 main CI/Pages | 缺失/无效/异常 provider、CLI 默认组合、反向依赖架构守卫和 Chromium E2E |
 | SEC-003 | 2026-08-20 | v2 验证器统一运行时/留存语义；内容、链接、结构、重复 ID 严格失败；全量 state 写入不能修改服务端审计数组 | 普通字段、首中尾链接、删除、插入、重排、结构和 API 拒绝回归 |

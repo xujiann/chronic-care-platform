@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 const { runPostgresSyncWorker } = require("../postgres-runtime-sync");
+const { attachWorkerObservability } = require("../src/platform/operations/worker-observability-contract");
 
 function parseArgs(argv = process.argv.slice(2)) {
   const flags = {};
@@ -19,7 +20,8 @@ async function runCli() {
     limit: flags.limit,
     maxAttempts: flags["max-attempts"]
   });
-  console.log(JSON.stringify(result, null, 2));
+  const observed = attachWorkerObservability("postgres-shadow-sync", result);
+  console.log(JSON.stringify(observed, null, 2));
   if (!result.ok) process.exitCode = 1;
 }
 

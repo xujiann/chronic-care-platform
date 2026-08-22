@@ -1,6 +1,7 @@
 "use strict";
 
 const { createHash } = require("node:crypto");
+const { attachWorkerObservability } = require("./worker-observability-contract");
 
 const SHA256 = /^sha256:[a-f0-9]{64}$/;
 
@@ -164,7 +165,7 @@ async function runShadowOutboxRelayOnce(options = {}) {
       idempotentReplay: result?.idempotentReplay === true
     }));
   }
-  return Object.freeze({
+  return attachWorkerObservability("domain-shadow-relay", {
     ok: true,
     relayId,
     fromSequence: startSequence,

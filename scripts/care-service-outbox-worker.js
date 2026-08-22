@@ -4,6 +4,7 @@
 const path = require("node:path");
 const { randomUUID } = require("node:crypto");
 const Runtime = require("../care-service-runtime");
+const { attachWorkerObservability } = require("../src/platform/operations/worker-observability-contract");
 
 const ROOT = path.resolve(__dirname, "..");
 
@@ -59,11 +60,11 @@ async function runWorkerOnce(options = {}) {
   const env = options.env || process.env;
   const configuration = workerConfiguration(env);
   if (!configuration.enabled) {
-    return {
+    return attachWorkerObservability("care-service-outbox", {
       ok: true,
       skipped: true,
       reason: "CARE_OUTBOX_WORKER_ENABLED is not enabled"
-    };
+    }, { observedAt: options.at || new Date().toISOString() });
   }
   if (!configuration.workerId) {
     throw workerError("CARE_WORKER_ID_REQUIRED", "CARE_OUTBOX_WORKER_ID is required");
@@ -84,7 +85,7 @@ async function runWorkerOnce(options = {}) {
       maxRetrySeconds: configuration.maxRetrySeconds
     }
   );
-  return {
+  return attachWorkerObservability("care-service-outbox", {
     ok: result.deadLetters === 0,
     skipped: false,
     runId,
@@ -99,7 +100,7 @@ async function runWorkerOnce(options = {}) {
       status: item.status,
       errorCode: item.errorCode || ""
     }))
-  };
+  }, { observedAt: options.at || new Date().toISOString() });
 }
 
 async function main() {

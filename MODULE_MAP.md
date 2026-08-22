@@ -232,3 +232,13 @@ Accepted、data owner 与兼容策略获人类批准后才能进入逐切片实�
 | `test/production-preflight-decision-receipt.test.js` | TEST-001 | 负向合同 | 锁定三项漂移、过期/未来、重放、缺失/异常/异步 verifier、错误脱敏和默认 runtime NO-GO |
 
 唯一签发权威、信任根、耐久 nonce ledger 和现场 provider 不属于当前实现；Proposed ADR 不授权生产 GO。
+
+## 21. Worker observability compatibility
+
+| 模块 | Owner | 职责 | 明确非职责 |
+|---|---|---|---|
+| `config/worker-observability-contract.json` | T00 | 12 个既有 worker 的状态/retry/lease/checkpoint 语义清单与字段映射 | 不定义新的业务状态机，不授权生产 |
+| `src/platform/operations/worker-observability-contract.js` | T00 | 生成版本化、闭集、摘要化的共同观测字段 | 不持久化报告，不接触业务载荷或凭据 |
+| `scripts/worker-observability-governance.js` | T00 | 发现部署入口，验证登记、适配和 Proposed 边界 | 不启动 worker，不读取现场系统 |
+
+现有领域 worker 仍属于各自 owner；T00 只拥有兼容投影。新增 worker 必须复用该合同，不能复制第二套共同协议。
