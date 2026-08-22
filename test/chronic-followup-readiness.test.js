@@ -17,6 +17,10 @@ test("chronic follow-up readiness covers all priority application boundaries", (
   const report = buildChronicFollowupReadinessReport({ data });
 
   assert.equal(report.ok, true);
+  assert.equal(report.productionReady, false);
+  assert.equal(report.productionDispatch.contract, "citizen-chronic.followup-dispatch-worker.v1");
+  assert.equal(report.productionDispatch.checks.some((item) => item.id === "request-path-isolation" && item.passed), true);
+  assert.match(report.productionBoundary, /NO-GO/);
   assert.equal(report.boundaries.length, 16);
   assert.equal(report.boundaries.every((item) => item.passed), true);
   assert.equal(report.summary.feedbackRecords >= 2, true);

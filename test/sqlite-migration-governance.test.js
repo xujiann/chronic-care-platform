@@ -31,14 +31,14 @@ function ledgerRows(db) {
   return db.prepare("SELECT version, name, checksum, applied_at FROM schema_migrations ORDER BY version").all();
 }
 
-test("SQLite migration registry freezes v1-v14 and exposes continuous v15 head", { skip: !DatabaseSync }, () => {
+test("SQLite migration registry freezes v1-v14 and exposes continuous v16 head", { skip: !DatabaseSync }, () => {
   const report = validateSqliteMigrationRegistry(SQLITE_MIGRATIONS);
 
   assert.equal(FROZEN_LEGACY_MAX_VERSION, 14);
-  assert.equal(SQLITE_SCHEMA_HEAD, 15);
-  assert.equal(report.head, 15);
+  assert.equal(SQLITE_SCHEMA_HEAD, 16);
+  assert.equal(report.head, 16);
   assert.match(report.registryFingerprint, /^[a-f0-9]{64}$/);
-  assert.deepEqual(SQLITE_MIGRATIONS.map((migration) => migration.version), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]);
+  assert.deepEqual(SQLITE_MIGRATIONS.map((migration) => migration.version), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]);
   SQLITE_MIGRATIONS.forEach((migration) => {
     assert.equal(migration.owner, "T00/data-governance");
     assert.match(migration.contentFingerprint, /^[a-f0-9]{64}$/);
@@ -55,7 +55,7 @@ test("SQLite migration registry freezes v1-v14 and exposes continuous v15 head",
   );
 });
 
-test("SQLite migrations apply from an empty database to v15 and rerun without ledger changes", { skip: !DatabaseSync }, () => {
+test("SQLite migrations apply from an empty database to v16 and rerun without ledger changes", { skip: !DatabaseSync }, () => {
   const db = openMemoryDatabase();
   try {
     const first = applySqliteMigrations(db);
@@ -63,11 +63,11 @@ test("SQLite migrations apply from an empty database to v15 and rerun without le
     const second = applySqliteMigrations(db);
     const after = ledgerRows(db);
 
-    assert.equal(first.head, 15);
-    assert.equal(first.applied, 15);
+    assert.equal(first.head, 16);
+    assert.equal(first.applied, 16);
     assert.equal(second.applied, 0);
     assert.deepEqual(after, before);
-    assert.deepEqual(after.map((row) => Number(row.version)), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]);
+    assert.deepEqual(after.map((row) => Number(row.version)), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]);
     after.forEach((row, index) => {
       assert.equal(row.name, SQLITE_MIGRATIONS[index].name);
       assert.equal(
@@ -83,7 +83,7 @@ test("SQLite migrations apply from an empty database to v15 and rerun without le
   }
 });
 
-test("a deterministic legacy v11 fixture upgrades to v15 without rewriting historical ledger rows", { skip: !DatabaseSync }, () => {
+test("a deterministic legacy v11 fixture upgrades to v16 without rewriting historical ledger rows", { skip: !DatabaseSync }, () => {
   const legacy = openMemoryDatabase();
   const fresh = openMemoryDatabase();
   try {
@@ -95,9 +95,9 @@ test("a deterministic legacy v11 fixture upgrades to v15 without rewriting histo
     const upgradedRows = ledgerRows(legacy);
     applySqliteMigrations(fresh);
 
-    assert.equal(upgraded.applied, 4);
+    assert.equal(upgraded.applied, 5);
     assert.deepEqual(upgradedRows.slice(0, 11), historicalRows);
-    assert.deepEqual(upgradedRows.slice(11).map((row) => Number(row.version)), [12, 13, 14, 15]);
+    assert.deepEqual(upgradedRows.slice(11).map((row) => Number(row.version)), [12, 13, 14, 15, 16]);
     assert.equal(readSqliteSchemaFingerprint(legacy), readSqliteSchemaFingerprint(fresh));
   } finally {
     legacy.close();
@@ -128,18 +128,18 @@ test("future migrations use content fingerprints and roll back failed DDL atomic
   const base = openMemoryDatabase();
   try {
     applySqliteMigrations(base);
-    const migration16 = {
-      version: 16,
+    const migration17 = {
+      version: 17,
       name: "test content-addressed migration",
       owner: "T00/data-governance",
       apply(db) {
-        db.exec("CREATE TABLE migration_v16_probe (id TEXT PRIMARY KEY)");
+        db.exec("CREATE TABLE migration_v17_probe (id TEXT PRIMARY KEY)");
       }
     };
-    const registry = [...SQLITE_MIGRATIONS, migration16];
+    const registry = [...SQLITE_MIGRATIONS, migration17];
     applySqliteMigrations(base, { migrations: registry });
-    const row = base.prepare("SELECT checksum FROM schema_migrations WHERE version = 16").get();
-    assert.equal(row.checksum, migrationContentFingerprint(migration16));
+    const row = base.prepare("SELECT checksum FROM schema_migrations WHERE version = 17").get();
+    assert.equal(row.checksum, migrationContentFingerprint(migration17));
   } finally {
     base.close();
   }
@@ -147,8 +147,8 @@ test("future migrations use content fingerprints and roll back failed DDL atomic
   const failing = openMemoryDatabase();
   try {
     applySqliteMigrations(failing);
-    const migration16 = {
-      version: 16,
+    const migration17 = {
+      version: 17,
       name: "test failed transactional migration",
       owner: "T00/data-governance",
       apply(db) {
@@ -158,11 +158,11 @@ test("future migrations use content fingerprints and roll back failed DDL atomic
     };
 
     assert.throws(
-      () => applySqliteMigrations(failing, { migrations: [...SQLITE_MIGRATIONS, migration16] }),
-      /SQLite migration 16 failed: fixture failure/
+      () => applySqliteMigrations(failing, { migrations: [...SQLITE_MIGRATIONS, migration17] }),
+      /SQLite migration 17 failed: fixture failure/
     );
     assert.equal(failing.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'failed_migration_probe'").get(), undefined);
-    assert.equal(failing.prepare("SELECT version FROM schema_migrations WHERE version = 16").get(), undefined);
+    assert.equal(failing.prepare("SELECT version FROM schema_migrations WHERE version = 17").get(), undefined);
   } finally {
     failing.close();
   }

@@ -2,11 +2,9 @@
 
 const {
   buildFollowupEventHealth,
-  dispatchPendingFollowupEventsToState,
   updateFollowupToState
 } = require("../../../citizen-chronic-followup-event-service");
 const {
-  createFollowupEventPublisher,
   inspectFollowupEventPublisherReadiness
 } = require("../../citizen-chronic/followup-event-publisher");
 
@@ -36,16 +34,9 @@ function followupAggregateIdsForUser(data, user, canAccessResident, rowMatchesOr
 }
 
 function createRouteSegments(runtime, options = {}) {
-  const { CitizenRecordsPolicy, CitizenRecordsV1, CitizenRecordsV2, PERSONAL_RECORD_PROTECTED_FIELDS, appendDataAccessLog, appendSecurityEvent, applyCitizenLifecycleAction, applyCitizenOperationsAction, buildChronicAcceptanceLedger, buildChronicArchiveStandardization, buildChronicFollowupSummary, buildChronicInstitutionInterfaceReport, buildChronicInteroperabilityProfiles, buildChronicLaunchCoreReport, buildChronicPathwayQualityReport, buildChronicPharmacyInsuranceClosure, buildChronicProductionSafetyEvidenceBridge, buildChronicProductionSafetyReport, buildChronicPublicHealthLoop, buildChronicReferralContinuity, buildChronicRiskStratification, buildCitizenLifecycleActionMessage, buildCitizenLifecycleActions, buildCitizenOperationsCenter, buildCitizenOperationsPublic, canAccessResident, canManageResidentProfile, citizenCareIdempotencyKey, citizenCareReceipt, citizenCareReplay, citizenCareRequestDigest, citizenCareWorkspace, cleanResidentPatch, closeFamilyDoctorChronicAction, collectJson, createHash, dispatchChronicFollowupAction, escalateChronicFollowupAction, ingestChronicDeviceMeasurement, mergeByKey, normalizePersonalRecord, normalizeState, patchBusinessCollectionItem, personIndexForResident, prependAuditTrailEntry, randomUUID, readDatabase, recordChronicLaunchCoreAction, recordChronicPharmacyCallback, recordChronicReferralContinuity, redactSensitiveResponse, requireApiRole, rowMatchesOrganizationScope, scheduleChronicReminderOutreach, scopeStateForUser, sealAuditTrail, seedCitizenHospitalServiceConfigs, seedCitizenIdentityReviewCases, seedCitizenOperationContents, seedCitizenServiceBlacklist, sendJson, upsertChronicFeedback, upsertResidentExperienceCheckin, validateChronicInteroperabilityMessage, writeDatabase } = runtime;
+  const { CitizenRecordsPolicy, CitizenRecordsV1, CitizenRecordsV2, PERSONAL_RECORD_PROTECTED_FIELDS, appendDataAccessLog, appendSecurityEvent, applyCitizenLifecycleAction, applyCitizenOperationsAction, buildChronicAcceptanceLedger, buildChronicArchiveStandardization, buildChronicFollowupSummary, buildChronicInstitutionInterfaceReport, buildChronicInteroperabilityProfiles, buildChronicLaunchCoreReport, buildChronicPathwayQualityReport, buildChronicPharmacyInsuranceClosure, buildChronicProductionSafetyEvidenceBridge, buildChronicProductionSafetyReport, buildChronicPublicHealthLoop, buildChronicReferralContinuity, buildChronicRiskStratification, buildCitizenLifecycleActionMessage, buildCitizenLifecycleActions, buildCitizenOperationsCenter, buildCitizenOperationsPublic, canAccessResident, canManageResidentProfile, citizenCareIdempotencyKey, citizenCareReceipt, citizenCareReplay, citizenCareRequestDigest, citizenCareWorkspace, cleanResidentPatch, closeFamilyDoctorChronicAction, collectJson, createHash, dispatchChronicFollowupAction, escalateChronicFollowupAction, ingestChronicDeviceMeasurement, mergeByKey, normalizePersonalRecord, normalizeState, patchBusinessCollectionItem, personIndexForResident, prependAuditTrailEntry, randomUUID, readDatabase, readFollowupDispatchOutboxHealth, recordChronicLaunchCoreAction, recordChronicPharmacyCallback, recordChronicReferralContinuity, redactSensitiveResponse, requireApiRole, rowMatchesOrganizationScope, scheduleChronicReminderOutreach, scopeStateForUser, sealAuditTrail, seedCitizenHospitalServiceConfigs, seedCitizenIdentityReviewCases, seedCitizenOperationContents, seedCitizenServiceBlacklist, sendJson, upsertChronicFeedback, upsertResidentExperienceCheckin, validateChronicInteroperabilityMessage, writeDatabase } = runtime;
   const publisherEnvironment = options.env || process.env;
   const publisherActivationVerifier = options.followupEventPublisherActivationVerifier;
-  const followupEventPublisher = options.followupEventPublisher || createFollowupEventPublisher({
-    activationVerifier: publisherActivationVerifier,
-    env: publisherEnvironment,
-    fetchImpl: options.fetchImpl,
-    now: options.publisherNow,
-    resolveAddresses: options.resolvePublisherAddresses
-  });
   const recordFollowupDispatchAudit = (user, result, detail, action = "dispatch chronic followup domain events") => {
     if (typeof appendSecurityEvent !== "function") return false;
     try {
@@ -616,6 +607,9 @@ function createRouteSegments(runtime, options = {}) {
         );
         sendJson(res, 200, {
           ...buildFollowupEventHealth(data, { aggregateIds }),
+          durableQueue: user.role === "commission"
+            ? readFollowupDispatchOutboxHealth()
+            : { scope: "not-disclosed", requestPathExternalDispatch: false, productionReady: false },
           publisher: inspectFollowupEventPublisherReadiness(publisherEnvironment, {
             activationVerifier: publisherActivationVerifier
           })
@@ -653,6 +647,22 @@ function createRouteSegments(runtime, options = {}) {
           });
           return true;
         }
+        let internalDurableHealth;
+        try {
+          internalDurableHealth = readFollowupDispatchOutboxHealth();
+        } catch {
+          internalDurableHealth = null;
+        }
+        if (internalDurableHealth?.durableStorageAvailable !== true || internalDurableHealth?.healthy !== true) {
+          recordFollowupDispatchAudit(user, "denied", "FOLLOWUP_EVENT_DISPATCH_DURABLE_QUEUE_UNAVAILABLE");
+          sendJson(res, 503, {
+            error: "Service Unavailable",
+            code: "FOLLOWUP_EVENT_DISPATCH_DURABLE_QUEUE_UNAVAILABLE",
+            message: "durable followup event queue is unavailable",
+            productionReady: false
+          });
+          return true;
+        }
         if (!recordFollowupDispatchAudit(
           user,
           "allowed",
@@ -684,41 +694,14 @@ function createRouteSegments(runtime, options = {}) {
           });
           return true;
         }
-        let result;
-        try {
-          result = await dispatchPendingFollowupEventsToState(data, {
-            aggregateIds,
-            environment: publisherEnvironment.NODE_ENV,
-            publisher: followupEventPublisher
-          });
-        } catch (error) {
-          const code = error.code || "FOLLOWUP_EVENT_DISPATCH_FAILED";
-          recordFollowupDispatchAudit(user, "failed", code);
-          const statusCode = Number.isInteger(error.statusCode) ? error.statusCode : 400;
-          sendJson(res, statusCode, {
-            error: statusCode >= 500 ? "Service Unavailable" : "Bad Request",
-            code,
-            message: "followup domain event dispatch failed",
-            productionReady: false
-          });
-          return true;
-        }
-        try {
-          writeDatabase(result.nextData);
-        } catch {
-          recordFollowupDispatchAudit(user, "failed", "FOLLOWUP_EVENT_DISPATCH_PERSISTENCE_FAILED");
-          sendJson(res, 503, {
-            error: "Service Unavailable",
-            code: "FOLLOWUP_EVENT_DISPATCH_PERSISTENCE_FAILED",
-            message: "followup domain event dispatch failed",
-            productionReady: false
-          });
-          return true;
-        }
+        const embeddedHealth = buildFollowupEventHealth(data, { aggregateIds });
+        const durableHealth = user.role === "commission"
+          ? internalDurableHealth
+          : { scope: "not-disclosed", requestPathExternalDispatch: false, productionReady: false };
         if (!recordFollowupDispatchAudit(
           user,
           "allowed",
-          `processed=${result.processed.length};scope=${aggregateIds ? aggregateIds.size : "commission"}`
+          `queued=${embeddedHealth.summary.pending};scope=${aggregateIds ? aggregateIds.size : "commission"};worker=required`
         )) {
           sendJson(res, 503, {
             error: "Service Unavailable",
@@ -729,9 +712,14 @@ function createRouteSegments(runtime, options = {}) {
           return true;
         }
         sendJson(res, 200, {
-          ok: result.health.ok,
-          processed: result.processed,
-          health: result.health,
+          ok: true,
+          accepted: true,
+          processed: [],
+          queued: embeddedHealth.summary.pending,
+          dispatchMode: "durable-worker",
+          requestPathExternalDispatch: false,
+          health: embeddedHealth,
+          durableQueue: durableHealth,
           productionReady: false
         });
         return true;

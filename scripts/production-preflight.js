@@ -4,6 +4,8 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const { assessAuditDeliveryConfig } = require("../src/platform/operations/audit-delivery");
+const { inspectFollowupDispatchWorkerReadiness } = require("../src/citizen-chronic/followup-dispatch-worker");
+const { inspectFollowupActivationProvider } = require("../src/citizen-chronic/followup-dispatch-activation-provider");
 
 const { buildLaunchSmokeReport } = require("./launch-smoke");
 const { verifyProductionDeploymentPackage } = require("./production-deployment-package");
@@ -116,10 +118,32 @@ async function buildProductionPreflight(options = {}) {
     envFile: options.envFile || "",
     env
   });
+  const productionEvidence = loadProductionEvidence(options);
+  const externalTrust = await verifyExternalTrust(options, {
+    manifest,
+    registryEntry: registry.entries?.find((item) => item.releaseId === manifest.releaseId) || null,
+    registryVerification,
+    productionEvidence: productionEvidence.report,
+    evidenceRecords: productionEvidence.records
+  });
+  const evidenceReleaseBound = evidenceBoundToRelease(productionEvidence.records, manifest);
+  const followupExternalEvidenceVerified = productionEvidence.report?.ok === true
+    && productionEvidence.report?.status === "go-decision-evidence-validated"
+    && evidenceReleaseBound
+    && validExternalAttestation(registryEntry?.externalAttestation)
+    && externalTrust.registryAttestationVerified
+    && externalTrust.productionEvidenceVerified;
   const auditDeliveryAssessment = options.auditDeliveryAssessment || assessAuditDeliveryConfig(env, {
     root,
     checkFilesystem: options.checkFilesystem !== false,
     sourceContinuityImplemented: env.AUDIT_DELIVERY_SOURCE_CONTRACT === "append-only-audit-source-v2"
+  });
+  const followupActivationProvider = options.followupActivationProvider || inspectFollowupActivationProvider(env, {
+    checkFilesystem: options.checkFilesystem !== false
+  });
+  const followupDispatchAssessment = options.followupDispatchAssessment || inspectFollowupDispatchWorkerReadiness(env, {
+    activationVerifierConfigured: options.followupDispatchActivationVerifierConfigured === true || followupActivationProvider.configured === true,
+    externalEvidenceVerified: followupExternalEvidenceVerified
   });
   const bindings = deploymentBindingChecks(env, manifest);
   const launchSmoke = options.launchSmoke || await buildLaunchSmokeReport({
@@ -128,14 +152,6 @@ async function buildProductionPreflight(options = {}) {
     artifactExists: options.artifactExists,
     releaseReport: options.releaseReport,
     cutover: options.cutover
-  });
-  const productionEvidence = loadProductionEvidence(options);
-  const externalTrust = await verifyExternalTrust(options, {
-    manifest,
-    registryEntry: registry.entries?.find((item) => item.releaseId === manifest.releaseId) || null,
-    registryVerification,
-    productionEvidence: productionEvidence.report,
-    evidenceRecords: productionEvidence.records
   });
 
   const exactRegistryBinding = Boolean(registryEntry)
@@ -158,12 +174,12 @@ async function buildProductionPreflight(options = {}) {
   const runtimeChecks = [
     ...bindings,
     check("preflight:production-config", productionConfig.passed, `${productionConfig.checks.filter((item) => item.passed).length}/${productionConfig.checks.length} production configuration checks`, "runtime-config"),
-    check("preflight:audit-delivery", auditDeliveryAssessment.ready === true && auditDeliveryAssessment.productionReady === true, `${auditDeliveryAssessment.checks?.filter((item) => item.passed).length || 0}/${auditDeliveryAssessment.checks?.length || 0} continuous audit deployment checks; productionReady=${auditDeliveryAssessment.productionReady === true}`, "runtime-config")
+    check("preflight:audit-delivery", auditDeliveryAssessment.ready === true && auditDeliveryAssessment.productionReady === true, `${auditDeliveryAssessment.checks?.filter((item) => item.passed).length || 0}/${auditDeliveryAssessment.checks?.length || 0} continuous audit deployment checks; productionReady=${auditDeliveryAssessment.productionReady === true}`, "runtime-config"),
+    check("preflight:chronic-followup-dispatch", followupDispatchAssessment.configured === true && followupDispatchAssessment.productionReady === true, `${followupDispatchAssessment.checks?.filter((item) => item.passed).length || 0}/${followupDispatchAssessment.checks?.length || 0} durable followup dispatch checks; productionReady=${followupDispatchAssessment.productionReady === true}`, "runtime-config")
   ];
   const liveChecks = launchSmoke.checks
     .filter((item) => item.category === "live")
     .map((item) => check(`preflight:${item.id}`, item.passed, item.detail, "live"));
-  const evidenceReleaseBound = evidenceBoundToRelease(productionEvidence.records, manifest);
   const externalChecks = [
     check("preflight:external-registry-attestation", validExternalAttestation(registryEntry?.externalAttestation) && externalTrust.registryAttestationVerified, externalTrust.registryAttestationVerified ? registryEntry?.externalAttestation?.evidenceRef : externalTrust.detail, "external-evidence"),
     check("preflight:production-evidence-validation", productionEvidence.report?.ok === true && productionEvidence.report?.status === "go-decision-evidence-validated" && externalTrust.productionEvidenceVerified, externalTrust.productionEvidenceVerified ? productionEvidence.report?.status : externalTrust.detail, "external-evidence"),
@@ -216,6 +232,20 @@ async function buildProductionPreflight(options = {}) {
       productionReady: auditDeliveryAssessment.productionReady === true,
       checks: (auditDeliveryAssessment.checks || []).map((item) => ({ id: item.id, passed: item.passed })),
       boundary: auditDeliveryAssessment.boundary || "continuous audit production evidence is incomplete"
+    },
+    followupDispatchAssessment: {
+      contract: followupDispatchAssessment.contract || "citizen-chronic.followup-dispatch-worker.v1",
+      configured: followupDispatchAssessment.configured === true,
+      externalEvidenceVerified: followupDispatchAssessment.externalEvidenceVerified === true,
+      productionReady: followupDispatchAssessment.productionReady === true,
+      checks: (followupDispatchAssessment.checks || []).map((item) => ({ id: item.id, passed: item.passed })),
+      boundary: followupDispatchAssessment.boundary || "Release-bound external evidence is required."
+    },
+    followupActivationProvider: {
+      contract: followupActivationProvider.contract || "citizen-chronic.followup-dispatch-activation-registry.v1",
+      configured: followupActivationProvider.configured === true,
+      externalDecisionRequired: true,
+      productionReady: followupActivationProvider.configured === true && followupExternalEvidenceVerified
     },
     launchSmoke: {
       ok: launchSmoke.ok,

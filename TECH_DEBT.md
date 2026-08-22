@@ -14,7 +14,7 @@
 | ARC-003 | 宽接口 | public-health runtime context 160 个依赖 | 组合根和路由同步变化，难形成领域端口 |
 | ARC-004 | 前端超大模块 | 数智医院 app 10.5k、citizen 6k、公卫 4.4k | 全局状态、渲染和流程耦合 |
 | ARC-007 | 临床子域隔离 | 急救、血液、影像、体检首个查询端口已建立，但两个混合路由仍承载写命令；血液 GET 有内存规范化，影像和体检 GET 有审计持久化；33 个 operations 字面路径已全部移交 T02 | 按特征测试逐用例迁移；禁止 operations 回流 T06，不把兼容副作用误写成纯查询 |
-| CHR-001 | 慢病随访事件投递 | T04 已有原子内嵌 outbox、幂等 inbox、稳定幂等键、独立 activation verifier、范围过滤、审计和签名 HTTPS publisher；单进程并发可合并，但批次/写回失败会再次发出同幂等键请求 | 仍需 T00/T04 独立任务建立 verifier 组合、持久 worker、lease、attempt/backoff、死信、供应方幂等核对和部署观测；当前不能承诺跨进程 exactly-once，不得关闭生产 Go/No-Go |
+| CHR-001 | 慢病随访事件投递 | 仓库内闭环已建立：SQLite v16 同事务 enqueue、专用 outbox、lease owner/token hash/version/expiry fencing、有界退避、死信、digest-only replay、独立 worker/CLI/systemd 合同与 Ed25519 activation provider；HTTP 请求路径不再同步外发 | 继续 NO-GO：真实 endpoint/凭据、外部签名 activation decision、可信签名回执、供应方幂等核对、PostgreSQL 多节点主存储、监控告警、服务启用和现场验收仍外置；只能承诺至少一次，不得宣称 exactly-once |
 | OBJ-001 | 对象存储生产闭环 | 应用侧 v1 响应信任已建立；500 条兼容上限已改为网关调用前失败关闭，既有 immutable/legal-hold 元数据不再被静默淘汰，但仍无无损分页仓储；外部 upload/complete/lifecycle 成功后再写本地状态，缺少 outbox、幂等收敛、失败对账和补偿；网关能力尚无签名声明 | 容量耗尽现在表现为明确不可用而非静默丢证据；外部对象与权威元数据仍可能不一致。后续分别建立无损分页/保留策略、请求外事务的持久命令轨道与对账 worker、版本化能力证明，禁止在请求路径直接双写 |
 | OPS-001 | 连续审计耐久信任 | 仓库内来源缺口已关闭：v15 同事务 append-only source、最小投影、cursor 批次、target/source 绑定和 checkpoint v3 已有专项测试；已淘汰历史不可恢复，checkpoint/head 仍在同一本地信任域，SIEM receipt 未独立验签，filesystem 仅是 WORM rehearsal | 继续 NO-GO：需真实签名耐久 receipt、外部单调 anchor、WORM/KMS/保留与恢复能力、Data Owner 投影审批、专用账号及现场验收 |
 | SEC-004 | XSS / CSP 面 | 37 个可执行内联脚本、8 个样式块和 13 个样式属性已迁至外部脚本/CSS/class，显式发布图 P0/P1 静态风险为 0 且 CI 拒绝新增；兼容 CSP 仍含 `unsafe-inline`，严格策略仅 Report-Only。871 个 HTML sink、动态 CSSOM 与真实托管响应头尚未完成运行时验证 | 补全角色浏览器回归、恶意输入和动态样式验证，再独立移除兼容 `unsafe-inline`；真实动态/静态响应头、独立扫描和渗透验收前继续 NO-GO |
@@ -48,8 +48,8 @@
 | SEC-002 | 2026-08-19 | 浏览器和 Service Worker 只消费生成的 `public-demo.json`；凭据删除、身份联系字段掩码、v60 撤销旧缓存 | 共享脱敏纯函数、源快照拒绝、Pages 仓库外构建；仓库历史分类残余风险继续由 `DATA_MODEL.md` 的 DATA-006 跟踪 |
 | CI-001 | 2026-08-19 | 综合 CI 拆为 governance-api、browser-e2e、release-readiness，并保留 fail-closed 聚合 test | workflow 契约测试锁定步骤归属、预算、always 聚合和三个上游结果 |
 | TEST-004 | 2026-08-19 | 居民小程序 JSON 制品改为递归扫描语义字符串值，仅跳过精确摘要字段中的合法 SHA-256；非 JSON 仍全文扫描 | 摘要命中放行，伪造摘要字段、`123456`、`888888`、`DEMO-MOBILE` 语义值和非 JSON 文本均拒绝 |
-| DATA-001 | 2026-08-22 | `STORAGE_SCHEMA_VERSION`、storageMeta、部署/readiness/release 门禁统一派生注册表 head v15 | 静态契约、storage、部署、生产就绪与发布报告测试 |
-| DATA-002 | 2026-08-22 | v1–v14 独立注册并冻结内容指纹，v15+ ledger 写内容 SHA-256，runner 拒绝连续性/name/checksum 漂移 | 空库、v11 升级、重跑、指纹/ledger 漂移、v15 checksum、未来 v16 与失败回滚测试 |
+| DATA-001 | 2026-08-22 | `STORAGE_SCHEMA_VERSION`、storageMeta、部署/readiness/release 门禁统一派生注册表 head v16 | 静态契约、storage、部署、生产就绪与发布报告测试 |
+| DATA-002 | 2026-08-22 | v1–v14 独立注册并冻结内容指纹，v15+ ledger 写内容 SHA-256，runner 拒绝连续性/name/checksum 漂移 | 空库、v11/v15 升级、重跑、指纹/ledger 漂移、v15/v16 checksum、未来 v17 与失败回滚测试 |
 | TEST-001 | 2026-08-22 | 建立 build/lint/typecheck/unit/integration/smoke 标准入口并映射 CI/Pages；test:all 与原 server.js 85/85/55 覆盖门禁语义不变 | 标准门禁契约、完整测试分区、隔离 smoke、静态发布链、CI 映射、独立内部边界覆盖和全量回归 |
 | TEST-002 | 2026-08-22 | 为 runtime identity、audit chain/source、object storage trust、API catalog/authorization 建立四个独立 c8 组并冻结当前真实基线；报告只存在临时目录 | 配置/脚本治理测试锁定阈值不得降低，要求每组至少一条直接负向合同，并绑定生产身份不可信模式、篡改、缺鉴权、路径漂移、幂等缺失和生产误 promotion 矩阵 |
 | ARC-002 | 2026-08-21 | alert runtime 改为显式 provider，worker 在组合边界懒注入既有 readiness；静态环由 1 降为 0，并已通过 PR #132 与 main CI/Pages | 缺失/无效/异常 provider、CLI 默认组合、反向依赖架构守卫和 Chromium E2E |
@@ -74,7 +74,7 @@
 
 ## 测试缺口优先顺序
 
-1. 后续 v16+ migration 的数据回填、前滚恢复和多历史版本 fixture。
+1. 后续 v17+ migration 的数据回填、前滚恢复和多历史版本 fixture。
 2. role × permission × resident/institution/region 数据范围矩阵。
 3. 前端 sink 的可信输入/恶意输入回归。
 4. 在现有四个内部边界覆盖组上逐步纳入新增存储/worker 模块；不得降低基线或替代行为负向断言。
@@ -97,3 +97,11 @@
   阻断项；不得以样例 receipt 或仓库测试替代。
 - 其余指标仍是未版本化的展示定义。后续按 T03–T09 数据 owner 逐项建立合同，不能把驾驶舱
   变成跨域写模型或居民级下钻入口。
+
+## 慢病随访 durable dispatch 剩余债务
+
+- CHR-001 的仓库内持久 worker/lease/backoff/dead-letter/replay 缺口已关闭；HTTP 不再同步外发。
+- 仍是至少一次投递，供应方必须按稳定 event/request identity 幂等并返回同一绑定回执；不得宣称 exactly-once。
+- SQLite v16 只覆盖单主机当前存储；多节点 PostgreSQL 主库、正式 migration/rollback/容量演练仍未完成。
+- 真实 endpoint、凭据、独立 activation、签名回执、监控告警、systemd 启用与现场联合验收继续 NO-GO。
+- 内嵌聚合 outbox 与专用投递表暂时双表达，后续只能在兼容迁移与独立 ADR 下逐步收敛。

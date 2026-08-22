@@ -15,7 +15,7 @@ const DEPENDENCIES = Object.freeze([
   "citizenCareWorkspace", "cleanResidentPatch", "closeFamilyDoctorChronicAction", "collectJson", "createHash",
   "dispatchChronicFollowupAction", "escalateChronicFollowupAction", "ingestChronicDeviceMeasurement", "mergeByKey",
   "normalizePersonalRecord", "normalizeState", "patchBusinessCollectionItem", "personIndexForResident",
-  "prependAuditTrailEntry", "randomUUID", "readDatabase", "recordChronicLaunchCoreAction",
+  "prependAuditTrailEntry", "randomUUID", "readDatabase", "readFollowupDispatchOutboxHealth", "recordChronicLaunchCoreAction",
   "recordChronicPharmacyCallback", "recordChronicReferralContinuity", "redactSensitiveResponse", "requireApiRole",
   "rowMatchesOrganizationScope",
   "scheduleChronicReminderOutreach", "scopeStateForUser", "sealAuditTrail", "seedCitizenHospitalServiceConfigs",

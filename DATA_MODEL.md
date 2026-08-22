@@ -64,8 +64,8 @@ erDiagram
 - 为兼容既有数据库，v1–v14 ledger checksum 继续使用历史 `version:name` 摘要；对应源码内容另由 14 个冻结 SHA-256 和注册表校验保护，禁止改写。
 - v15 及以后 ledger checksum 使用包含 version、name、owner、apply 实现和显式依赖的内容 SHA-256；新版本必须连续追加。
 - runner 在执行新迁移前校验已应用 ledger 是注册表的连续前缀，name/checksum 漂移会 fail-closed；单个迁移失败时 DDL 与 ledger 行一并回滚。
-- `STORAGE_SCHEMA_VERSION`、`storageMeta`、部署检查、生产 readiness 和发布报告统一从 `SQLITE_SCHEMA_HEAD` 派生，当前为 15。
-- 自动化测试覆盖空库 0→15、v11→15、重复执行、冻结指纹、ledger 漂移、未来 v16 内容 checksum 和失败回滚；schema fingerprint 用于比较升级结果与空库结果。
+- `STORAGE_SCHEMA_VERSION`、`storageMeta`、部署检查、生产 readiness 和发布报告统一从 `SQLITE_SCHEMA_HEAD` 派生，当前为 16。
+- 自动化测试覆盖空库 0→16、v11→16、v15→16 回填、重复执行、冻结指纹、ledger 漂移、未来 v17 内容 checksum 和失败回滚；schema fingerprint 用于比较升级结果与空库结果。
 
 专项 SQLite 表仍有独立生命周期和台账，不得误计入主 schema head；生产 PostgreSQL 是否已迁移仍必须由现场证据证明。
 
@@ -210,3 +210,14 @@ source/sink contract、目标摘要、cursor/source hash 与 receipt 摘要；ch
 `internal-boundary-coverage-v1` 只登记测试文件、源码范围和当前覆盖率阈值，不新增集合、表、字段、DDL、migration、outbox 或生产事实源。c8 原始数据和报告只进入操作系统临时目录并在命令结束时删除，不得提交或归档为平台数据。
 
 覆盖百分比不是业务事实、发布凭证或现场验收证据；它不能晋升 API、身份、审计或对象存储的生产状态，所有相关生产边界继续 `NO-GO`。
+
+## 15. 慢病随访外部投递权威状态（SQLite v16）
+
+`followups[*].domainRuntime.outbox` 继续承载 T04 领域事件兼容快照；`chronic_followup_dispatch_outbox` 是
+外部投递状态机的权威本地来源。`server.js` 在同一 SQLite 事务中由前者提取并插入/核对后者，不允许请求
+路径调用外部 publisher。关系为一个 followup 聚合对应多个唯一 event；一个 event 最多一个 mutable delivery
+row，并可对应多个 append-only replay 记录。
+
+投递 row 的 source 列永久冻结；worker 只更新状态、尝试、下一次时间、租约 fencing、最小回执/错误摘要。
+token、原始错误、原始 provider receipt、凭据和人工审批正文不入库。外部供应方幂等、可信签名回执和
+PostgreSQL 多节点主存储尚未建立，`productionReady=false`。

@@ -7,6 +7,13 @@ const {
   backfillAuditDeliverySourceFromCollections,
   createAuditDeliverySourceSchema
 } = require("../../identity-security/audit-delivery-source");
+const {
+  appendFollowupDispatchOutboxChanges,
+  backfillFollowupDispatchOutboxFromCollections,
+  createSqliteFollowupDispatchRepository,
+  createFollowupDispatchOutboxSchema,
+  followupDispatchMigrationFingerprintDependencies
+} = require("../../citizen-chronic/followup-dispatch-outbox");
 
 const MIGRATION_OWNER = "T00/data-governance";
 const FROZEN_LEGACY_MAX_VERSION = 14;
@@ -562,6 +569,19 @@ const MIGRATION_DEFINITIONS = [
       createAuditDeliverySourceSchema(db);
       backfillAuditDeliverySourceFromCollections(db);
     }
+  },
+  {
+    version: 16,
+    name: "add durable chronic followup dispatch outbox",
+    fingerprintDependencies: [
+      createFollowupDispatchOutboxSchema,
+      backfillFollowupDispatchOutboxFromCollections,
+      ...followupDispatchMigrationFingerprintDependencies
+    ],
+    apply(db) {
+      createFollowupDispatchOutboxSchema(db);
+      backfillFollowupDispatchOutboxFromCollections(db);
+    }
   }
 ].map((migration) => ({ ...migration, owner: MIGRATION_OWNER }));
 
@@ -710,7 +730,9 @@ module.exports = {
   FROZEN_LEGACY_MAX_VERSION,
   SQLITE_MIGRATIONS,
   SQLITE_SCHEMA_HEAD,
+  appendFollowupDispatchOutboxChanges,
   applySqliteMigrations,
+  createSqliteFollowupDispatchRepository,
   legacyLedgerChecksum,
   migrationContentFingerprint,
   readSqliteSchemaFingerprint,

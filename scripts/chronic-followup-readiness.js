@@ -2,6 +2,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const { buildChronicInformatizationSourceReport } = require("./chronic-informatization-sources");
+const { inspectFollowupDispatchWorkerReadiness } = require("../src/citizen-chronic/followup-dispatch-worker");
 
 const ROOT = path.resolve(__dirname, "..");
 const DEFAULT_OUTPUT = path.join(ROOT, "release", "chronic-followup-readiness-report.json");
@@ -151,6 +152,9 @@ function buildReferralContinuityEvidence(data) {
 function buildChronicFollowupReadinessReport(options = {}) {
   const data = options.data || readJson("data/db.json");
   const sourceTraceability = options.sourceTraceability || buildChronicInformatizationSourceReport({ data, pkg: options.pkg });
+  const productionDispatch = options.productionDispatch || inspectFollowupDispatchWorkerReadiness(options.env || process.env, {
+    activationVerifierConfigured: options.activationVerifierConfigured === true
+  });
   const feedback = (data.personalRecords || []).filter((item) => item.category === "chronic-feedback" || item.meta?.followupFeedback);
   const experienceRecords = (data.personalRecords || []).filter((item) => item.category === "chronic-self-checkin" || item.meta?.residentExperience);
   const followupMessages = (data.taskMessages || []).filter((item) => item.chronicFollowup);
@@ -366,6 +370,9 @@ function buildChronicFollowupReadinessReport(options = {}) {
     publicHealthLoopStages,
     publicHealthIntegrationLinks,
     sourceTraceability,
+    productionDispatch,
+    productionReady: false,
+    productionBoundary: "Durable local queue code is present; real endpoint, credential injection, trusted receipt, worker service activation and site acceptance remain NO-GO.",
     residentCoverage,
     reusePoints: [
       "chronicScreeningTasks",
