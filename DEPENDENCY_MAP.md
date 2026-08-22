@@ -146,7 +146,7 @@ JSON 源快照仍是高扇出依赖，但浏览器和 Pages 只依赖经统一�
   `refs/tags/vN` 核验的完整 commit SHA，并保留 `# vN` 注释供升级评审；契约测试禁止
   `actions/*@vN` 标签引用回流。
 - systemd 模板包含多项 Linux hardening。
-- Solution A 默认 HAPI 镜像为 `latest`；Orthanc DICOM 端口对宿主开放，必须在生产前加固。
+- Solution A 的 HAPI FHIR、PostgreSQL、Orthanc、OHIF 默认镜像已固定为审核过的精确版本与 registry digest；Orthanc 认证默认启用，Web 与 DICOM 默认绑定回环。非回环 DICOM 仅接受显式私网接口配置，真实拉取/漏洞扫描、TLS、防火墙白名单、设备连通和现场网络验收仍是生产阻断项。
 - Pages 先在 runner 临时目录构建显式资源集再上传；服务端和 Pages 共用同一发布清单。
 
 ## 9. 依赖治理结论

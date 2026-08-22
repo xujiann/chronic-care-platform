@@ -22,7 +22,6 @@
 | DATA-003 | 集合治理 | JSON 252 个集合，只有 83 个有 owner | 169 个遗留集合不能安全晋升生产 |
 | TEST-002 | 覆盖率 | c8 只 include `server.js`，固定测试清单 | 新 `src/` 模块和浏览器代码不在覆盖率结论中 |
 | TEST-003 | 安全负向测试 | 已建立源码、配置、环境模板、Git 元数据、文档和 `data/db.json` 拒绝矩阵 | 后续新增敏感类别必须扩展矩阵 |
-| DEPLOY-001 | Compose | HAPI 默认 `latest`；Orthanc 暴露 4242 | 不可复现和网络攻击面 |
 | GOV-001 | 规则冲突 | 基线中的路由工作流仍写旧集成分支/旧 baseline；本 T00 已校准，待合入关闭 | 操作人员可能走错误合入路径 |
 
 ## P2 — 触及时改善
@@ -60,6 +59,7 @@
 | SEC-008 | 2026-08-21 | 区域共享 access command 改为服务端授权，复用 `personalRecords`，加入机构/地区/用途/范围/版本、幂等摘要、应用层 CAS、撤销即时拒绝和脱敏审计；state-data 关闭四个 owner 集合与生产 reset 旁路 | 严格/legacy、客户端决定忽略、冲突、撤销、重放、append-only、删改/重排/伪造追加、package CAS 旁路、生产 reset、审计失败与所有权专项 |
 | SEC-009 | 2026-08-22 | 对象存储生产端口采用 v1 原始响应 HMAC、独立方向密钥、request/object/version 绑定、上传/下载精确 Origin 与 TTL、RFC3339 时间和显式扫描/生命周期回执；生产配置不完整时在 fetch 前失败关闭，legacy 仅限非生产未启用版本的迁移路径；现场 probe digest 绑定合同与 Origin | 独立已知签名向量；未签名/错签/陈旧/错配响应、空/漂移版本、恶意 Origin、userinfo/fragment、非标准时间、过期/超长 URL、缺失回执、类型强制和上游错误泄露负向及 v1 API 集成测试；readiness、发布环境、部署密钥合同与 ADR 同步 |
 | SUPPLY-001 | 2026-08-22 | CI 与 Pages 的六种官方 GitHub Action 全部固定到从官方 `refs/tags/vN` 核验的完整 commit SHA，并保留版本注释 | workflow 契约锁定 18 个引用、40 位 SHA、精确 tag 对应值和版本注释，并拒绝 `actions/*@vN` 回流 |
+| DEPLOY-001 | 2026-08-22 | Solution A 四个容器镜像固定到审核版本与 registry digest；Orthanc 认证默认启用，DICOM 默认回环且只接受显式私网接口；占位凭据和漂移镜像生产失败关闭 | readiness 锁定 Compose/环境模板/镜像策略一致性，并覆盖可变镜像、占位凭据、认证关闭、通配/公网绑定和外部证据持续 `NO-GO` |
 
 ## 重复、死代码和命名结论
 

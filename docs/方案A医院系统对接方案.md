@@ -73,4 +73,4 @@ flowchart LR
 
 首个试点建议选择一家接口配合度高的医院，以DR或CT单一模态起步：先用合成居民完成全链路，再用审批后的脱敏病例验证。院方负责源系统接口、网络与临床验收；平台方负责网关适配、MPI/FHIR/DICOMweb、监控与问题闭环；双方安全部门共同审批账号、证书和数据范围。
 
-当前仓库已经具备合成Patient、ImagingStudy、DiagnosticReport、像素DICOM上传及OHIF调阅能力，属于可联调环境，不等于正式上线。正式生产前仍必须完成：Orthanc鉴权启用、TLS/mTLS、正式证书与密钥托管、医院Endpoint目录、院内厂商接口确认、真实网络联通、性能与安全测试、容灾演练及上线审批。
+当前仓库已经具备合成Patient、ImagingStudy、DiagnosticReport、像素DICOM上传及OHIF调阅能力，并将 Orthanc 鉴权默认启用、DICOM 默认绑定回环、容器镜像固定到审核版本与摘要，属于可联调环境，不等于正式上线。正式生产前仍必须完成：真实镜像拉取与漏洞扫描、TLS/mTLS、正式证书与密钥托管、医院Endpoint目录、院内厂商接口确认、真实网络联通、性能与安全测试、容灾演练及上线审批。
