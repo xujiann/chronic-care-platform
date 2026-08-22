@@ -132,6 +132,9 @@ scripts/platform-cutover-alert-worker.js
   `test:all` 仍是独立的自动发现回归保护。
 - `scripts/internal-boundary-coverage.js` 复用现有 c8 与专项测试，为四个关键边界建立独立覆盖组；
   它不替代原 `server.js` 85/85/55 门禁，阈值只能持平或提高，报告不进入仓库。
+- `test/operations-command-handoff.test.js` 复用原 T02 handoff harness，把 32 条 operations command
+  路径登记为唯一数据驱动行为矩阵；`operations-command:behavior-test` 在 governance-api 显式运行，
+  同时仍由标准 unit 补集覆盖。矩阵保护遗留 handler，不是新路由注册表或拆分授权。
 
 ## 11. 区域共享调阅命令
 

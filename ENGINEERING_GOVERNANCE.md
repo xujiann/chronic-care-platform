@@ -81,6 +81,7 @@ LEGACY CODE → TEST PROTECTION → REFACTOR
 | 语法 | `npm run check` |
 | 全量自动发现 | `npm run test:all` |
 | 路由 | `npm run routes:check`、`npm run routes:test` |
+| operations 命令行为矩阵 | `npm run operations-command:behavior-test`（32/32 路径，直接运行真实 route segment） |
 | API 治理 | `npm run api:authentication-evidence`、`npm run api:authorization-matrix`、`npm run api:production-catalog`、`npm run api:idempotency-evidence` |
 | 集合治理 | `npm run data:collection-governance:verify`（只读；不生成 release 报告） |
 | 对象存储架构决策 | `npm run object-storage:architecture-governance:verify`（只读；Proposed 状态失败关闭） |
@@ -112,6 +113,10 @@ storage trust 与 API catalog/authorization 使用独立覆盖组，冻结当前
 API-IDEM-001 在 TEST PROTECTION 层新增幂等证据专项：源码 marker 只作观察，写接口只有在 owner、行为合同、实现锚点与可执行负向测试全部一致时才能标为 `behavior-verified`；该标签不等于生产就绪或分布式 exactly-once。
 
 API-AUTH-001 在 TEST PROTECTION 层新增 custom auth 证据专项：required/optional/none、credential source、replay/CSRF、scope、实现锚点和可执行负向测试必须同时一致。源码 marker 或相邻字符串不构成证明；目录解析不得跨越已结束的 handler 拼接 method/path，直接拒绝证据和解析器回归均纳入门禁。未登记入口继续 `review-required`，认证证据通过也不构成生产放行。
+
+TEST-007 在既有 operations handoff harness 上建立 32 条路径的唯一数据驱动矩阵，并由 governance-api
+显式运行。矩阵是拆分 699 行 handler 和治理 ARC-008 前的行为安全网，不改变 handler、数据 Owner、
+事务或生产状态。
 
 ## 9. 变更风险门禁
 

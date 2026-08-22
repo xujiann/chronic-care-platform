@@ -36,7 +36,6 @@
 | JOB-001 | Worker 一致性 | 多套 worker/retry/checkpoint 语义 | 建立共同任务状态和观测契约 |
 | TEST-006 | 静态基线与测试性能 | lint 对 2 个前端文件的 16 个重复键、`test/api.test.js` 的 3 个不可达块保留精确例外；typecheck 仅覆盖 6 个治理/安全文件；集成首批 API 契约在并发负载下约 174 秒 | 逐规则/逐目录消除例外并扩大类型基线；拆分超大 API 测试和测量 CI 时长，不降低断言或超时门禁 |
 | TEST-005 | 浏览器一致性 | Windows 本地配置优先系统 Chrome；完整 36 项中小程序超时恢复用例可受前序共享服务状态影响，而同文件 13/13、单例 1/1、CI Chromium 36/36 通过 | 后续独立测试任务统一本地/CI 浏览器选择并隔离 E2E 服务状态，不在数据治理切片中修改业务代码 |
-| TEST-007 | operations 命令行为矩阵 | 32 条路径已有唯一 Owner、静态等价、路由顺序、依赖、授权矩阵和代表性读写/审计保护；直接运行时行为约覆盖 7/32 条 | 在拆分 699 行 handler 或治理 ARC-008 前，补齐每条 action 的 role/scope、deny-before-read、响应、写入与审计顺序契约 |
 | DOC-001 | 历史文档 | 205 份 Markdown，历史快照与当前规则并存 | 标明 snapshot/current/superseded，不删除历史证据 |
 | REPO-001 | 跟踪制品 | `output/pdf` 有 3 个 PDF | 明确生成源、是否保留及禁止手工编辑 |
 
@@ -67,6 +66,7 @@
 | API-AUTH-001 | 2026-08-23 | `api-authentication-evidence-v1` 为 13 个客观可证入口登记 owner、mechanism、credential source、required/optional/none、replay/CSRF、scope 和负向测试；原 13 个未分类 key 中 12 个真实入口已闭合，1 个跨 handler 虚假 POST 已删除，目录升级 v3 | 唯一性、owner/route、credential、replay-CSRF、实现/测试锚点、T10 401/403、相邻 handler 误配、证据伪造和生产 promotion 负向；所有 593 项继续 NO-GO |
 | SEC-010 | 2026-08-23 | strict production preflight 不再只能靠测试注入 externalTrustVerifier；可部署 provider 使用 pinned anchor bundle、Ed25519 双角色签名、撤销/时窗和 release/source/artifact/evidence/registry 精确绑定，默认仍 NO-GO | generic signed-envelope 负向矩阵、CLI 自动装配、synthetic fixture 不提升全局生产状态、deployment package/env/CI 合同与脱敏错误 |
 | DEPLOY-002 | 2026-08-23 | 切换行动定义升级为 definitions-only v2；14/14 effective status 仅由共享 Ed25519 provider 验证的当前 release/artifact 绑定决定派生，并接入 strict preflight 与 protected manual workflow；手改 `verified` 固定失败 | 缺 provider/记录、错签/撤销、异 release/digest、过期/未来时间、角色重合、重复 signer、缺转换历史/命令回执、symlink/超限、错误脱敏与 digest-only receipt 负向测试 |
+| TEST-007 | 2026-08-23 | 复用既有 T02 handoff harness，对 operations-command 32/32 路径建立数据驱动运行时矩阵；覆盖 19 条只读、13 条写入、三条签名集成入口及 institution 范围 | 闭集唯一性、role/deny-before-read、payload/400/403/404、响应/副作用、审计—写入顺序、审计和写入失败语义；governance-api 显式专项门禁 |
 
 ## 重复、死代码和命名结论
 

@@ -135,6 +135,11 @@ HTTP request
 
 `GET /api/physical-exams` 已通过兼容委托接入 `physical-examination-dashboard-query.v1`。允许角色仍为 citizen、institution、commission；显式 `residentId` 继续按 `allowedResidentIdsForUser` 拒绝越权并记录安全事件。citizen 仍不接收联调、网关和专项分流明细，readiness 只暴露代码状态、质量和阻断数量；管理角色保留完整投影。成功响应继续在既有访问审计持久化之后执行最终脱敏。
 
+TEST-007 已把 T02 `operations-command` 的 32 条路径全部纳入运行时行为矩阵：每条路径验证声明角色和
+deny-before-read，19 条 GET 验证只读响应，13 条 POST 验证 payload/错误、响应、状态副作用及审计—写入
+顺序；三条 integration POST 另验证签名与 institution 机构范围。该矩阵没有新增 idempotency、CAS 或
+标准错误合同，也不改变生产 API 目录的 `NO-GO`。
+
 ## 9. 区域共享调阅 API
 
 `POST /api/regional-data-sharing/access-reviews` 保持原 method/path、commission/institution 角色声明和 `shared-05` 顺序。institution 继续按精确 `orgCode` 访问来源或目标共享包；commission 在非生产兼容模式保留原有全域服务端范围并增加 `COMMISSION_LEGACY_SCOPE` blocker。成功新建仍返回 201，幂等重放返回 200，授权拒绝返回 403，版本/幂等冲突返回 409，审计或生产仓储不可用返回 503。
