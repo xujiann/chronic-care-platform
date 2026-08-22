@@ -119,8 +119,9 @@ flowchart TB
     review 证据且固定禁止推断数据 owner。新增/删除、重复状态、引用漂移、非 owner 域和生产晋升
     都在 CI 失败关闭；本切片没有修改 JSON/SQLite、schema、API 或运行时，仍为 `NO-GO`。
 14. SEC-004 治理清单已升级为 `browser-security-risk-inventory.v2`，仍只扫描 144 个显式发布资产，
-    不改变页面运行时。机器基线精确锁定 896 个 DOM HTML sink（44 个资产）、69 个动态 URL sink
-    （18 个资产）和 48 个动态样式/CSSOM/runtime style element（15 个资产）；每个资产/类型同时绑定
+    血液主工作台已完成首个可信 DOM/text 渲染试点，接口字段不再进入 HTML 模板；机器基线现锁定
+    871 个 DOM HTML sink（43 个资产）、69 个动态 URL sink（18 个资产）和 45 个动态样式/CSSOM/runtime
+    style element（14 个资产）；每个资产/类型同时绑定
     occurrence 数量和规范化源行聚合 SHA-256。相同数量的片段替换、数量增加和新类型/资产都会失败关闭；
     该清单是待治理风险台账，不是可信渲染、严格 CSP 或生产安全证明。
 

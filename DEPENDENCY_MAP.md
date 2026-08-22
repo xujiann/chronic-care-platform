@@ -77,10 +77,11 @@ TypeScript 与 Node 类型仅用于开发门禁；lockfile audit 已修复 c8 �
 - 动态浏览器凭据方向为 `HttpOnly Cookie → /api/auth/context → 脱敏身份投影`；`auth.js` 在
   任何普通 API 调用前清除旧 localStorage token，Cookie 与 Authorization 并存时服务端也选择
   Cookie。bearer-only 兼容 token 仅存在页面内存，不跨重载恢复。
-- Inventory v2 在显式发布图精确锁定 891 处 `innerHTML=` 与 5 处 `insertAdjacentHTML`（合计 896，
-  覆盖 44 个资产）；最高为 citizen 94、app 90、public-health 78、platform 72。
+- Inventory v2 在显式发布图精确锁定 866 处 `innerHTML=` 与 5 处 `insertAdjacentHTML`（合计 871，
+  覆盖 43 个资产）；血液主工作台的 25 处 `innerHTML` 已迁到 DOM/text 节点，最高仍为 citizen 94、
+  app 90、public-health 78、platform 72。
 - 同一清单另锁定 69 个动态 URL sink（31 个模板 URL 属性、24 个 DOM `href/src` 属性、2 个
-  `setAttribute` URL、12 个导航调用）和 48 个动态样式 sink（31 个模板 style 属性、14 个 CSSOM
+  `setAttribute` URL、12 个导航调用）和 45 个动态样式 sink（30 个模板 style 属性、12 个 CSSOM
   属性、2 个 `setProperty`、1 个 runtime style element）。这些是词法治理事实，不是 taint 分析或放行证据。
 - 37 个页面内联守卫/脚本已汇入 `page-auth-bootstrap.js`、`mobile-preview.js` 等外部依赖；8 个样式块和
   13 个静态样式属性已汇入外部 CSS/class，显式发布图的 inline/eval 风险现为 0；CI/构建同时对

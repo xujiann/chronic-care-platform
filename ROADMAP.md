@@ -27,7 +27,7 @@
 | 7B | 健康驾驶舱版本化指标 | 首个 `population-service-visits.v1` 合同已建立 / P1 | 由 T03 确认来源版本与签名证据、由 T00 注入服务端 region scope；其余指标按 owner 逐项接入 |
 | 7C | 生产 API 机器目录 | v2 已把源码观察与行为证据分层；SMS callback 是首个合同 pilot，594 项全部 NO-GO / P1 | T01–T09 逐 owner 复核 7 个运行时策略、13 个自定义鉴权和 333 个缺行为证明的写接口；233 个未观察到标记项优先排查，不得用源码标记或猜测 owner 替代行为测试 |
 | 8 | JSON/SQLite state collection 治理 | DATA-003 首切片完成：252/252 状态完整，188 review-required、1 quarantined / P1 | 按 DATA-008 分 owner 确认、归档或 migration 晋升；process owner 证据不得自动变成 data owner |
-| 9 | 前端可信渲染与 CSP | Accepted ADR；37 个脚本和 21 个静态样式风险已外移；Inventory v2 已锁定 896 个 DOM HTML、69 个动态 URL、48 个动态样式风险且禁止增加/替换 / P1 | 按页面验证来源、编码/净化、动态 CSSOM、全角色浏览器和恶意输入；真实托管头验证与独立安全评估后才移除兼容 `unsafe-inline` 并强制严格 CSP |
+| 9 | 前端可信渲染与 CSP | Accepted ADR；37 个脚本和 21 个静态样式风险已外移；血液主工作台完成首个可信 DOM/text 试点，Inventory v2 现锁定 871 个 DOM HTML、69 个动态 URL、45 个动态样式风险且禁止增加/替换 / P1 | 沿用页面 Owner 小批次迁移和恶意输入回归；真实托管头验证与独立安全评估后才移除兼容 `unsafe-inline` 并强制严格 CSP |
 | 10 | CI/worker/部署依赖治理 | CI 风险域拆分已合入并经 main 验证；Action 完整 SHA 固定已形成 T00 候选，worker 仍候选 / P2 | 不降低 required checks；合入后持续按官方 tag 升级并核验 commit SHA，继续评审 worker 观测契约 |
 | 11 | 居民小程序制品凭证扫描消除哈希误报 | 已完成 / P2 | JSON 仅扫描语义字符串值并精确跳过两个字段中的合法 SHA-256；非 JSON 保留文本扫描；真实演示凭证与伪造摘要负向测试已建立 |
 
