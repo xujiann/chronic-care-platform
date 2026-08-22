@@ -38,6 +38,7 @@
 | 静态发布与浏览器安全 | `src/http/static-asset-policy.js`、`src/http/static-content-runtime.js`、`src/http/browser-security-policy.js`、`src/http/browser-security-inventory.js`、`page-auth-bootstrap.js`、`scripts/static-publication.js` | 44 个入口、递归资源图、Pages 制品和服务端读取共用默认拒绝契约；页面守卫使用外部标准接口，显式发布图 P0/P1 静态风险为 0；严格 CSP 仍是 Report-Only，生产 NO-GO |
 | 演示脱敏 | `src/platform/data/public-demo-snapshot.js` | 服务端合成、Pages 构建和 storage-admin 共用纯函数，凭据字段删除、个人姓名/身份/联系字段稳定掩码 |
 | API 生产目录 | `routeSourceFiles` + `scripts/api-authorization-matrix.js` → `scripts/production-api-catalog.js` | 字面路由与声明级授权事实合并为 endpoint 级 owner/auth/scope/idempotency/生产状态；249 项保留治理复核，全部生产 NO-GO |
+| 内部边界覆盖治理 | `config/internal-boundary-coverage.json` → `scripts/internal-boundary-coverage.js` | 复用现有 c8/测试，按 identity、audit、object storage、API governance 四组锁定真实基线和负向证据；报告仅写临时目录 |
 
 ## 3. 依赖宽度
 
@@ -128,6 +129,8 @@ scripts/platform-cutover-alert-worker.js
 - `eslint.config.js` 与 `jsconfig.typecheck.json` 是渐进式静态质量边界，不拥有业务接口。
   Pages、complete-unit-test、governance-api 和 release-readiness 只消费这些标准入口；
   `test:all` 仍是独立的自动发现回归保护。
+- `scripts/internal-boundary-coverage.js` 复用现有 c8 与专项测试，为四个关键边界建立独立覆盖组；
+  它不替代原 `server.js` 85/85/55 门禁，阈值只能持平或提高，报告不进入仓库。
 
 ## 11. 区域共享调阅命令
 

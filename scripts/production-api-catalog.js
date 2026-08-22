@@ -271,8 +271,12 @@ function validateProductionApiCatalog(catalog, matrix = buildMatrix(), sourceFil
   for (const entry of catalog.entries || []) {
     if (keys.has(entry.key)) errors.push(`duplicate catalog key: ${entry.key}`);
     keys.add(entry.key);
+    if (entry.key !== `${entry.method} ${entry.path}`) errors.push(`API method/path drift: ${entry.key}`);
     if (!entry.method || !entry.path || !/^T\d{2}$/.test(entry.owner) || !entry.domain || !entry.purpose) {
       errors.push(`incomplete API identity: ${entry.key || "unknown"}`);
+    }
+    if (!entry.authentication || !Object.hasOwn(entry.authentication, "required") || ![true, false, null].includes(entry.authentication.required)) {
+      errors.push(`API has no authentication classification: ${entry.key}`);
     }
     if (entry.authentication?.required === true && (!Array.isArray(entry.authorization?.roles) || entry.authorization.roles.length === 0)) {
       errors.push(`protected API has no role or scope policy: ${entry.key}`);

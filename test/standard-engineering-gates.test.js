@@ -31,6 +31,7 @@ test("package exposes the six approved standard engineering gates", () => {
   assert.equal(pkg.devDependencies?.["@types/node"], "22.20.1");
   assert.equal(fs.existsSync(path.join(ROOT, "eslint.config.js")), true);
   assert.equal(fs.existsSync(path.join(ROOT, "jsconfig.typecheck.json")), true);
+  assert.equal(pkg.scripts?.["test:coverage:boundaries"], "node scripts/internal-boundary-coverage.js");
 });
 
 test("unit and integration suites partition every root Node test while smoke stays curated", () => {
@@ -80,6 +81,7 @@ test("CI maps standard gates without renaming required checks or weakening test:
   assert.match(workflow, /npm run typecheck/);
   assert.match(workflow, /npm run test:smoke/);
   assert.match(workflow, /npm run build/);
+  assert.match(workflow, /npm run test:coverage:boundaries/);
   assert.match(pages, /npm run build -- --output="\$RUNNER_TEMP\/pages-site"/);
   assert.equal(pkg.scripts["test:all"], "node scripts/test-all.js");
 });
