@@ -219,3 +219,14 @@ Accepted、data owner 与兼容策略获人类批准后才能进入逐切片实�
 前者永远不能产生 production readiness；后者直接复用第 18 节共享验签端口，只输出 action ID、摘要、
 时间窗和稳定错误码。`production-promotion-receipt.js` 只在 strict GO 后生成 create-once 摘要凭证；两者
 均不依赖 `server.js`、数据库或领域路由，也不拥有现场证据正文。
+
+## 20. 生产 Go/No-Go 受信 receipt 模块
+
+| 模块 | Owner | 类型 | 当前边界 |
+|---|---|---|---|
+| `production-preflight-decision-receipt.js` | T00 发布治理 | 纯同步 trust port | 校验精确八字段 receipt 合同、稳定标识符、release/digest/fingerprint、最长 24 小时窗和结构化 verifier anti-replay verdict；只返回脱敏投影 |
+| `production-go-no-go.js` | T00 发布治理 | 领域 gate | 将不可伪造的当前进程验证投影作为第六项 prerequisite；普通对象或旧 synthetic GO 默认拒绝 |
+| `server.js#buildRuntimeProductionGoNoGoCenter` | T00 composition root | runtime composition | 先算当前证据指纹，再注入显式 receipt/verifier；默认组合不提供本地替代 verifier |
+| `test/production-preflight-decision-receipt.test.js` | TEST-001 | 负向合同 | 锁定三项漂移、过期/未来、重放、缺失/异常/异步 verifier、错误脱敏和默认 runtime NO-GO |
+
+唯一签发权威、信任根、耐久 nonce ledger 和现场 provider 不属于当前实现；Proposed ADR 不授权生产 GO。

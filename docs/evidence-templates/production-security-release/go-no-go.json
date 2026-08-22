@@ -9,7 +9,7 @@
   "changeTicket": "<change-ticket>",
   "executedAt": "<ISO-8601-time>",
   "target": "<production-cutover-window>",
-  "steps": ["Verify five current prerequisites", "Record four independent approvals", "Issue an independent command decision"],
+  "steps": ["Verify six current prerequisites", "Verify the release-bound single-use preflight decision receipt", "Record four independent approvals", "Issue an independent command decision"],
   "expectedResult": "GO is bound to the current evidence fingerprint and has an assigned rollback owner",
   "actualResult": "<minimized-result-summary>",
   "result": "pending",
@@ -19,7 +19,8 @@
     { "id": "securityOpinion", "passed": false, "evidenceRef": "controlled://<security-opinion-evidence>" },
     { "id": "launchSmoke", "passed": false, "evidenceRef": "controlled://<production-smoke-evidence>" },
     { "id": "cutoverChecklist", "passed": false, "evidenceRef": "controlled://<cutover-checklist-evidence>" },
-    { "id": "drSignoff", "passed": false, "evidenceRef": "controlled://<dr-signoff-evidence>" }
+    { "id": "drSignoff", "passed": false, "evidenceRef": "controlled://<dr-signoff-evidence>" },
+    { "id": "trustedPreflightDecision", "passed": false, "evidenceRef": "controlled://<trusted-preflight-receipt>" }
   ],
   "approvals": [
     { "role": "business", "account": "<business-account>", "status": "pending", "evidenceRef": "controlled://<business-approval>" },

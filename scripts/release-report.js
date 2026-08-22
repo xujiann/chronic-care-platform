@@ -884,7 +884,7 @@ function productionSecurityChecks(productionSecurity) {
 function productionGoNoGoChecks(productionGoNoGo) {
   return [
     check("productionGoNoGo:readiness", productionGoNoGo.ok, productionGoNoGo.ok ? "P0-10 software controls passed" : "P0-10 software controls failed", "error", "production-go-no-go"),
-    check("productionGoNoGo:prerequisites", productionGoNoGo.checks?.some((item) => item.id === "goNoGoReadiness:prerequisites" && item.passed), "five global production prerequisites modeled", "error", "production-go-no-go"),
+    check("productionGoNoGo:prerequisites", productionGoNoGo.checks?.some((item) => item.id === "goNoGoReadiness:prerequisites" && item.passed), "six global production prerequisites modeled, including trusted preflight receipt", "error", "production-go-no-go"),
     check("productionGoNoGo:evidenceDrift", productionGoNoGo.checks?.some((item) => item.id === "goNoGoReadiness:evidenceDrift" && item.passed), `${productionGoNoGo.center?.summary?.staleApprovals || 0} stale approvals visible`, "error", "production-go-no-go"),
     check("productionGoNoGo:boundary", productionGoNoGo.center?.gate?.softwareControlReady === true && productionGoNoGo.center?.gate?.productionGoRecorded === false, `${productionGoNoGo.center?.status || "unknown"}; no GO fabricated`, "warn", "production-go-no-go")
   ];

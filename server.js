@@ -402,6 +402,7 @@ const {
   seedProductionSecurityReleaseApprovals
 } = require("./production-security-acceptance");
 const {
+  assessProductionPreflightDecisionReceipt,
   buildProductionGoNoGoCenter,
   normalizeProductionGoNoGoApprovalAction,
   normalizeProductionGoNoGoDecision,
@@ -24539,21 +24540,31 @@ function readReleaseArtifact(fileName, fallback = {}) {
   }
 }
 
-function buildRuntimeProductionGoNoGoCenter(data) {
+function buildRuntimeProductionGoNoGoCenter(data, options = {}) {
   const normalized = normalizeState(data);
-  const launchSmoke = readReleaseArtifact("launch-smoke-report.json", {});
-  const cutoverArtifact = readReleaseArtifact("production-cutover-checklist.json", {});
+  const launchSmoke = options.launchSmoke || readReleaseArtifact("launch-smoke-report.json", {});
+  const cutoverArtifact = options.cutoverArtifact || readReleaseArtifact("production-cutover-checklist.json", {});
   const cutoverChecklist = Array.isArray(cutoverArtifact.checklist) ? cutoverArtifact.checklist : [];
   const securityCenter = buildProductionSecurityAcceptanceCenter(
     normalized.productionSecurityFindings,
     normalized.productionSecurityReleaseApprovals
   );
-  return buildProductionGoNoGoCenter(normalized, {
+  const localEvidence = {
     launchSmoke,
     cutoverChecklist,
     cutoverProfile: cutoverArtifact.profile,
-    drRehearsalSigned: cutoverSignoffReady("CUTOVER_DR_REHEARSAL_SIGNOFF")
-  }, securityCenter);
+    drRehearsalSigned: options.drRehearsalSigned === true || cutoverSignoffReady("CUTOVER_DR_REHEARSAL_SIGNOFF")
+  };
+  const preliminary = buildProductionGoNoGoCenter(normalized, localEvidence, securityCenter);
+  const trustedPreflightDecision = assessProductionPreflightDecisionReceipt(options.preflightDecisionReceipt, {
+    releaseId: options.releaseId || process.env.DEPLOYMENT_RELEASE_ID,
+    artifactDigest: options.artifactDigest || process.env.DEPLOYMENT_ARTIFACT_DIGEST,
+    evidenceFingerprint: preliminary.evidenceFingerprint
+  }, {
+    now: options.now,
+    verifier: options.preflightDecisionVerifier
+  });
+  return buildProductionGoNoGoCenter(normalized, { ...localEvidence, trustedPreflightDecision }, securityCenter);
 }
 
 function governanceActorFromUser(user = {}) {
@@ -28231,6 +28242,7 @@ if (require.main === module) {
 
 module.exports = {
   authorize,
+  buildRuntimeProductionGoNoGoCenter,
   authSecurityStateStoreMode,
   assertProductionRuntimeSecurity,
   careServiceReadinessPublicSummary,
