@@ -30,3 +30,18 @@
 - systemd 模板使用专用非 root 身份、只读应用目录和最小可写目录；preflight 只校验本地配置，始终 `productionReady=false`。
 
 真实 SIEM/WORM 接收、保留策略、证书签发、恢复演练和现场验收仍是外部门禁。
+
+## 2026-08-22 实施校正：部署信任合同 A
+
+只读生产审计确认原实现轮询 `securityEvents/dataAccessLogs` 当前展示快照，而两条链最多保留 120 条且窗口淘汰时会重封。该来源可能在两次 timer 之间丢失高频事件，并使未淘汰记录摘要变化后重复投递；因此原“连续”表述只适用于 rehearsal，不构成生产无损承诺。
+
+本次校正保留方案 3，但增加以下失败关闭约束：
+
+- worker、preflight、直接依赖、service/timer 必须进入不可变部署包和独立后台进程合同；
+- production worker 与全局 production preflight 共用 `audit-delivery-activation-v1` 评估，严格检查 URL、占位秘密、TLS mode/材料、专用 user/group、checkpoint/告警路径和来源合同；
+- systemd 必须先运行同一 preflight；CLI 对所有顶层失败默认输出有界、metadata-only signal 到 journal，不输出 provider 正文或审计记录；
+- `snapshot-rehearsal-v1`、未独立验签 receipt、同一可写目录内 checkpoint/head、本地 filesystem WORM 均不得获得生产 ready；旧 `AUDIT_EXPORT_PATH/SIEM_ENDPOINT` 不能替代连续审计运行合同。
+
+### 后续迁移成本与风险
+
+下一阶段须单独 ADR 与 migration：在审计写事务内追加 `append-only-outbox-v2`，以稳定单调 cursor 消费；checkpoint 绑定 source/sink/contract 并使用 lease/fencing 与外部单调锚；receipt 使用独立响应信任、时间/序列/前驱/目标绑定；敏感字段出域前建立 Data Owner 批准的版本化最小投影。完成这些条件及真实 SIEM/WORM、容量、恢复和现场验收前，推荐结论仍为 NO-GO。

@@ -5,11 +5,15 @@ Wants=network-online.target
 
 [Service]
 Type=oneshot
-User={{SERVICE_USER}}
-Group={{SERVICE_GROUP}}
+User={{AUDIT_DELIVERY_SERVICE_USER}}
+Group={{AUDIT_DELIVERY_SERVICE_GROUP}}
 WorkingDirectory={{APP_DIR}}
 EnvironmentFile={{ENV_FILE}}
+ExecStartPre={{NODE_BIN}} {{APP_DIR}}/scripts/audit-delivery-preflight.js
 ExecStart={{NODE_BIN}} {{APP_DIR}}/scripts/audit-delivery-worker.js
+TimeoutStartSec=420s
+KillMode=control-group
+StandardError=journal
 UMask=0077
 NoNewPrivileges=true
 PrivateTmp=true
@@ -25,7 +29,7 @@ MemoryDenyWriteExecute=true
 RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
 SystemCallArchitectures=native
 ReadOnlyPaths={{APP_DIR}}
-ReadWritePaths={{DATA_DIR}} {{AUDIT_CHECKPOINT_DIR}} {{AUDIT_WORM_DIRECTORY}}
+ReadWritePaths={{DATA_DIR}} {{AUDIT_CHECKPOINT_DIR}} {{AUDIT_WORM_DIRECTORY}} {{AUDIT_ALERT_JOURNAL_DIR}}
 
 [Install]
 WantedBy=multi-user.target

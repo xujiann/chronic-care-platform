@@ -2,6 +2,7 @@
 
 const fs = require("node:fs");
 const https = require("node:https");
+const os = require("node:os");
 const path = require("node:path");
 const { createHash, createHmac } = require("node:crypto");
 const { appendPilotCutoverAlertEvent } = require("../cutover/pilot-cutover-alert-lifecycle");
@@ -55,7 +56,7 @@ function readTlsMaterial(file, label, production) {
 
 function createSecureAuditTransport(options = {}) {
   const env = options.env || process.env;
-  const production = String(env.NODE_ENV || "").toLowerCase() === "production";
+  const production = isProductionEnvironment(env);
   assertTlsVerification(env);
   const ca = readTlsMaterial(options.caFile || env.SIEM_AUDIT_CA_FILE, "SIEM audit CA", production);
   const cert = readTlsMaterial(options.clientCertFile || env.SIEM_AUDIT_CLIENT_CERT_FILE, "SIEM audit client certificate", production);
@@ -179,44 +180,196 @@ function validateReceiptBinding(receipt, batch) {
   return receiptId;
 }
 
+function isProductionEnvironment(env = {}) {
+  return String(env.NODE_ENV || "").trim().toLowerCase() === "production";
+}
+
+function hasPlaceholder(value) {
+  return /replace|inject|example|changeme|placeholder|<|>/i.test(String(value || ""));
+}
+
+function validSiemEndpoint(value) {
+  try {
+    const target = new URL(String(value || ""));
+    return target.protocol === "https:"
+      && Boolean(target.hostname)
+      && !target.username
+      && !target.password
+      && !target.hash
+      && !target.search;
+  } catch {
+    return false;
+  }
+}
+
+function boundedRegularFile(value) {
+  try {
+    const stat = fs.lstatSync(path.resolve(value));
+    return !stat.isSymbolicLink() && stat.isFile() && stat.size > 0 && stat.size <= MAX_TLS_FILE_BYTES;
+  } catch {
+    return false;
+  }
+}
+
+function privateRegularFile(value) {
+  try {
+    const stat = fs.lstatSync(path.resolve(value));
+    return !stat.isSymbolicLink()
+      && stat.isFile()
+      && stat.size > 0
+      && stat.size <= MAX_TLS_FILE_BYTES
+      && (process.platform === "win32" || (stat.mode & 0o077) === 0);
+  } catch {
+    return false;
+  }
+}
+
+function canonicalProspectivePath(value) {
+  let existing = path.resolve(value);
+  const suffix = [];
+  while (!fs.existsSync(existing)) {
+    const parent = path.dirname(existing);
+    if (parent === existing) return path.resolve(value);
+    suffix.unshift(path.basename(existing));
+    existing = parent;
+  }
+  return path.join(fs.realpathSync(existing), ...suffix);
+}
+
+function realDirectory(value) {
+  try {
+    const stat = fs.lstatSync(path.resolve(value));
+    return !stat.isSymbolicLink() && stat.isDirectory();
+  } catch {
+    return false;
+  }
+}
+
 function assessAuditDeliveryConfig(env = {}, options = {}) {
-  const root = path.resolve(options.root || path.join(__dirname, "..", "..", ".."));
+  const root = canonicalProspectivePath(options.root || path.join(__dirname, "..", "..", ".."));
+  const production = isProductionEnvironment(env);
+  const checkFilesystem = options.checkFilesystem === true;
   const endpoint = String(env.SIEM_AUDIT_ENDPOINT || "").trim();
   const worm = String(env.AUDIT_WORM_DIRECTORY || "").trim();
   const checkpoint = String(env.AUDIT_DELIVERY_CHECKPOINT_PATH || "").trim();
   const tlsMode = String(env.SIEM_AUDIT_TLS_MODE || "").trim().toLowerCase();
   const serviceUser = String(env.AUDIT_DELIVERY_SERVICE_USER || "").trim();
   const serviceGroup = String(env.AUDIT_DELIVERY_SERVICE_GROUP || "").trim();
-  const outsideRoot = (value) => Boolean(value) && path.isAbsolute(value) && !isWithin(root, path.resolve(value));
+  const serviceUid = String(env.AUDIT_DELIVERY_SERVICE_UID || "").trim();
+  const serviceGid = String(env.AUDIT_DELIVERY_SERVICE_GID || "").trim();
+  const sourceContract = String(env.AUDIT_DELIVERY_SOURCE_CONTRACT || "").trim();
+  const alertJournal = String(env.PLATFORM_PILOT_CUTOVER_ALERT_JOURNAL_FILE || "").trim();
+  const outsideRoot = (value) => {
+    try { return Boolean(value) && path.isAbsolute(value) && !isWithin(root, canonicalProspectivePath(value)); } catch { return false; }
+  };
+  const externalFile = (value) => outsideRoot(value) && (!checkFilesystem || boundedRegularFile(value));
+  const externalFileParent = (value) => outsideRoot(value) && (!checkFilesystem || realDirectory(path.dirname(path.resolve(value))));
   let tlsVerified = true;
   try { assertTlsVerification(env); } catch { tlsVerified = false; }
+  const caFile = String(env.SIEM_AUDIT_CA_FILE || "").trim();
+  const certFile = String(env.SIEM_AUDIT_CLIENT_CERT_FILE || "").trim();
+  const keyFile = String(env.SIEM_AUDIT_CLIENT_KEY_FILE || "").trim();
+  const tlsFiles = [caFile, certFile, keyFile].filter(Boolean);
+  const tlsShapeReady = !endpoint || (tlsMode === "system"
+    ? tlsFiles.length === 0
+    : tlsMode === "custom-ca"
+      ? Boolean(caFile) && !certFile && !keyFile
+      : tlsMode === "mtls" && Boolean(certFile && keyFile));
+  const validServiceId = (value) => /^[1-9]\d*$/.test(value);
+  let processIdentityReady = true;
+  if (production && options.checkProcessIdentity === true) {
+    try {
+      const identity = options.processIdentity || (process.platform !== "win32"
+        && typeof process.getuid === "function"
+        && typeof process.getgid === "function"
+        ? { username: os.userInfo().username, uid: process.getuid(), gid: process.getgid() }
+        : null);
+      processIdentityReady = Boolean(identity)
+        && identity.username === serviceUser
+        && String(identity.uid) === serviceUid
+        && String(identity.gid) === serviceGid;
+    } catch { processIdentityReady = false; }
+  }
+  let wormSeparatedFromCheckpoint = true;
+  if (worm) {
+    try {
+      const canonicalWorm = canonicalProspectivePath(worm);
+      const canonicalCheckpoint = canonicalProspectivePath(checkpoint || root);
+      const canonicalCheckpointParent = canonicalProspectivePath(path.dirname(checkpoint || root));
+      wormSeparatedFromCheckpoint = !isWithin(canonicalWorm, canonicalCheckpoint)
+        && !isWithin(canonicalCheckpointParent, canonicalWorm);
+    } catch { wormSeparatedFromCheckpoint = false; }
+  }
   const checks = [
     { id: "audit-delivery:target", passed: Number(Boolean(endpoint)) + Number(Boolean(worm)) === 1 },
     { id: "audit-delivery:checkpoint", passed: outsideRoot(checkpoint) },
-    { id: "audit-delivery:service-account", passed: Boolean(serviceUser && serviceGroup) && !/^(?:root|administrator)$/i.test(serviceUser) },
-    { id: "audit-delivery:tls-verification", passed: tlsVerified }
+    { id: "audit-delivery:checkpoint-directory", passed: !checkFilesystem || externalFileParent(checkpoint) },
+    { id: "audit-delivery:service-account", passed: Boolean(serviceUser && serviceGroup)
+      && !/^(?:root|administrator)$/i.test(serviceUser)
+      && !/^(?:root|administrator)$/i.test(serviceGroup)
+      && (!production || (validServiceId(serviceUid) && validServiceId(serviceGid))) },
+    { id: "audit-delivery:process-identity", passed: processIdentityReady },
+    { id: "audit-delivery:tls-verification", passed: tlsVerified },
+    { id: "audit-delivery:source-continuity", passed: production
+      ? sourceContract === "append-only-outbox-v2" && options.sourceContinuityImplemented === true
+      : sourceContract === "snapshot-rehearsal-v1" || (sourceContract === "append-only-outbox-v2" && options.sourceContinuityImplemented === true) }
   ];
   if (endpoint) checks.push(
-    { id: "audit-delivery:siem-https", passed: /^https:\/\//i.test(endpoint) },
-    { id: "audit-delivery:signing-secret", passed: String(env.SIEM_AUDIT_SIGNING_SECRET || "").length >= 32 },
+    { id: "audit-delivery:siem-url", passed: validSiemEndpoint(endpoint) },
+    { id: "audit-delivery:signing-secret", passed: String(env.SIEM_AUDIT_SIGNING_SECRET || "").length >= 32 && !hasPlaceholder(env.SIEM_AUDIT_SIGNING_SECRET) },
     { id: "audit-delivery:tls-mode", passed: ["system", "custom-ca", "mtls"].includes(tlsMode) },
-    { id: "audit-delivery:custom-ca", passed: tlsMode !== "custom-ca" || outsideRoot(String(env.SIEM_AUDIT_CA_FILE || "")) },
-    { id: "audit-delivery:mtls", passed: tlsMode !== "mtls" || (outsideRoot(String(env.SIEM_AUDIT_CLIENT_CERT_FILE || "")) && outsideRoot(String(env.SIEM_AUDIT_CLIENT_KEY_FILE || ""))) }
+    { id: "audit-delivery:tls-shape", passed: tlsShapeReady },
+    { id: "audit-delivery:tls-material-files", passed: !checkFilesystem || tlsFiles.every((file) => externalFile(file)) },
+    { id: "audit-delivery:custom-ca-material", passed: tlsMode !== "custom-ca" || externalFile(caFile) },
+    { id: "audit-delivery:mtls-material", passed: tlsMode !== "mtls" || (externalFile(certFile) && outsideRoot(keyFile) && (!checkFilesystem || privateRegularFile(keyFile))) },
+    { id: "audit-delivery:alert-journal", passed: externalFileParent(alertJournal) },
+    { id: "audit-delivery:trusted-receipt", passed: !production }
   );
-  if (worm) checks.push({ id: "audit-delivery:worm-directory", passed: outsideRoot(worm) && path.dirname(path.resolve(checkpoint || root)) !== path.resolve(worm) });
-  return Object.freeze({ configured: checks[0].passed, ready: checks.every((item) => item.passed), checks: Object.freeze(checks.map(Object.freeze)), productionReady: false, boundary: "Local preflight does not prove SIEM/WORM acceptance, certificate issuance, retention approval or site signoff." });
+  if (worm) checks.push(
+    { id: "audit-delivery:worm-directory", passed: outsideRoot(worm) && wormSeparatedFromCheckpoint && (!checkFilesystem || realDirectory(worm)) },
+    { id: "audit-delivery:worm-capability", passed: !production }
+  );
+  if (production) checks.push({ id: "audit-delivery:external-checkpoint-anchor", passed: false });
+  return Object.freeze({
+    schemaVersion: "audit-delivery-activation-v1",
+    configured: checks[0].passed,
+    ready: checks.every((item) => item.passed),
+    checks: Object.freeze(checks.map(Object.freeze)),
+    productionReady: false,
+    boundary: "Snapshot polling, unsigned receipts, local checkpoint heads and filesystem rehearsal WORM do not prove continuous production audit delivery."
+  });
 }
 
 function createSiemAuditAdapter(options = {}) {
   const env = options.env || process.env;
   assertTlsVerification(env);
-  const endpoint = new URL(options.endpoint || env.SIEM_AUDIT_ENDPOINT);
-  if (endpoint.protocol !== "https:") throw deliveryError("AUDIT_TLS_REQUIRED", "SIEM audit endpoint requires HTTPS");
+  const production = isProductionEnvironment(env);
+  const tlsMode = String(env.SIEM_AUDIT_TLS_MODE || "").trim().toLowerCase();
+  if (production && !["system", "custom-ca", "mtls"].includes(tlsMode)) throw deliveryError("AUDIT_TLS_MODE_INVALID", "SIEM audit TLS mode is invalid");
+  const caFile = String(env.SIEM_AUDIT_CA_FILE || "").trim();
+  const certFile = String(env.SIEM_AUDIT_CLIENT_CERT_FILE || "").trim();
+  const keyFile = String(env.SIEM_AUDIT_CLIENT_KEY_FILE || "").trim();
+  const caConfigured = Boolean(caFile);
+  const certConfigured = Boolean(certFile);
+  const keyConfigured = Boolean(keyFile);
+  if (production && tlsMode === "system" && (caConfigured || certConfigured || keyConfigured)) throw deliveryError("AUDIT_TLS_MODE_MATERIAL_CONFLICT", "SIEM audit system TLS mode cannot include custom material");
+  if (production && tlsMode === "custom-ca" && !caConfigured) throw deliveryError("AUDIT_TLS_MATERIAL_REQUIRED", "SIEM audit custom CA material is required");
+  if (production && tlsMode === "custom-ca" && (certConfigured || keyConfigured)) throw deliveryError("AUDIT_TLS_MODE_MATERIAL_CONFLICT", "SIEM audit custom CA mode cannot include mTLS material");
+  if (production && tlsMode === "mtls" && !(certConfigured && keyConfigured)) throw deliveryError("AUDIT_MTLS_CONFIG_INVALID", "SIEM audit mTLS certificate and key are required");
+  const endpointValue = String(options.endpoint || env.SIEM_AUDIT_ENDPOINT || "");
+  if (!validSiemEndpoint(endpointValue)) throw deliveryError("AUDIT_ENDPOINT_INVALID", "SIEM audit endpoint requires a credential-free HTTPS URL without query or fragment");
+  const endpoint = new URL(endpointValue);
   const secret = String(options.signingSecret || env.SIEM_AUDIT_SIGNING_SECRET || "");
-  if (secret.length < 32 || /replace|inject|example|changeme|placeholder|<|>/i.test(secret)) throw deliveryError("AUDIT_SIGNING_SECRET_INVALID", "SIEM audit signing secret is invalid");
+  if (secret.length < 32 || hasPlaceholder(secret)) throw deliveryError("AUDIT_SIGNING_SECRET_INVALID", "SIEM audit signing secret is invalid");
   const fetchImpl = options.fetchImpl;
-  const transport = options.transport || (!fetchImpl ? createSecureAuditTransport({ ...options, env }) : null);
+  const normalizedTlsEnv = { ...env, SIEM_AUDIT_CA_FILE: caFile, SIEM_AUDIT_CLIENT_CERT_FILE: certFile, SIEM_AUDIT_CLIENT_KEY_FILE: keyFile };
+  const transport = options.transport || (!fetchImpl ? createSecureAuditTransport({ ...options, env: normalizedTlsEnv }) : null);
   const maximumAttempts = Math.min(5, Math.max(1, Number(options.maxAttempts || env.AUDIT_DELIVERY_MAX_ATTEMPTS || 3) || 3));
+  const retryOptions = {
+    ...options,
+    baseDelayMs: options.baseDelayMs ?? env.AUDIT_DELIVERY_RETRY_BASE_MS,
+    maxDelayMs: options.maxDelayMs ?? env.AUDIT_DELIVERY_MAX_RETRY_DELAY_MS
+  };
   const sleep = options.sleep || ((delay) => new Promise((resolve) => setTimeout(resolve, delay)));
   return Object.freeze({
     profile: "platform-adapter-v1",
@@ -241,7 +394,7 @@ function createSiemAuditAdapter(options = {}) {
         } catch (error) {
           lastError = error;
           if (error.retryable === false || attempt === maximumAttempts) break;
-          await sleep(retryDelayMs(error.response, attempt, options));
+          await sleep(retryDelayMs(error.response, attempt, retryOptions));
         }
       }
       throw deliveryError("AUDIT_DELIVERY_FAILED", "SIEM audit delivery exhausted bounded retries", false, { cause: lastError });
@@ -292,4 +445,4 @@ async function runAuditDeliveryCycle(options = {}) {
   }
 }
 
-module.exports = { assessAuditDeliveryConfig, auditWriteFailureSignal, buildAuditBatch, createPilotCutoverAuditLifecycleBridge, createSecureAuditTransport, createSiemAuditAdapter, createWormAuditAdapter, retryDelayMs, runAuditDeliveryCycle, stableStringify, validateReceiptBinding };
+module.exports = { assessAuditDeliveryConfig, auditWriteFailureSignal, buildAuditBatch, createPilotCutoverAuditLifecycleBridge, createSecureAuditTransport, createSiemAuditAdapter, createWormAuditAdapter, isProductionEnvironment, retryDelayMs, runAuditDeliveryCycle, stableStringify, validateReceiptBinding };

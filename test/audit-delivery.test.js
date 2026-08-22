@@ -4,10 +4,12 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
+const { spawnSync } = require("node:child_process");
 const test = require("node:test");
 const { auditHashFor } = require("../src/identity-security/audit-chain");
 const {
   assessAuditDeliveryConfig,
+  auditWriteFailureSignal,
   buildAuditBatch,
   createPilotCutoverAuditLifecycleBridge,
   createSecureAuditTransport,
@@ -15,7 +17,7 @@ const {
   createWormAuditAdapter,
   runAuditDeliveryCycle
 } = require("../src/platform/operations/audit-delivery");
-const { acquireWorkerLock, readCheckpoint, runWorker } = require("../scripts/audit-delivery-worker");
+const { acquireWorkerLock, createOperationalSignalEmitter, readCheckpoint, runWorker } = require("../scripts/audit-delivery-worker");
 
 const RECORDS = [
   { trail: "securityEvents", record: { id: "event-1", action: "login", result: "allowed" } },
@@ -89,6 +91,16 @@ test("secure audit transport enforces TLS verification and complete mTLS", (t) =
   fs.writeFileSync(cert, "fixture");
   assert.throws(() => createSecureAuditTransport({ env: { NODE_ENV: "production", NODE_TLS_REJECT_UNAUTHORIZED: "0" } }), { code: "AUDIT_TLS_VERIFICATION_DISABLED" });
   assert.throws(() => createSecureAuditTransport({ env: { NODE_ENV: "production" }, clientCertFile: cert }), { code: "AUDIT_MTLS_CONFIG_INVALID" });
+  assert.throws(() => createSecureAuditTransport({ env: { NODE_ENV: " production ", SIEM_AUDIT_CA_FILE: "relative-ca.pem" } }), { code: "AUDIT_TLS_FILE_INVALID" });
+  assert.throws(() => createSiemAuditAdapter({
+    env: {
+      NODE_ENV: "production",
+      SIEM_AUDIT_ENDPOINT: "https://siem.example.gov.cn/audit",
+      SIEM_AUDIT_SIGNING_SECRET: "a".repeat(32),
+      SIEM_AUDIT_TLS_MODE: "mtls"
+    },
+    fetchImpl: async () => { throw new Error("must not fetch"); }
+  }), { code: "AUDIT_MTLS_CONFIG_INVALID" });
 });
 
 test("production preflight requires one external target dedicated identity and explicit TLS", () => {
@@ -99,13 +111,229 @@ test("production preflight requires one external target dedicated identity and e
     SIEM_AUDIT_CLIENT_CERT_FILE: "C:\\secrets\\audit-client.pem",
     SIEM_AUDIT_CLIENT_KEY_FILE: "C:\\secrets\\audit-client.key",
     AUDIT_DELIVERY_CHECKPOINT_PATH: "C:\\health-data\\audit-state\\checkpoint.json",
+    AUDIT_DELIVERY_SOURCE_CONTRACT: "append-only-outbox-v2",
     AUDIT_DELIVERY_SERVICE_USER: "health-audit",
-    AUDIT_DELIVERY_SERVICE_GROUP: "health-audit"
-  }, { root: path.resolve(__dirname, "..") });
+    AUDIT_DELIVERY_SERVICE_GROUP: "health-audit",
+    PLATFORM_PILOT_CUTOVER_ALERT_JOURNAL_FILE: "C:\\health-data\\audit-state\\alerts.json"
+  }, { root: path.resolve(__dirname, ".."), sourceContinuityImplemented: true });
   assert.equal(ready.ready, process.platform === "win32");
   assert.equal(ready.productionReady, false);
   const unsafe = assessAuditDeliveryConfig({ SIEM_AUDIT_ENDPOINT: "http://siem.invalid", AUDIT_WORM_DIRECTORY: "/tmp/worm", AUDIT_DELIVERY_SERVICE_USER: "root", NODE_TLS_REJECT_UNAUTHORIZED: "0" });
   assert.equal(unsafe.ready, false);
+});
+
+test("SIEM retry bounds honor the documented environment contract", async () => {
+  const delays = [];
+  const batch = buildAuditBatch(RECORDS);
+  let attempts = 0;
+  const adapter = createSiemAuditAdapter({
+    env: {
+      SIEM_AUDIT_ENDPOINT: "https://siem.example.gov.cn/audit",
+      SIEM_AUDIT_SIGNING_SECRET: "c".repeat(32),
+      AUDIT_DELIVERY_MAX_ATTEMPTS: "2",
+      AUDIT_DELIVERY_RETRY_BASE_MS: "50",
+      AUDIT_DELIVERY_MAX_RETRY_DELAY_MS: "175"
+    },
+    sleep: async (delay) => delays.push(delay),
+    fetchImpl: async () => {
+      attempts += 1;
+      if (attempts === 1) return { ok: false, status: 503, headers: { "retry-after": "60" }, text: async () => "{}" };
+      return { ok: true, status: 202, text: async () => JSON.stringify({ receiptId: "receipt-env", batchId: batch.batchId, digest: batch.digest, recordCount: batch.recordCount }) };
+    }
+  });
+  assert.equal((await adapter.deliver(batch)).acknowledged, true);
+  assert.deepEqual(delays, [175]);
+});
+
+test("production preflight rejects runtime-invalid endpoints placeholders missing material and snapshot sources", (t) => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "audit-preflight-strict-"));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const checkpoint = path.join(directory, "state", "checkpoint.json");
+  const alertJournal = path.join(directory, "alerts", "journal.json");
+  fs.mkdirSync(path.dirname(checkpoint), { recursive: true });
+  fs.mkdirSync(path.dirname(alertJournal), { recursive: true });
+  const report = assessAuditDeliveryConfig({
+    NODE_ENV: "production",
+    SIEM_AUDIT_ENDPOINT: "https://",
+    SIEM_AUDIT_SIGNING_SECRET: "replace-with-secret-manager-value-0000",
+    SIEM_AUDIT_TLS_MODE: "mtls",
+    SIEM_AUDIT_CLIENT_CERT_FILE: path.join(directory, "missing-cert.pem"),
+    SIEM_AUDIT_CLIENT_KEY_FILE: path.join(directory, "missing-key.pem"),
+    AUDIT_DELIVERY_CHECKPOINT_PATH: checkpoint,
+    AUDIT_DELIVERY_SOURCE_CONTRACT: "snapshot-rehearsal-v1",
+    AUDIT_DELIVERY_SERVICE_USER: "health-audit",
+    AUDIT_DELIVERY_SERVICE_GROUP: "health-audit",
+    PLATFORM_PILOT_CUTOVER_ALERT_JOURNAL_FILE: alertJournal
+  }, { root: path.resolve(__dirname, ".."), checkFilesystem: true });
+  const failed = new Set(report.checks.filter((item) => !item.passed).map((item) => item.id));
+  assert.equal(report.ready, false);
+  assert.equal(failed.has("audit-delivery:siem-url"), true);
+  assert.equal(failed.has("audit-delivery:signing-secret"), true);
+  assert.equal(failed.has("audit-delivery:mtls-material"), true);
+  assert.equal(failed.has("audit-delivery:source-continuity"), true);
+});
+
+test("non-production WORM rehearsal passes the same filesystem-aware preflight", (t) => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "audit-worm-rehearsal-"));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const worm = path.join(directory, "worm");
+  const checkpointDirectory = path.join(directory, "checkpoint");
+  fs.mkdirSync(worm, { mode: 0o700 });
+  fs.mkdirSync(checkpointDirectory, { mode: 0o700 });
+  const report = assessAuditDeliveryConfig({
+    NODE_ENV: "staging",
+    AUDIT_WORM_DIRECTORY: worm,
+    AUDIT_DELIVERY_CHECKPOINT_PATH: path.join(checkpointDirectory, "checkpoint.json"),
+    AUDIT_DELIVERY_SOURCE_CONTRACT: "snapshot-rehearsal-v1",
+    AUDIT_DELIVERY_SERVICE_USER: "health-audit",
+    AUDIT_DELIVERY_SERVICE_GROUP: "health-audit"
+  }, { root: path.resolve(__dirname, ".."), checkFilesystem: true });
+  assert.equal(report.ready, true);
+  assert.equal(report.productionReady, false);
+
+  const env = {
+    ...process.env,
+    NODE_ENV: "staging",
+    AUDIT_WORM_DIRECTORY: worm,
+    AUDIT_DELIVERY_CHECKPOINT_PATH: path.join(checkpointDirectory, "checkpoint.json"),
+    AUDIT_DELIVERY_SOURCE_CONTRACT: "snapshot-rehearsal-v1",
+    AUDIT_DELIVERY_SERVICE_USER: "health-audit",
+    AUDIT_DELIVERY_SERVICE_GROUP: "health-audit"
+  };
+  ["SIEM_AUDIT_ENDPOINT", "SIEM_AUDIT_SIGNING_SECRET", "SIEM_AUDIT_TLS_MODE", "SIEM_AUDIT_CA_FILE", "SIEM_AUDIT_CLIENT_CERT_FILE", "SIEM_AUDIT_CLIENT_KEY_FILE"].forEach((name) => delete env[name]);
+  const cli = spawnSync(process.execPath, [path.resolve(__dirname, "../scripts/audit-delivery-preflight.js")], { encoding: "utf8", env });
+  assert.equal(cli.status, 0, cli.stderr);
+  assert.equal(JSON.parse(cli.stdout).ready, true);
+});
+
+test("TLS mode and configured material cannot drift between preflight and runtime", () => {
+  const env = {
+    NODE_ENV: "production",
+    SIEM_AUDIT_ENDPOINT: "https://siem.example.gov.cn/audit",
+    SIEM_AUDIT_SIGNING_SECRET: "a".repeat(32),
+    SIEM_AUDIT_TLS_MODE: "system",
+    SIEM_AUDIT_CA_FILE: path.resolve(os.tmpdir(), "stale-audit-ca.pem"),
+    AUDIT_DELIVERY_CHECKPOINT_PATH: path.resolve(os.tmpdir(), "audit-checkpoint.json"),
+    AUDIT_DELIVERY_SOURCE_CONTRACT: "snapshot-rehearsal-v1",
+    AUDIT_DELIVERY_SERVICE_USER: "health-audit",
+    AUDIT_DELIVERY_SERVICE_GROUP: "health-audit",
+    PLATFORM_PILOT_CUTOVER_ALERT_JOURNAL_FILE: path.resolve(os.tmpdir(), "audit-alerts.json")
+  };
+  const report = assessAuditDeliveryConfig(env, { root: path.resolve(__dirname, "..") });
+  assert.equal(report.checks.some((item) => item.id === "audit-delivery:tls-shape" && !item.passed), true);
+  assert.throws(() => createSiemAuditAdapter({ env, fetchImpl: async () => { throw new Error("must not fetch"); } }), { code: "AUDIT_TLS_MODE_MATERIAL_CONFLICT" });
+
+  const whitespaceEnv = { ...env, SIEM_AUDIT_CA_FILE: "  \t " };
+  const whitespaceReport = assessAuditDeliveryConfig(whitespaceEnv, { root: path.resolve(__dirname, "..") });
+  assert.equal(whitespaceReport.checks.some((item) => item.id === "audit-delivery:tls-shape" && item.passed), true);
+  assert.doesNotThrow(() => createSiemAuditAdapter({ env: whitespaceEnv, fetchImpl: async () => { throw new Error("must not fetch"); } }));
+});
+
+test("WORM and checkpoint separation uses canonical paths", (t) => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "audit-canonical-boundary-"));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const worm = path.join(directory, "worm");
+  const alias = path.join(directory, "worm-alias");
+  fs.mkdirSync(worm, { mode: 0o700 });
+  try {
+    fs.symlinkSync(worm, alias, process.platform === "win32" ? "junction" : "dir");
+  } catch (error) {
+    if (["EPERM", "EACCES"].includes(error.code)) return t.skip("filesystem cannot create a directory link");
+    throw error;
+  }
+  const report = assessAuditDeliveryConfig({
+    NODE_ENV: "staging",
+    AUDIT_WORM_DIRECTORY: worm,
+    AUDIT_DELIVERY_CHECKPOINT_PATH: path.join(alias, "checkpoint.json"),
+    AUDIT_DELIVERY_SOURCE_CONTRACT: "snapshot-rehearsal-v1",
+    AUDIT_DELIVERY_SERVICE_USER: "health-audit",
+    AUDIT_DELIVERY_SERVICE_GROUP: "health-audit"
+  }, { root: path.resolve(__dirname, "..") });
+  assert.equal(report.checks.some((item) => item.id === "audit-delivery:worm-directory" && !item.passed), true);
+});
+
+test("production process identity binds the exact service UID and GID", () => {
+  const report = assessAuditDeliveryConfig({
+    NODE_ENV: "production",
+    SIEM_AUDIT_ENDPOINT: "https://siem.example.gov.cn/audit",
+    SIEM_AUDIT_SIGNING_SECRET: "a".repeat(32),
+    SIEM_AUDIT_TLS_MODE: "system",
+    AUDIT_DELIVERY_CHECKPOINT_PATH: path.resolve(os.tmpdir(), "audit-checkpoint.json"),
+    AUDIT_DELIVERY_SOURCE_CONTRACT: "append-only-outbox-v2",
+    AUDIT_DELIVERY_SERVICE_USER: "health-audit",
+    AUDIT_DELIVERY_SERVICE_GROUP: "health-audit",
+    AUDIT_DELIVERY_SERVICE_UID: "1001",
+    AUDIT_DELIVERY_SERVICE_GID: "1003",
+    PLATFORM_PILOT_CUTOVER_ALERT_JOURNAL_FILE: path.resolve(os.tmpdir(), "audit-alerts.json")
+  }, {
+    root: path.resolve(__dirname, ".."),
+    checkProcessIdentity: true,
+    processIdentity: { username: "health-audit", uid: 1001, gid: 1002 },
+    sourceContinuityImplemented: true
+  });
+  assert.equal(report.checks.some((item) => item.id === "audit-delivery:service-account" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "audit-delivery:process-identity" && !item.passed), true);
+});
+
+test("production worker cannot bypass the shared deployment assessment", async () => {
+  await assert.rejects(runWorker({
+    env: {
+      NODE_ENV: "production",
+      SIEM_AUDIT_ENDPOINT: "https://siem.example.gov.cn/audit",
+      SIEM_AUDIT_SIGNING_SECRET: "a".repeat(32),
+      SIEM_AUDIT_TLS_MODE: "system",
+      AUDIT_DELIVERY_CHECKPOINT_PATH: path.resolve(os.tmpdir(), "audit-checkpoint.json"),
+      AUDIT_DELIVERY_SOURCE_CONTRACT: "snapshot-rehearsal-v1",
+      AUDIT_DELIVERY_SERVICE_USER: "health-audit",
+      AUDIT_DELIVERY_SERVICE_GROUP: "health-audit",
+      PLATFORM_PILOT_CUTOVER_ALERT_JOURNAL_FILE: path.resolve(os.tmpdir(), "audit-alerts.json")
+    }
+  }), { code: "AUDIT_DELIVERY_PREFLIGHT_FAILED" });
+
+  await assert.rejects(runWorker({
+    env: {
+      NODE_ENV: " production ",
+      AUDIT_WORM_DIRECTORY: path.resolve(os.tmpdir(), "audit-worm"),
+      AUDIT_DELIVERY_CHECKPOINT_PATH: path.resolve(os.tmpdir(), "audit-checkpoint.json"),
+      AUDIT_DELIVERY_SOURCE_CONTRACT: "snapshot-rehearsal-v1",
+      AUDIT_DELIVERY_SERVICE_USER: "health-audit",
+      AUDIT_DELIVERY_SERVICE_GROUP: "health-audit"
+    }
+  }), { code: "AUDIT_DELIVERY_PREFLIGHT_FAILED" });
+});
+
+test("CLI operational signal emitter is bounded metadata-only and excludes provider errors", () => {
+  let output = "";
+  const emitter = createOperationalSignalEmitter({ write(chunk) { output += chunk; } });
+  emitter(auditWriteFailureSignal({ code: "AUDIT_WORM_UNAVAILABLE", message: "resident r-100 secret-provider-body" }));
+  const event = JSON.parse(output);
+  assert.equal(event.schemaVersion, "audit-delivery-operational-signal-v1");
+  assert.equal(event.signal.metadataOnly, true);
+  assert.equal(event.signal.errorCode, "AUDIT_WORM_UNAVAILABLE");
+  assert.equal(output.includes("resident"), false);
+  assert.equal(output.includes("secret-provider-body"), false);
+  assert.equal(Buffer.byteLength(output) < 2048, true);
+});
+
+test("real worker CLI emits a metadata-only signal when production preflight fails", () => {
+  const marker = "must-not-appear-in-worker-stderr";
+  const result = spawnSync(process.execPath, [path.resolve(__dirname, "../scripts/audit-delivery-worker.js")], {
+    encoding: "utf8",
+    env: {
+      ...process.env,
+      NODE_ENV: "production",
+      SIEM_AUDIT_ENDPOINT: "https://siem.example.gov.cn/audit",
+      SIEM_AUDIT_SIGNING_SECRET: marker.repeat(3),
+      SIEM_AUDIT_TLS_MODE: "system",
+      AUDIT_DELIVERY_SOURCE_CONTRACT: "snapshot-rehearsal-v1"
+    }
+  });
+  assert.equal(result.status, 1);
+  const event = JSON.parse(result.stderr.trim().split(/\r?\n/).find((line) => line.startsWith("{")));
+  assert.equal(event.schemaVersion, "audit-delivery-operational-signal-v1");
+  assert.equal(event.signal.errorCode, "AUDIT_DELIVERY_PREFLIGHT_FAILED");
+  assert.equal(event.signal.metadataOnly, true);
+  assert.equal(result.stderr.includes(marker), false);
 });
 
 test("delivery lifecycle maps failure acknowledgement and recovery onto existing alert events", async () => {
@@ -199,11 +427,13 @@ test("checkpoint write failures emit a metadata-only operational control signal"
 
 test("audit delivery systemd template uses a dedicated account and minimum writable paths", () => {
   const service = fs.readFileSync(path.resolve(__dirname, "../deploy/audit-delivery-worker.service.template"), "utf8");
-  assert.match(service, /^User=\{\{SERVICE_USER\}\}$/m);
-  assert.match(service, /^Group=\{\{SERVICE_GROUP\}\}$/m);
+  assert.match(service, /^User=\{\{AUDIT_DELIVERY_SERVICE_USER\}\}$/m);
+  assert.match(service, /^Group=\{\{AUDIT_DELIVERY_SERVICE_GROUP\}\}$/m);
   assert.match(service, /^EnvironmentFile=\{\{ENV_FILE\}\}$/m);
   assert.match(service, /^ReadOnlyPaths=\{\{APP_DIR\}\}$/m);
-  assert.match(service, /^ReadWritePaths=\{\{DATA_DIR\}\} \{\{AUDIT_CHECKPOINT_DIR\}\} \{\{AUDIT_WORM_DIRECTORY\}\}$/m);
+  assert.match(service, /^ReadWritePaths=\{\{DATA_DIR\}\} \{\{AUDIT_CHECKPOINT_DIR\}\} \{\{AUDIT_WORM_DIRECTORY\}\} \{\{AUDIT_ALERT_JOURNAL_DIR\}\}$/m);
+  assert.match(service, /^ExecStartPre=\{\{NODE_BIN\}\} \{\{APP_DIR\}\}\/scripts\/audit-delivery-preflight\.js$/m);
+  assert.match(service, /^TimeoutStartSec=\d+s$/m);
   assert.match(service, /^UMask=0077$/m);
   assert.match(service, /^NoNewPrivileges=true$/m);
   assert.doesNotMatch(service, /SIEM_AUDIT_SIGNING_SECRET=/);

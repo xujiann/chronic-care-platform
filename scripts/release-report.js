@@ -8,6 +8,7 @@ const { financialGatewayCenter } = require("../financial-gateways");
 const { objectStorageCenter } = require("../secure-object-storage");
 const { alertRoutingCenter } = require("../observability-alerting");
 const { productionAdapterCenter } = require("../production-adapters");
+const { assessAuditDeliveryConfig } = require("../src/platform/operations/audit-delivery");
 const { buildAuditRetentionReport, renderMarkdown: renderAuditRetentionMarkdown } = require("./audit-retention");
 const { buildChronicFollowupReadinessReport, renderMarkdown: renderChronicFollowupMarkdown } = require("./chronic-followup-readiness");
 const { buildChronicInformatizationSourceReport, renderMarkdown: renderChronicInformatizationSourceMarkdown } = require("./chronic-informatization-sources");
@@ -280,6 +281,7 @@ function validateProductionConfig(options = {}) {
     env.ALERT_WEBHOOK_URL ? env.ALERT_WEBHOOK_SECRET || env.ALERTING_SIGNING_SECRET : ""
   ].filter((_, index) => index === 0 ? Boolean(env.SIEM_ENDPOINT) : Boolean(env.ALERT_WEBHOOK_URL));
   const configuredAlertInputs = alertRouting.routes.filter((item) => item.endpointConfigured);
+  const auditDeliveryAssessment = assessAuditDeliveryConfig(env, { root: ROOT });
 
   const checks = [
     check("env:file", envFileExists, envFileExists ? envFile : `${envFile} missing`, strict ? "error" : "warn", "environment"),
@@ -302,6 +304,7 @@ function validateProductionConfig(options = {}) {
     check("env:INTEGRATION_GATEWAY_SECRET.productionQuality", !strict || secretQuality(gatewaySecret).strongEnough, strict ? "production secret must be non-placeholder and at least 32 chars" : "not enforced outside production", strict ? "error" : "warn", "environment"),
     check("env:ALERTING.routes", alertRouting.adapterReady && configuredAlertInputs.every((item) => item.configured && item.productionHttps), `${alertRouting.summary.configured}/${alertRouting.summary.total} SIEM or webhook routes configured; ${configuredAlertInputs.length} endpoints declared`, strict ? "error" : "warn", "environment"),
     check("env:ALERTING.secretQuality", !strict || (alertSecrets.length > 0 && alertSecrets.every((secret) => secretQuality(secret).strongEnough)), strict ? "configured alert route secrets must be non-placeholder and at least 32 chars" : "not enforced outside production", strict ? "error" : "warn", "environment"),
+    check("env:AUDIT_DELIVERY.activation", auditDeliveryAssessment.ready, `${auditDeliveryAssessment.checks.filter((item) => item.passed).length}/${auditDeliveryAssessment.checks.length} deployment checks; ${auditDeliveryAssessment.boundary}`, strict ? "error" : "warn", "environment"),
     check("env:DEPLOYMENT.secretProvider", !strict || ["vault", "kms", "orchestrator"].includes(deploymentSecretProvider), strict ? deploymentSecretProvider || "missing DEPLOYMENT_SECRET_PROVIDER" : "not enforced outside production", strict ? "error" : "warn", "environment"),
     check("env:DEPLOYMENT.releaseId", !strict || (Boolean(deploymentReleaseId) && !hasPlaceholder(deploymentReleaseId)), strict ? deploymentReleaseId || "missing DEPLOYMENT_RELEASE_ID" : "not enforced outside production", strict ? "error" : "warn", "environment"),
     check("env:DEPLOYMENT.artifactDigest", !strict || /^sha256:[a-f0-9]{64}$/.test(deploymentArtifactDigest), strict ? deploymentArtifactDigest || "missing DEPLOYMENT_ARTIFACT_DIGEST" : "not enforced outside production", strict ? "error" : "warn", "environment"),

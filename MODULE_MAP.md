@@ -30,7 +30,7 @@
 | 平台数据 | `src/platform/data/`、`src/platform/storage/` | 数据所有权、SQLite migration 注册表/runner、PostgreSQL 主存储契约 |
 | 领域事件 | `src/platform/events/`、各领域 worker | outbox/inbox、幂等和后台投递 |
 | 慢病随访 publisher | `citizen-chronic-followup-event-service.js`、`src/citizen-chronic/followup-event-publisher.js` | T04 自有 v1 事件、安全 HTTPS 投递端口、独立 activation verifier 和本地兼容适配；尚无生产 worker/持久 lease |
-| 审计投递 | `src/platform/operations/audit-delivery.js`、`scripts/audit-delivery-worker.js` | SIEM/WORM、checkpoint v2；复用 cutover alert lifecycle，外部门禁保持关闭 |
+| 审计投递 | `src/platform/operations/audit-delivery.js`、`scripts/audit-delivery-worker.js`、`scripts/audit-delivery-preflight.js`、`deploy/audit-delivery-worker.*.template` | 部署包纳入完整依赖闭包，preflight/runtime 共用 activation-v1 检查并复用 cutover alert lifecycle；当前仅 rehearsal，append-only source、可信 receipt、外部 checkpoint anchor 和 WORM capability 未完成前生产失败关闭 |
 | 安全对象存储端口 | `secure-object-storage.js`、`scripts/object-storage-readiness.js` | T00 管版本化请求/响应信任、精确 Origin/TTL、严格回执和生产门禁；T08 仅通过现有附件路由调用，不拥有共享密钥与传输规则 |
 | 区域运行 | `src/platform/regional/`、`regions/` | 多地区清单、能力包、复制和发布注册 |
 | 领域实现 | `src/care-coordination/` 等与根目录服务 | 新旧实现并存，边界尚未完全迁移 |

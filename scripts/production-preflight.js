@@ -3,6 +3,7 @@
 
 const fs = require("node:fs");
 const path = require("node:path");
+const { assessAuditDeliveryConfig } = require("../src/platform/operations/audit-delivery");
 
 const { buildLaunchSmokeReport } = require("./launch-smoke");
 const { verifyProductionDeploymentPackage } = require("./production-deployment-package");
@@ -115,6 +116,10 @@ async function buildProductionPreflight(options = {}) {
     envFile: options.envFile || "",
     env
   });
+  const auditDeliveryAssessment = options.auditDeliveryAssessment || assessAuditDeliveryConfig(env, {
+    root,
+    checkFilesystem: options.checkFilesystem !== false
+  });
   const bindings = deploymentBindingChecks(env, manifest);
   const launchSmoke = options.launchSmoke || await buildLaunchSmokeReport({
     baseUrl: options.baseUrl || env.DEPLOYMENT_BASE_URL || "",
@@ -151,7 +156,8 @@ async function buildProductionPreflight(options = {}) {
   ];
   const runtimeChecks = [
     ...bindings,
-    check("preflight:production-config", productionConfig.passed, `${productionConfig.checks.filter((item) => item.passed).length}/${productionConfig.checks.length} production configuration checks`, "runtime-config")
+    check("preflight:production-config", productionConfig.passed, `${productionConfig.checks.filter((item) => item.passed).length}/${productionConfig.checks.length} production configuration checks`, "runtime-config"),
+    check("preflight:audit-delivery", auditDeliveryAssessment.ready === true && auditDeliveryAssessment.productionReady === true, `${auditDeliveryAssessment.checks?.filter((item) => item.passed).length || 0}/${auditDeliveryAssessment.checks?.length || 0} continuous audit deployment checks; productionReady=${auditDeliveryAssessment.productionReady === true}`, "runtime-config")
   ];
   const liveChecks = launchSmoke.checks
     .filter((item) => item.category === "live")
@@ -202,6 +208,13 @@ async function buildProductionPreflight(options = {}) {
         severity: item.severity,
         category: item.category
       }))
+    },
+    auditDeliveryAssessment: {
+      schemaVersion: auditDeliveryAssessment.schemaVersion || "audit-delivery-activation-v1",
+      ready: auditDeliveryAssessment.ready === true,
+      productionReady: auditDeliveryAssessment.productionReady === true,
+      checks: (auditDeliveryAssessment.checks || []).map((item) => ({ id: item.id, passed: item.passed })),
+      boundary: auditDeliveryAssessment.boundary || "continuous audit production evidence is incomplete"
     },
     launchSmoke: {
       ok: launchSmoke.ok,

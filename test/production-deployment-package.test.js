@@ -31,11 +31,25 @@ test("production deployment package hashes runtime files without persisting secr
     assert.equal(manifest.artifact.files.some((item) => item.path === "scripts/postgres-shadow-reconcile.js"), true);
     assert.equal(manifest.artifact.files.some((item) => item.path === "config/regions.json"), true);
     assert.equal(manifest.artifact.files.some((item) => item.path === "src/platform/regional/regional-runtime.js"), true);
+    [
+      "scripts/audit-delivery-worker.js",
+      "scripts/audit-delivery-preflight.js",
+      "src/platform/operations/audit-delivery.js",
+      "src/identity-security/audit-chain.js",
+      "src/platform/cutover/pilot-cutover-alert-lifecycle.js",
+      "src/platform/governance/technical-evidence.js",
+      "deploy/audit-delivery-worker.service.template",
+      "deploy/audit-delivery-worker.timer.template",
+      "deploy/platform-production-adapters.env.template"
+    ].forEach((runtimeFile) => assert.equal(manifest.artifact.files.some((item) => item.path === runtimeFile), true, runtimeFile));
     assert.equal(manifest.artifact.files.some((item) => item.path === "regions/template/manifest.json"), true);
     assert.equal(manifest.artifact.files.some((item) => item.path === "regions/210200/manifest.json"), true);
     assert.equal(manifest.artifact.files.some((item) => item.path === ".env"), false);
     assert.equal(manifest.secretContract.variables.every((item) => item.persistedInArtifact === false && !("value" in item)), true);
     assert.equal(manifest.secretContract.variables.some((item) => item.name === "OBJECT_STORAGE_RECEIPT_SIGNING_SECRET" && item.purpose === "object storage gateway response verification"), true);
+    assert.equal(manifest.secretContract.variables.some((item) => item.name === "SIEM_AUDIT_SIGNING_SECRET" && item.purpose === "continuous audit request signing"), true);
+    assert.equal(manifest.processContract.backgroundJobs.some((item) => item.id === "continuous-audit-delivery" && item.productionReady === false && item.preflight === "npm run audit:delivery:preflight"), true);
+    assert.equal(manifest.processContract.backgroundJobs.some((item) => item.id === "continuous-audit-delivery" && item.configurationTemplate === "deploy/platform-production-adapters.env.template" && item.configurationVariables.includes("AUDIT_DELIVERY_SOURCE_CONTRACT") && item.configurationVariables.includes("AUDIT_DELIVERY_SERVICE_UID") && item.configurationVariables.includes("AUDIT_DELIVERY_SERVICE_GID") && item.configurationVariables.includes("PLATFORM_PILOT_CUTOVER_ALERT_JOURNAL_FILE")), true);
     assert.equal(manifest.processContract.healthChecks.some((item) => item.route === "/api/live" && item.purpose === "process-liveness" && item.authentication === "none"), true);
     assert.equal(manifest.processContract.healthChecks.some((item) => item.route === "/api/health" && item.purpose === "dependency-readiness" && item.authentication === "none"), true);
     assert.equal(manifest.processContract.healthChecks.filter((item) => item.authentication === "commission").length, 2);
@@ -63,6 +77,12 @@ test("deployment package verification detects file digest tampering", () => {
   const failed = verifyProductionDeploymentPackage(tampered);
   assert.equal(failed.ok, false);
   assert.equal(failed.mismatched.includes(tampered.artifact.files[0].path), true);
+
+  const missingWorkerContract = structuredClone(manifest);
+  missingWorkerContract.processContract.backgroundJobs = [];
+  const workerFailed = verifyProductionDeploymentPackage(missingWorkerContract);
+  assert.equal(workerFailed.ok, false);
+  assert.equal(workerFailed.checks.some((item) => item.id === "deploymentVerify:auditWorker" && !item.passed), true);
 });
 
 test("deployment package renders writes and parses CLI flags", (t) => {
