@@ -58,6 +58,7 @@
 ## 7. API、鉴权与审计
 
 - API 变化登记 method/path、owner、调用方、角色、权限、数据范围、错误、幂等和审计事件。
+- `npm run api:authorization-matrix` 校验声明级授权，`npm run api:production-catalog` 校验 route inventory 与授权声明并集；动态/未分类项必须 review-required，目录不得出现生产 GO。
 - 鉴权默认拒绝；角色允许不等于资源范围允许。
 - 认证、越权、跨机构/跨居民、重放、并发和错误输入必须有负向测试。
 - 演示账号、默认密码和本地存储路径不得在生产降级启用。
@@ -80,6 +81,7 @@ LEGACY CODE → TEST PROTECTION → REFACTOR
 | 语法 | `npm run check` |
 | 全量自动发现 | `npm run test:all` |
 | 路由 | `npm run routes:check`、`npm run routes:test` |
+| API 治理 | `npm run api:authorization-matrix`、`npm run api:production-catalog` |
 | 架构 | `npm run architecture:test` |
 | 所有权 | `npm run process:verify`、`npm run process:test` |
 | 平台迭代 | `npm run platform:iterations:test` |

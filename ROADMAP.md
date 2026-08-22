@@ -25,6 +25,7 @@
 | 7 | 运行时上下文瘦身 | 候选 / P1 | 按领域子端口，逐块迁移，不重写 server |
 | 7A | 临床五个可治理子域 | 治理切片完成，急救/血液/影像/体检首用例已迁移；operations dashboard 与 command 已由 T00 移交 T02 / P1 | Accepted ADR；保持协议兼容，继续按五子域逐用例迁移并禁止 operations 回流 T06 |
 | 7B | 健康驾驶舱版本化指标 | 首个 `population-service-visits.v1` 合同已建立 / P1 | 由 T03 确认来源版本与签名证据、由 T00 注入服务端 region scope；其余指标按 owner 逐项接入 |
+| 7C | 生产 API 机器目录 | 已合并授权矩阵与字面 route inventory，594 项全部 NO-GO / P1 | T01–T09 逐 owner 复核 7 个运行时策略、14 个自定义鉴权和 233 个未观察到幂等标记的写接口；不得用源码标记替代行为测试 |
 | 8 | JSON 169 个遗留集合治理 | 候选 / P1 | owner 分类、使用证据、晋升/归档/迁移批次 |
 | 9 | 前端可信渲染与 CSP | 待 ADR / P1 | sink 清单、兼容策略、逐页 E2E/负向测试 |
 | 10 | CI/worker/部署依赖治理 | CI 风险域拆分已合入并经 main 验证；Action 完整 SHA 固定已形成 T00 候选，worker 仍候选 / P2 | 不降低 required checks；合入后持续按官方 tag 升级并核验 commit SHA，继续评审 worker 观测契约 |

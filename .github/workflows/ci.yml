@@ -134,6 +134,8 @@ jobs:
         run: npm run static:check && npm run static:test
       - name: Verify API authorization matrix
         run: npm run api:authorization-matrix
+      - name: Verify production API catalog
+        run: npm run api:production-catalog
       - name: Run blood system readiness gate
         run: npm run blood-system:readiness
       - name: Run emergency collaboration API gate

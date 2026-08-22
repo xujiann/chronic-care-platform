@@ -17,7 +17,7 @@
 | T08 | integration | 3 | 13 | 外部网关、签名回调和交换 |
 | T09 | research / shared | 14 | 30 | 科研沙箱、组合查询和确实跨域的体验 |
 
-静态扫描识别 368 个唯一的精确 method/path 组合，未发现重复；动态参数和 prefix 路由未计入该数字。`npm run routes:check` 对 64 个受检模块通过。
+历史字面扫描识别 368 个精确 method/path 下限；当前扫描识别 372 个字面条件路由和 588 条授权声明，机器生产目录取并集后形成 594 个唯一接口，其中 587 个为字面 method/path、7 个保留运行时策略阻断。目录复用现有授权矩阵和 route source inventory，不新增平行路由注册表；`npm run routes:check` 继续负责模块语法与装配边界。
 
 ## 2. 主要服务模块
 
@@ -37,6 +37,7 @@
 | 前端共享 | `auth.js`、`shared.js`、`platform-api-client.js`、`platform-shell.js` | 身份上下文、API 调用、壳和设计系统；服务端 token 不进入 localStorage，Cookie 上下文优先，陈旧凭据启动即清理 |
 | 静态发布 | `src/http/static-asset-policy.js`、`src/http/static-content-runtime.js`、`scripts/static-publication.js`、`config/static-publication.json` | 44 个入口、递归资源图、Pages 制品和服务端读取共用一份默认拒绝契约；HTTP 细节不再堆入组合根 |
 | 演示脱敏 | `src/platform/data/public-demo-snapshot.js` | 服务端合成、Pages 构建和 storage-admin 共用纯函数，凭据字段删除、个人姓名/身份/联系字段稳定掩码 |
+| API 生产目录 | `routeSourceFiles` + `scripts/api-authorization-matrix.js` → `scripts/production-api-catalog.js` | 字面路由与声明级授权事实合并为 endpoint 级 owner/auth/scope/idempotency/生产状态；249 项保留治理复核，全部生产 NO-GO |
 
 ## 3. 依赖宽度
 

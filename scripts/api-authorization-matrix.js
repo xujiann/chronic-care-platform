@@ -217,4 +217,4 @@ function runCli(argv = process.argv.slice(2)) {
 
 if (require.main === module) runCli();
 
-module.exports = { buildMatrix, readRouteSources, validateMatrix };
+module.exports = { DOMAIN_OWNERS, buildMatrix, readRouteSources, validateMatrix };

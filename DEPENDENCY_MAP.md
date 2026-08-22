@@ -24,6 +24,8 @@ flowchart LR
   AUDIT --> ADEL["audit-delivery worker"]
   ADEL --> ALERT["pilot-cutover-alert-lifecycle"]
   ADEL --> EXT
+  ROUTES --> AM["API authorization matrix"]
+  AM --> AC["production API catalog\nNO-GO metadata"]
 ```
 
 期望方向大体存在，但组合根仍把大量底层函数直接注入路由上下文；新模块不得回读组合根。
@@ -149,6 +151,7 @@ JSON 源快照仍是高扇出依赖，但浏览器和 Pages 只依赖经统一�
   release-readiness 和 Pages 运行标准 build；required check 名称和 fail-closed 聚合保持不变。
 - 主分支必需检查名称仍为 `complete-unit-test` 与 `test`。聚合 test 使用 `always()`
   并要求三个风险域结果全部为 success，失败、取消和跳过均 fail-closed。
+- governance-api 先校验声明级授权矩阵，再校验其派生的生产 API 目录；目录只依赖既有 `routeSourceFiles` 和授权输出，不依赖组合根、数据库或外部系统，也不生成仓库制品。
 - GitHub Actions 的 checkout、Node、Pages 和 artifact 引用均固定到经官方仓库
   `refs/tags/vN` 核验的完整 commit SHA，并保留 `# vN` 注释供升级评审；契约测试禁止
   `actions/*@vN` 标签引用回流。
