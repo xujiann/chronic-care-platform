@@ -78,7 +78,10 @@ TypeScript 与 Node 类型仅用于开发门禁；lockfile audit 已修复 c8 �
   任何普通 API 调用前清除旧 localStorage token，Cookie 与 Authorization 并存时服务端也选择
   Cookie。bearer-only 兼容 token 仅存在页面内存，不跨重载恢复。
 - 发现 871 处 `innerHTML=` / `insertAdjacentHTML` 类写入；最高为 citizen 94、app 90、public-health 78、platform 72。
-- CSP 允许 `script-src 'unsafe-inline'` 和 `style-src 'unsafe-inline'`。
+- 集中响应头端口保留兼容 CSP 的 `script/style 'unsafe-inline'` 以避免一次性破坏页面，同时下发不含
+  `unsafe-inline`/`unsafe-eval` 的严格 Report-Only 目标；不得把兼容基线描述为 CSP 已关闭。
+- 显式发布图的机器清单当前包含 37 个 P0 inline script、8 个 P1 inline style block 和 13 个
+  P1 style attribute；event handler、javascript URL 与 eval 类当前为 0，CI/构建按指纹拒绝新增 P0/P1。
 - Service Worker 缓存应用壳以及生成的 `data/public-demo.json`，缓存版本已从 v59 提升到 v60 以撤销旧快照缓存。
 
 ## 5. 数据依赖
@@ -158,6 +161,8 @@ JSON 源快照仍是高扇出依赖，但浏览器和 Pages 只依赖经统一�
 - systemd 模板包含多项 Linux hardening。
 - Solution A 的 HAPI FHIR、PostgreSQL、Orthanc、OHIF 默认镜像已固定为审核过的精确版本与 registry digest；Orthanc 认证默认启用，Web 与 DICOM 默认绑定回环。非回环 DICOM 仅接受显式私网接口配置，真实拉取/漏洞扫描、TLS、防火墙白名单、设备连通和现场网络验收仍是生产阻断项。
 - Pages 先在 runner 临时目录构建显式资源集再上传；服务端和 Pages 共用同一发布清单。
+- 静态制品同时携带 `browser-security-policy.json` 和构建 manifest 的 NO-GO 投影；它要求托管/CDN
+  应用等价响应头，但仓库当前没有真实静态托管响应头抓取证据，不能由制品内容推定已生效。
 
 ## 9. 依赖治理结论
 

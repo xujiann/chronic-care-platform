@@ -12,7 +12,7 @@ test("platform nonfunctional gate locks current frontend and composition budgets
   const report = buildPlatformNonfunctionalReadiness({ root: ROOT, now: "2026-08-16T05:00:00.000Z" });
   assert.equal(report.ok, true);
   assert.equal(report.summary.assetsWithinBudget, report.summary.assets);
-  assert.equal(report.summary.serverRequires, 129);
+  assert.equal(report.summary.serverRequires, 130);
   assert.ok(report.summary.testFiles >= 353);
   assert.ok(report.summary.routeFiles >= 43);
   assert.equal(report.productionReady, false);

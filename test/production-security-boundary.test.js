@@ -197,7 +197,12 @@ test("production runtime disables local passwords and emits browser security hea
   assert.equal(page.status, 200);
   assert.equal(page.headers.get("x-content-type-options"), "nosniff");
   assert.equal(page.headers.get("x-frame-options"), "SAMEORIGIN");
+  assert.match(page.headers.get("content-security-policy"), /script-src 'self' 'unsafe-inline'/);
   assert.match(page.headers.get("content-security-policy"), /script-src-attr 'none'/);
+  assert.match(page.headers.get("content-security-policy-report-only"), /script-src-attr 'none'/);
+  assert.doesNotMatch(page.headers.get("content-security-policy-report-only"), /unsafe-inline|unsafe-eval/);
+  assert.equal(page.headers.get("referrer-policy"), "no-referrer");
+  assert.match(page.headers.get("permissions-policy"), /camera=\(\)/);
   assert.match(page.headers.get("strict-transport-security"), /max-age=31536000/);
 
   const login = await fetch(`${baseUrl}/api/auth/login`, {

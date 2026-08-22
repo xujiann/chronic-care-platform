@@ -107,6 +107,13 @@ flowchart TB
     元数据兼容上限仍为 500 条，但创建第 501 条时会在网关调用前以稳定错误失败关闭，既有
     immutable/legal-hold 元数据不再被静默淘汰；无损分页仓储、外部调用与本地写入双写以及
     供应商能力证明仍是后续债务。
+12. SEC-004 第一切片把 `server.js` 的浏览器响应头抽到
+    `src/http/browser-security-policy.js`，动态 HTML、静态资源、API、下载与错误响应继续复用同一端口。
+    现有兼容 CSP 仍强制同源 base/frame、禁止 object 与脚本事件属性，但为保持 44 个页面兼容继续
+    允许 inline 脚本/样式；不含 `unsafe-inline`/`unsafe-eval` 的目标策略仅以 Report-Only 下发。
+    显式发布图的机器基线当前登记 37 个 P0 inline script 与 21 个 P1 inline style/style attribute，
+    CI 和静态构建按资产/类型/片段指纹拒绝新增高风险。静态制品携带同一策略合同，但真实托管响应头、
+    严格 CSP、独立扫描和现场验收均未证明，`productionReady` 保持 `false`。
 
 ## 6. T06 五子域治理切片
 

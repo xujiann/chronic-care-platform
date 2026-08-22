@@ -12,7 +12,7 @@
 - 生产环境缺失或非法的会话保留期、清理周期会以 `PRODUCTION_SESSION_RETENTION_INVALID` 拒绝启动；撤销审计保留期不得短于普通过期会话保留期。
 - 浏览器在 API 认证失败或网络异常时失败关闭，不再回退到本地演示账号；只有 `file:` 等静态预览场景允许本地演示身份。
 - 非市级监管角色按居民家庭、机构归属或医保/区县业务关系收敛居民数据；机构修改居民主索引时还必须匹配居民归属机构。
-- 动态血液业务字段在进入 `innerHTML` 前统一编码，服务端下发 CSP、`nosniff`、同源嵌入、引用策略和生产 HSTS 响应头。
+- 动态血液业务字段在进入 `innerHTML` 前统一编码；服务端通过集中端口下发兼容 CSP、严格 Report-Only 目标、`nosniff`、同源嵌入、引用策略和生产 HSTS。兼容 CSP 仍允许 inline，不能表述为严格 CSP 已关闭。
 - SQLite 会话可跨进程读取，并在共享同一 `DATA_DIR` 的实例间同步注销、账号停用和撤销审计；进程重启不会使有效会话丢失。多主机集中式会话使用 PostgreSQL 中央会话表：请求先装载中央状态再进入现有角色守卫，签发、注销和目录停用在响应前完成中央写入；数据库不可用时返回 `SESSION_STORE_UNAVAILABLE` 并失败关闭。
 - `SESSION_TOPOLOGY=multi-host` 强制要求 `SESSION_STORE=postgres`、有效 `DATABASE_URL` 和显式的生产 `POSTGRES_SSL_MODE=verify-full`；中央表由 PostgreSQL 迁移包创建，应用启动只校验表结构，不以运行账号执行 DDL。依赖就绪检查使用轻量 PostgreSQL 探针，中央会话不可用时 `/api/health` 返回 503 且不暴露数据库错误；无依赖的 `/api/live` 仍用于进程存活判定。
 - OTP、验证码发送/登录限流和失败锁定统一进入共享认证安全状态仓储；单主机 SQLite 复用 `state_collections` 的注册迁移基线和 `BEGIN IMMEDIATE`，不在运行时建表，多实例生产强制使用 PostgreSQL `${POSTGRES_SCHEMA}.auth_security_state` 与长期共享连接池。持久化键使用服务端 HMAC，不保存手机号、用户名或验证码明文；目录停用会同时撤销会话和该主体的 OTP、限流与锁定状态。

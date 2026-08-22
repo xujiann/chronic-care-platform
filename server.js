@@ -4,6 +4,7 @@ const path = require("path");
 const LEGACY_REGIONAL_STATS_KEY = "da" + "lianHealthStatistics2025";
 const { createPlatformRuntimeComposition } = require("./src/http/platform-runtime-composition");
 const { createPlatformRequestHandler, createStaticContentRuntime } = require("./src/http/platform-request-handler");
+const { createBrowserSecurityHeaders } = require("./src/http/browser-security-policy");
 const platformProductizationRuntime = require("./src/platform/productization/runtime");
 const { loadRegionalRuntime } = require("./src/platform/regional/regional-runtime");
 const { ContractRegistry } = require("./src/platform/contracts/contract-registry");
@@ -8328,16 +8329,7 @@ function relativeProjectPath(filePath) {
 }
 
 function securityResponseHeaders() {
-  const headers = {
-    "Content-Security-Policy": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'self'; script-src 'self' 'unsafe-inline'; script-src-attr 'none'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; connect-src 'self' https: wss:; frame-src 'self' https:; worker-src 'self' blob:",
-    "Cross-Origin-Opener-Policy": "same-origin",
-    "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
-    "Referrer-Policy": "no-referrer",
-    "X-Content-Type-Options": "nosniff",
-    "X-Frame-Options": "SAMEORIGIN"
-  };
-  if (isProductionRuntime()) headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains";
-  return headers;
+  return createBrowserSecurityHeaders({ production: isProductionRuntime() });
 }
 
 function sendJson(res, status, payload) {
