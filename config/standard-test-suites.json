@@ -1,6 +1,11 @@
 {
   "version": 1,
-  "description": "Transitional root Node test classification. Integration preserves the legacy npm test lane; unit is the exact complement of test:all; smoke is a curated fast runtime lane.",
+  "description": "Transitional root Node test classification. Integration preserves the legacy npm test lane; unit is the exact complement of test:all; smoke is a curated fast runtime lane. Isolated files keep known hotspots observable without changing assertions, timeouts or suite membership.",
+  "isolated": {
+    "integration": [
+      "test/api.test.js"
+    ]
+  },
   "integration": [
     "test/api.test.js",
     "test/audit-retention.test.js",

@@ -213,3 +213,9 @@ manual production workflow 也不调用业务 API 或执行部署。
 未来时间、重放或 verifier 异常只暴露稳定代码，不返回 provider 错误正文。写入普通 evidenceRef、DR
 布尔或 synthetic `verified:true` 对象不能晋升生产状态。唯一授权系统和 receipt 获取 API 尚未确定，
 不得把 Proposed ADR 或测试 fixture 登记为生产签发接口。
+
+## 18. TEST-006 静态与测试性能边界
+
+本切片不新增或改变任何 HTTP method/path、身份、角色、scope、错误、幂等或审计语义。
+`test/api.test.js` 的三段历史不可达断言仅改为显式 skipped debt，现有可执行断言保持原顺序；
+integration runner 只隔离该文件并输出耗时，不把通过、skip 数或耗时提升为 API 生产证据。
