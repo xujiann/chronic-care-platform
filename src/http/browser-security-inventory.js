@@ -97,7 +97,7 @@ function scanJavaScript(asset, content, findings) {
   addMatches(findings, asset, content, "dom-contextual-fragment", /\.createContextualFragment\s*\(/g, dynamic);
   addMatches(findings, asset, content, "dom-srcdoc", /(?:\.srcdoc\s*=|\.setAttribute\s*\(\s*["']srcdoc["'])/g, dynamic);
   addMatches(findings, asset, content, "dom-event-attribute", /\.setAttribute\s*\(\s*["']on[a-z][a-z0-9_-]*["']/gi, dynamic);
-  addMatches(findings, asset, content, "dynamic-html-url-attribute", /(?<![-\w])(?:href|src|action)\s*=\s*["'`][^"'`\r\n]*\$\{/gi, dynamic);
+  addMatches(findings, asset, content, "dynamic-html-url-attribute", /(?:^|[<\s])(?:href|src|action)\s*=\s*["'`][^"'`\r\n]*\$\{/gim, dynamic);
   addMatches(findings, asset, content, "dom-url-property", /\.(?:href|src)\s*=/g, dynamic);
   addMatches(findings, asset, content, "dom-url-attribute", /\.setAttribute\s*\(\s*["'](?:href|src|action)["']/gi, dynamic);
   addMatches(findings, asset, content, "navigation-call", /(?:\bwindow\.open|\b(?:window\.)?location\.(?:assign|replace))\s*\(/g, dynamic);

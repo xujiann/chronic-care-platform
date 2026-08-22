@@ -60,3 +60,36 @@ test("login redirect still crosses the unified internal navigation port", async 
   await page.locator("#login-form button[type='submit']").click();
   await expect(page).toHaveURL(/citizen\.html$/);
 });
+
+test("template URL bindings reject hostile values without leaving a navigable attribute", async ({ page }) => {
+  await page.goto("/login.html");
+  const result = await page.evaluate(() => {
+    const candidates = {
+      javascript: "javascript:alert(1)",
+      data: "data:text/html,<script>alert(1)</script>",
+      userinfo: "https://user:secret@www.nhc.gov.cn/policy",
+      protocolRelative: "//www.nhc.gov.cn/policy",
+      unapprovedOrigin: "https://evil.example/policy"
+    };
+    const links = Object.keys(candidates).map(() => {
+      const link = document.createElement("a");
+      link.setAttribute("href", "./stale.html");
+      return link;
+    });
+    const outcomes = window.HealthBrowserSafeUrl.setElementUrlBindings(links.map((link, index) => ({
+      element: link,
+      input: Object.values(candidates)[index],
+      options: {
+        capability: "official-source",
+        baseUrl: location.href,
+        allowedOrigins: ["https://www.nhc.gov.cn"]
+      }
+    })));
+    return {
+      outcomes: outcomes.map((item) => ({ ok: item.ok, errorCode: item.errorCode })),
+      hrefs: links.map((link) => link.getAttribute("href"))
+    };
+  });
+  expect(result.outcomes.every((item) => item.ok === false && /^SAFE_URL_/.test(item.errorCode))).toBe(true);
+  expect(result.hrefs).toEqual([null, null, null, null, null]);
+});

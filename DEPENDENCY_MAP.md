@@ -81,11 +81,12 @@ TypeScript 与 Node 类型仅用于开发门禁；lockfile audit 已修复 c8 �
 - Inventory v2 在显式发布图精确锁定 866 处 `innerHTML=` 与 5 处 `insertAdjacentHTML`（合计 871，
   覆盖 43 个资产）；血液主工作台的 25 处 `innerHTML` 已迁到 DOM/text 节点，最高仍为 citizen 94、
   app 90、public-health 78、platform 72。
-- 同一清单现锁定 35 个动态 URL sink（29 个模板 URL 属性、公共 Safe URL port 内 2 个 DOM URL
-  attribute 和 2 个导航调用、2 个 OHIF 导航）以及 45 个动态样式 sink（30 个模板 style 属性、
+- 同一清单现锁定 6 个动态 URL sink（公共 Safe URL port 内 2 个 DOM URL attribute 和 2 个导航调用、
+  2 个 OHIF 导航）以及 45 个动态样式 sink（30 个模板 style 属性、
   12 个 CSSOM 属性、2 个 `setProperty`、1 个 runtime style element）。浏览器 URL 依赖方向为
-  `页面 action → browser-safe-url-policy.v1 → capability/protocol/userinfo/exact-Origin decision → DOM/navigation`；
-  居民短时凭据复用同一端口，服务端对象存储信任合同保持不变。31 个未迁移 occurrence 仍需复核，
+  `页面 action → 无 URL 模板/固定 DOM anchor → browser-safe-url-policy.v1 → capability/protocol/userinfo/exact-Origin decision → DOM/navigation`；
+  28 个真实模板 URL 已迁移，1 个普通属性赋值误报已校正；
+  居民短时凭据复用同一端口，服务端对象存储信任合同保持不变。仅 2 个 OHIF 导航仍因真实 exact-Origin 未证明而需复核，
   这些词法事实和端口测试都不是 taint 分析、外部 Origin 或生产放行证据。
 - 37 个页面内联守卫/脚本已汇入 `page-auth-bootstrap.js`、`mobile-preview.js` 等外部依赖；8 个样式块和
   13 个静态样式属性已汇入外部 CSS/class，显式发布图的 inline/eval 风险现为 0；CI/构建同时对

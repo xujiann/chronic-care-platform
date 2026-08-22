@@ -1,5 +1,13 @@
 const PHYSICAL_EXAM_API = location.protocol === "file:" ? "" : `${location.origin}/api`;
 const physicalExamState = { overview: null, residentId: "", year: "", user: null };
+const PHYSICAL_EXAM_OFFICIAL_SOURCE_ORIGINS = Object.freeze([
+  "https://flk.npc.gov.cn",
+  "https://std.samr.gov.cn",
+  "https://www.cac.gov.cn",
+  "https://www.gov.cn",
+  "https://www.nhc.gov.cn",
+  "https://www.npc.gov.cn"
+]);
 
 document.addEventListener("DOMContentLoaded", async () => {
   const user = window.HealthCityAuth?.getUser?.();
@@ -260,11 +268,20 @@ function renderSpecializedIntakes(rows, programs) {
 function renderStandards(standards) {
   const target = document.querySelector("#physical-exam-standards");
   if (!target) return;
-  target.innerHTML = standards.map((item) => `<article class="contract-card">
+  target.innerHTML = standards.map((item, index) => `<article class="contract-card">
     <header><div><h3>${escapeExamHtml(item.code)}</h3><small>${escapeExamHtml(item.level)} · ${escapeExamHtml(item.status)}</small></div><span class="status-chip ${item.mandatory ? "warn" : "ok"}">${item.mandatory ? "强制依据" : "标准依据"}</span></header>
     <p>${escapeExamHtml(item.name)}</p>
-    <a class="text-action" href="${escapeExamHtml(item.source)}" target="_blank" rel="noreferrer">查看官方文件</a>
+    <a class="text-action" data-exam-standard-source="${index}" target="_blank" rel="noreferrer">查看官方文件</a>
   </article>`).join("");
+  window.HealthBrowserSafeUrl.setElementUrlBindings([...target.querySelectorAll("[data-exam-standard-source]")].map((link) => ({
+    element: link,
+    input: standards[Number(link.dataset.examStandardSource)]?.source,
+    options: {
+      capability: "official-source",
+      baseUrl: location.href,
+      allowedOrigins: PHYSICAL_EXAM_OFFICIAL_SOURCE_ORIGINS
+    }
+  })));
 }
 
 function renderQualityIndicators(indicators) {

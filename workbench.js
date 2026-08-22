@@ -18,6 +18,12 @@ const fallbackState = {
 
 let currentSiteReadinessPack = null;
 let currentSiteTemplateReadmes = null;
+const WORKBENCH_TRACEABILITY_OFFICIAL_ORIGINS = Object.freeze([
+  "https://nhsa.gov.cn",
+  "https://nmpa.gov.cn",
+  "https://www.nhsa.gov.cn",
+  "https://www.nmpa.gov.cn"
+]);
 
 document.addEventListener("DOMContentLoaded", async () => {
   const [
@@ -324,10 +330,20 @@ function renderDrugConsumableSupervision(report, state) {
     ${evidenceChecklistRow}
     ${supervisionRows || `<article class="priority-row"><div class="priority-rank warn">0</div><div><h3>No drug consumable supervision rows</h3><p>Run the local API or seed data to review this app.</p></div><span class="badge warn">empty</span></article>`}
   `;
+  window.HealthBrowserSafeUrl.setElementUrlBindings([...container.querySelectorAll("[data-workbench-traceability-policy-link]")].map((link, index) => {
+    const input = policySources[index]?.url || "./drug-consumable-about.html";
+    return {
+      element: link,
+      input,
+      options: policySources[index]?.url
+        ? { capability: "official-source", baseUrl: location.href, allowedOrigins: WORKBENCH_TRACEABILITY_OFFICIAL_ORIGINS }
+        : { capability: "internal-navigation", baseUrl: location.href }
+    };
+  }));
 }
 
 function renderDrugTraceabilityPolicyRow(policySources = []) {
-  const sourceLinks = policySources.slice(0, 3).map((item) => `<a href="${item.url || "./drug-consumable-about.html"}">${item.documentNo || item.authority || "source"}</a>`).join(" · ");
+  const sourceLinks = policySources.slice(0, 3).map((item) => `<a data-workbench-traceability-policy-link>${item.documentNo || item.authority || "source"}</a>`).join(" · ");
   return `<article class="priority-row" data-drug-traceability-policy-sources>
     <div class="priority-rank info">${policySources.length || "P"}</div>
     <div>

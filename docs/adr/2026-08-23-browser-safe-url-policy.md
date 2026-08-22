@@ -52,9 +52,19 @@ userinfo 和未批准 Origin 在 DOM mutation 前被拒绝。
 
 采用方案 3。`browser-safe-url-policy.v1` 是浏览器动态 URL 的唯一新增公共策略端口；调用方必须在
 mutation 前声明能力、base URL 和（适用时）独立 exact-Origin allowlist。首批只迁移仓库证据能够
-证明来源的调用；29 个模板 URL 和 2 个 OHIF 导航保持 `review-required`，不得硬编码猜测。
+证明来源的调用；当时 29 个模板 URL 和 2 个 OHIF 导航保持 `review-required`，不得硬编码猜测。
 `productionReady=false` 保持不变，真实托管响应头、OHIF/对象存储现场 Origin、严格 CSP、独立扫描和
 全角色验收仍是外部/后续阻断项。
+
+## 内部 sink 闭环状态（2026-08-23）
+
+后续切片继续采用方案 3，没有建立第二套 sanitizer。29 个原模板 occurrence 中，28 个真实 URL
+属性已改为模板不携带 URL，再由 `browser-safe-url-policy.v1` 按 internal/official capability 绑定 DOM；
+另 1 个是 `digital-hospital-standard-platform/app.js` 的普通 `item.action` 模板字符串赋值，扫描器已增加
+synthetic 回归避免再误判为 HTML `action` 属性。Inventory v2 的动态 URL 由 35 降至 6：公共端口内
+4 个受控 sink，外加 2 个 OHIF 导航。OHIF 的真实部署 Origin 仍不在仓库，故两项继续
+`review-required`，不猜测、不降级；恶意 javascript/data/userinfo/协议相对/未批准 Origin 的批量绑定
+在 mutation 前失败关闭。兼容 `unsafe-inline`、严格 Report-Only 与 `productionReady=false` 均保持不变。
 
 ## Rollback
 

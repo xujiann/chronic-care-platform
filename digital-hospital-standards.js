@@ -19,6 +19,25 @@ const DIGITAL_HOSPITAL_SOURCE_URLS = {
   internetDiagnosis: "https://www.nhc.gov.cn/yzygj/c100067/202203/61bb44c669144ad1a4266fc4d63dd7a4.shtml",
   classifiedProtection: "https://openstd.samr.gov.cn/bzgk/std/newGbInfo?hcno=BAFB47E8874764186BDB7865E8344DAF"
 };
+const DIGITAL_HOSPITAL_OFFICIAL_SOURCE_ORIGINS = Object.freeze([
+  "https://openstd.samr.gov.cn",
+  "https://www.cac.gov.cn",
+  "https://www.ndcpa.gov.cn",
+  "https://www.nhc.gov.cn"
+]);
+
+function bindDigitalHospitalOfficialSourceLinks(target, sources) {
+  const links = [...target.querySelectorAll("[data-digital-hospital-official-source]")];
+  window.HealthBrowserSafeUrl.setElementUrlBindings(links.map((link, index) => ({
+    element: link,
+    input: sources[index],
+    options: {
+      capability: "official-source",
+      baseUrl: location.href,
+      allowedOrigins: DIGITAL_HOSPITAL_OFFICIAL_SOURCE_ORIGINS
+    }
+  })));
+}
 
 const DIGITAL_HOSPITAL_POLICY_REGISTER = [
   { id: "dhp-national-hospital-informatization-2018", title: "全国医院信息化建设标准与规范（试行）", documentNo: "国卫办规划发〔2018〕4号", domains: ["电子病历", "互联互通", "智慧服务", "智慧管理", "标准服务", "安全合规"], authorityLevel: "行业建设规范", bindingLevel: "management-required", lifecycleStatus: "effective", sourceUrl: "https://www.nhc.gov.cn/wjw/c100175/201804/19de144b8bc741c19489a8489ba6fa77.shtml", applicability: "全国各级各类医院信息化规划、建设、升级和评价准备", controlTopics: ["基础设施", "信息平台", "医疗服务", "医院管理", "数据标准", "安全运维"], owner: "医院信息化标准组", reviewStatus: "verified-current", lastReviewedAt: "2026-07-17", nextReviewAt: "2027-01-31" },
@@ -405,7 +424,7 @@ function renderPolicyRegister() {
       <tbody>
         ${rows.map((item) => `
           <tr>
-            <td><strong>${digitalEscape(item.title)}</strong><br /><small>${digitalEscape(item.documentNo)} / ${digitalEscape(item.authorityLevel)}</small><br /><a href="${digitalEscape(item.sourceUrl)}" target="_blank" rel="noreferrer">官方来源</a></td>
+            <td><strong>${digitalEscape(item.title)}</strong><br /><small>${digitalEscape(item.documentNo)} / ${digitalEscape(item.authorityLevel)}</small><br /><a data-digital-hospital-official-source target="_blank" rel="noreferrer">官方来源</a></td>
             <td><span class="${digitalPolicyStatusClass(item)}">${digitalEscape(digitalPolicyBindingLabel(item.bindingLevel))}</span><br /><small>${digitalEscape(digitalPolicyLifecycleLabel(item.lifecycleStatus))} / ${digitalEscape(item.reviewStatus)}</small></td>
             <td>${digitalEscape(item.applicability)}</td>
             <td>${digitalEscape((item.domains || []).join("、"))}<br /><small>${digitalEscape((item.controlTopics || []).join("、"))}</small></td>
@@ -415,6 +434,7 @@ function renderPolicyRegister() {
       </tbody>
     </table>
   `);
+  bindDigitalHospitalOfficialSourceLinks(document.getElementById("digital-hospital-policy-register"), rows.map((item) => item.sourceUrl));
 }
 
 function digitalControlUiRow(item = {}) {
@@ -1036,25 +1056,35 @@ function renderFormalCutoverApprovals() {
 }
 
 function renderSourceMap() {
+  const domains = digitalHospitalStandardDomains();
+  const legalSources = [
+    DIGITAL_HOSPITAL_SOURCE_URLS.cybersecurityLaw,
+    DIGITAL_HOSPITAL_SOURCE_URLS.dataSecurityLaw,
+    DIGITAL_HOSPITAL_SOURCE_URLS.pipLaw
+  ];
   digitalSetHtml("digital-hospital-source-map", `
     <table>
       <thead><tr><th>依据</th><th>平台能力</th><th>链接</th></tr></thead>
       <tbody>
-        ${digitalHospitalStandardDomains().map((item) => `
+        ${domains.map((item) => `
           <tr>
             <td><strong>${digitalEscape(item.source)}</strong></td>
             <td>${digitalEscape(item.title)}<br /><small>${digitalEscape(item.indicators.join("、"))}</small></td>
-            <td><a href="${digitalEscape(item.sourceUrl)}" target="_blank" rel="noreferrer">官方来源</a></td>
+            <td><a data-digital-hospital-official-source target="_blank" rel="noreferrer">官方来源</a></td>
           </tr>
         `).join("")}
         <tr>
           <td><strong>网络安全法、数据安全法、个人信息保护法</strong></td>
           <td>最小必要、分类分级、权限隔离、敏感材料导出审批和全程审计</td>
-          <td><a href="${DIGITAL_HOSPITAL_SOURCE_URLS.cybersecurityLaw}" target="_blank" rel="noreferrer">网安法</a> / <a href="${DIGITAL_HOSPITAL_SOURCE_URLS.dataSecurityLaw}" target="_blank" rel="noreferrer">数据安全法</a> / <a href="${DIGITAL_HOSPITAL_SOURCE_URLS.pipLaw}" target="_blank" rel="noreferrer">个保法</a></td>
+          <td><a data-digital-hospital-official-source target="_blank" rel="noreferrer">网安法</a> / <a data-digital-hospital-official-source target="_blank" rel="noreferrer">数据安全法</a> / <a data-digital-hospital-official-source target="_blank" rel="noreferrer">个保法</a></td>
         </tr>
       </tbody>
     </table>
   `);
+  bindDigitalHospitalOfficialSourceLinks(
+    document.getElementById("digital-hospital-source-map"),
+    [...domains.map((item) => item.sourceUrl), ...legalSources]
+  );
 }
 
 async function recordDigitalHospitalLaunchEvidence(requirementId, button) {

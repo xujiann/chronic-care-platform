@@ -30,6 +30,15 @@ const DASHBOARD_TASK_COLLECTIONS = [
   "integrationGatewayEvents"
 ];
 
+function bindDashboardInternalLinks(target, selector, inputs) {
+  const links = [...target.querySelectorAll(selector)];
+  window.HealthBrowserSafeUrl.setElementUrlBindings(links.map((link, index) => ({
+    element: link,
+    input: inputs[index],
+    options: { capability: "internal-navigation", baseUrl: location.href }
+  })));
+}
+
 document.addEventListener("DOMContentLoaded", async () => {
   const summary = await loadDashboardSummary();
   currentDashboardSummary = summary;
@@ -1529,8 +1538,9 @@ function renderRiskDrilldowns(drilldowns) {
     <small>${item.application || ""} / ${dashboardCollectionLabel(item.collection || "")}</small>
     <p>${dashboardStatusLabel(item.owner || "owner-pending")} / ${dashboardStatusLabel(item.dueAt || "due-pending")}</p>
     <p>${item.blocker || ""}</p>
-    ${item.entry ? `<a href="./${item.entry}">源应用</a>` : ""}
+    ${item.entry ? `<a data-dashboard-risk-entry>源应用</a>` : ""}
   </article>`).join("") || `<article class="drilldown-card empty"><strong>等待风险下钻</strong><p>源应用产生待办后显示责任人、时限、轨迹和阻塞原因。</p></article>`;
+  bindDashboardInternalLinks(list, "[data-dashboard-risk-entry]", items.filter((item) => item.entry).map((item) => item.entry));
 }
 
 function renderSiteEvidencePackage(packageData) {
@@ -1661,8 +1671,9 @@ function renderIndicatorCenter(center) {
       <strong>${dashboardTechnicalLabel(item.name || item.id)}</strong>
       <small>${(item.modules || []).map((text) => dashboardTechnicalLabel(text)).join(" / ")}</small>
       <p>${dashboardTechnicalLabel(item.nextAction || "")}</p>
-      <a class="inline-action" href="${item.href || "#dashboard-indicator-center"}">查看入口</a>
+      <a class="inline-action" data-dashboard-indicator-entry>查看入口</a>
     </article>`).join("");
+    bindDashboardInternalLinks(entrypoints, "[data-dashboard-indicator-entry]", rows.map((item) => item.href || "#dashboard-indicator-center"));
   }
   if (boundary) boundary.textContent = center.boundary || "指标中心只做行政管理、绩效评估和上线审查的指标汇总与下钻，不替代源系统上报。";
   list.innerHTML = visibleIndicators.map((item) => `<article class="indicator-card ${item.status || "watch"}" data-indicator="${item.id}" data-indicator-dimension="${item.dimension || ""}" data-indicator-status="${item.status || "watch"}">
@@ -1673,8 +1684,9 @@ function renderIndicatorCenter(center) {
     <p><b>来源：</b>${dashboardTechnicalLabel(item.source || "")}</p>
     <p><b>当前：</b>${dashboardTechnicalLabel(item.currentValue || "")} / <b>目标：</b>${dashboardTechnicalLabel(item.targetValue || "")}</p>
     <p><b>阻塞：</b>${(item.blockers || ["暂无阻塞"]).map((text) => dashboardTechnicalLabel(text)).join("；")}</p>
-    <a class="inline-action" href="${item.drilldown?.href || "#dashboard-indicator-center"}" data-indicator-drilldown="${item.id}">${dashboardTechnicalLabel(item.drilldown?.label || "查看下钻")}</a>
+    <a class="inline-action" data-indicator-drilldown="${item.id}">${dashboardTechnicalLabel(item.drilldown?.label || "查看下钻")}</a>
   </article>`).join("") || `<article class="indicator-card empty"><strong>暂无匹配指标</strong><p>切换维度或状态查看，或等待现场指标口径确认后补充。</p></article>`;
+  bindDashboardInternalLinks(list, "[data-indicator-drilldown]", visibleIndicators.map((item) => item.drilldown?.href || "#dashboard-indicator-center"));
 }
 
 const buildStaticIndustryGovernanceIndicatorCenter = buildDashboardIndicatorCenter;
@@ -2268,17 +2280,19 @@ function formatDashboardNumber(value) {
 }
 
 function renderApplications(applications) {
-  document.querySelector("#dashboard-applications").innerHTML = `<table>
+  const target = document.querySelector("#dashboard-applications");
+  target.innerHTML = `<table>
     <thead><tr><th>应用</th><th>入口</th><th>源记录</th><th>待办</th><th>高风险</th><th>状态</th></tr></thead>
     <tbody>${applications.map((item) => `<tr>
       <td>${item.name}</td>
-      <td><a href="./${item.entry}">进入应用</a></td>
+      <td><a data-dashboard-application-entry>进入应用</a></td>
       <td>${item.records}</td>
       <td>${item.openActions}</td>
       <td>${item.highRisks}</td>
       <td><span class="badge ${item.status === "modeled" ? "info" : "warn"}">${dashboardStatusLabel(item.status)}</span></td>
     </tr>`).join("")}</tbody>
   </table>`;
+  bindDashboardInternalLinks(target, "[data-dashboard-application-entry]", applications.map((item) => item.entry));
   renderTemplates(applications);
 }
 
@@ -2297,7 +2311,8 @@ function renderRisks(risks) {
 }
 
 function renderActions(actions) {
-  document.querySelector("#dashboard-actions").innerHTML = actions.map((item, index) => `<article class="priority-row">
+  const target = document.querySelector("#dashboard-actions");
+  target.innerHTML = actions.map((item, index) => `<article class="priority-row">
     <div class="priority-rank ${item.priority === "high" ? "danger" : item.priority === "medium" ? "warn" : "info"}">${index + 1}</div>
     <div>
       <h3>${dashboardCollectionLabel(item.title || item.id)}</h3>
@@ -2305,10 +2320,11 @@ function renderActions(actions) {
     </div>
     <div class="capability-side">
       <span class="badge ${item.priority === "high" ? "danger" : item.priority === "medium" ? "warn" : "info"}">${dashboardPriorityLabel(item.priority)}</span>
-      ${item.entry ? `<a href="./${item.entry}">源应用</a>` : ""}
+      ${item.entry ? `<a data-dashboard-action-entry>源应用</a>` : ""}
       <small>${dashboardStatusLabel(item.owner || "owner-pending")}</small>
     </div>
   </article>`).join("") || `<article class="priority-row"><div class="priority-rank info">0</div><div><h3>暂无跨应用待办</h3><p>源应用待办完成后这里会归零。</p></div></article>`;
+  bindDashboardInternalLinks(target, "[data-dashboard-action-entry]", actions.filter((item) => item.entry).map((item) => item.entry));
 }
 
 function bindDashboardFilters() {

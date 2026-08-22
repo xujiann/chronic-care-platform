@@ -16,6 +16,12 @@ const fallbackState = {
 
 let platformState = fallbackState;
 let drugConsumableState = { boundaries: [], rows: [], summary: {} };
+const INSURANCE_TRACEABILITY_OFFICIAL_ORIGINS = Object.freeze([
+  "https://nhsa.gov.cn",
+  "https://nmpa.gov.cn",
+  "https://www.nhsa.gov.cn",
+  "https://www.nmpa.gov.cn"
+]);
 
 document.addEventListener("DOMContentLoaded", async () => {
   platformState = await loadPlatformState(fallbackState);
@@ -139,7 +145,18 @@ function renderDrugConsumableSupervision(report) {
   const boundaryRows = boundaries.map((item) => `
     <div><strong>${item.name}</strong><span>${item.source} · ${item.count} 条</span></div>
   `).join("");
-  document.querySelector("#drug-consumable-boundaries").innerHTML = `${boundaryRows}${renderTraceabilityPolicySources(policySources)}${renderTraceabilityEvidenceChecklist(evidenceChecklist)}`;
+  const boundaryTarget = document.querySelector("#drug-consumable-boundaries");
+  boundaryTarget.innerHTML = `${boundaryRows}${renderTraceabilityPolicySources(policySources)}${renderTraceabilityEvidenceChecklist(evidenceChecklist)}`;
+  window.HealthBrowserSafeUrl.setElementUrlBindings([...boundaryTarget.querySelectorAll("[data-drug-traceability-policy-link]")].map((link, index) => {
+    const input = policySources[index]?.url || "./drug-consumable-about.html";
+    return {
+      element: link,
+      input,
+      options: policySources[index]?.url
+        ? { capability: "official-source", baseUrl: location.href, allowedOrigins: INSURANCE_TRACEABILITY_OFFICIAL_ORIGINS }
+        : { capability: "internal-navigation", baseUrl: location.href }
+    };
+  }));
   document.querySelector("#drug-consumable-list").innerHTML = rows.map((item) => {
     const badge = item.riskLevel === "high" ? "danger" : item.normalizedStatus === "pending" ? "warn" : "info";
     const resident = residentOf(platformState, item.residentId);
@@ -174,7 +191,7 @@ function renderTraceabilityPolicySources(policySources = []) {
     ${policySources.slice(0, 5).map((item) => `
       <div data-drug-traceability-policy-source="${item.id || ""}">
         <strong>${item.documentNo || item.authority || "Policy source"}</strong>
-        <span><a href="${item.url || "./drug-consumable-about.html"}">${item.title || item.authority || "Official source"}</a></span>
+        <span><a data-drug-traceability-policy-link>${item.title || item.authority || "Official source"}</a></span>
       </div>
     `).join("")}
   `;

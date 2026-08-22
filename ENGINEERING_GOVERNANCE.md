@@ -91,6 +91,7 @@ LEGACY CODE → TEST PROTECTION → REFACTOR
 | 所有权 | `npm run process:verify`、`npm run process:test` |
 | 平台迭代 | `npm run platform:iterations:test` |
 | E2E | `npm run test:e2e` |
+| 浏览器 sink | `npm run security:browser:verify` + `npm run static:test` + `npm run test:e2e`（模板 URL 归零、OHIF 外部 Origin 继续失败关闭） |
 | 部署 | `npm run deploy:check` |
 
 六个标准入口已在 TEST-001 T00 切片建立。`test:unit` 与

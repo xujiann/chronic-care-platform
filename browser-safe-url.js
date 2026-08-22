@@ -198,6 +198,26 @@
     return decision;
   }
 
+  function setElementUrlBindings(bindings = []) {
+    if (!Array.isArray(bindings)) {
+      throw policyError("SAFE_URL_BINDINGS_INVALID", "safe URL bindings must be an array");
+    }
+    return bindings.map((binding) => {
+      const element = binding?.element;
+      const attribute = binding?.attribute || "href";
+      try {
+        return Object.freeze({
+          ok: true,
+          decision: setElementUrl(element, attribute, binding?.input, binding?.options || {})
+        });
+      } catch (error) {
+        if (error?.name !== "BrowserSafeUrlError") throw error;
+        if (typeof element?.removeAttribute === "function" && ["href", "src"].includes(attribute)) element.removeAttribute(attribute);
+        return Object.freeze({ ok: false, errorCode: error.code });
+      }
+    });
+  }
+
   function navigate(input, options = {}) {
     const decision = resolve(input, options);
     const target = options.navigation || root?.location;
@@ -216,6 +236,7 @@
     exactOrigins,
     navigate,
     resolve,
-    setElementUrl
+    setElementUrl,
+    setElementUrlBindings
   });
 });

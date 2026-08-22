@@ -59,6 +59,14 @@ download 收敛到 `browser-safe-url-policy.v1`，动态 URL occurrence 从 69 �
 `review-required`。这不改变本 ADR 的分阶段 CSP 决策：兼容 CSP、严格 Report-Only、外部托管验证和
 `productionReady=false` 保持不变。
 
+### Safe URL 内部 sink 闭环状态（2026-08-23）
+
+29 个原模板 occurrence 已由 28 个真实 DOM 绑定迁移和 1 个普通 `item.action` 词法误报校正闭合，
+动态 URL 基线现为 6：共享端口内 4 个受控 sink、缺真实 OHIF exact-Origin 的 2 个导航。批量绑定仍
+逐项调用唯一 Safe URL port，恶意 javascript/data/userinfo/协议相对/未批准 Origin 不会留下可导航属性。
+本状态不推进 CSP enforcement 阶段；HTML/style sink、全角色浏览器、真实托管响应头和独立评估未闭合，
+因此兼容 `unsafe-inline`、严格 Report-Only 与 `productionReady=false` 不变。
+
 ## Phased enforcement and rollback
 
 1. 第一阶段：集中端口、兼容 CSP + 严格 Report-Only、风险清单、CI 增量拒绝；固定 `productionReady=false`。

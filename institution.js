@@ -3,6 +3,12 @@ const institutionApiBase = location.protocol === "file:" || location.hostname.en
 let platformState = fallbackState;
 let institutionRegistrationDashboard = null;
 let institutionDrugConsumableState = { boundaries: [], rows: [], summary: {} };
+const INSTITUTION_TRACEABILITY_OFFICIAL_ORIGINS = Object.freeze([
+  "https://nhsa.gov.cn",
+  "https://nmpa.gov.cn",
+  "https://www.nhsa.gov.cn",
+  "https://www.nmpa.gov.cn"
+]);
 
 document.addEventListener("DOMContentLoaded", async () => {
   platformState = await loadPlatformState(fallbackState);
@@ -387,7 +393,7 @@ function renderInstitutionTraceabilityPolicySources(policySources = []) {
   if (!policySources.length) {
     return `<div data-institution-traceability-policy-sources><strong>Traceability policy sources</strong><span>No official policy sources returned.</span></div>`;
   }
-  return `<div data-institution-traceability-policy-sources><strong>Traceability policy sources</strong><span>${policySources.length} official policy links; review <a href="./drug-consumable-about.html">the policy basis</a> before uploading evidence.</span></div>${policySources.slice(0, 5).map((item) => `<div data-institution-traceability-policy-source="${item.id || ""}"><strong>${item.documentNo || item.authority || "Policy source"}</strong><span><a href="${item.url || "./drug-consumable-about.html"}">${item.title || item.authority || "Official source"}</a></span></div>`).join("")}`;
+  return `<div data-institution-traceability-policy-sources><strong>Traceability policy sources</strong><span>${policySources.length} official policy links; review <a href="./drug-consumable-about.html">the policy basis</a> before uploading evidence.</span></div>${policySources.slice(0, 5).map((item) => `<div data-institution-traceability-policy-source="${item.id || ""}"><strong>${item.documentNo || item.authority || "Policy source"}</strong><span><a data-institution-traceability-policy-link>${item.title || item.authority || "Official source"}</a></span></div>`).join("")}`;
 }
 
 function renderInstitutionTraceabilityEvidenceChecklist(evidenceChecklist = []) {
@@ -412,7 +418,18 @@ function renderInstitutionDrugConsumableSupervision(report, state) {
   const boundaries = report?.boundaries || [];
   countEl.textContent = `${openRows.length}/${items.length} open`;
   boundaryEl.innerHTML = boundaries.map((item) => `<div><strong>${item.name}</strong><span>${item.source} | ${item.count}</span></div>`).join("") || `<div><strong>Institution remediation</strong><span>Drug, consumable, fixed-pickup and catalog evidence</span></div>`;
-  boundaryEl.insertAdjacentHTML("beforeend", renderInstitutionTraceabilityPolicySources(report?.traceabilityPolicySources || []));
+  const policySources = report?.traceabilityPolicySources || [];
+  boundaryEl.insertAdjacentHTML("beforeend", renderInstitutionTraceabilityPolicySources(policySources));
+  window.HealthBrowserSafeUrl.setElementUrlBindings([...boundaryEl.querySelectorAll("[data-institution-traceability-policy-link]")].map((link, index) => {
+    const input = policySources[index]?.url || "./drug-consumable-about.html";
+    return {
+      element: link,
+      input,
+      options: policySources[index]?.url
+        ? { capability: "official-source", baseUrl: location.href, allowedOrigins: INSTITUTION_TRACEABILITY_OFFICIAL_ORIGINS }
+        : { capability: "internal-navigation", baseUrl: location.href }
+    };
+  }));
   boundaryEl.insertAdjacentHTML("beforeend", renderInstitutionTraceabilityEvidenceChecklist(report?.traceabilityEvidenceChecklist || []));
   listEl.innerHTML = openRows.map((item) => {
     const resident = residentOf(state, item.residentId);
