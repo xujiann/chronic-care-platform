@@ -128,6 +128,10 @@ flowchart TB
     `review-required`。每个资产/类型同时绑定
     occurrence 数量和规范化源行聚合 SHA-256。相同数量的片段替换、数量增加和新类型/资产都会失败关闭；
     该清单和 Safe URL 端口不是可信 HTML 渲染、严格 CSP、外部 Origin 或生产安全证明。
+15. TEST-007 已在既有 `operations-command-handoff` harness 上建立 32/32 路径的闭集行为矩阵。
+    19 条读取和 13 条写入逐路径锁定角色、拒绝先于读取、payload/错误、响应与实际副作用；三条集成入口
+    另覆盖签名和机构范围，全部写入口覆盖审计/写入顺序及审计或写入失败不返回成功。专项门禁进入
+    governance-api；本切片没有修改 699 行 handler、HTTP、数据、Schema 或生产状态，ARC-008 仍未关闭。
 
 ## 6. T06 五子域治理切片
 

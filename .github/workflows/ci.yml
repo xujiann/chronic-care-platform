@@ -122,6 +122,8 @@ jobs:
         run: node --test test/process-worktree.test.js
       - name: Test modular-monolith architecture contracts
         run: npm run architecture:test
+      - name: Protect all operations command runtime behaviors
+        run: npm run operations-command:behavior-test
       - name: Verify state collection ownership and quarantine boundary
         run: npm run data:collection-governance:verify
       - name: Verify object storage architecture decision remains fail-closed

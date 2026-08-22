@@ -205,6 +205,10 @@ CORE_DATA_DEFINITIONS → collection-governance → CI/release 治理投影`。�
 
 医院运行依赖方向现为 `platform-governance/operations-dashboard|operations-command HTTP route → 注入的既有 operations builders / 数据与审计端口`。dashboard 保留 8 项只读依赖，command 的 20 项依赖完整迁入 T02 runtime context；T06 已删除两个 operations 子上下文及其独占依赖。builder、组合根、数据、响应和写入顺序均未移动，原两个全局路由插槽保持不变；本切片只关闭错误领域归属，不把宽 handler 误述为已完成用例拆分。
 
+TEST-007 的验证依赖方向为 `32 路径闭集 → 既有 operations-command createRuntime harness → 真实
+route segment`。它用注入 spy 验证授权、读取、构建、审计、持久化和响应的顺序，不引入运行时依赖或
+平行 router；`operations-command:behavior-test` 由 governance-api 和标准 unit 补集执行。
+
 ## 11. 区域共享调阅依赖方向
 
 当前方向为 `shared-05 兼容 HTTP 适配器 → regional-sharing-access-command.v1（目标 T02） → resident-authorization-decision.v1 anti-corruption adapter → T04 授权状态/lifecycle`，居民范围、审计和持久化继续作为注入端口。T00 integration 拥有本次跨 owner 接线；命令不直接读取 `personalRecords.meta`、不导入 `server.js`，旧 `createRegionalSharingAccessReview` 已从组合根和 shared runtime context 删除。

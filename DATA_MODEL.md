@@ -197,6 +197,12 @@ Owner。原 handler 的 `readDatabase`、`writeDatabase`、集合名称、120/80
 两者机器 Owner 仍为 T05 care-coordination；本切片不把运行时路由 Owner 迁移误写为数据 Owner
 迁移，后续必须通过独立 ADR 和 T05 owner port/版本化事件治理。
 
+TEST-007 现在对 13 条 operations 写路径逐条验证实际集合变化、安全审计和持久化调用顺序；其中
+7 条治理动作另验证 `platformProcessAudit`，并锁定审计失败不调用 `writeDatabase`、写入失败不发送
+成功响应。该测试使用内存 fixture，不新增
+集合、表、DDL、migration 或事务保证；`resourceDispatchRequests`、`taskMessages` 的 T05 Owner 与
+ARC-008 状态不变。
+
 ## 12. 连续审计来源的 AS-IS 边界
 
 `audit_delivery_source_events` 是 SQLite v15 新增的 append-only 来源。`server.js` 在既有平台状态

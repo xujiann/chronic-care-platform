@@ -50,4 +50,7 @@
 - OPS-01：`GET /api/operations/dashboard` 已由 T00 从 T06 原子移交 T02 `platform-governance/operations-dashboard`，保持 method/path、commission 角色、响应和全局 manifest 插槽；T06 删除对应子上下文及三个不再使用的依赖，并以唯一归属和禁止回流测试保护。
 - OPS-02：其余 32 个 `/api/operations` 字面路径已由 T00 从 T06 原子移交 T02 `platform-governance/operations-command`；原 20 项依赖和全局 manifest 插槽整体迁移，handler 除 route id/domain 外逐字不变，method/path、角色、状态码、响应、写库和审计语义保持兼容。T06 的 operations 路由计数归零，机器注册表标记 handoff complete。
 - OPS-02 保留了既有 `resourceDispatchRequests`、`taskMessages` 跨域直写，数据机器 Owner 仍为 T05 care-coordination；该兼容债由 TECH_DEBT ARC-008 跟踪，后续 owner port/事件治理必须另立 ADR，不属于本次路由归属移交。
+- TEST-007：复用既有 handoff harness，对 operations-command 的 32/32 路径补齐角色、拒绝先于读取、
+  payload/错误、响应、副作用、审计—写入顺序及失败语义；该测试保护 OPS-02 的兼容承诺，不改变
+  handler 或关闭 ARC-008。
 - 尚未实施：五个临床子域路由全面移动、完整运行时上下文拆分、中央数据 Owner 晋升、独立 CI、数据库拆分和独立部署；operations 大 handler 的后续用例端口拆分也不属于本次原子移交。

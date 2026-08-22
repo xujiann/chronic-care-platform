@@ -21,9 +21,11 @@
 | `clinical-blood` | 同时包含血液和影像 | 先以 API 前缀保护，再逐用例移入 blood/imaging 端口 |
 | `blood-innovation` | 同时包含血液和体检 | 先以 API 前缀保护，再逐用例移入 blood/physical-examination 端口 |
 | `operations-dashboard` | 不属于五个临床子域 | 已由 T00 handoff 至 T02 `platform-governance/operations-dashboard` |
-| `operations-command` | 不属于五个临床子域 | T00/T02 handoff 至 platform-governance/operations |
+| `operations-command` | 不属于五个临床子域 | 已由 T00 handoff 至 T02 `platform-governance/operations-command` |
 
-`/api/operations` 原有 33 个字面路径；dashboard 1 个已移交 T02，operations-command 仍保留 32 个待移交路径。dashboard handoff 保持公开协议，并在原全局路由插槽替换 owner segment；后续 command 迁移仍不得由 T06 单独改变全局路由顺序。
+`/api/operations` 原有 33 个字面路径；dashboard 1 个与 command 32 个均已移交 T02，并保持公开协议和
+原全局路由插槽。TEST-007 已为 command 32/32 路径建立运行时行为矩阵；后续 handler 拆分或
+ARC-008 跨域写入治理必须保持该矩阵通过，且不得由 T06 改变全局路由顺序。
 
 ## 3. 数据边界
 
