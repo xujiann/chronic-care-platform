@@ -142,7 +142,9 @@ JSON 源快照仍是高扇出依赖，但浏览器和 Pages 只依赖经统一�
   release-readiness 和 Pages 运行标准 build；required check 名称和 fail-closed 聚合保持不变。
 - 主分支必需检查名称仍为 `complete-unit-test` 与 `test`。聚合 test 使用 `always()`
   并要求三个风险域结果全部为 success，失败、取消和跳过均 fail-closed。
-- GitHub Actions 使用 `@vN` 标签而非 commit SHA。
+- GitHub Actions 的 checkout、Node、Pages 和 artifact 引用均固定到经官方仓库
+  `refs/tags/vN` 核验的完整 commit SHA，并保留 `# vN` 注释供升级评审；契约测试禁止
+  `actions/*@vN` 标签引用回流。
 - systemd 模板包含多项 Linux hardening。
 - Solution A 默认 HAPI 镜像为 `latest`；Orthanc DICOM 端口对宿主开放，必须在生产前加固。
 - Pages 先在 runner 临时目录构建显式资源集再上传；服务端和 Pages 共用同一发布清单。

@@ -27,7 +27,7 @@
 | 7B | 健康驾驶舱版本化指标 | 首个 `population-service-visits.v1` 合同已建立 / P1 | 由 T03 确认来源版本与签名证据、由 T00 注入服务端 region scope；其余指标按 owner 逐项接入 |
 | 8 | JSON 169 个遗留集合治理 | 候选 / P1 | owner 分类、使用证据、晋升/归档/迁移批次 |
 | 9 | 前端可信渲染与 CSP | 待 ADR / P1 | sink 清单、兼容策略、逐页 E2E/负向测试 |
-| 10 | CI/worker/部署依赖治理 | CI 风险域拆分已合入并经 main 验证，供应链/worker 仍候选 / P2 | 不降低 required checks；继续评审 Action 固定和 worker 观测契约 |
+| 10 | CI/worker/部署依赖治理 | CI 风险域拆分已合入并经 main 验证；Action 完整 SHA 固定已形成 T00 候选，worker 仍候选 / P2 | 不降低 required checks；合入后持续按官方 tag 升级并核验 commit SHA，继续评审 worker 观测契约 |
 | 11 | 居民小程序制品凭证扫描消除哈希误报 | 已完成 / P2 | JSON 仅扫描语义字符串值并精确跳过两个字段中的合法 SHA-256；非 JSON 保留文本扫描；真实演示凭证与伪造摘要负向测试已建立 |
 
 ## 每日任务模板
