@@ -44,3 +44,4 @@
 - 生产 API 目录从现有 route source inventory 与授权矩阵派生；所有条目默认 `NO-GO`，静态幂等标记和仓库门禁不构成生产证据。
 - State collection 数据 owner 只来自现有 owner/system 合同；process owner 和源码引用仅作为证据。
   无明确 owner 的集合必须显式 `review-required` 或 `legacy-quarantined`，仓库检查不能授权生产晋升。
+- 关键内部边界按 identity、audit、object storage、API governance 独立测量覆盖率；原 server.js 门禁保持不变，基线只能持平或提高，临时覆盖报告不构成生产证据。

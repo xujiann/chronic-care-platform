@@ -36,6 +36,9 @@ REFACTOR
 | 前端 | 允许/拒绝页面、恶意输入、缓存更新、E2E |
 | 外部 | 超时、验签失败、重放、provider 不可用 |
 
+触及 runtime identity、audit chain/source、object storage trust 或 API governance 时，还必须运行
+`npm run test:coverage:boundaries`。覆盖率阈值只能持平或提高，且不能用数字替代上表的负向行为断言。
+
 ## 4. 完成条件
 
 - 公共行为未意外变化；预期变化有批准和契约更新。

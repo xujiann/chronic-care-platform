@@ -62,7 +62,7 @@ P1 台账关闭。
 | Runtime | Node `>=22.5` | CI 使用 Node 24；依赖 `node:sqlite` |
 | 生产 npm | `pg ^8.22.0` | PostgreSQL 适配器；官方 npm audit 为 0 |
 | 测试 | `@playwright/test ^1.61.0` | 浏览器 E2E |
-| 覆盖率 | `c8 ^11.0.0` | 只 include `server.js` |
+| 覆盖率 | `c8 ^11.0.0` | 原 `server.js` 门禁保持 85/85/55；另按 identity、audit、object storage、API governance 四组锁定真实基线 |
 | 静态质量（开发） | `eslint 9.39.5`、`typescript 7.0.2`、`@types/node 22.20.1` | 精确版本；Node `>=22.5` 兼容；不进入生产依赖 |
 | 平台内置 | http/fs/path/crypto/https | 无 Web 框架，路由和静态服务自行实现 |
 
@@ -163,6 +163,7 @@ CORE_DATA_DEFINITIONS → collection-governance → CI/release 治理投影`。�
 - governance-api 先校验声明级授权矩阵，再校验其派生的生产 API 目录；目录只依赖既有 `routeSourceFiles` 和授权输出，不依赖组合根、数据库或外部系统，也不生成仓库制品。
 - governance-api 同时执行 `data:collection-governance:verify`；新集合、陈旧/重复状态、owner/reader
   边界、源码使用状态漂移或任何生产晋升标志都会失败，命令默认只输出摘要且不写 release。
+- governance-api 随后运行四组内部边界覆盖门禁；脚本仅依赖现有 c8、既有测试和显式配置，报告写入临时目录并在结束时删除。该门禁与原 `server.js` 85/85/55 覆盖门禁独立，不能相互替代。
 - GitHub Actions 的 checkout、Node、Pages 和 artifact 引用均固定到经官方仓库
   `refs/tags/vN` 核验的完整 commit SHA，并保留 `# vN` 注释供升级评审；契约测试禁止
   `actions/*@vN` 标签引用回流。

@@ -1,0 +1,97 @@
+{
+  "schemaVersion": "internal-boundary-coverage-v1",
+  "reportPolicy": "temporary-ci-artifact-only",
+  "legacyServerCoverage": {
+    "script": "test:coverage",
+    "minimum": { "lines": 85, "functions": 85, "branches": 55 }
+  },
+  "groups": [
+    {
+      "id": "runtime-identity-policy",
+      "owner": "T01",
+      "includes": ["src/identity-security/runtime-identity-policy.js"],
+      "tests": ["test/runtime-identity-policy.test.js"],
+      "baseline": { "lines": 96.83, "functions": 100, "branches": 64.84 }
+    },
+    {
+      "id": "audit-chain-source",
+      "owner": "T00",
+      "includes": [
+        "src/identity-security/audit-chain.js",
+        "src/identity-security/audit-delivery-source.js"
+      ],
+      "tests": [
+        "test/audit-retention.test.js",
+        "test/audit-delivery-source.test.js"
+      ],
+      "baseline": { "lines": 93.19, "functions": 100, "branches": 74.49 }
+    },
+    {
+      "id": "object-storage-trust",
+      "owner": "T00",
+      "includes": ["secure-object-storage.js"],
+      "tests": [
+        "test/secure-object-storage.test.js",
+        "test/object-storage-readiness.test.js"
+      ],
+      "baseline": { "lines": 97.63, "functions": 100, "branches": 69.27 }
+    },
+    {
+      "id": "api-governance",
+      "owner": "T00",
+      "includes": [
+        "scripts/api-authorization-matrix.js",
+        "scripts/production-api-catalog.js"
+      ],
+      "tests": [
+        "test/api-authorization-matrix.test.js",
+        "test/production-api-catalog.test.js"
+      ],
+      "baseline": { "lines": 95.66, "functions": 92.3, "branches": 80.97 }
+    }
+  ],
+  "negativeMatrix": [
+    {
+      "id": "runtime-identity-production-trust",
+      "group": "runtime-identity-policy",
+      "test": "test/runtime-identity-policy.test.js",
+      "title": "production bearer and hybrid modes require the explicit compatibility gate and remain NO-GO"
+    },
+    {
+      "id": "audit-tampering",
+      "group": "audit-chain-source",
+      "test": "test/audit-retention.test.js",
+      "title": "audit verification rejects mutation deletion insertion reorder and structural defects"
+    },
+    {
+      "id": "object-storage-trust-tampering",
+      "group": "object-storage-trust",
+      "test": "test/secure-object-storage.test.js",
+      "title": "trust v1 rejects signed response body binding drift and hides provider errors"
+    },
+    {
+      "id": "missing-authentication",
+      "group": "api-governance",
+      "test": "test/production-api-catalog.test.js",
+      "title": "catalog validation rejects missing authentication classification"
+    },
+    {
+      "id": "method-path-drift",
+      "group": "api-governance",
+      "test": "test/production-api-catalog.test.js",
+      "title": "catalog validation rejects method and path drift"
+    },
+    {
+      "id": "idempotency-missing",
+      "group": "api-governance",
+      "test": "test/production-api-catalog.test.js",
+      "title": "catalog validation rejects missing idempotency classification"
+    },
+    {
+      "id": "production-promotion",
+      "group": "api-governance",
+      "test": "test/production-api-catalog.test.js",
+      "title": "catalog validation rejects production promotion"
+    }
+  ]
+}

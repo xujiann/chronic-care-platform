@@ -56,23 +56,51 @@ test("runtime-derived paths and roles remain explicit review blockers", () => {
   assert.equal(unresolved.every((entry) => entry.production.status === "NO-GO"), true);
 });
 
-test("catalog validation rejects production promotion, duplicate keys and missing authorization", () => {
+test("catalog validation rejects production promotion", () => {
   const matrix = buildMatrix();
   const promoted = clone(buildProductionApiCatalog(matrix));
   promoted.entries[0].production.status = "GO";
   promoted.entries[0].production.productionReady = true;
   assert.match(validateProductionApiCatalog(promoted, matrix).join("\n"), /must fail closed/);
+});
 
+test("catalog validation rejects duplicate keys", () => {
+  const matrix = buildMatrix();
   const duplicated = clone(buildProductionApiCatalog(matrix));
   duplicated.entries.push(clone(duplicated.entries[0]));
   duplicated.summary.entries += 1;
   duplicated.summary.productionNoGo += 1;
   assert.match(validateProductionApiCatalog(duplicated, matrix).join("\n"), /duplicate catalog key/);
+});
 
+test("catalog validation rejects missing authentication classification", () => {
+  const matrix = buildMatrix();
+  const missingAuthentication = clone(buildProductionApiCatalog(matrix));
+  delete missingAuthentication.entries[0].authentication;
+  assert.match(validateProductionApiCatalog(missingAuthentication, matrix).join("\n"), /no authentication classification/);
+});
+
+test("catalog validation rejects missing authorization roles", () => {
+  const matrix = buildMatrix();
   const missingAuthorization = clone(buildProductionApiCatalog(matrix));
   const protectedEntry = missingAuthorization.entries.find((entry) => entry.authentication.required);
   protectedEntry.authorization.roles = [];
   assert.match(validateProductionApiCatalog(missingAuthorization, matrix).join("\n"), /no role or scope policy/);
+});
+
+test("catalog validation rejects method and path drift", () => {
+  const matrix = buildMatrix();
+  const drifted = clone(buildProductionApiCatalog(matrix));
+  drifted.entries[0].path = "/api/drifted-path";
+  assert.match(validateProductionApiCatalog(drifted, matrix).join("\n"), /method\/path drift/);
+});
+
+test("catalog validation rejects missing idempotency classification", () => {
+  const matrix = buildMatrix();
+  const missingIdempotency = clone(buildProductionApiCatalog(matrix));
+  const writeEntry = missingIdempotency.entries.find((entry) => entry.idempotency.required);
+  delete writeEntry.idempotency;
+  assert.match(validateProductionApiCatalog(missingIdempotency, matrix).join("\n"), /no idempotency classification/);
 });
 
 test("catalog validation rejects source inventory drift", () => {

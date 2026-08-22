@@ -28,6 +28,7 @@
 | alert cutover runtime | T00 | B | 已改为显式 provider 端口，并有缺失/无效/异常失败测试和禁止反向依赖的架构测试 | 保持接口与 NO-GO 语义；worker 加载大组合根的残余随 ARC-001 渐进治理 |
 | CI/readiness pipeline | T00 | B | 已按风险域拆分、建立六个标准入口并保留 fail-closed 聚合门禁 | 扩大静态检查基线，继续治理测试性能、供应链固定与 worker 观测 |
 | API authorization/catalog governance | T00 | B | 复用 route inventory 与授权矩阵派生 594 项 endpoint 目录，负向门禁禁止缺失字段和生产放行 | 各 owner 逐项消除 runtime-policy、自定义鉴权和幂等观察缺口，不手工维护平行清单 |
+| internal boundary coverage governance | T00 | B | 四个关键边界独立锁定真实覆盖基线和负向矩阵，报告临时化 | 新增风险边界逐组纳入；阈值只升不降，不替代行为测试 |
 | continuous audit delivery | T00 | C | adapter、preflight、部署闭包与默认信号已标准化，但仍轮询 120 条展示快照，receipt/checkpoint/lock/WORM 不能证明生产耐久 | 按 ADR 先建事务内 append-only source，再依次治理可信 receipt、target binding、lease/fencing 与外部 anchor；当前只允许 rehearsal |
 
 ## 领域模块

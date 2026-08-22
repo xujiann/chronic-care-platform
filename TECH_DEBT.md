@@ -20,7 +20,7 @@
 | SEC-004 | XSS / CSP 面 | 37 个可执行内联脚本、8 个样式块和 13 个样式属性已迁至外部脚本/CSS/class，显式发布图 P0/P1 静态风险为 0 且 CI 拒绝新增；兼容 CSP 仍含 `unsafe-inline`，严格策略仅 Report-Only。871 个 HTML sink、动态 CSSOM 与真实托管响应头尚未完成运行时验证 | 补全角色浏览器回归、恶意输入和动态样式验证，再独立移除兼容 `unsafe-inline`；真实动态/静态响应头、独立扫描和渗透验收前继续 NO-GO |
 | SEC-005 | 混合会话 | 服务端 token 已禁止写入 localStorage，Cookie/Authorization 并存时 Cookie 优先，旧凭据自动清理；生产 bearer/hybrid 需显式兼容门禁并保持 NO-GO，静态演示仅保存无凭据身份状态 | bearer-only 仍有页面内存凭据、刷新即失效和额外运维状态；XSS/CSP 风险及真实 Cookie/CSRF 现场验证尚未关闭 |
 | DATA-008 | 集合 owner 决策 | 252/252 已有机器状态，但 188 个 `review-required` 与 1 个 `legacy-quarantined` 仍无可证明数据 owner | 按领域 owner 分批确认、归档或通过合同/migration 晋升；当前全部生产失败关闭 |
-| TEST-002 | 覆盖率 | c8 只 include `server.js`，固定测试清单 | 新 `src/` 模块和浏览器代码不在覆盖率结论中 |
+| TEST-002 | 覆盖率 | 原 `server.js` c8 门禁之外，identity、audit、object-storage trust 与 API governance 四组已建立独立真实基线和负向矩阵 | 其余 `src/` 模块和浏览器代码仍不在覆盖率结论中；按风险分组扩展，不得降低既有阈值 |
 | TEST-003 | 安全负向测试 | 已建立源码、配置、环境模板、Git 元数据、文档和 `data/db.json` 拒绝矩阵 | 后续新增敏感类别必须扩展矩阵 |
 | GOV-001 | 规则冲突 | 基线中的路由工作流仍写旧集成分支/旧 baseline；本 T00 已校准，待合入关闭 | 操作人员可能走错误合入路径 |
 
@@ -50,7 +50,8 @@
 | TEST-004 | 2026-08-19 | 居民小程序 JSON 制品改为递归扫描语义字符串值，仅跳过精确摘要字段中的合法 SHA-256；非 JSON 仍全文扫描 | 摘要命中放行，伪造摘要字段、`123456`、`888888`、`DEMO-MOBILE` 语义值和非 JSON 文本均拒绝 |
 | DATA-001 | 2026-08-22 | `STORAGE_SCHEMA_VERSION`、storageMeta、部署/readiness/release 门禁统一派生注册表 head v15 | 静态契约、storage、部署、生产就绪与发布报告测试 |
 | DATA-002 | 2026-08-22 | v1–v14 独立注册并冻结内容指纹，v15+ ledger 写内容 SHA-256，runner 拒绝连续性/name/checksum 漂移 | 空库、v11 升级、重跑、指纹/ledger 漂移、v15 checksum、未来 v16 与失败回滚测试 |
-| TEST-001 | 2026-08-20 | 建立 build/lint/typecheck/unit/integration/smoke 标准入口并映射 CI/Pages；test:all 语义不变 | 标准门禁契约、完整测试分区、隔离 smoke、静态发布链、CI 映射和全量回归 |
+| TEST-001 | 2026-08-22 | 建立 build/lint/typecheck/unit/integration/smoke 标准入口并映射 CI/Pages；test:all 与原 server.js 85/85/55 覆盖门禁语义不变 | 标准门禁契约、完整测试分区、隔离 smoke、静态发布链、CI 映射、独立内部边界覆盖和全量回归 |
+| TEST-002 | 2026-08-22 | 为 runtime identity、audit chain/source、object storage trust、API catalog/authorization 建立四个独立 c8 组并冻结当前真实基线；报告只存在临时目录 | 配置/脚本治理测试锁定阈值不得降低，要求每组至少一条直接负向合同，并绑定生产身份不可信模式、篡改、缺鉴权、路径漂移、幂等缺失和生产误 promotion 矩阵 |
 | ARC-002 | 2026-08-21 | alert runtime 改为显式 provider，worker 在组合边界懒注入既有 readiness；静态环由 1 降为 0，并已通过 PR #132 与 main CI/Pages | 缺失/无效/异常 provider、CLI 默认组合、反向依赖架构守卫和 Chromium E2E |
 | SEC-003 | 2026-08-20 | v2 验证器统一运行时/留存语义；内容、链接、结构、重复 ID 严格失败；全量 state 写入不能修改服务端审计数组 | 普通字段、首中尾链接、删除、插入、重排、结构和 API 拒绝回归 |
 | SEC-006 | 2026-08-21 | OTP、发送/登录限流和失败锁定迁入共享认证安全状态；生产多实例强制 PostgreSQL，签发/消费/撤销原子化 | SQLite 跨实例、PG 序列化重试、TTL、尝试耗尽、重启、并发单次消费与真实 PG CI 合同 |
@@ -76,7 +77,7 @@
 1. 后续 v16+ migration 的数据回填、前滚恢复和多历史版本 fixture。
 2. role × permission × resident/institution/region 数据范围矩阵。
 3. 前端 sink 的可信输入/恶意输入回归。
-4. 将覆盖率从 `server.js` 扩展到新增 `src/` 安全、存储和 worker 模块。
+4. 在现有四个内部边界覆盖组上逐步纳入新增存储/worker 模块；不得降低基线或替代行为负向断言。
 5. 在真实 provider/PostgreSQL/SIEM/WORM 环境重跑合同并封存受控证据引用。
 
 ## REG-01A 剩余债务
