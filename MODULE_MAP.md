@@ -126,10 +126,12 @@ scripts/platform-cutover-alert-worker.js
   allowlist；默认使用系统临时目录，显式输出仍必须位于仓库外。
 - `scripts/run-standard-test-suite.js` 与 `config/standard-test-suites.json` 管理测试分类；
   integration 冻结旧 `npm test` 清单，unit 是 `test:all` 根测试集合的精确补集，smoke
-  只保留隔离启动与发布健康检查。
+  只保留隔离启动与发布健康检查。TEST-006 将 `test/api.test.js` 标为 integration isolated hotspot，
+  不改变成员和执行顺序；runner 输出 batch/suite `durationMs`，不设置或放宽耗时阈值。
 - `eslint.config.js` 与 `jsconfig.typecheck.json` 是渐进式静态质量边界，不拥有业务接口。
   Pages、complete-unit-test、governance-api 和 release-readiness 只消费这些标准入口；
-  `test:all` 仍是独立的自动发现回归保护。
+  `test:all` 仍是独立的自动发现回归保护。lint 现只为两个前端文件保留 16 个重复键的规则级
+  例外，typecheck 覆盖 13 个唯一边界文件。
 - `scripts/internal-boundary-coverage.js` 复用现有 c8 与专项测试，为四个关键边界建立独立覆盖组；
   它不替代原 `server.js` 85/85/55 门禁，阈值只能持平或提高，报告不进入仓库。
 - `test/operations-command-handoff.test.js` 复用原 T02 handoff harness，把 32 条 operations command

@@ -168,6 +168,9 @@ CORE_DATA_DEFINITIONS → collection-governance → CI/release 治理投影`。�
   部署证据在 release-readiness 并行执行，不再共享浏览器外部依赖的时间预算。
 - complete-unit-test 依次运行标准 unit/integration，governance-api 运行 lint/typecheck/smoke，
   release-readiness 和 Pages 运行标准 build；required check 名称和 fail-closed 聚合保持不变。
+- TEST-006 保持上述 CI job 拓扑、预算和 required check 不变；标准 integration runner 依据同一
+  suite 配置把 `test/api.test.js` 作为单文件热点批次，其余文件仍按既有 40 文件上限顺序分批。
+  每个批次和整套测试向日志输出 `durationMs`，不设性能放行阈值，也不写仓库报告。
 - 主分支必需检查名称仍为 `complete-unit-test` 与 `test`。聚合 test 使用 `always()`
   并要求三个风险域结果全部为 success，失败、取消和跳过均 fail-closed。
 - governance-api 先校验 custom auth 控制流/负向测试证据，再校验声明级授权矩阵、显式幂等行为证据合同和派生生产 API 目录；依赖方向为 `routeSourceFiles + authentication/idempotency 小型 evidence registry → authorization matrix v3 → production catalog v3`。SMS 认证从既有幂等合同派生，不复制认证真相；字面 inventory 只在同一未结束 handler 范围配对 method/path，禁止从相邻 GET/POST 分支制造依赖；证据门禁不写数据库、报告或发布制品。
