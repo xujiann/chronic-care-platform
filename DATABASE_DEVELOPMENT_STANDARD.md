@@ -60,3 +60,10 @@ DATA-003 已为 252/252 个当前 state collection 建立机器状态与源码�
 - v1–v14 的源码内容必须匹配仓库冻结 SHA-256；任何修正都新建 v15+ migration。
 - v15+ 的 ledger checksum 使用注册表内容 SHA-256，并继续要求事务、空库/升级/重跑/失败测试。
 - schema head 只能从注册表导出；运行时、部署、readiness、报告和测试不得另建数字常量。
+
+### Proposed migration 预留约束
+
+Proposed ADR 可以在机器决策台账中预留“当前 head + 1”供冲突检测，但预留不是 migration、owner 或实施
+授权。台账必须默认关闭 migration/runtime/API/production promotion；若 head 在 ADR Accepted 前前进，
+应失败关闭并重新评审版本，而不是覆盖已合入 migration。本规则当前用于对象存储 v17 提案；实际 DDL、
+回填、冻结和回滚只能在 ADR Accepted 与 data owner 确认后的独立切片中建立。

@@ -171,3 +171,14 @@ process 自动成为数据 owner。252 个集合的 `productionPromotionAllowed`
   `requestPathExternalDispatch=false`；不调用 provider、不写 delivery 结果。durable queue 不可用或不健康时
   返回 503，institution 虽不获取全局计数，仍使用同一真实健康判定。
 - 人工 dead-letter replay 仅经受控 CLI digest 参数执行，尚未新增公网 HTTP 管理接口。
+
+## 14. 对象存储异步 API 候选（Proposed，未实施）
+
+现有安全附件 method/path、同步响应、鉴权、范围、错误和审计行为均未改变。Proposed ADR 建议未来另发
+版本化 v2：创建命令返回 `202 + commandId + statusUrl`，状态查询和人工 replay 使用稳定错误、幂等键与
+资源范围；生产请求路径不得直接调用 provider。具体 path、v1 是否继续同步、弃用窗口和调用方迁移顺序
+尚未获人类批准，不能登记为现有 API 或进入 production catalog 的 GO。
+
+机器治理 CLI 不是 HTTP API。ADR 未 Accepted 或 data owner/v1-v2 兼容策略未确认时，v17、runtime/API
+implementation 和 production promotion 全部失败关闭。真实 provider endpoint、凭据、回执、capability
+与现场验收继续是外部 NO-GO 边界。

@@ -30,6 +30,7 @@
 | 9 | 前端可信渲染与 CSP | Accepted ADR；37 个脚本和 21 个静态样式风险已外移；血液主工作台完成首个可信 DOM/text 试点，Inventory v2 现锁定 871 个 DOM HTML、69 个动态 URL、45 个动态样式风险且禁止增加/替换 / P1 | 沿用页面 Owner 小批次迁移和恶意输入回归；真实托管头验证与独立安全评估后才移除兼容 `unsafe-inline` 并强制严格 CSP |
 | 10 | CI/worker/部署依赖治理 | CI 风险域拆分已合入并经 main 验证；Action 完整 SHA 固定已形成 T00 候选，worker 仍候选 / P2 | 不降低 required checks；合入后持续按官方 tag 升级并核验 commit SHA，继续评审 worker 观测契约 |
 | 11 | 居民小程序制品凭证扫描消除哈希误报 | 已完成 / P2 | JSON 仅扫描语义字符串值并精确跳过两个字段中的合法 SHA-256；非 JSON 保留文本扫描；真实演示凭证与伪造摘要负向测试已建立 |
+| 12 | 对象存储结构化元数据与耐久命令轨道 | Proposed OBJ-ADR-002；仅完成机器 decision/action register、v17 冲突预留和 CI fail-closed 治理 / P1 | 人类确认 T08 data owner 与 v1/v2 兼容策略，ADR 转 Accepted 后才可按 v17→全量回填/冻结→异步 API→fenced worker→无损分页→持久 reconcile→readiness 的独立切片实施；真实 provider/KMS/WORM/扫描/容量/备份/现场证据继续 NO-GO |
 
 ## 每日任务模板
 
@@ -49,3 +50,11 @@
 - 下一现场阶段：绑定真实 endpoint/secret provider/activation trust files 与外部签名 decision，核验供应方幂等与签名回执，启用服务
   和告警并完成故障/恢复/死信 replay/回滚演练。
 - PostgreSQL 多节点主存储需另立 ADR/migration；在外部证据完成前保持 production NO-GO。
+
+## 2026-08-23 对象存储 ADR 前置治理
+
+- 基于 `origin/main@0796886` 建立 Proposed ADR；不改变 schema head v16、API、runtime 或数据。
+- 机器台账明确建议 T08 data owner、T00 technical owner，并把 owner/兼容策略标为两项未决人类决策。
+- governance-api 执行 fail-closed 检查：ADR/台账漂移、v17 被占用、owner 被推断、行动提前或任何
+  migration/runtime/API/promotion 标志误启用均失败。
+- 下一步不是直接编码；先完成人类决策和 ADR Acceptance，再按每个可回滚阶段独立审批。

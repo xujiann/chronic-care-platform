@@ -82,7 +82,9 @@ test("CI maps standard gates without renaming required checks or weakening test:
   assert.match(workflow, /npm run test:smoke/);
   assert.match(workflow, /npm run build/);
   assert.match(workflow, /npm run test:coverage:boundaries/);
+  assert.match(workflow, /npm run object-storage:architecture-governance:verify/);
   assert.match(pages, /npm run build -- --output="\$RUNNER_TEMP\/pages-site"/);
+  assert.equal(pkg.scripts["object-storage:architecture-governance:verify"], "node scripts/object-storage-architecture-governance.js");
   assert.equal(pkg.scripts["test:all"], "node scripts/test-all.js");
 });
 

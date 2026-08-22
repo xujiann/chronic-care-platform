@@ -40,3 +40,14 @@
 匹配 `accounts→Account`、`residents→Resident`、`integrationContracts→IntegrationContract`、
 `serviceOrders→ServiceOrder`。匹配不创建 owner、不证明语义等价，也不授权生产晋升；未匹配集合
 更不能据名称猜测概念。概念/主键/owner 变化仍必须遵守本文件的 ADR、migration、核对和回滚规则。
+
+## 对象存储提案的 closed-world 边界
+
+Proposed `OBJ-ADR-002` 不创建新的核心主体。安全附件元数据继续被视为既有 `HealthRecord` 的受限对象
+引用/保留投影，对象存储命令属于既有 `IntegrationContract` 的执行记录，安全与生命周期操作继续产生
+既有 `AuditEvent`；不得另造 Resident、Record、Institution 或 Audit 身份体系。
+
+T08 integration 作为 data owner 只是建议，T00 只是建议的 technical storage/worker owner。未由人类确认
+并更新机器 owner 合同前，不能把 `secureAttachments` 或未来结构化表登记为核心 owner，也不能用 route
+owner 推断。附件 ID、对象版本、命令 ID、resident/record/institution 关系、分类、保留和 legal-hold 语义
+如需冻结，必须在 Accepted ADR、v17 migration、回填核对和兼容/回滚方案中明确。

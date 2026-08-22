@@ -226,3 +226,17 @@ row，并可对应多个 append-only replay 记录。
 投递 row 的 source 列永久冻结；worker 只更新状态、尝试、下一次时间、租约 fencing、最小回执/错误摘要。
 token、原始错误、原始 provider receipt、凭据和人工审批正文不入库。外部供应方幂等、可信签名回执和
 PostgreSQL 多节点主存储尚未建立，`productionReady=false`。
+
+## 16. 对象存储 v17 候选模型（Proposed，未实施）
+
+当前权威事实没有变化：`secureAttachments` 仍在遗留 state collection 中，data owner 未确认，SQLite
+head 为 v16。Proposed ADR 仅为未来 v17 预留
+`secure_attachment_records`、`object_storage_commands`、`object_storage_command_receipts`、
+`object_storage_reconciliation_cases`、`object_storage_reconciliation_actions` 五组候选关系；仓库当前
+不存在这些表、DDL、回填或 PostgreSQL 对应实现。
+
+候选关系为一条附件元数据对应多个稳定命令；一条命令最多一个当前投递状态并可绑定不可变最小回执；
+附件/命令可关联多个对账 case/action。若 ADR Accepted，回填必须覆盖全部遗留行并以 count/digest/orphan
+失败关闭，通过后冻结遗留写入，不允许结构化表与 collection 在请求路径双写。列表候选使用绑定 scope、
+排序版本和 high-water mark 的 keyset cursor，不能以 500 条数组切片或 offset 替代。上述均非当前 schema
+事实或生产授权；data owner 与 API 兼容仍需人类确认。

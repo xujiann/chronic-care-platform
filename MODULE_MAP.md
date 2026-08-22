@@ -187,3 +187,16 @@ owner、文件引用和 closed-world 核心概念匹配只是证据，不能自�
   实际决定不进入仓库。
 - 边界：HTTP 路由只提交/查询本地队列；worker 才能调用 publisher。内嵌 outbox 保留 API 兼容，专用
   SQLite outbox 是外部投递权威状态。跨主机 PostgreSQL 实现尚不存在。
+
+## 17. 对象存储 ADR 前置治理模块
+
+| 模块 | Owner / Process | 类型 | 当前边界 |
+|---|---|---|---|
+| `config/object-storage-architecture-decision.json` | T00 治理；建议 T08 data owner 待确认 | machine decision/action register | 记录 Proposed 状态、两项人类决策、v17 预留和十项 blocked 行动；不是数据 owner 合同或实施授权 |
+| `scripts/object-storage-architecture-governance.js` | T00 | 只读 fail-closed CLI | 核对 ADR 状态/章节、行动覆盖、owner 未推断、SQLite head v16/v17 预留和 promotion=false；不写数据库或报告 |
+| `test/object-storage-architecture-governance.test.js` | T00 | TEST-001/architecture 保护 | 覆盖误启用 v17/runtime/API/promotion、行动提前、owner 推断、ADR 漂移、版本冲突和未决人类审批 |
+| `secure-object-storage.js`、`src/http/routes/integration.js` | 既有 T00/T08 | 未修改运行时 | 保持 v1 信任与同步兼容行为；没有在本切片实现 v17、异步 API、worker 或 reconcile |
+
+建议目标边界是 `T08 owner command/API → T00 structured repository + durable worker → gateway`，但只有 ADR
+Accepted、data owner 与兼容策略获人类批准后才能进入逐切片实现。Proposed 台账不能替代
+`config/domain-data-ownership.json`，也不能把 T08 route owner 自动解释为 data owner。
