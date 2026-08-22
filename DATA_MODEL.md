@@ -206,9 +206,9 @@ source/sink contract、目标摘要、cursor/source hash 与 receipt 摘要；ch
 
 ## 13. 生产 API 目录数据边界
 
-`production-api-catalog-v2` 是从路由源码、授权矩阵与小型行为证据注册表即时派生的治理元数据，不新增 JSON 集合、SQLite/PostgreSQL 表、字段、DDL、migration、outbox 或生产事实源。`config/api-idempotency-evidence.json` 只登记已验证 endpoint 合同，不复制 594 项路由清单；首项仅引用既有 SMS 回调实现/测试锚点。默认命令只向标准输出返回计数摘要；禁止加入凭据、真实 endpoint、患者标识、provider payload 或外部回执。
+`production-api-catalog-v3` 是从路由源码、授权矩阵与两个小型证据注册表即时派生的治理元数据，不新增 JSON 集合、SQLite/PostgreSQL 表、字段、DDL、migration、outbox 或生产事实源。`config/api-authentication-evidence.json` 只登记可由控制流和负向测试证明的 custom auth 入口；SMS 认证继续从既有 `config/api-idempotency-evidence.json` 派生，避免第二份手工真相。两者均只保存源码/测试引用和分类字符串，不复制 593 项路由清单，也不保存真实 credential、provider payload 或外部回执。
 
-目录中的 `source-marker-observed` 不是幂等执行证据；只有注册表合同、实现锚点和可执行测试证据全部验证通过才标记 `behavior-verified`。该状态只证明当前仓库行为，不证明跨实例 exactly-once 或生产耐久性；`NO-GO` 也不是可被写入业务状态的生命周期字段。真实 API 联调和现场证据仍由各领域既有权威模型管理，不能回写或反向污染该派生目录。
+目录中的源码 marker 既不是认证证明，也不是幂等执行证据；只有 owner、控制流锚点和可执行负向测试一致时才产生认证 evidence contract。认证分类只描述 AS-IS 的 required/optional/none、凭据来源、replay/CSRF 和 scope，不代表目标政策充分或生产安全。幂等 `behavior-verified` 仍只证明当前仓库行为，不证明跨实例 exactly-once 或生产耐久性；所有生产状态继续 `NO-GO`。
 
 ## 14. 内部边界覆盖率数据边界
 

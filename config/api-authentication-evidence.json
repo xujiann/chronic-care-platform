@@ -1,0 +1,611 @@
+{
+  "schemaVersion": "api-authentication-evidence-v1",
+  "policy": {
+    "sourceMarkersAreAuthenticationProof": false,
+    "unregisteredCustomAuthenticationStatus": "review-required",
+    "productionPromotionAllowed": false
+  },
+  "contracts": [
+    {
+      "contractId": "identity-security.authorization-context-session.v1",
+      "key": "GET /api/auth/context",
+      "method": "GET",
+      "path": "/api/auth/context",
+      "owner": "T01",
+      "domain": "authorization-context",
+      "purpose": "read-current-authorization-context",
+      "authentication": {
+        "required": true,
+        "mode": "required",
+        "mechanism": "bearer-or-cookie-session",
+        "principalType": "platform-user",
+        "credentialSource": ["cookie:health_city_browser_session", "header:authorization-bearer"]
+      },
+      "authorization": {
+        "model": "live-session-known-role-context",
+        "roles": [],
+        "dataScope": "current-session-authorization-context"
+      },
+      "replayCsrf": {
+        "replayProtection": "not-required-safe-read",
+        "csrf": "not-required-safe-read"
+      },
+      "implementationEvidence": [
+        {
+          "file": "src/http/routes/authorization-context.js",
+          "anchors": [
+            "req.method !== \"GET\" || url.pathname !== \"/api/auth/context\"",
+            "const session = runtime.currentSession(req)",
+            "AccessPolicy.knownRoles.includes"
+          ]
+        }
+      ],
+      "negativeTestEvidence": [
+        {
+          "file": "test/authorization-runtime-api.test.js",
+          "anchors": [
+            "authorization context requires authentication and denies unknown roles",
+            "assert.equal(anonymous.status, 401)",
+            "assert.equal(forged.status, 401)"
+          ]
+        }
+      ],
+      "repositoryStatus": "control-flow-and-negative-test-verified",
+      "productionReady": false,
+      "externalEvidenceRequired": true
+    },
+    {
+      "contractId": "identity-security.auth-me-live-session.v1",
+      "key": "GET /api/auth/me",
+      "method": "GET",
+      "path": "/api/auth/me",
+      "owner": "T01",
+      "domain": "identity-security",
+      "purpose": "read-current-live-session",
+      "authentication": {
+        "required": true,
+        "mode": "required",
+        "mechanism": "bearer-or-cookie-session",
+        "principalType": "platform-user",
+        "credentialSource": ["cookie:health_city_browser_session", "header:authorization-bearer"]
+      },
+      "authorization": {
+        "model": "validated-live-session-self-context",
+        "roles": [],
+        "dataScope": "current-session"
+      },
+      "replayCsrf": {
+        "replayProtection": "not-required-safe-read",
+        "csrf": "not-required-safe-read"
+      },
+      "implementationEvidence": [
+        {
+          "file": "src/http/routes/identity-security.js",
+          "anchors": [
+            "req.method === \"GET\" && url.pathname === \"/api/auth/me\"",
+            "resolved = resolveSession(req)",
+            "validateLiveSession(resolved.session, readDatabase())"
+          ]
+        }
+      ],
+      "negativeTestEvidence": [
+        {
+          "file": "test/api.test.js",
+          "anchors": [
+            "invalidates a session after logout",
+            "const me = await api(baseUrl, \"/api/auth/me\"",
+            "assert.equal(me.response.status, 401)"
+          ]
+        },
+        {
+          "file": "test/identity-lifecycle-api.test.js",
+          "anchors": [
+            "assert.equal((await request(baseUrl, \"/api/auth/me\", healthToken)).response.status, 401)"
+          ]
+        }
+      ],
+      "repositoryStatus": "control-flow-and-negative-test-verified",
+      "productionReady": false,
+      "externalEvidenceRequired": true
+    },
+    {
+      "contractId": "identity-security.logout-optional-session.v1",
+      "key": "POST /api/auth/logout",
+      "method": "POST",
+      "path": "/api/auth/logout",
+      "owner": "T01",
+      "domain": "identity-security",
+      "purpose": "revoke-current-session-and-clear-cookies",
+      "authentication": {
+        "required": false,
+        "mode": "optional",
+        "mechanism": "optional-bearer-or-cookie-session",
+        "principalType": "optional-platform-user",
+        "credentialSource": ["cookie:health_city_browser_session", "header:authorization-bearer", "anonymous-no-session"]
+      },
+      "authorization": {
+        "model": "optional-self-session-revocation",
+        "roles": [],
+        "dataScope": "current-session-only"
+      },
+      "replayCsrf": {
+        "replayProtection": "no-idempotency-claim-session-revocation-only",
+        "csrf": "required-for-cookie-session-not-required-for-bearer-or-anonymous"
+      },
+      "implementationEvidence": [
+        {
+          "file": "src/http/routes/identity-security.js",
+          "anchors": [
+            "req.method === \"POST\" && url.pathname === \"/api/auth/logout\"",
+            "if (resolved.session) requireCsrf(req, resolved, process.env)",
+            "clearSessionCookies(res, process.env)"
+          ]
+        }
+      ],
+      "negativeTestEvidence": [
+        {
+          "file": "test/authorization-runtime-api.test.js",
+          "anchors": [
+            "browser cookie can read context while unsafe requests require signed CSRF",
+            "assert.equal(rejected.status, 403)",
+            "CSRF_VALIDATION_FAILED"
+          ]
+        },
+        {
+          "file": "test/api.test.js",
+          "anchors": [
+            "invalidates a session after logout",
+            "assert.equal(me.response.status, 401)"
+          ]
+        }
+      ],
+      "repositoryStatus": "control-flow-and-negative-test-verified",
+      "productionReady": false,
+      "externalEvidenceRequired": true
+    },
+    {
+      "contractId": "identity-security.oidc-exchange-upstream-access-token.v1",
+      "key": "POST /api/auth/oidc/exchange",
+      "method": "POST",
+      "path": "/api/auth/oidc/exchange",
+      "owner": "T01",
+      "domain": "identity-security",
+      "purpose": "exchange-verified-upstream-identity-for-local-session",
+      "authentication": {
+        "required": true,
+        "mode": "required",
+        "mechanism": "oidc-upstream-access-token",
+        "principalType": "external-oidc-subject",
+        "credentialSource": ["json-body:accessToken"]
+      },
+      "authorization": {
+        "model": "verified-upstream-identity-bound-local-account",
+        "roles": [],
+        "dataScope": "bound-local-account"
+      },
+      "replayCsrf": {
+        "replayProtection": "upstream-token-validation-no-repository-single-use-claim",
+        "csrf": "not-applicable-no-platform-cookie-authentication"
+      },
+      "implementationEvidence": [
+        {
+          "file": "src/http/routes/identity-security.js",
+          "anchors": [
+            "req.method === \"POST\" && url.pathname === \"/api/auth/oidc/exchange\"",
+            "fetchOidcUserInfo(payload.accessToken)",
+            "mapping.status !== \"matched-existing-user\""
+          ]
+        }
+      ],
+      "negativeTestEvidence": [
+        {
+          "file": "test/api.test.js",
+          "anchors": [
+            "const unavailableOidc = await api(baseUrl, \"/api/auth/oidc/exchange\"",
+            "assert.equal(unavailableOidc.response.status, 502)",
+            "identity provider verification failed"
+          ]
+        }
+      ],
+      "repositoryStatus": "control-flow-and-negative-test-verified",
+      "productionReady": false,
+      "externalEvidenceRequired": true
+    },
+    {
+      "contractId": "identity-security.oidc-refresh-upstream-refresh-token.v1",
+      "key": "POST /api/auth/oidc/refresh",
+      "method": "POST",
+      "path": "/api/auth/oidc/refresh",
+      "owner": "T01",
+      "domain": "identity-security",
+      "purpose": "refresh-upstream-token-and-issue-local-session",
+      "authentication": {
+        "required": true,
+        "mode": "required",
+        "mechanism": "oidc-upstream-refresh-token",
+        "principalType": "external-oidc-subject",
+        "credentialSource": ["json-body:refreshToken"]
+      },
+      "authorization": {
+        "model": "verified-refreshed-identity-bound-active-local-account",
+        "roles": [],
+        "dataScope": "bound-local-account"
+      },
+      "replayCsrf": {
+        "replayProtection": "upstream-refresh-rotation-observed-no-repository-single-use-claim",
+        "csrf": "not-applicable-no-platform-cookie-authentication"
+      },
+      "implementationEvidence": [
+        {
+          "file": "src/http/routes/identity-security.js",
+          "anchors": [
+            "req.method === \"POST\" && url.pathname === \"/api/auth/oidc/refresh\"",
+            "refreshOidcAccessToken(payload.refreshToken)",
+            "refreshed identity is unbound, disabled or missing"
+          ]
+        }
+      ],
+      "negativeTestEvidence": [
+        {
+          "file": "test/identity-lifecycle-api.test.js",
+          "anchors": [
+            "const unboundRefresh = await request(baseUrl, \"/api/auth/oidc/refresh\"",
+            "assert.equal(unboundRefresh.response.status, 403)",
+            "provider-refresh-after-disable"
+          ]
+        }
+      ],
+      "repositoryStatus": "control-flow-and-negative-test-verified",
+      "productionReady": false,
+      "externalEvidenceRequired": true
+    },
+    {
+      "contractId": "identity-security.oidc-revoke-live-session.v1",
+      "key": "POST /api/auth/oidc/revoke",
+      "method": "POST",
+      "path": "/api/auth/oidc/revoke",
+      "owner": "T01",
+      "domain": "identity-security",
+      "purpose": "revoke-upstream-token-and-current-local-session",
+      "authentication": {
+        "required": true,
+        "mode": "required",
+        "mechanism": "live-session-plus-upstream-token",
+        "principalType": "platform-user",
+        "credentialSource": ["cookie:health_city_browser_session", "header:authorization-bearer", "json-body:upstreamToken"]
+      },
+      "authorization": {
+        "model": "validated-live-session-self-revocation",
+        "roles": [],
+        "dataScope": "current-session-and-presented-upstream-token"
+      },
+      "replayCsrf": {
+        "replayProtection": "local-session-revoked-on-success-or-upstream-failure",
+        "csrf": "required-for-cookie-session-not-required-for-bearer"
+      },
+      "implementationEvidence": [
+        {
+          "file": "src/http/routes/identity-security.js",
+          "anchors": [
+            "req.method === \"POST\" && url.pathname === \"/api/auth/oidc/revoke\"",
+            "requireCsrf(req, resolved, process.env)",
+            "validateLiveSession(resolved.session, readDatabase())"
+          ]
+        }
+      ],
+      "negativeTestEvidence": [
+        {
+          "file": "test/identity-lifecycle-api.test.js",
+          "anchors": [
+            "const revoked = await request(baseUrl, \"/api/auth/oidc/revoke\"",
+            "assert.equal(revoked.body.localSessionRevoked, true)",
+            "assert.equal((await request(baseUrl, \"/api/auth/me\", refreshedToken)).response.status, 401)"
+          ]
+        }
+      ],
+      "repositoryStatus": "control-flow-and-negative-test-verified",
+      "productionReady": false,
+      "externalEvidenceRequired": true
+    },
+    {
+      "contractId": "regional.public-context-no-credential.v1",
+      "key": "GET /api/regional/context",
+      "method": "GET",
+      "path": "/api/regional/context",
+      "owner": "T00",
+      "domain": "regional",
+      "purpose": "read-minimized-public-regional-context",
+      "authentication": {
+        "required": false,
+        "mode": "none",
+        "mechanism": "public-no-credential",
+        "principalType": "anonymous",
+        "credentialSource": ["none"]
+      },
+      "authorization": {
+        "model": "public-minimized-regional-context",
+        "roles": [],
+        "dataScope": "public-regional-context"
+      },
+      "replayCsrf": {
+        "replayProtection": "not-required-safe-read",
+        "csrf": "not-required-safe-read"
+      },
+      "implementationEvidence": [
+        {
+          "file": "src/http/routes/regional.js",
+          "anchors": [
+            "req.method !== \"GET\" || url.pathname !== \"/api/regional/context\"",
+            "sendJson(res, 200, regionalContext)"
+          ]
+        }
+      ],
+      "negativeTestEvidence": [
+        {
+          "file": "test/api.test.js",
+          "anchors": [
+            "const regionalResponse = await fetch(`${baseUrl}/api/regional/context`)",
+            "assert.equal(\"configs\" in regionalBody, false)",
+            "endpointEnvironmentName"
+          ]
+        }
+      ],
+      "repositoryStatus": "control-flow-and-negative-test-verified",
+      "productionReady": false,
+      "externalEvidenceRequired": true
+    },
+    {
+      "contractId": "shared.public-multi-practice-ledger.v1",
+      "key": "GET /api/public/multi-practice-ledger",
+      "method": "GET",
+      "path": "/api/public/multi-practice-ledger",
+      "owner": "T09",
+      "domain": "shared",
+      "purpose": "read-minimized-public-multi-practice-ledger",
+      "authentication": {
+        "required": false,
+        "mode": "none",
+        "mechanism": "public-no-credential",
+        "principalType": "anonymous",
+        "credentialSource": ["none"]
+      },
+      "authorization": {
+        "model": "public-ledger-projection-only",
+        "roles": [],
+        "dataScope": "public-multi-practice-ledger"
+      },
+      "replayCsrf": {
+        "replayProtection": "not-required-safe-read",
+        "csrf": "not-required-safe-read"
+      },
+      "implementationEvidence": [
+        {
+          "file": "src/http/routes/shared.js",
+          "anchors": [
+            "req.method === \"GET\" && url.pathname === \"/api/public/multi-practice-ledger\"",
+            "const publicLedger = registry.publicLedger.filter",
+            "publicLedger"
+          ]
+        }
+      ],
+      "negativeTestEvidence": [
+        {
+          "file": "test/api.test.js",
+          "anchors": [
+            "const publicLedger = await api(baseUrl, \"/api/public/multi-practice-ledger?q=中心医院\")",
+            "!item.licenseNo",
+            "assert.equal(publicLedger.response.status, 200)"
+          ]
+        }
+      ],
+      "repositoryStatus": "control-flow-and-negative-test-verified",
+      "productionReady": false,
+      "externalEvidenceRequired": true
+    },
+    {
+      "contractId": "shared.t10-specialty-cutover-pack-commission-session.v1",
+      "key": "GET /api/t10-specialty/cutover-pack",
+      "method": "GET",
+      "path": "/api/t10-specialty/cutover-pack",
+      "owner": "T09",
+      "domain": "shared",
+      "purpose": "read-t10-specialty-cutover-pack",
+      "authentication": {
+        "required": true,
+        "mode": "required",
+        "mechanism": "bearer-or-cookie-session",
+        "principalType": "platform-user",
+        "credentialSource": ["cookie:health_city_browser_session", "header:authorization-bearer"]
+      },
+      "authorization": {
+        "model": "commission-role-t10-specialty-cutover-read",
+        "roles": ["commission"],
+        "dataScope": "platform-t10-specialty-cutover"
+      },
+      "replayCsrf": {
+        "replayProtection": "not-required-safe-read",
+        "csrf": "not-required-safe-read"
+      },
+      "implementationEvidence": [
+        {
+          "file": "src/http/routes/shared.js",
+          "anchors": [
+            "req.method === \"GET\" && (url.pathname === \"/api/t10-specialty/cutover-pack\" || url.pathname === \"/api/t10-specialty-cutover\")",
+            "requireApiRole(req, res, [\"commission\"], url.pathname)",
+            "action: \"t10-specialty-cutover-read\""
+          ]
+        }
+      ],
+      "negativeTestEvidence": [
+        {
+          "file": "test/api.test.js",
+          "anchors": [
+            "const anonymousPack = await api(baseUrl, \"/api/t10-specialty/cutover-pack\")",
+            "assert.equal(anonymousPack.response.status, 401)",
+            "assert.equal(institutionPackDenied.response.status, 403)"
+          ]
+        }
+      ],
+      "repositoryStatus": "control-flow-and-negative-test-verified",
+      "productionReady": false,
+      "externalEvidenceRequired": true
+    },
+    {
+      "contractId": "platform-governance.digital-hospital-worker-register-auth.v1",
+      "key": "POST /api/digital-hospital/execution/workers",
+      "method": "POST",
+      "path": "/api/digital-hospital/execution/workers",
+      "owner": "T02",
+      "domain": "platform-governance",
+      "purpose": "register-digital-hospital-execution-worker",
+      "authentication": {
+        "required": true,
+        "mode": "required",
+        "mechanism": "production-mtls-or-nonproduction-commission-session",
+        "principalType": "execution-worker-or-commission-compatibility",
+        "credentialSource": ["tls-peer-certificate", "trusted-proxy-client-certificate-fingerprint", "nonproduction-cookie-or-bearer-session"]
+      },
+      "authorization": {
+        "model": "environment-bound-worker-identity-policy",
+        "roles": [],
+        "dataScope": "digital-hospital-execution-runtime"
+      },
+      "replayCsrf": {
+        "replayProtection": "no-route-replay-claim",
+        "csrf": "production-mtls-not-applicable-nonproduction-session-compatibility-not-claimed"
+      },
+      "implementationEvidence": [
+        {
+          "file": "src/http/routes/platform-governance/digital-hospital-governance.js",
+          "anchors": [
+            "req.method === \"POST\" && url.pathname === \"/api/digital-hospital/execution/workers\"",
+            "requireDigitalHospitalExecutionWorker(req, res, \"/api/digital-hospital/execution/workers\")"
+          ]
+        },
+        {
+          "file": "server.js",
+          "anchors": [
+            "function requireDigitalHospitalExecutionWorker(req, res, target)",
+            "DIGITAL_HOSPITAL_WORKER_MTLS_REQUIRED",
+            "digitalHospitalWorkerFingerprints().includes(fingerprint)"
+          ]
+        }
+      ],
+      "negativeTestEvidence": [
+        {
+          "file": "test/api.test.js",
+          "anchors": [
+            "const rejectedActor = requireDigitalHospitalExecutionWorker",
+            "assert.equal(rejectedResponse.status, 401)",
+            "DIGITAL_HOSPITAL_WORKER_MTLS_REQUIRED"
+          ]
+        }
+      ],
+      "repositoryStatus": "control-flow-and-negative-test-verified",
+      "productionReady": false,
+      "externalEvidenceRequired": true
+    },
+    {
+      "contractId": "platform-governance.digital-hospital-lease-recovery-auth.v1",
+      "key": "POST /api/digital-hospital/execution/leases/recover-expired",
+      "method": "POST",
+      "path": "/api/digital-hospital/execution/leases/recover-expired",
+      "owner": "T02",
+      "domain": "platform-governance",
+      "purpose": "recover-expired-digital-hospital-worker-leases",
+      "authentication": {
+        "required": true,
+        "mode": "required",
+        "mechanism": "production-mtls-or-nonproduction-commission-session",
+        "principalType": "execution-worker-or-commission-compatibility",
+        "credentialSource": ["tls-peer-certificate", "trusted-proxy-client-certificate-fingerprint", "nonproduction-cookie-or-bearer-session"]
+      },
+      "authorization": {
+        "model": "environment-bound-worker-identity-policy",
+        "roles": [],
+        "dataScope": "digital-hospital-execution-runtime"
+      },
+      "replayCsrf": {
+        "replayProtection": "no-route-replay-claim",
+        "csrf": "production-mtls-not-applicable-nonproduction-session-compatibility-not-claimed"
+      },
+      "implementationEvidence": [
+        {
+          "file": "src/http/routes/platform-governance/digital-hospital-governance.js",
+          "anchors": [
+            "req.method === \"POST\" && url.pathname === \"/api/digital-hospital/execution/leases/recover-expired\"",
+            "requireDigitalHospitalExecutionWorker(req, res, \"/api/digital-hospital/execution/leases/recover-expired\")"
+          ]
+        },
+        {
+          "file": "server.js",
+          "anchors": [
+            "function requireDigitalHospitalExecutionWorker(req, res, target)",
+            "DIGITAL_HOSPITAL_WORKER_MTLS_REQUIRED"
+          ]
+        }
+      ],
+      "negativeTestEvidence": [
+        {
+          "file": "test/api.test.js",
+          "anchors": [
+            "const rejectedActor = requireDigitalHospitalExecutionWorker",
+            "assert.equal(rejectedResponse.status, 401)",
+            "DIGITAL_HOSPITAL_WORKER_MTLS_REQUIRED"
+          ]
+        }
+      ],
+      "repositoryStatus": "control-flow-and-negative-test-verified",
+      "productionReady": false,
+      "externalEvidenceRequired": true
+    },
+    {
+      "contractId": "platform-governance.digital-hospital-signed-callback-auth.v1",
+      "key": "POST /api/digital-hospital/execution/callbacks",
+      "method": "POST",
+      "path": "/api/digital-hospital/execution/callbacks",
+      "owner": "T02",
+      "domain": "platform-governance",
+      "purpose": "receive-signed-digital-hospital-execution-callback",
+      "authentication": {
+        "required": true,
+        "mode": "required",
+        "mechanism": "signed-execution-callback-with-client-certificate-context",
+        "principalType": "digital-hospital-execution-provider",
+        "credentialSource": ["header:x-execution-timestamp", "header:x-execution-nonce", "header:x-execution-signature", "tls-client-certificate-context"]
+      },
+      "authorization": {
+        "model": "verified-execution-callback-job-scope",
+        "roles": [],
+        "dataScope": "digital-hospital-execution-job"
+      },
+      "replayCsrf": {
+        "replayProtection": "signed-timestamp-window-plus-nonce-and-job-binding",
+        "csrf": "not-applicable-external-signed-callback"
+      },
+      "implementationEvidence": [
+        {
+          "file": "src/http/routes/platform-governance/digital-hospital-governance.js",
+          "anchors": [
+            "req.method === \"POST\" && url.pathname === \"/api/digital-hospital/execution/callbacks\"",
+            "verifySignedExecutionCallback(payload",
+            "req.headers[\"x-execution-signature\"]"
+          ]
+        }
+      ],
+      "negativeTestEvidence": [
+        {
+          "file": "test/api.test.js",
+          "anchors": [
+            "const invalidCallback = await api(baseUrl, \"/api/digital-hospital/execution/callbacks\"",
+            "X-Execution-Signature\": \"0\".repeat(64)",
+            "assert.equal(invalidCallback.response.status, 401)"
+          ]
+        }
+      ],
+      "repositoryStatus": "control-flow-and-negative-test-verified",
+      "productionReady": false,
+      "externalEvidenceRequired": true
+    }
+  ]
+}

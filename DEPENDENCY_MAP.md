@@ -24,7 +24,8 @@ flowchart LR
   AUDIT --> ADEL["audit-delivery worker"]
   ADEL --> ALERT["pilot-cutover-alert-lifecycle"]
   ADEL --> EXT
-  ROUTES --> AM["API authorization matrix"]
+  ROUTES --> AE["API authentication evidence"]
+  AE --> AM["API authorization matrix"]
   AM --> AC["production API catalog\nNO-GO metadata"]
 ```
 
@@ -166,7 +167,7 @@ CORE_DATA_DEFINITIONS → collection-governance → CI/release 治理投影`。�
   release-readiness 和 Pages 运行标准 build；required check 名称和 fail-closed 聚合保持不变。
 - 主分支必需检查名称仍为 `complete-unit-test` 与 `test`。聚合 test 使用 `always()`
   并要求三个风险域结果全部为 success，失败、取消和跳过均 fail-closed。
-- governance-api 先校验声明级授权矩阵、显式幂等行为证据合同，再校验其派生的生产 API 目录；依赖方向为 `routeSourceFiles + 小型 evidence registry → authorization matrix → production catalog`。证据门禁复用既有 adapter/API 测试，不依赖组合根、数据库或外部系统，也不生成仓库制品。
+- governance-api 先校验 custom auth 控制流/负向测试证据，再校验声明级授权矩阵、显式幂等行为证据合同和派生生产 API 目录；依赖方向为 `routeSourceFiles + authentication/idempotency 小型 evidence registry → authorization matrix v3 → production catalog v3`。SMS 认证从既有幂等合同派生，不复制认证真相；字面 inventory 只在同一未结束 handler 范围配对 method/path，禁止从相邻 GET/POST 分支制造依赖；证据门禁不写数据库、报告或发布制品。
 - governance-api 同时执行 `data:collection-governance:verify`；新集合、陈旧/重复状态、owner/reader
   边界、源码使用状态漂移或任何生产晋升标志都会失败，命令默认只输出摘要且不写 release。
 - governance-api 随后运行四组内部边界覆盖门禁；脚本仅依赖现有 c8、既有测试和显式配置，报告写入临时目录并在结束时删除。该门禁与原 `server.js` 85/85/55 覆盖门禁独立，不能相互替代。

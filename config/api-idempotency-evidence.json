@@ -17,7 +17,16 @@
       "authentication": {
         "required": true,
         "mechanism": "hmac-sha256-signed-external-callback",
-        "principalType": "sms-provider"
+        "principalType": "sms-provider",
+        "credentialSource": [
+          "header:x-sms-timestamp",
+          "header:x-sms-nonce",
+          "header:x-sms-signature"
+        ],
+        "replayCsrf": {
+          "replayProtection": "signed-timestamp-window-plus-provider-nonce-and-event-ledger",
+          "csrf": "not-applicable-external-signed-callback"
+        }
       },
       "authorization": {
         "model": "verified-external-provider-message-scope",

@@ -136,6 +136,8 @@ jobs:
         run: npm run check
       - name: Verify static publication boundary and Browser Inventory v2
         run: npm run static:check && npm run security:browser:verify && npm run static:test
+      - name: Verify custom API authentication behavior evidence
+        run: npm run api:authentication-evidence
       - name: Verify API authorization matrix
         run: npm run api:authorization-matrix
       - name: Verify production API catalog

@@ -3,6 +3,7 @@
 
 const path = require("node:path");
 const { DOMAIN_OWNERS, buildMatrix, readRouteSources, validateMatrix } = require("./api-authorization-matrix");
+const { AUTHENTICATION_REGISTRY, authenticationEvidenceByKey, authenticationEvidenceContracts, validateAuthenticationEvidence } = require("./api-authentication-evidence");
 const { DEFAULT_REGISTRY, evidenceByKey, validateEvidenceRegistry } = require("./api-idempotency-evidence");
 
 const ROOT = path.resolve(__dirname, "..");
@@ -17,12 +18,12 @@ const IDEMPOTENCY_MARKERS = Object.freeze([
 ]);
 const LITERAL_ROUTE_PATTERNS = Object.freeze([
   Object.freeze({
-    expression: /req\.method\s*(?:===|!==)\s*["'](GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)["'][\s\S]{0,240}?url\.pathname\s*(?:===|!==)\s*["'](\/api\/[^"']+)["']/g,
+    expression: /req\.method\s*(?:===|!==)\s*["'](GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)["'][^}]{0,240}?url\.pathname\s*(?:===|!==)\s*["'](\/api\/[^"']+)["']/g,
     methodGroup: 1,
     pathGroup: 2
   }),
   Object.freeze({
-    expression: /url\.pathname\s*(?:===|!==)\s*["'](\/api\/[^"']+)["'][\s\S]{0,240}?req\.method\s*(?:===|!==)\s*["'](GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)["']/g,
+    expression: /url\.pathname\s*(?:===|!==)\s*["'](\/api\/[^"']+)["'][^}]{0,240}?req\.method\s*(?:===|!==)\s*["'](GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)["']/g,
     methodGroup: 2,
     pathGroup: 1
   })
@@ -127,8 +128,10 @@ function buildCatalogEntry(declarations, indexedSources, contracts) {
   const roles = [...new Set(declarations.flatMap((route) => route.roles))].sort();
   const dataScopes = [...new Set(declarations.map((route) => route.dataScope))].sort();
   const identityRequiredValues = [...new Set(declarations.map((route) => route.identity.required))];
+  const authenticationModes = [...new Set(declarations.map((route) => route.identity.mode))].sort();
   const mechanisms = [...new Set(declarations.map((route) => route.identity.mechanism))].sort();
   const principalTypes = [...new Set(declarations.map((route) => route.identity.principalType).filter(Boolean))].sort();
+  const authenticationContractIds = [...new Set(declarations.map((route) => route.authenticationEvidenceContractId).filter(Boolean))].sort();
   const authorizationModels = [...new Set(declarations.map((route) => route.authorizationModel).filter(Boolean))].sort();
   const idempotency = idempotencyFor(first.method, declarations, indexedSources, contracts.get(first.key));
   const routeResolution = first.path.startsWith("/api/") && first.method !== "ANY" ? "literal" : "runtime-policy";
@@ -137,6 +140,7 @@ function buildCatalogEntry(declarations, indexedSources, contracts) {
   if (domains.length !== 1) internalBlockers.push("multiple-route-domains");
   if (purposes.length !== 1) internalBlockers.push("multiple-route-purposes");
   if (identityRequiredValues.length !== 1) internalBlockers.push("conflicting-authentication-policy");
+  if (authenticationModes.length !== 1) internalBlockers.push("conflicting-authentication-mode");
   if (routeResolution !== "literal") internalBlockers.push("runtime-route-policy-not-resolved");
   if (identityRequiredValues[0] && roles.some((role) => role.startsWith("runtime-policy:"))) {
     internalBlockers.push("runtime-role-policy-not-resolved");
@@ -163,8 +167,10 @@ function buildCatalogEntry(declarations, indexedSources, contracts) {
     purpose: purposes.length === 1 ? purposes[0] : "multiple",
     authentication: {
       required: identityRequiredValues.length === 1 ? identityRequiredValues[0] : null,
+      mode: authenticationModes.length === 1 ? authenticationModes[0] : "review-required",
       mechanisms,
-      principalTypes
+      principalTypes,
+      evidenceContractIds: authenticationContractIds
     },
     authorization: {
       roles,
@@ -211,7 +217,10 @@ function buildInventoryOnlyEntry(route, indexedSources, contracts) {
     purpose: "runtime-policy-review-required",
     authentication: {
       required: null,
-      mechanisms: ["runtime-policy-review-required"]
+      mode: "review-required",
+      mechanisms: ["runtime-policy-review-required"],
+      principalTypes: [],
+      evidenceContractIds: []
     },
     authorization: {
       roles: [],
@@ -252,11 +261,12 @@ function buildProductionApiCatalog(matrix = buildMatrix(), sourceFiles = readRou
   }
   const entries = [...entriesByKey.values()].sort((left, right) => left.key.localeCompare(right.key));
   return {
-    schemaVersion: "production-api-catalog-v2",
+    schemaVersion: "production-api-catalog-v3",
     generatedFrom: {
       authorizationMatrix: matrix.schemaVersion,
       routeSources: matrix.generatedFrom,
       idempotencyEvidence: DEFAULT_REGISTRY.schemaVersion,
+      authenticationEvidence: AUTHENTICATION_REGISTRY.schemaVersion,
       ownership: "existing authorization matrix owner mapping and process workstream governance"
     },
     policy: {
@@ -273,7 +283,9 @@ function buildProductionApiCatalog(matrix = buildMatrix(), sourceFiles = readRou
       literalRoutes: entries.filter((entry) => entry.routeResolution === "literal").length,
       runtimePolicyRoutes: entries.filter((entry) => entry.routeResolution !== "literal").length,
       protectedRoutes: entries.filter((entry) => entry.authentication.required).length,
-      publicRoutes: entries.filter((entry) => entry.authentication.required === false).length,
+      publicRoutes: entries.filter((entry) => entry.authentication.mode === "none").length,
+      optionalAuthenticationRoutes: entries.filter((entry) => entry.authentication.mode === "optional").length,
+      authenticationEvidenceVerified: entries.filter((entry) => entry.authentication.evidenceContractIds.length === 1).length,
       unclassifiedAuthentication: entries.filter((entry) => entry.authentication.required === null).length,
       routeInventoryOnly: entries.filter((entry) => entry.sourceCoverage === "route-inventory-only").length,
       writeRoutes: entries.filter((entry) => entry.idempotency.required).length,
@@ -290,9 +302,12 @@ function buildProductionApiCatalog(matrix = buildMatrix(), sourceFiles = readRou
 
 function validateProductionApiCatalog(catalog, matrix = buildMatrix(), sourceFiles = readRouteSources()) {
   const errors = validateMatrix(matrix).map((error) => `authorization matrix: ${error}`);
+  errors.push(...validateAuthenticationEvidence().map((error) => `authentication evidence: ${error}`));
   errors.push(...validateEvidenceRegistry().map((error) => `idempotency evidence: ${error}`));
-  if (catalog.schemaVersion !== "production-api-catalog-v2") errors.push("unsupported production API catalog schema");
+  if (catalog.schemaVersion !== "production-api-catalog-v3") errors.push("unsupported production API catalog schema");
   if (catalog.generatedFrom?.authorizationMatrix !== matrix.schemaVersion) errors.push("authorization matrix source version drift");
+  if (catalog.generatedFrom?.authenticationEvidence !== AUTHENTICATION_REGISTRY.schemaVersion) errors.push("authentication evidence source version drift");
+  const governedAuthentication = authenticationEvidenceByKey();
   const keys = new Set();
   for (const entry of catalog.entries || []) {
     if (keys.has(entry.key)) errors.push(`duplicate catalog key: ${entry.key}`);
@@ -304,11 +319,22 @@ function validateProductionApiCatalog(catalog, matrix = buildMatrix(), sourceFil
     if (!entry.authentication || !Object.hasOwn(entry.authentication, "required") || ![true, false, null].includes(entry.authentication.required)) {
       errors.push(`API has no authentication classification: ${entry.key}`);
     }
+    if (!entry.authentication || !["required", "optional", "none", "review-required"].includes(entry.authentication.mode)) errors.push(`API has no authentication mode: ${entry.key}`);
+    if (entry.authentication?.mode === "required" && entry.authentication.required !== true) errors.push(`required authentication mode drift: ${entry.key}`);
+    if (["optional", "none"].includes(entry.authentication?.mode) && entry.authentication.required !== false) errors.push(`non-required authentication mode drift: ${entry.key}`);
     if (entry.authentication?.required === true && (!Array.isArray(entry.authorization?.roles) || entry.authorization.roles.length === 0) && entry.authorization?.models?.length !== 1) {
       errors.push(`protected API has no role or scope policy: ${entry.key}`);
     }
     if (entry.authentication?.required === null && (!entry.production?.blockers?.includes("authentication-policy-not-classified") || entry.production?.repositoryReview !== "review-required")) {
       errors.push(`unclassified authentication must remain review-required: ${entry.key}`);
+    }
+    if (entry.authentication?.required !== null && Array.isArray(entry.authentication?.evidenceContractIds) && entry.authentication.evidenceContractIds.length) {
+      const contract = governedAuthentication.get(entry.key);
+      if (entry.authentication.evidenceContractIds.length !== 1 || !contract || contract.contractId !== entry.authentication.evidenceContractIds[0]
+        || contract.owner !== entry.owner || contract.authentication.required !== entry.authentication.required
+        || contract.authentication.mode !== entry.authentication.mode || !entry.authentication.mechanisms.includes(contract.authentication.mechanism)) {
+        errors.push(`authentication classification lacks matching governed evidence: ${entry.key}`);
+      }
     }
     if (!Array.isArray(entry.authorization?.dataScopes) || entry.authorization.dataScopes.length === 0) {
       errors.push(`API has no data scope: ${entry.key}`);
@@ -345,7 +371,9 @@ function validateProductionApiCatalog(catalog, matrix = buildMatrix(), sourceFil
   if (catalog.summary?.writeIdempotencyNotObserved !== (catalog.entries || []).filter((entry) => entry.idempotency?.status === "not-observed").length) errors.push("source-marker not-observed summary drift");
   if (catalog.summary?.writeIdempotencyBehaviorProofRequired !== (catalog.entries || []).filter((entry) => entry.idempotency?.behaviorEvidence?.status === "behavior-proof-required").length) errors.push("behavior-proof-required summary drift");
   if (catalog.summary?.reviewRequired !== (catalog.entries || []).filter((entry) => entry.production?.repositoryReview === "review-required").length) errors.push("review-required summary drift");
-  if ((catalog.summary?.publicRoutes || 0) !== 5) errors.push("explicit public API register drift");
+  if (catalog.summary?.publicRoutes !== (catalog.entries || []).filter((entry) => entry.authentication?.mode === "none").length) errors.push("public API summary drift");
+  if (catalog.summary?.optionalAuthenticationRoutes !== (catalog.entries || []).filter((entry) => entry.authentication?.mode === "optional").length) errors.push("optional authentication summary drift");
+  if (catalog.summary?.authenticationEvidenceVerified !== authenticationEvidenceContracts().length) errors.push("authentication evidence summary drift");
   if (catalog.summary?.entries !== expectedKeys.size) errors.push("catalog source-union summary drift");
   if ((catalog.summary?.entries || 0) < 550) errors.push("production API catalog count unexpectedly low");
   return errors;

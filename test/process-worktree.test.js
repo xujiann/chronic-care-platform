@@ -52,10 +52,13 @@ test("process manifest assigns every domain route exactly once", () => {
   assert.equal(resolveProtectedOwner("src/platform/governance/regional-sharing-access-command.js", manifest), "T00");
   assert.equal(resolveProtectedOwner("src/platform/governance/resident-authorization-decision-adapter.js", manifest), "T00");
   assert.equal(resolveProtectedOwner("scripts/api-authorization-matrix.js", manifest), "T00");
+  assert.equal(resolveProtectedOwner("scripts/api-authentication-evidence.js", manifest), "T00");
   assert.equal(resolveProtectedOwner("scripts/production-api-catalog.js", manifest), "T00");
   assert.equal(resolveProtectedOwner("scripts/internal-boundary-coverage.js", manifest), "T00");
   assert.equal(resolveProtectedOwner("config/internal-boundary-coverage.json", manifest), "T00");
   assert.equal(resolveProtectedOwner("config/high-risk-api-authorization.json", manifest), "T00");
+  assert.equal(resolveProtectedOwner("config/api-authentication-evidence.json", manifest), "T00");
+  assert.equal(resolveProtectedOwner("test/api-authentication-evidence.test.js", manifest), "T00");
   assert.equal(resolveProtectedOwner("test/production-api-catalog.test.js", manifest), "T00");
   assert.equal(resolveProtectedOwner("test/internal-boundary-coverage-governance.test.js", manifest), "T00");
 });
@@ -148,6 +151,7 @@ test("CI isolates browser E2E and release readiness behind the required test agg
   assert.match(governanceJob, /timeout-minutes: 10/);
   assert.match(governanceJob, /Verify process ownership boundary/);
   assert.match(governanceJob, /Run API regression tests/);
+  assert.match(governanceJob, /Verify custom API authentication behavior evidence[\s\S]*npm run api:authentication-evidence/);
   assert.match(governanceJob, /Verify API authorization matrix[\s\S]*npm run api:authorization-matrix/);
   assert.match(governanceJob, /Verify production API catalog[\s\S]*npm run api:production-catalog/);
   assert.match(governanceJob, /Verify internal boundary coverage baselines[\s\S]*npm run test:coverage:boundaries/);
