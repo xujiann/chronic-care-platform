@@ -29,6 +29,7 @@
 | [切换告警运行时采用显式控制面 Provider 注入](./2026-08-20-pilot-cutover-alert-provider-injection.md) | Accepted | 已合入 `main@21d8f3c`（PR #132）；显式 provider、默认拒绝投影与反向依赖守卫 |
 | [生产身份与短信适配器信任边界](./2026-08-21-production-identity-sms-trust-boundary.md) | Accepted | JWKS/JWT、脱敏 transport、SMS 凭据/幂等/重试/健康及共享 OTP/锁定状态 |
 | [PostgreSQL shadow 合同强化](./2026-08-21-postgresql-shadow-contract-hardening.md) | Accepted | schema 隔离、健康探针、batch/digest/version/tombstone 冲突 |
+| [Solution A 容器部署采用安全默认值与不可变镜像](./2026-08-22-solution-a-secure-container-defaults.md) | Accepted | 容器镜像、Orthanc 认证、DICOM 绑定和生产失败关闭门禁 |
 | [连续审计投递与耐久 checkpoint](./2026-08-21-continuous-audit-delivery.md) | Accepted | SIEM/WORM rehearsal、checkpoint v2、部署信任合同 A；append-only source/可信 receipt/外部 anchor 前生产 NO-GO |
 | [连续审计采用 append-only source v2](./2026-08-22-append-only-audit-source-v2.md) | Accepted | SQLite v15 事务内审计来源、稳定 cursor、最小投影与 checkpoint v3；外部信任仍 NO-GO |
 | [对象存储网关采用版本化响应信任合同 v1](./2026-08-22-object-storage-gateway-trust-v1.md) | Accepted | 独立响应验签、请求/对象绑定、签名 URL Origin/TTL 与严格回执 |

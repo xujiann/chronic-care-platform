@@ -6,18 +6,22 @@
 
 ## 启动
 
-1. 将 `deploy/solution-a/.env.example` 复制为 `.env`，设置强密码且不要提交。
-2. 在 `deploy/solution-a` 执行 `docker compose config`，确认镜像和变量。
-3. 执行 `docker compose up -d`。
-4. 运行 `node scripts/solution-a-readiness.js`，再调用 `solutionAHealth()` 做在线探测。
+1. 将 `deploy/solution-a/.env.example` 复制为 `.env`；替换全部凭据占位符，密码至少 24 个字符，且不要提交 `.env`。
+2. 运行 `node scripts/solution-a-readiness.js`，确认仓库默认合同通过；生产候选必须运行 `node scripts/solution-a-readiness.js --production`，只要配置或外部证据未齐，该命令即以非零状态失败关闭。
+3. 在 `deploy/solution-a` 执行 `docker compose config`，确认生效镜像仍为审核过的 `tag@sha256` 引用、Orthanc 认证为 `true`、DICOM 绑定地址符合现场方案。
+4. 仅在获批的试点环境执行 `docker compose up -d`，再调用 `solutionAHealth()` 做在线探测。
 
-默认仅将管理Web端口绑定到本机；DICOM 4242端口供受控设备网络连接。为便于本机试点，`ORTHANC_AUTHENTICATION_ENABLED=false`，OHIF通过内部Nginx代理访问DICOMweb；任何网络共享或生产部署都必须改为统一认证并启用TLS。试点默认使用官方 `latest` 镜像以便首次验证；生产部署必须用已验证版本或镜像摘要锁定镜像，并增加网络白名单、备份恢复、日志审计、镜像漏洞扫描和真实数据合规审批。
+默认将管理 Web 端口和 Orthanc DICOM 4242 端口绑定到 `127.0.0.1`，并默认启用 Orthanc 认证。受控设备网络需要显式设置 `ORTHANC_DICOM_BIND_ADDRESS` 为获批的 RFC1918 私网接口地址；禁止使用 `0.0.0.0`、公网地址或未审批的接口。非回环绑定仍须完成现场 TLS、网络分段、防火墙白名单和设备连通验收。
+
+四个镜像均锁定为审核过的精确版本及 registry manifest digest；Compose 默认值与 `.env.example` 必须一致，环境覆盖也必须使用仓库已审核引用。2026-08-22 的版本来源为 [HAPI FHIR JPA Starter](https://github.com/hapifhir/hapi-fhir-jpaserver-starter)、[Orthanc 官方容器文档](https://orthanc.uclouvain.be/book/users/docker-orthancteam.html)、[OHIF v3.12.11 发布](https://github.com/OHIF/Viewers/releases/tag/v3.12.11)及 [PostgreSQL 官方镜像](https://hub.docker.com/_/postgres)；摘要来自对应 Docker Hub registry 元数据核验。该核验不等于真实拉取、签名验证、SBOM 或漏洞扫描。
+
+升级镜像时必须重新核验官方 release/tag 与 registry digest，在同一变更中同步 Compose、`.env.example`、readiness 镜像策略、专项测试和本 ADR 的实施记录；不得只改 tag，也不得回退到 `latest`。当前仓库仍缺真实镜像拉取与漏洞扫描、证书和密钥托管、备份恢复、外部日志审计及现场网络证据，所以 `productionReady` 必须保持 `false`。
 
 ## 平台环境变量
 
 `HAPI_FHIR_BASE_URL`、`ORTHANC_BASE_URL`、`ORTHANC_USERNAME`、`ORTHANC_PASSWORD`、`OHIF_BASE_URL`、`SOLUTION_A_TIMEOUT_MS`。
 
-验收：三个服务健康；FHIR `/metadata` 可达；Orthanc `/system` 鉴权成功；OHIF可加载；测试DICOM进入Orthanc后可通过StudyInstanceUID生成OHIF调阅地址；敏感凭据不写入代码或发布物。
+验收：占位凭据、默认用户名、认证关闭、可变/未审核镜像覆盖、通配或公网 DICOM 绑定均在生产配置门禁失败；三个服务健康；FHIR `/metadata` 可达；Orthanc `/system` 鉴权成功；OHIF可加载；测试DICOM进入Orthanc后可通过StudyInstanceUID生成OHIF调阅地址；敏感凭据不写入代码或发布物。
 
 平台接入入口：`GET /api/imaging-cloud/solution-a/health` 返回三项实时探测；`GET /api/imaging-cloud/studies/:id/viewer` 在居民数据权限校验后生成OHIF调阅地址。影像云页面展示实时状态并提供“OHIF调阅”按钮，调阅行为写入数据访问日志。
 
