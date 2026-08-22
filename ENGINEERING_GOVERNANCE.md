@@ -83,6 +83,7 @@ LEGACY CODE → TEST PROTECTION → REFACTOR
 | 路由 | `npm run routes:check`、`npm run routes:test` |
 | API 治理 | `npm run api:authorization-matrix`、`npm run api:production-catalog`、`npm run api:idempotency-evidence` |
 | 集合治理 | `npm run data:collection-governance:verify`（只读；不生成 release 报告） |
+| 对象存储架构决策 | `npm run object-storage:architecture-governance:verify`（只读；Proposed 状态失败关闭） |
 | 关键内部边界覆盖 | `npm run test:coverage:boundaries` |
 | 架构 | `npm run architecture:test` |
 | 所有权 | `npm run process:verify`、`npm run process:test` |
@@ -99,6 +100,10 @@ LEGACY CODE → TEST PROTECTION → REFACTOR
 
 DATA-003 的只读集合治理验证映射到 governance-api，并由 architecture test 运行专项负向测试；
 它补充 TEST-001，不改变 unit/integration/smoke 分区，也不把仓库通过结果解释为生产批准。
+
+OBJ-ADR-002 的机器 decision/action register 同样映射到 governance-api 与 architecture test。在 ADR
+Accepted、data owner 和 v1/v2 兼容策略获人类确认前，检查必须拒绝 v17、runtime/API implementation 和
+production promotion；它不修改实际 owner，不生成 migration，也不能替代外部对象存储现场证据。
 
 原 `server.js` 的 c8 85/85/55 门禁保持不变。runtime identity、audit chain/source、object
 storage trust 与 API catalog/authorization 使用独立覆盖组，冻结当前真实基线并绑定安全负向矩阵；

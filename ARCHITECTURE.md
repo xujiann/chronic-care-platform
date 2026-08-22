@@ -45,3 +45,10 @@
 - State collection 数据 owner 只来自现有 owner/system 合同；process owner 和源码引用仅作为证据。
   无明确 owner 的集合必须显式 `review-required` 或 `legacy-quarantined`，仓库检查不能授权生产晋升。
 - 关键内部边界按 identity、audit、object storage、API governance 独立测量覆盖率；原 server.js 门禁保持不变，基线只能持平或提高，临时覆盖报告不构成生产证据。
+
+## Proposed 方向（不授权实施）
+
+- `OBJ-ADR-002` 建议 T08 作为对象存储附件元数据 data owner、T00 作为共享存储/worker technical owner，
+  并规划 v17 结构化模型、版本化异步 API、回填冻结、无损分页、worker、reconcile 和 readiness。
+- data owner 与 v1/v2 兼容策略仍需人类确认；机器台账和 CI 在 ADR 未 Accepted 时禁止任何 v17、runtime/
+  API implementation 或 production promotion。当前 schema/API/runtime 仍保持 AS-IS 与 `NO-GO`。

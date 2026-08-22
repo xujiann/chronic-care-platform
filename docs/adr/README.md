@@ -37,6 +37,7 @@
 | [连续审计投递与耐久 checkpoint](./2026-08-21-continuous-audit-delivery.md) | Accepted | SIEM/WORM rehearsal、checkpoint v2、部署信任合同 A；append-only source/可信 receipt/外部 anchor 前生产 NO-GO |
 | [连续审计采用 append-only source v2](./2026-08-22-append-only-audit-source-v2.md) | Accepted | SQLite v15 事务内审计来源、稳定 cursor、最小投影与 checkpoint v3；外部信任仍 NO-GO |
 | [对象存储网关采用版本化响应信任合同 v1](./2026-08-22-object-storage-gateway-trust-v1.md) | Accepted | 独立响应验签、请求/对象绑定、签名 URL Origin/TTL 与严格回执 |
+| [对象存储采用结构化元数据与耐久异步命令轨道 v2](./2026-08-23-object-storage-durable-command-and-metadata-v2.md) | Proposed | T08 data owner/T00 technical owner 建议、SQLite v17 候选、异步 API、worker、分页、对账与默认 NO-GO；不授权实施 |
 | [区域共享调阅命令以居民授权事实为唯一许可依据](./2026-08-21-regional-sharing-access-command.md) | Accepted | T00 integration、目标 T02、T04 授权事实、幂等/CAS、不可变回执与生产 NO-GO |
 | [慢病随访外部 publisher 协议与失败语义](./2026-08-21-chronic-followup-external-publisher-protocol.md) | Accepted | T04 安全外发、activation、幂等回执、范围、审计与持久证据 |
 | [慢病随访耐久 outbox 与独立 worker](./2026-08-22-chronic-followup-durable-dispatch-outbox.md) | Accepted | SQLite v16 同事务 enqueue、租约 fencing、重试/死信/replay、请求路径隔离与生产 NO-GO |

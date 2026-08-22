@@ -64,3 +64,14 @@
 
 `server.js` 在 followups 的 SQLite 状态写事务内调用 enqueue/一致性 hook；回滚同时撤销业务状态和 outbox
 插入。真实 PostgreSQL 对应表、全量迁移、供应方回执、备份恢复和现场验收不在 v16 内，生产仍 NO-GO。
+
+## 6. SQLite v17 对象存储预留（Proposed，未实施）
+
+`OBJ-ADR-002` 为结构化附件元数据、耐久对象存储命令/回执和持久对账提出 v17 候选，但当前注册表
+head、运行时常量与 ledger 仍精确为 v16；仓库没有 v17 migration、表、索引、trigger、回填或
+PostgreSQL 对应 DDL。候选表名和实施阶段只存在于 Proposed ADR，不构成 schema 事实。
+
+机器台账预留 v17 并由 `object-storage:architecture-governance:verify` 核对当前 head=16；若其他主题先占用
+v17，必须重新评审本提案而不能改写迁移历史。只有 ADR Accepted、`secureAttachments` data owner 与 v1/v2
+兼容策略经人类确认后，才可另开 migration 切片；届时必须同步空库/历史升级/重跑/失败回滚、全量
+count/digest/orphan 核对、遗留写冻结和生产恢复证据。当前 production promotion 保持 false。

@@ -227,3 +227,16 @@ worker 依赖 repository 端口和 publisher 端口，repository 不依赖 HTTP�
 不能生成 activation 或可信回执。worker 复用 canonical `DATA_DIR/health-city.sqlite`，显式路径漂移启动失败；
 activation provider 只验证仓库外 registry 的逐事件 Ed25519 签名决定，不持有审批私钥。跨 T04/T00 的改动由
 T00 集成分支承载。
+
+## 对象存储 ADR 前置治理依赖方向
+
+当前运行依赖保持 `T08 integration HTTP caller → T00 secure-object-storage v1 gateway port → 外部网关`，
+本切片没有增加数据库或 worker 边。新增治理依赖是
+`Proposed ADR + machine decision/action register + domain owner manifest(read-only) + SQLite schema head(read-only)
+→ object-storage architecture verifier → architecture:test/governance-api`；验证器不依赖 `server.js`、不写
+数据库、不生成报告。
+
+若决策 Accepted，建议目标依赖为 `T08 data-owner command/API → T00 v17 repository + transactional command
+enqueue → T00 fenced worker → gateway`，另由 lossless keyset scan 驱动 reconcile/readiness。该目标不是
+AS-IS。T08 route owner 不能反向推断 data owner，T00 技术端口不能取得业务事实所有权；在 owner 与兼容
+策略批准前，所有 v17/runtime/API/promotion 依赖均保持 blocked。

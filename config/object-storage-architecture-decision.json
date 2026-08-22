@@ -1,0 +1,136 @@
+{
+  "schemaVersion": "object-storage-architecture-decision-v1",
+  "decision": {
+    "id": "OBJ-ADR-002",
+    "adrPath": "docs/adr/2026-08-23-object-storage-durable-command-and-metadata-v2.md",
+    "status": "proposed",
+    "defaultDecision": "NO-GO",
+    "recommendedOption": "versioned-async-command-and-structured-metadata",
+    "recommendedOwnership": {
+      "dataOwner": {
+        "process": "T08",
+        "domain": "integration",
+        "status": "recommendation-only"
+      },
+      "technicalOwner": {
+        "process": "T00",
+        "scope": "shared-storage-worker-readiness-deployment",
+        "status": "recommendation-only"
+      }
+    },
+    "recommendedCompatibility": {
+      "strategy": "parallel-versioned-v2-async-api",
+      "status": "recommendation-only"
+    },
+    "reservedSqliteMigrationVersion": 17,
+    "requiredHumanDecisions": [
+      {
+        "id": "confirm-secure-attachment-data-owner",
+        "status": "unresolved",
+        "requiredDecision": "Confirm or reject T08 integration as the secure attachment data owner."
+      },
+      {
+        "id": "confirm-v1-v2-api-compatibility",
+        "status": "unresolved",
+        "requiredDecision": "Approve the compatibility, deprecation and consumer migration strategy for synchronous v1 and asynchronous v2 APIs."
+      }
+    ],
+    "authorization": {
+      "v17MigrationAuthorized": false,
+      "runtimeImplementationAuthorized": false,
+      "apiImplementationAuthorized": false,
+      "productionPromotionAllowed": false
+    }
+  },
+  "actions": [
+    {
+      "id": "human-confirm-data-owner",
+      "owner": "T08/T00 review",
+      "status": "blocked-human-decision",
+      "dependsOn": [],
+      "deliverable": "Approved data-owner decision before changing the machine ownership manifest."
+    },
+    {
+      "id": "human-confirm-api-compatibility",
+      "owner": "T08 and current API consumers",
+      "status": "blocked-human-decision",
+      "dependsOn": [],
+      "deliverable": "Approved v1/v2 compatibility, deprecation and migration window."
+    },
+    {
+      "id": "accept-architecture-decision",
+      "owner": "T00 architecture review",
+      "status": "blocked-human-decision",
+      "dependsOn": [
+        "human-confirm-data-owner",
+        "human-confirm-api-compatibility"
+      ],
+      "deliverable": "ADR status changed through review from Proposed to Accepted."
+    },
+    {
+      "id": "sqlite-v17-structured-storage",
+      "owner": "T00 technical storage",
+      "status": "blocked-until-accepted",
+      "dependsOn": [
+        "accept-architecture-decision"
+      ],
+      "deliverable": "Content-hashed v17 migration, structured metadata/command/receipt/reconciliation tables and migration tests."
+    },
+    {
+      "id": "legacy-backfill-and-freeze",
+      "owner": "confirmed data owner with T00 migration support",
+      "status": "blocked-until-accepted",
+      "dependsOn": [
+        "sqlite-v17-structured-storage"
+      ],
+      "deliverable": "Lossless backfill, digest/count/orphan reconciliation and legacy write freeze."
+    },
+    {
+      "id": "versioned-async-api-v2",
+      "owner": "T08 API with T00 integration review",
+      "status": "blocked-until-accepted",
+      "dependsOn": [
+        "legacy-backfill-and-freeze"
+      ],
+      "deliverable": "Authorized 202 command/status/replay API v2 and approved v1 compatibility behavior."
+    },
+    {
+      "id": "durable-object-storage-worker",
+      "owner": "T00 technical worker",
+      "status": "blocked-until-accepted",
+      "dependsOn": [
+        "sqlite-v17-structured-storage"
+      ],
+      "deliverable": "Fenced lease, bounded retry/backoff, dead-letter, digest-only receipt/error and audited manual replay."
+    },
+    {
+      "id": "lossless-keyset-pagination",
+      "owner": "confirmed data owner with T00 storage support",
+      "status": "blocked-until-accepted",
+      "dependsOn": [
+        "legacy-backfill-and-freeze"
+      ],
+      "deliverable": "Scope-bound versioned keyset cursor, fixed high-water mark and no-loss concurrent pagination tests."
+    },
+    {
+      "id": "persistent-provider-reconciliation",
+      "owner": "T00 technical worker with T08 provider contract",
+      "status": "blocked-until-accepted",
+      "dependsOn": [
+        "durable-object-storage-worker",
+        "lossless-keyset-pagination"
+      ],
+      "deliverable": "Persistent discrepancy cases/actions, provider status/abort/capability receipts and bounded reconciliation."
+    },
+    {
+      "id": "readiness-deployment-and-operations",
+      "owner": "T00 release governance",
+      "status": "blocked-until-accepted",
+      "dependsOn": [
+        "versioned-async-api-v2",
+        "persistent-provider-reconciliation"
+      ],
+      "deliverable": "Fail-closed evidence-driven readiness, worker deployment contract, alerting, recovery and site acceptance."
+    }
+  ]
+}

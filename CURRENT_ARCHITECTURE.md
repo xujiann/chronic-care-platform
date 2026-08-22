@@ -168,3 +168,15 @@ T04 的随访 PATCH 仍在聚合内生成 `citizen-chronic.followup-updated.v1`�
 完成 lease、外发、回执摘要、退避、死信与 replay；生产 endpoint/凭据/activation/可信回执/现场验收
 未由仓库提供，当前 `productionReady=false`；中央 preflight 已可消费外部验证且绑定当前发布的
 正式证据解除该门禁。PostgreSQL 主切换不在本切片。
+
+## 2026-08-23 对象存储 ADR 前置治理（AS-IS）
+
+基于 `origin/main@0796886`，对象存储运行时仍是既有 T00 `secure-object-storage.js` 共享信任端口与
+T08 `integration` 同步 HTTP caller；`secureAttachments` 仍是 500 条失败关闭的遗留 collection，SQLite
+schema head 仍为 v16。当前没有 v17 表、异步 API、事务命令、worker、无损分页或持久对账实现。
+
+新增 Proposed ADR 与机器 `object-storage-architecture-decision-v1` 台账只描述建议方向：T08 data owner、
+T00 technical storage/worker owner、版本化异步 API v2、v17 结构化表、回填/冻结、keyset 分页、worker、
+reconcile 和 evidence-driven readiness。data owner 与 v1/v2 兼容策略仍待人类确认；机器门禁要求所有
+implementation/promotion 标志为 false、行动保持 blocked，并在治理 CI 失败关闭。该治理切片不改变
+`domain-data-ownership`、migration、runtime、API、数据或生产 `NO-GO`。
