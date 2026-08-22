@@ -17,7 +17,7 @@
 | T08 | integration | 3 | 13 | 外部网关、签名回调和交换 |
 | T09 | research / shared | 14 | 30 | 科研沙箱、组合查询和确实跨域的体验 |
 
-历史字面扫描识别 368 个精确 method/path 下限；当前扫描识别 372 个字面条件路由和 589 条授权声明（含一条显式外部 HMAC 回调合同），机器生产目录取并集后形成 594 个唯一接口，其中 587 个为字面 method/path、7 个保留运行时策略阻断。目录复用现有授权矩阵和 route source inventory，不新增平行路由注册表；`npm run routes:check` 继续负责模块语法与装配边界。
+历史字面扫描识别 368 个精确 method/path 下限；当前扫描识别 371 个字面条件路由和 601 条授权声明（含 13 条机器认证证据声明），机器生产目录取并集后形成 593 个唯一接口，其中 586 个为字面 method/path、7 个保留运行时策略阻断。扫描器不再跨越已结束的相邻 handler 配对 method/path；目录复用现有授权矩阵和 route source inventory，不新增平行路由注册表，`npm run routes:check` 继续负责模块语法与装配边界。
 
 ## 2. 主要服务模块
 
@@ -37,8 +37,8 @@
 | 前端共享 | `auth.js`、`shared.js`、`platform-api-client.js`、`platform-shell.js` | 身份上下文、API 调用、壳和设计系统；服务端 token 不进入 localStorage，Cookie 上下文优先，陈旧凭据启动即清理 |
 | 静态发布与浏览器安全 | `src/http/static-asset-policy.js`、`src/http/static-content-runtime.js`、`src/http/browser-security-policy.js`、`src/http/browser-security-inventory.js`、`page-auth-bootstrap.js`、`scripts/static-publication.js` | 44 个入口、144 个显式发布资产、Pages 制品和服务端读取共用默认拒绝契约；静态 inline/eval 风险为 0，血液主工作台已改为可信 DOM/text 渲染，Inventory v2 现锁定 871 个 DOM HTML、69 个动态 URL 和 45 个动态样式风险；严格 CSP 仍是 Report-Only，生产 NO-GO |
 | 演示脱敏 | `src/platform/data/public-demo-snapshot.js` | 服务端合成、Pages 构建和 storage-admin 共用纯函数，凭据字段删除、个人姓名/身份/联系字段稳定掩码 |
-| API 生产目录 | `routeSourceFiles` + `api-authorization-matrix` + `api-idempotency-evidence` → `production-api-catalog-v2` | 字面路由与声明级授权事实合并；源码标记与行为证据分层，首个 SMS callback pilot 通过合同/测试锚点验证，333 个写接口仍缺行为证明，339 项复核，全部生产 NO-GO |
-| 内部边界覆盖治理 | `config/internal-boundary-coverage.json` → `scripts/internal-boundary-coverage.js` | 复用现有 c8/测试，按 identity、audit、object storage、API governance 四组锁定真实基线和负向证据；报告仅写临时目录 |
+| API 生产目录 | `routeSourceFiles` + `api-authentication-evidence` + `api-idempotency-evidence` → `api-authorization-matrix-v3` → `production-api-catalog-v3` | 13 项认证证据绑定 owner、机制、凭据来源、replay/CSRF、scope 与负向测试；原 13 个未分类 key 中 12 个真实入口已客观分类，1 个公卫词法误配已删除，未分类认证为 0。幂等仍只有 SMS callback pilot，332 个写接口缺行为证明，333 项复核，全部生产 NO-GO |
+| 内部边界覆盖治理 | `config/internal-boundary-coverage.json` → `scripts/internal-boundary-coverage.js` | 复用现有 c8/测试，按 identity、audit、object storage、API authentication/catalog/authorization 四组锁定真实基线和负向证据；报告仅写临时目录 |
 
 ## 3. 依赖宽度
 

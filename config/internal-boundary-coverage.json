@@ -40,10 +40,12 @@
       "id": "api-governance",
       "owner": "T00",
       "includes": [
+        "scripts/api-authentication-evidence.js",
         "scripts/api-authorization-matrix.js",
         "scripts/production-api-catalog.js"
       ],
       "tests": [
+        "test/api-authentication-evidence.test.js",
         "test/api-authorization-matrix.test.js",
         "test/production-api-catalog.test.js"
       ],

@@ -1,6 +1,8 @@
 "use strict";
 
 const assert = require("node:assert/strict");
+const { execFileSync } = require("node:child_process");
+const path = require("node:path");
 const test = require("node:test");
 const { buildMatrix } = require("../scripts/api-authorization-matrix");
 const { buildLiteralRouteInventory, buildProductionApiCatalog, validateProductionApiCatalog } = require("../scripts/production-api-catalog");
@@ -9,34 +11,96 @@ function clone(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
+test("literal route inventory never pairs method and path across adjacent handlers", () => {
+  const inventory = buildLiteralRouteInventory([{
+    file: path.resolve(__dirname, "../src/http/routes/public-health/parser-regression.js"),
+    source: `
+      if (req.method === "GET" && url.pathname === "/api/public-health/domain-events/health") {
+        return health();
+      }
+      if (req.method === "POST" && url.pathname === "/api/public-health/domain-events/dispatch") {
+        return dispatch();
+      }
+    `
+  }]);
+  assert.deepEqual(inventory.map((entry) => entry.key), [
+    "GET /api/public-health/domain-events/health",
+    "POST /api/public-health/domain-events/dispatch"
+  ]);
+  assert.equal(inventory.some((entry) => entry.key === "POST /api/public-health/domain-events/health"), false);
+});
+
+test("inventory-only routes stay review-required without inferred authentication", () => {
+  const sourceFiles = [{
+    file: path.resolve(__dirname, "../src/http/routes/public-health/inventory-only-regression.js"),
+    source: `if (req.method === "POST" && url.pathname === "/api/public-health/inventory-only-regression") { return true; }`
+  }];
+  const matrix = {
+    schemaVersion: "api-authorization-matrix-v3",
+    generatedFrom: "synthetic-test-source",
+    routes: []
+  };
+  const catalog = buildProductionApiCatalog(matrix, sourceFiles);
+  const entry = catalog.entries[0];
+  assert.equal(entry.key, "POST /api/public-health/inventory-only-regression");
+  assert.equal(entry.owner, "T03");
+  assert.equal(entry.authentication.required, null);
+  assert.equal(entry.production.repositoryReview, "review-required");
+  assert.equal(entry.production.blockers.includes("idempotency-behavior-proof-required"), true);
+});
+
+test("API governance CLIs expose checked and full read-only projections", () => {
+  for (const script of ["api-authentication-evidence.js", "api-authorization-matrix.js", "production-api-catalog.js"]) {
+    const scriptPath = path.resolve(__dirname, `../scripts/${script}`);
+    const checked = JSON.parse(execFileSync(process.execPath, [scriptPath, "--check"], { encoding: "utf8" }));
+    assert.equal(checked.ok, true);
+    const full = JSON.parse(execFileSync(process.execPath, [scriptPath], { encoding: "utf8", maxBuffer: 16 * 1024 * 1024 }));
+    assert.ok(full.schemaVersion);
+  }
+});
+
 test("production API catalog reuses the authorization inventory and stays fail closed", () => {
   const matrix = buildMatrix();
   const catalog = buildProductionApiCatalog(matrix);
   assert.deepEqual(validateProductionApiCatalog(catalog, matrix), []);
   const literalRouteInventory = buildLiteralRouteInventory();
   const expectedKeys = new Set([...matrix.routes.map((route) => route.key), ...literalRouteInventory.map((route) => route.key)]);
-  assert.equal(matrix.routes.length, 589);
-  assert.equal(literalRouteInventory.length, 372);
-  assert.equal(catalog.summary.entries, 594);
-  assert.equal(catalog.summary.unclassifiedAuthentication, 13);
+  assert.equal(matrix.routes.length, 601);
+  assert.equal(literalRouteInventory.length, 371);
+  assert.equal(catalog.summary.entries, 593);
+  assert.equal(catalog.schemaVersion, "production-api-catalog-v3");
+  assert.equal(catalog.summary.authenticationEvidenceVerified, 13);
+  assert.equal(catalog.summary.unclassifiedAuthentication, 0);
+  assert.equal(catalog.summary.routeInventoryOnly, 0);
+  assert.equal(catalog.summary.publicRoutes, 7);
+  assert.equal(catalog.summary.optionalAuthenticationRoutes, 1);
   assert.equal(catalog.summary.entries, expectedKeys.size);
   assert.equal(catalog.summary.declarations, matrix.routes.length);
-  assert.equal(catalog.summary.publicRoutes, 5);
   assert.equal(catalog.summary.productionNoGo, catalog.summary.entries);
   assert.equal(catalog.entries.every((entry) => entry.method && entry.path && entry.owner && entry.authentication && entry.authorization && entry.idempotency), true);
   assert.equal(catalog.entries.every((entry) => entry.production.status === "NO-GO" && entry.production.productionReady === false), true);
 });
 
-test("literal route inventory leaves unreviewed custom session policies unclassified", () => {
+test("custom authentication evidence classifies every proven control flow without inventing a route", () => {
   const catalog = buildProductionApiCatalog();
-  for (const key of ["GET /api/auth/context", "GET /api/auth/me", "POST /api/auth/logout"]) {
+  for (const key of ["GET /api/auth/context", "GET /api/auth/me", "POST /api/auth/logout", "GET /api/regional/context"]) {
     const entry = catalog.entries.find((candidate) => candidate.key === key);
     assert.ok(entry, `${key} is catalogued`);
-    assert.equal(entry.sourceCoverage, "route-inventory-only");
-    assert.equal(entry.authentication.required, null);
-    assert.equal(entry.production.repositoryReview, "review-required");
+    assert.equal(entry.sourceCoverage, "authorization-matrix-and-route-inventory");
+    assert.equal(entry.authentication.evidenceContractIds.length, 1);
     assert.equal(entry.production.status, "NO-GO");
   }
+  assert.equal(catalog.entries.find((entry) => entry.key === "POST /api/auth/logout").authentication.mode, "optional");
+  assert.equal(catalog.entries.find((entry) => entry.key === "GET /api/regional/context").authentication.mode, "none");
+  const t10CutoverPack = catalog.entries.find((entry) => entry.key === "GET /api/t10-specialty/cutover-pack");
+  assert.equal(t10CutoverPack.authentication.required, true);
+  assert.deepEqual(t10CutoverPack.authorization.roles, ["commission"]);
+  assert.equal(t10CutoverPack.authentication.evidenceContractIds[0], "shared.t10-specialty-cutover-pack-commission-session.v1");
+  assert.equal(t10CutoverPack.sourceCoverage, "authorization-matrix-and-route-inventory");
+  const health = catalog.entries.find((entry) => entry.key === "GET /api/public-health/domain-events/health");
+  assert.equal(health.authentication.required, true);
+  assert.deepEqual(health.authorization.roles, ["commission"]);
+  assert.equal(catalog.entries.some((entry) => entry.key === "POST /api/public-health/domain-events/health"), false);
   const callback = catalog.entries.find((entry) => entry.key === "POST /api/auth/sms-delivery-callback");
   assert.equal(callback.authentication.required, true);
   assert.deepEqual(callback.authentication.mechanisms, ["hmac-sha256-signed-external-callback"]);
@@ -93,6 +157,10 @@ test("catalog validation rejects missing authentication classification", () => {
   const missingAuthentication = clone(buildProductionApiCatalog(matrix));
   delete missingAuthentication.entries[0].authentication;
   assert.match(validateProductionApiCatalog(missingAuthentication, matrix).join("\n"), /no authentication classification/);
+
+  const forgedAuthenticationEvidence = clone(buildProductionApiCatalog(matrix));
+  forgedAuthenticationEvidence.entries.find((entry) => entry.key === "GET /api/auth/context").authentication.evidenceContractIds[0] = "forged.authentication.v1";
+  assert.match(validateProductionApiCatalog(forgedAuthenticationEvidence, matrix).join("\n"), /authentication classification lacks matching governed evidence/);
 });
 
 test("catalog validation rejects missing authorization roles", () => {
@@ -150,10 +218,33 @@ test("catalog validation rejects idempotency and review summary drift", () => {
   drifted.summary.writeIdempotencyObserved -= 1;
   drifted.summary.writeIdempotencyNotObserved += 1;
   drifted.summary.reviewRequired -= 1;
+  drifted.summary.authenticationEvidenceVerified -= 1;
+  drifted.summary.optionalAuthenticationRoutes -= 1;
+  drifted.summary.publicRoutes -= 1;
   const errors = validateProductionApiCatalog(drifted, matrix).join("\n");
   assert.match(errors, /behavior-verified idempotency summary drift/);
   assert.match(errors, /behavior-proof-required summary drift/);
   assert.match(errors, /source-marker observed summary drift/);
   assert.match(errors, /source-marker not-observed summary drift/);
   assert.match(errors, /review-required summary drift/);
+  assert.match(errors, /authentication evidence summary drift/);
+  assert.match(errors, /optional authentication summary drift/);
+  assert.match(errors, /public API summary drift/);
+});
+
+test("catalog validation rejects incomplete identity scope blockers and unclassified promotion", () => {
+  const matrix = buildMatrix();
+  const drifted = clone(buildProductionApiCatalog(matrix));
+  const entry = drifted.entries.find((candidate) => candidate.key === "GET /api/t10-specialty/cutover-pack");
+  entry.owner = "";
+  entry.authorization.dataScopes = [];
+  entry.authentication.required = null;
+  entry.authentication.mode = "review-required";
+  entry.production.repositoryReview = "catalogued";
+  entry.production.blockers = [];
+  const errors = validateProductionApiCatalog(drifted, matrix).join("\n");
+  assert.match(errors, /incomplete API identity/);
+  assert.match(errors, /unclassified authentication must remain review-required/);
+  assert.match(errors, /no data scope/);
+  assert.match(errors, /lacks the external evidence blocker/);
 });

@@ -3766,6 +3766,16 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(forgedBoundary.response.status, 400);
     assert.equal(forgedBoundary.body.code, "T10_MODULE_BOUNDARY_OVERRIDE_FORBIDDEN");
 
+    const anonymousPack = await api(baseUrl, "/api/t10-specialty/cutover-pack");
+    assert.equal(anonymousPack.response.status, 401);
+
+    const institutionPackDenied = await api(
+      baseUrl,
+      "/api/t10-specialty/cutover-pack",
+      authorized(institutionLogin.body.token)
+    );
+    assert.equal(institutionPackDenied.response.status, 403);
+
     const scopedPack = await api(
       baseUrl,
       `/api/t10-specialty/cutover-pack?institutionId=${encodeURIComponent(institutionId)}&enabledTrackIds=physical-examination`,

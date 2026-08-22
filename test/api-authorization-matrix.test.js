@@ -12,6 +12,9 @@ test("modular API authorization matrix covers owners roles scopes purposes and h
   const matrix = buildMatrix();
   assert.deepEqual(validateMatrix(matrix), []);
   assert.equal(matrix.generatedFrom, "src/http/routes/**/*.js");
+  assert.equal(matrix.schemaVersion, "api-authorization-matrix-v3");
+  assert.equal(matrix.summary.declarations, 601);
+  assert.equal(matrix.summary.customAuthenticationEvidence, 13);
   assert.equal(matrix.summary.protected >= 550, true);
   assert.equal(matrix.summary.highRisk, 9);
   assert.equal(matrix.summary.residentScoped > 0, true);
@@ -22,6 +25,15 @@ test("modular API authorization matrix covers owners roles scopes purposes and h
   assert.equal(callback.identity.principalType, "sms-provider");
   assert.equal(callback.authorizationModel, "verified-external-provider-message-scope");
   assert.deepEqual(callback.roles, []);
+  const logout = matrix.routes.find((route) => route.key === "POST /api/auth/logout");
+  assert.equal(logout.identity.mode, "optional");
+  assert.equal(logout.authenticationEvidenceContractId, "identity-security.logout-optional-session.v1");
+  const regionalContext = matrix.routes.find((route) => route.key === "GET /api/regional/context");
+  assert.equal(regionalContext.identity.mode, "none");
+  assert.equal(regionalContext.owner, "T00");
+  const t10CutoverPack = matrix.routes.find((route) => route.key === "GET /api/t10-specialty/cutover-pack");
+  assert.deepEqual(t10CutoverPack.roles, ["commission"]);
+  assert.equal(t10CutoverPack.authenticationEvidenceContractId, "shared.t10-specialty-cutover-pack-commission-session.v1");
 });
 
 test("custom external authentication remains fail closed when its model or principal drifts", () => {
@@ -33,5 +45,9 @@ test("custom external authentication remains fail closed when its model or princ
   const missingPrincipal = clone(buildMatrix());
   const callbackWithoutPrincipal = missingPrincipal.routes.find((route) => route.key === "POST /api/auth/sms-delivery-callback");
   delete callbackWithoutPrincipal.identity.principalType;
-  assert.match(validateMatrix(missingPrincipal).join("\n"), /custom authorization model lacks an external principal/);
+  assert.match(validateMatrix(missingPrincipal).join("\n"), /custom authorization model lacks a governed principal/);
+
+  const forgedEvidence = clone(buildMatrix());
+  forgedEvidence.routes.find((route) => route.key === "GET /api/auth/context").authenticationEvidenceContractId = "forged.authentication.v1";
+  assert.match(validateMatrix(forgedEvidence).join("\n"), /custom authentication lacks matching governed evidence/);
 });
