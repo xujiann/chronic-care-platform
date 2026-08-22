@@ -109,7 +109,7 @@ JSON 源快照仍是高扇出依赖，但浏览器和 Pages 只依赖经统一�
 | HIS/EMR/LIS/PACS | T08、care、clinical | 现场地址、凭据、证书、字段与回执 |
 | OIDC/SMS | T01 identity-security | provider 可用性、绑定、重放、回调验签及共享 OTP/限流/锁定状态 |
 | HAPI FHIR/Orthanc/OHIF | Solution A、clinical | 容器版本、认证、DICOM/FHIR 兼容 |
-| 对象存储 | `secure-object-storage.js`（T00 共享端口）→ T08 现有附件 caller → 厂商中立网关 | 生产缺 v1 合同、独立响应密钥、精确上传/下载 Origin、响应签名/时间窗/请求对象绑定或显式扫描/生命周期回执即失败关闭；真实桶/KMS/WORM/扫描/备份/容量和外部调用—本地写入对账仍阻断上线 |
+| 对象存储 | `secure-object-storage.js`（T00 共享端口）→ T08 现有附件 caller → 厂商中立网关 | 生产缺 v1 合同、独立响应密钥、精确上传/下载 Origin、响应签名/时间窗/请求对象绑定或显式扫描/生命周期回执即失败关闭；附件元数据达到 500 条时也在网关调用前失败关闭并保留全部既有行；真实桶/KMS/WORM/扫描/备份/容量、无损分页和外部调用—本地写入对账仍阻断上线 |
 | 连续审计 | `state_collections` 展示快照 → `audit-delivery-worker` → SIEM 或 filesystem rehearsal WORM；失败复用 cutover alert journal 与 systemd journal | 部署依赖闭包和启动前检查已显式；当前快照只有 120 条窗口且重封，不能作为无损 source，SIEM receipt、target/checkpoint binding、外部单调锚与真实 WORM capability 仍阻断生产 |
 | GitHub Actions/Pages | CI 与静态站 | 分支保护、制品、外部 5xx |
 

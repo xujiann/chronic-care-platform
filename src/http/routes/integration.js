@@ -3,6 +3,8 @@
 const clinicalResultExchange = require("./t08-clinical-result-exchange");
 const externalJointTest = require("./integration/external-joint-test");
 
+const SECURE_ATTACHMENT_METADATA_LIMIT = 500;
+
 function createRouteSegments(runtime) {
   const { APPOINTMENT_CONTRACT_ID, PHYSICAL_EXAM_CONTRACT_ID, appendDataAccessLog, appendSecurityEvent, applyObjectLifecycle, buildIntegrationSample, canAccessResident, canAccessSecureAttachment, collectJson, createObjectDownloadIntent, createObjectUploadIntent, dispatchFinancialRequest, dispatchHospitalRequest, finalizeObjectUpload, hospitalConnectorCenter, landAppointmentIntegrationEvent, landPhysicalExamIntegrationEvent, normalizeHospitalConnectorDomain, normalizeIntegrationEvent, objectStorageCenter, prependAuditTrailEntry, randomUUID, readDatabase, requireApiRole, sendJson, summarizeIntegrationGateway, updateIntegrationEvent, validateAttachmentMetadata, verifyIntegrationSignature, writeDatabase } = runtime;
   return [
@@ -59,6 +61,16 @@ function createRouteSegments(runtime) {
           sendJson(res, 400, { error: "Bad Request", message: "居民附件必须关联 residentId" });
           return true;
         }
+        const currentAttachments = Array.isArray(data.secureAttachments) ? data.secureAttachments : [];
+        if (currentAttachments.length >= SECURE_ATTACHMENT_METADATA_LIMIT) {
+          sendJson(res, 507, {
+            error: "Insufficient Storage",
+            code: "SECURE_ATTACHMENT_METADATA_CAPACITY_EXCEEDED",
+            message: "安全附件元数据容量已满，请联系平台管理员处理",
+            productionReady: false
+          });
+          return true;
+        }
         try {
           validateAttachmentMetadata(payload);
         } catch (error) {
@@ -98,7 +110,7 @@ function createRouteSegments(runtime) {
             createdByRole: user.role,
             createdByOrgCode: user.orgCode || ""
           };
-          data.secureAttachments = [attachment, ...(Array.isArray(data.secureAttachments) ? data.secureAttachments : [])].slice(0, 500);
+          data.secureAttachments = [attachment, ...currentAttachments];
           data.securityEvents = [{
             id: randomUUID(), at: new Date().toLocaleString("zh-CN", { hour12: false }), actor: user.name, role: user.role,
             action: "创建安全附件上传授权", target: attachmentId, result: "允许", detail: `${attachment.classification} · ${attachment.retentionPolicy} · ${attachment.expectedSizeBytes} bytes`
