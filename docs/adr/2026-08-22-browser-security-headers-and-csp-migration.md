@@ -43,6 +43,10 @@
 
 显式发布图原有 37 个可执行内联脚本、8 个内联样式块和 13 个样式属性已迁至外部脚本、外部样式表和受控 class，P0/P1 静态风险基线为 0。角色/账户守卫统一由 `page-auth-bootstrap.js` 承载，并以行为测试保持原有加载顺序和失败关闭语义。此结果只完成第二阶段的静态迁移，不授权提前进入第三/四阶段：动态 CSSOM、全角色浏览器与恶意输入回归、真实托管响应头和独立安全评估仍未完成，因此兼容 `unsafe-inline` 保留、严格策略仍为 Report-Only、`productionReady=false`。
 
+### Inventory v2 治理状态（2026-08-22）
+
+显式发布图的治理清单扩展到 DOM HTML、动态 URL、动态 HTML style、CSSOM 和 runtime style element：当前精确 occurrence 为 896、69、48，分别覆盖 44、18、15 个资产。每个资产/类型以规范化源行 occurrence 集合生成稳定 SHA-256；数量增长、同数量替换、新资产或新类型均失败关闭，风险减少也必须显式刷新基线接受评审。该词法清单不分析数据来源和净化效果，不修改任何 sink、响应头或 CSP enforcement；兼容 CSP、严格 Report-Only 和 `productionReady=false` 均保持不变。
+
 ## Phased enforcement and rollback
 
 1. 第一阶段：集中端口、兼容 CSP + 严格 Report-Only、风险清单、CI 增量拒绝；固定 `productionReady=false`。

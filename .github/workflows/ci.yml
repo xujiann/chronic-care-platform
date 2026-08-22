@@ -132,7 +132,7 @@ jobs:
         run: npm run test:smoke
       - name: Check legacy JavaScript syntax baseline
         run: npm run check
-      - name: Verify static publication security boundary
+      - name: Verify static publication boundary and Browser Inventory v2
         run: npm run static:check && npm run security:browser:verify && npm run static:test
       - name: Verify API authorization matrix
         run: npm run api:authorization-matrix
