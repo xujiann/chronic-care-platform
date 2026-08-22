@@ -4,6 +4,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const { routeSourceFiles } = require("../src/http/runtime-source");
+const { DEFAULT_REGISTRY, validateEvidenceRegistry } = require("./api-idempotency-evidence");
 
 const ROOT = path.resolve(__dirname, "..");
 const HIGH_RISK = require("../config/high-risk-api-authorization.json").routes;
@@ -128,6 +129,19 @@ function readRouteSources(root = ROOT) {
   }));
 }
 
+function customRouteSource(contract, sourceFiles) {
+  const matches = [];
+  for (const entry of sourceFiles) {
+    const pathIndex = entry.source.indexOf(`url.pathname === "${contract.path}"`);
+    if (pathIndex < 0) continue;
+    const context = entry.source.slice(Math.max(0, pathIndex - 240), pathIndex);
+    if (!context.includes(`req.method === "${contract.method}"`)) continue;
+    matches.push(`${path.relative(ROOT, entry.file).replaceAll("\\", "/")}:${entry.source.slice(0, pathIndex).split("\n").length}`);
+  }
+  if (matches.length !== 1) throw new Error(`custom authentication route must resolve exactly once: ${contract.key} (${matches.length})`);
+  return matches[0];
+}
+
 function buildMatrix(sourceFiles = readRouteSources()) {
   const routes = PUBLIC_ROUTES.map((route) => ({
     ...route,
@@ -177,9 +191,28 @@ function buildMatrix(sourceFiles = readRouteSources()) {
     }
   }
 
+  for (const contract of DEFAULT_REGISTRY.contracts) {
+    routes.push({
+      key: contract.key,
+      method: contract.method,
+      path: contract.path,
+      owner: contract.owner,
+      domain: contract.domain,
+      identity: { ...contract.authentication },
+      roles: [...contract.authorization.roles],
+      dataScope: contract.authorization.dataScope,
+      authorizationModel: contract.authorization.model,
+      purpose: contract.purpose,
+      highRisk: false,
+      source: customRouteSource(contract, sourceFiles),
+      governanceSource: `config/api-idempotency-evidence.json#${contract.contractId}`
+    });
+  }
+
   return {
     schemaVersion: "api-authorization-matrix-v2",
     generatedFrom: "src/http/routes/**/*.js",
+    explicitCustomAuthenticationFrom: DEFAULT_REGISTRY.schemaVersion,
     generatedAt: new Date().toISOString(),
     summary: {
       declarations: routes.length,
@@ -194,11 +227,12 @@ function buildMatrix(sourceFiles = readRouteSources()) {
 }
 
 function validateMatrix(matrix) {
-  const errors = [];
+  const errors = validateEvidenceRegistry().map((error) => `idempotency evidence: ${error}`);
   if (matrix.summary.protected < 550) errors.push(`protected declaration count unexpectedly low: ${matrix.summary.protected}`);
   for (const route of matrix.routes) {
     if (!route.method || !route.path || !route.owner || !route.purpose || !route.dataScope) errors.push(`incomplete route: ${route.source}`);
-    if (route.identity.required && route.roles.length === 0) errors.push(`protected route has no roles: ${route.key}`);
+    if (route.identity.required && route.roles.length === 0 && !route.authorizationModel) errors.push(`protected route has no roles or custom authorization model: ${route.key}`);
+    if (route.authorizationModel && (!route.identity.principalType || route.identity.mechanism === "bearer-or-cookie-session")) errors.push(`custom authorization model lacks an external principal: ${route.key}`);
   }
   for (const key of Object.keys(HIGH_RISK)) {
     const matches = matrix.routes.filter((route) => route.key === key && route.highRisk);

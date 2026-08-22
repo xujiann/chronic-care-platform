@@ -151,6 +151,7 @@ test("CI isolates browser E2E and release readiness behind the required test agg
   assert.match(governanceJob, /Verify API authorization matrix[\s\S]*npm run api:authorization-matrix/);
   assert.match(governanceJob, /Verify production API catalog[\s\S]*npm run api:production-catalog/);
   assert.match(governanceJob, /Verify internal boundary coverage baselines[\s\S]*npm run test:coverage:boundaries/);
+  assert.match(governanceJob, /Verify API idempotency behavior evidence[\s\S]*npm run api:idempotency-evidence/);
   assert.doesNotMatch(governanceJob, /Install Chromium|Run deployment readiness gate/);
 
   assert.match(browserJob, /timeout-minutes: 15/);

@@ -1,6 +1,6 @@
 # API MAP — 主线接口地图
 
-> 实施分支 AS-IS 快照：历史静态分析识别的 368 条精确路由是下限；当前扫描识别 372 个字面条件路由和 588 条授权声明，派生目录取并集后形成 594 个唯一接口（587 个字面路由、7 个运行时策略）。动态 ID、请求体 action 和外部回调变体仍需以运行时路由测试为准。
+> 实施分支 AS-IS 快照：历史静态分析识别的 368 条精确路由是下限；当前扫描识别 372 个字面条件路由和 589 条授权声明，派生目录取并集后形成 594 个唯一接口（587 个字面路由、7 个运行时策略）。新增声明仅分类既有 SMS 外部回调认证，不新增路由。动态 ID、请求体 action 和外部回调变体仍需以运行时路由测试为准。
 
 ## 1. 请求链
 
@@ -87,7 +87,8 @@ HTTP request
 - 所有既有状态写入在同一 SQLite 事务内核对并追加 v15 审计 source；该 hook 不暴露新 HTTP API，同 ID 异内容会使原请求整体失败回滚。
 - `PUT /api/state` 保持原路径和成功形状。审计数组以及四个 T02 区域共享集合均为服务端管理字段：省略时保留，提交时必须与当前值逐项深相等。区域集合的删除、修改、重排或伪造追加优先返回 `409 REGIONAL_SHARING_SERVER_MANAGED_COLLECTION_CONFLICT`；其他集合的乐观版本冲突仍返回 `409 STORAGE_CONFLICT`。集合级兼容入口对四个区域集合返回 `403 REGIONAL_SHARING_SERVER_MANAGED_COLLECTION_WRITE_DENIED`。
 - `npm run api:authorization-matrix` 从模块化路由源码生成/校验 owner、身份、角色、范围、用途和九条高风险接口唯一性。
-- `npm run api:production-catalog` 合并上述授权矩阵与同一 route source inventory 的字面条件，补充 auth、roles-or-scope、幂等观察和生产状态；它不维护第二份手工路由清单。当前 594 项全部 `NO-GO`，249 项因运行时 route/role、自定义鉴权未分类或未观察到写幂等标记保持 `review-required`。
+- `npm run api:production-catalog` 合并上述授权矩阵与同一 route source inventory 的字面条件；`production-api-catalog-v2` 将源码标记观察和行为证据分开。当前 594 项全部 `NO-GO`；334 个写接口中 1 个有行为合同，333 个仍缺行为证明，13 个自定义鉴权仍未分类，合计 339 项 `review-required`。
+- `npm run api:idempotency-evidence` 校验证据合同、实现/测试锚点并执行 SMS ledger 幂等行为测试；pilot 的认证是 HMAC 签名外部 provider message scope，不伪装成平台角色。
 - 身份/SMS HTTP 路径保持不变；组合根已为短信发送生成随机 request ID，适配器现在拒绝缺失幂等 ID，OIDC refresh 返回的 ID token 必须通过 JWKS/claims 验证后才暴露脱敏 claims。
 - `POST /api/attachments/upload-intents` 在完成身份和居民范围校验后检查服务端元数据容量；已有
   500 条或更多记录时返回 `507 SECURE_ATTACHMENT_METADATA_CAPACITY_EXCEEDED`，且不调用对象
@@ -106,9 +107,9 @@ HTTP request
 
 ## 7. API 风险与缺失测试
 
-- `API-001`：机器目录已覆盖当前 588 条授权声明、372 个字面条件路由和两者并集的 594 个唯一接口，并强制 method/path/owner/auth/roles-or-scope/idempotency/生产状态完整；不再手工复制路由清单。
-- `API-002`：静态矩阵与目录已建立，但 7 个运行时策略路由、14 个自定义鉴权未分类入口、233 个未观察到幂等标记的写接口和 role × permission × resource 运行时允许/拒绝组合仍需逐 owner 扩展；源码标记不能替代行为证明。
-- API 治理脚本已形成独立覆盖组，并以负向测试拒绝缺鉴权分类、method/path 漂移、缺幂等分类和生产误 promotion；覆盖率门禁不关闭上述 249 项 `review-required`，也不构成生产放行证据。
+- `API-001`：机器目录已覆盖当前 589 条授权声明、372 个字面条件路由和两者并集的 594 个唯一接口，并强制 method/path/owner/auth/roles-or-scope/idempotency/生产状态完整；不再手工复制路由清单。
+- `API-002`：静态矩阵与目录已建立，但 7 个运行时策略路由、13 个自定义鉴权未分类入口、333 个尚无行为证据合同的写接口和 role × permission × resource 运行时允许/拒绝组合仍需逐 owner 扩展；233 个“未观察到标记”只是观察子集，源码标记不能替代行为证明。
+- API 治理脚本已形成独立覆盖组，并以负向测试拒绝缺鉴权分类、method/path 漂移、缺幂等行为证明和生产误 promotion；覆盖率门禁不关闭上述 339 项 `review-required`，也不构成生产放行证据。
 - `API-003`：错误响应契约不统一，调用方需要理解多个格式。
 - `API-004`：`shared` 有 12 个路由段，容易成为跨域逻辑聚集点。
 - `API-005`：已通过 Pages/Node 共用显式资源图和敏感路径拒绝矩阵缓解；后续新增页面资源必须同步更新清单并通过构建验证。

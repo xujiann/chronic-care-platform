@@ -15,10 +15,10 @@ test("production API catalog reuses the authorization inventory and stays fail c
   assert.deepEqual(validateProductionApiCatalog(catalog, matrix), []);
   const literalRouteInventory = buildLiteralRouteInventory();
   const expectedKeys = new Set([...matrix.routes.map((route) => route.key), ...literalRouteInventory.map((route) => route.key)]);
-  assert.equal(matrix.routes.length, 588);
+  assert.equal(matrix.routes.length, 589);
   assert.equal(literalRouteInventory.length, 372);
   assert.equal(catalog.summary.entries, 594);
-  assert.equal(catalog.summary.unclassifiedAuthentication, 14);
+  assert.equal(catalog.summary.unclassifiedAuthentication, 13);
   assert.equal(catalog.summary.entries, expectedKeys.size);
   assert.equal(catalog.summary.declarations, matrix.routes.length);
   assert.equal(catalog.summary.publicRoutes, 5);
@@ -27,9 +27,9 @@ test("production API catalog reuses the authorization inventory and stays fail c
   assert.equal(catalog.entries.every((entry) => entry.production.status === "NO-GO" && entry.production.productionReady === false), true);
 });
 
-test("literal route inventory adds custom session and callback policies without guessing authorization", () => {
+test("literal route inventory leaves unreviewed custom session policies unclassified", () => {
   const catalog = buildProductionApiCatalog();
-  for (const key of ["GET /api/auth/context", "GET /api/auth/me", "POST /api/auth/logout", "POST /api/auth/sms-delivery-callback"]) {
+  for (const key of ["GET /api/auth/context", "GET /api/auth/me", "POST /api/auth/logout"]) {
     const entry = catalog.entries.find((candidate) => candidate.key === key);
     assert.ok(entry, `${key} is catalogued`);
     assert.equal(entry.sourceCoverage, "route-inventory-only");
@@ -37,6 +37,12 @@ test("literal route inventory adds custom session and callback policies without 
     assert.equal(entry.production.repositoryReview, "review-required");
     assert.equal(entry.production.status, "NO-GO");
   }
+  const callback = catalog.entries.find((entry) => entry.key === "POST /api/auth/sms-delivery-callback");
+  assert.equal(callback.authentication.required, true);
+  assert.deepEqual(callback.authentication.mechanisms, ["hmac-sha256-signed-external-callback"]);
+  assert.equal(callback.authorization.rolesOrScope, "verified-external-provider-message-scope");
+  assert.equal(callback.sourceCoverage, "authorization-matrix-and-route-inventory");
+  assert.equal(callback.production.productionReady, false);
 });
 
 test("write APIs always expose an idempotency classification without claiming proof", () => {
@@ -44,8 +50,17 @@ test("write APIs always expose an idempotency classification without claiming pr
   const writes = catalog.entries.filter((entry) => entry.idempotency.required);
   assert.equal(writes.length > 0, true);
   assert.equal(writes.every((entry) => ["source-marker-observed", "not-observed"].includes(entry.idempotency.status)), true);
-  assert.equal(catalog.policy.writeIdempotencyEvidence, "source-marker-observation-only");
+  assert.equal(catalog.policy.sourceMarkersAreBehaviorProof, false);
+  assert.equal(catalog.policy.writeIdempotencyEvidence, "explicit-behavior-contract-and-executable-test-evidence");
   assert.equal(catalog.entries.filter((entry) => entry.idempotency.status === "not-observed").every((entry) => entry.production.repositoryReview === "review-required"), true);
+  assert.equal(catalog.summary.writeIdempotencyBehaviorVerified, 1);
+  assert.equal(catalog.summary.writeIdempotencyBehaviorProofRequired, writes.length - 1);
+  assert.equal(writes.filter((entry) => entry.idempotency.behaviorEvidence.status === "behavior-proof-required").every((entry) => entry.production.blockers.includes("idempotency-behavior-proof-required")), true);
+  const callback = catalog.entries.find((entry) => entry.key === "POST /api/auth/sms-delivery-callback");
+  assert.equal(callback.idempotency.status, "source-marker-observed");
+  assert.equal(callback.idempotency.behaviorEvidence.status, "behavior-verified");
+  assert.equal(callback.idempotency.behaviorEvidence.distributedExactlyOnceClaimed, false);
+  assert.equal(callback.production.status, "NO-GO");
 });
 
 test("runtime-derived paths and roles remain explicit review blockers", () => {
@@ -83,9 +98,24 @@ test("catalog validation rejects missing authentication classification", () => {
 test("catalog validation rejects missing authorization roles", () => {
   const matrix = buildMatrix();
   const missingAuthorization = clone(buildProductionApiCatalog(matrix));
-  const protectedEntry = missingAuthorization.entries.find((entry) => entry.authentication.required);
+  const protectedEntry = missingAuthorization.entries.find((entry) => entry.authentication.required && entry.authorization.roles.length);
   protectedEntry.authorization.roles = [];
   assert.match(validateProductionApiCatalog(missingAuthorization, matrix).join("\n"), /no role or scope policy/);
+
+  const forgedBehaviorProof = clone(buildProductionApiCatalog(matrix));
+  const markerOnly = forgedBehaviorProof.entries.find((entry) => entry.idempotency.status === "source-marker-observed" && entry.idempotency.behaviorEvidence.status === "behavior-proof-required");
+  markerOnly.idempotency.behaviorEvidence = {
+    status: "behavior-verified",
+    contractId: "forged.source-marker-proof",
+    owner: markerOnly.owner,
+    distributedExactlyOnceClaimed: false
+  };
+  markerOnly.production.blockers = markerOnly.production.blockers.filter((blocker) => blocker !== "idempotency-behavior-proof-required");
+  assert.match(validateProductionApiCatalog(forgedBehaviorProof, matrix).join("\n"), /matching governed contract/);
+
+  const exactlyOnceClaim = clone(buildProductionApiCatalog(matrix));
+  exactlyOnceClaim.entries.find((entry) => entry.idempotency.behaviorEvidence.status === "behavior-verified").idempotency.behaviorEvidence.distributedExactlyOnceClaimed = true;
+  assert.match(validateProductionApiCatalog(exactlyOnceClaim, matrix).join("\n"), /must not claim distributed exactly-once/);
 });
 
 test("catalog validation rejects method and path drift", () => {
@@ -110,4 +140,20 @@ test("catalog validation rejects source inventory drift", () => {
   catalog.summary.entries -= 1;
   catalog.summary.productionNoGo -= 1;
   assert.match(validateProductionApiCatalog(catalog, matrix).join("\n"), /missing from catalog/);
+});
+
+test("catalog validation rejects idempotency and review summary drift", () => {
+  const matrix = buildMatrix();
+  const drifted = clone(buildProductionApiCatalog(matrix));
+  drifted.summary.writeIdempotencyBehaviorVerified += 1;
+  drifted.summary.writeIdempotencyBehaviorProofRequired -= 1;
+  drifted.summary.writeIdempotencyObserved -= 1;
+  drifted.summary.writeIdempotencyNotObserved += 1;
+  drifted.summary.reviewRequired -= 1;
+  const errors = validateProductionApiCatalog(drifted, matrix).join("\n");
+  assert.match(errors, /behavior-verified idempotency summary drift/);
+  assert.match(errors, /behavior-proof-required summary drift/);
+  assert.match(errors, /source-marker observed summary drift/);
+  assert.match(errors, /source-marker not-observed summary drift/);
+  assert.match(errors, /review-required summary drift/);
 });

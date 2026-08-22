@@ -32,7 +32,7 @@
 | ARC-006 | 同名模块 | 根目录与 `src/` 有 6 组同名 | 文档明确前端/服务端/迁移角色，不做全仓改名 |
 | ARC-008 | operations 跨域写入 | OPS-02 为保持兼容，将 T06 的既有直写整体移入 T02；其中 `resourceDispatchRequests`、`taskMessages` 的机器 Owner 仍是 T05 care-coordination | 后续仅在独立 ADR/切片中改为 T05 owner port 或版本化事件；在完成行为矩阵前不得直接改写副作用 |
 | API-001 | 错误契约 | 多种 JSON 错误格式 | 新 API 使用版本化标准错误接口 |
-| API-002 | 接口目录复核 | 已合并 588 条授权声明与 372 个字面条件路由，形成 594 个唯一接口的派生机器目录；7 个运行时策略、14 个自定义鉴权未分类入口和 233 个未观察到幂等标记的写接口使 249 项保持 review-required | 逐 owner 以行为测试补 route/action、身份、幂等、CAS、错误与审计合同；禁止把字符串标记当成生产证明 |
+| API-002 | 接口目录复核 | v2 合并 589 条授权声明与 372 个字面条件路由，仍为 594 项；SMS callback 已完成首个行为合同/custom auth pilot，但 7 个运行时策略、13 个自定义鉴权未分类入口和 333 个无行为证明写接口使 339 项保持 review-required | 逐 owner 以行为测试补 route/action、身份、幂等、CAS、错误与审计合同；233 个未观察到标记项优先排查，禁止把字符串标记或猜测 owner 当成生产证明 |
 | JOB-001 | Worker 一致性 | 多套 worker/retry/checkpoint 语义 | 建立共同任务状态和观测契约 |
 | TEST-006 | 静态基线与测试性能 | lint 对 2 个前端文件的 16 个重复键、`test/api.test.js` 的 3 个不可达块保留精确例外；typecheck 仅覆盖 6 个治理/安全文件；集成首批 API 契约在并发负载下约 174 秒 | 逐规则/逐目录消除例外并扩大类型基线；拆分超大 API 测试和测量 CI 时长，不降低断言或超时门禁 |
 | TEST-005 | 浏览器一致性 | Windows 本地配置优先系统 Chrome；完整 36 项中小程序超时恢复用例可受前序共享服务状态影响，而同文件 13/13、单例 1/1、CI Chromium 36/36 通过 | 后续独立测试任务统一本地/CI 浏览器选择并隔离 E2E 服务状态，不在数据治理切片中修改业务代码 |
@@ -63,6 +63,7 @@
 | DEPLOY-001 | 2026-08-22 | Solution A 四个容器镜像固定到审核版本与 registry digest；Orthanc 认证默认启用，DICOM 默认回环且只接受显式私网接口；占位凭据和漂移镜像生产失败关闭 | readiness 锁定 Compose/环境模板/镜像策略一致性，并覆盖可变镜像、占位凭据、认证关闭、通配/公网绑定和外部证据持续 `NO-GO` |
 | API-CATALOG-001 | 2026-08-22 | 从 `api-authorization-matrix-v2` 派生 `production-api-catalog-v1`，逐项覆盖 method/path/owner/auth/roles-or-scope/idempotency/生产状态且全部 NO-GO | 目录集合等价、唯一键、必要字段、动态策略、幂等观察和生产放行负向测试；governance-api CI 同时校验矩阵与目录 |
 | DATA-003 | 2026-08-22 | 复用既有 collection governance，对 252/252 集合建立唯一 owner/system/review/quarantine 状态；87 个 owner 合同不被复制，源码 process owner 不推断数据 owner，生产晋升固定失败关闭 | 完整性、唯一性、陈旧/冲突、owner/reader/shared 边界、源码引用漂移、核心概念匹配、生产晋升负向与治理 CI |
+| API-IDEM-001 | 2026-08-22 | `production-api-catalog-v2` 将 source marker 与行为证明分层；SMS callback 复用既有事件 ledger/测试成为唯一 pilot，并分类为 HMAC 外部 principal | 合同唯一性、owner/route/实现/测试锚点、伪造 marker 晋升、生产晋升和 distributed exactly-once 否定断言；CI 执行专项行为测试 |
 
 ## 重复、死代码和命名结论
 
