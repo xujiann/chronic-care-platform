@@ -80,6 +80,10 @@ HTTP request
 - `PUT /api/state` 保持原路径和成功形状。审计数组以及四个 T02 区域共享集合均为服务端管理字段：省略时保留，提交时必须与当前值逐项深相等。区域集合的删除、修改、重排或伪造追加优先返回 `409 REGIONAL_SHARING_SERVER_MANAGED_COLLECTION_CONFLICT`；其他集合的乐观版本冲突仍返回 `409 STORAGE_CONFLICT`。集合级兼容入口对四个区域集合返回 `403 REGIONAL_SHARING_SERVER_MANAGED_COLLECTION_WRITE_DENIED`。
 - `npm run api:authorization-matrix` 从模块化路由源码生成/校验 owner、身份、角色、范围、用途和九条高风险接口唯一性。
 - 身份/SMS HTTP 路径保持不变；组合根已为短信发送生成随机 request ID，适配器现在拒绝缺失幂等 ID，OIDC refresh 返回的 ID token 必须通过 JWKS/claims 验证后才暴露脱敏 claims。
+- `POST /api/attachments/upload-intents` 在完成身份和居民范围校验后检查服务端元数据容量；已有
+  500 条或更多记录时返回 `507 SECURE_ATTACHMENT_METADATA_CAPACITY_EXCEEDED`，且不调用对象
+  存储网关、不写数据库、不返回附件标识、文件名、对象地址或容量明细。第 500 条可正常创建，
+  既有元数据不再通过数组截断被删除；持久命令和分页仓储仍是后续生产闭环。
 - `GET /api/chronic/followup-events/health` 兼容增加脱敏 publisher readiness；不返回 endpoint、
   secret 或外部回执。`POST /api/chronic/followup-events/dispatch` 保持 method/path、角色和成功
   shape；机构调用仅可看到并投递 resident/org 双重范围内的聚合，拒绝发生在外发前，成功、

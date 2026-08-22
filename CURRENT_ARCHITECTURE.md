@@ -101,7 +101,9 @@ flowchart TB
     HMAC、时间窗和 request ID，再绑定 operation、bucket、attachment、object/version。上传/下载
     URL 受 Origin 与 TTL 约束，完成和生命周期必须返回显式扫描/执行回执。非生产未声明版本时暂保留
     legacy 迁移路径，所有生产就绪投影仍为 `false`。当前没有修改 T08 公开路由、数据库或 Schema；
-    元数据 500 条静默截断、外部调用与本地写入双写以及供应商能力证明仍是后续债务。
+    元数据兼容上限仍为 500 条，但创建第 501 条时会在网关调用前以稳定错误失败关闭，既有
+    immutable/legal-hold 元数据不再被静默淘汰；无损分页仓储、外部调用与本地写入双写以及
+    供应商能力证明仍是后续债务。
 
 ## 6. T06 五子域治理切片
 

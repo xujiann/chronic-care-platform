@@ -15,7 +15,7 @@
 | ARC-004 | 前端超大模块 | 数智医院 app 10.5k、citizen 6k、公卫 4.4k | 全局状态、渲染和流程耦合 |
 | ARC-007 | 临床子域隔离 | 急救、血液、影像、体检首个查询端口已建立，但两个混合路由仍承载写命令；血液 GET 有内存规范化，影像和体检 GET 有审计持久化；33 个 operations 字面路径已全部移交 T02 | 按特征测试逐用例迁移；禁止 operations 回流 T06，不把兼容副作用误写成纯查询 |
 | CHR-001 | 慢病随访事件投递 | T04 已有原子内嵌 outbox、幂等 inbox、稳定幂等键、独立 activation verifier、范围过滤、审计和签名 HTTPS publisher；单进程并发可合并，但批次/写回失败会再次发出同幂等键请求 | 仍需 T00/T04 独立任务建立 verifier 组合、持久 worker、lease、attempt/backoff、死信、供应方幂等核对和部署观测；当前不能承诺跨进程 exactly-once，不得关闭生产 Go/No-Go |
-| OBJ-001 | 对象存储生产闭环 | 应用侧 v1 响应信任已建立，但 `secureAttachments.slice(0, 500)` 会静默淘汰元数据；外部 upload/complete/lifecycle 成功后再写本地状态，缺少 outbox、幂等收敛、失败对账和补偿；网关能力尚无签名声明 | 可能产生外部对象与权威元数据不一致、证据丢失或误判 WORM/扫描能力；后续分别建立无损分页/保留策略、请求外事务的持久命令轨道与对账 worker、版本化能力证明，禁止在请求路径直接双写 |
+| OBJ-001 | 对象存储生产闭环 | 应用侧 v1 响应信任已建立；500 条兼容上限已改为网关调用前失败关闭，既有 immutable/legal-hold 元数据不再被静默淘汰，但仍无无损分页仓储；外部 upload/complete/lifecycle 成功后再写本地状态，缺少 outbox、幂等收敛、失败对账和补偿；网关能力尚无签名声明 | 容量耗尽现在表现为明确不可用而非静默丢证据；外部对象与权威元数据仍可能不一致。后续分别建立无损分页/保留策略、请求外事务的持久命令轨道与对账 worker、版本化能力证明，禁止在请求路径直接双写 |
 | OPS-001 | 连续审计来源与耐久信任 | 部署信任合同已把 worker 完整依赖闭包、统一 preflight、systemd 启动门禁和 metadata-only CLI 信号接入发布链；但来源仍轮询会重封且最多保留 120 条的展示快照，checkpoint/head 同一信任域，SIEM receipt 未独立验签，本地目录仅是 WORM rehearsal | 高写入可在轮询前永久丢失，窗口重封会重复投递，协同回滚/目标切换/陈旧锁无法安全恢复；必须建立事务内 append-only outbox、可信回执与 target binding、lease/fencing、外部单调锚和敏感字段最小投影后才可解除生产阻断 |
 | SEC-004 | XSS 面 | 871 个 HTML sink，CSP 允许 inline | 需可信渲染接口和逐页负向测试 |
 | SEC-005 | 混合会话 | HttpOnly Cookie 已建立，但 localStorage/demo bearer 兼容仍存在 | 降级路径、XSS 后凭据暴露面 |

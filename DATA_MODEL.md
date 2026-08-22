@@ -83,6 +83,12 @@ payload/request/receipt/provider/signature/activation 摘要、occurredAt 和 `a
 外发或最终整体写回失败时输入快照保持 pending，后续以稳定幂等键重试。缺少独立持久 lease、
 attempt/backoff 和 dead-letter，因此不能把当前结构描述为多实例生产投递仓储。
 
+`secureAttachments` 仍是遗留 JSON 元数据集合，尚未晋升为结构化生产写模型。兼容入口最多
+允许保存 500 条；达到或超过上限时，新的上传授权请求会在对象存储网关调用和本地写入之前以
+`SECURE_ATTACHMENT_METADATA_CAPACITY_EXCEEDED` 失败关闭。既有记录（包括 immutable 与
+legal-hold）不会再为新记录让位；这只关闭静默数据丢失，不替代无损分页仓储、migration、
+并发 CAS、outbox 或外部对象对账。
+
 ## 5. PostgreSQL 结构
 
 已跟踪 SQL 至少定义 13 张生产候选表：
