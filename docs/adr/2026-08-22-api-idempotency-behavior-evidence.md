@@ -51,3 +51,5 @@
 ## 2026-08-23 existing-proof 扩展状态
 
 在不修改运行时和数据库 schema 的前提下，注册表已扩展到 6 份合同。区域共享、直接转诊、科研合规导出 action 与 SMS callback 共 4 个完整 endpoint；两条通用兼容转诊入口只登记 `collection=referrals` / `referrals:*` action-slice。目录必须让 action-slice 保留 `behavior-proof-required` 和 `review-required`，禁止用局部证明晋升整个通用入口。专项测试直接执行身份先于读取、精确重放、同键异载荷、CAS、稳定错误和 AS-IS 审计语义；全部合同仍为 `productionReady=false`、`distributedExactlyOnceClaimed=false`。
+
+同日第二个 owner 切片将注册表扩展到 7 份：只把 T07 `POST /api/online-payments/refunds` 登记为第 5 个完整 endpoint。选择该入口是因为既有 HTTP 与事务测试能够直接证明匿名/角色拒绝、服务端机构绑定、幂等键摘要、精确重放、同键异载荷 `PERSISTENCE_COMMAND_CONFLICT`、版本冲突、并发余额保护及 command/outbox 原子提交。相邻退款 action regex 未登记；T08 普通 integration event/dispatch 因同键异载荷当前只返回旧事件，也未登记。退款 endpoint 在目录中仍受 `runtime-role-policy-not-resolved` 阻断，故全局 `review-required` 数保持 330；该合同不改变运行时、数据库或生产 NO-GO。

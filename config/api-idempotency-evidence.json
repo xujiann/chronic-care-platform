@@ -463,6 +463,135 @@
       ],
       "productionReady": false,
       "externalEvidenceRequired": true
+    },
+    {
+      "contractId": "insurance-payment.refund-request-command.v1",
+      "key": "POST /api/online-payments/refunds",
+      "method": "POST",
+      "path": "/api/online-payments/refunds",
+      "owner": "T07",
+      "domain": "insurance-payment",
+      "purpose": "create-online-payment-refund-request",
+      "customAuthenticationEvidence": false,
+      "authentication": {
+        "required": true,
+        "mechanism": "bearer-or-cookie-session",
+        "principalType": "platform-user",
+        "credentialSource": ["header:authorization", "cookie:session"],
+        "replayCsrf": {
+          "replayProtection": "hashed-idempotency-key-plus-versioned-command-receipt",
+          "csrf": "platform-session-transport-policy"
+        }
+      },
+      "authorization": {
+        "model": "platform-rbac-plus-insurance-payment-operating-model-and-trusted-actor-organization-binding",
+        "roles": ["institution", "commission"],
+        "dataScope": "institution"
+      },
+      "coverage": {
+        "level": "endpoint",
+        "selector": "entire-route",
+        "actions": ["refund.request"],
+        "unverifiedRemainder": false
+      },
+      "idempotency": {
+        "key": "header:Idempotency-Key or body.idempotencyKey",
+        "payloadBinding": ["paymentEventId", "paymentTradeNo", "orderReference", "refundAmountFen", "refundReason", "reasonCode", "actor.organizationId"],
+        "exactReplay": "returns the original public refund and command/outbox receipt with idempotent=true without creating a second refund",
+        "conflictingReuse": "PERSISTENCE_COMMAND_CONFLICT",
+        "persistenceScope": "onlinePaymentRefunds refundTransactionRuntime versioned command receipt and outbox checkpoint",
+        "distributedExactlyOnceClaimed": false
+      },
+      "concurrency": {
+        "cas": {
+          "required": true,
+          "field": "paymentEventId-scoped in-process write lock plus refund aggregate expectedVersion",
+          "conflictCodes": ["PERSISTENCE_VERSION_CONFLICT"]
+        }
+      },
+      "errors": [
+        { "code": "REFUND_CONTRACT_FIELD_INVALID", "status": 400 },
+        { "code": "INSURANCE_PAYMENT_RESPONSIBILITY_DENIED", "status": 403 },
+        { "code": "PERSISTENCE_COMMAND_CONFLICT", "status": 409 },
+        { "code": "PERSISTENCE_VERSION_CONFLICT", "status": 409 },
+        { "code": "REFUND_AMOUNT_EXCEEDS_AVAILABLE", "status": 409 },
+        { "code": "REFUND_LEDGER_UNAVAILABLE", "status": 503 }
+      ],
+      "audit": {
+        "accepted": "commits one versioned command receipt and one correlated refund-request outbox event with the refund state",
+        "replay": "returns the original refund and receipt without another refund, command receipt, or outbox event",
+        "rejected": "authentication and responsibility failures are rejected before the refund transaction; validation and conflict failures do not commit another refund or command/outbox receipt, and no separate HTTP denial audit is claimed"
+      },
+      "implementationEvidence": [
+        {
+          "file": "src/http/routes/insurance-payment.js",
+          "anchors": [
+            "url.pathname === \"/api/online-payments/refunds\" && req.method === \"POST\"",
+            "authorizeInsurancePaymentAction(\"refund.request\"",
+            "withRefundRequestLock(payload"
+          ]
+        },
+        {
+          "file": "insurance-payment-refund-transaction.js",
+          "anchors": [
+            "refundTransactionRuntime",
+            "eventType: REFUND_REQUEST_CONTRACT.eventType",
+            "error instanceof Persistence.InsurancePaymentPersistenceError"
+          ]
+        },
+        {
+          "file": "insurance-payment-operating-model.js",
+          "anchors": [
+            "\"refund.request\": Object.freeze({ roles: [\"institution\", \"commission\"]",
+            "INSURANCE_PAYMENT_RESPONSIBILITY_DENIED"
+          ]
+        },
+        {
+          "file": "insurance-payment-persistence.js",
+          "anchors": [
+            "PERSISTENCE_VERSION_CONFLICT",
+            "idempotentReplay: true",
+            "nextRecord.outbox.push"
+          ]
+        }
+      ],
+      "testEvidence": [
+        {
+          "file": "test/insurance-payment-public-api.test.js",
+          "anchors": [
+            "assert.equal(anonymousRefund.response.status, 401)",
+            "assert.equal(unauthorizedRefund.response.status, 403)",
+            "assert.equal(replayed.body.idempotent, true)",
+            "assert.equal(conflictingReplay.body.code, \"PERSISTENCE_COMMAND_CONFLICT\")",
+            "assert.equal(created.body.refund.organizationId, \"MR1\")"
+          ]
+        },
+        {
+          "file": "test/insurance-payment-operating-model.test.js",
+          "anchors": [
+            "OperatingModel.authorizeAction(\"refund.request\", { role: \"institution\", organizationType: \"medical_institution\" }).allowed, true",
+            "OperatingModel.authorizeAction(\"refund.request\", { role: \"institution\", organizationType: \"hospital_finance\" }).allowed, false"
+          ]
+        },
+        {
+          "file": "test/insurance-payment-refund-transaction.test.js",
+          "anchors": [
+            "same idempotency key replays once and conflicting reuse is rejected before another refund",
+            "checkpoint.commands.length, 1",
+            "checkpoint.outbox.length, 1",
+            "outcomes[1].reason.code, \"REFUND_AMOUNT_EXCEEDS_AVAILABLE\""
+          ]
+        },
+        {
+          "file": "test/insurance-payment-persistence.test.js",
+          "anchors": [
+            "outcomes[1].reason.code, \"PERSISTENCE_VERSION_CONFLICT\"",
+            "error.code === \"PERSISTENCE_COMMAND_CONFLICT\""
+          ]
+        }
+      ],
+      "productionReady": false,
+      "externalEvidenceRequired": true
     }
   ]
 }

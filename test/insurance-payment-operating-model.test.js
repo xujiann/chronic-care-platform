@@ -24,6 +24,8 @@ test("responsibility authorization requires both role and organization boundary"
   assert.equal(OperatingModel.authorizeAction("special-case.apply", { role: "insurance", organizationType: "insurance_center" }).allowed, false);
   assert.equal(OperatingModel.authorizeAction("settlement.core-callback", { role: "system", organizationType: "insurance_core_adapter" }).allowed, true);
   assert.equal(OperatingModel.authorizeAction("settlement.core-callback", { role: "insurance", organizationType: "insurance_center" }).allowed, false);
+  assert.equal(OperatingModel.authorizeAction("refund.request", { role: "institution", organizationType: "medical_institution" }).allowed, true);
+  assert.equal(OperatingModel.authorizeAction("refund.request", { role: "institution", organizationType: "hospital_finance" }).allowed, false);
   assert.equal(OperatingModel.authorizeAction("refund.resubmit", { role: "institution", organizationType: "medical_institution" }).allowed, true);
   assert.equal(OperatingModel.authorizeAction("refund.resubmit", { role: "finance", organizationType: "hospital_finance" }).allowed, false);
   assert.equal(OperatingModel.authorizeAction("formal-grouping.receipt", { role: "system", organizationType: "official_grouper_adapter" }).allowed, true);

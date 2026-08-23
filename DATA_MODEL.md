@@ -230,7 +230,7 @@ source/sink contract、目标摘要、cursor/source hash 与 receipt 摘要；ch
 
 目录中的源码 marker 既不是认证证明，也不是幂等执行证据；只有 owner、控制流锚点和可执行负向测试一致时才产生认证 evidence contract。认证分类只描述 AS-IS 的 required/optional/none、凭据来源、replay/CSRF 和 scope，不代表目标政策充分或生产安全。幂等 `behavior-verified` 仍只证明当前仓库行为，不证明跨实例 exactly-once 或生产耐久性；所有生产状态继续 `NO-GO`。
 
-API-002 的 existing-proof 扩展只增加 5 份合同，使注册表达到 6 份：区域共享回执、转诊 inbox/outbox 和科研导出 `commandReceipts` 均为既有状态表达，没有新增集合、表、字段、DDL、migration 或事实源。两个转诊兼容 action-slice 仍属于通用 endpoint 的局部证据，不能据此把其他 collection/task action 宣称为幂等；科研导出创建路径只有重复 ID 冲突，没有同键精确重放合同，继续 `behavior-proof-required`。
+API-002 的 existing-proof 扩展现只增加治理合同，使注册表达到 7 份：区域共享回执、转诊 inbox/outbox、科研导出 `commandReceipts` 与 T07 退款 `refundTransactionRuntime` command/outbox checkpoint 均为既有状态表达，没有新增集合、表、字段、DDL、migration 或事实源。退款幂等键仅以 SHA-256 摘要进入既有事务状态，公开投影继续移除运行时 checkpoint 与 key hash。两个转诊兼容 action-slice 仍属于通用 endpoint 的局部证据，不能据此把其他 collection/task action 宣称为幂等；科研导出创建路径只有重复 ID 冲突，没有同键精确重放合同，继续 `behavior-proof-required`。
 
 ## 14. 内部边界覆盖率数据边界
 

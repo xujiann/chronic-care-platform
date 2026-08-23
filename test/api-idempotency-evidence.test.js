@@ -16,8 +16,8 @@ function clone(value) {
 
 test("idempotency evidence registry validates only directly proven endpoint and action-slice contracts", () => {
   assert.deepEqual(validateEvidenceRegistry(), []);
-  assert.equal(DEFAULT_REGISTRY.contracts.length, 6);
-  assert.equal(endpointEvidenceContracts().length, 4);
+  assert.equal(DEFAULT_REGISTRY.contracts.length, 7);
+  assert.equal(endpointEvidenceContracts().length, 5);
   assert.equal(actionSliceEvidenceContracts().length, 2);
   assert.equal(DEFAULT_REGISTRY.contracts[0].key, "POST /api/auth/sms-delivery-callback");
   assert.equal(DEFAULT_REGISTRY.contracts[0].owner, "T01");
@@ -32,22 +32,24 @@ test("idempotency evidence registry validates only directly proven endpoint and 
     "POST /api/referrals/:id/actions",
     "POST /api/workflow-actions",
     "POST /api/tasks/:id/actions",
-    "POST /api/research/compliant-exports/:id/actions"
+    "POST /api/research/compliant-exports/:id/actions",
+    "POST /api/online-payments/refunds"
   ]);
 });
 
 test("catalog promotes only whole endpoints and retains generic action routes as review-required", () => {
   const catalog = buildProductionApiCatalog();
-  assert.equal(catalog.summary.writeIdempotencyBehaviorVerified, 4);
+  assert.equal(catalog.summary.writeIdempotencyBehaviorVerified, 5);
   assert.equal(catalog.summary.writeIdempotencyActionSlicesVerified, 2);
-  assert.equal(catalog.summary.writeIdempotencyBehaviorProofRequired, 329);
+  assert.equal(catalog.summary.writeIdempotencyBehaviorProofRequired, 328);
   assert.equal(catalog.summary.reviewRequired, 330);
 
   for (const key of [
     "POST /api/auth/sms-delivery-callback",
     "POST /api/regional-data-sharing/access-reviews",
     "POST /api/referrals/:id/actions",
-    "POST /api/research/compliant-exports/:id/actions"
+    "POST /api/research/compliant-exports/:id/actions",
+    "POST /api/online-payments/refunds"
   ]) {
     const entry = catalog.entries.find((candidate) => candidate.key === key);
     assert.equal(entry.idempotency.behaviorEvidence.status, "behavior-verified", key);
@@ -69,6 +71,13 @@ test("catalog promotes only whole endpoints and retains generic action routes as
   const researchCreate = catalog.entries.find((entry) => entry.key === "POST /api/research/datasets/:id/compliant-exports");
   assert.equal(researchCreate.idempotency.behaviorEvidence.status, "behavior-proof-required");
   assert.deepEqual(researchCreate.idempotency.behaviorEvidence.verifiedActionContracts, []);
+  const refund = catalog.entries.find((entry) => entry.key === "POST /api/online-payments/refunds");
+  assert.equal(refund.production.repositoryReview, "review-required");
+  assert.equal(refund.production.blockers.includes("runtime-role-policy-not-resolved"), true);
+  for (const runtimePolicy of catalog.entries.filter((entry) => entry.owner === "T07" && entry.routeResolution === "runtime-policy" && entry.idempotency.required)) {
+    assert.equal(runtimePolicy.idempotency.behaviorEvidence.status, "behavior-proof-required", runtimePolicy.key);
+    assert.deepEqual(runtimePolicy.idempotency.behaviorEvidence.verifiedActionContracts, [], runtimePolicy.key);
+  }
 });
 
 test("idempotency evidence registry rejects marker promotion, production promotion and missing executable evidence", () => {
@@ -104,4 +113,8 @@ test("idempotency evidence registry rejects marker promotion, production promoti
   const missingAudit = clone(DEFAULT_REGISTRY);
   delete missingAudit.contracts.find((contract) => contract.key === "POST /api/research/compliant-exports/:id/actions").audit.replay;
   assert.match(validateEvidenceRegistry(missingAudit).join("\n"), /audit behavior contract required/);
+
+  const missingRefundConflict = clone(DEFAULT_REGISTRY);
+  delete missingRefundConflict.contracts.find((contract) => contract.key === "POST /api/online-payments/refunds").idempotency.conflictingReuse;
+  assert.match(validateEvidenceRegistry(missingRefundConflict).join("\n"), /replay and conflict behavior required/);
 });

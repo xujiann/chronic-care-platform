@@ -134,6 +134,8 @@ Playwright、外部 Origin、生产现场或安全评估证据。
 
 API-IDEM-001 在 TEST PROTECTION 层新增幂等证据专项：源码 marker 只作观察，写接口只有在 owner、route/action、身份、重放/冲突、CAS、错误、审计、实现锚点与可执行负向测试全部一致时才能标为 `behavior-verified`；action-slice 只能登记局部证据，完整 endpoint 必须继续 `review-required`。该标签不等于生产就绪或分布式 exactly-once。
 
+API-002 的 T07 退款切片只登记 `POST /api/online-payments/refunds`：匿名和非授权角色拒绝、可信 actor 机构绑定、精确回放、同键异载荷冲突、事务 CAS 及 command/outbox 原子性均有真实行为测试。相邻退款 action regex、T08 普通 integration event/dispatch 和静态 runtime-role variant 不随该证据晋升；目录继续保留 `review-required`、外部证据阻断和全量 `NO-GO`。
+
 API-AUTH-001 在 TEST PROTECTION 层新增 custom auth 证据专项：required/optional/none、credential source、replay/CSRF、scope、实现锚点和可执行负向测试必须同时一致。源码 marker 或相邻字符串不构成证明；目录解析不得跨越已结束的 handler 拼接 method/path，直接拒绝证据和解析器回归均纳入门禁。未登记入口继续 `review-required`，认证证据通过也不构成生产放行。
 
 TEST-007 在既有 operations handoff harness 上建立 32 条路径的唯一数据驱动矩阵，并由 governance-api
