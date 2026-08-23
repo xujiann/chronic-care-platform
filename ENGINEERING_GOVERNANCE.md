@@ -122,7 +122,7 @@ JOB-001 的共同合同只允许 additive、metadata-only 观测投影。新增 
 storage trust 与 API catalog/authorization 使用独立覆盖组，冻结当前真实基线并绑定安全负向矩阵；
 后续只能持平或提高。覆盖原始数据和报告只写临时目录，不得提交，也不能替代生产现场证据。
 
-API-IDEM-001 在 TEST PROTECTION 层新增幂等证据专项：源码 marker 只作观察，写接口只有在 owner、行为合同、实现锚点与可执行负向测试全部一致时才能标为 `behavior-verified`；该标签不等于生产就绪或分布式 exactly-once。
+API-IDEM-001 在 TEST PROTECTION 层新增幂等证据专项：源码 marker 只作观察，写接口只有在 owner、route/action、身份、重放/冲突、CAS、错误、审计、实现锚点与可执行负向测试全部一致时才能标为 `behavior-verified`；action-slice 只能登记局部证据，完整 endpoint 必须继续 `review-required`。该标签不等于生产就绪或分布式 exactly-once。
 
 API-AUTH-001 在 TEST PROTECTION 层新增 custom auth 证据专项：required/optional/none、credential source、replay/CSRF、scope、实现锚点和可执行负向测试必须同时一致。源码 marker 或相邻字符串不构成证明；目录解析不得跨越已结束的 handler 拼接 method/path，直接拒绝证据和解析器回归均纳入门禁。未登记入口继续 `review-required`，认证证据通过也不构成生产放行。
 

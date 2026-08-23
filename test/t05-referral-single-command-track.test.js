@@ -222,7 +222,11 @@ test("owner command rejects a missing actor and ambiguous organization substring
 
 function routeRuntime({ payload, user }) {
   let state = fixture();
+  let currentPayload = payload;
+  let currentUser = user;
+  let reads = 0;
   const responses = [];
+  const securityEvents = [];
   const runtime = {
     WORKFLOW_COLLECTIONS: new Set(["referrals"]),
     WORKFLOW_ROLE_COLLECTIONS: {
@@ -230,15 +234,18 @@ function routeRuntime({ payload, user }) {
       citizen: new Set(["referrals"]),
       commission: new Set(["referrals"])
     },
-    appendSecurityEvent: () => undefined,
+    appendSecurityEvent: (event) => securityEvents.push(event),
     buildCitizenTaskActionMessage: (item, collection, command, actor) => ({
       id: "message-1", sourceId: item.id, collection, residentId: item.residentId,
       createdBy: actor.username, action: command.action
     }),
     canAccessResident: () => true,
-    collectJson: async () => payload,
-    readDatabase: () => state,
-    requireApiRole: () => user,
+    collectJson: async () => currentPayload,
+    readDatabase: () => {
+      reads += 1;
+      return state;
+    },
+    requireApiRole: () => currentUser,
     sendJson: (res, status, body) => {
       responses.push({ status, body });
       res.statusCode = status;
@@ -246,7 +253,15 @@ function routeRuntime({ payload, user }) {
     },
     writeDatabase: (next) => { state = next; }
   };
-  return { runtime, responses, state: () => state };
+  return {
+    runtime,
+    responses,
+    securityEvents,
+    reads: () => reads,
+    setPayload: (next) => { currentPayload = next; },
+    setUser: (next) => { currentUser = next; },
+    state: () => state
+  };
 }
 
 async function dispatch(runtime, req, pathname) {
@@ -258,39 +273,93 @@ async function dispatch(runtime, req, pathname) {
   throw new Error(`unhandled route ${pathname}`);
 }
 
-test("three public referral action paths delegate to one inbox/outbox command track and preserve response shapes", async () => {
+test("three public referral action paths prove route identity, replay, conflict, CAS, audit, and response contracts", async () => {
   const scenarios = [
     {
       pathname: "/api/referrals/rf1/actions",
       user: institution(),
       payload: { expectedVersion: 1, status: "已接诊" },
+      conflictingPayload: { expectedVersion: 1, status: "已完成" },
+      replayAuditResult: "idempotent",
       assertShape: (body) => assert.equal(body.referral.id, "rf1")
     },
     {
       pathname: "/api/workflow-actions",
       user: institution(),
       payload: { collection: "referrals", id: "rf1", expectedVersion: 1, status: "已接诊", updates: {} },
+      conflictingPayload: { collection: "referrals", id: "rf1", expectedVersion: 1, status: "已完成", updates: {} },
+      replayAuditResult: "幂等",
       assertShape: (body) => assert.equal(body.id, "rf1")
     },
     {
       pathname: "/api/tasks/referrals%3Arf1/actions",
       user: { id: "u-citizen", username: "citizen", name: "演示居民A", role: "citizen", residentId: "r1" },
       payload: { action: "resident-confirm", comment: "居民端确认服务安排", expectedVersion: 1 },
+      conflictingPayload: { action: "resident-confirm", comment: "同键不同居民意见", expectedVersion: 1 },
+      replayAuditResult: "idempotent",
       assertShape: (body) => assert.equal(body.taskAction, "resident-confirm")
     }
   ];
   for (const [index, scenario] of scenarios.entries()) {
     const holder = routeRuntime(scenario);
-    const res = await dispatch(holder.runtime, {
+    const commandId = `ref-path-${index}`;
+    const req = {
       method: "POST",
       correlationId: `trace-${index}`,
-      headers: { "idempotency-key": `ref-path-${index}` }
-    }, scenario.pathname);
+      headers: { "idempotency-key": commandId }
+    };
+    const res = await dispatch(holder.runtime, req, scenario.pathname);
     assert.equal(res.statusCode, 200);
     scenario.assertShape(res.body);
     assert.equal(holder.state().referralSystem.referrals[0].version, 2);
     assert.equal(holder.state().referralSystem[INBOX_COLLECTION].length, 1);
     assert.equal(holder.state().referralSystem[OUTBOX_COLLECTION].length, 1);
+    assert.equal(holder.securityEvents.at(-1).result, index === 1 ? "允许" : "allowed");
+
+    const replay = await dispatch(holder.runtime, req, scenario.pathname);
+    assert.equal(replay.statusCode, 200);
+    scenario.assertShape(replay.body);
+    assert.equal(holder.state().referralSystem.referrals[0].version, 2);
+    assert.equal(holder.state().referralSystem[INBOX_COLLECTION].length, 1);
+    assert.equal(holder.state().referralSystem[OUTBOX_COLLECTION].length, 1);
+    assert.equal(holder.securityEvents.at(-1).result, scenario.replayAuditResult);
+
+    const auditCountBeforeConflict = holder.securityEvents.length;
+    holder.setPayload(scenario.conflictingPayload);
+    const conflict = await dispatch(holder.runtime, req, scenario.pathname);
+    assert.equal(conflict.statusCode, 409);
+    assert.equal(conflict.body.code, "REFERRAL_COMMAND_IDEMPOTENCY_CONFLICT");
+    assert.equal(holder.securityEvents.length, auditCountBeforeConflict);
+    assert.equal(holder.state().referralSystem[INBOX_COLLECTION].length, 1);
+
+    holder.setPayload(scenario.payload);
+    const stale = await dispatch(holder.runtime, {
+      ...req,
+      headers: { "idempotency-key": `${commandId}-stale` }
+    }, scenario.pathname);
+    assert.equal(stale.statusCode, 409);
+    assert.equal(stale.body.code, "REFERRAL_VERSION_CONFLICT");
+    assert.equal(holder.securityEvents.length, auditCountBeforeConflict);
+  }
+});
+
+test("three public referral action paths deny missing identity before state reads", async () => {
+  const scenarios = [
+    ["/api/referrals/rf1/actions", { expectedVersion: 1, status: "已接诊" }],
+    ["/api/workflow-actions", { collection: "referrals", id: "rf1", expectedVersion: 1, status: "已接诊", updates: {} }],
+    ["/api/tasks/referrals%3Arf1/actions", { action: "resident-confirm", expectedVersion: 1 }]
+  ];
+  for (const [index, [pathname, payload]] of scenarios.entries()) {
+    const holder = routeRuntime({ payload, user: null });
+    const readsBefore = holder.reads();
+    const res = await dispatch(holder.runtime, {
+      method: "POST",
+      correlationId: `identity-denied-${index}`,
+      headers: { "idempotency-key": `identity-denied-${index}` }
+    }, pathname);
+    assert.equal(res.statusCode, undefined);
+    assert.equal(holder.reads(), readsBefore);
+    assert.equal(holder.state().referralSystem[INBOX_COLLECTION].length, 0);
   }
 });
 

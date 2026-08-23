@@ -4,7 +4,13 @@
 const path = require("node:path");
 const { DOMAIN_OWNERS, buildMatrix, readRouteSources, validateMatrix } = require("./api-authorization-matrix");
 const { AUTHENTICATION_REGISTRY, authenticationEvidenceByKey, authenticationEvidenceContracts, validateAuthenticationEvidence } = require("./api-authentication-evidence");
-const { DEFAULT_REGISTRY, evidenceByKey, validateEvidenceRegistry } = require("./api-idempotency-evidence");
+const {
+  DEFAULT_REGISTRY,
+  actionSliceEvidenceContracts,
+  endpointEvidenceContracts,
+  evidenceByKey,
+  validateEvidenceRegistry
+} = require("./api-idempotency-evidence");
 
 const ROOT = path.resolve(__dirname, "..");
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
@@ -98,15 +104,17 @@ function idempotencyFor(method, declarations, indexedSources, contract = null) {
     required: true,
     status: mechanisms.length ? "source-marker-observed" : "not-observed",
     mechanisms,
-    behaviorEvidence: contract ? {
+    behaviorEvidence: contract?.coverage?.level === "endpoint" ? {
       status: "behavior-verified",
       contractId: contract.contractId,
       owner: contract.owner,
       persistenceScope: contract.idempotency.persistenceScope,
-      distributedExactlyOnceClaimed: false
+      distributedExactlyOnceClaimed: false,
+      verifiedActionContracts: []
     } : {
       status: "behavior-proof-required",
-      contractId: null
+      contractId: null,
+      verifiedActionContracts: contract?.coverage?.level === "action-slice" ? [contract.contractId] : []
     }
   });
 }
@@ -292,6 +300,7 @@ function buildProductionApiCatalog(matrix = buildMatrix(), sourceFiles = readRou
       writeIdempotencyObserved: entries.filter((entry) => entry.idempotency.status === "source-marker-observed").length,
       writeIdempotencyNotObserved: entries.filter((entry) => entry.idempotency.status === "not-observed").length,
       writeIdempotencyBehaviorVerified: entries.filter((entry) => entry.idempotency.behaviorEvidence.status === "behavior-verified").length,
+      writeIdempotencyActionSlicesVerified: entries.reduce((count, entry) => count + (entry.idempotency.behaviorEvidence.verifiedActionContracts || []).length, 0),
       writeIdempotencyBehaviorProofRequired: entries.filter((entry) => entry.idempotency.behaviorEvidence.status === "behavior-proof-required").length,
       reviewRequired: entries.filter((entry) => entry.production.repositoryReview === "review-required").length,
       productionNoGo: entries.filter((entry) => entry.production.status === "NO-GO").length
@@ -346,8 +355,23 @@ function validateProductionApiCatalog(catalog, matrix = buildMatrix(), sourceFil
     if (entry.idempotency?.required && entry.idempotency.behaviorEvidence?.status === "behavior-proof-required" && (!entry.production?.blockers?.includes("idempotency-behavior-proof-required") || entry.production?.repositoryReview !== "review-required")) errors.push(`unverified write API must remain review-required: ${entry.key}`);
     if (entry.idempotency?.behaviorEvidence?.status === "behavior-verified") {
       const contract = evidenceByKey().get(entry.key);
-      if (!contract || entry.idempotency.behaviorEvidence.contractId !== contract.contractId || entry.owner !== contract.owner) errors.push(`behavior verification lacks a matching governed contract: ${entry.key}`);
+      if (!contract || contract.coverage?.level !== "endpoint" || entry.idempotency.behaviorEvidence.contractId !== contract.contractId || entry.owner !== contract.owner) errors.push(`behavior verification lacks a matching governed endpoint contract: ${entry.key}`);
       if (entry.idempotency.behaviorEvidence.distributedExactlyOnceClaimed !== false) errors.push(`behavior verification must not claim distributed exactly-once: ${entry.key}`);
+    }
+    const expectedActionContract = evidenceByKey().get(entry.key)?.coverage?.level === "action-slice"
+      ? [evidenceByKey().get(entry.key).contractId]
+      : [];
+    if (JSON.stringify(entry.idempotency?.behaviorEvidence?.verifiedActionContracts || []) !== JSON.stringify(expectedActionContract)) {
+      errors.push(`action-slice verification contract drift: ${entry.key}`);
+    }
+    for (const contractId of entry.idempotency?.behaviorEvidence?.verifiedActionContracts || []) {
+      const contract = evidenceByKey().get(entry.key);
+      if (!contract || contract.coverage?.level !== "action-slice" || contract.contractId !== contractId || entry.owner !== contract.owner) {
+        errors.push(`action-slice verification lacks a matching governed contract: ${entry.key}`);
+      }
+      if (!entry.production?.blockers?.includes("idempotency-behavior-proof-required") || entry.production?.repositoryReview !== "review-required") {
+        errors.push(`action-slice verification must not promote the full endpoint: ${entry.key}`);
+      }
     }
     if (entry.production?.status !== "NO-GO" || entry.production?.productionReady !== false || entry.production?.externalEvidenceRequired !== true) {
       errors.push(`API production status must fail closed: ${entry.key}`);
@@ -365,7 +389,8 @@ function validateProductionApiCatalog(catalog, matrix = buildMatrix(), sourceFil
   if (catalog.summary?.entries !== keys.size) errors.push("catalog entry summary drift");
   if (catalog.summary?.declarations !== matrix.routes.length) errors.push("catalog declaration summary drift");
   if (catalog.summary?.productionNoGo !== keys.size) errors.push("not every catalog entry is production NO-GO");
-  if (catalog.summary?.writeIdempotencyBehaviorVerified !== DEFAULT_REGISTRY.contracts.length) errors.push("behavior-verified idempotency summary drift");
+  if (catalog.summary?.writeIdempotencyBehaviorVerified !== endpointEvidenceContracts().length) errors.push("behavior-verified idempotency summary drift");
+  if (catalog.summary?.writeIdempotencyActionSlicesVerified !== actionSliceEvidenceContracts().length) errors.push("action-slice idempotency summary drift");
   if ((catalog.summary?.writeIdempotencyBehaviorVerified || 0) + (catalog.summary?.writeIdempotencyBehaviorProofRequired || 0) !== catalog.summary?.writeRoutes) errors.push("write behavior evidence summary drift");
   if (catalog.summary?.writeIdempotencyObserved !== (catalog.entries || []).filter((entry) => entry.idempotency?.status === "source-marker-observed").length) errors.push("source-marker observed summary drift");
   if (catalog.summary?.writeIdempotencyNotObserved !== (catalog.entries || []).filter((entry) => entry.idempotency?.status === "not-observed").length) errors.push("source-marker not-observed summary drift");

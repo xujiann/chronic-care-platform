@@ -44,6 +44,10 @@
 
 采用方案 3。`production-api-catalog-v2` 同时保留 `source-marker-observed/not-observed` 与独立的 `behavior-verified/behavior-proof-required`。源码标记永远不能自动晋升行为状态；只有机器合同、owner、实现锚点和可执行测试证据一致时才允许 `behavior-verified`。
 
-首个且唯一 pilot 为 `POST /api/auth/sms-delivery-callback`：T01 owner，认证机制为 HMAC-SHA256 签名外部 SMS provider，授权范围为 provider message delivery；业务幂等键为 `eventId`，精确重放返回既有事件，同键异载荷返回 `SMS_CALLBACK_EVENT_CONFLICT`。该结论只适用于当前 ledger 行为，不宣称分布式 exactly-once。
+首个 pilot 为 `POST /api/auth/sms-delivery-callback`：T01 owner，认证机制为 HMAC-SHA256 签名外部 SMS provider，授权范围为 provider message delivery；业务幂等键为 `eventId`，精确重放返回既有事件，同键异载荷返回 `SMS_CALLBACK_EVENT_CONFLICT`。该结论只适用于当前 ledger 行为，不宣称分布式 exactly-once。
 
 所有条目继续固定 `NO-GO`、`productionReady=false` 和外部现场证据阻断。后续扩展必须由相应 owner 提供行为合同和真实负向测试；不得用批量源码扫描结果、注释或猜测 owner 填充注册表。
+
+## 2026-08-23 existing-proof 扩展状态
+
+在不修改运行时和数据库 schema 的前提下，注册表已扩展到 6 份合同。区域共享、直接转诊、科研合规导出 action 与 SMS callback 共 4 个完整 endpoint；两条通用兼容转诊入口只登记 `collection=referrals` / `referrals:*` action-slice。目录必须让 action-slice 保留 `behavior-proof-required` 和 `review-required`，禁止用局部证明晋升整个通用入口。专项测试直接执行身份先于读取、精确重放、同键异载荷、CAS、稳定错误和 AS-IS 审计语义；全部合同仍为 `productionReady=false`、`distributedExactlyOnceClaimed=false`。

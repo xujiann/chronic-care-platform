@@ -14,6 +14,7 @@
       "owner": "T01",
       "domain": "identity-security",
       "purpose": "receive-protected-external-callback",
+      "customAuthenticationEvidence": true,
       "authentication": {
         "required": true,
         "mechanism": "hmac-sha256-signed-external-callback",
@@ -33,6 +34,12 @@
         "roles": [],
         "dataScope": "provider-message-delivery"
       },
+      "coverage": {
+        "level": "endpoint",
+        "selector": "entire-route",
+        "actions": ["apply-delivery-status"],
+        "unverifiedRemainder": false
+      },
       "idempotency": {
         "key": "eventId",
         "payloadBinding": [
@@ -46,6 +53,17 @@
         "conflictingReuse": "SMS_CALLBACK_EVENT_CONFLICT",
         "persistenceScope": "current-sms-delivery-ledger",
         "distributedExactlyOnceClaimed": false
+      },
+      "concurrency": {
+        "cas": { "required": false, "field": "", "conflictCodes": [] }
+      },
+      "errors": [
+        { "code": "SMS_CALLBACK_EVENT_CONFLICT", "status": 409 }
+      ],
+      "audit": {
+        "accepted": "persists one delivery-ledger event",
+        "replay": "returns the persisted event without a duplicate ledger event",
+        "rejected": "returns a stable callback conflict without replacing the persisted event"
       },
       "implementationEvidence": [
         {
@@ -80,6 +98,367 @@
             "const callbackReplay = await api(baseUrl, \"/api/auth/sms-delivery-callback\"",
             "assert.equal(callbackReplay.body.idempotentReplay, true)"
           ]
+        }
+      ],
+      "productionReady": false,
+      "externalEvidenceRequired": true
+    },
+    {
+      "contractId": "platform-governance.regional-sharing-access-review-command.v1",
+      "key": "POST /api/regional-data-sharing/access-reviews",
+      "method": "POST",
+      "path": "/api/regional-data-sharing/access-reviews",
+      "owner": "T02",
+      "domain": "shared",
+      "purpose": "execute-regional-sharing-access-review",
+      "customAuthenticationEvidence": false,
+      "authentication": {
+        "required": true,
+        "mechanism": "bearer-or-cookie-session",
+        "principalType": "platform-user",
+        "credentialSource": ["header:authorization", "cookie:session"],
+        "replayCsrf": {
+          "replayProtection": "idempotency-key-plus-current-authorization-reevaluation",
+          "csrf": "platform-session-transport-policy"
+        }
+      },
+      "authorization": {
+        "model": "platform-rbac-plus-organization-region-purpose-scope-and-resident-authorization",
+        "roles": ["commission", "institution"],
+        "dataScope": "institution"
+      },
+      "coverage": {
+        "level": "endpoint",
+        "selector": "entire-route",
+        "actions": ["regional-sharing-access-review"],
+        "unverifiedRemainder": false
+      },
+      "idempotency": {
+        "key": "header:Idempotency-Key",
+        "payloadBinding": ["packageId", "authorizationId", "authorizationVersion", "expectedVersion", "actorOrgCode", "purposeCode", "regionCode", "scopes"],
+        "exactReplay": "returns the persisted receipt with replayed=true after current authorization is reevaluated",
+        "conflictingReuse": "REGIONAL_SHARING_IDEMPOTENCY_CONFLICT",
+        "persistenceScope": "regionalSharingAccessReviews receipt history",
+        "distributedExactlyOnceClaimed": false
+      },
+      "concurrency": {
+        "cas": {
+          "required": true,
+          "field": "expectedVersion plus authorizationVersion",
+          "conflictCodes": ["REGIONAL_SHARING_PACKAGE_VERSION_CONFLICT", "REGIONAL_SHARING_AUTHORIZATION_VERSION_CONFLICT"]
+        }
+      },
+      "errors": [
+        { "code": "REGIONAL_SHARING_ORGANIZATION_SCOPE_DENIED", "status": 403 },
+        { "code": "REGIONAL_SHARING_IDEMPOTENCY_CONFLICT", "status": 409 },
+        { "code": "REGIONAL_SHARING_PACKAGE_VERSION_CONFLICT", "status": 409 },
+        { "code": "REGIONAL_SHARING_AUDIT_UNAVAILABLE", "status": 503 }
+      ],
+      "audit": {
+        "accepted": "appends an immutable access receipt plus security and data-access audit projections before state persistence",
+        "replay": "returns the original receipt without appending a second receipt",
+        "rejected": "authorization denials append a denied receipt; pre-mutation validation and conflict failures append a security denial event at the HTTP boundary"
+      },
+      "implementationEvidence": [
+        {
+          "file": "src/platform/governance/regional-sharing-access-command.js",
+          "anchors": ["REGIONAL_SHARING_IDEMPOTENCY_CONFLICT", "REGIONAL_SHARING_PACKAGE_VERSION_CONFLICT", "auditDecision(nextData, user, currentPackage, receipt"]
+        },
+        {
+          "file": "src/http/routes/shared.js",
+          "anchors": ["POST\" && url.pathname === \"/api/regional-data-sharing/access-reviews", "withRegionalSharingPackageWriteLock", "REGIONAL_SHARING_AUDIT_UNAVAILABLE"]
+        }
+      ],
+      "testEvidence": [
+        {
+          "file": "test/regional-sharing-access-command.test.js",
+          "anchors": ["same idempotency key replays exactly once and conflicting reuse is rejected", "package and authorization versions provide application-level compare-and-swap", "audit failure aborts the state transition"]
+        },
+        {
+          "file": "test/regional-sharing-access-api.test.js",
+          "anchors": ["replayAfterRevoke.response.status, 403", "REGIONAL_SHARING_AUTHORIZATION_REVOKED", "concurrent.map((item) => item.response.status).sort(), [201, 409]"]
+        }
+      ],
+      "productionReady": false,
+      "externalEvidenceRequired": true
+    },
+    {
+      "contractId": "care-coordination.referral-direct-command.v1",
+      "key": "POST /api/referrals/:id/actions",
+      "method": "POST",
+      "path": "/api/referrals/:id/actions",
+      "owner": "T05",
+      "domain": "care-coordination",
+      "purpose": "execute-referral-owner-command",
+      "customAuthenticationEvidence": false,
+      "authentication": {
+        "required": true,
+        "mechanism": "bearer-or-cookie-session",
+        "principalType": "platform-user",
+        "credentialSource": ["header:authorization", "cookie:session"],
+        "replayCsrf": { "replayProtection": "referral-command-inbox", "csrf": "platform-session-transport-policy" }
+      },
+      "authorization": {
+        "model": "platform-rbac-plus-referral-organization-and-region-scope",
+        "roles": ["commission", "county", "institution"],
+        "dataScope": "institution"
+      },
+      "coverage": {
+        "level": "endpoint",
+        "selector": "entire-route",
+        "actions": ["update-referral"],
+        "unverifiedRemainder": false
+      },
+      "idempotency": {
+        "key": "header:Idempotency-Key",
+        "payloadBinding": ["referralId", "expectedVersion", "source", "actor.id", "actor.role", "actor.orgCode", "patch"],
+        "exactReplay": "returns the persisted inbox receipt and original outbox event without a second state commit",
+        "conflictingReuse": "REFERRAL_COMMAND_IDEMPOTENCY_CONFLICT",
+        "persistenceScope": "referralCommandInbox plus referralOutbox UoW",
+        "distributedExactlyOnceClaimed": false
+      },
+      "concurrency": {
+        "cas": { "required": true, "field": "expectedVersion", "conflictCodes": ["REFERRAL_VERSION_CONFLICT"] }
+      },
+      "errors": [
+        { "code": "REFERRAL_SCOPE_DENIED", "status": 403 },
+        { "code": "REFERRAL_COMMAND_IDEMPOTENCY_CONFLICT", "status": 409 },
+        { "code": "REFERRAL_VERSION_CONFLICT", "status": 409 }
+      ],
+      "audit": {
+        "accepted": "appends the referral aggregate audit trail and emits an allowed HTTP security event",
+        "replay": "does not duplicate aggregate, inbox, or outbox state and emits an idempotent HTTP security event",
+        "rejected": "403 authorization failures emit a denied HTTP security event; 400 and 409 command failures have no separate HTTP security event"
+      },
+      "implementationEvidence": [
+        {
+          "file": "src/care-coordination/referral-command-service.js",
+          "anchors": ["REFERRAL_COMMAND_IDEMPOTENCY_CONFLICT", "REFERRAL_VERSION_CONFLICT", "patch.auditTrail = ["]
+        },
+        {
+          "file": "src/http/routes/care-coordination.js",
+          "anchors": ["/api/referrals/:id/actions", "executeReferralCommand({", "idempotentReplay: result.replayed"]
+        }
+      ],
+      "testEvidence": [
+        {
+          "file": "test/t05-referral-command-contracts.test.js",
+          "anchors": ["referral command rejects stale versions and idempotency-key intent drift", "assert.equal(replay.replayed, true)", "assert.equal(securityEvents[0].result, \"allowed\")"]
+        },
+        {
+          "file": "test/t05-referral-single-command-track.test.js",
+          "anchors": ["owner command authorizes actor and organization before inbox replay or CAS", "three public referral action paths prove route identity, replay, conflict, CAS, audit, and response contracts"]
+        }
+      ],
+      "productionReady": false,
+      "externalEvidenceRequired": true
+    },
+    {
+      "contractId": "care-coordination.referral-workflow-action-slice.v1",
+      "key": "POST /api/workflow-actions",
+      "method": "POST",
+      "path": "/api/workflow-actions",
+      "owner": "T05",
+      "domain": "care-coordination",
+      "purpose": "execute-referral-workflow-action-slice",
+      "customAuthenticationEvidence": false,
+      "authentication": {
+        "required": true,
+        "mechanism": "bearer-or-cookie-session",
+        "principalType": "platform-user",
+        "credentialSource": ["header:authorization", "cookie:session"],
+        "replayCsrf": { "replayProtection": "referral-command-inbox", "csrf": "platform-session-transport-policy" }
+      },
+      "authorization": {
+        "model": "platform-rbac-plus-referral-organization-and-region-scope",
+        "roles": ["commission", "county", "institution", "insurance"],
+        "dataScope": "institution"
+      },
+      "coverage": {
+        "level": "action-slice",
+        "selector": "body.collection=referrals",
+        "actions": ["update-referral-workflow"],
+        "unverifiedRemainder": true
+      },
+      "idempotency": {
+        "key": "header:Idempotency-Key",
+        "payloadBinding": ["collection", "id", "expectedVersion", "source", "actor.id", "actor.role", "actor.orgCode", "status", "updates"],
+        "exactReplay": "the referrals slice returns the persisted referral without a second inbox or outbox entry",
+        "conflictingReuse": "REFERRAL_COMMAND_IDEMPOTENCY_CONFLICT",
+        "persistenceScope": "referralCommandInbox plus referralOutbox UoW for collection=referrals only",
+        "distributedExactlyOnceClaimed": false
+      },
+      "concurrency": {
+        "cas": { "required": true, "field": "expectedVersion", "conflictCodes": ["REFERRAL_VERSION_CONFLICT"] }
+      },
+      "errors": [
+        { "code": "REFERRAL_SCOPE_DENIED", "status": 403 },
+        { "code": "REFERRAL_COMMAND_IDEMPOTENCY_CONFLICT", "status": 409 },
+        { "code": "REFERRAL_VERSION_CONFLICT", "status": 409 }
+      ],
+      "audit": {
+        "accepted": "the referrals slice emits an allowed workflow security event and persists the aggregate audit trail",
+        "replay": "the referrals slice emits an idempotent workflow security event without duplicate command state",
+        "rejected": "403 authorization failures emit a denied workflow security event; 400 and 409 command failures have no separate HTTP security event"
+      },
+      "implementationEvidence": [
+        {
+          "file": "src/http/routes/care-coordination.js",
+          "anchors": ["url.pathname === \"/api/workflow-actions\"", "if (collection === \"referrals\")", "source: \"workflow\""]
+        },
+        {
+          "file": "src/care-coordination/referral-command-service.js",
+          "anchors": ["REFERRAL_COMMAND_IDEMPOTENCY_CONFLICT", "REFERRAL_VERSION_CONFLICT", "referralCommandInbox"]
+        }
+      ],
+      "testEvidence": [
+        {
+          "file": "test/t05-referral-single-command-track.test.js",
+          "anchors": ["pathname: \"/api/workflow-actions\"", "three public referral action paths prove route identity, replay, conflict, CAS, audit, and response contracts"]
+        },
+        {
+          "file": "test/t05-referral-command-contracts.test.js",
+          "anchors": ["referral command rejects stale versions and idempotency-key intent drift", "assert.equal(replay.replayed, true)"]
+        }
+      ],
+      "productionReady": false,
+      "externalEvidenceRequired": true
+    },
+    {
+      "contractId": "care-coordination.referral-task-action-slice.v1",
+      "key": "POST /api/tasks/:id/actions",
+      "method": "POST",
+      "path": "/api/tasks/:id/actions",
+      "owner": "T05",
+      "domain": "care-coordination",
+      "purpose": "execute-referral-task-action-slice",
+      "customAuthenticationEvidence": false,
+      "authentication": {
+        "required": true,
+        "mechanism": "bearer-or-cookie-session",
+        "principalType": "platform-user",
+        "credentialSource": ["header:authorization", "cookie:session"],
+        "replayCsrf": { "replayProtection": "referral-command-inbox", "csrf": "platform-session-transport-policy" }
+      },
+      "authorization": {
+        "model": "platform-rbac-plus-referral-resident-family-organization-or-region-scope",
+        "roles": ["citizen", "commission", "county", "institution", "insurance"],
+        "dataScope": "resident"
+      },
+      "coverage": {
+        "level": "action-slice",
+        "selector": "decoded-path-id-prefix=referrals:",
+        "actions": ["resident-confirm", "cancel-request", "update", "accept", "complete", "return", "cancel"],
+        "unverifiedRemainder": true
+      },
+      "idempotency": {
+        "key": "header:Idempotency-Key",
+        "payloadBinding": ["referralId", "expectedVersion", "source", "actor.id", "actor.role", "actor.residentId", "action", "comment", "satisfaction", "patch"],
+        "exactReplay": "the referrals: task slice returns the persisted referral without duplicate inbox, outbox, or citizen task-message state",
+        "conflictingReuse": "REFERRAL_COMMAND_IDEMPOTENCY_CONFLICT",
+        "persistenceScope": "referralCommandInbox plus referralOutbox UoW for referrals: task IDs only",
+        "distributedExactlyOnceClaimed": false
+      },
+      "concurrency": {
+        "cas": { "required": true, "field": "expectedVersion", "conflictCodes": ["REFERRAL_VERSION_CONFLICT"] }
+      },
+      "errors": [
+        { "code": "REFERRAL_ACTION_DENIED", "status": 403 },
+        { "code": "REFERRAL_SCOPE_DENIED", "status": 403 },
+        { "code": "REFERRAL_COMMAND_IDEMPOTENCY_CONFLICT", "status": 409 },
+        { "code": "REFERRAL_VERSION_CONFLICT", "status": 409 }
+      ],
+      "audit": {
+        "accepted": "the referrals: slice emits an allowed task security event and persists the aggregate audit trail",
+        "replay": "the referrals: slice emits an idempotent task security event without duplicate command or citizen task-message state",
+        "rejected": "403 authorization failures emit a denied task security event; 400 and 409 command failures have no separate HTTP security event"
+      },
+      "implementationEvidence": [
+        {
+          "file": "src/http/routes/care-coordination.js",
+          "anchors": ["const [collection, id] = taskId.split(\":\")", "if (collection === \"referrals\")", "source: \"task\""]
+        },
+        {
+          "file": "src/care-coordination/referral-command-service.js",
+          "anchors": ["function taskCommandIntent(input, actor)", "REFERRAL_COMMAND_IDEMPOTENCY_CONFLICT", "REFERRAL_VERSION_CONFLICT"]
+        }
+      ],
+      "testEvidence": [
+        {
+          "file": "test/t05-referral-single-command-track.test.js",
+          "anchors": ["pathname: \"/api/tasks/referrals%3Arf1/actions\"", "owner command enforces citizen family scope and action-specific allowlists"]
+        },
+        {
+          "file": "test/t05-referral-command-api.test.js",
+          "anchors": ["t05-citizen-task-command-001", "finalPersisted.referralSystem.referralCommandInbox.length, 3"]
+        }
+      ],
+      "productionReady": false,
+      "externalEvidenceRequired": true
+    },
+    {
+      "contractId": "research.compliant-export-decision-command.v1",
+      "key": "POST /api/research/compliant-exports/:id/actions",
+      "method": "POST",
+      "path": "/api/research/compliant-exports/:id/actions",
+      "owner": "T09",
+      "domain": "research",
+      "purpose": "execute-compliant-export-decision",
+      "customAuthenticationEvidence": false,
+      "authentication": {
+        "required": true,
+        "mechanism": "bearer-or-cookie-session",
+        "principalType": "platform-user",
+        "credentialSource": ["header:authorization", "cookie:session"],
+        "replayCsrf": { "replayProtection": "compliant-export-command-receipts", "csrf": "platform-session-transport-policy" }
+      },
+      "authorization": {
+        "model": "commission-role-plus-requester-reviewer-separation",
+        "roles": ["commission"],
+        "dataScope": "platform"
+      },
+      "coverage": {
+        "level": "endpoint",
+        "selector": "body.action",
+        "actions": ["approve", "reject", "release"],
+        "unverifiedRemainder": false
+      },
+      "idempotency": {
+        "key": "header:Idempotency-Key or body.commandId",
+        "payloadBinding": ["action", "expectedVersion", "reviewEvidenceRef", "reviewNote", "releaseEvidenceRef", "releaseNote", "watermark"],
+        "exactReplay": "returns the persisted export record with replayed=true and no duplicate decision or audit write",
+        "conflictingReuse": "RESEARCH_EXPORT_IDEMPOTENCY_CONFLICT",
+        "persistenceScope": "compliantDataExports commandReceipts",
+        "distributedExactlyOnceClaimed": false
+      },
+      "concurrency": {
+        "cas": { "required": true, "field": "expectedVersion", "conflictCodes": ["RESEARCH_EXPORT_VERSION_CONFLICT"] }
+      },
+      "errors": [
+        { "code": "RESEARCH_EXPORT_REVIEW_ROLE_REQUIRED", "status": 403 },
+        { "code": "RESEARCH_EXPORT_REVIEWER_SEPARATION_REQUIRED", "status": 403 },
+        { "code": "RESEARCH_EXPORT_IDEMPOTENCY_CONFLICT", "status": 409 },
+        { "code": "RESEARCH_EXPORT_VERSION_CONFLICT", "status": 409 }
+      ],
+      "audit": {
+        "accepted": "appends one decision history entry, one command receipt, and one allowed research audit before persistence",
+        "replay": "returns before appending research audit or writing state",
+        "rejected": "workflow conflicts and authorization failures append one denied research audit and persist that audit projection"
+      },
+      "implementationEvidence": [
+        {
+          "file": "src/http/research/compliant-export-workflow.js",
+          "anchors": ["RESEARCH_EXPORT_IDEMPOTENCY_CONFLICT", "RESEARCH_EXPORT_VERSION_CONFLICT", "next.commandReceipts.push"]
+        },
+        {
+          "file": "src/http/routes/research.js",
+          "anchors": ["/api/research/compliant-exports/:id/actions", "commandId: req.headers[\"idempotency-key\"] || payload.commandId", "if (result.replayed)"]
+        }
+      ],
+      "testEvidence": [
+        {
+          "file": "test/research-compliant-export-workflow.test.js",
+          "anchors": ["compliant export commands enforce CAS and idempotency", "research action route proves identity, replay, conflict, CAS, and audit behavior", "RESEARCH_EXPORT_IDEMPOTENCY_CONFLICT", "RESEARCH_EXPORT_VERSION_CONFLICT"]
         }
       ],
       "productionReady": false,

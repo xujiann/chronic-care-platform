@@ -117,14 +117,21 @@ test("write APIs always expose an idempotency classification without claiming pr
   assert.equal(catalog.policy.sourceMarkersAreBehaviorProof, false);
   assert.equal(catalog.policy.writeIdempotencyEvidence, "explicit-behavior-contract-and-executable-test-evidence");
   assert.equal(catalog.entries.filter((entry) => entry.idempotency.status === "not-observed").every((entry) => entry.production.repositoryReview === "review-required"), true);
-  assert.equal(catalog.summary.writeIdempotencyBehaviorVerified, 1);
-  assert.equal(catalog.summary.writeIdempotencyBehaviorProofRequired, writes.length - 1);
+  assert.equal(catalog.summary.writeIdempotencyBehaviorVerified, 4);
+  assert.equal(catalog.summary.writeIdempotencyActionSlicesVerified, 2);
+  assert.equal(catalog.summary.writeIdempotencyBehaviorProofRequired, writes.length - 4);
   assert.equal(writes.filter((entry) => entry.idempotency.behaviorEvidence.status === "behavior-proof-required").every((entry) => entry.production.blockers.includes("idempotency-behavior-proof-required")), true);
   const callback = catalog.entries.find((entry) => entry.key === "POST /api/auth/sms-delivery-callback");
   assert.equal(callback.idempotency.status, "source-marker-observed");
   assert.equal(callback.idempotency.behaviorEvidence.status, "behavior-verified");
   assert.equal(callback.idempotency.behaviorEvidence.distributedExactlyOnceClaimed, false);
   assert.equal(callback.production.status, "NO-GO");
+  for (const key of ["POST /api/workflow-actions", "POST /api/tasks/:id/actions"]) {
+    const actionSlice = catalog.entries.find((entry) => entry.key === key);
+    assert.equal(actionSlice.idempotency.behaviorEvidence.status, "behavior-proof-required");
+    assert.equal(actionSlice.idempotency.behaviorEvidence.verifiedActionContracts.length, 1);
+    assert.equal(actionSlice.production.repositoryReview, "review-required");
+  }
 });
 
 test("runtime-derived paths and roles remain explicit review blockers", () => {
@@ -179,7 +186,7 @@ test("catalog validation rejects missing authorization roles", () => {
     distributedExactlyOnceClaimed: false
   };
   markerOnly.production.blockers = markerOnly.production.blockers.filter((blocker) => blocker !== "idempotency-behavior-proof-required");
-  assert.match(validateProductionApiCatalog(forgedBehaviorProof, matrix).join("\n"), /matching governed contract/);
+  assert.match(validateProductionApiCatalog(forgedBehaviorProof, matrix).join("\n"), /matching governed (?:endpoint )?contract/);
 
   const exactlyOnceClaim = clone(buildProductionApiCatalog(matrix));
   exactlyOnceClaim.entries.find((entry) => entry.idempotency.behaviorEvidence.status === "behavior-verified").idempotency.behaviorEvidence.distributedExactlyOnceClaimed = true;
@@ -214,6 +221,7 @@ test("catalog validation rejects idempotency and review summary drift", () => {
   const matrix = buildMatrix();
   const drifted = clone(buildProductionApiCatalog(matrix));
   drifted.summary.writeIdempotencyBehaviorVerified += 1;
+  drifted.summary.writeIdempotencyActionSlicesVerified -= 1;
   drifted.summary.writeIdempotencyBehaviorProofRequired -= 1;
   drifted.summary.writeIdempotencyObserved -= 1;
   drifted.summary.writeIdempotencyNotObserved += 1;
@@ -223,6 +231,7 @@ test("catalog validation rejects idempotency and review summary drift", () => {
   drifted.summary.publicRoutes -= 1;
   const errors = validateProductionApiCatalog(drifted, matrix).join("\n");
   assert.match(errors, /behavior-verified idempotency summary drift/);
+  assert.match(errors, /action-slice idempotency summary drift/);
   assert.match(errors, /behavior-proof-required summary drift/);
   assert.match(errors, /source-marker observed summary drift/);
   assert.match(errors, /source-marker not-observed summary drift/);
