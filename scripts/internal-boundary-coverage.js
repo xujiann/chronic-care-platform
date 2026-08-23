@@ -12,7 +12,13 @@ const REQUIRED_GROUPS = new Set([
   "runtime-identity-policy",
   "audit-chain-source",
   "object-storage-trust",
-  "api-governance"
+  "api-governance",
+  "worker-observability",
+  "regional-sharing-command",
+  "referral-owner-command",
+  "research-compliant-export",
+  "browser-response-policy",
+  "browser-safe-url-port"
 ]);
 const REQUIRED_NEGATIVE_CASES = new Set([
   "runtime-identity-production-trust",
@@ -21,7 +27,13 @@ const REQUIRED_NEGATIVE_CASES = new Set([
   "missing-authentication",
   "method-path-drift",
   "idempotency-missing",
-  "production-promotion"
+  "production-promotion",
+  "worker-observability-fail-closed",
+  "regional-authorization-recheck",
+  "referral-authorization-before-replay",
+  "research-export-separation",
+  "browser-response-production-no-go",
+  "browser-safe-url-hostile-input"
 ]);
 const METRICS = Object.freeze(["lines", "functions", "branches"]);
 
@@ -45,15 +57,20 @@ function validateConfig(config = readConfig()) {
   if (legacy.lines < 85 || legacy.functions < 85 || legacy.branches < 55) errors.push("legacy server coverage cannot fall below 85/85/55");
 
   const groupIds = new Set();
+  const groupById = new Map();
+  const includedPaths = new Set();
   for (const group of config.groups || []) {
     if (!group.id || groupIds.has(group.id)) errors.push(`duplicate or missing coverage group: ${group.id || "unknown"}`);
     groupIds.add(group.id);
+    groupById.set(group.id, group);
     if (!/^T\d{2}$/.test(String(group.owner || ""))) errors.push(`invalid coverage owner: ${group.id}`);
     for (const field of ["includes", "tests"]) {
       if (!Array.isArray(group[field]) || group[field].length === 0) errors.push(`${group.id} has no ${field}`);
       for (const relativePath of group[field] || []) {
         const resolved = safeRepositoryPath(relativePath);
         if (!resolved || !fs.existsSync(resolved)) errors.push(`${group.id} has unsafe or missing ${field} path: ${relativePath}`);
+        if (field === "includes" && includedPaths.has(relativePath)) errors.push(`coverage source belongs to multiple groups: ${relativePath}`);
+        if (field === "includes") includedPaths.add(relativePath);
       }
     }
     for (const metric of METRICS) {
@@ -73,6 +90,9 @@ function validateConfig(config = readConfig()) {
     const resolved = safeRepositoryPath(item.test);
     if (!resolved || !fs.existsSync(resolved)) errors.push(`negative matrix test is unsafe or missing: ${item.test}`);
     else if (!fs.readFileSync(resolved, "utf8").includes(`test("${item.title}"`)) errors.push(`negative matrix title is missing: ${item.id}`);
+    if (groupById.has(item.group) && !groupById.get(item.group).tests.includes(item.test)) {
+      errors.push(`negative matrix test is not executed by its coverage group: ${item.id}`);
+    }
   }
   for (const id of REQUIRED_NEGATIVE_CASES) if (!negativeIds.has(id)) errors.push(`missing required negative matrix case: ${id}`);
   for (const id of REQUIRED_GROUPS) if (!negativeGroupIds.has(id)) errors.push(`coverage group has no direct negative matrix case: ${id}`);

@@ -17,7 +17,13 @@ const EXPECTED_BASELINES = Object.freeze({
   "runtime-identity-policy": Object.freeze({ lines: 96.83, functions: 100, branches: 64.84 }),
   "audit-chain-source": Object.freeze({ lines: 93.19, functions: 100, branches: 74.49 }),
   "object-storage-trust": Object.freeze({ lines: 97.63, functions: 100, branches: 69.27 }),
-  "api-governance": Object.freeze({ lines: 95.66, functions: 92.3, branches: 80.97 })
+  "api-governance": Object.freeze({ lines: 99.18, functions: 100, branches: 82.9 }),
+  "worker-observability": Object.freeze({ lines: 94.85, functions: 100, branches: 86.39 }),
+  "regional-sharing-command": Object.freeze({ lines: 91.84, functions: 96.29, branches: 81.52 }),
+  "referral-owner-command": Object.freeze({ lines: 63.26, functions: 82.97, branches: 74.22 }),
+  "research-compliant-export": Object.freeze({ lines: 88.66, functions: 100, branches: 55.88 }),
+  "browser-response-policy": Object.freeze({ lines: 88.23, functions: 100, branches: 35 }),
+  "browser-safe-url-port": Object.freeze({ lines: 88.42, functions: 92.3, branches: 70.31 })
 });
 
 test("internal boundary coverage config locks every reviewed group and current baseline", () => {
@@ -59,4 +65,12 @@ test("coverage governance rejects baseline relaxation and missing negative evide
   const missingNegative = structuredClone(readConfig());
   missingNegative.negativeMatrix.pop();
   assert.match(validateConfig(missingNegative).join("\n"), /missing required negative matrix case/);
+
+  const detachedNegative = structuredClone(readConfig());
+  detachedNegative.negativeMatrix.find((item) => item.id === "browser-safe-url-hostile-input").test = "test/browser-security-policy.test.js";
+  assert.match(validateConfig(detachedNegative).join("\n"), /negative matrix test is not executed by its coverage group/);
+
+  const duplicateSource = structuredClone(readConfig());
+  duplicateSource.groups.find((group) => group.id === "browser-response-policy").includes.push("browser-safe-url.js");
+  assert.match(validateConfig(duplicateSource).join("\n"), /coverage source belongs to multiple groups/);
 });
