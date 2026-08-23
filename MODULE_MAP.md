@@ -85,7 +85,7 @@ scripts/platform-cutover-alert-worker.js
 |---|---:|---|
 | `server.js` | 28,189 | 组合根、种子和领域函数仍集中；SQLite migration 已抽离 |
 | `digital-hospital-standard-platform/app.js` | 10,563 | 单文件子站 |
-| `test/api.test.js` | 约 8,300 | 回归范围仍巨大；共享运行时、单个 hospital mock 及单个 alert mock 生命周期已提取，业务断言仍集中 |
+| `test/api.test.js` | 约 8,300 | 回归范围仍巨大；共享运行时及 hospital、alert、financial 三个单一 mock 生命周期已提取，业务断言仍集中 |
 | `citizen.js` | 6,066 | 居民端视图、状态和流程耦合 |
 | `portal.css` | 5,243 | 全局样式影响面大 |
 | `test/static.test.js` | 5,058 | 静态结构测试集中 |
@@ -137,7 +137,11 @@ scripts/platform-cutover-alert-worker.js
   hospital 生产 adapter、公共测试 SDK 或外部回执来源。
 - `test/helpers/alert-delivery-mock-runtime.js` 只拥有单个告警投递子测试内的 SIEM mock HTTP server、请求数组、
   成功/503 失败开关、动态回环端口、3 个既有测试环境变量和关闭清理；测试正文仍显式控制失败后恢复和重试顺序。
-  它不是生产 SIEM adapter、公共测试 SDK 或外部投递证据；financial/storage mock 仍留在原测试边界。
+  它不是生产 SIEM adapter、公共测试 SDK 或外部投递证据。
+- `test/helpers/financial-gateway-mock-runtime.js` 只拥有单个金融网关子测试内的 mock HTTP server、请求数组、
+  PAYMENT/INSURANCE/CERTIFICATE synthetic receipt 映射、动态回环端口、6 个既有测试环境变量和关闭清理；
+  HMAC、callback、reconciliation、retry 和请求次数断言仍在测试正文。它不是生产金融 adapter、公共测试 SDK
+  或外部支付/医保/证照回执来源；storage mock 仍留在原测试边界。
 - `test/escort-owner-route-characterization.test.js`、`test/internet-nursing-closed-loop-characterization.test.js`
   与 `test/internet-nursing-nurse-lifecycle-characterization.test.js` 是 T05 owner/route 特征测试；共享
   `test/helpers/care-api-characterization-runtime.js` 在各测试进程内启动真实 HTTP 服务并使用临时数据副本，

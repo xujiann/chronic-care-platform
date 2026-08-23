@@ -240,6 +240,10 @@ scope、幂等、错误和审计断言均不变。synthetic `his-provider-*` 只
 环境变量及关闭清理移入测试 helper；既有 `/api/observability/alerts/dispatch` 与 retry method/path、HMAC、
 鉴权、scope、幂等、敏感字段拒绝、失败事件及 incident 关闭断言均不变。synthetic `siem-event-*` 只用于
 回归，不能解释为外部 SIEM 投递、生产告警送达或现场证据。
+第四个夹具切片只把 financial gateway mock 的创建、动态回环监听、请求记录、三类 synthetic receipt、6 个
+测试环境变量及关闭清理移入测试 helper；既有 financial dispatch/callback/reconciliation/retry method/path、
+请求与回调 HMAC、鉴权、scope、幂等、敏感字段拒绝、审计和请求次数断言均不变。synthetic provider receipt
+只用于回归，不能解释为真实支付、医保、证照投递或现场证据。
 
 ## 18A. TEST-002 内部覆盖扩展（无 API 变化）
 
