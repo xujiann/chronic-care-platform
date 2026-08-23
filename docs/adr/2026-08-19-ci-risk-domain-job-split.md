@@ -63,3 +63,11 @@ T00 PR 实跑三个风险域，并在合并后刷新被旧 CI 阻塞的 PR。
 check 或以重复重跑代替修复。回滚为回退本切片提交并恢复前一单体 job；无数据、制品或
 运行时恢复步骤。本 ADR supersede `2026-08-19-ci-comprehensive-test-time-budget.md`
 中关于单一综合 `test` job 的拓扑决定，15 分钟有界原则继续适用于拆分后的高风险 job。
+
+## 2026-08-23 TEST-002 实施状态
+
+`governance-api` 继续复用既有 `test:coverage:boundaries` 步骤，不改变 job 拓扑、预算或 required check。
+内部 c8 边界从 4 组扩展为 10 组，新增 Worker 观测投影、区域共享命令、转诊 owner command、科研合规
+导出、浏览器响应头策略和 Safe URL 端口；API governance 原阈值同步提高到当前实测值。各组源码范围
+互不重叠，负向合同测试必须实际进入所属组，报告仍只写操作系统临时目录。浏览器端口的 Node 直接测试
+不能替代 Playwright、真实 OHIF Origin、托管响应头或现场安全评估。

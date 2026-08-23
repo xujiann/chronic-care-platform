@@ -126,8 +126,10 @@ JOB-001 的共同合同只允许 additive、metadata-only 观测投影。新增 
 不得借共同 outcome 改写业务状态机，也不得把投影、摘要或仓库测试解释为生产授权。
 
 原 `server.js` 的 c8 85/85/55 门禁保持不变。runtime identity、audit chain/source、object
-storage trust 与 API catalog/authorization 使用独立覆盖组，冻结当前真实基线并绑定安全负向矩阵；
-后续只能持平或提高。覆盖原始数据和报告只写临时目录，不得提交，也不能替代生产现场证据。
+storage trust、API governance、worker observability、区域共享命令、转诊 owner command、科研合规导出、
+浏览器响应头和 Safe URL 使用 10 个职责独立覆盖组，冻结当前真实基线并绑定实际执行的安全负向矩阵；
+源码不能跨组重复，后续阈值只能持平或提高。覆盖原始数据和报告只写临时目录，不得提交，也不能替代
+Playwright、外部 Origin、生产现场或安全评估证据。
 
 API-IDEM-001 在 TEST PROTECTION 层新增幂等证据专项：源码 marker 只作观察，写接口只有在 owner、route/action、身份、重放/冲突、CAS、错误、审计、实现锚点与可执行负向测试全部一致时才能标为 `behavior-verified`；action-slice 只能登记局部证据，完整 endpoint 必须继续 `review-required`。该标签不等于生产就绪或分布式 exactly-once。
 

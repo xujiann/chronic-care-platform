@@ -49,7 +49,56 @@
         "test/api-authorization-matrix.test.js",
         "test/production-api-catalog.test.js"
       ],
-      "baseline": { "lines": 95.66, "functions": 92.3, "branches": 80.97 }
+      "baseline": { "lines": 99.18, "functions": 100, "branches": 82.9 }
+    },
+    {
+      "id": "worker-observability",
+      "owner": "T00",
+      "includes": ["src/platform/operations/worker-observability-contract.js"],
+      "tests": ["test/worker-observability-contract.test.js"],
+      "baseline": { "lines": 94.85, "functions": 100, "branches": 86.39 }
+    },
+    {
+      "id": "regional-sharing-command",
+      "owner": "T00",
+      "includes": [
+        "src/platform/governance/regional-sharing-access-command.js",
+        "src/platform/governance/resident-authorization-decision-adapter.js"
+      ],
+      "tests": ["test/regional-sharing-access-command.test.js"],
+      "baseline": { "lines": 91.84, "functions": 96.29, "branches": 81.52 }
+    },
+    {
+      "id": "referral-owner-command",
+      "owner": "T05",
+      "includes": ["src/care-coordination/referral-command-service.js"],
+      "tests": [
+        "test/t05-referral-command-contracts.test.js",
+        "test/t05-referral-single-command-track.test.js",
+        "test/t05-referral-command-api.test.js"
+      ],
+      "baseline": { "lines": 63.26, "functions": 82.97, "branches": 74.22 }
+    },
+    {
+      "id": "research-compliant-export",
+      "owner": "T09",
+      "includes": ["src/http/research/compliant-export-workflow.js"],
+      "tests": ["test/research-compliant-export-workflow.test.js"],
+      "baseline": { "lines": 88.66, "functions": 100, "branches": 55.88 }
+    },
+    {
+      "id": "browser-response-policy",
+      "owner": "T00",
+      "includes": ["src/http/browser-security-policy.js"],
+      "tests": ["test/browser-security-policy.test.js"],
+      "baseline": { "lines": 88.23, "functions": 100, "branches": 35 }
+    },
+    {
+      "id": "browser-safe-url-port",
+      "owner": "T00",
+      "includes": ["browser-safe-url.js"],
+      "tests": ["test/browser-safe-url.test.js"],
+      "baseline": { "lines": 88.42, "functions": 92.3, "branches": 70.31 }
     }
   ],
   "negativeMatrix": [
@@ -94,6 +143,42 @@
       "group": "api-governance",
       "test": "test/production-api-catalog.test.js",
       "title": "catalog validation rejects production promotion"
+    },
+    {
+      "id": "worker-observability-fail-closed",
+      "group": "worker-observability",
+      "test": "test/worker-observability-contract.test.js",
+      "title": "unknown profiles, invalid timestamps, and widened projections fail closed"
+    },
+    {
+      "id": "regional-authorization-recheck",
+      "group": "regional-sharing-command",
+      "test": "test/regional-sharing-access-command.test.js",
+      "title": "authorization lifecycle, grantee, purpose, scopes and version are recalculated before inbox replay"
+    },
+    {
+      "id": "referral-authorization-before-replay",
+      "group": "referral-owner-command",
+      "test": "test/t05-referral-single-command-track.test.js",
+      "title": "owner command authorizes actor and organization before inbox replay or CAS"
+    },
+    {
+      "id": "research-export-separation",
+      "group": "research-compliant-export",
+      "test": "test/research-compliant-export-workflow.test.js",
+      "title": "requester separation, role, identifiers, and read scope fail closed"
+    },
+    {
+      "id": "browser-response-production-no-go",
+      "group": "browser-response-policy",
+      "test": "test/browser-security-policy.test.js",
+      "title": "central browser header port keeps the target CSP report-only and production NO-GO"
+    },
+    {
+      "id": "browser-safe-url-hostile-input",
+      "group": "browser-safe-url-port",
+      "test": "test/browser-safe-url.test.js",
+      "title": "safe URL port rejects executable, data, userinfo, protocol-relative and cross-origin navigation"
     }
   ]
 }

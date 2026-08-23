@@ -20,7 +20,7 @@
 | SEC-004 | XSS / CSP 面 | 37 个可执行内联脚本、8 个样式块和 13 个静态样式属性已外移；血液主工作台 25 个 HTML sink、2 个 CSSOM sink 和 1 个模板 style sink 已迁为 DOM/text/class 并补恶意 API 载荷 E2E。29 个原模板 URL occurrence 已由 28 个真实 DOM 绑定迁移和 1 个 `item.action` 扫描误报校正闭合；Inventory v2 对 145 个发布资产锁定 871 个 DOM HTML、6 个动态 URL 和 45 个动态样式风险。Safe URL port 拒绝 javascript/data/userinfo/协议相对/未批准 Origin；兼容 CSP 仍含 `unsafe-inline`，严格策略仅 Report-Only | 仅 2 个 OHIF 导航仍 `review-required`；清单不判断 HTML 输入可信度，仍须治理 871 个 HTML 与 45 个动态样式 sink，并补全角色浏览器回归。真实 OHIF/对象存储 Origin、托管头、独立扫描和渗透验收前继续 NO-GO |
 | SEC-005 | 混合会话 | 服务端 token 已禁止写入 localStorage，Cookie/Authorization 并存时 Cookie 优先，旧凭据自动清理；生产 bearer/hybrid 需显式兼容门禁并保持 NO-GO，静态演示仅保存无凭据身份状态 | bearer-only 仍有页面内存凭据、刷新即失效和额外运维状态；XSS/CSP 风险及真实 Cookie/CSRF 现场验证尚未关闭 |
 | DATA-008 | 集合 owner 决策 | 252/252 已有机器状态，但 188 个 `review-required` 与 1 个 `legacy-quarantined` 仍无可证明数据 owner | 按领域 owner 分批确认、归档或通过合同/migration 晋升；当前全部生产失败关闭 |
-| TEST-002 | 覆盖率 | 原 `server.js` c8 门禁之外，identity、audit、object-storage trust 与 API governance 四组已建立独立真实基线和负向矩阵 | 其余 `src/` 模块和浏览器代码仍不在覆盖率结论中；按风险分组扩展，不得降低既有阈值 |
+| TEST-002 | 覆盖率 | 原 `server.js` c8 门禁之外，内部边界已从 4 组扩展为 10 组；新增 worker observability、区域共享命令、转诊 owner command、科研合规导出、浏览器响应头和 Safe URL，并把 API governance 基线提高到最新主线实测 99.18/100/82.9 | 其余 `src/` 与页面控制器仍不在覆盖率结论中；Safe URL 的 Node 端口覆盖不等于页面/真实 Origin 覆盖，浏览器业务仍须 Playwright；按风险继续扩展且不得降低任何已合并阈值 |
 | TEST-003 | 安全负向测试 | 已建立源码、配置、环境模板、Git 元数据、文档和 `data/db.json` 拒绝矩阵 | 后续新增敏感类别必须扩展矩阵 |
 | GOV-002 | 生产授权权威 | runtime 已拒绝仅凭本地 JSON、DR 布尔、普通 evidenceRef 或 synthetic GO 放行，并要求 release/digest/fingerprint/有效期/anti-replay/verifier 的受信 receipt；ADR 仍为 Proposed | 唯一外部签发权威、信任根轮换、耐久 nonce ledger、provider 可用性/灾备和现场验收仍待人工接受；此前生产 false-positive 已关闭，但生产继续 NO-GO |
 
@@ -48,7 +48,7 @@
 | DATA-002 | 2026-08-22 | v1–v14 独立注册并冻结内容指纹，v15+ ledger 写内容 SHA-256，runner 拒绝连续性/name/checksum 漂移 | 空库、v11/v15 升级、重跑、指纹/ledger 漂移、v15/v16 checksum、未来 v17 与失败回滚测试 |
 | TEST-001 | 2026-08-22 | 建立 build/lint/typecheck/unit/integration/smoke 标准入口并映射 CI/Pages；test:all 与原 server.js 85/85/55 覆盖门禁语义不变；governance-api 静态发布链包含 Safe URL port、Browser Inventory v2，并在 2026-08-23 增加对象存储 Proposed ADR fail-closed 验证 | 标准门禁契约、完整测试分区、隔离 smoke、静态发布链、Inventory v2 精确 occurrence/指纹与 synthetic 负向矩阵、Safe URL 模块/Playwright 恶意协议和 Origin 拒绝、CI 映射、独立内部边界覆盖和全量回归；对象存储专项拒绝未批准 v17/runtime/API/promotion、owner 推断和 ADR/行动台账漂移 |
 | JOB-001 | 2026-08-23 | 盘点 12 套真实 worker 语义并建立 `platform-worker-observability.v1` 兼容投影；保留各业务 state/retry/lease/checkpoint/receipt，未创造第二状态机 | 9 个部署入口自动发现、登记/接入漂移、未知 profile、字段扩宽、敏感正文/原始身份/lease token 泄露和生产误授权负向测试；真实采集、告警与现场验收仍外置 |
-| TEST-002 | 2026-08-22 | 为 runtime identity、audit chain/source、object storage trust、API catalog/authorization 建立四个独立 c8 组并冻结当前真实基线；报告只存在临时目录 | 配置/脚本治理测试锁定阈值不得降低，要求每组至少一条直接负向合同，并绑定生产身份不可信模式、篡改、缺鉴权、路径漂移、幂等缺失和生产误 promotion 矩阵 |
+| TEST-002 | 2026-08-22 | 为 runtime identity、audit chain/source、object storage trust、API catalog/authorization 建立首批四组；2026-08-23 existing-proof 扩展再增加 worker observability、区域共享、转诊、科研导出、浏览器响应头和 Safe URL 六组，合计 10 组，并提高 API governance 旧阈值；报告只存在临时目录 | 配置/脚本治理测试锁定实测阈值不得降低、源码范围不跨组重复，且每组至少一条实际执行的直接负向合同；浏览器端口覆盖不冒充页面、OHIF Origin、CSP 或现场安全证据 |
 | ARC-002 | 2026-08-21 | alert runtime 改为显式 provider，worker 在组合边界懒注入既有 readiness；静态环由 1 降为 0，并已通过 PR #132 与 main CI/Pages | 缺失/无效/异常 provider、CLI 默认组合、反向依赖架构守卫和 Chromium E2E |
 | SEC-003 | 2026-08-20 | v2 验证器统一运行时/留存语义；内容、链接、结构、重复 ID 严格失败；全量 state 写入不能修改服务端审计数组 | 普通字段、首中尾链接、删除、插入、重排、结构和 API 拒绝回归 |
 | SEC-006 | 2026-08-21 | OTP、发送/登录限流和失败锁定迁入共享认证安全状态；生产多实例强制 PostgreSQL，签发/消费/撤销原子化 | SQLite 跨实例、PG 序列化重试、TTL、尝试耗尽、重启、并发单次消费与真实 PG CI 合同 |
@@ -83,7 +83,7 @@
 1. 后续 v17+ migration 的数据回填、前滚恢复和多历史版本 fixture。
 2. role × permission × resident/institution/region 数据范围矩阵。
 3. 前端 sink 的可信输入/恶意输入回归。
-4. 在现有四个内部边界覆盖组上逐步纳入新增存储/worker 模块；不得降低基线或替代行为负向断言。
+4. 在现有 10 个内部边界覆盖组上逐步纳入其余高风险 `src/` 模块；不得降低基线、跨组重复源码，或以静态加载替代行为负向断言。
 5. 在真实 provider/PostgreSQL/SIEM/WORM 环境重跑合同并封存受控证据引用。
 
 ## REG-01A 剩余债务

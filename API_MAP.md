@@ -221,6 +221,10 @@ manual production workflow 也不调用业务 API 或执行部署。
 `test/api.test.js` 的三段历史不可达断言仅改为显式 skipped debt，现有可执行断言保持原顺序；
 integration runner 只隔离该文件并输出耗时，不把通过、skip 数或耗时提升为 API 生产证据。
 
+## 18A. TEST-002 内部覆盖扩展（无 API 变化）
+
+区域共享命令、转诊 owner command 和科研合规导出状态机现进入各自独立 c8 组，直接复用既有身份先行、重放/CAS、职责分离和失败关闭测试；覆盖组不新增或改变 HTTP method/path、响应、鉴权、审计或生产状态。浏览器响应头与 Safe URL 组同样只测内部策略端口，不能替代 Playwright 页面行为、真实托管头或外部 Origin 验证。
+
 ## 19. Worker 观测合同（无 HTTP 变化）
 
 本切片不新增或改变 HTTP method/path、请求/响应 schema、鉴权、scope、幂等或审计语义。既有 worker/CLI
