@@ -63,3 +63,9 @@
 在本 ADR 已接受的逐 endpoint 机制内，`POST /api/financial-gateways/reconciliation-runs` 的拒绝记录由第 8 份行为合同替换。实现保留既有成功响应和 provider digest ledger：身份与保险 gateway scope 先于读取，同 gateway/date 在进程内串行并在锁内重读；精确载荷回放复用原 run，同 digest 异 summary 返回稳定 409。run 与 `securityEvents` 链式审计进入同一状态快照并只调用一次 `writeDatabase`；SQLite 继续使用既有 collection-version CAS/事务，冲突被投影为脱敏 409，写失败不再触发第二次审计写。
 
 该切片不增加 schema、migration、dependency、outbox 或新 ADR。因为没有实际下游消息语义，不为目录虚构 outbox；进程锁只保护 JSON/单进程兼容路径，SQLite CAS 也不等于分布式 exactly-once。`financialReconciliationRuns` data owner、真实多实例 PostgreSQL、外部对账来源与现场证据均未关闭，合同继续 `productionReady=false`，593 项仍全部 `NO-GO`。
+
+## 2026-08-23 T01 security-control action 扩展
+
+在本 ADR 已接受的逐 endpoint 机制内，注册表新增第 9 份合同，只登记 `POST /api/security/controls/:id/actions`。实现复用既有 session-security-audit owner repository：commission 与 provider-verified step-up 先于 command collection；精确 control ID 缺失保持 404/零写；相同 command/intent 精确回放，异载荷返回稳定 409；同一 cloned-state UoW 只写一次 `securityAcceptanceLedger + securityEvents receipt/result snapshot/chained audit`。SQLite collection-version 冲突被投影为脱敏 409，普通写失败不触发 fallback audit。
+
+该扩展不接现有 PostgreSQL adapter，不增加 schema、migration、dependency、outbox 或新 ADR；没有真实下游语义时不为目录虚构 outbox。`securityAcceptanceLedger` data owner、跨实例耐久性和现场证据仍未决，所以该 endpoint 及全目录继续 `productionReady=false` / `NO-GO`，且不宣称 distributed exactly-once。
