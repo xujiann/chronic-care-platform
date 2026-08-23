@@ -119,7 +119,7 @@
   },
   "riskBaseline": {
     "schemaVersion": 2,
-    "sourceRevision": "origin/main@7b87d18b + process/t00-ui-blood-innovation-20260823",
+    "sourceRevision": "origin/main@e66c9446 + process/t00-ui-physical-examination-20260823",
     "failClosedPriorities": [
       "P0",
       "P1"
@@ -164,7 +164,7 @@
       {"asset":"operations.js","type":"dynamic-html-style-attribute","priority":"P1","fingerprint":"ff41c5eb70af14e7f78ee505196d273a06bf46742a66fff20053e41a72366960","count":2},
       {"asset":"physical-examination-standalone.js","type":"dom-inner-html","priority":"P0","fingerprint":"ef66ec8c517f14833687cef68593e729ae6201055b231d107d6391d04aeb3dbd","count":6},
       {"asset":"physical-examination.js","type":"cssom-property-mutation","priority":"P1","fingerprint":"0db1e9921c1148c82acc0dbde8dd5014e9e92fe9f7045e6f81628f32fe4b01fb","count":2},
-      {"asset":"physical-examination.js","type":"dom-inner-html","priority":"P0","fingerprint":"e1b8344336f26c71eafc9ce22aa47e26f28664a23195b73caad52177b4813ae4","count":27},
+      {"asset":"physical-examination.js","type":"dom-inner-html","priority":"P0","fingerprint":"9bd1e762e80c97141ef4cd17d203daaca7777f72b81061c9c3cd7296902da311","count":25},
       {"asset":"physical-examination.js","type":"dynamic-html-style-attribute","priority":"P1","fingerprint":"2f02273f501cbc0108da3b67376541a3fde686fb09ceeb8f65bfdf729d64cc04","count":1},
       {"asset":"pilot-acceptance-ui.js","type":"dom-inner-html","priority":"P0","fingerprint":"81b011932ed8cbdeefff70e2e4b50550af01cee409e052bbfd8a7c1e3c9b2d34","count":2},
       {"asset":"platform-design-system.js","type":"runtime-style-element","priority":"P1","fingerprint":"7cf23475e4eb58f8d506b8dd381ba3d9e77d13f22f2bfec8bd84175d0eeb0408","count":1},

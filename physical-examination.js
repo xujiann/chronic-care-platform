@@ -8,6 +8,25 @@ const PHYSICAL_EXAM_OFFICIAL_SOURCE_ORIGINS = Object.freeze([
   "https://www.nhc.gov.cn",
   "https://www.npc.gov.cn"
 ]);
+const PHYSICAL_EXAM_TRANSLATION_STATUS_CLASSES = new Set(["within-report-range", "abnormal", "high-risk"]);
+const PHYSICAL_EXAM_QUALITY_STATUS_CLASSES = new Set(["blocked", "review", "passed"]);
+const PHYSICAL_EXAM_ISSUE_LEVEL_CLASSES = new Set(["blocking", "review", "passed"]);
+
+function createPhysicalExamElement(tagName, options = {}, children = []) {
+  const node = document.createElement(tagName);
+  if (options.className) node.className = options.className;
+  if (Object.hasOwn(options, "text")) node.textContent = String(options.text ?? "");
+  (Array.isArray(children) ? children : [children]).flat(Infinity).forEach((child) => {
+    if (child == null) return;
+    node.append(child instanceof Node ? child : document.createTextNode(String(child)));
+  });
+  return node;
+}
+
+function physicalExamClassName(baseClass, candidate, allowedClasses) {
+  const value = String(candidate ?? "");
+  return allowedClasses.has(value) ? `${baseClass} ${value}` : baseClass;
+}
 
 document.addEventListener("DOMContentLoaded", async () => {
   const user = window.HealthCityAuth?.getUser?.();
@@ -133,7 +152,18 @@ function renderHighlightTranslations(rows) {
   const target = document.querySelector("#physical-exam-translations");
   if (!target) return;
   const prioritized = [...rows].sort((a, b) => Number(b.status !== "within-report-range") - Number(a.status !== "within-report-range"));
-  target.innerHTML = prioritized.slice(0, 8).map((item) => `<article class="translation-card ${item.status}"><header><strong>${escapeExamHtml(item.title)}</strong><span>${escapeExamHtml(item.value)}</span></header><p>${escapeExamHtml(item.plainMeaning)}</p><small>下一步：${escapeExamHtml(item.nextStep)} · ${escapeExamHtml(item.department)}</small><em>${escapeExamHtml(item.boundary)}</em></article>`).join("") || `<p class="muted">暂无可翻译的结构化项目。</p>`;
+  const cards = prioritized.slice(0, 8).map((item) => createPhysicalExamElement("article", {
+    className: physicalExamClassName("translation-card", item.status, PHYSICAL_EXAM_TRANSLATION_STATUS_CLASSES)
+  }, [
+    createPhysicalExamElement("header", {}, [
+      createPhysicalExamElement("strong", { text: item.title }),
+      createPhysicalExamElement("span", { text: item.value })
+    ]),
+    createPhysicalExamElement("p", { text: item.plainMeaning }),
+    createPhysicalExamElement("small", { text: `下一步：${String(item.nextStep ?? "")} · ${String(item.department ?? "")}` }),
+    createPhysicalExamElement("em", { text: item.boundary })
+  ]));
+  target.replaceChildren(...(cards.length ? cards : [createPhysicalExamElement("p", { className: "muted", text: "暂无可翻译的结构化项目。" })]));
 }
 
 function renderHighlightPlans(rows) {
@@ -153,7 +183,23 @@ function renderRepeatRadiation(repeats, radiation) {
 function renderQualityReviews(rows) {
   const target = document.querySelector("#physical-exam-quality-reviews");
   if (!target) return;
-  target.innerHTML = rows.map((item) => `<article class="quality-review-card ${item.status}"><header><strong>${escapeExamHtml(item.institution)}</strong><span>${escapeExamHtml(item.score)}分</span></header><p>${escapeExamHtml(item.reportId)} · ${escapeExamHtml(item.date)}</p><div>${(item.issues || []).slice(0, 5).map((issue) => `<span class="issue ${issue.level}">${escapeExamHtml(issue.message)}</span>`).join("") || `<span class="issue passed">自动检查未发现结构缺口</span>`}</div></article>`).join("") || `<p class="muted">暂无报告质检结果。</p>`;
+  const cards = rows.map((item) => {
+    const issues = (item.issues || []).slice(0, 5).map((issue) => createPhysicalExamElement("span", {
+      className: physicalExamClassName("issue", issue.level, PHYSICAL_EXAM_ISSUE_LEVEL_CLASSES),
+      text: issue.message
+    }));
+    return createPhysicalExamElement("article", {
+      className: physicalExamClassName("quality-review-card", item.status, PHYSICAL_EXAM_QUALITY_STATUS_CLASSES)
+    }, [
+      createPhysicalExamElement("header", {}, [
+        createPhysicalExamElement("strong", { text: item.institution }),
+        createPhysicalExamElement("span", { text: `${String(item.score ?? "")}分` })
+      ]),
+      createPhysicalExamElement("p", { text: `${String(item.reportId ?? "")} · ${String(item.date ?? "")}` }),
+      createPhysicalExamElement("div", {}, issues.length ? issues : [createPhysicalExamElement("span", { className: "issue passed", text: "自动检查未发现结构缺口" })])
+    ]);
+  });
+  target.replaceChildren(...(cards.length ? cards : [createPhysicalExamElement("p", { className: "muted", text: "暂无报告质检结果。" })]));
 }
 
 function renderInstitutionBenchmarks(rows) {

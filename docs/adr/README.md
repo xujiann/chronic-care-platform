@@ -21,7 +21,7 @@
 | [仓库文档与跟踪 PDF 采用闭集治理](./2026-08-23-repository-documentation-and-artifact-governance.md) | Accepted | 当前工作流、Markdown 分类、历史快照冻结与 PDF 来源/摘要治理 |
 | [综合 CI 采用 15 分钟有界时间预算](./2026-08-19-ci-comprehensive-test-time-budget.md) | Superseded | 综合 test job 的超时预算与回归约束 |
 | [CI 按风险域拆分并保留聚合必需检查](./2026-08-19-ci-risk-domain-job-split.md) | Accepted | 治理/API、浏览器 E2E、发布就绪与 required test 聚合 |
-| [Playwright E2E 采用统一浏览器策略与独占测试服务](./2026-08-23-playwright-e2e-isolation-and-browser-policy.md) | Accepted | Playwright Chromium、在线 Service Worker 隔离、PWA 专项、动态端口与当前 54 项套件分区 |
+| [Playwright E2E 采用统一浏览器策略与独占测试服务](./2026-08-23-playwright-e2e-isolation-and-browser-policy.md) | Accepted | Playwright Chromium、在线 Service Worker 隔离、PWA 专项、动态端口与当前 55 项套件分区 |
 | [模块化单体与微服务提取标准](../ADR-模块化单体与微服务提取标准-2026-08-03.md) | Accepted | 模块边界和服务提取 |
 | [SQLite migration 与核心 schema 冻结](./2026-08-18-sqlite-migration-and-core-schema-freeze.md) | Accepted | 已合入 `main@026762f`（PR #129）；v1–v14 冻结，v15+ 内容指纹化 |
 | [核心数据 closed-world 定义](./2026-08-18-core-data-closed-world.md) | Accepted | 核心概念不可随意平行创建 |
