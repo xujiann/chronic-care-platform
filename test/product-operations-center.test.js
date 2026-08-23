@@ -70,6 +70,29 @@ function dataFixture() {
   };
 }
 
+function createFakeMountTarget() {
+  const document = {
+    createElement(tagName) {
+      return {
+        tagName,
+        className: "",
+        dataset: {},
+        textContent: "",
+        children: [],
+        append(...children) {
+          this.children.push(...children);
+        },
+        replaceChildren(...children) {
+          this.children = children;
+        }
+      };
+    }
+  };
+  const target = document.createElement("div");
+  target.ownerDocument = document;
+  return target;
+}
+
 test("product operations center unifies five local control sections without exposing payloads", () => {
   const report = buildProductOperationsCenter(dataFixture(), {
     program: PROGRAM,
@@ -134,7 +157,15 @@ test("standalone product operations UI escapes every projected value", () => {
   const html = operationsUi.render(viewModel);
   assert.match(html, /&lt;img src=x onerror=alert\(1\)&gt;/);
   assert.doesNotMatch(html, /<img/);
-  const target = { innerHTML: "" };
+  const target = createFakeMountTarget();
   assert.equal(operationsUi.mount(viewModel, target), target);
-  assert.equal(target.innerHTML, html);
+  const section = target.children[0];
+  const metric = section.children[0].children[0];
+  const workItem = section.children[1].children[0];
+  assert.equal(section.dataset.productOperationsStatus, viewModel.status);
+  assert.equal(metric.children[0].textContent, "1");
+  assert.equal(metric.children[1].textContent, "开放事项");
+  assert.equal(workItem.dataset.productOperationItem, "wi-safe");
+  assert.equal(workItem.children[0].textContent, "<img src=x onerror=alert(1)>");
+  assert.throws(() => operationsUi.mount(viewModel, { innerHTML: "" }), /mount target is invalid/);
 });

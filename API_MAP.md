@@ -78,8 +78,8 @@ HTTP request
 - 静态未知/敏感路径统一 404；`GET/HEAD /data/public-demo.json` 返回合成脱敏数据，`/data/db.json`、源码、配置和仓库元数据不可发布。
 - HTML、静态资源、JSON/API、下载与错误响应由集中端口下发 `nosniff`、frame、referrer、
   permissions 与 CSP。显式发布图的内联脚本/样式静态风险已归零，但兼容 CSP 仍含 `unsafe-inline`，
-  严格目标只为 Report-Only；血液主工作台、急救生命链、医生工作台、血液上线看板与陪诊工作台 API 字段已使用 DOM/text 节点，Inventory v2 已把
-  843 个 DOM HTML、6 个动态 URL 和 45 个动态样式
+  严格目标只为 Report-Only；血液主工作台、急救生命链、医生工作台、血液上线看板、陪诊工作台与产品运行驾驶舱 API 字段已使用 DOM/text 节点，Inventory v2 已把
+  842 个 DOM HTML、6 个动态 URL 和 45 个动态样式
   sink 作为资产级治理事实锁定。`browser-safe-url-policy.v1` 将可证明的内部导航、对象存储、`tel:120`
   和 blob 下载迁入统一协议/无凭据/exact-Origin 检查；29 个原模板 occurrence 已由 28 个真实 DOM
   绑定迁移和 1 个扫描误报校正闭合，仅 2 个 OHIF 导航保持 `review-required`。该变化不改变任何
@@ -251,7 +251,7 @@ profile、profile 替换、额外字段和生产授权扩张均失败关闭。�
 ## 20. Playwright E2E 隔离（无 HTTP 变化）
 
 TEST-005 只改变测试进程、浏览器与临时端口装配，不新增或改变任何 HTTP method/path、鉴权、角色、
-scope、错误、幂等或审计语义。根 31 项与居民 13 项继续调用现有接口；动态回环端口和临时数据只用于
+scope、错误、幂等或审计语义。根 32 项与居民 13 项继续调用现有接口；动态回环端口和临时数据只用于
 自动化验证，不能登记为公开 API、生产 endpoint 或现场证据。
 
 PWA 专项增加 3 项独立浏览器行为测试，但不新增测试控制 HTTP API：仍由现有 `/api/health` 探活并使用
@@ -290,3 +290,11 @@ method/path、payload、身份、错误、幂等和审计均保持原状。API �
 陪诊师、风险队列、政策映射和医院交接按钮的 method/path、payload、身份、机构范围、错误、幂等和审计均保持原状。
 API 字段通过 `textContent`/文本节点写入，订单 ID 只经 dataset 绑定动作；恶意标签和事件属性不能进入活动 DOM。
 仓库测试不证明上游数据可信、真实 HIS/导诊台、托管响应头、渗透或生产上线。
+
+## 26. 产品运行驾驶舱可信渲染（无 HTTP 变化）
+
+本切片只改变 `product-operations-ui.js` 对既有 `GET /api/platform/productization/operations/cockpit`
+响应中 allowlisted operational metadata 的浏览器表达；method/path、commission 鉴权、响应 schema、
+审计和固定 `productionReady=false` 均保持原状。`mount` 使用显式 DOM/text/dataset 构造，兼容的
+`render` 字符串接口继续执行原编码语义；恶意标签和事件属性不能进入活动 DOM。仓库测试不证明
+上游数据可信、真实托管响应头、渗透或生产上线。
