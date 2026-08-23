@@ -309,6 +309,10 @@ HTTP 生命周期；`siem-event-*` 仍是 synthetic 响应，失败与恢复顺�
 第四个夹具切片只移动单个 financial gateway mock 的进程内请求数组、三类 synthetic receipt 映射、临时环境
 变量和 HTTP 生命周期；`payment-provider-*`、`insurance-provider-*`、`certificate-provider-*` 不持久化为
 新事实源，也不代表真实支付、医保或证照供应方回执、联调或生产证据。本切片不新增集合、schema 或 migration。
+第五个夹具切片只移动单个 object-storage gateway mock 的进程内请求数组、四类签名 synthetic 响应、动态
+回环 URL、临时环境变量和 HTTP 生命周期；`setScanStatus` 只控制测试内存状态，仍由原测试正文按原顺序切换。
+synthetic upload/scan/download/lifecycle 回执、URL 和恶意 provider 文本不持久化为新事实源，也不代表真实
+对象存储、扫描、WORM、KMS、联调或现场证据；本切片不新增集合、表、schema 或 migration。
 两个前端文件去重的 16 项仅是静态中文翻译键；shadow map 只存在测试代码，既不成为新的业务字典，
 也不写入运行时状态。两项历史覆盖值继续采用原 JavaScript 最终生效值，不改变数据模型或展示输入。
 

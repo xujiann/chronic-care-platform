@@ -46,7 +46,8 @@ T05 care owner 的遗留路由还必须运行 3 个独立 HTTP 特征测试，�
 拆分 `test/api.test.js` 自身时，每个切片只能移动一个共享测试生命周期；必须锁定子测试数量与顺序，
 保持单进程 server、共享状态、断言、超时、integration 成员和 CI 预算，并运行完整 API hotspot。
 外部 mock helper 必须是领域特定且测试专用的生命周期边界；只有创建、监听、既有环境变量和关闭路径均无
-跨子测试引用时才能提取；可变失败开关必须仍由所属子测试显式按原顺序驱动，helper 不得自行恢复或重试。
+跨子测试引用时才能提取；可变失败或扫描状态必须仍由所属子测试通过最小 control API 显式按原顺序驱动，
+helper 不得自行恢复或重试。
 按请求类型生成的 synthetic receipt 映射必须保持原值与请求计数语义；synthetic 响应不得描述为真实
 provider receipt、外部送达或现场证据。
 
