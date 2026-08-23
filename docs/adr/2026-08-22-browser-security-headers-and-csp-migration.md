@@ -86,6 +86,17 @@ API 字段冻结现有编码表现，迁移后同一浏览器合同确认标签�
 数据或审计，也不推进 CSP enforcement；真实托管头、OHIF/外部 Origin、独立渗透与现场验收继续
 NO-GO，兼容 `unsafe-inline`、严格 Report-Only 和 `productionReady=false` 保持不变。
 
+### 血液上线看板可信渲染切片（2026-08-23）
+
+`blood-go-live.js` 将上线摘要、临床门禁、标准登记、接口/设备、要求、演练、迁移与审批中的
+8 个 `innerHTML` 迁为显式 `createElement`、`textContent`、固定 class 与 `replaceChildren`。
+迁移前先以恶意 API 字段冻结现有编码表现，迁移后同一浏览器合同确认标签、事件属性不会被创建，
+既有表格与状态表达保持不变。Inventory v2 的 DOM HTML occurrence 由 859 降为 851，覆盖资产由
+41 降为 40；动态 URL 6 和动态样式 45 均未改变。该单页切片不改变 API、鉴权、数据、审计或
+CSP enforcement；真实血液系统/设备接口、证据双签、演练、迁移、审批、托管头、OHIF/外部 Origin、
+独立渗透与现场验收继续 NO-GO，兼容 `unsafe-inline`、严格 Report-Only 和
+`productionReady=false` 保持不变。
+
 ## Phased enforcement and rollback
 
 1. 第一阶段：集中端口、兼容 CSP + 严格 Report-Only、风险清单、CI 增量拒绝；固定 `productionReady=false`。
