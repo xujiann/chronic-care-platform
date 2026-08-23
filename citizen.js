@@ -214,6 +214,16 @@ const citizenServiceTabs = [
   { key: "registration", label: "挂号", status: "已实现", detail: "号源查询、预约确认、支付医保和取消规则", title: "挂号服务二级页面", actionLabel: "提交挂号预约" }
 ];
 
+function bindCitizenInternalLinks(target, selector, inputs) {
+  if (!target) return [];
+  const links = [...target.querySelectorAll(selector)];
+  return window.HealthBrowserSafeUrl.setElementUrlBindings(links.map((link, index) => ({
+    element: link,
+    input: inputs[index],
+    options: { capability: "internal-navigation", baseUrl: location.href }
+  })));
+}
+
 const CITIZEN_HIDDEN_STATUS_PATTERN = /待开发|待上线|未上线|规划中|pending|todo|backlog/i;
 
 function isCitizenLaunchVisible(item) {
@@ -604,7 +614,7 @@ function bindServiceTabs() {
   if (target) {
     target.innerHTML = launchedTabs.map((item) => {
       const meta = serviceNavigationMeta(item);
-      return `<a href="${citizenPageHref(item.key)}" data-service-tab="${item.key}" data-service-state="${item.status}" aria-current="${item.key === activeServiceTab ? "page" : "false"}">
+      return `<a data-service-tab="${item.key}" data-service-state="${item.status}" aria-current="${item.key === activeServiceTab ? "page" : "false"}">
       <span>${item.label}</span>
       <strong class="ready">${item.status}</strong>
       <small>${item.detail}</small>
@@ -614,6 +624,7 @@ function bindServiceTabs() {
       <em>二级页面</em>
     </a>`;
     }).join("");
+    bindCitizenInternalLinks(target, "[data-service-tab]", launchedTabs.map((item) => citizenPageHref(item.key)));
     target.querySelectorAll("[data-service-tab]").forEach((link) => {
       link.addEventListener("click", (event) => {
         event.preventDefault();
@@ -628,14 +639,16 @@ function bindServiceTabs() {
 function renderMobileServiceNav() {
   const target = document.querySelector("#mobile-service-nav");
   if (!target) return;
-  target.innerHTML = getLaunchedCitizenServiceTabs().map((item) => {
+  const tabs = getLaunchedCitizenServiceTabs();
+  target.innerHTML = tabs.map((item) => {
     const active = item.key === activeServiceTab;
     const meta = serviceNavigationMeta(item);
-    return `<a href="${citizenPageHref(item.key)}" data-mobile-service-tab="${item.key}" data-mobile-service-state="${item.status}" data-mobile-service-count="${meta.featureCount}" title="${item.label}：${meta.featureCount}项已实现能力；连接状态由平台后台核验" aria-label="${item.label}，${item.status}，${meta.featureCount}项已实现能力，连接状态由平台后台核验" aria-current="${active ? "page" : "false"}">
+    return `<a data-mobile-service-tab="${item.key}" data-mobile-service-state="${item.status}" data-mobile-service-count="${meta.featureCount}" title="${item.label}：${meta.featureCount}项已实现能力；连接状态由平台后台核验" aria-label="${item.label}，${item.status}，${meta.featureCount}项已实现能力，连接状态由平台后台核验" aria-current="${active ? "page" : "false"}">
     <span>${item.label}</span>
     <small class="ready service-count-badge">${mobileServiceBadgeLabel(item, active)}</small>
   </a>`;
   }).join("");
+  bindCitizenInternalLinks(target, "[data-mobile-service-tab]", tabs.map((item) => citizenPageHref(item.key)));
   target.querySelectorAll("[data-mobile-service-tab]").forEach((link) => {
     link.addEventListener("click", (event) => {
       event.preventDefault();
@@ -663,13 +676,14 @@ function renderMobileServiceRail() {
     ${tabs.map((item, index) => {
       const activeItem = item.key === activeServiceTab;
       const meta = serviceNavigationMeta(item);
-      return `<a href="${citizenPageHref(item.key)}" role="listitem" data-mobile-rail-tab="${item.key}" data-mobile-rail-index="${index + 1}" aria-current="${activeItem ? "page" : "false"}" aria-label="${item.label}，${activeItem ? "当前二级页面" : `${meta.featureCount}项已上线功能`}">
+      return `<a role="listitem" data-mobile-rail-tab="${item.key}" data-mobile-rail-index="${index + 1}" aria-current="${activeItem ? "page" : "false"}" aria-label="${item.label}，${activeItem ? "当前二级页面" : `${meta.featureCount}项已上线功能`}">
         <span>${item.label}</span>
         <small class="mobile-service-rail-state">${item.status}</small>
         <small>${activeItem ? "\u5f53\u524d" : `${meta.featureCount}\u9879`}</small>
       </a>`;
     }).join("")}
   </div>`;
+  bindCitizenInternalLinks(target, "[data-mobile-rail-tab]", tabs.map((item) => citizenPageHref(item.key)));
   target.querySelectorAll("[data-mobile-rail-tab]").forEach((link) => {
     link.addEventListener("click", (event) => {
       event.preventDefault();
@@ -709,9 +723,10 @@ function renderMobileServicePagebar() {
     </div>
     <button type="button" class="service-page-step primary" data-service-page-step="1" aria-label="下一项：${next?.label || active.label}">下一项</button>
     <div class="service-mobile-actionbar" aria-label="${active.label}手机端快捷操作">
-      <a class="service-mobile-action primary" href="${internalAction ? citizenPageHref(active.key) : active.actionHref}" ${internalAction ? `data-mobile-primary-action="${active.key}"` : ""}>${active.actionLabel}</a>
+      <a class="service-mobile-action primary" data-mobile-primary-link ${internalAction ? `data-mobile-primary-action="${active.key}"` : ""}>${active.actionLabel}</a>
       <button type="button" class="service-mobile-action" data-mobile-feature-list>功能清单</button>
     </div>`;
+  bindCitizenInternalLinks(target, "[data-mobile-primary-link]", [internalAction ? citizenPageHref(active.key) : active.actionHref]);
   target.querySelectorAll("[data-service-page-step]").forEach((button) => {
     button.addEventListener("click", () => {
       const destination = adjacentCitizenServiceTab(Number(button.dataset.servicePageStep || 1));
@@ -746,11 +761,12 @@ function renderCitizenActionDock(immediateRecentLabel = "") {
     ${items.map((item) => {
       const recentBadge = item.recent ? `<small>最近</small>` : "";
       if (item.href) {
-        return `<a class="citizen-action-chip ${item.primary ? "primary" : ""} ${item.recent ? "recent" : ""}" href="${item.href}" data-action-dock-label="${item.label}" data-action-dock-service="${item.internal ? item.key : ""}" aria-label="${active.label}：${item.label}">${item.label}${recentBadge}</a>`;
+        return `<a class="citizen-action-chip ${item.primary ? "primary" : ""} ${item.recent ? "recent" : ""}" data-action-dock-url data-action-dock-label="${item.label}" data-action-dock-service="${item.internal ? item.key : ""}" aria-label="${active.label}：${item.label}">${item.label}${recentBadge}</a>`;
       }
       return `<button type="button" class="citizen-action-chip ${item.tone === "primary" ? "primary" : ""} ${item.recent ? "recent" : ""}" data-action-dock-label="${item.label}" data-action-dock-target="${item.target || ""}" aria-label="${active.label}：${item.label}">${item.label}${recentBadge}</button>`;
     }).join("")}
   </div>`;
+  bindCitizenInternalLinks(target, "[data-action-dock-url]", items.filter((item) => item.href).map((item) => item.href));
   target.querySelectorAll("[data-action-dock-service]").forEach((link) => {
     if (!link.dataset.actionDockService) {
       link.addEventListener("click", () => rememberCitizenAction(active.key, link.dataset.actionDockLabel));
@@ -911,7 +927,7 @@ function renderClientChannels() {
     <div class="client-channel-entry">
       <code>${currentEntry}</code>
       <div class="client-channel-actions">
-        <a class="client-channel-action primary" href="./${currentEntry}">打开入口</a>
+        <a class="client-channel-action primary" data-client-channel-entry-link>打开入口</a>
         <button type="button" class="client-channel-action" data-copy-client-entry="${currentEntry}">复制入口</button>
         <button type="button" class="client-channel-action wide" data-copy-launch-materials="${active.key}">复制材料清单</button>
       </div>
@@ -939,6 +955,7 @@ function renderClientChannels() {
       ${active.launchChecklist.map((item) => `<p><strong>${item.label}</strong><span>${item.state}</span><small>${item.note}</small></p>`).join("")}
     </section>
   </div>`;
+  bindCitizenInternalLinks(detail, "[data-client-channel-entry-link]", [`./${currentEntry}`]);
   detail.querySelector("[data-copy-client-entry]")?.addEventListener("click", (event) => copyClientEntry(event.currentTarget.dataset.copyClientEntry));
   detail.querySelector("[data-copy-launch-materials]")?.addEventListener("click", () => copyLaunchMaterials(active, currentEntry));
 }
@@ -1169,16 +1186,18 @@ function renderServiceSummary() {
       <span class="feature-state ready">${launchedTabs.length} 项已上线</span>
       <span class="feature-state ready">仅显示上线功能</span>
     </div>
-    <a class="service-page-action" href="${internalAction ? citizenPageHref(active.key) : active.actionHref}" ${internalAction ? `data-service-action="${active.key}"` : ""}>${active.actionLabel}</a>
+    <a class="service-page-action" data-service-page-action-link ${internalAction ? `data-service-action="${active.key}"` : ""}>${active.actionLabel}</a>
   </div>
   <nav class="service-subnav" aria-label="${active.label}功能导航">
     ${activeItems.map((item) => {
-      return `<a href="#${featureNavId(item)}" data-service-feature="${featureNavId(item)}">
+      return `<a data-service-feature="${featureNavId(item)}">
         <span>${item.name}</span>
         <small class="ready">${item.status}</small>
       </a>`;
     }).join("")}
   </nav>`;
+  bindCitizenInternalLinks(target, "[data-service-page-action-link]", [internalAction ? citizenPageHref(active.key) : active.actionHref]);
+  bindCitizenInternalLinks(target, "[data-service-feature]", activeItems.map((item) => `#${featureNavId(item)}`));
   target.querySelector("[data-service-action]")?.addEventListener("click", (event) => {
     event.preventDefault();
     invokeInternalServiceAction(event.currentTarget.dataset.serviceAction);
@@ -1561,7 +1580,7 @@ function renderReminderCenter(residentId) {
   listEl.innerHTML = reminders.map((item) => `<article class="mini-card service-task-card ${item.priority === "high" ? "urgent" : ""}">
     <div class="service-task-head">
       <span>${item.service}</span>
-      <a class="service-task-action" href="${citizenPageHref(item.page)}">${item.action}</a>
+      <a class="service-task-action" data-reminder-service-link>${item.action}</a>
     </div>
     <h3>${item.title}</h3>
     <p class="muted">${item.detail}</p>
@@ -1573,6 +1592,7 @@ function renderReminderCenter(residentId) {
       ${renderServiceTaskButtons(item)}
     </div>
   </article>`).join("") || `<p class="muted">暂无服务待办，居民端会在预约、随访或授权到期时自动汇总。</p>`;
+  bindCitizenInternalLinks(listEl, "[data-reminder-service-link]", reminders.map((item) => citizenPageHref(item.page)));
 }
 
 function isResidentServiceTaskOpen(item) {
@@ -1710,7 +1730,8 @@ function renderCitizenPhysicalExamHighlights(residentId) {
   setCitizenExamHtml("citizen-exam-timeline", trajectories.map((item) => `<div class="exam-highlight-row"><strong>${escapeHtml(item.name)}</strong><span>${escapeHtml(item.latest ? `${item.latest.value}${item.latest.unit || ""}` : "-")}</span><small>${item.delta === null ? "已建立基线" : `较上次 ${item.delta > 0 ? "+" : ""}${escapeHtml(item.delta)}`} · ${(item.points || []).length}个时间点</small></div>`).join("") || citizenExamEmpty("接入结构化报告后生成趋势。"));
 
   const actions = (highlights.actionCards || []).filter((item) => item.residentId === residentId);
-  setCitizenExamHtml("citizen-exam-actions", actions.map((item) => `<div class="exam-action-card ${item.priority}"><strong>${escapeHtml(item.title)}</strong><p>${escapeHtml((item.evidence || []).join("；"))}</p><small>${escapeHtml(item.nextStep)} · ${escapeHtml(item.dueAt || "尽快")}</small><div class="exam-action-buttons"><button type="button" data-exam-ack="${escapeHtml(item.id)}">我已了解</button><button type="button" data-exam-review="${escapeHtml(item.reportId)}" data-exam-department="${escapeHtml(item.appointmentDepartment)}">申请复查</button><a href="${escapeHtml(citizenPageHref("family-doctor"))}">联系家医</a></div><ol>${(item.steps || []).map((step) => `<li class="${step.completed ? "done" : "pending"}">${step.completed ? "✓" : "○"} ${escapeHtml(step.name)}</li>`).join("")}</ol></div>`).join("") || citizenExamEmpty("当前没有需要处理的体检异常。"));
+  setCitizenExamHtml("citizen-exam-actions", actions.map((item) => `<div class="exam-action-card ${item.priority}"><strong>${escapeHtml(item.title)}</strong><p>${escapeHtml((item.evidence || []).join("；"))}</p><small>${escapeHtml(item.nextStep)} · ${escapeHtml(item.dueAt || "尽快")}</small><div class="exam-action-buttons"><button type="button" data-exam-ack="${escapeHtml(item.id)}">我已了解</button><button type="button" data-exam-review="${escapeHtml(item.reportId)}" data-exam-department="${escapeHtml(item.appointmentDepartment)}">申请复查</button><a data-exam-family-doctor-link>联系家医</a></div><ol>${(item.steps || []).map((step) => `<li class="${step.completed ? "done" : "pending"}">${step.completed ? "✓" : "○"} ${escapeHtml(step.name)}</li>`).join("")}</ol></div>`).join("") || citizenExamEmpty("当前没有需要处理的体检异常。"));
+  bindCitizenInternalLinks(document.querySelector("#citizen-exam-actions"), "[data-exam-family-doctor-link]", actions.map(() => citizenPageHref("family-doctor")));
 
   const translations = (highlights.translations || []).filter((item) => item.residentId === residentId).sort((a, b) => Number(b.status !== "within-report-range") - Number(a.status !== "within-report-range"));
   setCitizenExamHtml("citizen-exam-translations", translations.slice(0, 5).map((item) => `<details class="exam-translation"><summary><strong>${escapeHtml(item.title)}</strong><span>${escapeHtml(item.value)}</span></summary><p>${escapeHtml(item.plainMeaning)}</p><small>下一步：${escapeHtml(item.nextStep)} · ${escapeHtml(item.department)}</small><em>${escapeHtml(item.boundary)}</em></details>`).join("") || citizenExamEmpty("暂无可解释的结构化项目。"));
@@ -1946,7 +1967,7 @@ function renderServiceOrderCenter(residentId) {
   cards.innerHTML = orders.slice(0, 12).map((item) => `<article class="service-order-card">
     <div>
       <span>${escapeHtml(item.service)}</span>
-      <a class="service-task-action" href="${citizenPageHref(item.page)}">${escapeHtml(item.primaryAction)}</a>
+      <a class="service-task-action" data-service-order-link>${escapeHtml(item.primaryAction)}</a>
     </div>
     <h3>${escapeHtml(item.title)}</h3>
     <p>${escapeHtml(item.institution || "服务机构待确认")}</p>
@@ -1956,6 +1977,7 @@ function renderServiceOrderCenter(residentId) {
       <span class="status ${item.statusClass}">${escapeHtml(item.lifecycle)} · ${escapeHtml(item.status)}</span>
     </div>
   </article>`).join("") || `<p class="muted">暂无服务订单。提交护理、陪诊、挂号、体检或家医申请后会统一汇总在这里。</p>`;
+  bindCitizenInternalLinks(cards, "[data-service-order-link]", orders.slice(0, 12).map((item) => citizenPageHref(item.page)));
 }
 
 function buildCitizenHighlightItems(resident, diseases = [], followups = [], records = []) {
@@ -2089,10 +2111,11 @@ function renderCitizenHighlightCenter(resident, diseases, followups, records) {
     <p>${escapeHtml(item.detail)}</p>
     <small>${escapeHtml(item.evidence)}</small>
     <div class="citizen-highlight-actions">
-      ${item.href ? `<a class="service-task-action" href="${item.href}">${escapeHtml(item.action)}</a>` : ""}
+      ${item.href ? `<a class="service-task-action" data-citizen-highlight-link>${escapeHtml(item.action)}</a>` : ""}
       ${item.command ? `<button type="button" class="service-task-action" data-highlight-command="${item.command}">${escapeHtml(item.action)}</button>` : ""}
     </div>
   </article>`).join("");
+  bindCitizenInternalLinks(grid, "[data-citizen-highlight-link]", items.filter((item) => item.href).map((item) => item.href));
   grid.querySelectorAll("[data-highlight-command]").forEach((button) => {
     button.addEventListener("click", () => runCitizenHighlightCommand(button.dataset.highlightCommand));
   });

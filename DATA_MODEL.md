@@ -98,7 +98,8 @@ T06 血液主工作台可信渲染只改变浏览器节点构造：接口响应�
 
 `browser-safe-url-policy.v1` 只处理浏览器 URL 能力决定，不创建集合、字段、表、DDL、migration 或
 事实源。exact-Origin allowlist 由调用方的既有受控配置提供，不保存签名 URL、对象 key、居民标识、
-电话事件或外部 provider 回执；当前 Inventory 中 31 个 `review-required` occurrence 也只是源码治理
+电话事件或外部 provider 回执；29 个原模板 occurrence 已由 28 个真实迁移和 1 个词法误报校正闭合，
+当前 Inventory 中 2 个 OHIF `review-required` occurrence 也只是源码治理
 状态，不能写回业务数据或作为生产放行证据。
 
 `followups` 继续由 citizen-chronic/T04 拥有；随访事件 outbox、inbox、projection 和 receipt

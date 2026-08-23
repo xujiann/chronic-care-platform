@@ -65,11 +65,11 @@ test("published browser assets match the exact Inventory v2 fail-closed baseline
   assert.equal(inventory.schemaVersion, 2);
   assert.equal(inventory.contractId, "browser-security-risk-inventory.v2");
   assert.equal(inventory.assetsScanned, 145);
-  assert.equal(inventory.summary.total, 951);
-  assert.equal(inventory.summary.byPriority.P0, 906);
+  assert.equal(inventory.summary.total, 922);
+  assert.equal(inventory.summary.byPriority.P0, 877);
   assert.equal(inventory.summary.byPriority.P1, 45);
   assert.equal(inventory.summary.byPriority.P2, 0);
-  assert.equal(inventory.findings.length, 76);
+  assert.equal(inventory.findings.length, 67);
   assert.equal(inventory.summary.byType["inline-script"], 0);
   assert.equal(inventory.summary.byType["inline-style-block"], 0);
   assert.equal(inventory.summary.byType["style-attribute"], 0);
@@ -77,7 +77,7 @@ test("published browser assets match the exact Inventory v2 fail-closed baseline
   assert.equal(inventory.summary.byType["eval-call"], 0);
   assert.equal(inventory.summary.byType["dom-inner-html"], 866);
   assert.equal(inventory.summary.byType["dom-insert-adjacent-html"], 5);
-  assert.equal(inventory.summary.byType["dynamic-html-url-attribute"], 29);
+  assert.equal(inventory.summary.byType["dynamic-html-url-attribute"], 0);
   assert.equal(inventory.summary.byType["dom-url-property"], 0);
   assert.equal(inventory.summary.byType["dom-url-attribute"], 2);
   assert.equal(inventory.summary.byType["navigation-call"], 4);
@@ -87,14 +87,17 @@ test("published browser assets match the exact Inventory v2 fail-closed baseline
   assert.equal(inventory.summary.byType["runtime-style-element"], 1);
   assert.equal(new Set(inventory.findings.filter((item) => ["dom-inner-html", "dom-insert-adjacent-html"].includes(item.type)).map((item) => item.asset)).size, 43);
   assert.equal(new Set(inventory.findings.filter((item) => ["dynamic-html-style-attribute", "cssom-property-mutation", "cssom-set-property", "runtime-style-element"].includes(item.type)).map((item) => item.asset)).size, 14);
-  assert.equal(new Set(inventory.findings.filter((item) => ["dynamic-html-url-attribute", "dom-url-property", "dom-url-attribute", "navigation-call"].includes(item.type)).map((item) => item.asset)).size, 11);
+  assert.equal(new Set(inventory.findings.filter((item) => ["dynamic-html-url-attribute", "dom-url-property", "dom-url-attribute", "navigation-call"].includes(item.type)).map((item) => item.asset)).size, 2);
   assert.equal(policy.riskBaseline.schemaVersion, 2);
-  assert.equal(policy.riskBaseline.findings.reduce((sum, item) => sum + item.count, 0), 951);
+  assert.equal(policy.riskBaseline.findings.reduce((sum, item) => sum + item.count, 0), 922);
   assert.equal(policy.riskBaseline.findings.some((item) => item.asset === "blood.js"), false);
   assert.equal(policy.safeUrl.contractId, "browser-safe-url-policy.v1");
   assert.equal(policy.safeUrl.controlledSinkOccurrences, 4);
-  assert.equal(policy.safeUrl.reviewRequiredOccurrences, 31);
-  assert.equal(policy.safeUrl.reviewRequired.reduce((sum, item) => sum + item.count, 0), 31);
+  assert.equal(policy.safeUrl.internallyClosedTemplateOccurrences, 28);
+  assert.equal(policy.safeUrl.inventoryFalsePositiveCorrections, 1);
+  assert.equal(policy.safeUrl.reviewRequiredOccurrences, 2);
+  assert.equal(policy.safeUrl.reviewRequired.reduce((sum, item) => sum + item.count, 0), 2);
+  assert.equal(policy.safeUrl.reviewRequired.length, 1);
   assert.equal(policy.safeUrl.reviewRequired.find((item) => item.asset === "imaging-cloud.js").reason, "ohif-exact-origin-allowlist-not-proven");
   assert.equal(inventory.riskTypes["event-handler"].priority, "P0");
   assert.equal(inventory.riskTypes["eval-call"].priority, "P0");
@@ -115,6 +118,7 @@ test("inventory verification fails closed on a newly introduced high-risk browse
       "document.write(payload); range.createContextualFragment(payload); frame.srcdoc = payload;",
       "node.setAttribute('onclick', payload);",
       "const markup = `<a href=\"${url}\" style=\"color:${color}\">open</a>`;",
+      "item.action = `${item.action}; completed`;",
       "link.href = url; link.setAttribute('src', url); window.open(url);",
       "node.style.color = color; node.style.setProperty('--tone', color); document.createElement('style');"
     ].join("\n"));
@@ -128,6 +132,7 @@ test("inventory verification fails closed on a newly introduced high-risk browse
 
     assert.equal(verification.ok, false);
     assert.equal(verification.code, "BROWSER_SECURITY_HIGH_RISK_ADDITION");
+    assert.equal(inventory.summary.byType["dynamic-html-url-attribute"], 1);
     assert.deepEqual(new Set(verification.violations.map((item) => item.type)), new Set([
       "inline-script",
       "event-handler",
@@ -192,7 +197,7 @@ test("CI and static publication keep the browser security gate wired", () => {
   assert.equal(packageJson.scripts["security:browser:verify"], "node scripts/browser-security-inventory.js verify");
   assert.match(packageJson.scripts["static:check"], /node --check browser-safe-url\.js/);
   assert.match(packageJson.scripts["static:test"], /test\/browser-safe-url\.test\.js/);
-  assert.match(ci, /Verify static publication, Safe URL port and Browser Inventory v2/);
+  assert.match(ci, /Verify static publication, Safe URL template closure and Browser Inventory v2/);
   assert.match(ci, /npm run security:browser:verify/);
   assert.equal(publication.seedAssets.includes("browser-security-policy.json"), true);
   const publishedAssets = collectPublicAssets(ROOT, publication);

@@ -1,7 +1,7 @@
 {
   "schemaVersion": "platform-nonfunctional-budgets-v1",
   "frontendAssets": [
-    { "file": "citizen.js", "maximumBytes": 349500, "maximumLines": 6075 },
+    { "file": "citizen.js", "maximumBytes": 351500, "maximumLines": 6100 },
     { "file": "public-health.js", "maximumBytes": 304000, "maximumLines": 4475 },
     { "file": "platform.js", "maximumBytes": 239000, "maximumLines": 3815 },
     { "file": "operations.js", "maximumBytes": 223000, "maximumLines": 3725 },

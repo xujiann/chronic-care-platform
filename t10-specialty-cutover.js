@@ -129,7 +129,8 @@ function renderFirstIncrement(increment) {
 }
 
 function renderTracks(tracks, stages) {
-  document.querySelector("#track-grid").innerHTML = tracks.map((track) => `
+  const target = document.querySelector("#track-grid");
+  target.innerHTML = tracks.map((track, index) => `
     <article class="cutover-card">
       <h3>${escapeHtml(track.name)}</h3>
       <p class="muted">${escapeHtml(track.department)}</p>
@@ -139,24 +140,30 @@ function renderTracks(tracks, stages) {
         <span class="badge warn">${track.blockers?.length || 0}个现场阻断</span>
       </div>
       <ul class="stage-list">${stages.map((stage) => `<li class="${stage === track.currentStage ? "stage-active" : ""}">${escapeHtml(stage)}</li>`).join("")}</ul>
-      <p><a href="./${encodeURIComponent(track.page)}">打开页面</a> · <code>${escapeHtml(track.api)}</code></p>
+      <p><a data-track-page="${index}">打开页面</a> · <code>${escapeHtml(track.api)}</code></p>
       <p class="muted">Readiness digest：${escapeHtml(track.readiness?.digest || "")}</p>
     </article>
   `).join("");
+  window.HealthBrowserSafeUrl.setElementUrlBindings([...target.querySelectorAll("[data-track-page]")].map((link) => ({
+    element: link,
+    input: `./${encodeURIComponent(tracks[Number(link.dataset.trackPage)]?.page || "")}`,
+    options: { capability: "internal-navigation", baseUrl: location.href }
+  })));
 }
 
 function renderInstitutionDeploymentManifest(manifest, gate, compatibility, packagePlan) {
   const modules = manifest.enabledModules || [];
-  const rows = modules.map((item) => `
+  const rows = modules.map((item, index) => `
     <tr>
       <td><strong>${escapeHtml(item.name)}</strong><br><span class="muted">${escapeHtml(item.deploymentUnit)}</span></td>
-      <td><a href="./${encodeURIComponent(item.page)}">${escapeHtml(item.page)}</a><br><code>${escapeHtml(item.api)}</code></td>
+      <td><a data-module-page="${index}">${escapeHtml(item.page)}</a><br><code>${escapeHtml(item.api)}</code></td>
       <td><code>${escapeHtml(item.dataNamespace)}</code></td>
       <td>${escapeHtml(item.rollbackUnit)}</td>
       <td><span class="badge warn">${escapeHtml(item.productionTrafficState)}</span></td>
     </tr>
   `).join("");
-  document.querySelector("#institution-deployment-manifest").innerHTML = `
+  const target = document.querySelector("#institution-deployment-manifest");
+  target.innerHTML = `
     <div class="cutover-card">
       <div class="badge-row">
         <span class="badge">${escapeHtml(manifest.institutionId || "institution-template")}</span>
@@ -192,6 +199,11 @@ function renderInstitutionDeploymentManifest(manifest, gate, compatibility, pack
       </article>
     </div>
   `;
+  window.HealthBrowserSafeUrl.setElementUrlBindings([...target.querySelectorAll("[data-module-page]")].map((link) => ({
+    element: link,
+    input: `./${encodeURIComponent(modules[Number(link.dataset.modulePage)]?.page || "")}`,
+    options: { capability: "internal-navigation", baseUrl: location.href }
+  })));
 }
 
 function renderInstitutionOperations(plan) {

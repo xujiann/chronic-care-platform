@@ -121,13 +121,14 @@ flowchart TB
 14. SEC-004 治理清单已升级为 `browser-security-risk-inventory.v2`，当前扫描 145 个显式发布资产。
     `browser-safe-url-policy.v1` 复用居民短时凭据/对象存储的 HTTPS、无凭据和 exact-Origin 语义，
     为 internal navigation、official source、object storage、`tel` 与 blob download 建立唯一公共端口。
-    血液主工作台可信 DOM/text 试点与 Safe URL 首批迁移后，机器基线锁定 871 个 DOM HTML sink
-    （43 个资产）、35 个动态 URL sink（11 个资产）和 45 个动态样式/CSSOM/runtime style element
-    （14 个资产）；35 项中 4 项是公共端口内
-    受控 mutation/navigation，29 个模板 URL 与 2 个缺可信 OHIF exact-Origin allowlist 的导航继续
-    `review-required`。每个资产/类型同时绑定
+    血液主工作台可信 DOM/text 试点与 Safe URL 内部闭环后，机器基线锁定 871 个 DOM HTML sink
+    （43 个资产）、6 个动态 URL sink（2 个资产）和 45 个动态样式/CSSOM/runtime style element
+    （14 个资产）；29 个原模板 occurrence 中 28 个真实 URL 已改为无 URL 模板加 DOM 绑定，另 1 个
+    `item.action` 普通赋值已从扫描误报中排除。当前 4 项是公共端口内受控 mutation/navigation，只有
+    2 个缺真实 OHIF exact-Origin allowlist 的导航继续 `review-required`。每个资产/类型同时绑定
     occurrence 数量和规范化源行聚合 SHA-256。相同数量的片段替换、数量增加和新类型/资产都会失败关闭；
-    该清单和 Safe URL 端口不是可信 HTML 渲染、严格 CSP、外部 Origin 或生产安全证明。
+    该清单和 Safe URL 端口不是可信 HTML 渲染、严格 CSP、外部 Origin 或生产安全证明；兼容
+    `unsafe-inline`、严格 Report-Only 与 `productionReady=false` 均未改变。
 15. TEST-007 已在既有 `operations-command-handoff` harness 上建立 32/32 路径的闭集行为矩阵。
     19 条读取和 13 条写入逐路径锁定角色、拒绝先于读取、payload/错误、响应与实际副作用；三条集成入口
     另覆盖签名和机构范围，全部写入口覆盖审计/写入顺序及审计或写入失败不返回成功。专项门禁进入

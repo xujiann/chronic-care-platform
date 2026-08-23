@@ -141,6 +141,37 @@ test("DOM assignment and navigation resolve before mutating their targets", () =
   assert.equal(calls.length, 1);
 });
 
+test("batch DOM bindings fail individual hostile URLs closed without bypassing the shared policy", () => {
+  function element() {
+    const attributes = new Map();
+    return {
+      attributes,
+      removeAttribute: (name) => attributes.delete(name),
+      setAttribute: (name, value) => attributes.set(name, value)
+    };
+  }
+  const allowed = element();
+  const hostile = element();
+  hostile.attributes.set("href", "./stale.html");
+  const outcomes = SafeUrl.setElementUrlBindings([
+    {
+      element: allowed,
+      input: "./citizen.html?page=health-record",
+      options: { capability: "internal-navigation", baseUrl: BASE_URL }
+    },
+    {
+      element: hostile,
+      input: "javascript:alert(1)",
+      options: { capability: "internal-navigation", baseUrl: BASE_URL }
+    }
+  ]);
+  assert.equal(outcomes[0].ok, true);
+  assert.equal(allowed.attributes.get("href"), "./citizen.html?page=health-record");
+  assert.deepEqual(outcomes[1], { ok: false, errorCode: "SAFE_URL_PROTOCOL_DENIED" });
+  assert.equal(hostile.attributes.has("href"), false);
+  errorCode(() => SafeUrl.setElementUrlBindings({}));
+});
+
 test("browser global location supplies the default base and navigation target", () => {
   const original = Object.getOwnPropertyDescriptor(globalThis, "location");
   const calls = [];

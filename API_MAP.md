@@ -79,10 +79,11 @@ HTTP request
 - HTML、静态资源、JSON/API、下载与错误响应由集中端口下发 `nosniff`、frame、referrer、
   permissions 与 CSP。显式发布图的内联脚本/样式静态风险已归零，但兼容 CSP 仍含 `unsafe-inline`，
   严格目标只为 Report-Only；血液主工作台 API 字段已使用 DOM/text 节点，Inventory v2 已把
-  871 个 DOM HTML、35 个动态 URL 和 45 个动态样式
+  871 个 DOM HTML、6 个动态 URL 和 45 个动态样式
   sink 作为资产级治理事实锁定。`browser-safe-url-policy.v1` 将可证明的内部导航、对象存储、`tel:120`
-  和 blob 下载迁入统一协议/无凭据/exact-Origin 检查；29 个模板 URL 与 2 个 OHIF 导航保持
-  `review-required`。该变化不改变任何 HTTP API、响应体或鉴权，也不证明 HTML sink 输入可信。动态样式
+  和 blob 下载迁入统一协议/无凭据/exact-Origin 检查；29 个原模板 occurrence 已由 28 个真实 DOM
+  绑定迁移和 1 个扫描误报校正闭合，仅 2 个 OHIF 导航保持 `review-required`。该变化不改变任何
+  HTTP API、响应体或鉴权，也不证明 HTML sink 输入可信。动态样式
   与全角色浏览器回归完成前 SEC-004 仍未关闭。生产 HSTS 只由
   生产运行时生成，真实 TLS 终止层仍需现场核验。
 - 多个领域具有 HMAC、nonce、时间窗、CAS、outbox 和 replay 记录。
