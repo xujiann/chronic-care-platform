@@ -223,6 +223,13 @@ integration runner 只隔离该文件并输出耗时，不把通过、skip 数�
 后续 duplicate-key closure 只清理 `internet-nursing.js` 与 `quality-safety.js` 的静态翻译 map；
 既有 API 调用、请求参数、响应消费和 DOM 渲染入口保持不变，最终中文展示由逐键调用特征测试锁定。
 
+后续 T05 revalidation 已恢复上述 3 段显式 skip，并以独立真实 HTTP 测试固定 owner 契约：陪诊创建/
+阶段推进/handoff、护理创建/评估/派单/接单与护士接单/开始/完成。`POST /api/escort-services/orders`
+引用 `registrationOrderId` 时先返回稳定 `ESCORT_REGISTRATION_NOT_FOUND`(400) 或
+`ESCORT_REGISTRATION_SCOPE_DENIED`(403)；`POST /api/escort-services/orders/:id/hospital-handoff`
+将 `reject` 与 `return` 均投影为 `hospital-returned`，并原子更新 `hospitalInterfaceStatus`。鉴权角色、
+method/path、幂等、审计、notification plan 与 outbox 语义不变；planned/pending 不能解释为外部送达。
+
 ## 18A. TEST-002 内部覆盖扩展（无 API 变化）
 
 区域共享命令、转诊 owner command 和科研合规导出状态机现进入各自独立 c8 组，直接复用既有身份先行、重放/CAS、职责分离和失败关闭测试；覆盖组不新增或改变 HTTP method/path、响应、鉴权、审计或生产状态。浏览器响应头与 Safe URL 组同样只测内部策略端口，不能替代 Playwright 页面行为、真实托管头或外部 Origin 验证。
@@ -237,7 +244,7 @@ profile、profile 替换、额外字段和生产授权扩张均失败关闭。�
 ## 20. Playwright E2E 隔离（无 HTTP 变化）
 
 TEST-005 只改变测试进程、浏览器与临时端口装配，不新增或改变任何 HTTP method/path、鉴权、角色、
-scope、错误、幂等或审计语义。根 27 项与居民 13 项继续调用现有接口；动态回环端口和临时数据只用于
+scope、错误、幂等或审计语义。根 28 项与居民 13 项继续调用现有接口；动态回环端口和临时数据只用于
 自动化验证，不能登记为公开 API、生产 endpoint 或现场证据。
 
 PWA 专项增加 3 项独立浏览器行为测试，但不新增测试控制 HTTP API：仍由现有 `/api/health` 探活并使用

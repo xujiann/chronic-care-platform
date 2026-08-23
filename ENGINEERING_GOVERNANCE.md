@@ -106,9 +106,11 @@ LEGACY CODE → TEST PROTECTION → REFACTOR
 是可快速独立运行的精选集合；`test:all` 的自动发现语义保持不变。`lint`
 覆盖仓库 JavaScript，当前不再保留文件级规则例外；`typecheck`
 已从主线实际 9 个唯一文件扩大为 13 个治理/安全边界文件的增量基线，不得表述为全仓类型检查。
-`test/api.test.js` 已恢复全文件 `no-unreachable`；三段原不可达断言保留为具名显式 skip 债务，
-不得误报为已获得行为保护。两个前端文件原有 16 个 shadowed map key 必须由旧值/最终值/真实翻译
-调用特征测试保护；新增重复键或重新引入 `no-dupe-keys` 文件例外均失败关闭。
+`test/api.test.js` 已恢复全文件 `no-unreachable`；三段原不可达 care 断言已完成 owner/route 重验、
+删除 skip 并恢复执行，另有 3 个独立真实 HTTP 特征测试保护陪诊、护理闭环与护士生命周期。测试必须
+保持 scope、幂等、audit、notification plan 和 pending outbox 断言，不得以模拟 delivery 替代外部回执。
+两个前端文件原有 16 个 shadowed map key 已在旧值/最终值/真实翻译调用特征测试保护下去重；新增重复键
+或重新引入 `no-dupe-keys` 文件例外均失败关闭。
 扩大基线时应先清债，不得用全局关闭规则换取通过。
 
 标准 integration suite 保持成员、顺序、断言与超时不变；`test/api.test.js` 作为单文件热点批次执行，

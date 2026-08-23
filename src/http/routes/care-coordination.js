@@ -498,7 +498,7 @@ function createRouteSegments(runtime) {
           const payload = await collectJson(req);
           const result = await careServicePlatformAdapter().createOrder(
             "escort",
-            careServiceCreatePayload(payload, "escort"),
+            careServiceCreatePayload(payload, "escort", user),
             careServiceActor(user),
             { commandId: careServiceCommandId(req, payload) }
           );
@@ -516,13 +516,22 @@ function createRouteSegments(runtime) {
         try {
           const payload = await collectJson(req);
           const decision = String(payload.decision || "").trim().toLowerCase();
+          const returned = ["reject", "return"].includes(decision);
+          const transition = careServiceTransitionInput(payload);
           const result = await careServicePlatformAdapter().transitionOrder(
             "escort",
             decodeURIComponent(escortHospitalHandoffMatch[1]),
-            decision === "return" ? "hospital-returned" : "hospital-confirmed",
+            returned ? "hospital-returned" : "hospital-confirmed",
             careServiceActor(user),
             {
-              ...careServiceTransitionInput(payload).input,
+              ...transition.input,
+              updates: {
+                ...transition.input.updates,
+                hospitalInterfaceStatus: returned ? "returned" : "confirmed",
+                hospitalCheckInStatus: returned
+                  ? "pending"
+                  : String(payload.hospitalCheckInStatus || "confirmed").trim()
+              },
               commandId: careServiceCommandId(req, payload)
             }
           );
