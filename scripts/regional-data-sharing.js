@@ -123,6 +123,7 @@ function buildRegionalDataSharingReport(options = {}) {
   const about = options.about ?? readText("regional-data-sharing-about.html");
   const client = options.client ?? readText("regional-data-sharing.js");
   const accessCommand = options.accessCommand ?? readText("src/platform/governance/regional-sharing-access-command.js");
+  const readModel = options.readModel ?? readText("src/platform/governance/regional-sharing-read-model.js");
   const scope = data.regionalDataSharingScope || {};
   const packages = Array.isArray(data.regionalSharingPackages) ? data.regionalSharingPackages : [];
   const snapshots = data.regionalSharingSnapshots || {};
@@ -142,8 +143,8 @@ function buildRegionalDataSharingReport(options = {}) {
     { id: "regional:contractRefs", passed: contractRefs.length >= 4 && contractRefs.every((id) => contracts.has(id)), detail: [...new Set(contractRefs)].join(",") },
     { id: "regional:accessReviews", passed: reviews.length >= 1 && reviews.every((item) => item.packageId && item.residentId && item.purpose && item.decision), detail: `${reviews.length} reviews` },
     { id: "regional:apiRoutes", passed: /\/api\/regional-data-sharing/.test(server) && /regionalSharingAccessCommand\.execute/.test(server) && /regional-sharing-access-command\.v1/.test(accessCommand), detail: "GET routes and server-owned access command present" },
-    { id: "regional:apiHandoff", passed: /buildRegionalReferralHandoffEvidence/.test(server) && /referralHandoffReady/.test(server) && /referralHandoff/.test(client), detail: "API returns referral handoff evidence per package" },
-    { id: "regional:handoffReportApi", passed: /\/api\/regional-data-sharing\/handoff-report/.test(server) && /buildRegionalHandoffReport/.test(server) && /renderRegionalHandoffMarkdown/.test(server), detail: "runtime referral handoff report route present" },
+    { id: "regional:apiHandoff", passed: /buildRegionalReferralHandoffEvidence/.test(server) && /referralHandoffReady/.test(readModel) && /referralHandoff/.test(client), detail: "API returns referral handoff evidence per package" },
+    { id: "regional:handoffReportApi", passed: /\/api\/regional-data-sharing\/handoff-report/.test(server) && /regionalSharingReadModel\.buildRegionalHandoffReport/.test(server) && /buildRegionalHandoffReport/.test(readModel) && /renderRegionalHandoffMarkdown/.test(readModel), detail: "runtime referral handoff report route and read-model port present" },
     { id: "regional:handoffEvidence", passed: handoffReady >= 1 && packages.every((item) => handoffByPackage.get(item.id)?.total === 6), detail: `${handoffReady}/${packages.length} packages ready for referral handoff` },
     { id: "regional:frontendEntry", passed: /regional-data-sharing\.js/.test(html) && /regional-access-form/.test(html) && /authFetch/.test(client), detail: "page and client workflow present" },
     { id: "regional:frontendWorkflow", passed: /regional-sharing-loop/.test(html) && /regional-selected-package/.test(html) && /regional-access-feedback/.test(html) && /selectRegionalPackage/.test(client) && /renderRegionalLoop/.test(client), detail: "loop, selection and access feedback present" },

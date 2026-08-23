@@ -5,7 +5,7 @@ const { COMMAND_ID: REGIONAL_SHARING_ACCESS_COMMAND_ID, createRegionalSharingAcc
 const { protectSharedRouteSegments } = require("../shared/route-policy");
 
 function createRouteSegments(runtime, options = {}) {
-  const { BloodClinicalProduction, EmergencyModuleGate, SERVICE_ORDER_SOURCE_COLLECTIONS, T10SpecialtyModuleGovernance, appendDataAccessLog, appendSecurityEvent, applyPilotInterfaceReviewAction, authorizationState, buildAuthorizationLifecycle, buildConsortiumPerformanceReport, buildDataGovernanceOverview, buildDataQualityIssues, buildDataQualityScorecard, buildDrugConsumableSupervision, buildDrugTraceabilityEvidenceSubmission, buildMasterDataDirectory, buildMobileExperience, buildMultiPracticeRegistry, buildObservabilityAlertCenter, buildPilotAcceptanceCenter, buildPriorityApplicationTemplates, buildRegionalDataSharingView, buildRegionalHandoffReport, buildServiceAcceptanceSummary, buildServiceOrderSummary, buildSpecialtyCutoverPack, buildT10PlatformBlockedReadiness, calculateCreditEvaluations, canAccessResident, canAccessServiceOrder, canReadT10InstitutionModules, collectJson, dispatchAlert, normalizeServiceOrders, normalizeState, prependAuditTrailEntry, randomUUID, readDatabase, redactSensitiveResponse, requireApiRole, resealAuditTrail, scopeStateForUser, sealAuditTrail, seedAccessibilityChecklist, seedMobileExperienceSettings, sendJson, sendT10SpecialtyModuleError, trustedT10Institution, updateDrugConsumableSupervision, upsertAlertDeliveryIncident, validateAlert, writeDatabase } = runtime;
+  const { BloodClinicalProduction, EmergencyModuleGate, SERVICE_ORDER_SOURCE_COLLECTIONS, T10SpecialtyModuleGovernance, appendDataAccessLog, appendSecurityEvent, applyPilotInterfaceReviewAction, authorizationState, buildAuthorizationLifecycle, buildConsortiumPerformanceReport, buildDataGovernanceOverview, buildDataQualityIssues, buildDataQualityScorecard, buildDrugConsumableSupervision, buildDrugTraceabilityEvidenceSubmission, buildMasterDataDirectory, buildMobileExperience, buildMultiPracticeRegistry, buildObservabilityAlertCenter, buildPilotAcceptanceCenter, buildPriorityApplicationTemplates, buildServiceAcceptanceSummary, buildServiceOrderSummary, buildSpecialtyCutoverPack, buildT10PlatformBlockedReadiness, calculateCreditEvaluations, canAccessResident, canAccessServiceOrder, canReadT10InstitutionModules, collectJson, dispatchAlert, normalizeServiceOrders, normalizeState, prependAuditTrailEntry, randomUUID, readDatabase, redactSensitiveResponse, regionalSharingReadModel, requireApiRole, resealAuditTrail, scopeStateForUser, sealAuditTrail, seedAccessibilityChecklist, seedMobileExperienceSettings, sendJson, sendT10SpecialtyModuleError, trustedT10Institution, updateDrugConsumableSupervision, upsertAlertDeliveryIncident, validateAlert, writeDatabase } = runtime;
   const residentAuthorizationDecision = createResidentAuthorizationDecisionAdapter({
     authorizationState,
     buildAuthorizationLifecycle
@@ -523,7 +523,7 @@ function createRouteSegments(runtime, options = {}) {
     if (req.method === "GET" && url.pathname === "/api/regional-data-sharing") {
         const user = requireApiRole(req, res, ["commission", "institution"], "/api/regional-data-sharing");
         if (!user) return true;
-        const view = projectRegionalSharingReadResponse(buildRegionalDataSharingView(readDatabase(), user));
+        const view = projectRegionalSharingReadResponse(regionalSharingReadModel.buildRegionalDataSharingView(readDatabase(), user));
         sendJson(res, 200, redactSensitiveResponse(view, user));
         return true;
       }
@@ -531,7 +531,7 @@ function createRouteSegments(runtime, options = {}) {
       if (req.method === "GET" && url.pathname === "/api/regional-data-sharing/handoff-report") {
         const user = requireApiRole(req, res, ["commission", "institution"], "/api/regional-data-sharing/handoff-report");
         if (!user) return true;
-        const report = buildRegionalHandoffReport(readDatabase(), user);
+        const report = regionalSharingReadModel.buildRegionalHandoffReport(readDatabase(), user);
         appendSecurityEvent({
           actor: user.name,
           role: user.role,

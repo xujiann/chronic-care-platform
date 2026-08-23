@@ -1574,6 +1574,7 @@ test("regional data sharing application has runnable entry, API and evidence scr
   const about = read("regional-data-sharing-about.html");
   const client = read("regional-data-sharing.js");
   const server = readServerRuntime();
+  const readModel = read("src/platform/governance/regional-sharing-read-model.js");
   const script = read("scripts/regional-data-sharing.js");
   const auth = read("auth.js");
   const data = JSON.parse(read("data/db.json"));
@@ -1661,9 +1662,10 @@ test("regional data sharing application has runnable entry, API and evidence scr
   assert.match(client, /\["approved", "allowed"\]\.includes\(item\.decision\)/);
   assert.match(server, /seedRegionalDataSharingScope/);
   assert.match(server, /buildRegionalReferralHandoffEvidence/);
-  assert.match(server, /buildRegionalHandoffReport/);
-  assert.match(server, /renderRegionalHandoffMarkdown/);
-  assert.match(server, /referralHandoffReady/);
+  assert.match(server, /createRegionalSharingReadModel/);
+  assert.match(readModel, /buildRegionalHandoffReport/);
+  assert.match(readModel, /renderRegionalHandoffMarkdown/);
+  assert.match(readModel, /referralHandoffReady/);
   assert.match(server, /authorizationState: CitizenRecordsV1\.authorizationState/);
   assert.match(server, /buildAuthorizationLifecycle: CitizenRecordsV2\.buildAuthorizationLifecycle/);
   assert.match(server, /\/api\/regional-data-sharing\/handoff-report/);

@@ -40,6 +40,21 @@ test("pilot cutover alert runtime never imports the composition root", () => {
   assert.doesNotMatch(source, /require\s*\(\s*["'][^"']*server(?:\.js)?["']\s*\)/);
 });
 
+test("regional sharing read model remains independent from the composition root and HTTP routes", () => {
+  const source = fs.readFileSync(path.join(
+    __dirname,
+    "..",
+    "src",
+    "platform",
+    "governance",
+    "regional-sharing-read-model.js"
+  ), "utf8");
+  assert.doesNotMatch(source, /require\s*\(\s*["'][^"']*server(?:\.js)?["']\s*\)/);
+  assert.doesNotMatch(source, /require\s*\(\s*["'][^"']*src[\\/]http[\\/]routes/);
+  assert.match(source, /function createRegionalSharingReadModel/);
+  assert.match(source, /regional-sharing-read-model\.v1/);
+});
+
 test("business collections have one domain owner and production has no fallback writes", () => {
   assert.equal(validateOwnershipManifest(), true);
   assert.equal(ownershipManifest.storagePolicy.production.authoritative, "postgresql");

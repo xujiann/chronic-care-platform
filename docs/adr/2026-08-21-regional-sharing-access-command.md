@@ -24,7 +24,7 @@
 ## Disadvantages
 
 - 方案 3 要求历史共享包和授权记录补齐结构化字段；严格生产调用方还必须携带 `Idempotency-Key`、`expectedVersion` 和 `authorizationVersion`，且持久化必须绑定已授权的 PostgreSQL atomic repository。
-- 当前仍通过 `shared-05` 保留旧 URL 插槽，区域共享 GET read model 和部分 builder 尚未移入 T02，边界不是最终形态。
+- 当前仍通过 `shared-05` 保留旧 URL 插槽；两个 GET builder 已进入目标 T02 read-model 模块，但 legacy normalize/seed/handoff evidence 与源码 owner 仍处于 T00 integration 边界，尚不是最终形态。
 - 模块级 package queue 与应用层共享包 CAS 只能保护当前单进程兼容适配器，不能替代跨进程数据库事务；正式切换前仍需把同一命令绑定到 PostgreSQL 原子仓储。
 
 ## Migration cost
@@ -44,10 +44,22 @@
 
 采用方案 3。T00 负责本次跨 owner integration，目标 T02 拥有 `regionalDataSharingScope`、`regionalSharingPackages`、`regionalSharingSnapshots` 和 `regionalSharingAccessReviews`；T04 保持 `personalRecords` 授权事实 owner，T02 consumer-side adapter 通过 `resident-authorization-decision.v1` 读取并净化决策，命令不直接读取 T04 meta。命令使用服务端 allow/deny、精确机构/地区范围、用途/范围完全匹配、授权和共享包版本 CAS、幂等键 SHA-256 与规范请求摘要；每次 inbox 重放前重新计算授权。请求与持久化字段均拒绝超长/畸形值，不做截断比较。HTTP GET/POST 均使用专用 review allowlist。commission 在非生产保留历史全域范围并显式降级，生产仍必须通过独立现场授权。
 
-`config/process-workstreams.json` 将本切片两个 `src/platform/governance` 文件登记为 T00 integration 源码 owner，机器门禁与当前跨 owner 接线责任一致；目标数据 owner 仍是 T02。T00 同时修改 T02 state-data 兼容边界，确保 legacy full-state/collection writer 不能成为第二写 owner。后续源码正式移交 T02 必须另行更新 ADR 和流程 owner。
+`config/process-workstreams.json` 将当前三个 regional-sharing `src/platform/governance` 文件登记为 T00 integration 源码 owner，机器门禁与当前跨 owner 接线责任一致；目标数据 owner 仍是 T02。T00 同时修改 T02 state-data 兼容边界，确保 legacy full-state/collection writer 不能成为第二写 owner。后续源码正式移交 T02 必须另行更新 ADR 和流程 owner。
 
 首切片非目标包括：移动两个 GET API、改写业务 builder、改变路由顺序、增加 SQLite migration、把现场 evidence lifecycle 当授权、授权生产切换。单进程 package queue 只防止当前进程内全状态丢写；`productionCutoverAuthorized=false`、`atomicRepositoryReady=false`，generic JSON/SQLite 在 production 返回 503。非生产 demo reset 仍可恢复 seed，但 production 固定拒绝。生产 readiness 保持 false，直到完成 PostgreSQL 原子仓储、真实机构/地区映射、迁移核对、回滚演练和现场批准。
 
 ## Decision
 
 本 ADR 已按批准的方案 B 接受。实现和后续增量必须遵守上述 owner、跨域合同、失败关闭、不可变回执和生产 NO-GO 边界。
+
+## Read-model implementation status（2026-08-23）
+
+后续 T00 integration 增量将 `buildRegionalDataSharingView`、`buildRegionalHandoffReport` 及 Markdown 投影
+从 `server.js` 移入 `regional-sharing-read-model.v1`。`shared-05` 的两个 GET 仍位于原全局插槽，通过 shared
+runtime context 注入同一个冻结 read-model capability；组合根仅装配既有 legacy helper、UUID 和时钟。
+特征测试锁定 method/path、身份先于读取、机构范围、access-review allowlist、角色脱敏、记录排序、响应 shape、
+handoff 审计时点和错误语义；架构门禁禁止 read model 反向导入 `server.js` 或 HTTP route。
+
+该增量不修改 access command、公开 API、collection、schema、migration、依赖或生产状态，也不将仓库测试
+解释为 PostgreSQL atomic repository、外部地区/机构映射、不可变审计留存或现场验收证据。回滚只需恢复上一
+版本组合委托，不得删除/改写既有 access receipts 或放宽生产 NO-GO。

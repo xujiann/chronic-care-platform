@@ -53,6 +53,7 @@ test("process manifest assigns every domain route exactly once", () => {
   assert.equal(resolveProtectedOwner(".github/workflows/ci.yml", manifest), "T00");
   assert.equal(resolveProtectedOwner("src/http/routes/platform-governance/phase2-operations.js", manifest), "T02");
   assert.equal(resolveProtectedOwner("src/platform/governance/regional-sharing-access-command.js", manifest), "T00");
+  assert.equal(resolveProtectedOwner("src/platform/governance/regional-sharing-read-model.js", manifest), "T00");
   assert.equal(resolveProtectedOwner("src/platform/governance/resident-authorization-decision-adapter.js", manifest), "T00");
   assert.equal(resolveProtectedOwner("scripts/api-authorization-matrix.js", manifest), "T00");
   assert.equal(resolveProtectedOwner("scripts/api-authentication-evidence.js", manifest), "T00");

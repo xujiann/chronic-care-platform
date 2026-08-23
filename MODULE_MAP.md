@@ -169,15 +169,18 @@ scripts/platform-cutover-alert-worker.js
 | 模块 | Owner / Process | 类型 | 当前边界 |
 |---|---|---|---|
 | `src/platform/governance/regional-sharing-access-command.js` | 机器 owner T00 integration；目标 platform-governance / T02 | `regional-sharing-access-command.v1` 写用例 | 服务端授权、幂等、应用层 CAS、package queue、回执与审计组装；不导入 `server.js` |
+| `src/platform/governance/regional-sharing-read-model.js` | 机器 owner T00 integration；目标 platform-governance / T02 | `regional-sharing-read-model.v1` 两查询只读端口 | 构建共享视图和交接清单；只依赖组合根注入的 legacy normalize/seed/scope/handoff/UUID/clock 端口，不导入 `server.js` 或 HTTP 路由 |
 | `src/platform/governance/resident-authorization-decision-adapter.js` | 机器 owner T00 integration；目标 T02 consumer adapter | `resident-authorization-decision.v1` anti-corruption adapter | 唯一读取 T04 `personalRecords` meta 的边界；命令只消费结构化决策端口 |
 | `src/http/routes/shared.js` 的 `shared-05` | 兼容 HTTP 适配器 | 原 method/path/顺序 | 认证外层、读取/写入端口、兼容响应头；不再拥有旧 review 决策函数 |
 | `src/http/routes/state-data.js` | platform-state / T02；跨 owner 收口 T00 | legacy state 兼容边界 | 四个区域集合只能省略或深相等，拒绝全量/集合级客户端旁路 |
 | `citizen-records-v1/v2` | citizen-chronic / T04 | 授权事实端口 | 提供授权状态与 lifecycle；T02 只读消费，不复制授权模型 |
 | `config/regional-sharing-access-data-contract.json` | T00/T02 治理证据 | 数据晋升合同 | 锁定 owner、跨域合同、无 DDL 迁移理由、回滚和生产 NO-GO |
 
-两个区域共享 GET builder 仍在组合根，`shared-05` 仍是混合路由；本切片只迁移 access command 并最小化 GET review 投影，不宣称区域共享模块已完整独立或已经具备跨进程生产事务。
+两个区域共享 GET builder 已由组合根归位到版本化 read-model port，shared runtime context 由两个散函数依赖
+收敛为一个 capability；`shared-05` 仍是混合兼容路由，legacy normalize/seed/handoff evidence 仍由组合根注入，
+因此不能宣称区域共享模块已完整独立或已经具备跨进程生产事务。
 
-`config/process-workstreams.json` 对两个新 governance 源文件登记当前可验证的 T00 integration owner；这是跨 owner 接线期的源码责任，不改变 `domain-data-ownership.json` 中四个区域集合的目标 T02 数据 owner。后续正式移交必须在独立 ADR/流程变更中同时更新源码 owner 和运行时边界。
+`config/process-workstreams.json` 对三个 regional-sharing governance 源文件登记当前可验证的 T00 integration owner；这是跨 owner 接线期的源码责任，不改变 `domain-data-ownership.json` 中四个区域集合的目标 T02 数据 owner。后续正式移交必须在独立 ADR/流程变更中同时更新源码 owner 和运行时边界。
 ## 12. 慢病随访 publisher 边界
 
 依赖方向为 `citizen-chronic HTTP route → followup event service → T04 publisher port → HTTPS
