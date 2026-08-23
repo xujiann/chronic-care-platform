@@ -233,3 +233,9 @@ profile、profile 替换、额外字段和生产授权扩张均失败关闭。�
 TEST-005 只改变测试进程、浏览器与临时端口装配，不新增或改变任何 HTTP method/path、鉴权、角色、
 scope、错误、幂等或审计语义。根 27 项与居民 13 项继续调用现有接口；动态回环端口和临时数据只用于
 自动化验证，不能登记为公开 API、生产 endpoint 或现场证据。
+
+## 21. 仓库文档与制品治理（无 HTTP 变化）
+
+本切片不新增或改变任何 HTTP method/path、身份、角色、scope、错误、幂等或审计语义。
+`repository:governance:verify` 是只读 CLI/CI 门禁，仅校验当前 workflow、Markdown 路径分类与 PDF
+provenance/digest；不公开治理清单为 API，不读取 PDF 正文作为业务数据，也不产生生产 readiness。

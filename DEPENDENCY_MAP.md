@@ -289,3 +289,10 @@ external verifier，所以依赖缺失时稳定失败关闭。未来外部 CAB/p
 保持不同 state/retry/lease/checkpoint/receipt 语义，只投影为共同 outcome/count/error-code/digest；因此
 不存在新的跨域写边或第二套任务协议。部署包显式携带模块和清单，CI 从 systemd `ExecStart` 发现 9 个
 入口并拒绝未登记或未接入适配器的 worker。对象存储 v2 的 Proposed worker 继续 blocked。
+
+## 仓库文档与 PDF 治理依赖方向
+
+依赖方向为 `git ls-files + config/repository-governance.json + ADR status + process manifests + tracked PDF
+bytes/source paths → scripts/repository-governance.js → governance-api + architecture:test`。验证器只读文件和 Git
+索引，不依赖 `server.js`、HTTP、数据库、外部服务或 PDF 工具链，也不生成制品。当前流程依赖
+`origin/main`，固定 baseline tag 只被证据链消费；日期化 snapshot 和 superseded ADR 不得成为开发基线。

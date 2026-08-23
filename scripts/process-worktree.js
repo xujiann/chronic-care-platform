@@ -13,7 +13,7 @@ function loadManifest(file = MANIFEST_PATH) {
   if (manifest.schemaVersion !== "process-workstreams-v1") {
     throw new Error(`unsupported process manifest: ${manifest.schemaVersion || "missing"}`);
   }
-  if (!manifest.integrationBranch || !manifest.baselineTag || !manifest.processes || !Array.isArray(manifest.protectedPaths)) {
+  if (!manifest.integrationBranch || !manifest.developmentBase || !manifest.baselineTag || !manifest.processes || !Array.isArray(manifest.protectedPaths)) {
     throw new Error("process manifest is incomplete");
   }
   return manifest;
@@ -83,7 +83,7 @@ function buildWorktreePlan(options, manifest = loadManifest()) {
   if (!process) throw new Error(`unknown process: ${processId}`);
   const topic = normalizeTopic(options.topic);
   const date = normalizeDate(options.date);
-  const base = String(options.base || manifest.baselineTag);
+  const base = String(options.base || manifest.developmentBase);
   const branch = `process/${processId.toLowerCase()}-${topic}-${date}`;
   const worktreeRoot = path.resolve(options.worktreeRoot || defaultWorktreeRoot(options.root || ROOT));
   const worktree = path.resolve(options.path || path.join(worktreeRoot, `${processId.toLowerCase()}-${topic}-${date}`));
@@ -188,6 +188,7 @@ function runCli() {
   if (command === "list") {
     console.log(JSON.stringify({
       integrationBranch: manifest.integrationBranch,
+      developmentBase: manifest.developmentBase,
       baselineTag: manifest.baselineTag,
       branchPattern: manifest.branchPattern,
       processes: listProcesses(manifest)
@@ -218,7 +219,7 @@ function runCli() {
       console.log(JSON.stringify({ ok: true, skipped: true, branch, reason: "integration branch is governed by T00" }, null, 2));
       return;
     }
-    const base = String(flags.base || manifest.baselineTag);
+    const base = String(flags.base || manifest.developmentBase);
     git(["rev-parse", "--verify", `${base}^{commit}`]);
     const report = { branch, base, ...validateChanges(parsed.processId, changedFiles(base), manifest) };
     console.log(JSON.stringify(report, null, 2));

@@ -29,7 +29,7 @@ flowchart TB
 
 ## 2. 仓库结构
 
-本实施分支预计跟踪 1,388 个文件，其中 JavaScript 947、Markdown 233、JSON 94、HTML 44。主要目录：
+本治理切片闭集盘点 1,532 个受跟踪文件，其中 JavaScript 1,034、Markdown 264、JSON 106、HTML 44。主要目录：
 
 | 路径 | 作用 | 当前边界 |
 |---|---|---|
@@ -41,8 +41,8 @@ flowchart TB
 | `config/` | 进程、数据所有权、区域、迁移和发布策略 | 多数为机器可读治理事实 |
 | `data/` | 被跟踪的 `db.json` 开发/迁移输入 | 浏览器只读取运行时或构建时生成的 `public-demo.json`；生成物不入库 |
 | `deploy/` | SQL、systemd、Compose、环境模板和现场验证 | 生产证据默认 NO-GO |
-| `scripts/` | 测试、readiness、报告、部署和后台 worker | 185 个根级文件，职责和产物较分散 |
-| `test/` | Node test 与 Playwright | 448 个 test/spec 文件（441 Node、7 E2E spec 文件） |
+| `scripts/` | 测试、readiness、报告、部署和后台 worker | 186 个根级文件，职责和产物较分散 |
+| `test/` | Node test 与 Playwright | 449 个 test/spec 文件（442 Node、7 E2E spec 文件） |
 | `regions/` | 多地区部署配置 | 由区域清单和发布注册表控制 |
 | `digital-hospital-standard-platform/` | 内嵌数智医院展示前端 | 独立页面但仍共享主仓发布生命周期 |
 | `resident-mini-program-platform/` | 居民小程序适配前端 | 独立页面但仍共享主仓发布生命周期 |
@@ -227,3 +227,15 @@ AS-IS 仍是多套独立 worker 状态机：12 个 profile 分别保留自己的
 metadata-only 投影；worker/run 只输出 SHA-256 摘要，错误只输出稳定 code，完整业务报告不进入投影摘要。
 部署模板发现的 9 个 server-side 入口均由机器清单登记和 CI 校验。该层固定生产非授权；浏览器 Service
 Worker、外部数字医院注册及仍为 Proposed 的对象存储 v2 worker 不在运行合同内。
+
+## 2026-08-23 仓库文档与跟踪 PDF 治理
+
+日常开发和本地 ownership 校验默认使用最新 fetched `origin/main`；固定
+`baseline/governance-20260817-enhancement-v1` 仅保留为可复现证据 tag。历史日期化路由/治理文档不再被
+`AGENTS.md` 作为当前工作流入口引用，原文和摘要保持不变。
+
+`repository-governance-v1` 从 Git 路径派生 264 份 Markdown 的闭集清单：195 份 `current`、68 份
+`snapshot`、1 份 `superseded`，每个路径必须唯一命中规则；snapshot 内容聚合摘要失败关闭。
+`output/pdf` 的 3 个 PDF 未修改，分别绑定 SHA-256、大小、页数、引入提交、来源与保留理由。现有仓库
+没有任何一个 PDF 的可复现生成器；医院运行脚本只是 verifier，不能被描述为 generator。机器门禁只读，
+不生成报告、PDF 或归档产物。

@@ -297,3 +297,10 @@ PostgreSQL、release、报告或归档产物。API 热点隔离配置只登记�
 data owner 或权威事实。`sourceReportDigest` 只对已脱敏的 profile/outcome/time/identity digest/count/error code
 输入计算，不对业务报告正文、患者数据、凭据或 lease token 计算可关联摘要。本切片保持 schema head v16
 和所有核心表冻结；后续若要持久化指标或日志，必须由独立 owner/留存/访问控制决策处理。
+
+## 22. 仓库清单与 PDF 摘要不是业务数据
+
+`repository-governance-v1` 只保存路径分类、计数/聚合摘要以及三个跟踪 PDF 的 SHA-256、大小、页数、
+引入提交和来源引用。它不读取或写入 `data/db.json`、SQLite、PostgreSQL，不新增 collection、表、字段、
+DDL、migration、业务事实或生产证据。PDF digest 只证明受跟踪字节未漂移，不能证明内容正确、来源系统
+已上线或现场已经验收。

@@ -18,6 +18,7 @@
 |---|---|---|
 | [main 作为唯一集成主干](../ADR-main唯一集成主干-2026-08-03.md) | Accepted | 分支、PR、CI 和发布基线 |
 | [PR 所有权门禁跟随目标集成分支](./2026-08-19-pr-ownership-gate-target-base.md) | Accepted | process PR 的比较基线与所有权校验 |
+| [仓库文档与跟踪 PDF 采用闭集治理](./2026-08-23-repository-documentation-and-artifact-governance.md) | Accepted | 当前工作流、Markdown 分类、历史快照冻结与 PDF 来源/摘要治理 |
 | [综合 CI 采用 15 分钟有界时间预算](./2026-08-19-ci-comprehensive-test-time-budget.md) | Superseded | 综合 test job 的超时预算与回归约束 |
 | [CI 按风险域拆分并保留聚合必需检查](./2026-08-19-ci-risk-domain-job-split.md) | Accepted | 治理/API、浏览器 E2E、发布就绪与 required test 聚合 |
 | [Playwright E2E 采用统一浏览器策略与独占测试服务](./2026-08-23-playwright-e2e-isolation-and-browser-policy.md) | Accepted | Playwright Chromium、Service Worker 隔离、动态端口与 39 项套件分区 |

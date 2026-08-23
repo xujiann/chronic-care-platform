@@ -1,0 +1,140 @@
+{
+  "schemaVersion": "repository-governance-v1",
+  "workflow": {
+    "integrationBranch": "main",
+    "developmentBase": "origin/main",
+    "evidenceBaselineTag": "baseline/governance-20260817-enhancement-v1",
+    "mergeDirection": "process-branch-to-main",
+    "historicalSnapshots": [
+      {
+        "path": "docs/路由模块化与并行开发边界-2026-08-03.md",
+        "sha256": "149d1210bf41d2544c405f085290fbd2a7faf1cdba5c24c1b6551767d0dd6c59"
+      },
+      {
+        "path": "docs/治理集成基线-2026-08-03.md",
+        "sha256": "5d7f6506d2e45bb6f44b5a480c857177720b3d55549e4ee6feb6eee537079ff8"
+      }
+    ]
+  },
+  "markdown": {
+    "schemaVersion": "tracked-markdown-inventory-v1",
+    "source": "git ls-files --cached --others --exclude-standard -- *.md",
+    "classifications": ["current", "snapshot", "superseded"],
+    "rules": [
+      {
+        "id": "explicit-superseded-adr",
+        "classification": "superseded",
+        "exactPaths": [
+          "docs/adr/2026-08-19-ci-comprehensive-test-time-budget.md"
+        ]
+      },
+      {
+        "id": "root-point-in-time-snapshots",
+        "classification": "snapshot",
+        "exactPaths": [
+          "ENGINEERING_HEALTH_CHECK.md",
+          "TODAY_PLAN.md"
+        ]
+      },
+      {
+        "id": "dated-or-versioned-document-snapshots",
+        "classification": "snapshot",
+        "regularExpressions": [
+          "^docs/(?!adr/)(?!ADR-).*(?:-\\d{4}-\\d{2}-\\d{2}|v0\\.\\d+).*\\.md$"
+        ]
+      },
+      {
+        "id": "current-root-and-nondocs",
+        "classification": "current",
+        "regularExpressions": [
+          "^(?!docs/)(?!ENGINEERING_HEALTH_CHECK\\.md$)(?!TODAY_PLAN\\.md$).+\\.md$"
+        ]
+      },
+      {
+        "id": "current-indexed-adrs",
+        "classification": "current",
+        "regularExpressions": [
+          "^docs/adr/(?!2026-08-19-ci-comprehensive-test-time-budget\\.md$).+\\.md$",
+          "^docs/ADR-.+\\.md$"
+        ]
+      },
+      {
+        "id": "current-undated-documents",
+        "classification": "current",
+        "regularExpressions": [
+          "^docs/(?!adr/)(?!ADR-)(?!.*(?:-\\d{4}-\\d{2}-\\d{2}|v0\\.\\d+).*\\.md$).+\\.md$"
+        ]
+      }
+    ],
+    "expected": {
+      "total": 264,
+      "pathDigest": "4752af5e491a061fbbc5689ed684265f5fe186e84af3196c3755dc8d205a463a",
+      "snapshotContentDigest": "1d62eda18ad189b7a41f3e4f7108b53be2803bc7853a025889fe0effd2782665",
+      "byClassification": {
+        "current": { "count": 195, "pathDigest": "da39431c7e5db63119bd01bdac9e08728586f6117613def571272bd6d9b03ac0" },
+        "snapshot": { "count": 68, "pathDigest": "8bf6f19f5171f4adafee4d1abea0f3d8c842669c91cbb926ce37b024d5668179" },
+        "superseded": { "count": 1, "pathDigest": "7e28560ddbbc2fff4af5cf27beaac9751b444dc7d61b03d8531dbf1fcada81ff" }
+      }
+    }
+  },
+  "pdf": {
+    "schemaVersion": "tracked-pdf-artifacts-v1",
+    "trackedRoot": "output/pdf",
+    "manualEditAllowed": false,
+    "artifacts": [
+      {
+        "path": "output/pdf/hospital-operations-module-brief-report.pdf",
+        "sha256": "e86628cb78f4e82335109c2b6e2b563c248e54712af1df953e87786c16af3dc2",
+        "bytes": 210742,
+        "pages": 2,
+        "introducedCommit": "776797da439788e2689e57930422a12e314b3656",
+        "retentionReason": "operations.html 和发布制品清单仍引用该两页现场工作底稿。",
+        "generation": {
+          "status": "untracked-historical",
+          "producer": "ReportLab PDF Library",
+          "verifier": "scripts/hospital-operations-brief-pdf.js",
+          "sourcePaths": [
+            "scripts/hospital-operations-module-report.js",
+            "scripts/hospital-operations-release.js",
+            "scripts/hospital-operations-readiness.js",
+            "operations.html"
+          ],
+          "provenanceEvidence": "PDF metadata and introducing commit; the tracked script verifies the binary but is not a generator."
+        }
+      },
+      {
+        "path": "output/pdf/医共体协同闭环模块开发总结报告.pdf",
+        "sha256": "ab81e656789ab62ad4fb7b4cd0ce2ecbf4571ed8ab262ebc0d2285067dd0a2db",
+        "bytes": 293086,
+        "pages": 5,
+        "introducedCommit": "89eec038898ae79ead90459a99bdd08a2421c1dc",
+        "retentionReason": "与同一提交引入的医联体研发报告共同构成历史模块交付证据。",
+        "generation": {
+          "status": "untracked-historical",
+          "producer": "ReportLab PDF Library",
+          "sourcePaths": [
+            "docs/医联体转诊与远程会诊平台研发报告.md"
+          ],
+          "embeddedSourceCommit": "5cf0171231329212f128f19dbfe71441419c45ac",
+          "provenanceEvidence": "PDF body records its source branch/commit; no reproducible generator is tracked."
+        }
+      },
+      {
+        "path": "output/pdf/卫生健康信息平台全系统流程图与功能分析.pdf",
+        "sha256": "f1a1d3bd1361102309698fb6fa9776008170fcca29c8b51bf4c10f61ade73c90",
+        "bytes": 366925,
+        "pages": 4,
+        "introducedCommit": "ebea8ce3c9acd214c526e9c67998762155efe4ba",
+        "retentionReason": "PDF 页脚明确绑定 docs/system-flow.md，作为 2026-06-23 的全平台历史流程快照保留。",
+        "generation": {
+          "status": "untracked-historical",
+          "producer": "Headless Chrome / Skia PDF",
+          "sourcePaths": [
+            "docs/system-flow.md"
+          ],
+          "provenanceEvidence": "PDF footer names docs/system-flow.md and the introducing commit contains both files; no generator is tracked."
+        }
+      }
+    ]
+  }
+}

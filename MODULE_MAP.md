@@ -246,3 +246,15 @@ Accepted、data owner 与兼容策略获人类批准后才能进入逐切片实�
 | `scripts/worker-observability-governance.js` | T00 | 发现部署入口，验证登记、适配和 Proposed 边界 | 不启动 worker，不读取现场系统 |
 
 现有领域 worker 仍属于各自 owner；T00 只拥有兼容投影。新增 worker 必须复用该合同，不能复制第二套共同协议。
+
+## 22. 仓库治理模块
+
+| 模块 | Owner | 职责 | 非职责 |
+|---|---|---|---|
+| `config/repository-governance.json` | T00 | 当前 workflow、Markdown 分类规则/闭集摘要、3 个 PDF 来源与 digest 的机器合同 | 不定义业务 owner，不包含 PDF 正文 |
+| `scripts/repository-governance.js` | T00 | 只读枚举 Git 路径，拒绝漏分/重叠/快照改写/旧 baseline/PDF 漂移 | 不生成或修改文档、PDF、报告和归档 |
+| `test/repository-governance.test.js` | T00 / TEST-001 | 锁定 264 份 Markdown、三类边界、当前 main 流程和 3 个 PDF 负向漂移 | 不证明 PDF 内容正确或生产可用 |
+
+依赖方向为 `Git 跟踪路径 + ADR 状态 + 当前进程清单 + PDF bytes/source paths → repository governance
+verifier → governance-api/architecture:test`。snapshot 与 superseded 只提供历史证据，不得反向覆盖 current
+规则；PDF verifier 不能取得 generator 身份。
