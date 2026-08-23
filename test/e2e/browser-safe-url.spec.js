@@ -42,7 +42,7 @@ test("browser safe URL port allows controlled destinations and rejects hostile s
   });
   expect(result.contractId).toBe("browser-safe-url-policy.v1");
   expect(result.href).toBe("./citizen.html?page=health-record");
-  expect(result.calls).toEqual(["http://127.0.0.1:5210/login.html?expired=1"]);
+  expect(result.calls).toEqual([`${new URL(page.url()).origin}/login.html?expired=1`]);
   expect(Object.keys(result.rejected)).toEqual([
     "javascript",
     "data",

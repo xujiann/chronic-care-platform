@@ -3,12 +3,14 @@
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
+const { requireE2EPort } = require("./playwright-port-policy");
 
 const root = path.resolve(__dirname, "..", "..");
 const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "resident-mini-program-e2e-"));
 fs.copyFileSync(path.join(root, "data", "db.json"), path.join(dataDir, "db.json"));
 
-process.env.PORT = "5210";
+const port = requireE2EPort();
+process.env.PORT = String(port);
 process.env.DATA_DIR = dataDir;
 process.env.STORAGE_ENGINE = "json";
 
@@ -40,4 +42,4 @@ process.on("uncaughtException", (error) => {
   void shutdown("exception");
 });
 
-startServer(5210);
+startServer(port);

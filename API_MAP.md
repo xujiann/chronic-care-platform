@@ -227,3 +227,9 @@ integration runner 只隔离该文件并输出耗时，不把通过、skip 数�
 报告仅 additive 地增加 `workerObservability`；原业务字段和失败/重试结果继续权威。投影字段闭集、未知
 profile、profile 替换、额外字段和生产授权扩张均失败关闭。该库接口不是公开 API，不能据此宣称 worker
 已启用、外部 delivery 已完成或平台可以生产上线。
+
+## 20. Playwright E2E 隔离（无 HTTP 变化）
+
+TEST-005 只改变测试进程、浏览器与临时端口装配，不新增或改变任何 HTTP method/path、鉴权、角色、
+scope、错误、幂等或审计语义。根 27 项与居民 13 项继续调用现有接口；动态回环端口和临时数据只用于
+自动化验证，不能登记为公开 API、生产 endpoint 或现场证据。

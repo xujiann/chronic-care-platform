@@ -20,6 +20,10 @@
 是动态浏览器会话凭据；显式 bearer-only 兼容只在当前页面内存中短暂持有 token，页面重载不恢复，
 且生产始终保持 NO-GO。本切片不新增表、集合、字段或 migration。
 
+Playwright E2E 只在操作系统临时目录复制开发种子，根 27 项和居民 13 项由不同服务进程与不同
+`DATA_DIR` 消费；每次标准运行还分配独立回环端口，不能连接其他 worktree 的测试服务。测试结束删除
+临时目录，既不写回 `data/db.json`，也不形成业务事实、迁移证据或生产验收证据。
+
 ## 2. SQLite Schema
 
 主存储 migration 位于 `src/platform/storage/sqlite-migrations.js` 的版本化注册表，当前实际与公开 head 均为 v15。包括 `schema_migrations` 在内，主 SQLite 逻辑上创建 31 张表：

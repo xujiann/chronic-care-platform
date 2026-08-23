@@ -3,19 +3,19 @@
 const { spawn } = require("node:child_process");
 const http = require("node:http");
 const path = require("node:path");
+const { findAvailablePort } = require("./playwright-e2e-runtime");
 
 const root = path.resolve(__dirname, "..");
 const serverEntry = path.join(root, "test", "e2e", "resident-mini-program-test-server.js");
 const playwrightEntry = path.join(root, "node_modules", "@playwright", "test", "cli.js");
 const playwrightConfig = path.join(root, "test", "e2e", "resident-mini-program.playwright.config.js");
 const host = "127.0.0.1";
-const port = 5210;
 
 function delay(milliseconds) {
   return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }
 
-function healthRequest() {
+function healthRequest(port) {
   return new Promise((resolve) => {
     const request = http.get({ host, port, path: "/api/health", timeout: 500 }, (response) => {
       response.resume();
@@ -29,10 +29,10 @@ function healthRequest() {
   });
 }
 
-async function waitForHealth(expected, timeoutMs) {
+async function waitForHealth(port, expected, timeoutMs) {
   const deadline = Date.now() + timeoutMs;
   do {
-    if ((await healthRequest()) === expected) return true;
+    if ((await healthRequest(port)) === expected) return true;
     await delay(100);
   } while (Date.now() < deadline);
   return false;
@@ -57,15 +57,17 @@ function waitForExit(child, timeoutMs) {
   });
 }
 
-function runPlaywright() {
+function runPlaywright(port) {
   return new Promise((resolve, reject) => {
     const child = spawn(process.execPath, [
       playwrightEntry,
       "test",
       "--config",
-      playwrightConfig
+      playwrightConfig,
+      ...process.argv.slice(2)
     ], {
       cwd: root,
+      env: { ...process.env, PLAYWRIGHT_E2E_PORT: String(port) },
       shell: false,
       stdio: "inherit",
       windowsHide: true
@@ -75,7 +77,7 @@ function runPlaywright() {
   });
 }
 
-async function stopOwnedServer(server) {
+async function stopOwnedServer(server, port) {
   if (server.exitCode === null && server.connected) server.send({ type: "shutdown" });
   let result;
   try {
@@ -86,12 +88,14 @@ async function stopOwnedServer(server) {
     throw error;
   }
   if (result.code !== 0) throw new Error(`居民端测试服务异常退出：${result.code ?? result.signal}`);
-  if (!(await waitForHealth(false, 3000))) throw new Error("居民端测试服务退出后端口仍被占用");
+  if (!(await waitForHealth(port, false, 3000))) throw new Error("居民端测试服务退出后端口仍被占用");
 }
 
 async function main() {
+  const port = await findAvailablePort();
   const server = spawn(process.execPath, [serverEntry], {
     cwd: root,
+    env: { ...process.env, PLAYWRIGHT_E2E_PORT: String(port) },
     shell: false,
     stdio: ["ignore", "inherit", "inherit", "ipc"],
     windowsHide: true
@@ -101,10 +105,11 @@ async function main() {
     server.once("error", (error) => {
       process.stderr.write(`居民端测试服务启动失败：${error.message}\n`);
     });
-    if (!(await waitForHealth(true, 10_000))) throw new Error("居民端测试服务未能启动");
-    playwrightResult = await runPlaywright();
+    const healthy = await waitForHealth(port, true, 10_000);
+    if (!healthy || server.exitCode !== null) throw new Error("居民端测试服务未能以独占进程启动");
+    playwrightResult = await runPlaywright(port);
   } finally {
-    await stopOwnedServer(server);
+    await stopOwnedServer(server, port);
   }
   if (playwrightResult.code !== 0) {
     throw new Error(`居民端移动端测试失败：${playwrightResult.code ?? playwrightResult.signal}`);

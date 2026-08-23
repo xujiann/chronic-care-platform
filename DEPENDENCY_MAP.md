@@ -94,6 +94,9 @@ TypeScript 与 Node 类型仅用于开发门禁；lockfile audit 已修复 c8 �
 - 集中响应头端口暂保留兼容 CSP 的 `script/style 'unsafe-inline'`，并下发不含 `unsafe-inline`/`unsafe-eval`
   的严格 Report-Only 目标；动态 CSSOM、全角色浏览器回归和真实托管验证完成前不得描述为 CSP 已关闭。
 - Service Worker 缓存应用壳以及生成的 `data/public-demo.json`，缓存版本已从 v59 提升到 v60 以撤销旧快照缓存。
+- E2E 依赖方向为 `npm test:e2e → root runner(27) / resident owned runner(13) → 动态回环端口 + 独立临时
+  DATA_DIR → Playwright Chromium`。两套配置共用 `playwright-browser-policy.v1` 并设置
+  `serviceWorkers=block`；系统 Chrome、固定 5210 端口和跨套件服务复用不再是标准测试依赖。
 
 ## 5. 数据依赖
 
@@ -167,6 +170,8 @@ CORE_DATA_DEFINITIONS → collection-governance → CI/release 治理投影`。�
   browser-e2e 和 release-readiness 各为 15 分钟，聚合 test 为 5 分钟。
 - Chromium 安装和 Playwright E2E 独占 browser-e2e runner；发布、数据库、安全、报告和
   部署证据在 release-readiness 并行执行，不再共享浏览器外部依赖的时间预算。
+- browser-e2e 本地与 CI 均由标准 `test:e2e` 顺序执行 27 + 13 项；两阶段各自分配端口和数据目录，
+  Playwright 列表门禁拒绝遗漏、重复归属或浏览器/Service Worker 策略漂移。
 - complete-unit-test 依次运行标准 unit/integration，governance-api 运行 lint/typecheck/smoke，
   release-readiness 和 Pages 运行标准 build；required check 名称和 fail-closed 聚合保持不变。
 - TEST-006 保持上述 CI job 拓扑、预算和 required check 不变；标准 integration runner 依据同一
