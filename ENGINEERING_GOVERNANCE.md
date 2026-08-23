@@ -157,10 +157,10 @@ TEST-007 在既有 operations handoff harness 上建立 32 条路径的唯一数
 显式运行。矩阵是拆分 699 行 handler 和治理 ARC-008 前的行为安全网，不改变 handler、数据 Owner、
 事务或生产状态。
 
-TEST-005 规定标准 E2E 只能使用 Playwright Chromium，不得按本地操作系统自动切换浏览器。在线根 35 项
+TEST-005 规定标准 E2E 只能使用 Playwright Chromium，不得按本地操作系统自动切换浏览器。在线根 36 项
 （含急救生命链、医生工作台、血液上线看板、陪诊工作台、产品运行驾驶舱、产品区域运行驾驶舱、质量安全工作台和区域切换工作台恶意响应回归）与
 居民 13 项继续阻止 Service Worker；PWA 3 项只能在独立允许策略、context、动态回环端口和临时数据中运行。
-三套必须形成 51 项不重叠并集，PWA 每项结束注销 registration 并删除 Cache Storage；runner 不得复用或
+三套必须形成 52 项不重叠并集，PWA 每项结束注销 registration 并删除 Cache Storage；runner 不得复用或
 停止其他任务的服务。该门禁不证明真实 HTTPS、OS 安装策略、外部 Origin 或现场浏览器验收。
 
 ## 9. 变更风险门禁

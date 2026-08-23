@@ -39,7 +39,7 @@
 | 演示脱敏 | `src/platform/data/public-demo-snapshot.js` | 服务端合成、Pages 构建和 storage-admin 共用纯函数，凭据字段删除、个人姓名/身份/联系字段稳定掩码 |
 | API 生产目录 | `routeSourceFiles` + `api-authentication-evidence` + `api-idempotency-evidence` → `api-authorization-matrix-v3` → `production-api-catalog-v3` | 13 项认证证据保持未分类为 0。10 份幂等行为合同覆盖 8 个完整 endpoint 与 2 个转诊 action-slice；新增 T02 quality-governance item action 复用既有状态机/adapter，以 record 级串行、scope-before-receipt、SQLite CAS 映射和单次 record+receipt+三类 audit 写入闭合。325 个写接口仍缺 endpoint 级行为证明；退款 runtime-role variant 与通用 action remainder 使 327 项保持复核，全部生产 NO-GO。T07 深审仅余 dispatch 与 formal grouping 两个 proof gap |
 | 内部边界覆盖治理 | `config/internal-boundary-coverage.json` → `scripts/internal-boundary-coverage.js` | 复用现有 c8/直接行为测试，以 10 个不重叠源码组锁定 identity、audit、object storage、API governance、worker observability、区域共享命令、转诊 owner command、科研合规导出、浏览器响应头与 Safe URL 真实基线；每组绑定至少一条实际执行的负向合同，报告仅写临时目录 |
-| Playwright E2E 基础设施 | `playwright-browser-policy.v1`、`playwright-pwa-browser-policy.v1`、`playwright-port-policy`、三套 runner/config | 在线根 35 项（含急救生命链、医生工作台、血液上线看板、陪诊工作台、产品运行驾驶舱、产品区域运行驾驶舱、质量安全工作台与区域切换工作台恶意响应回归）与居民 13 项继续阻止 Service Worker；独立 PWA 3 项只在专项 context 允许 Worker，三套共 51 项唯一并集，统一 Chromium、动态端口和临时数据，并验证缓存/注册清理 |
+| Playwright E2E 基础设施 | `playwright-browser-policy.v1`、`playwright-pwa-browser-policy.v1`、`playwright-port-policy`、三套 runner/config | 在线根 36 项（含急救生命链、医生工作台、血液上线看板、陪诊工作台、产品运行驾驶舱、产品区域运行驾驶舱、质量安全工作台、区域切换工作台恶意响应回归与 Go/No-Go 四方审批角色命名空间回归）与居民 13 项继续阻止 Service Worker；独立 PWA 3 项只在专项 context 允许 Worker，三套共 52 项唯一并集，统一 Chromium、动态端口和临时数据，并验证缓存/注册清理 |
 | 生产证据信任 provider | `src/platform/governance/production-evidence-trust-provider.js` → `scripts/production-preflight.js` | T00 通用 signed-envelope/anchor 验证端口与 production decision 适配；CLI 可部署装配，双角色 Ed25519、pin、撤销、时窗和发布上下文失败关闭；不拥有生产授权 |
 
 ## 3. 依赖宽度
@@ -160,9 +160,9 @@ scripts/platform-cutover-alert-worker.js
 - `test/operations-command-handoff.test.js` 复用原 T02 handoff harness，把 32 条 operations command
   路径登记为唯一数据驱动行为矩阵；`operations-command:behavior-test` 在 governance-api 显式运行，
   同时仍由标准 unit 补集覆盖。矩阵保护遗留 handler，不是新路由注册表或拆分授权。
-- 根、居民和 PWA 三套 Playwright 配置共用 Chromium、动态端口与 runner 端口装配；在线 35 + 13 项
+- 根、居民和 PWA 三套 Playwright 配置共用 Chromium、动态端口与 runner 端口装配；在线 36 + 13 项
   固定 `serviceWorkers=block`，只有 PWA 3 项使用 `playwright-pwa-browser-policy.v1` 允许 Worker。
-  Playwright 列表门禁锁定 35 + 13 + 3 = 51 且无重复，固定端口、系统 Chrome 或 PWA 测试混入在线套件会失败。
+  Playwright 列表门禁锁定 36 + 13 + 3 = 52 且无重复，固定端口、系统 Chrome 或 PWA 测试混入在线套件会失败。
 
 ## 11. 区域共享调阅命令
 
