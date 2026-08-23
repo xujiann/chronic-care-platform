@@ -21,8 +21,11 @@ const requiredFiles = [
   "test/resident-mini-program-chinese-scan.test.js",
   "test/resident-mini-program-static.test.js",
   "test/e2e/resident-mini-program.spec.js",
+  "test/e2e/playwright-browser-policy.js",
+  "test/e2e/playwright-port-policy.js",
   "test/e2e/resident-mini-program.playwright.config.js",
   "test/e2e/resident-mini-program-test-server.js",
+  "scripts/playwright-e2e-runtime.js",
   "scripts/resident-mini-program-e2e.js",
   "scripts/resident-mini-program-preview.js",
   "scripts/resident-mini-program-chinese-scan.js",
@@ -48,6 +51,8 @@ function assess() {
   const delivery = missing.includes("resident-mini-program-delivery-policy.js") ? "" : fs.readFileSync(path.join(root, "resident-mini-program-delivery-policy.js"), "utf8");
   const release = missing.includes("scripts/resident-mini-program-release.js") ? "" : fs.readFileSync(path.join(root, "scripts/resident-mini-program-release.js"), "utf8");
   const e2eRunner = missing.includes("scripts/resident-mini-program-e2e.js") ? "" : fs.readFileSync(path.join(root, "scripts/resident-mini-program-e2e.js"), "utf8");
+  const browserPolicy = missing.includes("test/e2e/playwright-browser-policy.js") ? "" : fs.readFileSync(path.join(root, "test/e2e/playwright-browser-policy.js"), "utf8");
+  const portPolicy = missing.includes("test/e2e/playwright-port-policy.js") ? "" : fs.readFileSync(path.join(root, "test/e2e/playwright-port-policy.js"), "utf8");
   const checks = {
     dedicatedAssets: missing.length === 0,
     strictSession: /\/api\/auth\/me/.test(app) && /validateServerIdentity/.test(app),
@@ -71,7 +76,8 @@ function assess() {
     privacyObservability: /createObservabilityQueue/.test(delivery) && /redactTelemetry/.test(delivery) && /observability-toggle/.test(html),
     releaseRollback: /releaseDecision/.test(delivery) && /emergencyStopDefault/.test(release) && /grayReleaseDefault/.test(release),
     deviceMatrix: /PLATFORM_MINIMUM_VERSIONS/.test(runtime) && /soft-keyboard-open/.test(fs.readFileSync(path.join(root, "resident-mini-program.css"), "utf8")),
-    e2eCleanup: /shell:\s*false/.test(e2eRunner) && /type:\s*"shutdown"/.test(e2eRunner) && /waitForHealth\(false/.test(e2eRunner),
+    e2eCleanup: /shell:\s*false/.test(e2eRunner) && /type:\s*"shutdown"/.test(e2eRunner) && /waitForHealth\(port, false/.test(e2eRunner),
+    e2eIsolation: /browserName:\s*"chromium"/.test(browserPolicy) && /serviceWorkers:\s*"block"/.test(browserPolicy) && /PLAYWRIGHT_E2E_PORT/.test(portPolicy) && /findAvailablePort/.test(e2eRunner),
     chineseShell: /居民健康服务/.test(html) && /消息与待办/.test(html),
     chineseScan: /resident-mini-program-chinese-scan/.test(requiredFiles.join(" ")),
     accessibility: /适老化与无障碍/.test(html) && /aria-live/.test(html) && /loading-skeleton/.test(html)

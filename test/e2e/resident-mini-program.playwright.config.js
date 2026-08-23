@@ -1,10 +1,10 @@
 "use strict";
 
 const { defineConfig } = require("@playwright/test");
-const fs = require("node:fs");
+const { createBrowserUse } = require("./playwright-browser-policy");
+const { createE2EBaseURL, requireE2EPort } = require("./playwright-port-policy");
 
-const localChrome = "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe";
-const launchOptions = !process.env.CI && fs.existsSync(localChrome) ? { executablePath: localChrome } : {};
+const baseURL = createE2EBaseURL(requireE2EPort());
 
 module.exports = defineConfig({
   testDir: __dirname,
@@ -13,14 +13,7 @@ module.exports = defineConfig({
   workers: 1,
   timeout: 30_000,
   reporter: "line",
-  use: {
-    baseURL: "http://127.0.0.1:5210",
-    browserName: "chromium",
-    headless: true,
-    launchOptions,
-    screenshot: "only-on-failure",
-    trace: "retain-on-failure"
-  },
+  use: createBrowserUse(baseURL),
   expect: {
     timeout: 15_000
   }
