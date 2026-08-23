@@ -39,7 +39,7 @@ function authenticationEvidenceContracts(registry = AUTHENTICATION_REGISTRY, ide
       ...contract,
       governanceSource: `config/api-authentication-evidence.json#${contract.contractId}`
     })),
-    ...(idempotencyRegistry.contracts || []).map(smsAuthenticationContract)
+    ...(idempotencyRegistry.contracts || []).filter((contract) => contract.customAuthenticationEvidence === true).map(smsAuthenticationContract)
   ];
 }
 

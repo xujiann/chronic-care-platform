@@ -2,6 +2,7 @@
   "schemaVersion": "high-risk-api-authorization-v1",
   "routes": {
     "PUT /api/state": { "owner": "T02", "roles": ["commission"], "dataScope": "platform", "purpose": "replace-platform-state-with-server-managed-audit" },
+    "POST /api/regional-data-sharing/access-reviews": { "owner": "T02", "roles": ["commission", "institution"], "dataScope": "institution", "purpose": "execute-regional-sharing-access-review" },
     "GET /api/audit/verify": { "owner": "T01", "roles": ["commission"], "dataScope": "platform", "purpose": "verify-audit-integrity" },
     "GET /api/audit/export": { "owner": "T01", "roles": ["commission"], "dataScope": "platform", "purpose": "export-minimized-audit-evidence" },
     "GET /api/public-health/highlights": { "owner": "T03", "roles": ["commission"], "dataScope": "platform", "purpose": "read-public-health-command-overview" },

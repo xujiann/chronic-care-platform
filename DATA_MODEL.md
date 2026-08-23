@@ -222,6 +222,8 @@ source/sink contract、目标摘要、cursor/source hash 与 receipt 摘要；ch
 
 目录中的源码 marker 既不是认证证明，也不是幂等执行证据；只有 owner、控制流锚点和可执行负向测试一致时才产生认证 evidence contract。认证分类只描述 AS-IS 的 required/optional/none、凭据来源、replay/CSRF 和 scope，不代表目标政策充分或生产安全。幂等 `behavior-verified` 仍只证明当前仓库行为，不证明跨实例 exactly-once 或生产耐久性；所有生产状态继续 `NO-GO`。
 
+API-002 的 existing-proof 扩展只增加 5 份合同，使注册表达到 6 份：区域共享回执、转诊 inbox/outbox 和科研导出 `commandReceipts` 均为既有状态表达，没有新增集合、表、字段、DDL、migration 或事实源。两个转诊兼容 action-slice 仍属于通用 endpoint 的局部证据，不能据此把其他 collection/task action 宣称为幂等；科研导出创建路径只有重复 ID 冲突，没有同键精确重放合同，继续 `behavior-proof-required`。
+
 ## 14. 内部边界覆盖率数据边界
 
 `internal-boundary-coverage-v1` 只登记测试文件、源码范围和当前覆盖率阈值，不新增集合、表、字段、DDL、migration、outbox 或生产事实源。c8 原始数据和报告只进入操作系统临时目录并在命令结束时删除，不得提交或归档为平台数据。

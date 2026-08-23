@@ -16,7 +16,7 @@ test("modular API authorization matrix covers owners roles scopes purposes and h
   assert.equal(matrix.summary.declarations, 601);
   assert.equal(matrix.summary.customAuthenticationEvidence, 13);
   assert.equal(matrix.summary.protected >= 550, true);
-  assert.equal(matrix.summary.highRisk, 9);
+  assert.equal(matrix.summary.highRisk, 10);
   assert.equal(matrix.summary.residentScoped > 0, true);
   assert.equal(matrix.summary.institutionScoped > 0, true);
   assert.equal(matrix.routes.every((route) => route.owner && route.identity && route.dataScope && route.purpose), true);
@@ -34,6 +34,10 @@ test("modular API authorization matrix covers owners roles scopes purposes and h
   const t10CutoverPack = matrix.routes.find((route) => route.key === "GET /api/t10-specialty/cutover-pack");
   assert.deepEqual(t10CutoverPack.roles, ["commission"]);
   assert.equal(t10CutoverPack.authenticationEvidenceContractId, "shared.t10-specialty-cutover-pack-commission-session.v1");
+  const regionalAccess = matrix.routes.find((route) => route.key === "POST /api/regional-data-sharing/access-reviews");
+  assert.equal(regionalAccess.owner, "T02");
+  assert.equal(regionalAccess.highRisk, true);
+  assert.deepEqual(regionalAccess.roles, ["commission", "institution"]);
 });
 
 test("custom external authentication remains fail closed when its model or principal drifts", () => {

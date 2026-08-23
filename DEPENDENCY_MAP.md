@@ -174,7 +174,7 @@ CORE_DATA_DEFINITIONS → collection-governance → CI/release 治理投影`。�
   每个批次和整套测试向日志输出 `durationMs`，不设性能放行阈值，也不写仓库报告。
 - 主分支必需检查名称仍为 `complete-unit-test` 与 `test`。聚合 test 使用 `always()`
   并要求三个风险域结果全部为 success，失败、取消和跳过均 fail-closed。
-- governance-api 先校验 custom auth 控制流/负向测试证据，再校验声明级授权矩阵、显式幂等行为证据合同和派生生产 API 目录；依赖方向为 `routeSourceFiles + authentication/idempotency 小型 evidence registry → authorization matrix v3 → production catalog v3`。SMS 认证从既有幂等合同派生，不复制认证真相；字面 inventory 只在同一未结束 handler 范围配对 method/path，禁止从相邻 GET/POST 分支制造依赖；证据门禁不写数据库、报告或发布制品。
+- governance-api 先校验 custom auth 控制流/负向测试证据，再校验声明级授权矩阵、显式幂等行为证据合同和派生生产 API 目录；依赖方向为 `routeSourceFiles + authentication/idempotency 小型 evidence registry → authorization matrix v3 → production catalog v3`。只有显式标记的 SMS 外部 principal 从幂等合同派生 custom auth，平台 session/RBAC 合同继续复用授权矩阵，避免重复认证声明。幂等合同的 `endpoint` 覆盖可产生 `behavior-verified`，`action-slice` 只登记已验证 action 并保留完整 endpoint 阻断；字面 inventory 只在同一未结束 handler 范围配对 method/path。证据门禁不写数据库、报告或发布制品。
 - governance-api 同时执行 `data:collection-governance:verify`；新集合、陈旧/重复状态、owner/reader
   边界、源码使用状态漂移或任何生产晋升标志都会失败，命令默认只输出摘要且不写 release。
 - governance-api 随后运行四组内部边界覆盖门禁；脚本仅依赖现有 c8、既有测试和显式配置，报告写入临时目录并在结束时删除。该门禁与原 `server.js` 85/85/55 覆盖门禁独立，不能相互替代。

@@ -9,6 +9,7 @@ const {
   createCompliantExportRequest,
   isExportVisibleToUser
 } = require("../src/http/research/compliant-export-workflow");
+const { createRouteSegments } = require("../src/http/routes/research");
 
 function approvedDataset() {
   return {
@@ -133,4 +134,100 @@ test("requester separation, role, identifiers, and read scope fail closed", () =
   assert.equal(isExportVisibleToUser(requested, { role: "commission", username: "health" }), true);
   assert.equal(isExportVisibleToUser(requested, { role: "institution", username: "hospital" }), true);
   assert.equal(isExportVisibleToUser(requested, { role: "institution", username: "community" }), false);
+});
+
+test("research action route proves identity, replay, conflict, CAS, and audit behavior", async () => {
+  let state = {
+    compliantDataExports: [createRequest()],
+    researchDatasets: [approvedDataset()],
+    researchAudits: []
+  };
+  let payload = {
+    action: "approve",
+    expectedVersion: 1,
+    reviewEvidenceRef: "REVIEW-ROUTE-001",
+    reviewNote: "route-level behavior proof"
+  };
+  let user = { role: "commission", username: "health", name: "监管用户" };
+  let writes = 0;
+  let reads = 0;
+  const runtime = {
+    appendResearchAudit(data, actor, dataset, action, detail, result) {
+      data.researchAudits.push({ actor: actor.username, datasetId: dataset.id, action, detail, result });
+    },
+    buildResearchSandboxSummary: () => ({}),
+    collectJson: async () => payload,
+    normalizeResearchApproval: () => ({}),
+    normalizeResearchDatasetApplication: () => ({}),
+    normalizeResearchEvidenceDocument: () => ({}),
+    readDatabase() {
+      reads += 1;
+      return state;
+    },
+    requireApiRole: () => user,
+    requireDatasetSandboxAccess: () => true,
+    sendJson(res, status, body) {
+      res.statusCode = status;
+      res.body = body;
+    },
+    writeDatabase(next) {
+      writes += 1;
+      state = next;
+    }
+  };
+  const segments = createRouteSegments(runtime);
+  const dispatch = async (commandId) => {
+    const res = {};
+    const req = { method: "POST", headers: { "idempotency-key": commandId } };
+    const url = new URL("http://localhost/api/research/compliant-exports/cde-rd-test-001-request-001/actions");
+    let handled = false;
+    for (const segment of segments) {
+      if (await segment.handle(req, res, url)) {
+        handled = true;
+        break;
+      }
+    }
+    assert.equal(handled, true);
+    return res;
+  };
+
+  const deniedReads = reads;
+  user = null;
+  const denied = await dispatch("research-route-denied");
+  assert.equal(denied.statusCode, undefined);
+  assert.equal(reads, deniedReads);
+
+  user = { role: "commission", username: "health", name: "监管用户" };
+  const accepted = await dispatch("research-route-approve-001");
+  assert.equal(accepted.statusCode, 200);
+  assert.equal(accepted.body.replayed, false);
+  assert.equal(accepted.body.domainVersion, 2);
+  assert.equal(writes, 1);
+  assert.equal(state.researchAudits.length, 1);
+
+  const replay = await dispatch("research-route-approve-001");
+  assert.equal(replay.statusCode, 200);
+  assert.equal(replay.body.replayed, true);
+  assert.equal(replay.body.domainVersion, 2);
+  assert.equal(writes, 1);
+  assert.equal(state.researchAudits.length, 1);
+
+  payload = { ...payload, reviewNote: "conflicting payload" };
+  const conflict = await dispatch("research-route-approve-001");
+  assert.equal(conflict.statusCode, 409);
+  assert.equal(conflict.body.code, "RESEARCH_EXPORT_IDEMPOTENCY_CONFLICT");
+  assert.equal(writes, 2);
+  assert.equal(state.researchAudits.at(-1).result, "denied");
+
+  payload = {
+    action: "release",
+    expectedVersion: 1,
+    releaseEvidenceRef: "RELEASE-ROUTE-001",
+    watermark: "wm-route"
+  };
+  const stale = await dispatch("research-route-release-stale");
+  assert.equal(stale.statusCode, 409);
+  assert.equal(stale.body.code, "RESEARCH_EXPORT_VERSION_CONFLICT");
+  assert.equal(writes, 3);
+  assert.equal(state.researchAudits.at(-1).result, "denied");
 });
