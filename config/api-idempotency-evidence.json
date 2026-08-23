@@ -877,6 +877,112 @@
       ],
       "productionReady": false,
       "externalEvidenceRequired": true
+    },
+    {
+      "contractId": "platform-governance.quality-operations-item-action-command.v1",
+      "key": "POST /api/quality-operations-governance/items/:id/actions",
+      "method": "POST",
+      "path": "/api/quality-operations-governance/items/:id/actions",
+      "owner": "T02",
+      "domain": "platform-governance",
+      "purpose": "apply-scoped-quality-operations-governance-transition",
+      "customAuthenticationEvidence": false,
+      "authentication": {
+        "required": true,
+        "mechanism": "bearer-or-cookie-session",
+        "principalType": "platform-user",
+        "credentialSource": ["header:authorization", "cookie:session"],
+        "replayCsrf": {
+          "replayProtection": "idempotency-key-plus-command-fingerprint-and-record-write-tail",
+          "csrf": "platform-session-transport-policy"
+        }
+      },
+      "authorization": {
+        "model": "platform-rbac-plus-action-policy-and-record-institution-scope",
+        "roles": ["commission", "institution", "insurance"],
+        "dataScope": "governance-record-institution"
+      },
+      "coverage": {
+        "level": "endpoint",
+        "selector": "entire-route",
+        "actions": ["quality-operations-governance-item-action"],
+        "unverifiedRemainder": false
+      },
+      "idempotency": {
+        "key": "header:Idempotency-Key",
+        "payloadBinding": ["domain", "recordId", "action", "actor.id", "actor.role", "actor.institutionId", "actor.scopeInstitutionIds", "expectedVersion", "payload"],
+        "exactReplay": "returns the persisted record and audit snapshot with replayed=true without a second state write",
+        "conflictingReuse": "IDEMPOTENCY_CONFLICT",
+        "persistenceScope": "source governance record plus command receipt and governance/platform/security audit projections in one platform state write",
+        "distributedExactlyOnceClaimed": false
+      },
+      "concurrency": {
+        "cas": {
+          "required": true,
+          "field": "per-record in-process write tail plus expectedVersion and SQLite storageMeta.collectionVersions",
+          "conflictCodes": ["VERSION_CONFLICT", "QUALITY_GOVERNANCE_VERSION_CONFLICT"]
+        }
+      },
+      "errors": [
+        { "code": "INVALID_COMMAND", "status": 400 },
+        { "code": "ACTOR_FORBIDDEN", "status": 403 },
+        { "code": "INSTITUTION_SCOPE_DENIED", "status": 403 },
+        { "code": "RECORD_NOT_FOUND", "status": 404 },
+        { "code": "DOMAIN_MISMATCH", "status": 409 },
+        { "code": "VERSION_CONFLICT", "status": 409 },
+        { "code": "IDEMPOTENCY_CONFLICT", "status": 409 },
+        { "code": "QUALITY_GOVERNANCE_VERSION_CONFLICT", "status": 409 },
+        { "code": "QUALITY_GOVERNANCE_COMMAND_FAILED", "status": 500 }
+      ],
+      "audit": {
+        "accepted": "commits the source record, command receipt and governance, platform-process and chained security audit projections in one state write",
+        "replay": "returns the persisted record and audit snapshot without another state or audit write",
+        "rejected": "authorization is reevaluated before receipt replay; scoped and command denials preserve the existing three audit projections, missing records remain write-free, and persistence failure has no fallback audit write"
+      },
+      "implementationEvidence": [
+        {
+          "file": "src/http/routes/platform-governance/governance-catalog.js",
+          "anchors": [
+            "withGovernanceRecordWriteLock(recordId",
+            "const visibility = governanceAuditForRecord(data, recordId, user)",
+            "QUALITY_GOVERNANCE_VERSION_CONFLICT",
+            "if (!result.replayed)"
+          ]
+        },
+        {
+          "file": "quality-operations-governance.js",
+          "anchors": [
+            "const authorization = authorizeGovernanceCommand(record, command)",
+            "deniedReceipt?.fingerprint === fingerprint",
+            "IDEMPOTENCY_CONFLICT",
+            "return rememberResult(state, command, fingerprint, updated, auditEvent"
+          ]
+        },
+        {
+          "file": "quality-operations-governance-adapter.js",
+          "anchors": [
+            "function applyGovernanceResultToData(data, result)",
+            "data.qualityOperationsGovernanceCommandReceipts",
+            "data.platformProcessAudit = [",
+            "data.securityEvents = ["
+          ]
+        }
+      ],
+      "testEvidence": [
+        {
+          "file": "test/quality-operations-governance-command-contract.test.js",
+          "anchors": [
+            "denies identity before body collection or state read",
+            "checks resource scope before receipt replay and keeps missing records write-free",
+            "replays exact commands and rejects payload drift",
+            "serializes same-record concurrent equal and conflicting commands",
+            "commits record receipt and three audit projections in one write",
+            "redacts persistence failures and maps SQLite CAS without fallback audit write"
+          ]
+        }
+      ],
+      "productionReady": false,
+      "externalEvidenceRequired": true
     }
   ]
 }

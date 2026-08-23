@@ -450,25 +450,40 @@ function executeGovernanceCommand(inputState, inputCommand) {
   }
 
   const fingerprint = commandFingerprint(command);
+  const record = state.records[command.recordId];
+  if (!record) return rejectCommand(state, null, command, fingerprint, "RECORD_NOT_FOUND", "governance record not found");
+  const authorization = authorizeGovernanceCommand(record, command);
+  if (!authorization.allowed) {
+    const deniedReceipt = state.commandReceipts[command.idempotencyKey];
+    if (
+      deniedReceipt?.fingerprint === fingerprint
+      && deniedReceipt.ok === false
+      && deniedReceipt.code === authorization.code
+    ) {
+      return resultFromReceipt(state, deniedReceipt, true);
+    }
+    return rejectCommand(
+      state,
+      record,
+      command,
+      fingerprint,
+      authorization.code,
+      authorization.reason,
+      !deniedReceipt
+    );
+  }
+
   const existingReceipt = state.commandReceipts[command.idempotencyKey];
   if (existingReceipt) {
     if (existingReceipt.fingerprint === fingerprint) return resultFromReceipt(state, existingReceipt, true);
-    const record = state.records[command.recordId];
     return rejectCommand(state, record, command, fingerprint, "IDEMPOTENCY_CONFLICT", "idempotency key was already used by a different command", false);
   }
 
-  const record = state.records[command.recordId];
-  if (!record) return rejectCommand(state, null, command, fingerprint, "RECORD_NOT_FOUND", "governance record not found");
   if (record.domain !== command.domain) {
     return rejectCommand(state, record, command, fingerprint, "DOMAIN_MISMATCH", "command domain does not match record domain");
   }
   if (command.expectedVersion !== undefined && Number(command.expectedVersion) !== record.version) {
     return rejectCommand(state, record, command, fingerprint, "VERSION_CONFLICT", `expected version ${command.expectedVersion}, current version ${record.version}`);
-  }
-
-  const authorization = authorizeGovernanceCommand(record, command);
-  if (!authorization.allowed) {
-    return rejectCommand(state, record, command, fingerprint, authorization.code, authorization.reason);
   }
 
   const nextStatus = STATUS_MACHINES[record.domain]?.[record.status]?.[command.action];
