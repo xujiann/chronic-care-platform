@@ -57,3 +57,9 @@
 ## 2026-08-23 T07 第二批零晋升审计
 
 同一注册表新增 3 条最小 `reviewedProofRequired` 记录，但没有新增行为合同。`POST /api/financial-gateways/dispatch` 缺少同键异载荷冲突、并发/CAS 和原子审计/outbox；`POST /api/financial-gateways/reconciliation-runs` 虽有摘要重放/冲突但缺少并发 fencing 与原子命令；`POST /api/disease-payment/formal-grouping/jobs` 虽有重放/冲突和角色检查，但缺资源范围、CAS、稳定 HTTP 错误和原子审计/outbox。拒绝记录与行为合同同 key 时验证失败；它只防止部分证据被误升级，不复制路由目录或创造目标语义。三项及全目录继续 `NO-GO`。
+
+## 2026-08-23 T07 financial reconciliation 扩展
+
+在本 ADR 已接受的逐 endpoint 机制内，`POST /api/financial-gateways/reconciliation-runs` 的拒绝记录由第 8 份行为合同替换。实现保留既有成功响应和 provider digest ledger：身份与保险 gateway scope 先于读取，同 gateway/date 在进程内串行并在锁内重读；精确载荷回放复用原 run，同 digest 异 summary 返回稳定 409。run 与 `securityEvents` 链式审计进入同一状态快照并只调用一次 `writeDatabase`；SQLite 继续使用既有 collection-version CAS/事务，冲突被投影为脱敏 409，写失败不再触发第二次审计写。
+
+该切片不增加 schema、migration、dependency、outbox 或新 ADR。因为没有实际下游消息语义，不为目录虚构 outbox；进程锁只保护 JSON/单进程兼容路径，SQLite CAS 也不等于分布式 exactly-once。`financialReconciliationRuns` data owner、真实多实例 PostgreSQL、外部对账来源与现场证据均未关闭，合同继续 `productionReady=false`，593 项仍全部 `NO-GO`。

@@ -17,6 +17,7 @@ const RECONCILIABLE_OPERATIONS = new Map([
   ["INSURANCE", new Set(["settlement", "settlement-cancel"])],
   ["CERTIFICATE", new Set(["issue", "revoke"])]
 ]);
+const financialReconciliationWriteTails = new Map();
 
 class FinancialCallbackError extends Error {
   constructor(message, code, statusCode = 400) {
@@ -405,6 +406,23 @@ function normalizedReconciliationInteger(value, label) {
   return number;
 }
 
+function withFinancialReconciliationLock(input = {}, work) {
+  if (typeof work !== "function") {
+    throw new FinancialCallbackError("financial reconciliation work unit is required", "FINANCIAL_RECONCILIATION_WORK_REQUIRED", 503);
+  }
+  const gatewayType = normalizeGatewayType(input.gatewayType || input.type);
+  const businessDate = safeFinancialText(input.businessDate, 10);
+  const lockKey = `${gatewayType}:${businessDate}`;
+  const previous = financialReconciliationWriteTails.get(lockKey) || Promise.resolve();
+  const pending = previous.then(work, work);
+  const tail = pending.then(() => undefined, () => undefined);
+  financialReconciliationWriteTails.set(lockKey, tail);
+  tail.finally(() => {
+    if (financialReconciliationWriteTails.get(lockKey) === tail) financialReconciliationWriteTails.delete(lockKey);
+  });
+  return pending;
+}
+
 function createFinancialReconciliationRun(data, input = {}, actor = {}) {
   if (!data || typeof data !== "object") throw new FinancialCallbackError("financial reconciliation ledger is unavailable", "FINANCIAL_RECONCILIATION_LEDGER_UNAVAILABLE", 503);
   const gatewayType = normalizeGatewayType(input.gatewayType || input.type);
@@ -773,6 +791,7 @@ module.exports = {
   syncRefundFromFinancialCallback: OnlinePaymentRefunds.syncRefundFromFinancialCallback,
   validateFinancialRequest,
   verifyFinancialCallback,
+  withFinancialReconciliationLock,
   verifyRefundLedger: OnlinePaymentRefunds.verifyRefundLedger,
   verifyRefundStateProjection: OnlinePaymentRefunds.verifyRefundStateProjection
 };

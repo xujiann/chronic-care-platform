@@ -38,36 +38,6 @@
       "productionReady": false
     },
     {
-      "reviewId": "T07-financial-reconciliation-20260823",
-      "key": "POST /api/financial-gateways/reconciliation-runs",
-      "method": "POST",
-      "path": "/api/financial-gateways/reconciliation-runs",
-      "owner": "T07",
-      "domain": "insurance-payment",
-      "missingProof": [
-        "cas-or-concurrency",
-        "atomic-audit-or-outbox"
-      ],
-      "evidence": [
-        {
-          "file": "financial-gateways.js",
-          "anchors": [
-            "function createFinancialReconciliationRun",
-            "FINANCIAL_RECONCILIATION_DIGEST_CONFLICT",
-            "idempotentReplay: true"
-          ]
-        },
-        {
-          "file": "test/financial-gateways.test.js",
-          "anchors": [
-            "financial reconciliation compares digest-only provider summaries",
-            "FINANCIAL_RECONCILIATION_DIGEST_CONFLICT"
-          ]
-        }
-      ],
-      "productionReady": false
-    },
-    {
       "reviewId": "T07-formal-grouping-job-20260823",
       "key": "POST /api/disease-payment/formal-grouping/jobs",
       "method": "POST",
@@ -689,6 +659,117 @@
           "anchors": [
             "outcomes[1].reason.code, \"PERSISTENCE_VERSION_CONFLICT\"",
             "error.code === \"PERSISTENCE_COMMAND_CONFLICT\""
+          ]
+        }
+      ],
+      "productionReady": false,
+      "externalEvidenceRequired": true
+    },
+    {
+      "contractId": "insurance-payment.financial-reconciliation-command.v1",
+      "key": "POST /api/financial-gateways/reconciliation-runs",
+      "method": "POST",
+      "path": "/api/financial-gateways/reconciliation-runs",
+      "owner": "T07",
+      "domain": "insurance-payment",
+      "purpose": "record-financial-gateway-daily-reconciliation",
+      "customAuthenticationEvidence": false,
+      "authentication": {
+        "required": true,
+        "mechanism": "bearer-or-cookie-session",
+        "principalType": "platform-user",
+        "credentialSource": ["header:authorization", "cookie:session"],
+        "replayCsrf": {
+          "replayProtection": "provider-statement-digest-plus-server-side-reconciliation-ledger",
+          "csrf": "platform-session-transport-policy"
+        }
+      },
+      "authorization": {
+        "model": "platform-rbac-plus-server-side-financial-gateway-scope",
+        "roles": ["commission", "insurance"],
+        "dataScope": "commission-all-gateway-types-or-insurance-only-INSURANCE"
+      },
+      "coverage": {
+        "level": "endpoint",
+        "selector": "entire-route",
+        "actions": ["financial-reconciliation.record"],
+        "unverifiedRemainder": false
+      },
+      "idempotency": {
+        "key": "gatewayType plus businessDate plus providerSummary.statementDigest",
+        "payloadBinding": [
+          "gatewayType",
+          "businessDate",
+          "providerSummary.total",
+          "providerSummary.succeeded",
+          "providerSummary.exceptions",
+          "providerSummary.grossAmountFen",
+          "providerSummary.statementDigest"
+        ],
+        "exactReplay": "returns the persisted run with idempotentReplay=true without creating another reconciliation run",
+        "conflictingReuse": "FINANCIAL_RECONCILIATION_DIGEST_CONFLICT",
+        "persistenceScope": "financialReconciliationRuns plus securityEvents in one platform state write",
+        "distributedExactlyOnceClaimed": false
+      },
+      "concurrency": {
+        "cas": {
+          "required": true,
+          "field": "gatewayType/businessDate in-process write lock plus storageMeta.collectionVersions",
+          "conflictCodes": ["FINANCIAL_RECONCILIATION_VERSION_CONFLICT"]
+        }
+      },
+      "errors": [
+        { "code": "FINANCIAL_RECONCILIATION_GATEWAY_SCOPE_DENIED", "status": 403 },
+        { "code": "FINANCIAL_RECONCILIATION_DIGEST_CONFLICT", "status": 409 },
+        { "code": "FINANCIAL_RECONCILIATION_VERSION_CONFLICT", "status": 409 },
+        { "code": "FINANCIAL_RECONCILIATION_FAILED", "status": 500 },
+        { "code": "FINANCIAL_RECONCILIATION_LEDGER_UNAVAILABLE", "status": 503 }
+      ],
+      "audit": {
+        "accepted": "commits one reconciliation run and one chained security event in the same platform state write",
+        "replay": "commits one replay security event in the same single state write without creating another reconciliation run",
+        "rejected": "identity and gateway scope stop before ledger read; validation and payload conflicts do not write; a failed state write is not followed by a second audit write"
+      },
+      "implementationEvidence": [
+        {
+          "file": "src/http/routes/insurance-payment.js",
+          "anchors": [
+            "url.pathname === \"/api/financial-gateways/reconciliation-runs\"",
+            "withFinancialReconciliationLock(payload",
+            "data.securityEvents = prependAuditTrailEntry",
+            "FINANCIAL_RECONCILIATION_VERSION_CONFLICT"
+          ]
+        },
+        {
+          "file": "financial-gateways.js",
+          "anchors": [
+            "function withFinancialReconciliationLock",
+            "function createFinancialReconciliationRun",
+            "FINANCIAL_RECONCILIATION_DIGEST_CONFLICT",
+            "idempotentReplay: true"
+          ]
+        },
+        {
+          "file": "server.js",
+          "anchors": [
+            "function verifySqliteCollectionVersions",
+            "SQLite optimistic lock conflict on",
+            "db.exec(\"COMMIT\")"
+          ]
+        }
+      ],
+      "testEvidence": [
+        {
+          "file": "test/financial-reconciliation-route-contract.test.js",
+          "anchors": [
+            "denies identity before body collection and database read",
+            "enforces insurance gateway scope before database read",
+            "exact replay and conflicting payload retain one run",
+            "serializes concurrent exact replay without duplicate runs",
+            "serializes concurrent conflicting payloads",
+            "commits run and audit in one atomic write",
+            "write failure performs no second audit write",
+            "maps SQLite CAS failure to a stable redacted conflict"
           ]
         }
       ],

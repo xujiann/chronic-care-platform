@@ -7,8 +7,9 @@ const DEPENDENCIES = Object.freeze([
   "OnlinePaymentRefunds", "appendSecurityEvent", "applyFinancialCallback", "authorizeInsurancePaymentAction",
   "collectJson", "createFinancialReconciliationRun", "diseasePaymentPackageSignatureOptions",
   "dispatchFinancialRequest", "financialGatewayCenter", "financialGatewayOperationsCenter", "normalizeState",
-  "patchBusinessCollectionItem", "randomUUID", "readDatabase", "requireApiRole", "requireInsuranceSystemCommand",
-  "sendInsurancePaymentError", "sendJson", "validateFinancialRequest", "verifyFinancialCallback", "writeDatabase"
+  "patchBusinessCollectionItem", "prependAuditTrailEntry", "randomUUID", "readDatabase", "requireApiRole", "requireInsuranceSystemCommand",
+  "sendInsurancePaymentError", "sendJson", "validateFinancialRequest", "verifyFinancialCallback",
+  "withFinancialReconciliationLock", "writeDatabase"
 ]);
 
 module.exports = { DEPENDENCIES, DOMAIN, PROCESS };

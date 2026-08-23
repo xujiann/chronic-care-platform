@@ -17,10 +17,10 @@ function clone(value) {
 
 test("idempotency evidence registry validates only directly proven endpoint and action-slice contracts", () => {
   assert.deepEqual(validateEvidenceRegistry(), []);
-  assert.equal(DEFAULT_REGISTRY.contracts.length, 7);
-  assert.equal(endpointEvidenceContracts().length, 5);
+  assert.equal(DEFAULT_REGISTRY.contracts.length, 8);
+  assert.equal(endpointEvidenceContracts().length, 6);
   assert.equal(actionSliceEvidenceContracts().length, 2);
-  assert.equal(proofRequiredReviews().length, 3);
+  assert.equal(proofRequiredReviews().length, 2);
   assert.equal(DEFAULT_REGISTRY.contracts[0].key, "POST /api/auth/sms-delivery-callback");
   assert.equal(DEFAULT_REGISTRY.contracts[0].owner, "T01");
   assert.equal(DEFAULT_REGISTRY.contracts.every((contract) => contract.productionReady === false), true);
@@ -35,14 +35,14 @@ test("idempotency evidence registry validates only directly proven endpoint and 
     "POST /api/workflow-actions",
     "POST /api/tasks/:id/actions",
     "POST /api/research/compliant-exports/:id/actions",
-    "POST /api/online-payments/refunds"
+    "POST /api/online-payments/refunds",
+    "POST /api/financial-gateways/reconciliation-runs"
   ]);
 });
 
-test("reviewed T07 candidates remain proof-required and cannot be mistaken for behavior contracts", () => {
+test("remaining reviewed T07 candidates stay proof-required after reconciliation closure", () => {
   const expected = [
     "POST /api/financial-gateways/dispatch",
-    "POST /api/financial-gateways/reconciliation-runs",
     "POST /api/disease-payment/formal-grouping/jobs"
   ];
   assert.deepEqual(proofRequiredReviews().map((review) => review.key), expected);
@@ -60,17 +60,18 @@ test("reviewed T07 candidates remain proof-required and cannot be mistaken for b
 
 test("catalog promotes only whole endpoints and retains generic action routes as review-required", () => {
   const catalog = buildProductionApiCatalog();
-  assert.equal(catalog.summary.writeIdempotencyBehaviorVerified, 5);
+  assert.equal(catalog.summary.writeIdempotencyBehaviorVerified, 6);
   assert.equal(catalog.summary.writeIdempotencyActionSlicesVerified, 2);
-  assert.equal(catalog.summary.writeIdempotencyBehaviorProofRequired, 328);
-  assert.equal(catalog.summary.reviewRequired, 330);
+  assert.equal(catalog.summary.writeIdempotencyBehaviorProofRequired, 327);
+  assert.equal(catalog.summary.reviewRequired, 329);
 
   for (const key of [
     "POST /api/auth/sms-delivery-callback",
     "POST /api/regional-data-sharing/access-reviews",
     "POST /api/referrals/:id/actions",
     "POST /api/research/compliant-exports/:id/actions",
-    "POST /api/online-payments/refunds"
+    "POST /api/online-payments/refunds",
+    "POST /api/financial-gateways/reconciliation-runs"
   ]) {
     const entry = catalog.entries.find((candidate) => candidate.key === key);
     assert.equal(entry.idempotency.behaviorEvidence.status, "behavior-verified", key);
@@ -95,6 +96,10 @@ test("catalog promotes only whole endpoints and retains generic action routes as
   const refund = catalog.entries.find((entry) => entry.key === "POST /api/online-payments/refunds");
   assert.equal(refund.production.repositoryReview, "review-required");
   assert.equal(refund.production.blockers.includes("runtime-role-policy-not-resolved"), true);
+  const reconciliation = catalog.entries.find((entry) => entry.key === "POST /api/financial-gateways/reconciliation-runs");
+  assert.equal(reconciliation.idempotency.behaviorEvidence.contractId, "insurance-payment.financial-reconciliation-command.v1");
+  assert.equal(reconciliation.production.repositoryReview, "catalogued");
+  assert.equal(reconciliation.production.status, "NO-GO");
   for (const runtimePolicy of catalog.entries.filter((entry) => entry.owner === "T07" && entry.routeResolution === "runtime-policy" && entry.idempotency.required)) {
     assert.equal(runtimePolicy.idempotency.behaviorEvidence.status, "behavior-proof-required", runtimePolicy.key);
     assert.deepEqual(runtimePolicy.idempotency.behaviorEvidence.verifiedActionContracts, [], runtimePolicy.key);

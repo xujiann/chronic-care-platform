@@ -3,7 +3,7 @@
 const InsurancePaymentRefundTransaction = require("../../../insurance-payment-refund-transaction");
 
 function createRouteSegments(runtime) {
-  const { DiseasePaymentGrouperContract, DiseasePaymentIntake, DiseasePaymentService, FinancialCallbackError, OnlinePaymentRefunds, appendSecurityEvent, applyFinancialCallback, authorizeInsurancePaymentAction, collectJson, createFinancialReconciliationRun, diseasePaymentPackageSignatureOptions, dispatchFinancialRequest, financialGatewayCenter, financialGatewayOperationsCenter, normalizeState, patchBusinessCollectionItem, randomUUID, readDatabase, requireApiRole, requireInsuranceSystemCommand, sendInsurancePaymentError, sendJson, validateFinancialRequest, verifyFinancialCallback, writeDatabase } = runtime;
+  const { DiseasePaymentGrouperContract, DiseasePaymentIntake, DiseasePaymentService, FinancialCallbackError, OnlinePaymentRefunds, appendSecurityEvent, applyFinancialCallback, authorizeInsurancePaymentAction, collectJson, createFinancialReconciliationRun, diseasePaymentPackageSignatureOptions, dispatchFinancialRequest, financialGatewayCenter, financialGatewayOperationsCenter, normalizeState, patchBusinessCollectionItem, prependAuditTrailEntry, randomUUID, readDatabase, requireApiRole, requireInsuranceSystemCommand, sendInsurancePaymentError, sendJson, validateFinancialRequest, verifyFinancialCallback, withFinancialReconciliationLock, writeDatabase } = runtime;
   return [
     {
       id: "insurance-payment-01",
@@ -127,27 +127,37 @@ function createRouteSegments(runtime) {
         try {
           const payload = await collectJson(req);
           if (user.role === "insurance" && String(payload.gatewayType || payload.type || "").toUpperCase() !== "INSURANCE") {
-            sendJson(res, 403, { error: "Forbidden", message: "insurance role is limited to insurance reconciliation" });
+            sendJson(res, 403, {
+              error: "Forbidden",
+              code: "FINANCIAL_RECONCILIATION_GATEWAY_SCOPE_DENIED",
+              message: "insurance role is limited to insurance reconciliation"
+            });
             return true;
           }
-          const data = readDatabase();
-          const result = createFinancialReconciliationRun(data, payload, user);
-          writeDatabase(normalizeState(data));
-          appendSecurityEvent({
-            actor: user.name,
-            role: user.role,
-            action: "financial daily reconciliation",
-            target: `${result.run.gatewayType}/${result.run.businessDate}`,
-            result: result.run.status === "matched" ? "allowed" : "review-required",
-            detail: `${result.run.id}:${result.run.status}:${result.run.providerSummary.statementDigest}`
+          const result = await withFinancialReconciliationLock(payload, async () => {
+            const data = readDatabase();
+            const reconciliation = createFinancialReconciliationRun(data, payload, user);
+            data.securityEvents = prependAuditTrailEntry(data.securityEvents, {
+              id: randomUUID(),
+              at: new Date().toLocaleString("zh-CN", { hour12: false }),
+              actor: user.name,
+              role: user.role,
+              action: "financial daily reconciliation",
+              target: `${reconciliation.run.gatewayType}/${reconciliation.run.businessDate}`,
+              result: reconciliation.run.status === "matched" ? "allowed" : "review-required",
+              detail: `${reconciliation.run.id}:${reconciliation.run.status}:${reconciliation.run.providerSummary.statementDigest}`
+            });
+            writeDatabase(normalizeState(data));
+            return reconciliation;
           });
           sendJson(res, result.idempotentReplay ? 200 : 201, { ok: true, idempotentReplay: result.idempotentReplay, run: result.run, productionEvidence: false });
         } catch (error) {
           const known = error instanceof FinancialCallbackError;
-          sendJson(res, known ? error.statusCode : error instanceof SyntaxError ? 400 : 500, {
+          const versionConflict = String(error?.message || "").includes("SQLite optimistic lock conflict");
+          sendJson(res, versionConflict ? 409 : known ? error.statusCode : error instanceof SyntaxError ? 400 : 500, {
             ok: false,
-            code: known ? error.code : error instanceof SyntaxError ? "FINANCIAL_RECONCILIATION_BODY_INVALID" : "FINANCIAL_RECONCILIATION_FAILED",
-            message: known ? error.message : "financial reconciliation failed"
+            code: versionConflict ? "FINANCIAL_RECONCILIATION_VERSION_CONFLICT" : known ? error.code : error instanceof SyntaxError ? "FINANCIAL_RECONCILIATION_BODY_INVALID" : "FINANCIAL_RECONCILIATION_FAILED",
+            message: versionConflict ? "financial reconciliation state changed; retry with a fresh snapshot" : known ? error.message : "financial reconciliation failed"
           });
         }
         return true;

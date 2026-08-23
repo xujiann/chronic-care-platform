@@ -301,7 +301,8 @@ const {
   financialGatewayOperationsCenter,
   normalizeFinancialReconciliationRun,
   validateFinancialRequest,
-  verifyFinancialCallback
+  verifyFinancialCallback,
+  withFinancialReconciliationLock
 } = require("./financial-gateways");
 const {
   alertRoutingCenter,
@@ -28106,7 +28107,8 @@ function createRuntimeCapabilitySource() {
   verifySmsDeliveryCallback,
   verifyTrustedRespiratoryNetworkEvidence,
     workflowStateCollectionKey,
-    writeDatabase,
+  writeDatabase,
+  withFinancialReconciliationLock,
   });
 }
 
