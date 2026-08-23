@@ -67,6 +67,15 @@ download 收敛到 `browser-safe-url-policy.v1`，动态 URL occurrence 从 69 �
 本状态不推进 CSP enforcement 阶段；HTML/style sink、全角色浏览器、真实托管响应头和独立评估未闭合，
 因此兼容 `unsafe-inline`、严格 Report-Only 与 `productionReady=false` 不变。
 
+### 急救生命链可信渲染切片（2026-08-23）
+
+`emergency-lifechain-ui.js` 将 overview、quality、command-center 及失败回退中的 6 个 `innerHTML`
+迁为显式 `createElement`、`textContent`、dataset、固定 class 与 `replaceChildren`。浏览器以恶意 API
+字段验证标签和事件属性不会被创建，同时保留事件/授权按钮的原 dataset 行为。Inventory v2 的 DOM
+HTML occurrence 由 871 降为 865，覆盖资产由 43 降为 42；动态 URL 6 和动态样式 45 均未改变。
+该单页切片不代表 `emergency.js` 或其他页面已迁移，不推进 CSP enforcement；真实托管头、OHIF/外部
+Origin、独立渗透与现场验收仍未完成，兼容 `unsafe-inline`、严格 Report-Only 和 `productionReady=false` 保持不变。
+
 ## Phased enforcement and rollback
 
 1. 第一阶段：集中端口、兼容 CSP + 严格 Report-Only、风险清单、CI 增量拒绝；固定 `productionReady=false`。

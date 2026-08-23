@@ -49,6 +49,8 @@
 - 在线 Playwright 继续在 27 + 13 项 context 中阻止 Service Worker；PWA 只在独立 3 项 context 中允许，
   使用同一 Chromium/动态端口策略并逐项注销 registration、删除 Cache Storage。v61 只缓存同源成功响应，
   仓库测试不替代真实 HTTPS、设备策略或现场安装验收。
+- 急救生命链单页 controller 的 6 个 API 驱动 HTML sink 已迁为显式 DOM/text/class，Inventory v2 的
+  HTML occurrence 由 871 降至 865；该页恶意响应浏览器测试不替代真实托管头、渗透或现场验收。
 - strict production preflight 通过 T00 受控文件 provider 装配既有 external trust verifier；只接受独立
   pin 的 Ed25519 anchor bundle、双角色签名和当前 release/artifact/evidence/registry 绑定，默认继续 NO-GO。
 
