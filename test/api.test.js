@@ -13,6 +13,7 @@ const EscortService = require("../escort-service");
 const NursingEscortDomain = require("../nursing-escort-domain");
 const { startAlertDeliveryMock } = require("./helpers/alert-delivery-mock-runtime");
 const { createApiRegressionRuntime } = require("./helpers/api-regression-runtime");
+const { startFinancialGatewayMock } = require("./helpers/financial-gateway-mock-runtime");
 const { startHospitalAdapterMock } = require("./helpers/hospital-adapter-mock-runtime");
 
 async function waitForHealth(baseUrl) {
@@ -5874,40 +5875,12 @@ test("API authentication, scoping and governance regression suite", async (t) =>
   });
 
   await t.test("dispatches payment insurance and certificate requests through audited production gateways", async (t) => {
-    const financialRequests = [];
-    const financialMock = http.createServer(async (request, response) => {
-      const chunks = [];
-      for await (const chunk of request) chunks.push(chunk);
-      const bodyText = Buffer.concat(chunks).toString("utf8");
-      const body = JSON.parse(bodyText);
-      financialRequests.push({ headers: request.headers, bodyText, body });
-      response.writeHead(200, { "Content-Type": "application/json" });
-      const receiptId = body.type === "PAYMENT"
-        ? `payment-provider-${financialRequests.length}`
-        : body.type === "INSURANCE"
-          ? `insurance-provider-${financialRequests.length}`
-          : `certificate-provider-${financialRequests.length}`;
-      response.end(JSON.stringify({ receiptId, status: "accepted" }));
-    });
-    financialMock.listen(0, "127.0.0.1");
-    await once(financialMock, "listening");
-    const financialPort = financialMock.address().port;
-    process.env.PAYMENT_GATEWAY_URL = `http://127.0.0.1:${financialPort}/payment`;
-    process.env.INSURANCE_GATEWAY_URL = `http://127.0.0.1:${financialPort}/insurance`;
-    process.env.CERTIFICATE_GATEWAY_URL = `http://127.0.0.1:${financialPort}/certificate`;
-    process.env.FINANCIAL_GATEWAY_SECRET = "api-test-financial-gateway-secret";
-    process.env.FINANCIAL_CALLBACK_SECRET = "api-test-financial-callback-secret";
-    process.env.FINANCIAL_GATEWAY_MAX_ATTEMPTS = "1";
-    t.after(async () => {
-      delete process.env.PAYMENT_GATEWAY_URL;
-      delete process.env.INSURANCE_GATEWAY_URL;
-      delete process.env.CERTIFICATE_GATEWAY_URL;
-      delete process.env.FINANCIAL_GATEWAY_SECRET;
-      delete process.env.FINANCIAL_CALLBACK_SECRET;
-      delete process.env.FINANCIAL_GATEWAY_MAX_ATTEMPTS;
-      financialMock.closeAllConnections?.();
-      await new Promise((resolve) => financialMock.close(resolve));
-    });
+    const {
+      port: financialPort,
+      requests: financialRequests,
+      stop: stopFinancialGatewayMock
+    } = await startFinancialGatewayMock();
+    t.after(stopFinancialGatewayMock);
 
     const institution = await login(baseUrl, "hospital");
     const commission = await login(baseUrl, "health");

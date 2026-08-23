@@ -79,6 +79,7 @@ test("the API hotspot is isolated without changing integration membership or ord
 test("the API hotspot keeps extracted lifecycles and the exact subtest order", () => {
   const apiTest = read("test/api.test.js");
   const alertMockHelper = read("test/helpers/alert-delivery-mock-runtime.js");
+  const financialMockHelper = read("test/helpers/financial-gateway-mock-runtime.js");
   const runtimeHelper = read("test/helpers/api-regression-runtime.js");
   const hospitalMockHelper = read("test/helpers/hospital-adapter-mock-runtime.js");
   const subtestNames = [...apiTest.matchAll(/await t\.test\("([^"]+)"/g)].map((match) => match[1]);
@@ -115,6 +116,18 @@ test("the API hotspot keeps extracted lifecycles and the exact subtest order", (
   assert.match(alertMockHelper, /eventId: `siem-event-\$\{requests\.length\}`/);
   assert.match(alertMockHelper, /SIEM_ENDPOINT = `http:\/\/127\.0\.0\.1:\$\{port\}\/events`/);
   assert.match(alertMockHelper, /server\.closeAllConnections\?\.\(\)/);
+  assert.equal((apiTest.match(/startFinancialGatewayMock\(\)/g) || []).length, 1);
+  assert.match(apiTest, /port: financialPort,\s+requests: financialRequests,\s+stop: stopFinancialGatewayMock/);
+  assert.match(apiTest, /t\.after\(stopFinancialGatewayMock\)/);
+  assert.doesNotMatch(apiTest, /const financialMock = http\.createServer/);
+  assert.equal((financialMockHelper.match(/http\.createServer/g) || []).length, 1);
+  assert.match(financialMockHelper, /server\.listen\(0, "127\.0\.0\.1"\)/);
+  assert.match(financialMockHelper, /payment-provider-\$\{requests\.length\}/);
+  assert.match(financialMockHelper, /insurance-provider-\$\{requests\.length\}/);
+  assert.match(financialMockHelper, /certificate-provider-\$\{requests\.length\}/);
+  assert.match(financialMockHelper, /PAYMENT_GATEWAY_URL = `http:\/\/127\.0\.0\.1:\$\{port\}\/payment`/);
+  assert.match(financialMockHelper, /FINANCIAL_CALLBACK_SECRET = "api-test-financial-callback-secret"/);
+  assert.match(financialMockHelper, /server\.closeAllConnections\?\.\(\)/);
   assert.equal(subtestNames.length, 43);
   assert.equal(orderDigest, "dab18cc7fb2ae790cae552d5646c30f9ba35e8139ac47c629466001dfe6b6cea");
 });

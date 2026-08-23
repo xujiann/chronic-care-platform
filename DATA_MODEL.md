@@ -306,6 +306,9 @@ PostgreSQL、release、报告或归档产物。API 热点隔离配置只登记�
 第三个夹具切片同样只移动单个 SIEM alert mock 的进程内请求数组、成功/503 失败开关、临时环境变量和
 HTTP 生命周期；`siem-event-*` 仍是 synthetic 响应，失败与恢复顺序继续由原子测试正文控制。它不新增表、
 集合、schema、migration 或耐久事实源，也不代表真实 SIEM 回执、告警送达或现场联调证据。
+第四个夹具切片只移动单个 financial gateway mock 的进程内请求数组、三类 synthetic receipt 映射、临时环境
+变量和 HTTP 生命周期；`payment-provider-*`、`insurance-provider-*`、`certificate-provider-*` 不持久化为
+新事实源，也不代表真实支付、医保或证照供应方回执、联调或生产证据。本切片不新增集合、schema 或 migration。
 两个前端文件去重的 16 项仅是静态中文翻译键；shadow map 只存在测试代码，既不成为新的业务字典，
 也不写入运行时状态。两项历史覆盖值继续采用原 JavaScript 最终生效值，不改变数据模型或展示输入。
 

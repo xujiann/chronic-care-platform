@@ -47,7 +47,8 @@ T05 care owner 的遗留路由还必须运行 3 个独立 HTTP 特征测试，�
 保持单进程 server、共享状态、断言、超时、integration 成员和 CI 预算，并运行完整 API hotspot。
 外部 mock helper 必须是领域特定且测试专用的生命周期边界；只有创建、监听、既有环境变量和关闭路径均无
 跨子测试引用时才能提取；可变失败开关必须仍由所属子测试显式按原顺序驱动，helper 不得自行恢复或重试。
-synthetic 响应不得描述为真实 provider receipt、外部送达或现场证据。
+按请求类型生成的 synthetic receipt 映射必须保持原值与请求计数语义；synthetic 响应不得描述为真实
+provider receipt、外部送达或现场证据。
 
 ## 4. 完成条件
 
