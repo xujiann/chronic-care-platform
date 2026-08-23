@@ -165,6 +165,8 @@ test("type checking is explicitly incremental and lint ignores generated artifac
   assert.match(eslintSource, /test-results\/\*\*/);
   assert.match(eslintSource, /no-dupe-keys/);
   assert.match(eslintSource, /no-unreachable/);
+  assert.doesNotMatch(eslintSource, /no-dupe-keys["']?\s*:\s*["']off["']/);
+  assert.doesNotMatch(eslintSource, /files:\s*\["internet-nursing\.js",\s*"quality-safety\.js"\]/);
   assert.doesNotMatch(eslintSource, /files:\s*\["test\/api\.test\.js"\]/);
 });
 

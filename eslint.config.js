@@ -30,12 +30,5 @@ module.exports = [
       "no-unsafe-finally": "error",
       "valid-typeof": "error"
     }
-  },
-  {
-    // Frozen legacy baseline: later removal requires behavior tests for the shadowed map entries.
-    files: ["internet-nursing.js", "quality-safety.js"],
-    rules: {
-      "no-dupe-keys": "off"
-    }
   }
 ];

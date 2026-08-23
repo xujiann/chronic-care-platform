@@ -177,6 +177,8 @@ CORE_DATA_DEFINITIONS → collection-governance → CI/release 治理投影`。�
 - TEST-006 保持上述 CI job 拓扑、预算和 required check 不变；标准 integration runner 依据同一
   suite 配置把 `test/api.test.js` 作为单文件热点批次，其余文件仍按既有 40 文件上限顺序分批。
   每个批次和整套测试向日志输出 `durationMs`，不设性能放行阈值，也不写仓库报告。
+- 两个前端翻译 map 继续由原 `displayText` / `zh` / `zhText` / `statusLabel` 调用链消费；去重不引入
+  共享运行时模块或新依赖。专项 Node 测试读取并隔离执行这些纯翻译边界，标准 unit 自动发现负责漂移门禁。
 - 主分支必需检查名称仍为 `complete-unit-test` 与 `test`。聚合 test 使用 `always()`
   并要求三个风险域结果全部为 success，失败、取消和跳过均 fail-closed。
 - governance-api 先校验 custom auth 控制流/负向测试证据，再校验声明级授权矩阵、显式幂等行为证据合同和派生生产 API 目录；依赖方向为 `routeSourceFiles + authentication/idempotency 小型 evidence registry → authorization matrix v3 → production catalog v3`。只有显式标记的 SMS 外部 principal 从幂等合同派生 custom auth，平台 session/RBAC 合同继续复用授权矩阵，避免重复认证声明。幂等合同的 `endpoint` 覆盖可产生 `behavior-verified`，`action-slice` 只登记已验证 action 并保留完整 endpoint 阻断；字面 inventory 只在同一未结束 handler 范围配对 method/path。证据门禁不写数据库、报告或发布制品。

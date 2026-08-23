@@ -104,10 +104,11 @@ LEGACY CODE → TEST PROTECTION → REFACTOR
 六个标准入口已在 TEST-001 T00 切片建立。`test:unit` 与
 `test:integration` 对根 `test/*.test.js` 形成不重叠且完整的分区，`test:smoke`
 是可快速独立运行的精选集合；`test:all` 的自动发现语义保持不变。`lint`
-覆盖仓库 JavaScript，但只对 2 个已登记遗留前端文件保留精确规则级例外；`typecheck`
+覆盖仓库 JavaScript，当前不再保留文件级规则例外；`typecheck`
 已从主线实际 9 个唯一文件扩大为 13 个治理/安全边界文件的增量基线，不得表述为全仓类型检查。
 `test/api.test.js` 已恢复全文件 `no-unreachable`；三段原不可达断言保留为具名显式 skip 债务，
-不得误报为已获得行为保护。lint 仍只对两个前端文件的 16 个 shadowed map key 保留精确例外。
+不得误报为已获得行为保护。两个前端文件原有 16 个 shadowed map key 必须由旧值/最终值/真实翻译
+调用特征测试保护；新增重复键或重新引入 `no-dupe-keys` 文件例外均失败关闭。
 扩大基线时应先清债，不得用全局关闭规则换取通过。
 
 标准 integration suite 保持成员、顺序、断言与超时不变；`test/api.test.js` 作为单文件热点批次执行，
