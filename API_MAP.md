@@ -218,8 +218,8 @@ manual production workflow 也不调用业务 API 或执行部署。
 ## 18. TEST-006 静态与测试性能边界
 
 本切片不新增或改变任何 HTTP method/path、身份、角色、scope、错误、幂等或审计语义。
-`test/api.test.js` 的三段历史不可达断言仅改为显式 skipped debt，现有可执行断言保持原顺序；
-integration runner 只隔离该文件并输出耗时，不把通过、skip 数或耗时提升为 API 生产证据。
+`test/api.test.js` 的三段历史不可达断言曾先登记为显式 skipped debt，后续 T05 revalidation 已全部恢复执行；
+integration runner 只隔离该文件并输出耗时，不把通过数或耗时提升为 API 生产证据。
 后续 duplicate-key closure 只清理 `internet-nursing.js` 与 `quality-safety.js` 的静态翻译 map；
 既有 API 调用、请求参数、响应消费和 DOM 渲染入口保持不变，最终中文展示由逐键调用特征测试锁定。
 
@@ -229,6 +229,10 @@ integration runner 只隔离该文件并输出耗时，不把通过、skip 数�
 `ESCORT_REGISTRATION_SCOPE_DENIED`(403)；`POST /api/escort-services/orders/:id/hospital-handoff`
 将 `reject` 与 `return` 均投影为 `hospital-returned`，并原子更新 `hospitalInterfaceStatus`。鉴权角色、
 method/path、幂等、审计、notification plan 与 outbox 语义不变；planned/pending 不能解释为外部送达。
+
+首个 API 夹具切片只把临时数据副本、环境变量和同一 HTTP server 生命周期移动到测试 helper；测试正文的
+43 个有序子测试及其请求、身份、scope、幂等、错误和审计断言原样保留。helper 暴露的 fixture 与数字医院
+配置函数仅供同一测试进程继续执行既有断言，不是新 API、公共 SDK 或生产信任接口。
 
 ## 18A. TEST-002 内部覆盖扩展（无 API 变化）
 

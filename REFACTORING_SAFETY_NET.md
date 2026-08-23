@@ -43,6 +43,9 @@ T05 care owner 的遗留路由还必须运行 3 个独立 HTTP 特征测试，�
 生命周期。派单证据构造器与 owner adapter 必须处于同一测试进程信任边界；通知只断言 plan、outbox
 和可信 receipt，不得把模拟字段写成外部送达证据。
 
+拆分 `test/api.test.js` 自身时，每个切片只能移动一个共享测试生命周期；必须锁定子测试数量与顺序，
+保持单进程 server、共享状态、断言、超时、integration 成员和 CI 预算，并运行完整 API hotspot。
+
 ## 4. 完成条件
 
 - 公共行为未意外变化；预期变化有批准和契约更新。
