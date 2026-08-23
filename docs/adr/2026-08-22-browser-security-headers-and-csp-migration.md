@@ -118,6 +118,17 @@ occurrence 由 851 降为 843，覆盖资产由 40 降为 39，其中 `innerHTML
 数据、schema、审计、CI 或 CSP enforcement；真实托管头、OHIF/外部 Origin、独立渗透与现场验收继续
 NO-GO，兼容 `unsafe-inline`、严格 Report-Only 和 `productionReady=false` 保持不变。
 
+### 产品区域运行驾驶舱可信渲染切片（2026-08-23）
+
+`product-regional-operations-ui.js` 将 `mount` 中唯一的 `innerHTML` sink 迁为显式
+`createElement`、`textContent`、dataset 与 `replaceChildren`，同时保留既有 `render`/`escapeHtml`
+字符串接口及编码语义。迁移前先以恶意增强驾驶舱 API 字段冻结现有文本与 dataset 表现，迁移后同一
+浏览器合同确认标签和事件属性不会被创建。Inventory v2 的 DOM HTML occurrence 由 842 降为 841，
+覆盖资产由 38 降为 37，其中 `innerHTML` 838→837；动态 URL 6 和动态样式 45 均未改变。该单页切片
+不改变 API、commission 鉴权、数据、schema、审计、CI 或 CSP enforcement；真实托管头、地区外部系统、
+OHIF/外部 Origin、独立渗透与现场验收继续 NO-GO，兼容 `unsafe-inline`、严格 Report-Only 和
+`productionReady=false` 保持不变。
+
 ## Phased enforcement and rollback
 
 1. 第一阶段：集中端口、兼容 CSP + 严格 Report-Only、风险清单、CI 增量拒绝；固定 `productionReady=false`。
