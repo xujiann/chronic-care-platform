@@ -119,7 +119,7 @@
   },
   "riskBaseline": {
     "schemaVersion": 2,
-    "sourceRevision": "origin/main@65db3bcd + process/t00-sec004-html-sink-20260823",
+    "sourceRevision": "origin/main@64a1ad5e + process/t00-sec004-html-sink2-20260823",
     "failClosedPriorities": [
       "P0",
       "P1"
@@ -147,7 +147,6 @@
       {"asset":"digital-hospital-standards.js","type":"dom-inner-html","priority":"P0","fingerprint":"01ec45bb7f49934cd1bf2fc88fc6142f0b724b5d61e32d16c5c8c0342526d83a","count":6},
       {"asset":"disease-payment.js","type":"cssom-property-mutation","priority":"P1","fingerprint":"1e64c5f05b95d01f3a82b79b2ecbea1692f2b7489e4611b2abeb2157fc7bc7db","count":1},
       {"asset":"disease-payment.js","type":"dom-inner-html","priority":"P0","fingerprint":"14f7da2de2830d8722fefc1da8aba657b6ae89e6fd50bc6798455cf1ea555017","count":34},
-      {"asset":"doctor.js","type":"dom-inner-html","priority":"P0","fingerprint":"3f9da557554ac14ee9bb776e30efe13c91b7faee0945ced1127a3a0b7b584556","count":6},
       {"asset":"emergency-lifechain-ui.js","type":"cssom-property-mutation","priority":"P1","fingerprint":"82f77bdf1201372098ffc2ede01e3a5b3898ed953ab72e7a8b2edb1aaa1ca8a6","count":1},
       {"asset":"emergency.js","type":"cssom-property-mutation","priority":"P1","fingerprint":"76e5487c3cefb26768bfb3658ef7148088aefef92c7e9ba0940afeee3228e9e0","count":1},
       {"asset":"emergency.js","type":"dom-inner-html","priority":"P0","fingerprint":"9126c53e00a27f472b5ad2c71d7056f3db3d1d680e497c3972ee536f2988669f","count":17},

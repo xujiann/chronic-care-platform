@@ -76,6 +76,16 @@ HTML occurrence 由 871 降为 865，覆盖资产由 43 降为 42；动态 URL 6
 该单页切片不代表 `emergency.js` 或其他页面已迁移，不推进 CSP enforcement；真实托管头、OHIF/外部
 Origin、独立渗透与现场验收仍未完成，兼容 `unsafe-inline`、严格 Report-Only 和 `productionReady=false` 保持不变。
 
+### 医生工作台可信渲染切片（2026-08-23）
+
+`doctor.js` 将本人指标、临床辅助、执业档案、政策、申请消息与公开备案中的 6 个 `innerHTML`
+迁为显式 `createElement`、`textContent`、dataset、固定 class 与 `replaceChildren`。迁移前先以恶意
+API 字段冻结现有编码表现，迁移后同一浏览器合同确认标签、事件属性不会被创建，临床提醒按钮仍保留
+原 alert ID/action dataset。与急救切片合并后，Inventory v2 的 DOM HTML occurrence 由 865 降为
+859，覆盖资产由 42 降为 41；动态 URL 6 和动态样式 45 均未改变。该单页切片不改变 API、鉴权、
+数据或审计，也不推进 CSP enforcement；真实托管头、OHIF/外部 Origin、独立渗透与现场验收继续
+NO-GO，兼容 `unsafe-inline`、严格 Report-Only 和 `productionReady=false` 保持不变。
+
 ## Phased enforcement and rollback
 
 1. 第一阶段：集中端口、兼容 CSP + 严格 Report-Only、风险清单、CI 增量拒绝；固定 `productionReady=false`。
