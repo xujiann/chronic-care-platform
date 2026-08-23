@@ -75,8 +75,8 @@ test("static publication build writes a sanitized standalone Pages artifact", ()
     assert.equal(result.manifest.browserSecurity.externalHeaderApplicationRequired, true);
     assert.equal(result.manifest.browserSecurity.safeUrlContractId, "browser-safe-url-policy.v1");
     assert.equal(result.manifest.browserSecurity.safeUrlReviewRequiredOccurrences, 2);
-    assert.equal(result.manifest.browserSecurity.inventory.total, 891);
-    assert.equal(result.manifest.browserSecurity.inventory.byPriority.P0, 846);
+    assert.equal(result.manifest.browserSecurity.inventory.total, 889);
+    assert.equal(result.manifest.browserSecurity.inventory.byPriority.P0, 844);
     assert.equal(result.manifest.browserSecurity.inventory.byPriority.P1, 45);
     assert.deepEqual(listFiles(output).sort(), result.manifest.files.map((file) => file.path).sort());
     assert.equal(fs.existsSync(path.join(output, "browser-security-policy.json")), true);

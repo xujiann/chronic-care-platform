@@ -140,6 +140,18 @@ pack 的二十余个渲染区，而非一个低风险文本点。迁移前先以
 OHIF/外部 Origin、独立渗透与现场验收继续 NO-GO，兼容 `unsafe-inline`、严格 Report-Only 和
 `productionReady=false` 保持不变。
 
+### 区域切换工作台可信渲染切片（2026-08-23）
+
+`regional-cutover-workbench-ui.js` 的两个 `innerHTML` 分别承载区域切换摘要卡片和地区证据卡片。
+大部分字段原先经过 `escapeHtml`，但 `readyScopes/requiredScopes` 直接进入模板；恶意 API 回归在旧实现
+中可创建活动标签和事件属性。迁移后摘要、地区、发布、运维、存储、证据、阻断项、边界及区域 dataset
+均通过显式 `createElement`、`textContent`、固定 class、dataset 与 `replaceChildren` 写入，原 badge、
+文本格式和加载失败行为保持不变。Inventory v2 的 DOM HTML occurrence 由 840 降为 838，覆盖资产由
+36 降为 35，其中 `innerHTML` 836→834；动态 URL 6 和动态样式 45 均未改变。该单页切片不改变 API、
+commission 鉴权、区域发布事实、审计、schema、CI 或 CSP enforcement；真实地区切换、外部证据、
+托管头、独立渗透与现场验收继续 NO-GO，兼容 `unsafe-inline`、严格 Report-Only 和
+`productionReady=false` 保持不变。
+
 ## Phased enforcement and rollback
 
 1. 第一阶段：集中端口、兼容 CSP + 严格 Report-Only、风险清单、CI 增量拒绝；固定 `productionReady=false`。
