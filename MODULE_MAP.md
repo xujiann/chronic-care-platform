@@ -35,11 +35,11 @@
 | 区域运行 | `src/platform/regional/`、`regions/` | 多地区清单、能力包、复制和发布注册 |
 | 领域实现 | `src/care-coordination/` 等与根目录服务 | 新旧实现并存，边界尚未完全迁移 |
 | 前端共享 | `auth.js`、`shared.js`、`platform-api-client.js`、`platform-shell.js` | 身份上下文、API 调用、壳和设计系统；服务端 token 不进入 localStorage，Cookie 上下文优先，陈旧凭据启动即清理 |
-| 静态发布与浏览器安全 | `src/http/static-asset-policy.js`、`src/http/static-content-runtime.js`、`src/http/browser-security-policy.js`、`src/http/browser-security-inventory.js`、`browser-safe-url.js`、`page-auth-bootstrap.js`、`scripts/static-publication.js` | 44 个入口、145 个显式发布资产、Pages 制品和服务端读取共用默认拒绝契约；血液主工作台、急救生命链、医生工作台、血液上线看板与陪诊工作台 controller 已改为可信 DOM/text 渲染，Safe URL port 按 internal/official/object-storage/tel/blob 能力在 mutation 前检查协议、凭据和 exact-Origin。28 个真实模板 URL 已改为模板无 URL、共享端口 DOM 绑定，1 个普通 `item.action` 误报已校正；Inventory v2 现锁定 843 个 DOM HTML、6 个动态 URL 和 45 个动态样式风险，仅 2 个 OHIF URL occurrence 仍复核。严格 CSP 仍是 Report-Only，生产 NO-GO |
+| 静态发布与浏览器安全 | `src/http/static-asset-policy.js`、`src/http/static-content-runtime.js`、`src/http/browser-security-policy.js`、`src/http/browser-security-inventory.js`、`browser-safe-url.js`、`page-auth-bootstrap.js`、`scripts/static-publication.js` | 44 个入口、145 个显式发布资产、Pages 制品和服务端读取共用默认拒绝契约；血液主工作台、急救生命链、医生工作台、血液上线看板、陪诊工作台与产品运行驾驶舱 controller 已改为可信 DOM/text 渲染，Safe URL port 按 internal/official/object-storage/tel/blob 能力在 mutation 前检查协议、凭据和 exact-Origin。28 个真实模板 URL 已改为模板无 URL、共享端口 DOM 绑定，1 个普通 `item.action` 误报已校正；Inventory v2 现锁定 842 个 DOM HTML、6 个动态 URL 和 45 个动态样式风险，仅 2 个 OHIF URL occurrence 仍复核。严格 CSP 仍是 Report-Only，生产 NO-GO |
 | 演示脱敏 | `src/platform/data/public-demo-snapshot.js` | 服务端合成、Pages 构建和 storage-admin 共用纯函数，凭据字段删除、个人姓名/身份/联系字段稳定掩码 |
 | API 生产目录 | `routeSourceFiles` + `api-authentication-evidence` + `api-idempotency-evidence` → `api-authorization-matrix-v3` → `production-api-catalog-v3` | 13 项认证证据保持未分类为 0。9 份幂等行为合同覆盖 7 个完整 endpoint 与 2 个转诊 action-slice；T01 security-control action 复用 session-security-audit repository 的 receipt/audit 单写、进程内串行和 SQLite CAS，只增加稳定脱敏冲突映射，未接 PG adapter、未新增 outbox。326 个写接口仍缺 endpoint 级行为证明；退款 runtime-role variant 与通用 action remainder 使 328 项保持复核，全部生产 NO-GO。T07 深审仅余 dispatch 与 formal grouping 两个 proof gap |
 | 内部边界覆盖治理 | `config/internal-boundary-coverage.json` → `scripts/internal-boundary-coverage.js` | 复用现有 c8/直接行为测试，以 10 个不重叠源码组锁定 identity、audit、object storage、API governance、worker observability、区域共享命令、转诊 owner command、科研合规导出、浏览器响应头与 Safe URL 真实基线；每组绑定至少一条实际执行的负向合同，报告仅写临时目录 |
-| Playwright E2E 基础设施 | `playwright-browser-policy.v1`、`playwright-pwa-browser-policy.v1`、`playwright-port-policy`、三套 runner/config | 在线根 31 项（含急救生命链、医生工作台、血液上线看板、陪诊工作台恶意响应回归）与居民 13 项继续阻止 Service Worker；独立 PWA 3 项只在专项 context 允许 Worker，三套共 47 项唯一并集，统一 Chromium、动态端口和临时数据，并验证缓存/注册清理 |
+| Playwright E2E 基础设施 | `playwright-browser-policy.v1`、`playwright-pwa-browser-policy.v1`、`playwright-port-policy`、三套 runner/config | 在线根 32 项（含急救生命链、医生工作台、血液上线看板、陪诊工作台与产品运行驾驶舱恶意响应回归）与居民 13 项继续阻止 Service Worker；独立 PWA 3 项只在专项 context 允许 Worker，三套共 48 项唯一并集，统一 Chromium、动态端口和临时数据，并验证缓存/注册清理 |
 | 生产证据信任 provider | `src/platform/governance/production-evidence-trust-provider.js` → `scripts/production-preflight.js` | T00 通用 signed-envelope/anchor 验证端口与 production decision 适配；CLI 可部署装配，双角色 Ed25519、pin、撤销、时窗和发布上下文失败关闭；不拥有生产授权 |
 
 ## 3. 依赖宽度
@@ -149,9 +149,9 @@ scripts/platform-cutover-alert-worker.js
 - `test/operations-command-handoff.test.js` 复用原 T02 handoff harness，把 32 条 operations command
   路径登记为唯一数据驱动行为矩阵；`operations-command:behavior-test` 在 governance-api 显式运行，
   同时仍由标准 unit 补集覆盖。矩阵保护遗留 handler，不是新路由注册表或拆分授权。
-- 根、居民和 PWA 三套 Playwright 配置共用 Chromium、动态端口与 runner 端口装配；在线 31 + 13 项
+- 根、居民和 PWA 三套 Playwright 配置共用 Chromium、动态端口与 runner 端口装配；在线 32 + 13 项
   固定 `serviceWorkers=block`，只有 PWA 3 项使用 `playwright-pwa-browser-policy.v1` 允许 Worker。
-  Playwright 列表门禁锁定 31 + 13 + 3 = 47 且无重复，固定端口、系统 Chrome 或 PWA 测试混入在线套件会失败。
+  Playwright 列表门禁锁定 32 + 13 + 3 = 48 且无重复，固定端口、系统 Chrome 或 PWA 测试混入在线套件会失败。
 
 ## 11. 区域共享调阅命令
 
