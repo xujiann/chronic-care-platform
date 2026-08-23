@@ -5,6 +5,108 @@
     "unregisteredWriteStatus": "behavior-proof-required",
     "productionPromotionAllowed": false
   },
+  "reviewedProofRequired": [
+    {
+      "reviewId": "T07-financial-dispatch-20260823",
+      "key": "POST /api/financial-gateways/dispatch",
+      "method": "POST",
+      "path": "/api/financial-gateways/dispatch",
+      "owner": "T07",
+      "domain": "insurance-payment",
+      "missingProof": [
+        "payload-conflict",
+        "cas-or-concurrency",
+        "atomic-audit-or-outbox"
+      ],
+      "evidence": [
+        {
+          "file": "src/http/routes/insurance-payment.js",
+          "anchors": [
+            "url.pathname === \"/api/financial-gateways/dispatch\"",
+            "if (duplicate)",
+            "idempotentReplay: true"
+          ]
+        },
+        {
+          "file": "test/api.test.js",
+          "anchors": [
+            "dispatches payment insurance and certificate requests through audited production gateways",
+            "const replay = await api(baseUrl, \"/api/financial-gateways/dispatch\""
+          ]
+        }
+      ],
+      "productionReady": false
+    },
+    {
+      "reviewId": "T07-financial-reconciliation-20260823",
+      "key": "POST /api/financial-gateways/reconciliation-runs",
+      "method": "POST",
+      "path": "/api/financial-gateways/reconciliation-runs",
+      "owner": "T07",
+      "domain": "insurance-payment",
+      "missingProof": [
+        "cas-or-concurrency",
+        "atomic-audit-or-outbox"
+      ],
+      "evidence": [
+        {
+          "file": "financial-gateways.js",
+          "anchors": [
+            "function createFinancialReconciliationRun",
+            "FINANCIAL_RECONCILIATION_DIGEST_CONFLICT",
+            "idempotentReplay: true"
+          ]
+        },
+        {
+          "file": "test/financial-gateways.test.js",
+          "anchors": [
+            "financial reconciliation compares digest-only provider summaries",
+            "FINANCIAL_RECONCILIATION_DIGEST_CONFLICT"
+          ]
+        }
+      ],
+      "productionReady": false
+    },
+    {
+      "reviewId": "T07-formal-grouping-job-20260823",
+      "key": "POST /api/disease-payment/formal-grouping/jobs",
+      "method": "POST",
+      "path": "/api/disease-payment/formal-grouping/jobs",
+      "owner": "T07",
+      "domain": "insurance-payment",
+      "missingProof": [
+        "resource-scope",
+        "cas-or-concurrency",
+        "stable-error-contract",
+        "atomic-audit-or-outbox"
+      ],
+      "evidence": [
+        {
+          "file": "src/http/routes/insurance-payment.js",
+          "anchors": [
+            "url.pathname === \"/api/disease-payment/formal-grouping/jobs\"",
+            "authorizeInsurancePaymentAction(\"formal-grouping.create\""
+          ]
+        },
+        {
+          "file": "disease-payment-intake.js",
+          "anchors": [
+            "function createFormalGroupingJob",
+            "正式分组作业幂等键已绑定不同",
+            "idempotent: true"
+          ]
+        },
+        {
+          "file": "test/insurance-payment-formal-grouper-projection.test.js",
+          "anchors": [
+            "formal grouper idempotency key cannot alias a different case snapshot",
+            "幂等键已绑定不同"
+          ]
+        }
+      ],
+      "productionReady": false
+    }
+  ],
   "contracts": [
     {
       "contractId": "identity-security.sms-delivery-callback-idempotency.v1",
