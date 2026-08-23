@@ -220,6 +220,8 @@ manual production workflow 也不调用业务 API 或执行部署。
 本切片不新增或改变任何 HTTP method/path、身份、角色、scope、错误、幂等或审计语义。
 `test/api.test.js` 的三段历史不可达断言仅改为显式 skipped debt，现有可执行断言保持原顺序；
 integration runner 只隔离该文件并输出耗时，不把通过、skip 数或耗时提升为 API 生产证据。
+后续 duplicate-key closure 只清理 `internet-nursing.js` 与 `quality-safety.js` 的静态翻译 map；
+既有 API 调用、请求参数、响应消费和 DOM 渲染入口保持不变，最终中文展示由逐键调用特征测试锁定。
 
 ## 18A. TEST-002 内部覆盖扩展（无 API 变化）
 

@@ -34,7 +34,7 @@
 | API-001 | 错误契约 | 多种 JSON 错误格式 | 新 API 使用版本化标准错误接口 |
 | API-002 | 接口目录复核 | v3 合并 601 条授权声明与 371 个字面条件路由，形成 593 项；13 项认证证据保持不变。existing-proof 首批把区域共享、直接转诊、科研导出 action 3 个 endpoint 加入行为证明，并登记 2 个转诊 action-slice；连同 SMS 共 6 份合同、4 个 endpoint verified。329 个写接口仍缺 endpoint 级证明，330 项保持 review-required | 逐 owner 补 route/action、身份、幂等、CAS、错误与审计合同；`workflow-actions` 与 `tasks/:id/actions` 的非转诊 remainder、科研导出创建路径和 7 个运行时策略继续 review-required。禁止把 action-slice、字符串标记或猜测 owner 当成完整 endpoint 证明 |
 | JOB-001 | Worker 一致性 | 12 个既有 worker profile、9 个部署入口已建立 `platform-worker-observability.v1` 脱敏兼容投影；领域 state/retry/lease/checkpoint/receipt 仍各自权威，仓库不据此推导生产授权 | 后续接入真实指标/日志采集器与告警路由前，必须另行确认 owner、留存、访问控制和现场启用证据；不得把兼容投影演变为统一领域状态机 |
-| TEST-006 | 静态基线与测试性能 | 已关闭 `test/api.test.js` 的全文件 `no-unreachable` 例外：3 段原不可达断言改为具名显式 skip 债务；typecheck 去重并从主线实际 9 个唯一文件扩大至 13 个；本机 Node 24 三次单文件采样约 294–371 秒，现作为独立 integration 热点批次输出 batch/suite 耗时。suite 成员、顺序、断言、超时、CI job 预算与 required checks 均未降低 | 剩余两个前端文件 16 个重复键需先补 shadow-map 行为测试再消除；3 个显式 skip 必须由 T05 owner 逐块重验后恢复执行；API 巨型夹具仍需按共享服务生命周期拆分，耗时数据先观察多次 CI 分布，不凭单机样本设门槛 |
+| TEST-006 | 静态基线与测试性能 | 已关闭 `test/api.test.js` 的全文件 `no-unreachable` 例外：3 段原不可达断言改为具名显式 skip 债务；typecheck 去重并从主线实际 9 个唯一文件扩大至 13 个；本机 Node 24 三次单文件采样约 294–371 秒，现作为独立 integration 热点批次输出 batch/suite 耗时。两个前端文件的 16 个重复翻译键已有逐键 shadow/final 值和 `displayText`/`zh`/`zhText`/`statusLabel` 调用保护，去重保持首次插入顺序及最终生效值，lint 文件级例外已归零 | 3 个显式 skip 必须由 T05 owner 逐块重验后恢复执行；API 巨型夹具仍需按共享服务生命周期拆分，耗时数据先观察多次 CI 分布，不凭单机样本设门槛；不得恢复文件级 lint 豁免 |
 
 ## 已关闭
 

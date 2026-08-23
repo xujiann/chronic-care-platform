@@ -131,8 +131,9 @@ scripts/platform-cutover-alert-worker.js
   不改变成员和执行顺序；runner 输出 batch/suite `durationMs`，不设置或放宽耗时阈值。
 - `eslint.config.js` 与 `jsconfig.typecheck.json` 是渐进式静态质量边界，不拥有业务接口。
   Pages、complete-unit-test、governance-api 和 release-readiness 只消费这些标准入口；
-  `test:all` 仍是独立的自动发现回归保护。lint 现只为两个前端文件保留 16 个重复键的规则级
-  例外，typecheck 覆盖 13 个唯一边界文件。
+  `test:all` 仍是独立的自动发现回归保护。两个前端翻译 map 的 16 个重复键已由
+  `frontend-duplicate-key-contract` 锁定旧 shadow 值、最终值和调用行为后去重；lint 现无文件级规则例外，
+  typecheck 覆盖 13 个唯一边界文件。
 - `scripts/internal-boundary-coverage.js` 复用现有 c8 与专项测试，为 10 个关键边界建立独立覆盖组；
   它不替代原 `server.js` 85/85/55 门禁，阈值只能持平或提高，报告不进入仓库。
 - `test/operations-command-handoff.test.js` 复用原 T02 handoff harness，把 32 条 operations command
