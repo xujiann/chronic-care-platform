@@ -1,4 +1,5 @@
 const assert = require("node:assert/strict");
+const { createHash } = require("node:crypto");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
@@ -73,6 +74,25 @@ test("the API hotspot is isolated without changing integration membership or ord
   assert.deepEqual(batches[0], { files: ["test/api.test.js"], isolated: true });
   assert.deepEqual(batches.flatMap((batch) => batch.files), integration);
   assert.equal(batches.slice(1).every((batch) => batch.files.length <= 40), true);
+});
+
+test("the API hotspot keeps one extracted runtime lifecycle and the exact subtest order", () => {
+  const apiTest = read("test/api.test.js");
+  const runtimeHelper = read("test/helpers/api-regression-runtime.js");
+  const subtestNames = [...apiTest.matchAll(/await t\.test\("([^"]+)"/g)].map((match) => match[1]);
+  const orderDigest = createHash("sha256").update(subtestNames.join("\n")).digest("hex");
+
+  assert.equal((apiTest.match(/createApiRegressionRuntime\(\)/g) || []).length, 1);
+  assert.match(apiTest, /start: startApiRegressionRuntime/);
+  assert.match(apiTest, /stop: stopApiRegressionRuntime/);
+  assert.doesNotMatch(apiTest, /mkdtempSync|startServer\(0\)|stopServer\(\)|health-platform-test-/);
+  assert.match(runtimeHelper, /mkdtempSync/);
+  assert.match(runtimeHelper, /startServer\(0\)/);
+  assert.match(runtimeHelper, /await once\(server, "listening"\)/);
+  assert.match(runtimeHelper, /await stopServer\(\)/);
+  assert.match(runtimeHelper, /rmSync\(dataDir, \{ recursive: true, force: true \}\)/);
+  assert.equal(subtestNames.length, 43);
+  assert.equal(orderDigest, "dab18cc7fb2ae790cae552d5646c30f9ba35e8139ac47c629466001dfe6b6cea");
 });
 
 test("standard suite metrics are emitted for success without a time threshold", () => {

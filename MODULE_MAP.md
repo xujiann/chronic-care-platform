@@ -85,7 +85,7 @@ scripts/platform-cutover-alert-worker.js
 |---|---:|---|
 | `server.js` | 28,189 | 组合根、种子和领域函数仍集中；SQLite migration 已抽离 |
 | `digital-hospital-standard-platform/app.js` | 10,563 | 单文件子站 |
-| `test/api.test.js` | 8,140 | 回归范围巨大、定位慢 |
+| `test/api.test.js` | 约 8,300 | 回归范围仍巨大；首个共享运行时夹具已提取，业务断言仍集中 |
 | `citizen.js` | 6,066 | 居民端视图、状态和流程耦合 |
 | `portal.css` | 5,243 | 全局样式影响面大 |
 | `test/static.test.js` | 5,058 | 静态结构测试集中 |
@@ -129,6 +129,9 @@ scripts/platform-cutover-alert-worker.js
   integration 冻结旧 `npm test` 清单，unit 是 `test:all` 根测试集合的精确补集，smoke
   只保留隔离启动与发布健康检查。TEST-006 将 `test/api.test.js` 标为 integration isolated hotspot，
   不改变成员和执行顺序；runner 输出 batch/suite `durationMs`，不设置或放宽耗时阈值。
+- `test/helpers/api-regression-runtime.js` 只拥有上述 API 热点的临时 JSON seed、测试环境变量和同一
+  `server.js` 启停生命周期；它显式返回测试正文仍需的 fixture 与数字医院测试句柄，不拥有 API、领域状态机、
+  生产配置或外部证据。工程门禁锁定 43 个子测试的数量和顺序摘要，后续只能继续按一个共享生命周期小步拆分。
 - `test/escort-owner-route-characterization.test.js`、`test/internet-nursing-closed-loop-characterization.test.js`
   与 `test/internet-nursing-nurse-lifecycle-characterization.test.js` 是 T05 owner/route 特征测试；共享
   `test/helpers/care-api-characterization-runtime.js` 在各测试进程内启动真实 HTTP 服务并使用临时数据副本，

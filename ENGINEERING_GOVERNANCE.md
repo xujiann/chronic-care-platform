@@ -116,6 +116,9 @@ LEGACY CODE → TEST PROTECTION → REFACTOR
 标准 integration suite 保持成员、顺序、断言与超时不变；`test/api.test.js` 作为单文件热点批次执行，
 runner 向 CI 日志输出 batch/suite `durationMs`。耗时只用于定位与趋势观测，不是放行阈值，当前不改变
 CI job 拓扑、10/15/5 分钟预算或 required check。
+API 热点的共享运行时夹具可以按一次一个生命周期移入 `test/helpers/`，但必须保持同一 server/进程、
+测试成员与顺序、断言、超时、临时数据清理和 CI 预算。首个切片以 43 个子测试的有序 SHA-256 摘要失败关闭；
+helper 只能服务测试，不能承载业务逻辑、生产凭据、外部投递或现场证据。改变并行/分片拓扑须另行审批和 ADR。
 
 DATA-003 的只读集合治理验证映射到 governance-api，并由 architecture test 运行专项负向测试；
 它补充 TEST-001，不改变 unit/integration/smoke 分区，也不把仓库通过结果解释为生产批准。

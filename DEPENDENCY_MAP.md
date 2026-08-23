@@ -178,6 +178,9 @@ CORE_DATA_DEFINITIONS → collection-governance → CI/release 治理投影`。�
 - TEST-006 保持上述 CI job 拓扑、预算和 required check 不变；标准 integration runner 依据同一
   suite 配置把 `test/api.test.js` 作为单文件热点批次，其余文件仍按既有 40 文件上限顺序分批。
   每个批次和整套测试向日志输出 `durationMs`，不设性能放行阈值，也不写仓库报告。
+- 首个夹具切片的测试依赖方向为 `test/api.test.js -> test/helpers/api-regression-runtime.js -> server.js + 临时 JSON 副本`。
+  helper 不被运行时代码或其他领域模块反向引用；server 仍只启动一次，43 个子测试仍在同一进程按原顺序共享状态，
+  因此没有新增运行时依赖、静态环、并行写入或 CI 拓扑变化。
 - 两个前端翻译 map 继续由原 `displayText` / `zh` / `zhText` / `statusLabel` 调用链消费；去重不引入
   共享运行时模块或新依赖。专项 Node 测试读取并隔离执行这些纯翻译边界，标准 unit 自动发现负责漂移门禁。
 - care revalidation 的依赖方向为
