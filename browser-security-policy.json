@@ -119,7 +119,7 @@
   },
   "riskBaseline": {
     "schemaVersion": 2,
-    "sourceRevision": "origin/main@7ded9a69 + process/t00-sec004-blood-go-live-sink-20260823",
+    "sourceRevision": "origin/main@cc91f490 + process/t00-sec004-html-sink4-20260823",
     "failClosedPriorities": [
       "P0",
       "P1"
@@ -149,8 +149,6 @@
       {"asset":"emergency-lifechain-ui.js","type":"cssom-property-mutation","priority":"P1","fingerprint":"82f77bdf1201372098ffc2ede01e3a5b3898ed953ab72e7a8b2edb1aaa1ca8a6","count":1},
       {"asset":"emergency.js","type":"cssom-property-mutation","priority":"P1","fingerprint":"76e5487c3cefb26768bfb3658ef7148088aefef92c7e9ba0940afeee3228e9e0","count":1},
       {"asset":"emergency.js","type":"dom-inner-html","priority":"P0","fingerprint":"9126c53e00a27f472b5ad2c71d7056f3db3d1d680e497c3972ee536f2988669f","count":17},
-      {"asset":"escort.js","type":"dom-inner-html","priority":"P0","fingerprint":"69edbe3a333de7acc587e6ae7f5a6ae67f8a8a4960c59993f79bf3163f70ac1e","count":7},
-      {"asset":"escort.js","type":"dom-insert-adjacent-html","priority":"P0","fingerprint":"584b2149aef075121cccbfab5dfe95f52ab00302eb9abeea20ac1cdfb957d136","count":1},
       {"asset":"health-dashboard-about.js","type":"dom-inner-html","priority":"P0","fingerprint":"055d5a1915144b591040e577c1bd9ea63d14c9032d4436d3c0fa40c277e832f3","count":4},
       {"asset":"health-dashboard.js","type":"dom-inner-html","priority":"P0","fingerprint":"2e517c2d8e4a522ed14a5d45600a3961ffe55d95b2b2a1a645159a6eadad8e2a","count":51},
       {"asset":"health-dashboard.js","type":"dynamic-html-style-attribute","priority":"P1","fingerprint":"c3568fab59159239d93b2fb0b38fff488dd11be140309955f557806e4b10cf9f","count":3},

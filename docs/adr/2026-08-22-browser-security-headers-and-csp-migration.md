@@ -97,6 +97,17 @@ CSP enforcement；真实血液系统/设备接口、证据双签、演练、迁�
 独立渗透与现场验收继续 NO-GO，兼容 `unsafe-inline`、严格 Report-Only 和
 `productionReady=false` 保持不变。
 
+### 陪诊工作台可信渲染切片（2026-08-23）
+
+`escort.js` 将指标、服务商下拉、订单、服务主体、陪诊师、风险队列与政策映射中的 7 个 `innerHTML`
+和订单医院交接按钮的 1 个 `insertAdjacentHTML` 迁为显式 `createElement`、`textContent`/文本节点、
+固定 class、dataset 与 `replaceChildren`。迁移前先以恶意陪诊 API 字段冻结现有编码与 action/hospital
+dataset 表现，迁移后同一浏览器合同确认标签和事件属性不会被创建。Inventory v2 的 DOM HTML
+occurrence 由 851 降为 843，覆盖资产由 40 降为 39，其中 `innerHTML` 846→839、
+`insertAdjacentHTML` 5→4；动态 URL 6 和动态样式 45 均未改变。该单页切片不改变 API、鉴权、
+数据、schema、审计、CI 或 CSP enforcement；真实 HIS/导诊台、托管头、OHIF/外部 Origin、独立渗透
+与现场验收继续 NO-GO，兼容 `unsafe-inline`、严格 Report-Only 和 `productionReady=false` 保持不变。
+
 ## Phased enforcement and rollback
 
 1. 第一阶段：集中端口、兼容 CSP + 严格 Report-Only、风险清单、CI 增量拒绝；固定 `productionReady=false`。

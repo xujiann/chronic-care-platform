@@ -175,10 +175,13 @@ function escortRiskQualityText(item) {
   return `risk/quality blocked: ${control.blockers.slice(0, 5).join(", ")}`;
 }
 
-function escortRiskQualityActionAttributes(item, target) {
+function escortRiskQualityActionState(item, target) {
   const control = item.riskQualityControl;
-  if (control?.ok && control.target === target) return "";
-  return `disabled aria-disabled="true" title="${escapeHtml(escortRiskQualityText(item) || `transition to ${target} blocked`)}"`;
+  if (control?.ok && control.target === target) return { disabled: false, title: "" };
+  return {
+    disabled: true,
+    title: escortRiskQualityText(item) || `transition to ${target} blocked`
+  };
 }
 
 function buildEscortSchedulingControl(order, domain) {
@@ -288,50 +291,95 @@ function renderEscortMetrics(summary) {
     ["补贴保障", summary.subsidyOrders || 0, "subsidy / time-bank"],
     ["质量回访", summary.qualityReviewRequired || 0, "callback required"]
   ];
-  document.querySelector("#escort-metrics").innerHTML = metrics.map(([label, value, hint]) => `
-    <article class="metric-card">
-      <span>${escapeHtml(label)}</span>
-      <strong>${escapeHtml(value)}</strong>
-      <small>${escapeHtml(hint)}</small>
-    </article>
-  `).join("");
+  document.querySelector("#escort-metrics").replaceChildren(...metrics.map(([label, value, hint]) => {
+    const card = escortElement("article", { className: "metric-card" });
+    card.append(
+      escortElement("span", { text: label }),
+      escortElement("strong", { text: value }),
+      escortElement("small", { text: hint })
+    );
+    return card;
+  }));
 }
 
 function renderProviderSelect(providers) {
   const select = document.querySelector("#escort-provider-select");
   if (!select) return;
-  select.innerHTML = providers.map((item) => `<option value="${escapeHtml(item.id)}">${escapeHtml(item.name)}</option>`).join("");
+  select.replaceChildren(...providers.map((item) => {
+    const option = escortElement("option", { text: item.name });
+    option.value = String(item.id ?? "");
+    return option;
+  }));
 }
 
 function renderEscortOrders(items) {
-  document.querySelector("#escort-orders").innerHTML = `
-    <table>
-      <thead><tr><th>订单</th><th>居民</th><th>服务主体</th><th>陪诊师</th><th>就医安排</th><th>保障</th><th>状态</th><th>操作</th></tr></thead>
-      <tbody>${items.map((item) => `
-        <tr>
-          <td><strong>${escapeHtml(item.id)}</strong><br><small>${escapeHtml(item.sourceChannel || "")}</small></td>
-          <td>${escapeHtml(item.residentId || "")}<br><small>${escapeHtml(item.familyContactStatus || "")}</small></td>
-          <td>${escapeHtml(item.provider?.name || item.providerName || item.providerId || "")}<br><small>${escapeHtml(item.district || "")}</small></td>
-          <td>${escapeHtml(item.worker?.name || item.workerId || "pending")}<br><small>${escapeHtml((item.serviceItems || []).join(", "))}</small><br><small>${escapeHtml(escortDispatchControlText(item))}</small></td>
-          <td>${escapeHtml(item.hospital || "")}<br><small>${escapeHtml(item.department || "")} / ${escapeHtml(item.appointmentAt || item.due || "")}</small><br><small>${statusBadge(item.hospitalInterfaceStatus || "pending")} ${escapeHtml(item.hospitalCheckInNo || item.outpatientQueueNo || item.hospitalNotice || "")}</small><br><small>${escapeHtml(item.hisVisitId || item.appointmentSource || "")} ${escapeHtml(item.departmentCode || "")} ${escapeHtml(item.doctorCode || "")}</small></td>
-          <td>${statusBadge(item.subsidyType)} ${statusBadge(item.contractStatus)} ${statusBadge(item.insuranceStatus)}</td>
-          <td>${statusBadge(item.status)} ${statusBadge(item.priority)}<br><small>${escapeHtml(item.qualityReview || "")}</small><br><small>${escapeHtml(escortServiceEvidenceText(item))}</small><br><small>${escapeHtml(escortFinancialEvidenceText(item))}</small><br><small>${escapeHtml(escortRiskQualityText(item))}</small><br><small>${escapeHtml(escortSchedulingText(item))}</small><br><small>${escapeHtml(escortCancellationRefundText(item))}</small><br><small>${escapeHtml(escortTimelineNotificationText(item))}</small></td>
-          <td>
-            <button class="inline-action" type="button" data-escort-action="${escapeHtml(item.id)}" data-status="in-service" ${item.serviceEvidenceControl?.ok ? "" : `disabled aria-disabled="true" title="${escapeHtml(escortServiceEvidenceText(item))}"`}>开始</button>
-            <button class="inline-action" type="button" data-escort-action="${escapeHtml(item.id)}" data-status="quality-review" ${escortRiskQualityActionAttributes(item, "quality-review")}>回访</button>
-            <button class="inline-action" type="button" data-escort-action="${escapeHtml(item.id)}" data-status="closed" ${escortRiskQualityActionAttributes(item, "closed")}>关闭</button>
-          </td>
-        </tr>
-      `).join("")}</tbody>
-    </table>
-  `;
-  document.querySelectorAll('[data-escort-action][data-status="closed"]').forEach((button) => {
-    const id = escapeHtml(button.dataset.escortAction || "");
-    button.insertAdjacentHTML("beforebegin", `
-      <button class="inline-action" type="button" data-escort-hospital="${id}" data-decision="confirm">医院确认</button>
-      <button class="inline-action" type="button" data-escort-hospital="${id}" data-decision="return">退回</button>
-    `);
+  const { table, body } = escortTable(["订单", "居民", "服务主体", "陪诊师", "就医安排", "保障", "状态", "操作"]);
+  items.forEach((item) => {
+    const row = document.createElement("tr");
+
+    const orderCell = document.createElement("td");
+    orderCell.append(escortElement("strong", { text: item.id }), document.createElement("br"), escortElement("small", { text: item.sourceChannel || "" }));
+
+    const residentCell = document.createElement("td");
+    residentCell.append(escortText(item.residentId || ""), document.createElement("br"), escortElement("small", { text: item.familyContactStatus || "" }));
+
+    const providerCell = document.createElement("td");
+    providerCell.append(escortText(item.provider?.name || item.providerName || item.providerId || ""), document.createElement("br"), escortElement("small", { text: item.district || "" }));
+
+    const workerCell = document.createElement("td");
+    workerCell.append(
+      escortText(item.worker?.name || item.workerId || "pending"),
+      document.createElement("br"),
+      escortElement("small", { text: (item.serviceItems || []).join(", ") }),
+      document.createElement("br"),
+      escortElement("small", { text: escortDispatchControlText(item) })
+    );
+
+    const appointmentCell = document.createElement("td");
+    const hospitalReceipt = document.createElement("small");
+    escortAppendSpaced(hospitalReceipt, [statusBadge(item.hospitalInterfaceStatus || "pending"), escortText(item.hospitalCheckInNo || item.outpatientQueueNo || item.hospitalNotice || "")]);
+    appointmentCell.append(
+      escortText(item.hospital || ""),
+      document.createElement("br"),
+      escortElement("small", { text: `${item.department || ""} / ${item.appointmentAt || item.due || ""}` }),
+      document.createElement("br"),
+      hospitalReceipt,
+      document.createElement("br"),
+      escortElement("small", { text: `${item.hisVisitId || item.appointmentSource || ""} ${item.departmentCode || ""} ${item.doctorCode || ""}` })
+    );
+
+    const protectionCell = document.createElement("td");
+    escortAppendSpaced(protectionCell, [statusBadge(item.subsidyType), statusBadge(item.contractStatus), statusBadge(item.insuranceStatus)]);
+
+    const statusCell = document.createElement("td");
+    escortAppendSpaced(statusCell, [statusBadge(item.status), statusBadge(item.priority)]);
+    [
+      item.qualityReview || "",
+      escortServiceEvidenceText(item),
+      escortFinancialEvidenceText(item),
+      escortRiskQualityText(item),
+      escortSchedulingText(item),
+      escortCancellationRefundText(item),
+      escortTimelineNotificationText(item)
+    ].forEach((text) => statusCell.append(document.createElement("br"), escortElement("small", { text })));
+
+    const actionCell = document.createElement("td");
+    const serviceState = {
+      disabled: !item.serviceEvidenceControl?.ok,
+      title: item.serviceEvidenceControl?.ok ? "" : escortServiceEvidenceText(item)
+    };
+    escortAppendSpaced(actionCell, [
+      escortActionButton(item.id, "in-service", "开始", serviceState),
+      escortActionButton(item.id, "quality-review", "回访", escortRiskQualityActionState(item, "quality-review")),
+      escortHospitalButton(item.id, "confirm", "医院确认"),
+      escortHospitalButton(item.id, "return", "退回"),
+      escortActionButton(item.id, "closed", "关闭", escortRiskQualityActionState(item, "closed"))
+    ]);
+
+    row.append(orderCell, residentCell, providerCell, workerCell, appointmentCell, protectionCell, statusCell, actionCell);
+    body.append(row);
   });
+  document.querySelector("#escort-orders").replaceChildren(table);
   document.querySelectorAll("[data-escort-action]").forEach((button) => {
     button.addEventListener("click", () => updateEscortOrder(button.dataset.escortAction, button.dataset.status));
   });
@@ -341,38 +389,40 @@ function renderEscortOrders(items) {
 }
 
 function renderEscortProviders(items) {
-  document.querySelector("#escort-providers").innerHTML = `
-    <table>
-      <thead><tr><th>主体</th><th>区</th><th>能力</th><th>收费</th><th>风险保障</th><th>发布</th></tr></thead>
-      <tbody>${items.map((item) => `
-        <tr>
-          <td><strong>${escapeHtml(item.name)}</strong><br><small>${escapeHtml(item.type || "")}</small></td>
-          <td>${escapeHtml(item.district || "")}</td>
-          <td>${escapeHtml(item.trainedWorkers || 0)} workers<br><small>${escapeHtml(item.serviceCapacity || "")}</small></td>
-          <td>${escapeHtml(item.pricing?.halfDayFee || 0)} half day<br><small>subsidy ${escapeHtml(item.pricing?.subsidyAccepted)}</small></td>
-          <td>${escapeHtml(item.insurance || "")}<br><small>${escapeHtml(item.emergencyPlan || "")}</small></td>
-          <td>${statusBadge(item.status)}<br><small>score ${escapeHtml(item.qualityScore || "")}</small></td>
-        </tr>
-      `).join("")}</tbody>
-    </table>
-  `;
+  const { table, body } = escortTable(["主体", "区", "能力", "收费", "风险保障", "发布"]);
+  items.forEach((item) => {
+    const row = document.createElement("tr");
+    const provider = document.createElement("td");
+    provider.append(escortElement("strong", { text: item.name }), document.createElement("br"), escortElement("small", { text: item.type || "" }));
+    const capacity = document.createElement("td");
+    capacity.append(escortText(`${item.trainedWorkers || 0} workers`), document.createElement("br"), escortElement("small", { text: item.serviceCapacity || "" }));
+    const pricing = document.createElement("td");
+    pricing.append(escortText(`${item.pricing?.halfDayFee || 0} half day`), document.createElement("br"), escortElement("small", { text: `subsidy ${item.pricing?.subsidyAccepted ?? ""}` }));
+    const protection = document.createElement("td");
+    protection.append(escortText(item.insurance || ""), document.createElement("br"), escortElement("small", { text: item.emergencyPlan || "" }));
+    const publication = document.createElement("td");
+    publication.append(statusBadge(item.status), document.createElement("br"), escortElement("small", { text: `score ${item.qualityScore || ""}` }));
+    row.append(provider, escortElement("td", { text: item.district || "" }), capacity, pricing, protection, publication);
+    body.append(row);
+  });
+  document.querySelector("#escort-providers").replaceChildren(table);
 }
 
 function renderEscortWorkers(items) {
-  document.querySelector("#escort-workers").innerHTML = `
-    <table>
-      <thead><tr><th>陪诊师</th><th>服务主体</th><th>培训</th><th>技能</th><th>状态</th></tr></thead>
-      <tbody>${items.map((item) => `
-        <tr>
-          <td><strong>${escapeHtml(item.name)}</strong><br><small>${escapeHtml(item.district || "")}</small></td>
-          <td>${escapeHtml(item.providerId || "")}</td>
-          <td>${escapeHtml(item.trainingHours || 0)}h / ${statusBadge(item.examStatus)}</td>
-          <td>${escapeHtml((item.skills || []).join(", "))}</td>
-          <td>${statusBadge(item.status)} ${statusBadge(escortWorkerQualification(item).ok ? "qualified" : "blocked")}<br><small>${escapeHtml(escortWorkerQualificationText(item))}</small></td>
-        </tr>
-      `).join("")}</tbody>
-    </table>
-  `;
+  const { table, body } = escortTable(["陪诊师", "服务主体", "培训", "技能", "状态"]);
+  items.forEach((item) => {
+    const row = document.createElement("tr");
+    const worker = document.createElement("td");
+    worker.append(escortElement("strong", { text: item.name }), document.createElement("br"), escortElement("small", { text: item.district || "" }));
+    const training = document.createElement("td");
+    escortAppendSpaced(training, [escortText(`${item.trainingHours || 0}h /`), statusBadge(item.examStatus)]);
+    const status = document.createElement("td");
+    escortAppendSpaced(status, [statusBadge(item.status), statusBadge(escortWorkerQualification(item).ok ? "qualified" : "blocked")]);
+    status.append(document.createElement("br"), escortElement("small", { text: escortWorkerQualificationText(item) }));
+    row.append(worker, escortElement("td", { text: item.providerId || "" }), training, escortElement("td", { text: (item.skills || []).join(", ") }), status);
+    body.append(row);
+  });
+  document.querySelector("#escort-workers").replaceChildren(table);
 }
 
 function escortWorkerQualification(item, order = {}) {
@@ -390,13 +440,26 @@ function escortWorkerQualificationText(item) {
 }
 
 function renderEscortRisks(items) {
-  document.querySelector("#escort-risks").innerHTML = items.map((item) => `
-    <div>
-      <strong>${escapeHtml(item.id)}</strong>
-      <span>${statusBadge(item.priority)} ${statusBadge(item.riskLevel)} ${escapeHtml(item.status || "")}</span>
-      <span>${escapeHtml(item.nextAction || item.qualityReview || "")}</span>
-    </div>
-  `).join("") || "<div><strong>No high-risk escort order</strong><span>All open escort orders are routine.</span></div>";
+  const rows = items.map((item) => {
+    const row = document.createElement("div");
+    const status = document.createElement("span");
+    escortAppendSpaced(status, [statusBadge(item.priority), statusBadge(item.riskLevel), escortText(item.status || "")]);
+    row.append(
+      escortElement("strong", { text: item.id }),
+      status,
+      escortElement("span", { text: item.nextAction || item.qualityReview || "" })
+    );
+    return row;
+  });
+  if (!rows.length) {
+    const empty = document.createElement("div");
+    empty.append(
+      escortElement("strong", { text: "No high-risk escort order" }),
+      escortElement("span", { text: "All open escort orders are routine." })
+    );
+    rows.push(empty);
+  }
+  document.querySelector("#escort-risks").replaceChildren(...rows);
 }
 
 function renderEscortPolicy(dashboard) {
@@ -407,12 +470,11 @@ function renderEscortPolicy(dashboard) {
     ["Required evidence", (policy.requiredEvidence || []).join(", ")],
     ["Service items", (policy.serviceItems || []).join(", ")]
   ];
-  document.querySelector("#escort-policy").innerHTML = rows.map(([label, value]) => `
-    <div>
-      <strong>${escapeHtml(label)}</strong>
-      <span>${escapeHtml(value)}</span>
-    </div>
-  `).join("");
+  document.querySelector("#escort-policy").replaceChildren(...rows.map(([label, value]) => {
+    const row = document.createElement("div");
+    row.append(escortElement("strong", { text: label }), escortElement("span", { text: value }));
+    return row;
+  }));
 }
 
 function bindEscortOrderForm() {
@@ -486,15 +548,55 @@ function statusBadge(status) {
     "reschedule-requested": "改约待审核",
     "no-show-review": "爽约待复核"
   }[text] || text;
-  return `<span class="badge ${type}">${escapeHtml(label)}</span>`;
+  return escortElement("span", { className: `badge ${type}`, text: label });
 }
 
-function escapeHtml(value) {
-  return String(value ?? "").replace(/[&<>"']/g, (char) => ({
-    "&": "&amp;",
-    "<": "&lt;",
-    ">": "&gt;",
-    '"': "&quot;",
-    "'": "&#39;"
-  }[char]));
+function escortElement(tagName, options = {}) {
+  const element = document.createElement(tagName);
+  if (options.className) element.className = options.className;
+  if (Object.hasOwn(options, "text")) element.textContent = String(options.text ?? "");
+  return element;
+}
+
+function escortText(value) {
+  return document.createTextNode(String(value ?? ""));
+}
+
+function escortAppendSpaced(parent, nodes) {
+  nodes.forEach((node, index) => {
+    if (index) parent.append(escortText(" "));
+    parent.append(node);
+  });
+}
+
+function escortTable(headers) {
+  const table = document.createElement("table");
+  const head = document.createElement("thead");
+  const headerRow = document.createElement("tr");
+  headerRow.append(...headers.map((header) => escortElement("th", { text: header })));
+  head.append(headerRow);
+  const body = document.createElement("tbody");
+  table.append(head, body);
+  return { table, body };
+}
+
+function escortActionButton(id, status, label, state = {}) {
+  const button = escortElement("button", { className: "inline-action", text: label });
+  button.type = "button";
+  button.dataset.escortAction = String(id ?? "");
+  button.dataset.status = status;
+  if (state.disabled) {
+    button.disabled = true;
+    button.setAttribute("aria-disabled", "true");
+    button.title = String(state.title ?? "");
+  }
+  return button;
+}
+
+function escortHospitalButton(id, decision, label) {
+  const button = escortElement("button", { className: "inline-action", text: label });
+  button.type = "button";
+  button.dataset.escortHospital = String(id ?? "");
+  button.dataset.decision = decision;
+  return button;
 }
