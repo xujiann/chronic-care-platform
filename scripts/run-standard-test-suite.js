@@ -26,6 +26,7 @@ function validateStandardTestSuites(config = loadStandardTestSuites()) {
   const allSet = new Set(all);
   const integration = (config.integration || []).map(normalizeTestPath);
   const smoke = (config.smoke || []).map(normalizeTestPath);
+  const isolated = config.isolated || {};
   const errors = [];
 
   if (config.version !== 1) errors.push("standard test suite version must be 1");
@@ -37,6 +38,23 @@ function validateStandardTestSuites(config = loadStandardTestSuites()) {
     if (duplicates.length) errors.push(`${name} suite contains duplicates: ${duplicates.join(", ")}`);
     const missing = files.filter((file) => !allSet.has(file));
     if (missing.length) errors.push(`${name} suite references missing tests: ${missing.join(", ")}`);
+  }
+
+  for (const [name, files] of Object.entries(isolated)) {
+    if (!STANDARD_SUITES.has(name)) {
+      errors.push(`isolated suite is unknown: ${name}`);
+      continue;
+    }
+    if (!Array.isArray(files)) {
+      errors.push(`isolated suite must be an array: ${name}`);
+      continue;
+    }
+    const normalized = files.map(normalizeTestPath);
+    const duplicates = [...new Set(duplicateValues(normalized))];
+    if (duplicates.length) errors.push(`isolated ${name} suite contains duplicates: ${duplicates.join(", ")}`);
+    const suiteFiles = name === "integration" ? integration : name === "smoke" ? smoke : all.filter((file) => !integration.includes(file));
+    const outsideSuite = normalized.filter((file) => !suiteFiles.includes(file));
+    if (outsideSuite.length) errors.push(`isolated ${name} files are outside the suite: ${outsideSuite.join(", ")}`);
   }
 
   const integrationSet = new Set(integration);
@@ -55,6 +73,31 @@ function validateStandardTestSuites(config = loadStandardTestSuites()) {
   };
 }
 
+function buildStandardTestBatches(name, tests, config, batchSize) {
+  const isolated = new Set((config.isolated?.[name] || []).map(normalizeTestPath));
+  const batches = [];
+  let pending = [];
+
+  function flushPending() {
+    while (pending.length) {
+      batches.push({ files: pending.slice(0, batchSize), isolated: false });
+      pending = pending.slice(batchSize);
+    }
+  }
+
+  for (const file of tests) {
+    if (isolated.has(file)) {
+      flushPending();
+      batches.push({ files: [file], isolated: true });
+      continue;
+    }
+    pending.push(file);
+    if (pending.length === batchSize) flushPending();
+  }
+  flushPending();
+  return batches;
+}
+
 function listStandardSuite(name, config = loadStandardTestSuites()) {
   if (!STANDARD_SUITES.has(name)) throw new Error(`unknown standard test suite: ${name}`);
   const validation = validateStandardTestSuites(config);
@@ -68,28 +111,52 @@ function listStandardSuite(name, config = loadStandardTestSuites()) {
 }
 
 function runStandardSuite(name, options = {}) {
-  const tests = listStandardSuite(name);
+  const config = loadStandardTestSuites();
+  const tests = listStandardSuite(name, config);
   if (options.listOnly) {
     process.stdout.write(`${tests.join("\n")}\n`);
     return { ok: true, suite: name, tests: tests.length, batches: 0 };
   }
 
+  const now = options.now || Date.now;
+  const spawn = options.spawnSync || spawnSync;
   const batchSize = name === "smoke" ? tests.length : parseBatchSize(options.batchSize);
-  const batches = Math.ceil(tests.length / batchSize);
-  for (let offset = 0; offset < tests.length; offset += batchSize) {
-    const batch = tests.slice(offset, offset + batchSize);
-    const batchNumber = Math.floor(offset / batchSize) + 1;
-    process.stdout.write(`\n[standard-test:${name}] batch ${batchNumber}/${batches}: ${batch.length} files\n`);
-    const result = spawnSync(
+  const testBatches = buildStandardTestBatches(name, tests, config, batchSize);
+  const suiteStartedAt = now();
+  const batchDurationsMs = [];
+  for (let index = 0; index < testBatches.length; index += 1) {
+    const { files, isolated } = testBatches[index];
+    const batchNumber = index + 1;
+    process.stdout.write(`\n[standard-test:${name}] batch ${batchNumber}/${testBatches.length}: ${files.length} files${isolated ? " (isolated hotspot)" : ""}\n`);
+    const batchStartedAt = now();
+    const result = spawn(
       process.execPath,
-      ["--test", "--test-concurrency=1", ...batch],
+      ["--test", "--test-concurrency=1", ...files],
       { cwd: ROOT, stdio: "inherit", windowsHide: true }
     );
+    batchDurationsMs.push(Math.max(0, now() - batchStartedAt));
     if (result.status !== 0) {
-      return { ok: false, suite: name, tests: tests.length, batches, failedBatch: batchNumber };
+      const metrics = {
+        suite: name,
+        tests: tests.length,
+        batches: testBatches.length,
+        durationMs: Math.max(0, now() - suiteStartedAt),
+        batchDurationsMs,
+        failedBatch: batchNumber
+      };
+      process.stdout.write(`[standard-test:metrics] ${JSON.stringify(metrics)}\n`);
+      return { ok: false, ...metrics };
     }
   }
-  return { ok: true, suite: name, tests: tests.length, batches };
+  const metrics = {
+    suite: name,
+    tests: tests.length,
+    batches: testBatches.length,
+    durationMs: Math.max(0, now() - suiteStartedAt),
+    batchDurationsMs
+  };
+  process.stdout.write(`[standard-test:metrics] ${JSON.stringify(metrics)}\n`);
+  return { ok: true, ...metrics };
 }
 
 if (require.main === module) {
@@ -105,6 +172,7 @@ if (require.main === module) {
 
 module.exports = {
   CONFIG_PATH,
+  buildStandardTestBatches,
   listStandardSuite,
   loadStandardTestSuites,
   normalizeTestPath,

@@ -13,13 +13,16 @@
   "include": [
     "scripts/run-standard-test-suite.js",
     "scripts/production-cutover-action-register.js",
+    "scripts/internal-boundary-coverage.js",
     "scripts/standard-build.js",
     "scripts/static-publication.js",
     "scripts/test-all.js",
+    "src/http/browser-security-inventory.js",
+    "src/http/browser-security-policy.js",
     "src/http/static-asset-policy.js",
+    "src/identity-security/audit-chain.js",
     "src/platform/data/public-demo-snapshot.js",
     "src/platform/governance/production-evidence-trust-provider.js",
-    "scripts/production-cutover-action-register.js",
     "scripts/production-promotion-receipt.js"
   ],
   "exclude": [

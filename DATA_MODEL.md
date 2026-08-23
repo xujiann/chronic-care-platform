@@ -277,3 +277,9 @@ head v16、PostgreSQL 结构、`data/db.json` 或任何 data owner。
 verifier verdict 还必须精确回显前三项绑定和 receiptId，并提供 `verifiedAt`、`verifierId`、
 `singleUseEnforced=true`、`replayDetected=false`。验证后的对象由进程内 trust marker 标记，序列化、重建或
 伪造的普通对象不再可信。未来若引入耐久 nonce/replay ledger，必须另立 Accepted ADR、migration 和恢复测试。
+
+## 20. TEST-006 测试耗时观测数据边界
+
+标准测试 runner 只把批次和套件的 `durationMs` 输出到进程/CI 日志，不写 `data/db.json`、SQLite、
+PostgreSQL、release、报告或归档产物。API 热点隔离配置只登记受跟踪测试文件路径，不包含业务数据、
+患者信息、凭据或生产证据，也不改变任何 schema、migration、集合 owner 或事实源。

@@ -35,7 +35,7 @@
 | API-001 | 错误契约 | 多种 JSON 错误格式 | 新 API 使用版本化标准错误接口 |
 | API-002 | 接口目录复核 | v3 合并 601 条授权声明与 371 个字面条件路由，形成 593 项；13 项认证证据覆盖 SMS 和原 13 个未分类 key 中的 12 个真实入口，T10 已有直接拒绝证据，公卫跨 handler 虚假 POST 已删除，未分类认证为 0；7 个运行时策略和 332 个无幂等行为证明写接口使 333 项保持 review-required | 逐 owner 补 route/action、身份、幂等、CAS、错误与审计合同，保持跨 handler 解析回归测试，禁止把字符串标记或猜测 owner 当成证明 |
 | JOB-001 | Worker 一致性 | 多套 worker/retry/checkpoint 语义 | 建立共同任务状态和观测契约 |
-| TEST-006 | 静态基线与测试性能 | lint 对 2 个前端文件的 16 个重复键、`test/api.test.js` 的 3 个不可达块保留精确例外；typecheck 仅覆盖 6 个治理/安全文件；集成首批 API 契约在并发负载下约 174 秒 | 逐规则/逐目录消除例外并扩大类型基线；拆分超大 API 测试和测量 CI 时长，不降低断言或超时门禁 |
+| TEST-006 | 静态基线与测试性能 | 已关闭 `test/api.test.js` 的全文件 `no-unreachable` 例外：3 段原不可达断言改为具名显式 skip 债务；typecheck 去重并从主线实际 9 个唯一文件扩大至 13 个；本机 Node 24 三次单文件采样约 294–371 秒，现作为独立 integration 热点批次输出 batch/suite 耗时。suite 成员、顺序、断言、超时、CI job 预算与 required checks 均未降低 | 剩余两个前端文件 16 个重复键需先补 shadow-map 行为测试再消除；3 个显式 skip 必须由 T05 owner 逐块重验后恢复执行；API 巨型夹具仍需按共享服务生命周期拆分，耗时数据先观察多次 CI 分布，不凭单机样本设门槛 |
 | TEST-005 | 浏览器一致性 | Windows 本地配置优先系统 Chrome；完整 36 项中小程序超时恢复用例可受前序共享服务状态影响，而同文件 13/13、单例 1/1、CI Chromium 36/36 通过 | 后续独立测试任务统一本地/CI 浏览器选择并隔离 E2E 服务状态，不在数据治理切片中修改业务代码 |
 | DOC-001 | 历史文档 | 205 份 Markdown，历史快照与当前规则并存 | 标明 snapshot/current/superseded，不删除历史证据 |
 | REPO-001 | 跟踪制品 | `output/pdf` 有 3 个 PDF | 明确生成源、是否保留及禁止手工编辑 |

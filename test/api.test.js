@@ -4222,7 +4222,7 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(reminded.body.message.residentId, remindable.residentId);
   });
 
-  await t.test("allows citizen medical escort appointment within household scope", async () => {
+  await t.test("allows citizen medical escort appointment within household scope", async (subtest) => {
     const dashboard = await api(baseUrl, "/api/escort-services/dashboard", authorized(citizenToken));
     assert.equal(dashboard.response.status, 200);
     assert.equal(dashboard.body.ok, true);
@@ -4291,8 +4291,7 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     const escortOutboxHealth = await api(baseUrl, "/api/care-services/outbox/health", authorized(commissionToken));
     assert.equal([200, 503].includes(escortOutboxHealth.response.status), true);
     assert.equal(escortOutboxHealth.body.byDomain.escort.pending >= 1, true);
-    return;
-
+    await subtest.test("tracks the legacy escort extended regression debt explicitly", { skip: "previously unreachable; care owner behavior revalidation required" }, async () => {
     const missingHospital = await api(baseUrl, "/api/escort-services/orders", authorized(citizenToken, {
       method: "POST",
       body: JSON.stringify({
@@ -4531,6 +4530,7 @@ test("API authentication, scoping and governance regression suite", async (t) =>
       })
     }));
     assert.equal(denied.response.status, 403);
+    });
   });
 
   await t.test("supports citizen registration HIS payment insurance and SMS workflow", async () => {
@@ -5012,7 +5012,7 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(denied.response.status, 403);
   });
 
-  await t.test("guards mobile internet nursing appointments for launch", async () => {
+  await t.test("guards mobile internet nursing appointments for launch", async (subtest) => {
     const dashboard = await api(baseUrl, "/api/internet-nursing/dashboard", authorized(citizenToken));
     assert.equal(dashboard.response.status, 200);
     assert.equal(dashboard.body.siteCutoverPack.status, "ready-for-site-signoff");
@@ -5149,8 +5149,7 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     const nursingOutboxHealth = await api(baseUrl, "/api/care-services/outbox/health", authorized(hospitalToken));
     assert.equal([200, 503].includes(nursingOutboxHealth.response.status), true);
     assert.equal(nursingOutboxHealth.body.byDomain.nursing.pending >= 1, true);
-    return;
-
+    await subtest.test("tracks the legacy internet nursing closed-loop regression debt explicitly", { skip: "previously unreachable; care owner behavior revalidation required" }, async () => {
     const closedLoopDashboard = await api(baseUrl, "/api/internet-nursing/dashboard", authorized(citizenToken));
     const closedLoopOrder = closedLoopDashboard.body.orders.find((item) => item.id === created.body.id);
     assert.equal(closedLoopOrder.status, "accepted");
@@ -5185,9 +5184,10 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     }));
     assert.equal(unsupportedService.response.status, 400);
     assert.match(unsupportedService.body.message, /does not publish/);
+    });
   });
 
-  await t.test("scopes internet nursing nurse actions to own workstation orders", async () => {
+  await t.test("scopes internet nursing nurse actions to own workstation orders", async (subtest) => {
     const nurseLogin = await login(baseUrl, "nurse");
     assert.equal(nurseLogin.response.status, 200);
     assert.equal(nurseLogin.body.user.accountType, "nurse");
@@ -5219,8 +5219,7 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     }));
     assert.equal(spoofedNurse.response.status, 409);
     assert.match(spoofedNurse.body.message, /transition|evidence|nurse/i);
-    return;
-
+    await subtest.test("tracks the legacy nurse lifecycle regression debt explicitly", { skip: "previously unreachable; care owner behavior revalidation required" }, async () => {
     const prematureComplete = await api(baseUrl, "/api/internet-nursing/orders/ino-001/actions", authorized(nurseToken, {
       method: "POST",
       body: JSON.stringify({
@@ -5298,6 +5297,7 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(completed.body.notificationReceiptSummary.read >= 1, true);
     assert.equal(completed.body.locationTracePoints.some((item) => item.stage === "service-complete"), true);
     assert.equal(completed.body.notificationDeliveries.some((item) => item.event === "service-complete" && item.channel === "sms"), true);
+    });
   });
 
   await t.test("enforces personal record ownership and protects record identity", async () => {

@@ -37,12 +37,5 @@ module.exports = [
     rules: {
       "no-dupe-keys": "off"
     }
-  },
-  {
-    // Frozen legacy baseline: api.test.js is independently covered by test:integration/test:all.
-    files: ["test/api.test.js"],
-    rules: {
-      "no-unreachable": "off"
-    }
   }
 ];

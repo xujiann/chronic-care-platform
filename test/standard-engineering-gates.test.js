@@ -57,6 +57,59 @@ test("unit and integration suites partition every root Node test while smoke sta
   assert.equal(smoke.every((file) => all.includes(file)), true);
 });
 
+test("the API hotspot is isolated without changing integration membership or order", () => {
+  const {
+    buildStandardTestBatches,
+    listStandardSuite,
+    loadStandardTestSuites,
+    validateStandardTestSuites
+  } = require("../scripts/run-standard-test-suite");
+  const config = loadStandardTestSuites();
+  const integration = listStandardSuite("integration", config);
+  const batches = buildStandardTestBatches("integration", integration, config, 40);
+
+  assert.equal(validateStandardTestSuites(config).ok, true);
+  assert.deepEqual(config.isolated.integration, ["test/api.test.js"]);
+  assert.deepEqual(batches[0], { files: ["test/api.test.js"], isolated: true });
+  assert.deepEqual(batches.flatMap((batch) => batch.files), integration);
+  assert.equal(batches.slice(1).every((batch) => batch.files.length <= 40), true);
+});
+
+test("standard suite metrics are emitted for success without a time threshold", () => {
+  const { runStandardSuite } = require("../scripts/run-standard-test-suite");
+  const originalWrite = process.stdout.write;
+  const output = [];
+  let currentTime = 100;
+
+  process.stdout.write = (chunk) => {
+    output.push(String(chunk));
+    return true;
+  };
+  try {
+    const result = runStandardSuite("smoke", {
+      now: () => {
+        currentTime += 5;
+        return currentTime;
+      },
+      spawnSync: () => ({ status: 0 })
+    });
+    assert.equal(result.ok, true);
+    assert.equal(result.durationMs >= 0, true);
+    assert.deepEqual(result.batchDurationsMs, [5]);
+  } finally {
+    process.stdout.write = originalWrite;
+  }
+
+  const metricLine = output.find((line) => line.startsWith("[standard-test:metrics] "));
+  assert.ok(metricLine);
+  const metrics = JSON.parse(metricLine.slice("[standard-test:metrics] ".length));
+  assert.equal(metrics.suite, "smoke");
+  assert.equal(metrics.tests, 2);
+  assert.equal(metrics.batches, 1);
+  assert.deepEqual(metrics.batchDurationsMs, [5]);
+  assert.equal("maxDurationMs" in metrics, false);
+});
+
 function pkgTestFiles(command) {
   return String(command || "").match(/test\/[\w.-]+\.test\.js/g) || [];
 }
@@ -97,10 +150,30 @@ test("type checking is explicitly incremental and lint ignores generated artifac
   assert.equal(typecheck.compilerOptions.noEmit, true);
   assert.equal(typecheck.compilerOptions.strict, false);
   assert.equal(Array.isArray(typecheck.include), true);
-  assert.equal(typecheck.include.length > 0, true);
+  assert.equal(typecheck.include.length, 13);
+  assert.equal(new Set(typecheck.include).size, typecheck.include.length);
   assert.equal(typecheck.include.includes("**/*.js"), false);
+  for (const file of [
+    "scripts/internal-boundary-coverage.js",
+    "src/http/browser-security-inventory.js",
+    "src/http/browser-security-policy.js",
+    "src/identity-security/audit-chain.js"
+  ]) {
+    assert.equal(typecheck.include.includes(file), true, file);
+  }
   assert.match(eslintSource, /coverage\/\*\*/);
   assert.match(eslintSource, /test-results\/\*\*/);
   assert.match(eslintSource, /no-dupe-keys/);
   assert.match(eslintSource, /no-unreachable/);
+  assert.doesNotMatch(eslintSource, /files:\s*\["test\/api\.test\.js"\]/);
+});
+
+test("the former API unreachable blocks remain visible as three explicit skipped debts", () => {
+  const apiTest = read("test/api.test.js");
+  const explicitDebts = apiTest.match(/previously unreachable; care owner behavior revalidation required/g) || [];
+
+  assert.equal(explicitDebts.length, 3);
+  assert.doesNotMatch(apiTest, /\n\s+return;\r?\n\s*\r?\n\s+const missingHospital/);
+  assert.doesNotMatch(apiTest, /\n\s+return;\r?\n\s*\r?\n\s+const closedLoopDashboard/);
+  assert.doesNotMatch(apiTest, /\n\s+return;\r?\n\s*\r?\n\s+const prematureComplete/);
 });
