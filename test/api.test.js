@@ -12,6 +12,7 @@ const { signGatewayResponse } = require("../secure-object-storage");
 const EscortService = require("../escort-service");
 const NursingEscortDomain = require("../nursing-escort-domain");
 const { createApiRegressionRuntime } = require("./helpers/api-regression-runtime");
+const { startHospitalAdapterMock } = require("./helpers/hospital-adapter-mock-runtime");
 
 async function waitForHealth(baseUrl) {
   for (let attempt = 0; attempt < 60; attempt += 1) {
@@ -5755,27 +5756,12 @@ test("API authentication, scoping and governance regression suite", async (t) =>
 
     const commission = await login(baseUrl, "health");
 
-    const hospitalRequests = [];
-    const hospitalMock = http.createServer(async (request, response) => {
-      const chunks = [];
-      for await (const chunk of request) chunks.push(chunk);
-      const bodyText = Buffer.concat(chunks).toString("utf8");
-      hospitalRequests.push({ headers: request.headers, bodyText, body: JSON.parse(bodyText) });
-      response.writeHead(200, { "Content-Type": "application/json" });
-      response.end(JSON.stringify({ receiptId: `his-provider-${hospitalRequests.length}`, status: "accepted" }));
-    });
-    hospitalMock.listen(0, "127.0.0.1");
-    await once(hospitalMock, "listening");
-    const hospitalPort = hospitalMock.address().port;
-    process.env.HIS_ADAPTER_URL = `http://127.0.0.1:${hospitalPort}/his/events`;
-    process.env.HIS_ADAPTER_SECRET = "api-test-his-adapter-secret";
-    process.env.HOSPITAL_ADAPTER_MAX_ATTEMPTS = "1";
-    t.after(async () => {
-      delete process.env.HIS_ADAPTER_URL;
-      delete process.env.HIS_ADAPTER_SECRET;
-      delete process.env.HOSPITAL_ADAPTER_MAX_ATTEMPTS;
-      await new Promise((resolve) => hospitalMock.close(resolve));
-    });
+    const {
+      port: hospitalPort,
+      requests: hospitalRequests,
+      stop: stopHospitalAdapterMock
+    } = await startHospitalAdapterMock();
+    t.after(stopHospitalAdapterMock);
 
     const adapters = await api(baseUrl, "/api/integration/adapters", authorized(institution.body.token));
     assert.equal(adapters.response.status, 200);

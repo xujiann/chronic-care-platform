@@ -76,9 +76,10 @@ test("the API hotspot is isolated without changing integration membership or ord
   assert.equal(batches.slice(1).every((batch) => batch.files.length <= 40), true);
 });
 
-test("the API hotspot keeps one extracted runtime lifecycle and the exact subtest order", () => {
+test("the API hotspot keeps extracted lifecycles and the exact subtest order", () => {
   const apiTest = read("test/api.test.js");
   const runtimeHelper = read("test/helpers/api-regression-runtime.js");
+  const hospitalMockHelper = read("test/helpers/hospital-adapter-mock-runtime.js");
   const subtestNames = [...apiTest.matchAll(/await t\.test\("([^"]+)"/g)].map((match) => match[1]);
   const orderDigest = createHash("sha256").update(subtestNames.join("\n")).digest("hex");
 
@@ -91,6 +92,16 @@ test("the API hotspot keeps one extracted runtime lifecycle and the exact subtes
   assert.match(runtimeHelper, /await once\(server, "listening"\)/);
   assert.match(runtimeHelper, /await stopServer\(\)/);
   assert.match(runtimeHelper, /rmSync\(dataDir, \{ recursive: true, force: true \}\)/);
+  assert.equal((apiTest.match(/startHospitalAdapterMock\(\)/g) || []).length, 1);
+  assert.match(apiTest, /port: hospitalPort,\s+requests: hospitalRequests,\s+stop: stopHospitalAdapterMock/);
+  assert.match(apiTest, /t\.after\(stopHospitalAdapterMock\)/);
+  assert.doesNotMatch(apiTest, /const hospitalMock = http\.createServer/);
+  assert.match(hospitalMockHelper, /http\.createServer/);
+  assert.match(hospitalMockHelper, /server\.listen\(0, "127\.0\.0\.1"\)/);
+  assert.match(hospitalMockHelper, /await once\(server, "listening"\)/);
+  assert.match(hospitalMockHelper, /receiptId: `his-provider-\$\{requests\.length\}`/);
+  assert.match(hospitalMockHelper, /HIS_ADAPTER_URL = `http:\/\/127\.0\.0\.1:\$\{port\}\/his\/events`/);
+  assert.match(hospitalMockHelper, /await new Promise\(\(resolve\) => server\.close\(resolve\)\)/);
   assert.equal(subtestNames.length, 43);
   assert.equal(orderDigest, "dab18cc7fb2ae790cae552d5646c30f9ba35e8139ac47c629466001dfe6b6cea");
 });
