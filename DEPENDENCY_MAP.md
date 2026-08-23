@@ -94,7 +94,7 @@ TypeScript 与 Node 类型仅用于开发门禁；lockfile audit 已修复 c8 �
 - 集中响应头端口暂保留兼容 CSP 的 `script/style 'unsafe-inline'`，并下发不含 `unsafe-inline`/`unsafe-eval`
   的严格 Report-Only 目标；动态 CSSOM、全角色浏览器回归和真实托管验证完成前不得描述为 CSP 已关闭。
 - Service Worker v61 缓存应用壳以及生成的 `data/public-demo.json`；激活时删除 v60 及其他旧缓存，只缓存同源成功响应，API、跨 Origin 与 404 拒绝响应不进入 Cache Storage。
-- E2E 依赖方向为 `npm test:e2e → root runner(33) / resident owned runner(13) / PWA runner(3) → 动态回环端口 + 独立临时
+- E2E 依赖方向为 `npm test:e2e → root runner(34) / resident owned runner(13) / PWA runner(3) → 动态回环端口 + 独立临时
   DATA_DIR → Playwright Chromium`。两套配置共用 `playwright-browser-policy.v1` 并设置
   `serviceWorkers=block`；系统 Chrome、固定 5210 端口和跨套件服务复用不再是标准测试依赖。
 
@@ -193,6 +193,11 @@ CORE_DATA_DEFINITIONS → collection-governance → CI/release 治理投影`。�
   `test/api.test.js -> test/helpers/financial-gateway-mock-runtime.js -> node:http`；helper 只管理一个子测试已有的
   financial mock 生命周期，不依赖运行时代码、storage mock 或其他测试阶段。签名/callback/reconciliation/retry
   仍由所属子测试执行，因此没有新增反向依赖、静态环、并行共享状态、integration 成员、CI 拓扑或预算变化。
+- 第五个夹具切片新增且仅新增测试依赖
+  `test/api.test.js -> test/helpers/object-storage-gateway-mock-runtime.js -> secure-object-storage sign port + node:http`；
+  helper 只管理一个子测试已有的 storage mock 生命周期，复用原测试已调用的响应签名端口。四类响应、动态 URL
+  和 `scanStatus` 仍封闭在该 helper，测试正文只通过最小 setter 保持原切换顺序，因此没有新增运行时依赖、
+  反向环、并行共享状态、integration 成员、CI 拓扑或预算变化。
 - 两个前端翻译 map 继续由原 `displayText` / `zh` / `zhText` / `statusLabel` 调用链消费；去重不引入
   共享运行时模块或新依赖。专项 Node 测试读取并隔离执行这些纯翻译边界，标准 unit 自动发现负责漂移门禁。
 - care revalidation 的依赖方向为

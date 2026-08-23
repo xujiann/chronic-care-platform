@@ -244,6 +244,10 @@ scope、幂等、错误和审计断言均不变。synthetic `his-provider-*` 只
 测试环境变量及关闭清理移入测试 helper；既有 financial dispatch/callback/reconciliation/retry method/path、
 请求与回调 HMAC、鉴权、scope、幂等、敏感字段拒绝、审计和请求次数断言均不变。synthetic provider receipt
 只用于回归，不能解释为真实支付、医保、证照投递或现场证据。
+第五个夹具切片只把 object-storage gateway mock 的创建、四类 v1 签名响应、动态回环 URL、请求记录、8 个
+测试环境变量及关闭清理移入测试 helper；既有附件 upload/complete/download/lifecycle method/path、响应签名、
+鉴权、居民/机构 scope、元数据脱敏、immutable/legal-hold、恶意 scan 文本拒绝和 quarantine 断言均不变。
+`setScanStatus` 仍由原测试正文在相同时点调用；synthetic 回执与 URL 不能解释为真实存储或现场证据。
 
 ## 18A. TEST-002 内部覆盖扩展（无 API 变化）
 

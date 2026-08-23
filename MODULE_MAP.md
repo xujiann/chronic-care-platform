@@ -85,7 +85,7 @@ scripts/platform-cutover-alert-worker.js
 |---|---:|---|
 | `server.js` | 28,189 | 组合根、种子和领域函数仍集中；SQLite migration 已抽离 |
 | `digital-hospital-standard-platform/app.js` | 10,563 | 单文件子站 |
-| `test/api.test.js` | 约 8,300 | 回归范围仍巨大；共享运行时及 hospital、alert、financial 三个单一 mock 生命周期已提取，业务断言仍集中 |
+| `test/api.test.js` | 约 8,200 | 回归范围仍巨大；共享运行时及 hospital、alert、financial、object-storage 四个单一 mock 生命周期已提取，业务断言仍集中 |
 | `citizen.js` | 6,066 | 居民端视图、状态和流程耦合 |
 | `portal.css` | 5,243 | 全局样式影响面大 |
 | `test/static.test.js` | 5,058 | 静态结构测试集中 |
@@ -141,7 +141,11 @@ scripts/platform-cutover-alert-worker.js
 - `test/helpers/financial-gateway-mock-runtime.js` 只拥有单个金融网关子测试内的 mock HTTP server、请求数组、
   PAYMENT/INSURANCE/CERTIFICATE synthetic receipt 映射、动态回环端口、6 个既有测试环境变量和关闭清理；
   HMAC、callback、reconciliation、retry 和请求次数断言仍在测试正文。它不是生产金融 adapter、公共测试 SDK
-  或外部支付/医保/证照回执来源；storage mock 仍留在原测试边界。
+  或外部支付/医保/证照回执来源。
+- `test/helpers/object-storage-gateway-mock-runtime.js` 只拥有单个附件子测试内的 mock HTTP server、四类 v1
+  签名响应、动态回环 URL、请求数组、8 个既有测试环境变量和关闭清理；最小 `setScanStatus` 控制口由测试正文
+  按原 clean→恶意 provider 文本顺序驱动，helper 不自行恢复或重试。它不是生产存储 adapter、公共测试 SDK，
+  synthetic upload/scan/download/lifecycle 回执与 URL 也不是外部对象存储或现场证据。
 - `test/escort-owner-route-characterization.test.js`、`test/internet-nursing-closed-loop-characterization.test.js`
   与 `test/internet-nursing-nurse-lifecycle-characterization.test.js` 是 T05 owner/route 特征测试；共享
   `test/helpers/care-api-characterization-runtime.js` 在各测试进程内启动真实 HTTP 服务并使用临时数据副本，

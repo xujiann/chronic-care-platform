@@ -118,7 +118,8 @@ runner 向 CI 日志输出 batch/suite `durationMs`。耗时只用于定位与�
 CI job 拓扑、10/15/5 分钟预算或 required check。
 API 热点的共享运行时夹具可以按一次一个生命周期移入 `test/helpers/`，但必须保持同一 server/进程、
 测试成员与顺序、断言、超时、临时数据清理和 CI 预算。首个 seed/env/server、第二个单一 HIS mock、第三个
-单一 SIEM alert mock 及第四个单一 financial gateway mock 切片继续以 43 个子测试的有序 SHA-256 摘要失败关闭；每个 helper 只能拥有一个已证明封闭的测试生命周期，
+单一 SIEM alert mock、第四个单一 financial gateway mock 及第五个单一 object-storage gateway mock 切片继续以
+43 个子测试的有序 SHA-256 摘要失败关闭；五个 helper 路径与启动调用必须唯一。每个 helper 只能拥有一个已证明封闭的测试生命周期，
 不能承载业务逻辑、生产凭据、外部投递或现场证据。改变并行/分片拓扑须另行审批和 ADR。
 
 DATA-003 的只读集合治理验证映射到 governance-api，并由 architecture test 运行专项负向测试；

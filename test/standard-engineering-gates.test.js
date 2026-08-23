@@ -82,9 +82,21 @@ test("the API hotspot keeps extracted lifecycles and the exact subtest order", (
   const financialMockHelper = read("test/helpers/financial-gateway-mock-runtime.js");
   const runtimeHelper = read("test/helpers/api-regression-runtime.js");
   const hospitalMockHelper = read("test/helpers/hospital-adapter-mock-runtime.js");
+  const storageMockHelper = read("test/helpers/object-storage-gateway-mock-runtime.js");
+  const lifecycleHelperImports = [...apiTest.matchAll(/require\("\.\/helpers\/([^"]+-runtime)"\)/g)]
+    .map((match) => match[1]);
   const subtestNames = [...apiTest.matchAll(/await t\.test\("([^"]+)"/g)].map((match) => match[1]);
   const orderDigest = createHash("sha256").update(subtestNames.join("\n")).digest("hex");
 
+  assert.equal(lifecycleHelperImports.length, 5);
+  assert.equal(new Set(lifecycleHelperImports).size, 5);
+  assert.deepEqual([...lifecycleHelperImports].sort(), [
+    "alert-delivery-mock-runtime",
+    "api-regression-runtime",
+    "financial-gateway-mock-runtime",
+    "hospital-adapter-mock-runtime",
+    "object-storage-gateway-mock-runtime"
+  ]);
   assert.equal((apiTest.match(/createApiRegressionRuntime\(\)/g) || []).length, 1);
   assert.match(apiTest, /start: startApiRegressionRuntime/);
   assert.match(apiTest, /stop: stopApiRegressionRuntime/);
@@ -128,6 +140,23 @@ test("the API hotspot keeps extracted lifecycles and the exact subtest order", (
   assert.match(financialMockHelper, /PAYMENT_GATEWAY_URL = `http:\/\/127\.0\.0\.1:\$\{port\}\/payment`/);
   assert.match(financialMockHelper, /FINANCIAL_CALLBACK_SECRET = "api-test-financial-callback-secret"/);
   assert.match(financialMockHelper, /server\.closeAllConnections\?\.\(\)/);
+  assert.equal((apiTest.match(/startObjectStorageGatewayMock\(\)/g) || []).length, 1);
+  assert.match(apiTest, /port: storagePort,\s+requests: storageRequests,\s+setScanStatus,\s+stop: stopObjectStorageGatewayMock/);
+  assert.match(apiTest, /t\.after\(stopObjectStorageGatewayMock\)/);
+  assert.match(apiTest, /setScanStatus\(providerScanText\)/);
+  assert.doesNotMatch(apiTest, /const storageMock = http\.createServer|const sendStorageResponse|let scanStatus = "clean"/);
+  assert.equal((storageMockHelper.match(/http\.createServer/g) || []).length, 1);
+  assert.match(storageMockHelper, /server\.listen\(0, "127\.0\.0\.1"\)/);
+  assert.match(storageMockHelper, /function setScanStatus\(value\) \{\s+scanStatus = value;/);
+  assert.match(storageMockHelper, /signGatewayResponse\(responseText, RECEIPT_SECRET/);
+  assert.match(storageMockHelper, /"X-Object-Storage-Contract": "object-storage-gateway-trust-v1"/);
+  assert.match(storageMockHelper, /request\.url === "\/storage\/upload-intents"/);
+  assert.match(storageMockHelper, /request\.url === "\/storage\/objects\/complete"/);
+  assert.match(storageMockHelper, /request\.url === "\/storage\/download-intents"/);
+  assert.match(storageMockHelper, /receiptId: `lifecycle-receipt-\$\{body\.attachmentId\}`/);
+  assert.match(storageMockHelper, /OBJECT_STORAGE_GATEWAY_URL = `http:\/\/127\.0\.0\.1:\$\{port\}\/storage\/`/);
+  assert.match(storageMockHelper, /OBJECT_STORAGE_RECEIPT_SIGNING_SECRET = RECEIPT_SECRET/);
+  assert.match(storageMockHelper, /server\.closeAllConnections\?\.\(\)/);
   assert.equal(subtestNames.length, 43);
   assert.equal(orderDigest, "dab18cc7fb2ae790cae552d5646c30f9ba35e8139ac47c629466001dfe6b6cea");
 });
