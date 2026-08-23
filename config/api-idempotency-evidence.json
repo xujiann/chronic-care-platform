@@ -7,37 +7,6 @@
   },
   "reviewedProofRequired": [
     {
-      "reviewId": "T07-financial-dispatch-20260823",
-      "key": "POST /api/financial-gateways/dispatch",
-      "method": "POST",
-      "path": "/api/financial-gateways/dispatch",
-      "owner": "T07",
-      "domain": "insurance-payment",
-      "missingProof": [
-        "payload-conflict",
-        "cas-or-concurrency",
-        "atomic-audit-or-outbox"
-      ],
-      "evidence": [
-        {
-          "file": "src/http/routes/insurance-payment.js",
-          "anchors": [
-            "url.pathname === \"/api/financial-gateways/dispatch\"",
-            "if (duplicate)",
-            "idempotentReplay: true"
-          ]
-        },
-        {
-          "file": "test/api.test.js",
-          "anchors": [
-            "dispatches payment insurance and certificate requests through audited production gateways",
-            "const replay = await api(baseUrl, \"/api/financial-gateways/dispatch\""
-          ]
-        }
-      ],
-      "productionReady": false
-    },
-    {
       "reviewId": "T07-formal-grouping-job-20260823",
       "key": "POST /api/disease-payment/formal-grouping/jobs",
       "method": "POST",
@@ -659,6 +628,159 @@
           "anchors": [
             "outcomes[1].reason.code, \"PERSISTENCE_VERSION_CONFLICT\"",
             "error.code === \"PERSISTENCE_COMMAND_CONFLICT\""
+          ]
+        }
+      ],
+      "productionReady": false,
+      "externalEvidenceRequired": true
+    },
+    {
+      "contractId": "insurance-payment.financial-dispatch-command.v1",
+      "key": "POST /api/financial-gateways/dispatch",
+      "method": "POST",
+      "path": "/api/financial-gateways/dispatch",
+      "owner": "T07",
+      "domain": "insurance-payment",
+      "purpose": "dispatch-signed-financial-gateway-request",
+      "customAuthenticationEvidence": false,
+      "authentication": {
+        "required": true,
+        "mechanism": "bearer-or-cookie-session",
+        "principalType": "platform-user",
+        "credentialSource": ["header:authorization", "cookie:session"],
+        "replayCsrf": {
+          "replayProtection": "idempotency-key-plus-canonical-request-digest-and-persisted-dispatch-ledger",
+          "csrf": "platform-session-transport-policy"
+        }
+      },
+      "authorization": {
+        "model": "platform-rbac-plus-server-side-financial-gateway-scope",
+        "roles": ["commission", "institution", "insurance"],
+        "dataScope": "commission-all-gateway-types; institution-payload-bound-to-authenticated-orgCode; insurance-only-INSURANCE"
+      },
+      "coverage": {
+        "level": "endpoint",
+        "selector": "entire-route",
+        "actions": ["financial-gateway.dispatch"],
+        "unverifiedRemainder": false
+      },
+      "idempotency": {
+        "key": "body:idempotencyKey",
+        "payloadBinding": ["type", "operation", "contractId", "payload"],
+        "exactReplay": "returns the persisted accepted, failed or dispatching financial event with stable status semantics and without another adapter call or state write",
+        "conflictingReuse": "FINANCIAL_DISPATCH_IDEMPOTENCY_CONFLICT",
+        "persistenceScope": "durable integrationGatewayEvents reservation before adapter call, explicit guarded state-transition intent, bounded retained financial ledger, followed by final event plus securityEvents in one platform state write",
+        "distributedExactlyOnceClaimed": false
+      },
+      "concurrency": {
+        "cas": {
+          "required": true,
+          "field": "per-command in-process lock plus short global state-write lock, durable idempotency reservation and storageMeta.collectionVersions",
+          "conflictCodes": ["FINANCIAL_DISPATCH_VERSION_CONFLICT"]
+        }
+      },
+      "errors": [
+        { "code": "FINANCIAL_DISPATCH_BODY_INVALID", "status": 400 },
+        { "code": "FINANCIAL_DISPATCH_GATEWAY_SCOPE_DENIED", "status": 403 },
+        { "code": "FINANCIAL_DISPATCH_INSTITUTION_SCOPE_DENIED", "status": 403 },
+        { "code": "FINANCIAL_DISPATCH_IDEMPOTENCY_CONFLICT", "status": 409 },
+        { "code": "FINANCIAL_DISPATCH_RESERVATION_UNAVAILABLE", "status": 409 },
+        { "code": "FINANCIAL_DISPATCH_VERSION_CONFLICT", "status": 409 },
+        { "code": "FINANCIAL_DISPATCH_PROVIDER_REJECTED", "status": 502 },
+        { "code": "FINANCIAL_DISPATCH_FAILED", "status": 500 }
+      ],
+      "audit": {
+        "accepted": "commits a durable dispatch reservation before the adapter call, then replaces it with the final financial event and appends one security event in the same final state write",
+        "replay": "returns the persisted accepted event as 200, dispatching reservation as 202, or failed event as the original stable 502 shape without another adapter call or state write",
+        "rejected": "identity and role scope stop before ledger read; institution payload is bound to the authenticated orgCode; conflicts do not call the adapter or write; final-write failure leaves the reservation and has no fallback write"
+      },
+      "implementationEvidence": [
+        {
+          "file": "src/http/routes/insurance-payment.js",
+          "anchors": [
+            "url.pathname === \"/api/financial-gateways/dispatch\"",
+            "withFinancialDispatchLock(idempotencyKey",
+            "FINANCIAL_DISPATCH_IDEMPOTENCY_CONFLICT",
+            "FINANCIAL_DISPATCH_INSTITUTION_SCOPE_DENIED",
+            "FINANCIAL_DISPATCH_RESERVATION_UNAVAILABLE",
+            "FINANCIAL_DISPATCH_VERSION_CONFLICT",
+            "financialGatewayWrite: {",
+            "kind: \"finalize\""
+          ]
+        },
+        {
+          "file": "financial-gateways.js",
+          "anchors": [
+            "function financialDispatchRequestDigest",
+            "function withFinancialDispatchLock",
+            "function withFinancialDispatchStateLock",
+            "financialDispatchWriteTails"
+          ]
+        },
+        {
+          "file": "server.js",
+          "anchors": [
+            "function guardFinancialGatewayEvents",
+            "financial gateway write requires a valid integrationGatewayEvents expected version",
+            "financial gateway idempotency ledger capacity reached",
+            "persisted financial gateway ledger must be an array",
+            "function assertFinancialCallbackAttestation",
+            "financial callback verification attestation is invalid",
+            "function assertFinancialFinalizeEvidence",
+            "function verifySqliteCollectionVersions",
+            "SQLite optimistic lock conflict on",
+            "db.exec(\"COMMIT\")"
+          ]
+        }
+      ],
+      "testEvidence": [
+        {
+          "file": "test/financial-gateway-dispatch-route-contract.test.js",
+          "anchors": [
+            "denies identity before body collection and database read",
+            "enforces insurance gateway scope before database read",
+            "binds institution requests to the authenticated organization",
+            "exact replay and conflicting payload retain one event",
+            "serializes concurrent exact replay and conflicting payloads",
+            "runs different keys concurrently and retains both events",
+            "commits accepted event and audit in one atomic write",
+            "preserves one failed business event and audit commit on adapter rejection",
+            "write failure performs no fallback write",
+            "recovers after a reservation write failure without duplicate provider calls",
+            "final write failure leaves a durable reservation and prevents redispatch",
+            "maps SQLite CAS failure to a stable redacted conflict"
+          ]
+        },
+        {
+          "file": "test/financial-gateway-storage-contract.test.js",
+          "anchors": [
+            "financial idempotency events survive display truncation and real SQLite rejects stale writes",
+            "JSON financial ledger corruption fails closed before a state write",
+            "JSON financial ledger with valid JSON but an invalid collection shape fails closed",
+            "legacy financial events with a key but no request payload accept callback evidence through the legacy intent",
+            "financial idempotency ledger capacity fails closed without evicting old receipts",
+            "legacy financial capacity scope prioritizes institution over the historical principal fallback",
+            "real storage commits a successful callback racing a failed retry into reconciliation-required state",
+            "callback attestation cannot be rebased onto a newer persisted callback ledger head",
+            "callback verification attestation is invalid",
+            "finalize provider receipt is incomplete",
+            "finalize failure evidence is incomplete",
+            "FINANCIAL_DISPATCH_VERSION_CONFLICT"
+          ]
+        },
+        {
+          "file": "test/financial-gateway-retry-route-contract.test.js",
+          "anchors": [
+            "a verified callback route can persist during retry and its evidence survives finalization",
+            "a successful callback racing a failed retry blocks every further provider dispatch until reconciliation",
+            "manual dead-letter cannot downgrade a successful financial lifecycle or trigger retry",
+            "financial dispatch waits for an in-flight retry on the same key and replays without another provider call"
+          ]
+        },
+        {
+          "file": "test/financial-gateways.test.js",
+          "anchors": [
+            "financial callbacks fail closed for ambiguous receipts and cross-event replay evidence"
           ]
         }
       ],

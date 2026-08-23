@@ -84,7 +84,7 @@ function buildFinancialGatewayReadiness(options = {}) {
     "/api/financial-gateways/operations",
     "/api/financial-gateways/reconciliation-runs",
     "adapterType: \"financial\"",
-    "event.adapterType === \"financial\"",
+    "retrySource?.adapterType === \"financial\"",
     "payment-transaction-v1"
   ];
   const envVariables = [
@@ -94,14 +94,22 @@ function buildFinancialGatewayReadiness(options = {}) {
     "CERTIFICATE_GATEWAY_URL",
     "FINANCIAL_GATEWAY_TIMEOUT_MS",
     "FINANCIAL_GATEWAY_MAX_ATTEMPTS",
+    "FINANCIAL_IDEMPOTENCY_LEDGER_MAX_EVENTS",
+    "FINANCIAL_IDEMPOTENCY_LEDGER_MAX_EVENTS_PER_SCOPE",
+    "FINANCIAL_CALLBACK_LEDGER_MAX_EVENTS_PER_REQUEST",
     "FINANCIAL_CALLBACK_SECRET",
     "FINANCIAL_CALLBACK_MAX_SKEW_SECONDS"
   ];
+  const ledgerMaximumMatch = environment.match(/FINANCIAL_IDEMPOTENCY_LEDGER_MAX_EVENTS\s*=\s*(\d+)/);
+  const ledgerMaximum = Number(ledgerMaximumMatch?.[1] || 0);
+  const ledgerScopeMaximum = Number(environment.match(/FINANCIAL_IDEMPOTENCY_LEDGER_MAX_EVENTS_PER_SCOPE\s*=\s*(\d+)/)?.[1] || 0);
+  const callbackLedgerMaximum = Number(environment.match(/FINANCIAL_CALLBACK_LEDGER_MAX_EVENTS_PER_REQUEST\s*=\s*(\d+)/)?.[1] || 0);
   const checks = [
     { id: "financialGateway:capabilities", passed: capabilities.every((item) => item.passed), detail: `${capabilities.filter((item) => item.passed).length}/${capabilities.length} capability groups` },
     { id: "financialGateway:api", passed: apiMarkers.every((marker) => serverSource.includes(marker)), detail: `${apiMarkers.filter((marker) => serverSource.includes(marker)).length}/${apiMarkers.length} runtime markers` },
     { id: "financialGateway:operationsUi", passed: ["financial-gateway-operations-center", "financial-gateway-callback-events", "financial-reconciliation-runs", "financial-reconciliation-dialog"].every((marker) => platformHtml.includes(marker)) && ["renderFinancialGatewayOperationsCenter", "loadFinancialGatewayOperationsCenter", "financial-gateways/reconciliation-runs"].every((marker) => platformSource.includes(marker)), detail: "commission callback, exception and daily reconciliation operations UI" },
     { id: "financialGateway:environment", passed: envVariables.every((marker) => environment.includes(marker)), detail: `${envVariables.filter((marker) => environment.includes(marker)).length}/${envVariables.length} environment variables documented` },
+    { id: "financialGateway:ledger-capacity", passed: Number.isSafeInteger(ledgerMaximum) && ledgerMaximum >= 1000 && ledgerMaximum <= 1000000 && Number.isSafeInteger(ledgerScopeMaximum) && ledgerScopeMaximum >= 100 && ledgerScopeMaximum <= ledgerMaximum && Number.isSafeInteger(callbackLedgerMaximum) && callbackLedgerMaximum >= 30 && callbackLedgerMaximum <= 10000 && ["ledgerCapacity", "ledgerRemaining", "ledgerUtilizationPercent", "maximumPerScope", "callbackLedgerCapacity", "warningAtPercent", "criticalAtPercent"].every((marker) => adapterSource.includes(marker)) && ["health_platform_financial_idempotency_ledger_events", "health_platform_financial_idempotency_ledger_utilization_percent", "health_platform_financial_idempotency_scope_peak_utilization_percent", "health_platform_financial_callback_ledger_peak_utilization_percent"].every((marker) => serverSource.includes(marker)) && ["80%", "95%", "迁移和审批", "单一授权主体", "只追加"].every((marker) => documentation.includes(marker)), detail: `configured global=${ledgerMaximum || "invalid"}, per-scope=${ledgerScopeMaximum || "invalid"}, callback=${callbackLedgerMaximum || "invalid"}; headroom, isolation, Prometheus gauges and alert thresholds required` },
     { id: "financialGateway:boundary", passed: ["适配器基础通过不等于支付、医保或电子证照已经正式验收", "签名回调代码就绪", "摘要级日终对账", "现场联合测试回执"].every((marker) => documentation.includes(marker)), detail: "credentials, callbacks, reconciliation and signed acceptance boundaries documented" },
     { id: "financialGateway:releaseWiring", passed: Boolean(pkg.scripts?.["financial-gateway:readiness"]) && releaseSource.includes("buildFinancialGatewayReadiness") && deploySource.includes("financialGatewayReadiness") && manifestSource.includes("financial-gateway-readiness-report"), detail: "package, release report, deploy check and manifest wiring" }
   ];

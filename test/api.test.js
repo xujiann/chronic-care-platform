@@ -411,6 +411,9 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.match(prometheusBody, /health_platform_financial_callback_pending 0/);
     assert.match(prometheusBody, /health_platform_financial_callback_exceptions 0/);
     assert.match(prometheusBody, /health_platform_financial_reconciliation_differences 0/);
+    assert.match(prometheusBody, /health_platform_financial_idempotency_ledger_events \d+/);
+    assert.match(prometheusBody, /health_platform_financial_idempotency_ledger_capacity 100000/);
+    assert.match(prometheusBody, /health_platform_financial_idempotency_ledger_utilization_percent \d+(?:\.\d+)?/);
 
     const readiness = await api(baseUrl, "/api/system/readiness", authorized(accountLogin.body.token));
     assert.equal(readiness.response.status, 200);
@@ -6050,17 +6053,15 @@ test("API authentication, scoping and governance regression suite", async (t) =>
       method: "POST",
       body: JSON.stringify({ reason: "provider-reconciliation-retest" })
     }));
-    assert.equal(marked.response.status, 200);
-    assert.equal(marked.body.deadLetter, true);
+    assert.equal(marked.response.status, 409);
+    assert.equal(marked.body.code, "FINANCIAL_DEAD_LETTER_NOT_ALLOWED");
     const retried = await api(baseUrl, `/api/integration/events/${dispatched.body.id}/retry`, authorized(commission.body.token, {
       method: "POST",
       body: JSON.stringify({ reason: "provider-recovered" })
     }));
-    assert.equal(retried.response.status, 200);
-    assert.equal(retried.body.deadLetter, false);
-    assert.equal(retried.body.lastRetryResult, "provider-accepted");
-    assert.equal(retried.body.adapterReceipt.receiptId, "payment-provider-2");
-    assert.equal(financialRequests.length, 2);
+    assert.equal(retried.response.status, 409);
+    assert.equal(retried.body.code, "FINANCIAL_RETRY_RECONCILIATION_REQUIRED");
+    assert.equal(financialRequests.length, 1);
 
     const certificate = await api(baseUrl, "/api/financial-gateways/dispatch", authorized(commission.body.token, {
       method: "POST",
@@ -6079,7 +6080,7 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(certificate.response.status, 202);
     assert.equal(certificate.body.gatewayType, "CERTIFICATE");
     assert.equal(certificate.body.contractId, "certificate-sync-v1");
-    assert.equal(financialRequests.length, 3);
+    assert.equal(financialRequests.length, 2);
   });
 
   await t.test("routes minimized alerts to SIEM and closes delivery incidents after retry", async (t) => {

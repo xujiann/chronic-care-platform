@@ -297,11 +297,18 @@ const {
   applyFinancialCallback,
   createFinancialReconciliationRun,
   dispatchFinancialRequest,
+  financialDispatchRequestDigest,
   financialGatewayCenter,
   financialGatewayOperationsCenter,
+  financialCallbackLedgerDigest,
+  financialIdempotencyLedgerCapacity,
+  financialIdempotencyScopeKey,
   normalizeFinancialReconciliationRun,
   validateFinancialRequest,
   verifyFinancialCallback,
+  verifyFinancialCallbackEvidenceAttestation,
+  withFinancialDispatchLock,
+  withFinancialDispatchStateLock,
   withFinancialReconciliationLock
 } = require("./financial-gateways");
 const {
@@ -7498,6 +7505,361 @@ function syncPublicHealthOfficialExchangeUniqueKeys(db, data, at) {
   }
 }
 
+function financialGatewayEventDigest(event = {}) {
+  return financialDispatchRequestDigest(event.requestPayload || {
+    type: event.gatewayType,
+    operation: event.operation,
+    contractId: event.contractId,
+    payload: event.payload
+  });
+}
+
+function indexFinancialGatewayEvents(events, label) {
+  const byId = new Map();
+  const byKey = new Map();
+  const legacyById = new Map();
+  (Array.isArray(events) ? events : []).filter((item) => item?.adapterType === "financial").forEach((item) => {
+    const id = String(item?.id || "").trim();
+    const key = String(item?.idempotencyKey || "").trim();
+    if (!id) throw new Error(`${label} financial gateway event identity is incomplete`);
+    if (byId.has(id) || legacyById.has(id)) throw new Error(`${label} financial gateway event id is duplicated`);
+    const requestPayload = item.requestPayload;
+    const modernContract = requestPayload
+      && typeof requestPayload === "object"
+      && !Array.isArray(requestPayload)
+      && String(requestPayload.type || "").trim()
+      && String(requestPayload.operation || "").trim()
+      && String(requestPayload.contractId || "").trim();
+    if (!key || !modernContract) {
+      legacyById.set(id, item);
+      return;
+    }
+    if (String(requestPayload.idempotencyKey || "").trim() !== key
+      || String(item.gatewayType || "").trim().toUpperCase() !== String(requestPayload.type).trim().toUpperCase()
+      || String(item.operation || "").trim().toLowerCase() !== String(requestPayload.operation).trim().toLowerCase()
+      || String(item.contractId || "").trim() !== String(requestPayload.contractId).trim()) {
+      throw new Error(`${label} financial gateway request identity is inconsistent`);
+    }
+    if (byKey.has(key)) throw new Error(`${label} financial gateway idempotency ledger is inconsistent`);
+    byId.set(id, item);
+    byKey.set(key, item);
+  });
+  return { byId, byKey, legacyById };
+}
+
+function assertFinancialCallbackMutation(existing, candidate) {
+  const mutableFields = new Set([
+    "callbackEvents",
+    "updatedAt",
+    "providerStatus",
+    "latestCallbackAt",
+    "businessDate",
+    "providerCode",
+    "reconciliationStatus"
+  ]);
+  const stableView = (event) => Object.fromEntries(
+    Object.entries(event || {}).filter(([key]) => !mutableFields.has(key))
+  );
+  if (JSON.stringify(stableView(existing)) !== JSON.stringify(stableView(candidate))) {
+    throw new Error("financial callback may change only callback evidence and provider projection");
+  }
+  const previousEvents = Array.isArray(existing?.callbackEvents) ? existing.callbackEvents : [];
+  const candidateEvents = Array.isArray(candidate?.callbackEvents) ? candidate.callbackEvents : [];
+  if (candidateEvents.length < previousEvents.length || candidateEvents.length > previousEvents.length + 1) {
+    throw new Error("financial callback evidence must be append-only");
+  }
+  if (candidateEvents.length === previousEvents.length
+    && JSON.stringify(candidate) !== JSON.stringify(existing)) {
+    throw new Error("financial callback provider projection requires new callback evidence");
+  }
+  const retained = candidateEvents.slice(candidateEvents.length - previousEvents.length);
+  if (previousEvents.length && JSON.stringify(retained) !== JSON.stringify(previousEvents)) {
+    throw new Error("financial callback evidence must be append-only");
+  }
+  if (candidateEvents.length === previousEvents.length + 1) {
+    const appended = candidateEvents[0];
+    if (!appended?.eventId || !appended?.nonceDigest || appended.signatureVerified !== true) {
+      throw new Error("financial callback evidence identity is incomplete");
+    }
+    if (appended.stateApplied === true) {
+      const expectedReconciliationStatus = appended.status === "succeeded"
+        ? "provider-final"
+        : ["succeeded", "failed", "cancelled", "reversed"].includes(appended.status)
+          ? "provider-exception"
+          : "provider-processing";
+      if (candidate.providerStatus !== appended.status
+        || candidate.latestCallbackAt !== appended.occurredAt
+        || candidate.businessDate !== appended.businessDate
+        || String(candidate.providerCode || "") !== String(appended.providerCode || "")
+        || candidate.reconciliationStatus !== expectedReconciliationStatus) {
+        throw new Error("financial callback provider projection does not match appended evidence");
+      }
+    } else {
+      const projectionFields = ["providerStatus", "latestCallbackAt", "businessDate", "providerCode"];
+      if (projectionFields.some((field) => JSON.stringify(candidate[field]) !== JSON.stringify(existing[field]))) {
+        throw new Error("ignored financial callback may not change provider projection");
+      }
+      const expectedReconciliationStatus = ["superseded-receipt", "amount-mismatch"].includes(appended.ignoredReason)
+        ? "provider-exception"
+        : existing.reconciliationStatus;
+      if (candidate.reconciliationStatus !== expectedReconciliationStatus) {
+        throw new Error("ignored financial callback reconciliation projection is invalid");
+      }
+    }
+  }
+}
+
+function assertFinancialCallbackAttestation(currentEvents, eventId, existing, candidate, intent) {
+  const callbackEventId = String(intent?.callbackEventId || "").trim();
+  const callbackEvents = Array.isArray(candidate?.callbackEvents) ? candidate.callbackEvents : [];
+  const previousCallbackEvents = Array.isArray(existing?.callbackEvents) ? existing.callbackEvents : [];
+  const callbackEvent = callbackEvents.find((item) => String(item?.eventId || "").trim() === callbackEventId);
+  const appendsEvidence = callbackEvents.length === previousCallbackEvents.length + 1;
+  const prior = previousCallbackEvents.find((item) => String(item?.eventId || "").trim() === callbackEventId);
+  if (!callbackEventId
+    || !callbackEvent
+    || (appendsEvidence && callbackEvent !== callbackEvents[0])
+    || (!appendsEvidence && !prior)
+    || !verifyFinancialCallbackEvidenceAttestation(
+    callbackEvent,
+    intent?.callbackAttestation,
+    eventId,
+    financialCallbackLedgerDigest(previousCallbackEvents)
+  )) {
+    throw new Error("financial callback verification attestation is invalid");
+  }
+  for (const item of Array.isArray(currentEvents) ? currentEvents : []) {
+    if (item?.adapterType !== "financial" || String(item.id || "").trim() === eventId) continue;
+    for (const evidence of Array.isArray(item.callbackEvents) ? item.callbackEvents : []) {
+      if (String(evidence?.eventId || "").trim() === callbackEventId
+        || (callbackEvent.nonceDigest && evidence?.nonceDigest === callbackEvent.nonceDigest)) {
+        throw new Error("financial callback evidence was already bound to another event");
+      }
+    }
+  }
+  if (prior && JSON.stringify(prior) !== JSON.stringify(callbackEvent)) {
+    throw new Error("financial callback replay evidence is inconsistent");
+  }
+}
+
+function assertFinancialFinalizeEvidence(currentEvents, existing, candidate, kind) {
+  const status = String(candidate?.status || "").trim().toLowerCase();
+  if (["accepted", "processing", "succeeded"].includes(status)) {
+    const receipt = candidate?.adapterReceipt;
+    const dispatchedAt = String(candidate?.dispatchedAt || "").trim();
+    const dispatchedAtMs = Date.parse(dispatchedAt);
+    if (!receipt || typeof receipt !== "object" || Array.isArray(receipt)
+      || !String(receipt.receiptId || "").trim()
+      || String(receipt.type || "").trim().toUpperCase() !== String(candidate.gatewayType || "").trim().toUpperCase()
+      || String(receipt.operation || "").trim().toLowerCase() !== String(candidate.operation || "").trim().toLowerCase()
+      || String(receipt.contractId || "").trim() !== String(candidate.contractId || "").trim()
+      || String(receipt.idempotencyKey || "").trim() !== String(candidate.idempotencyKey || "").trim()
+      || String(receipt.status || "").trim().toLowerCase() !== status
+      || (String(candidate.providerStatus || "").trim().toLowerCase() !== status
+        && !(candidate.reconciliationStatus === "provider-exception"
+          && Array.isArray(candidate.callbackEvents)
+          && candidate.callbackEvents.length > 0))
+      || !dispatchedAt
+      || !Number.isFinite(dispatchedAtMs)
+      || new Date(dispatchedAtMs).toISOString() !== dispatchedAt
+      || String(receipt.acceptedAt || "").trim() !== dispatchedAt
+      || String(candidate.businessDate || "").trim() !== dispatchedAt.slice(0, 10)) {
+      throw new Error(`financial gateway ${kind} provider receipt is incomplete`);
+    }
+    const receiptId = String(receipt.receiptId).trim();
+    const gatewayType = String(candidate.gatewayType || "").trim().toUpperCase();
+    const receiptAlreadyBound = (Array.isArray(currentEvents) ? currentEvents : []).some((item) => {
+      if (item?.adapterType !== "financial"
+        || String(item.id || "").trim() === String(candidate.id || "").trim()
+        || String(item.gatewayType || "").trim().toUpperCase() !== gatewayType) return false;
+      return [item.adapterReceipt, ...(Array.isArray(item.adapterReceiptHistory) ? item.adapterReceiptHistory : [])]
+        .some((prior) => String(prior?.receiptId || "").trim() === receiptId);
+    });
+    if (receiptAlreadyBound) throw new Error("financial gateway provider receipt is already bound to another event");
+    return;
+  }
+  const failureCode = String(candidate?.failureCode || "").trim();
+  const failedAt = String(candidate?.failedAt || "").trim();
+  const failedAtMs = Date.parse(failedAt);
+  if (["failed", "rejected"].includes(status)
+    && (![
+      "FINANCIAL_DISPATCH_PROVIDER_REJECTED",
+      "REFUND_DISPATCH_PROVIDER_REJECTED",
+      "FINANCIAL_RETRY_PROVIDER_REJECTED"
+    ].includes(failureCode)
+      || !Number.isFinite(failedAtMs)
+      || new Date(failedAtMs).toISOString() !== failedAt
+      || !String(candidate?.deadLetterReason || "").trim()
+      || candidate?.deadLetter !== true
+      || !(candidate?.reconciliationStatus === "dead-letter"
+        || (candidate?.reconciliationStatus === "provider-exception"
+          && Array.isArray(existing?.callbackEvents)
+          && existing.callbackEvents.length > 0))
+      || ["adapterReceipt", "adapterReceiptHistory", "providerStatus", "dispatchedAt", "callbackEvents"]
+        .some((field) => JSON.stringify(candidate?.[field]) !== JSON.stringify(existing?.[field])))) {
+    throw new Error(`financial gateway ${kind} failure evidence is incomplete`);
+  }
+}
+
+function guardFinancialGatewayEvents(currentEvents, nextEvents, intent, { sqlite, expectedVersions } = {}) {
+  if (!Array.isArray(currentEvents)) throw new Error("persisted financial gateway ledger must be an array");
+  if (nextEvents !== undefined && !Array.isArray(nextEvents)) throw new Error("incoming financial gateway ledger must be an array");
+  const incoming = Array.isArray(nextEvents) ? nextEvents : [];
+  const persisted = Array.isArray(currentEvents) ? currentEvents : [];
+  const current = indexFinancialGatewayEvents(persisted, "persisted");
+  const next = indexFinancialGatewayEvents(incoming, "incoming");
+  const persistedFinancialById = new Map([...current.legacyById, ...current.byId]);
+  incoming.forEach((item) => {
+    const id = String(item?.id || "").trim();
+    const persistedFinancial = persistedFinancialById.get(id);
+    if (!persistedFinancial) return;
+    if (item?.adapterType !== "financial"
+      || String(item?.idempotencyKey || "").trim() !== String(persistedFinancial.idempotencyKey || "").trim()) {
+      throw new Error("financial gateway event identity is immutable");
+    }
+  });
+  next.byKey.forEach((item, key) => {
+    const persistedWithKey = current.byKey.get(key);
+    if (persistedWithKey && String(persistedWithKey.id).trim() !== String(item.id).trim()) {
+      throw new Error("financial gateway idempotency key is already bound to another event");
+    }
+  });
+  const compose = (financialById) => {
+    const included = new Set();
+    const ordered = incoming.flatMap((item) => {
+      if (item?.adapterType !== "financial") return [item];
+      const id = String(item?.id || "").trim();
+      const guarded = financialById.get(id);
+      if (!guarded || included.has(id)) return [];
+      included.add(id);
+      return [guarded];
+    });
+    financialById.forEach((item, id) => {
+      if (!included.has(id)) ordered.push(item);
+    });
+    return ordered;
+  };
+
+  const currentAll = persistedFinancialById;
+  if (!intent) return compose(currentAll);
+  const financialExpectedVersion = Number(expectedVersions?.integrationGatewayEvents);
+  if (sqlite && (!Object.hasOwn(expectedVersions || {}, "integrationGatewayEvents")
+    || !Number.isSafeInteger(financialExpectedVersion)
+    || financialExpectedVersion < 0)) {
+    throw new Error("financial gateway write requires a valid integrationGatewayEvents expected version");
+  }
+  const kind = String(intent.kind || "").trim();
+  const eventId = String(intent.eventId || "").trim();
+  if (kind === "legacy-callback") {
+    const candidate = next.legacyById.get(eventId);
+    const existing = current.legacyById.get(eventId);
+    if (!eventId || !candidate || !existing) throw new Error("legacy financial callback write intent is incomplete");
+    for (const [id, item] of next.legacyById) {
+      if (id === eventId) continue;
+      if (JSON.stringify(item) !== JSON.stringify(current.legacyById.get(id))) {
+        throw new Error("financial gateway write intent may change only one event");
+      }
+    }
+    for (const [id, item] of next.byId) {
+      if (JSON.stringify(item) !== JSON.stringify(current.byId.get(id))) {
+        throw new Error("financial gateway write intent may change only one event");
+      }
+    }
+    const fromStatus = String(existing.status || "").trim();
+    const toStatus = String(candidate.status || "").trim();
+    const callbackStatuses = ["dispatching", "retrying", "accepted", "processing", "succeeded", "failed", "rejected", "cancelled", "reversed"];
+    if (!callbackStatuses.includes(fromStatus) || !callbackStatuses.includes(toStatus)) {
+      throw new Error("financial gateway state transition is not allowed");
+    }
+    if (toStatus !== fromStatus) throw new Error("financial callback may not rewrite dispatch lifecycle status");
+    assertFinancialCallbackMutation(existing, candidate);
+    assertFinancialCallbackAttestation(persisted, eventId, existing, candidate, intent);
+    const guardedLegacy = new Map(currentAll);
+    guardedLegacy.set(eventId, candidate);
+    return compose(guardedLegacy);
+  }
+  const idempotencyKey = String(intent.idempotencyKey || "").trim();
+  const requestDigest = String(intent.requestDigest || "").trim();
+  const candidate = next.byId.get(eventId);
+  const existing = current.byId.get(eventId);
+  if (!eventId || !idempotencyKey || !requestDigest || !candidate) {
+    throw new Error("financial gateway write intent is incomplete");
+  }
+  if (current.legacyById.has(eventId)) throw new Error("legacy financial gateway event identity is immutable");
+  if (String(candidate.idempotencyKey).trim() !== idempotencyKey || financialGatewayEventDigest(candidate) !== requestDigest) {
+    throw new Error("financial gateway write intent does not match the event");
+  }
+  const existingWithKey = current.byKey.get(idempotencyKey);
+  if (existingWithKey && String(existingWithKey.id).trim() !== eventId) {
+    throw new Error("financial gateway idempotency key is already bound to another event");
+  }
+  if (existing && financialGatewayEventDigest(existing) !== requestDigest) {
+    throw new Error("financial gateway request digest is immutable");
+  }
+  if (existing) {
+    const immutableFields = ["adapterType", "gatewayType", "operation", "contractId", "direction", "receivedBy", "capacityScope", "externalId", "residentId"];
+    if (immutableFields.some((field) => JSON.stringify(candidate[field]) !== JSON.stringify(existing[field]))) {
+      throw new Error("financial gateway event contract identity is immutable");
+    }
+  }
+  for (const [id, item] of next.byId) {
+    if (id === eventId) continue;
+    const persistedItem = current.byId.get(id);
+    if (!persistedItem || JSON.stringify(item) !== JSON.stringify(persistedItem)) {
+      throw new Error("financial gateway write intent may change only one event");
+    }
+  }
+  const allowed = {
+    reserve: { from: [null], to: ["dispatching"] },
+    finalize: { from: ["dispatching"], to: ["accepted", "processing", "succeeded", "failed", "rejected"] },
+    callback: { from: ["dispatching", "retrying", "accepted", "processing", "succeeded", "failed", "rejected"], to: ["dispatching", "retrying", "accepted", "processing", "succeeded", "failed", "rejected", "cancelled", "reversed"] },
+    "retry-reserve": { from: ["failed"], to: ["retrying"] },
+    "retry-finalize": { from: ["retrying"], to: ["accepted", "processing", "succeeded", "failed", "rejected"] },
+    "manual-dead-letter": { from: ["failed"], to: ["failed"] }
+  }[kind];
+  const fromStatus = existing ? String(existing.status || "").trim() : null;
+  const toStatus = String(candidate.status || "").trim();
+  if (!allowed || !allowed.from.includes(fromStatus) || !allowed.to.includes(toStatus)) {
+    throw new Error("financial gateway state transition is not allowed");
+  }
+  if (kind === "callback" && toStatus !== fromStatus) {
+    throw new Error("financial callback may not rewrite dispatch lifecycle status");
+  }
+  if (kind === "callback") assertFinancialCallbackMutation(existing, candidate);
+  if (kind === "callback") assertFinancialCallbackAttestation(persisted, eventId, existing, candidate, intent);
+  if (["finalize", "retry-finalize"].includes(kind)) assertFinancialFinalizeEvidence(persisted, existing, candidate, kind);
+  const currentFinancialEvents = [...current.byId.values(), ...current.legacyById.values()];
+  const ledgerCapacity = financialIdempotencyLedgerCapacity(currentFinancialEvents, process.env);
+  if (!existing && ledgerCapacity.used >= ledgerCapacity.maximum) throw new Error("financial gateway idempotency ledger capacity reached");
+  if (!existing) {
+    const candidateScope = financialIdempotencyScopeKey(candidate);
+    const usedByScope = currentFinancialEvents.filter((item) => financialIdempotencyScopeKey(item) === candidateScope).length;
+    if (usedByScope >= ledgerCapacity.maximumPerScope) {
+      throw new Error("financial gateway idempotency ledger scope capacity reached");
+    }
+  }
+  const guardedFinancial = new Map(currentAll);
+  guardedFinancial.set(eventId, candidate);
+  return compose(guardedFinancial);
+}
+
+function persistedIntegrationGatewayEvents(sqlite) {
+  if (sqlite) {
+    const db = openSqliteDatabase();
+    try {
+      const table = db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'state_collections'").get();
+      if (!table) return [];
+      const row = db.prepare("SELECT payload FROM state_collections WHERE key = ?").get("integrationGatewayEvents");
+      return row ? JSON.parse(row.payload) : [];
+    } finally {
+      db.close();
+    }
+  }
+  if (!fs.existsSync(DB_FILE)) return [];
+  const parsed = JSON.parse(fs.readFileSync(DB_FILE, "utf8"));
+  return parsed.integrationGatewayEvents === undefined ? [] : parsed.integrationGatewayEvents;
+}
+
 function writeDatabase(data, options = {}) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
   const publicHealthExternalCas = options.publicHealthExternalCas || null;
@@ -7505,8 +7867,18 @@ function writeDatabase(data, options = {}) {
   const publicHealthEndpointProbeInsert = options.publicHealthEndpointProbeInsert || null;
   const publicHealthEndpointProbeCampaignInsert = options.publicHealthEndpointProbeCampaignInsert || null;
   const publicHealthModernizationWrite = options.publicHealthModernizationWrite || null;
+  const financialGatewayWrite = options.financialGatewayWrite || null;
   const sqlite = shouldUseSqlite();
-  const normalized = normalizeState(data);
+  const guardedData = {
+    ...data,
+    integrationGatewayEvents: guardFinancialGatewayEvents(
+      persistedIntegrationGatewayEvents(sqlite),
+      data.integrationGatewayEvents,
+      financialGatewayWrite,
+      { sqlite, expectedVersions: data.storageMeta?.collectionVersions }
+    )
+  };
+  const normalized = normalizeState(guardedData);
   if ((publicHealthExternalCas
     || publicHealthExternalContractInsert
     || publicHealthEndpointProbeInsert
@@ -7536,8 +7908,9 @@ function writeDatabase(data, options = {}) {
   assertUniquePublicHealthEndpointProbeCampaigns(normalized.publicHealthExternalEndpointProbeCampaigns);
   assertUniquePublicHealthModernizationState(normalized);
   normalized.storageMeta = data.storageMeta || storageMeta();
+  let persistedState = normalized;
   if (sqlite) {
-    writeSqliteState(
+    persistedState = writeSqliteState(
       normalized,
       String(options.event || "write-state"),
       data.storageMeta?.collectionVersions,
@@ -7545,13 +7918,14 @@ function writeDatabase(data, options = {}) {
       publicHealthExternalContractInsert,
       publicHealthEndpointProbeInsert,
       publicHealthEndpointProbeCampaignInsert,
-      publicHealthModernizationWrite
+      publicHealthModernizationWrite,
+      financialGatewayWrite
     );
   }
   const snapshot = {
-    ...normalized,
+    ...persistedState,
     storageMeta: {
-      ...normalized.storageMeta,
+      ...persistedState.storageMeta,
       engine: sqlite ? "json-snapshot" : "json",
       mode: sqlite ? "GitHub Pages 静态预览 JSON 快照" : "JSON 文件存储"
     }
@@ -7708,13 +8082,28 @@ function writeSqliteState(
   publicHealthExternalContractInsert = null,
   publicHealthEndpointProbeInsert = null,
   publicHealthEndpointProbeCampaignInsert = null,
-  publicHealthModernizationWrite = null
+  publicHealthModernizationWrite = null,
+  financialGatewayWrite = null
 ) {
   const db = openSqliteDatabase();
   const now = new Date().toISOString();
   try {
     db.exec("PRAGMA foreign_keys = ON");
     db.exec("BEGIN");
+    const financialRow = db.prepare("SELECT payload FROM state_collections WHERE key = ?")
+      .get("integrationGatewayEvents");
+    const persistedFinancialEvents = financialRow
+      ? JSON.parse(financialRow.payload)
+      : event === "migrate-json-snapshot" ? data.integrationGatewayEvents : [];
+    data = {
+      ...data,
+      integrationGatewayEvents: guardFinancialGatewayEvents(
+        persistedFinancialEvents,
+        data.integrationGatewayEvents,
+        financialGatewayWrite,
+        { sqlite: true, expectedVersions }
+      )
+    };
     if (publicHealthExternalCas) {
       const getCollection = db.prepare("SELECT payload FROM state_collections WHERE key = ?");
       const dispatchRow = getCollection.get("publicHealthExternalDispatches");
@@ -7807,6 +8196,7 @@ function writeSqliteState(
     }
     db.prepare("INSERT INTO storage_events (id, at, event, detail) VALUES (?, ?, ?, ?)").run(randomUUID(), now, event, "platform state persisted");
     db.exec("COMMIT");
+    return normalized;
   } catch (error) {
     db.exec("ROLLBACK");
     throw error;
@@ -7846,7 +8236,10 @@ function verifySqliteCollectionVersions(db, keys, expectedVersions) {
     const row = getVersion.get(key);
     const currentVersion = row ? Number(row.version) : 0;
     const expectedVersion = Number(expectedVersions[key]);
-    if (Number.isFinite(expectedVersion) && currentVersion !== expectedVersion) {
+    if (!Number.isSafeInteger(expectedVersion) || expectedVersion < 0) {
+      throw new Error(`SQLite expected version is invalid for ${key}`);
+    }
+    if (currentVersion !== expectedVersion) {
       throw new Error(`SQLite optimistic lock conflict on ${key}: expected ${expectedVersion}, current ${currentVersion}`);
     }
   });
@@ -8529,6 +8922,21 @@ function renderPrometheusRuntimeMetrics(data) {
     "# HELP health_platform_financial_reconciliation_differences Daily financial reconciliation runs with differences.",
     "# TYPE health_platform_financial_reconciliation_differences gauge",
     `health_platform_financial_reconciliation_differences ${value(financial.reconciliationDifferences, 0)}`,
+    "# HELP health_platform_financial_idempotency_ledger_events Financial idempotency receipts retained in the immutable ledger.",
+    "# TYPE health_platform_financial_idempotency_ledger_events gauge",
+    `health_platform_financial_idempotency_ledger_events ${value(financial.ledgerEvents, 0)}`,
+    "# HELP health_platform_financial_idempotency_ledger_capacity Configured hard capacity for financial idempotency receipts.",
+    "# TYPE health_platform_financial_idempotency_ledger_capacity gauge",
+    `health_platform_financial_idempotency_ledger_capacity ${value(financial.ledgerCapacity, 0)}`,
+    "# HELP health_platform_financial_idempotency_ledger_utilization_percent Financial idempotency ledger utilization percentage.",
+    "# TYPE health_platform_financial_idempotency_ledger_utilization_percent gauge",
+    `health_platform_financial_idempotency_ledger_utilization_percent ${value(financial.ledgerUtilizationPercent, 0)}`,
+    "# HELP health_platform_financial_idempotency_scope_peak_utilization_percent Peak utilization across isolated institution or principal scopes.",
+    "# TYPE health_platform_financial_idempotency_scope_peak_utilization_percent gauge",
+    `health_platform_financial_idempotency_scope_peak_utilization_percent ${value(financial.ledgerPeakScopeUtilizationPercent, 0)}`,
+    "# HELP health_platform_financial_callback_ledger_peak_utilization_percent Peak append-only callback evidence utilization for one financial request.",
+    "# TYPE health_platform_financial_callback_ledger_peak_utilization_percent gauge",
+    `health_platform_financial_callback_ledger_peak_utilization_percent ${value(financial.callbackLedgerUtilizationPercent, 0)}`,
     ""
   ].join("\n");
 }
@@ -8543,6 +8951,11 @@ function buildObservabilitySignals(data) {
   const smsDeliveryFailures = Number(metrics.messaging?.smsDelivery?.failed || 0);
   const financialCallbackExceptions = Number(metrics.integrations?.financialCallbacks?.exceptions || 0);
   const financialReconciliationDifferences = Number(metrics.integrations?.financialCallbacks?.reconciliationDifferences || 0);
+  const financialLedgerUtilization = Math.max(
+    Number(metrics.integrations?.financialCallbacks?.ledgerUtilizationPercent || 0),
+    Number(metrics.integrations?.financialCallbacks?.ledgerPeakScopeUtilizationPercent || 0),
+    Number(metrics.integrations?.financialCallbacks?.callbackLedgerUtilizationPercent || 0)
+  );
   const definitions = [
     {
       fingerprint: `postgres-sync-slo:${postgresSloBreaches}`,
@@ -8608,6 +9021,17 @@ function buildObservabilitySignals(data) {
       metric: "financialGatewayExceptions",
       value: financialCallbackExceptions + financialReconciliationDifferences,
       owner: "cross-agency-integration",
+      evidenceRefs: ["/api/financial-gateways/operations", "/api/metrics/prometheus"]
+    },
+    {
+      fingerprint: `financial-ledger-capacity:${financialLedgerUtilization}`,
+      source: "financial-gateway-ledger",
+      severity: financialLedgerUtilization >= 95 ? "critical" : "warning",
+      title: "Financial idempotency ledger capacity requires review",
+      summary: `Financial idempotency ledger utilization is ${financialLedgerUtilization}%; archive or capacity changes require an approved migration.`,
+      metric: "financialLedgerUtilizationPercent",
+      value: financialLedgerUtilization >= 80 ? financialLedgerUtilization : 0,
+      owner: "database-operations",
       evidenceRefs: ["/api/financial-gateways/operations", "/api/metrics/prometheus"]
     },
     {
@@ -15181,7 +15605,7 @@ function sendInsurancePaymentError(res, error) {
   const status = Number(error?.statusCode || 0)
     || (/not found|涓嶅瓨鍦/i.test(String(error?.message || "")) ? 404 : 409);
   sendJson(res, status, {
-    error: status === 403 ? "Forbidden" : status === 404 ? "Not Found" : status === 400 ? "Bad Request" : "Conflict",
+    error: status >= 500 ? "Bad Gateway" : status === 403 ? "Forbidden" : status === 404 ? "Not Found" : status === 400 ? "Bad Request" : "Conflict",
     code: error?.code || "INSURANCE_PAYMENT_COMMAND_REJECTED",
     message: String(error?.message || "insurance payment command was rejected")
   });
@@ -27779,6 +28203,7 @@ function createRuntimeCapabilitySource() {
   dispatchAlert,
   dispatchChronicFollowupAction,
   dispatchFinancialRequest,
+  financialDispatchRequestDigest,
   dispatchHospitalRequest,
   enqueuePublicHealthExternalDispatchToState,
   enqueueDirectReportDeliveryToState,
@@ -28108,6 +28533,8 @@ function createRuntimeCapabilitySource() {
   verifyTrustedRespiratoryNetworkEvidence,
     workflowStateCollectionKey,
   writeDatabase,
+  withFinancialDispatchLock,
+  withFinancialDispatchStateLock,
   withFinancialReconciliationLock,
   });
 }
@@ -28260,6 +28687,7 @@ if (require.main === module) {
 
 module.exports = {
   authorize,
+  buildObservabilitySignals,
   buildRuntimeProductionGoNoGoCenter,
   authSecurityStateStoreMode,
   assertProductionRuntimeSecurity,

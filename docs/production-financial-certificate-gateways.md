@@ -23,6 +23,9 @@ FINANCIAL_GATEWAY_SECRET
 FINANCIAL_GATEWAY_TOKEN
 FINANCIAL_GATEWAY_TIMEOUT_MS
 FINANCIAL_GATEWAY_MAX_ATTEMPTS
+FINANCIAL_IDEMPOTENCY_LEDGER_MAX_EVENTS
+FINANCIAL_IDEMPOTENCY_LEDGER_MAX_EVENTS_PER_SCOPE
+FINANCIAL_CALLBACK_LEDGER_MAX_EVENTS_PER_REQUEST
 FINANCIAL_CALLBACK_SECRET
 FINANCIAL_CALLBACK_MAX_SKEW_SECONDS
 ```
@@ -36,12 +39,14 @@ CERTIFICATE_GATEWAY_URL / CERTIFICATE_GATEWAY_SECRET / CERTIFICATE_GATEWAY_TOKEN
 PAYMENT_CALLBACK_SECRET / INSURANCE_CALLBACK_SECRET / CERTIFICATE_CALLBACK_SECRET
 ```
 
-生产环境必须使用 HTTPS，出站签名密钥与回调验签密钥必须分离并由密钥管理系统注入，不得写入代码、数据快照或发布报告。共享 `FINANCIAL_CALLBACK_SECRET` 可由分域回调密钥覆盖，生产回调时间窗限制为 60 至 900 秒。
+生产环境必须使用 HTTPS，出站签名密钥与回调验签密钥必须分离并由密钥管理系统注入，不得写入代码、数据快照或发布报告。共享 `FINANCIAL_CALLBACK_SECRET` 可由分域回调密钥覆盖，生产回调时间窗限制为 60 至 900 秒。`FINANCIAL_IDEMPOTENCY_LEDGER_MAX_EVENTS` 默认 100000、允许 1000 至 1000000；`FINANCIAL_IDEMPOTENCY_LEDGER_MAX_EVENTS_PER_SCOPE` 默认 10000，以机构编码优先、否则按调用主体隔离，防止单一授权主体耗尽全局账本。`FINANCIAL_CALLBACK_LEDGER_MAX_EVENTS_PER_REQUEST` 默认 1000、允许 30 至 10000，callback evidence 只追加、不滑动淘汰，达到单请求上限稳定返回 507 并转人工对账。运行中心与 Prometheus 暴露全局/分 scope/callback 已用量、上限和利用率，80% 触发 warning、95% 触发 critical。达到上限后新金融 reservation 失败关闭，禁止静默淘汰旧幂等凭证；扩容或归档必须通过迁移和审批，并在上线前配置值班告警接收方。
 
 ## 回调与对账安全
 
 - 签名输入绑定原始业务 JSON 的稳定摘要、回调时间戳和 nonce；签名比较采用定时安全比较。
+- 验签器为单次持久化签发绑定目标 gateway event 的进程内证明；中央写守卫复验该证明并拒绝 callback event/nonce 跨账项重放。证明不入库、不写日志、不返回客户端，进程重启后不可复用。
 - 回调只持久化白名单字段，供应商结算引用仅保存 SHA-256 摘要。
+- 成功 dispatch/retry finalize 必须携带与 gateway type、operation、status 一致的供应商回执和 dispatchedAt；失败 finalize 必须同时携带稳定失败码、失败时间、死信原因和死信标记，禁止无证据写入成功或失败账项。
 - 同一事件号内容变化、nonce 重用、未来时间、金额不一致、旧回执和乱序终态冲突均不会覆盖当前状态。
 - 摘要级日终对账只证明本地计算与登记摘要的差异处理链可运行，`productionEvidence` 固定为 `false`。
 

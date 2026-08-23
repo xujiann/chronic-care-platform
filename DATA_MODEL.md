@@ -230,9 +230,9 @@ source/sink contract、目标摘要、cursor/source hash 与 receipt 摘要；ch
 
 目录中的源码 marker 既不是认证证明，也不是幂等执行证据；只有 owner、控制流锚点和可执行负向测试一致时才产生认证 evidence contract。认证分类只描述 AS-IS 的 required/optional/none、凭据来源、replay/CSRF 和 scope，不代表目标政策充分或生产安全。幂等 `behavior-verified` 仍只证明当前仓库行为，不证明跨实例 exactly-once 或生产耐久性；所有生产状态继续 `NO-GO`。
 
-API-002 的 existing-proof 扩展现使注册表达到 10 份合同。新增 T02 quality-governance item action 合同继续复用 `qualityRectificationOrders` / `resourceDispatchRequests` / `drugConsumableSupervisions` 来源、`qualityOperationsGovernanceCommandReceipts` 以及既有 governance/platform/security audit 投影；一次非重放命令只通过同一个 `writeDatabase` 提交来源记录、receipt 和三类审计。未新增集合、表、字段、DDL、migration、outbox 或事实源；SQLite 继续依赖读取快照中的 collection version，JSON 兼容路径只增加 record 级进程内串行，不能据此宣称跨实例 exactly-once。相关来源和审计集合的既有 owner 状态未改变，两个转诊 action-slice 仍不能晋升通用 endpoint。
+API-002 的 existing-proof 扩展现使注册表达到 11 份合同。新增 T07 financial dispatch 合同继续复用 `integrationGatewayEvents`、`securityEvents`、既有 gateway adapter 与状态写入端口；第一次状态写以 `reserve` 意图把既有 event shape 的 `dispatching` reservation 持久化，第二次状态写以 `finalize` 意图从新快照替换最终事件并追加审计。`id ↔ idempotencyKey ↔ requestDigest` 为不可变绑定，状态转换必须显式属于 reserve/finalize/callback/retry/manual-dead-letter；callback 仅追加 evidence 与更新 provider projection，不能改写 dispatch lifecycle，manual dead-letter 仅能标记 failed。普通全状态写只能保留已持久化金融事件，SQLite 会在同一写事务内基于最新 collection 再次合并和校验。金融事件有显式容量上限，语法错误或非数组的 JSON/SQLite payload 均失败关闭；利用率、余量、80% warning 与 95% critical 进入 operations/Prometheus，禁止自动淘汰，归档/扩容需 migration 与审批。没有新增集合、表、字段、DDL、migration、outbox 或事实源；显式金融 SQLite 写必须携带有效的 `storageMeta.collectionVersions.integrationGatewayEvents`，JSON 兼容路径由短时状态写锁保护，不能据此宣称跨实例 exactly-once。相关集合的既有 owner 状态未改变，两个转诊 action-slice 仍不能晋升通用 endpoint。
 
-T07 第二批审计的 `reviewedProofRequired` 现只保留 financial dispatch 与 formal grouping job。financial reconciliation 的拒绝记录已在同一评审变更中由直接行为合同替换；机器验证仍禁止拒绝记录和正式合同同 key 并存。
+T07 第二批审计的 `reviewedProofRequired` 现只保留 formal grouping job。financial reconciliation 与 financial dispatch 的拒绝记录均已在相应评审变更中由直接行为合同替换；机器验证仍禁止拒绝记录和正式合同同 key 并存。
 
 ## 14. 内部边界覆盖率数据边界
 
@@ -334,3 +334,7 @@ data owner 或权威事实。`sourceReportDigest` 只对已脱敏的 profile/out
 引入提交和来源引用。它不读取或写入 `data/db.json`、SQLite、PostgreSQL，不新增 collection、表、字段、
 DDL、migration、业务事实或生产证据。PDF digest 只证明受跟踪字节未漂移，不能证明内容正确、来源系统
 已上线或现场已经验收。
+
+## 23. 金融回调证明不是持久化数据
+
+callback 写意图中的验签证明绑定目标 gateway event，callback event/nonce 在全金融账本唯一；证明只存在于单次写调用，不属于数据库 schema、JSON collection 或公共投影。成功 finalize 的 provider receipt 必须绑定 gateway type、operation、status 与 dispatchedAt；失败 finalize 固定失败码、失败时间、死信原因和死信标记。

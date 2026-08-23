@@ -748,8 +748,9 @@ function reviewSpecialCaseAppeal(input, id, payload, actor) {
   return { state, row, appeal: reviewed.appeal, review: reviewed.review };
 }
 
-function createSettlementBatch(input, payload, actor) {
+function createSettlementBatch(input, payload, actor, options = {}) {
   const state = normalizeState(input);
+  const createdAt = new Date(options.at || Date.now()).toISOString();
   if (payload.type === "annual") throw new Error("年度清算必须基于已拨付月度批次单独创建");
   const period = String(payload.period || new Date().toISOString().slice(0, 7));
   if (!/^\d{4}-\d{2}$/.test(period)) throw new Error("结算期间必须为YYYY-MM");
@@ -778,7 +779,7 @@ function createSettlementBatch(input, payload, actor) {
   const snapshots = admission.map(({ item, calculation, specialCase, basePaymentStandardFen, paymentStandardFen, paymentStandard }) => ({ caseId: item.id, settlementListNo: item.settlementListNo, institution: item.institution, institutionCode: item.institutionCode, formalReceiptId: calculation.grouping.receiptId, formalReceiptDigest: calculation.grouping.receiptDigest, schemeVersion: calculation.grouping.schemeVersion, groupCode: calculation.grouping.groupCode, parameterId: calculation.parameterId, basePaymentStandardFen, paymentStandardFen, paymentStandard, specialCaseId: specialCase?.row.id || "", specialCaseDecisionDigest: specialCase?.decisionDigest || "" }));
   const declaredAmount = round(candidates.reduce((sum, item) => sum + Number(item.declaredFundAmount || 0), 0));
   const standardAmount = round(admission.reduce((sum, row) => sum + row.paymentStandard, 0));
-  const batch = { id: `settlement-${period}-${Date.now()}`, type: "月度结算", period, institution: institution || "全部机构", caseCount: candidates.length, declaredAmount, declaredAmountFen: Settlement.yuanToFen(declaredAmount, "申报金额"), standardAmount, standardAmountFen: Settlement.yuanToFen(standardAmount, "标准金额"), adjustedAmount: standardAmount, adjustedAmountFen: Settlement.yuanToFen(standardAmount, "调整后金额"), submissionDeadline, policyWorkingDays: 30, workingCalendar, status: Settlement.SETTLEMENT_LABELS.BATCH_FROZEN, settlementState: "BATCH_FROZEN", calculationSnapshots: snapshots, batchDigest: DiseasePaymentIntake.digest({ period, institution: institution || "全部机构", submissionDeadline, workingCalendar, snapshots }), frozenAt: new Date().toISOString(), createdAt: new Date().toISOString(), createdBy: actor, events: [] };
+  const batch = { id: `settlement-${period}-${Date.now()}`, type: "月度结算", period, institution: institution || "全部机构", caseCount: candidates.length, declaredAmount, declaredAmountFen: Settlement.yuanToFen(declaredAmount, "申报金额"), standardAmount, standardAmountFen: Settlement.yuanToFen(standardAmount, "标准金额"), adjustedAmount: standardAmount, adjustedAmountFen: Settlement.yuanToFen(standardAmount, "调整后金额"), submissionDeadline, policyWorkingDays: 30, workingCalendar, status: Settlement.SETTLEMENT_LABELS.BATCH_FROZEN, settlementState: "BATCH_FROZEN", calculationSnapshots: snapshots, batchDigest: DiseasePaymentIntake.digest({ period, institution: institution || "全部机构", submissionDeadline, workingCalendar, snapshots }), frozenAt: createdAt, createdAt, createdBy: actor, events: [] };
   batch.sla = Settlement.buildSettlementSla(batch, batch.frozenAt);
   Settlement.appendEvent(batch, { id: `settlement-event-${randomUUID()}`, action: "freeze", from: "NONE", to: "BATCH_FROZEN", actor, at: batch.frozenAt, idempotencyKey: batch.id, detail: { batchDigest: batch.batchDigest, standardAmountFen: batch.standardAmountFen, submissionDeadline, slaDueDate: batch.sla.dueDate } });
   admission.forEach(({ item, calculation, specialCase, basePaymentStandardFen, paymentStandardFen, paymentStandard }) => {

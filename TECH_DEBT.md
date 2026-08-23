@@ -10,7 +10,7 @@
 
 | ID | 类别 | 现状与证据 | 风险/缺失测试 |
 |---|---|---|---|
-| ARC-001 | 超大组合根 | `server.js` 约 28.2k 行 | 变更冲突、初始化耦合、难隔离测试 |
+| ARC-001 | 超大组合根 | `server.js` 约 28.7k 行 | 变更冲突、初始化耦合、难隔离测试 |
 | ARC-003 | 宽接口 | public-health runtime context 160 个依赖 | 组合根和路由同步变化，难形成领域端口 |
 | ARC-004 | 前端超大模块 | 数智医院 app 10.5k、citizen 6k、公卫 4.4k | 全局状态、渲染和流程耦合 |
 | ARC-007 | 临床子域隔离 | 急救、血液、影像、体检首个查询端口已建立，但两个混合路由仍承载写命令；血液 GET 有内存规范化，影像和体检 GET 有审计持久化；33 个 operations 字面路径已全部移交 T02 | 按特征测试逐用例迁移；禁止 operations 回流 T06，不把兼容副作用误写成纯查询 |
@@ -32,7 +32,7 @@
 | ARC-006 | 同名模块 | 根目录与 `src/` 有 6 组同名 | 文档明确前端/服务端/迁移角色，不做全仓改名 |
 | ARC-008 | operations 跨域写入 | OPS-02 为保持兼容，将 T06 的既有直写整体移入 T02；其中 `resourceDispatchRequests`、`taskMessages` 的机器 Owner 仍是 T05 care-coordination | 后续仅在独立 ADR/切片中改为 T05 owner port 或版本化事件；在完成行为矩阵前不得直接改写副作用 |
 | API-001 | 错误契约 | 多种 JSON 错误格式 | 新 API 使用版本化标准错误接口 |
-| API-002 | 接口目录复核 | v3 仍为 593 项、13 项认证证据且未分类为 0。T02 quality-governance item action 已以 session/RBAC、scope-before-receipt、404 零写、exact replay/conflict、record 级串行、SQLite CAS、稳定脱敏错误和一次 record+receipt+三类 audit 写入闭合，使注册表达到 10 份合同、8 个 endpoint verified；未新增 schema/outbox/外部依赖，也不宣称跨实例 exactly-once。325 个写接口仍缺 endpoint 级证明，327 项保持 review-required | 继续逐 owner 补证；financial dispatch 与 formal grouping job 保留 `reviewedProofRequired`。来源集合 owner、真实多实例/PG 行为和现场证据仍未决，该 endpoint 保持 NO-GO |
+| API-002 | 接口目录复核 | v3 仍为 593 项、13 项认证证据且未分类为 0。T07 financial dispatch 已以 session/RBAC、gateway 与 institution scope、canonical digest replay/conflict、按 key 命令锁、短时状态写锁、显式状态转换意图、外调前耐久 reservation、SQLite 事务内二次 ledger 校验/CAS、错误形状账本失败关闭、callback/retry 合并、终态 dead-letter 防降级、稳定失败重放/错误脱敏、容量指标/告警和最终 event+audit 原子写入闭合，使注册表达到 11 份合同、9 个 endpoint verified；未新增 schema/outbox/外部依赖，也不宣称跨实例 exactly-once。324 个写接口仍缺 endpoint 级证明，326 项保持 review-required | 继续逐 owner 补证；formal grouping job 保留 `reviewedProofRequired`。真实 provider、凭据/网络、跨实例/PG 行为、经审批的归档迁移和现场证据仍未决，该 endpoint 保持 NO-GO |
 | JOB-001 | Worker 一致性 | 12 个既有 worker profile、9 个部署入口已建立 `platform-worker-observability.v1` 脱敏兼容投影；领域 state/retry/lease/checkpoint/receipt 仍各自权威，仓库不据此推导生产授权 | 后续接入真实指标/日志采集器与告警路由前，必须另行确认 owner、留存、访问控制和现场启用证据；不得把兼容投影演变为统一领域状态机 |
 | TEST-006 | 静态基线与测试性能 | `test/api.test.js` 的全文件 `no-unreachable` 已关闭，原 3 个 care 显式 skip 已由 T05 owner/route 独立特征测试逐块重验并恢复执行；陪诊引用挂号单的存在性/scope 缺口与 handoff `reject/return` 投影已最小修复。typecheck 为 13 个唯一文件；两个前端文件的 16 个重复翻译键已有逐键 shadow/final 值和真实调用保护，去重保持首次插入顺序及最终生效值，lint 文件级例外已归零；API 热点仍作为独立 integration 批次输出耗时。五个可逆夹具切片已分别提取临时 seed/env/server、单个 HIS hospital mock、单个 SIEM alert mock、单个 financial gateway mock 和单个 object-storage gateway mock 生命周期；storage 的签名响应、四类 operation、动态 URL 与 mutable scan 状态通过领域 helper 和最小 setter 保真。43 个子测试顺序摘要继续锁定 suite 成员、断言、超时、单进程语义、CI 预算与 required checks 不降低 | API 巨型测试仍集中约 8,200 行业务断言和其余共享状态。后续只按一个共享服务生命周期继续小步拆分，不得按耗时并行化共享状态或把 helper 变成生产接口。耗时先观察多次 CI 分布，不凭单机样本设门槛；不得恢复文件级 lint 豁免；外部护理/陪诊/HIS/SIEM/financial/storage 投递与现场证据继续由生产 readiness 跟踪，不以本测试关闭 |
 
@@ -60,7 +60,7 @@
 | DEPLOY-001 | 2026-08-22 | Solution A 四个容器镜像固定到审核版本与 registry digest；Orthanc 认证默认启用，DICOM 默认回环且只接受显式私网接口；占位凭据和漂移镜像生产失败关闭 | readiness 锁定 Compose/环境模板/镜像策略一致性，并覆盖可变镜像、占位凭据、认证关闭、通配/公网绑定和外部证据持续 `NO-GO` |
 | API-CATALOG-001 | 2026-08-22 | 从 `api-authorization-matrix-v2` 派生 `production-api-catalog-v1`，逐项覆盖 method/path/owner/auth/roles-or-scope/idempotency/生产状态且全部 NO-GO | 目录集合等价、唯一键、必要字段、动态策略、幂等观察和生产放行负向测试；governance-api CI 同时校验矩阵与目录 |
 | DATA-003 | 2026-08-22 | 复用既有 collection governance，对 252/252 集合建立唯一 owner/system/review/quarantine 状态；87 个 owner 合同不被复制，源码 process owner 不推断数据 owner，生产晋升固定失败关闭 | 完整性、唯一性、陈旧/冲突、owner/reader/shared 边界、源码引用漂移、核心概念匹配、生产晋升负向与治理 CI |
-| API-IDEM-001 | 2026-08-22 | `production-api-catalog-v2/v3` 将 source marker 与行为证明分层；2026-08-23 已扩展为 8 个 endpoint 与 2 个 action-slice。T02 quality-governance item action 在既有 Accepted 机制内复用 owner 状态机、adapter 和全状态 UoW；其余 2 条 `reviewedProofRequired` 仍不得与合同同 key 并存 | 合同唯一性、身份/范围、重放/冲突、同/异载荷并发、SQLite CAS 稳定错误、原子审计、404/写失败零 fallback、生产晋升与 distributed exactly-once 否定断言；CI 执行全部登记专项行为测试 |
+| API-IDEM-001 | 2026-08-22 | `production-api-catalog-v2/v3` 将 source marker 与行为证明分层；2026-08-23 已扩展为 9 个 endpoint 与 2 个 action-slice。T07 financial dispatch 在既有 Accepted 机制内复用 gateway adapter，以 integration event 作为有容量上限的耐久 reservation；按 key 命令锁允许异 key 外调并行，短时状态写锁、SQLite 事务内再校验和显式金融写意图禁止普通全状态写改绑、回退或覆盖 callback evidence/provider projection。其余 1 条 `reviewedProofRequired` 仍不得与合同同 key 并存 | 合同唯一性、身份/范围、重放/冲突、同/异键并发、外调前 reservation、真实 SQLite stale-write/HTTP 映射、JSON 语法及集合形状失败关闭、真实双路由 callback/retry 竞态、终态 dead-letter 防降级、容量 headroom/告警、最终原子审计、失败重放/脱敏、生产晋升与 distributed exactly-once 否定断言；CI 执行全部登记专项行为测试 |
 | API-AUTH-001 | 2026-08-23 | `api-authentication-evidence-v1` 为 13 个客观可证入口登记 owner、mechanism、credential source、required/optional/none、replay/CSRF、scope 和负向测试；原 13 个未分类 key 中 12 个真实入口已闭合，1 个跨 handler 虚假 POST 已删除，目录升级 v3 | 唯一性、owner/route、credential、replay-CSRF、实现/测试锚点、T10 401/403、相邻 handler 误配、证据伪造和生产 promotion 负向；所有 593 项继续 NO-GO |
 | SEC-010 | 2026-08-23 | strict production preflight 不再只能靠测试注入 externalTrustVerifier；可部署 provider 使用 pinned anchor bundle、Ed25519 双角色签名、撤销/时窗和 release/source/artifact/evidence/registry 精确绑定，默认仍 NO-GO | generic signed-envelope 负向矩阵、CLI 自动装配、synthetic fixture 不提升全局生产状态、deployment package/env/CI 合同与脱敏错误 |
 | DEPLOY-002 | 2026-08-23 | 切换行动定义升级为 definitions-only v2；14/14 effective status 仅由共享 Ed25519 provider 验证的当前 release/artifact 绑定决定派生，并接入 strict preflight 与 protected manual workflow；手改 `verified` 固定失败 | 缺 provider/记录、错签/撤销、异 release/digest、过期/未来时间、角色重合、重复 signer、缺转换历史/命令回执、symlink/超限、错误脱敏与 digest-only receipt 负向测试 |
@@ -112,3 +112,9 @@
 - SQLite v16 只覆盖单主机当前存储；多节点 PostgreSQL 主库、正式 migration/rollback/容量演练仍未完成。
 - 真实 endpoint、凭据、独立 activation、签名回执、监控告警、systemd 启用与现场联合验收继续 NO-GO。
 - 内嵌聚合 outbox 与专用投递表暂时双表达，后续只能在兼容迁移与独立 ADR 下逐步收敛。
+
+## 金融账本剩余债务
+
+- 仓库内已关闭自报 `signatureVerified`、跨账项 callback event/nonce 重放和无 provider receipt 的成功 finalize；失败 finalize 也要求完整稳定证据。
+- 进程内 attestation 只保护当前进程到当前写调用，不等于跨实例 exactly-once、KMS/HSM 验签、生产 PostgreSQL 事务或外部供应方事实证明。
+- 真实 provider 字段映射、来源网络白名单、凭据、对账传输、归档迁移、容量基线及现场签收仍为外部/现场 NO-GO。

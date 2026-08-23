@@ -17,10 +17,10 @@ function clone(value) {
 
 test("idempotency evidence registry validates only directly proven endpoint and action-slice contracts", () => {
   assert.deepEqual(validateEvidenceRegistry(), []);
-  assert.equal(DEFAULT_REGISTRY.contracts.length, 10);
-  assert.equal(endpointEvidenceContracts().length, 8);
+  assert.equal(DEFAULT_REGISTRY.contracts.length, 11);
+  assert.equal(endpointEvidenceContracts().length, 9);
   assert.equal(actionSliceEvidenceContracts().length, 2);
-  assert.equal(proofRequiredReviews().length, 2);
+  assert.equal(proofRequiredReviews().length, 1);
   assert.equal(DEFAULT_REGISTRY.contracts[0].key, "POST /api/auth/sms-delivery-callback");
   assert.equal(DEFAULT_REGISTRY.contracts[0].owner, "T01");
   assert.equal(DEFAULT_REGISTRY.contracts.every((contract) => contract.productionReady === false), true);
@@ -36,15 +36,15 @@ test("idempotency evidence registry validates only directly proven endpoint and 
     "POST /api/tasks/:id/actions",
     "POST /api/research/compliant-exports/:id/actions",
     "POST /api/online-payments/refunds",
+    "POST /api/financial-gateways/dispatch",
     "POST /api/financial-gateways/reconciliation-runs",
     "POST /api/security/controls/:id/actions",
     "POST /api/quality-operations-governance/items/:id/actions"
   ]);
 });
 
-test("remaining reviewed T07 candidates stay proof-required after reconciliation closure", () => {
+test("remaining reviewed T07 candidate stays proof-required after financial dispatch closure", () => {
   const expected = [
-    "POST /api/financial-gateways/dispatch",
     "POST /api/disease-payment/formal-grouping/jobs"
   ];
   assert.deepEqual(proofRequiredReviews().map((review) => review.key), expected);
@@ -62,10 +62,10 @@ test("remaining reviewed T07 candidates stay proof-required after reconciliation
 
 test("catalog promotes only whole endpoints and retains generic action routes as review-required", () => {
   const catalog = buildProductionApiCatalog();
-  assert.equal(catalog.summary.writeIdempotencyBehaviorVerified, 8);
+  assert.equal(catalog.summary.writeIdempotencyBehaviorVerified, 9);
   assert.equal(catalog.summary.writeIdempotencyActionSlicesVerified, 2);
-  assert.equal(catalog.summary.writeIdempotencyBehaviorProofRequired, 325);
-  assert.equal(catalog.summary.reviewRequired, 327);
+  assert.equal(catalog.summary.writeIdempotencyBehaviorProofRequired, 324);
+  assert.equal(catalog.summary.reviewRequired, 326);
 
   for (const key of [
     "POST /api/auth/sms-delivery-callback",
@@ -73,6 +73,7 @@ test("catalog promotes only whole endpoints and retains generic action routes as
     "POST /api/referrals/:id/actions",
     "POST /api/research/compliant-exports/:id/actions",
     "POST /api/online-payments/refunds",
+    "POST /api/financial-gateways/dispatch",
     "POST /api/financial-gateways/reconciliation-runs",
     "POST /api/security/controls/:id/actions",
     "POST /api/quality-operations-governance/items/:id/actions"
@@ -104,6 +105,10 @@ test("catalog promotes only whole endpoints and retains generic action routes as
   assert.equal(reconciliation.idempotency.behaviorEvidence.contractId, "insurance-payment.financial-reconciliation-command.v1");
   assert.equal(reconciliation.production.repositoryReview, "catalogued");
   assert.equal(reconciliation.production.status, "NO-GO");
+  const dispatch = catalog.entries.find((entry) => entry.key === "POST /api/financial-gateways/dispatch");
+  assert.equal(dispatch.idempotency.behaviorEvidence.contractId, "insurance-payment.financial-dispatch-command.v1");
+  assert.equal(dispatch.production.repositoryReview, "catalogued");
+  assert.equal(dispatch.production.status, "NO-GO");
   const securityControl = catalog.entries.find((entry) => entry.key === "POST /api/security/controls/:id/actions");
   assert.equal(securityControl.idempotency.behaviorEvidence.contractId, "identity-security.security-control-action-command.v1");
   assert.deepEqual(securityControl.authorization.roles, ["commission"]);
@@ -162,9 +167,9 @@ test("idempotency evidence registry rejects marker promotion, production promoti
   forgedReviewedPromotion.contracts.push({
     ...clone(forgedReviewedPromotion.contracts[0]),
     contractId: "forged-reviewed-promotion",
-    key: "POST /api/financial-gateways/dispatch",
+    key: "POST /api/disease-payment/formal-grouping/jobs",
     method: "POST",
-    path: "/api/financial-gateways/dispatch"
+    path: "/api/disease-payment/formal-grouping/jobs"
   });
   assert.match(validateEvidenceRegistry(forgedReviewedPromotion).join("\n"), /cannot coexist with behavior contract/);
 

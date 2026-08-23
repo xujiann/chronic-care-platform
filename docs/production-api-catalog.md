@@ -24,7 +24,7 @@
 
 两个仓库内部歧义已按证据闭合：`GET /api/t10-specialty/cutover-pack` 绑定真实 shared handler、commission 角色以及匿名 401/机构角色 403 的直接行为测试；目录解析器禁止跨越已结束的 handler 配对 method/path，`POST /api/public-health/domain-events/health` 虚假 key 已删除，同时保留真实 `GET .../health` 与 `POST .../dispatch`。修正没有创建新 API 或改变运行时策略。
 
-`production-api-catalog-v3` 另行统计幂等行为证据：333 个写接口中，101 个观察到幂等相关标记、232 个未观察到。`api-idempotency-evidence-v1` 现登记 6 份直接行为合同：SMS callback、区域共享调阅、直接转诊和科研合规导出 action 共 4 个完整 endpoint，另有 `workflow-actions[collection=referrals]` 与 `tasks[referrals:*]` 2 个 action-slice。因此 4 个 endpoint 为 `behavior-verified`，329 个仍为 `behavior-proof-required`；两个 action-slice 只进入 `verifiedActionContracts`，通用 endpoint 继续阻断。所有合同都明确不证明多实例 exactly-once。
+`production-api-catalog-v3` 另行统计幂等行为证据：333 个写接口中，101 个观察到幂等相关标记、232 个未观察到。`api-idempotency-evidence-v1` 现登记 11 份直接行为合同，其中 9 个完整 endpoint 为 `behavior-verified`，另有 `workflow-actions[collection=referrals]` 与 `tasks[referrals:*]` 2 个 action-slice；324 个写接口仍为 `behavior-proof-required`，总计 326 项 `review-required`。最新 T07 financial dispatch 合同直接证明身份/角色/机构范围先于读取、canonical request digest 精确重放/冲突、同 key 命令串行与异 key 外调并行、短时状态写锁、外调前耐久 reservation、显式金融状态转换、普通写防回退、损坏账本失败关闭、callback/retry 竞态保护、最终 event+audit 原子提交、失败重放/错误脱敏和真实 SQLite stale-write 拒绝；两个 action-slice 仍只进入 `verifiedActionContracts`，通用 endpoint 继续阻断。所有合同都明确不证明多实例 exactly-once。
 
 区域共享目录 owner 由 Accepted ADR 和现有数据 owner 合同明确为 T02，不再沿 `shared.js` 文件名推断成 T09。科研导出创建接口只证明重复导出 ID 冲突，没有同键精确重放，未登记为幂等行为合同。
 
@@ -40,6 +40,6 @@
 
 1. 先消除 7 个 `runtime-policy` 路由的静态不确定性，但不得改变公共 method/path。
 2. 保持 T10 精确路径 401/403 和相邻 handler method/path 解析回归测试，防止已闭合歧义回流。
-3. 由 T01–T09 owner 分批为 329 个未验证写接口提供 endpoint 行为合同与负向测试；232 个“未观察到标记”只是优先排查子集，只读接口不要求幂等键。
+3. 由 T01–T09 owner 分批为 324 个未验证写接口提供 endpoint 行为合同与负向测试；232 个“未观察到标记”只是优先排查子集，只读接口不要求幂等键。
 4. 将已验证的幂等、CAS、错误与审计合同接入领域专项测试，不以字符串标记替代行为测试。
 5. 持续扩展 role × permission × resident/institution/region 的运行时允许和拒绝矩阵。

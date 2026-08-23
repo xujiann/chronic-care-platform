@@ -3,7 +3,7 @@
 const InsurancePaymentRefundTransaction = require("../../../insurance-payment-refund-transaction");
 
 function createRouteSegments(runtime) {
-  const { DiseasePaymentGrouperContract, DiseasePaymentIntake, DiseasePaymentService, FinancialCallbackError, OnlinePaymentRefunds, appendSecurityEvent, applyFinancialCallback, authorizeInsurancePaymentAction, collectJson, createFinancialReconciliationRun, diseasePaymentPackageSignatureOptions, dispatchFinancialRequest, financialGatewayCenter, financialGatewayOperationsCenter, normalizeState, patchBusinessCollectionItem, prependAuditTrailEntry, randomUUID, readDatabase, requireApiRole, requireInsuranceSystemCommand, sendInsurancePaymentError, sendJson, validateFinancialRequest, verifyFinancialCallback, withFinancialReconciliationLock, writeDatabase } = runtime;
+  const { DiseasePaymentGrouperContract, DiseasePaymentIntake, DiseasePaymentService, FinancialCallbackError, OnlinePaymentRefunds, appendSecurityEvent, applyFinancialCallback, authorizeInsurancePaymentAction, collectJson, createFinancialReconciliationRun, diseasePaymentPackageSignatureOptions, dispatchFinancialRequest, financialDispatchRequestDigest, financialGatewayCenter, financialGatewayOperationsCenter, normalizeState, patchBusinessCollectionItem, prependAuditTrailEntry, randomUUID, readDatabase, requireApiRole, requireInsuranceSystemCommand, sendInsurancePaymentError, sendJson, validateFinancialRequest, verifyFinancialCallback, withFinancialDispatchLock, withFinancialDispatchStateLock, withFinancialReconciliationLock, writeDatabase } = runtime;
   return [
     {
       id: "insurance-payment-01",
@@ -20,52 +20,80 @@ function createRouteSegments(runtime) {
             nonce: req.headers["x-financial-nonce"],
             signature: req.headers["x-financial-signature"]
           });
-          const data = readDatabase();
-          const result = applyFinancialCallback(data, verified);
-          let domainResult = null;
-          if (result.gatewayEvent.gatewayType === "PAYMENT" && result.gatewayEvent.operation === "refund") {
-            domainResult = OnlinePaymentRefunds.syncRefundFromFinancialCallback(
-              data,
-              result,
-              "financial-callback-adapter",
-              { trustedFinancialCallback: true }
+          const { result, domainResult } = await withFinancialDispatchStateLock(() => {
+            const data = readDatabase();
+            const result = applyFinancialCallback(data, verified);
+            let domainResult = null;
+            if (result.gatewayEvent.gatewayType === "PAYMENT" && result.gatewayEvent.operation === "refund") {
+              domainResult = OnlinePaymentRefunds.syncRefundFromFinancialCallback(
+                data,
+                result,
+                "financial-callback-adapter",
+                { trustedFinancialCallback: true }
+              );
+            }
+            if (result.gatewayEvent.gatewayType === "INSURANCE"
+              && result.gatewayEvent.operation === "settlement"
+              && ["core-accepted", "core-returned", "payment-failed", "confirm-payment"].includes(String(payload.action || ""))) {
+              const callbackPayload = {
+                action: String(payload.action),
+                receiptId: verified.receiptId,
+                idempotencyKey: verified.eventId,
+                paidAmountFen: verified.amountFen,
+                returnCycleId: payload.returnCycleId,
+                failureCycleId: payload.failureCycleId,
+                reasonCode: verified.providerCode || payload.reasonCode,
+                reason: verified.failureReason || payload.reason,
+                requirementDigest: payload.requirementDigest,
+                failureEvidenceDigest: payload.failureEvidenceDigest,
+                correctionWorkingDays: payload.correctionWorkingDays,
+                resolutionWorkingDays: payload.resolutionWorkingDays,
+                at: verified.receivedAt
+              };
+              const settlementResult = DiseasePaymentService.applyInsuranceCoreSettlementCallback(
+                data.diseasePayment,
+                result.gatewayEvent.externalId,
+                callbackPayload,
+                "insurance-core-adapter"
+              );
+              data.diseasePayment = settlementResult.state;
+              domainResult = settlementResult;
+            }
+            data.securityEvents = prependAuditTrailEntry(data.securityEvents, {
+              id: randomUUID(),
+              at: new Date().toLocaleString("zh-CN", { hour12: false }),
+              actor: `${verified.gatewayType.toLowerCase()}-provider`,
+              role: "external-adapter",
+              action: "financial gateway callback",
+              target: verified.receiptId,
+              result: result.idempotentReplay ? "幂等" : result.callbackEvent.stateApplied ? "允许" : "仅记录",
+              detail: `${verified.eventId}:${verified.status}${result.callbackEvent.ignoredReason ? `:${result.callbackEvent.ignoredReason}` : ""}`
+            });
+            const modernFinancialEvent = Boolean(
+              result.gatewayEvent.idempotencyKey
+              && result.gatewayEvent.requestPayload
+              && typeof result.gatewayEvent.requestPayload === "object"
+              && !Array.isArray(result.gatewayEvent.requestPayload)
+              && result.gatewayEvent.requestPayload.type
+              && result.gatewayEvent.requestPayload.operation
+              && result.gatewayEvent.requestPayload.contractId
             );
-          }
-          if (result.gatewayEvent.gatewayType === "INSURANCE"
-            && result.gatewayEvent.operation === "settlement"
-            && ["core-accepted", "core-returned", "payment-failed", "confirm-payment"].includes(String(payload.action || ""))) {
-            const callbackPayload = {
-              action: String(payload.action),
-              receiptId: verified.receiptId,
-              idempotencyKey: verified.eventId,
-              paidAmountFen: verified.amountFen,
-              returnCycleId: payload.returnCycleId,
-              failureCycleId: payload.failureCycleId,
-              reasonCode: verified.providerCode || payload.reasonCode,
-              reason: verified.failureReason || payload.reason,
-              requirementDigest: payload.requirementDigest,
-              failureEvidenceDigest: payload.failureEvidenceDigest,
-              correctionWorkingDays: payload.correctionWorkingDays,
-              resolutionWorkingDays: payload.resolutionWorkingDays,
-              at: verified.receivedAt
-            };
-            const settlementResult = DiseasePaymentService.applyInsuranceCoreSettlementCallback(
-              data.diseasePayment,
-              result.gatewayEvent.externalId,
-              callbackPayload,
-              "insurance-core-adapter"
+            writeDatabase(
+              { ...normalizeState(data), storageMeta: data.storageMeta },
+              {
+                financialGatewayWrite: {
+                  kind: modernFinancialEvent ? "callback" : "legacy-callback",
+                  eventId: result.gatewayEvent.id,
+                  idempotencyKey: modernFinancialEvent ? result.gatewayEvent.idempotencyKey : "",
+                  requestDigest: modernFinancialEvent
+                    ? financialDispatchRequestDigest(result.gatewayEvent.requestPayload)
+                    : "",
+                  callbackEventId: result.callbackEvent.eventId,
+                  callbackAttestation: result.verificationAttestation
+                }
+              }
             );
-            data.diseasePayment = settlementResult.state;
-            domainResult = settlementResult;
-          }
-          writeDatabase(normalizeState(data));
-          appendSecurityEvent({
-            actor: `${verified.gatewayType.toLowerCase()}-provider`,
-            role: "external-adapter",
-            action: "financial gateway callback",
-            target: verified.receiptId,
-            result: result.idempotentReplay ? "idempotent" : result.callbackEvent.stateApplied ? "allowed" : "recorded-not-applied",
-            detail: `${verified.eventId}:${verified.status}${result.callbackEvent.ignoredReason ? `:${result.callbackEvent.ignoredReason}` : ""}`
+            return { result, domainResult };
           });
           sendJson(res, 200, {
             ok: true,
@@ -91,14 +119,16 @@ function createRouteSegments(runtime) {
           const known = error instanceof FinancialCallbackError;
           const status = known ? error.statusCode : unsupportedType || error instanceof SyntaxError ? 400 : 500;
           const code = known ? error.code : unsupportedType ? "FINANCIAL_CALLBACK_GATEWAY_INVALID" : error instanceof SyntaxError ? "FINANCIAL_CALLBACK_BODY_INVALID" : "FINANCIAL_CALLBACK_FAILED";
-          appendSecurityEvent({
-            actor: "financial-provider",
-            role: "external-adapter",
-            action: "financial gateway callback",
-            target: `/api/financial-gateways/callbacks/${String(callbackType || "").replace(/[\r\n]/g, " ").slice(0, 32)}`,
-            result: "denied",
-            detail: code
-          });
+          try {
+            appendSecurityEvent({
+              actor: "financial-provider",
+              role: "external-adapter",
+              action: "financial gateway callback",
+              target: `/api/financial-gateways/callbacks/${String(callbackType || "").replace(/[\r\n]/g, " ").slice(0, 32)}`,
+              result: "denied",
+              detail: code
+            });
+          } catch {}
           sendJson(res, status, { ok: false, code, message: known ? error.message : unsupportedType ? "financial callback gateway is invalid" : "financial callback failed" });
         }
         return true;
@@ -147,7 +177,7 @@ function createRouteSegments(runtime) {
               result: reconciliation.run.status === "matched" ? "allowed" : "review-required",
               detail: `${reconciliation.run.id}:${reconciliation.run.status}:${reconciliation.run.providerSummary.statementDigest}`
             });
-            writeDatabase(normalizeState(data));
+            writeDatabase({ ...normalizeState(data), storageMeta: data.storageMeta });
             return reconciliation;
           });
           sendJson(res, result.idempotentReplay ? 200 : 201, { ok: true, idempotentReplay: result.idempotentReplay, run: result.run, productionEvidence: false });
@@ -173,7 +203,13 @@ function createRouteSegments(runtime) {
       if (req.method === "POST" && url.pathname === "/api/financial-gateways/dispatch") {
         const user = requireApiRole(req, res, ["commission", "institution", "insurance"], "/api/financial-gateways/dispatch");
         if (!user) return true;
-        const payload = await collectJson(req);
+        let payload;
+        try {
+          payload = await collectJson(req);
+        } catch {
+          sendJson(res, 400, { ok: false, code: "FINANCIAL_DISPATCH_BODY_INVALID", message: "financial dispatch body is invalid" });
+          return true;
+        }
         let validated;
         try {
           validated = validateFinancialRequest(payload);
@@ -182,7 +218,12 @@ function createRouteSegments(runtime) {
           return true;
         }
         if (validated.type !== "INSURANCE" && user.role === "insurance") {
-          sendJson(res, 403, { error: "Forbidden", message: "insurance role is limited to the insurance gateway" });
+          sendJson(res, 403, {
+            ok: false,
+            error: "Forbidden",
+            code: "FINANCIAL_DISPATCH_GATEWAY_SCOPE_DENIED",
+            message: "insurance role is limited to the insurance gateway"
+          });
           return true;
         }
         const contractByType = {
@@ -196,16 +237,22 @@ function createRouteSegments(runtime) {
           sendJson(res, 400, { error: "Bad Request", message: "financial gateway idempotencyKey is required" });
           return true;
         }
-        const data = readDatabase();
-        const duplicate = (data.integrationGatewayEvents || []).find((item) =>
-          item.adapterType === "financial" &&
-          item.gatewayType === validated.type &&
-          item.operation === validated.operation &&
-          item.idempotencyKey === idempotencyKey
-        );
-        if (duplicate) {
-          sendJson(res, 200, { ...duplicate, idempotentReplay: true });
-          return true;
+        if (user.role === "institution") {
+          const actorInstitutionCode = String(user.orgCode || "").trim();
+          const requestedInstitutionCode = String(validated.payload.institutionCode || "").trim();
+          if (!actorInstitutionCode || (requestedInstitutionCode && requestedInstitutionCode !== actorInstitutionCode)) {
+            sendJson(res, 403, {
+              ok: false,
+              error: "Forbidden",
+              code: "FINANCIAL_DISPATCH_INSTITUTION_SCOPE_DENIED",
+              message: "financial dispatch institution scope denied"
+            });
+            return true;
+          }
+          validated = {
+            ...validated,
+            payload: { ...validated.payload, institutionCode: actorInstitutionCode }
+          };
         }
         const requestPayload = {
           type: validated.type,
@@ -214,77 +261,163 @@ function createRouteSegments(runtime) {
           idempotencyKey,
           payload: validated.payload
         };
-        const baseEvent = {
-          id: `igw-${randomUUID()}`,
-          direction: "outbound",
-          adapterType: "financial",
-          gatewayType: validated.type,
-          operation: validated.operation,
-          contractId,
-          domain: validated.type,
-          resource: "FinancialGatewayRequest",
-          idempotencyKey,
-          externalId: String(validated.payload.externalId || validated.payload.orderNo || validated.payload.claimNo || "").trim(),
-          residentId: String(validated.payload.residentId || "").trim(),
-          status: "dispatching",
-          signatureVerified: false,
-          outboundSigned: true,
-          receivedBy: user.username || user.role,
-          requestPayload,
-          payload: validated.payload,
-          retryCount: 0,
-          deadLetter: false,
-          reconciliationStatus: "dispatching",
-          receivedAt: new Date().toISOString()
-        };
+        const requestDigest = financialDispatchRequestDigest(requestPayload);
         try {
-          const receipt = await dispatchFinancialRequest(requestPayload);
-          const event = {
-            ...baseEvent,
-            status: receipt.status,
-            adapterReceipt: receipt,
-            adapterReceiptHistory: [],
-            providerStatus: receipt.status,
-            callbackEvents: [],
-            businessDate: String(receipt.acceptedAt || "").slice(0, 10),
-            dispatchedAt: receipt.acceptedAt,
-            reconciliationStatus: "provider-accepted"
-          };
-          data.integrationGatewayEvents = [event, ...(Array.isArray(data.integrationGatewayEvents) ? data.integrationGatewayEvents : [])].slice(0, 200);
-          data.securityEvents = [{
-            id: randomUUID(),
-            at: new Date().toLocaleString("zh-CN", { hour12: false }),
-            actor: user.name,
-            role: user.role,
-            action: "dispatch financial gateway request",
-            target: `${validated.type}/${validated.operation}`,
-            result: "allowed",
-            detail: `${receipt.receiptId} | ${idempotencyKey} | attempts=${receipt.attempts}`
-          }, ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])].slice(0, 120);
-          writeDatabase(data);
-          sendJson(res, 202, event);
+          const result = await withFinancialDispatchLock(idempotencyKey, async () => {
+            const reservation = await withFinancialDispatchStateLock(() => {
+              const data = readDatabase();
+              const duplicate = (data.integrationGatewayEvents || []).find((item) =>
+                item.adapterType === "financial" && item.idempotencyKey === idempotencyKey
+              );
+              if (duplicate) {
+                const duplicateDigest = financialDispatchRequestDigest(duplicate.requestPayload || {
+                  type: duplicate.gatewayType,
+                  operation: duplicate.operation,
+                  contractId: duplicate.contractId,
+                  payload: duplicate.payload
+                });
+                if (duplicateDigest !== requestDigest) {
+                  throw new FinancialCallbackError(
+                    "financial dispatch idempotency key is bound to a different request",
+                    "FINANCIAL_DISPATCH_IDEMPOTENCY_CONFLICT",
+                    409
+                  );
+                }
+                if (duplicate.status === "failed") {
+                  return {
+                    status: 502,
+                    body: {
+                      ok: false,
+                      code: "FINANCIAL_DISPATCH_PROVIDER_REJECTED",
+                      message: "financial gateway dispatch failed",
+                      event: { ...duplicate, idempotentReplay: true }
+                    }
+                  };
+                }
+                if (["dispatching", "retrying"].includes(duplicate.status)) {
+                  return { status: 202, body: { ...duplicate, idempotentReplay: true } };
+                }
+                return { status: 200, body: { ...duplicate, idempotentReplay: true } };
+              }
+              const baseEvent = {
+                id: `igw-${randomUUID()}`,
+                direction: "outbound",
+                adapterType: "financial",
+                gatewayType: validated.type,
+                operation: validated.operation,
+                contractId,
+                domain: validated.type,
+                resource: "FinancialGatewayRequest",
+                idempotencyKey,
+                externalId: String(validated.payload.externalId || validated.payload.orderNo || validated.payload.claimNo || "").trim(),
+                residentId: String(validated.payload.residentId || "").trim(),
+                status: "dispatching",
+                signatureVerified: false,
+                outboundSigned: true,
+                receivedBy: user.username || user.role,
+                capacityScope: user.orgCode
+                  ? `institution:${String(user.orgCode).trim()}`
+                  : `principal:${String(user.username || user.role).trim()}`,
+                requestPayload,
+                payload: validated.payload,
+                retryCount: 0,
+                deadLetter: false,
+                reconciliationStatus: "dispatching",
+                receivedAt: new Date().toISOString()
+              };
+              data.integrationGatewayEvents = [baseEvent, ...(Array.isArray(data.integrationGatewayEvents) ? data.integrationGatewayEvents : [])].slice(0, 200);
+              writeDatabase(data, {
+                financialGatewayWrite: {
+                  kind: "reserve",
+                  eventId: baseEvent.id,
+                  idempotencyKey,
+                  requestDigest
+                }
+              });
+              return { baseEvent };
+            });
+            if (Object.hasOwn(reservation, "status")) return reservation;
+            const { baseEvent } = reservation;
+            let event;
+            let status;
+            let body;
+            let auditResult;
+            let auditDetail;
+            try {
+              const receipt = await dispatchFinancialRequest(requestPayload);
+              event = {
+                ...baseEvent,
+                status: receipt.status,
+                adapterReceipt: receipt,
+                adapterReceiptHistory: [],
+                providerStatus: receipt.status,
+                callbackEvents: [],
+                businessDate: String(receipt.acceptedAt || "").slice(0, 10),
+                dispatchedAt: receipt.acceptedAt,
+                reconciliationStatus: "provider-accepted"
+              };
+              status = 202;
+              body = event;
+              auditResult = "allowed";
+              auditDetail = `${receipt.receiptId} | ${idempotencyKey} | attempts=${receipt.attempts}`;
+            } catch (error) {
+              event = {
+                ...baseEvent,
+                status: "failed",
+                deadLetter: true,
+                deadLetterReason: "financial gateway provider dispatch failed",
+                failureCode: "FINANCIAL_DISPATCH_PROVIDER_REJECTED",
+                failedAt: new Date().toISOString(),
+                reconciliationStatus: "dead-letter"
+              };
+              status = 502;
+              body = { ok: false, code: "FINANCIAL_DISPATCH_PROVIDER_REJECTED", message: "financial gateway dispatch failed", event };
+              auditResult = "failed";
+              auditDetail = `${event.id} | ${idempotencyKey} | moved to reconciliation`;
+            }
+            await withFinancialDispatchStateLock(() => {
+              const committedData = readDatabase();
+              const reservedIndex = (committedData.integrationGatewayEvents || []).findIndex((item) => item.id === baseEvent.id);
+              if (reservedIndex < 0 || committedData.integrationGatewayEvents[reservedIndex].status !== "dispatching") {
+                throw new FinancialCallbackError(
+                  "financial dispatch reservation is unavailable",
+                  "FINANCIAL_DISPATCH_RESERVATION_UNAVAILABLE",
+                  409
+                );
+              }
+              committedData.integrationGatewayEvents[reservedIndex] = event;
+              committedData.securityEvents = [{
+                id: randomUUID(),
+                at: new Date().toLocaleString("zh-CN", { hour12: false }),
+                actor: user.name,
+                role: user.role,
+                action: "dispatch financial gateway request",
+                target: `${validated.type}/${validated.operation}`,
+                result: auditResult,
+                detail: auditDetail
+              }, ...(Array.isArray(committedData.securityEvents) ? committedData.securityEvents : [])].slice(0, 120);
+              writeDatabase(committedData, {
+                financialGatewayWrite: {
+                  kind: "finalize",
+                  eventId: event.id,
+                  idempotencyKey,
+                  requestDigest
+                }
+              });
+            });
+            return { status, body };
+          });
+          sendJson(res, result.status, result.body);
         } catch (error) {
-          const event = {
-            ...baseEvent,
-            status: "failed",
-            deadLetter: true,
-            deadLetterReason: String(error.message || "financial gateway dispatch failed").slice(0, 200),
-            failedAt: new Date().toISOString(),
-            reconciliationStatus: "dead-letter"
-          };
-          data.integrationGatewayEvents = [event, ...(Array.isArray(data.integrationGatewayEvents) ? data.integrationGatewayEvents : [])].slice(0, 200);
-          data.securityEvents = [{
-            id: randomUUID(),
-            at: new Date().toLocaleString("zh-CN", { hour12: false }),
-            actor: user.name,
-            role: user.role,
-            action: "dispatch financial gateway request",
-            target: `${validated.type}/${validated.operation}`,
-            result: "failed",
-            detail: `${event.id} | ${idempotencyKey} | moved to reconciliation`
-          }, ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])].slice(0, 120);
-          writeDatabase(data);
-          sendJson(res, 502, { ok: false, message: "financial gateway dispatch failed", event });
+          const known = error instanceof FinancialCallbackError;
+          const versionConflict = String(error?.message || "").includes("SQLite optimistic lock conflict");
+          sendJson(res, versionConflict ? 409 : known ? error.statusCode : 500, {
+            ok: false,
+            code: versionConflict ? "FINANCIAL_DISPATCH_VERSION_CONFLICT" : known ? error.code : "FINANCIAL_DISPATCH_FAILED",
+            message: versionConflict
+              ? "financial dispatch state changed; retry with a fresh snapshot"
+              : known ? error.message : "financial dispatch failed"
+          });
         }
         return true;
       }
@@ -585,6 +718,7 @@ function createRouteSegments(runtime) {
           if (headerIdempotencyKey) payload.idempotencyKey = headerIdempotencyKey;
           if (action === "reviews") payload.role = user.role;
           let result;
+          let persistedInFinancialCommand = false;
           if (action === "resubmit") {
             result = OnlinePaymentRefunds.resubmitRejectedRefund(data, id, payload, user);
           } else if (action === "reviews") {
@@ -598,58 +732,178 @@ function createRouteSegments(runtime) {
           } else if (action === "close") {
             result = OnlinePaymentRefunds.closeRefund(data, id, payload, user);
           } else {
-            const requestPayload = OnlinePaymentRefunds.prepareRefundDispatch(data, id);
-            const duplicate = (data.integrationGatewayEvents || []).find((item) =>
+            const priorGatewayEvent = (data.integrationGatewayEvents || []).find((item) =>
               item.adapterType === "financial"
               && item.gatewayType === "PAYMENT"
               && item.operation === "refund"
-              && item.idempotencyKey === requestPayload.idempotencyKey
+              && item.externalId === id
+              && item.requestPayload
             );
-            let event = duplicate;
-            if (!event) {
-              const receipt = await dispatchFinancialRequest(requestPayload);
-              event = {
-                id: `igw-${randomUUID()}`,
-                direction: "outbound",
-                adapterType: "financial",
-                gatewayType: "PAYMENT",
-                operation: "refund",
-                contractId: requestPayload.contractId,
-                domain: "PAYMENT",
-                resource: "FinancialGatewayRequest",
-                idempotencyKey: requestPayload.idempotencyKey,
-                externalId: id,
-                residentId: "",
-                status: receipt.status,
-                signatureVerified: false,
-                outboundSigned: true,
-                receivedBy: user.username || user.role,
-                requestPayload,
-                payload: requestPayload.payload,
-                retryCount: 0,
-                deadLetter: false,
-                reconciliationStatus: "provider-accepted",
-                receivedAt: new Date().toISOString(),
-                adapterReceipt: receipt,
-                adapterReceiptHistory: [],
-                providerStatus: receipt.status,
-                callbackEvents: [],
-                businessDate: String(receipt.acceptedAt || "").slice(0, 10),
-                dispatchedAt: receipt.acceptedAt
-              };
-              data.integrationGatewayEvents = [event, ...(Array.isArray(data.integrationGatewayEvents) ? data.integrationGatewayEvents : [])].slice(0, 200);
-            }
-            result = OnlinePaymentRefunds.recordRefundDispatch(
-              data,
-              id,
-              event.adapterReceipt,
-              event.id,
-              user
-            );
-            result.gatewayEventId = event.id;
-            result.idempotent = Boolean(duplicate);
+            const requestPayload = priorGatewayEvent?.requestPayload || OnlinePaymentRefunds.prepareRefundDispatch(data, id);
+            const idempotencyKey = String(requestPayload.idempotencyKey || "").trim();
+            const requestDigest = financialDispatchRequestDigest(requestPayload);
+            result = await withFinancialDispatchLock(idempotencyKey, async () => {
+              const reserved = await withFinancialDispatchStateLock(() => {
+                const reservationData = readDatabase();
+                const duplicate = (reservationData.integrationGatewayEvents || []).find((item) =>
+                  item.adapterType === "financial"
+                  && item.gatewayType === "PAYMENT"
+                  && item.operation === "refund"
+                  && item.idempotencyKey === idempotencyKey
+                );
+                if (duplicate) {
+                  if (financialDispatchRequestDigest(duplicate.requestPayload) !== requestDigest) {
+                    throw new FinancialCallbackError(
+                      "refund dispatch idempotency key is bound to another request",
+                      "REFUND_DISPATCH_IDEMPOTENCY_CONFLICT",
+                      409
+                    );
+                  }
+                  if (["dispatching", "retrying"].includes(duplicate.status)) {
+                    return {
+                      complete: {
+                        row: reservationData.onlinePaymentRefunds.find((item) => item.id === id),
+                        gatewayEventId: duplicate.id,
+                        idempotent: true,
+                        pending: true
+                      }
+                    };
+                  }
+                  if (duplicate.deadLetter || duplicate.status === "failed" || !duplicate.adapterReceipt) {
+                    throw new FinancialCallbackError(
+                      "refund gateway dispatch requires reconciliation",
+                      "REFUND_DISPATCH_RECONCILIATION_REQUIRED",
+                      409
+                    );
+                  }
+                  const refund = reservationData.onlinePaymentRefunds.find((item) => item.id === id);
+                  if (!refund) {
+                    throw new FinancialCallbackError("refund not found", "REFUND_NOT_FOUND", 404);
+                  }
+                  if (refund.state === "APPROVED") {
+                    const replay = OnlinePaymentRefunds.recordRefundDispatch(
+                      reservationData,
+                      id,
+                      duplicate.adapterReceipt,
+                      duplicate.id,
+                      user
+                    );
+                    writeDatabase(reservationData);
+                    return { complete: { ...replay, gatewayEventId: duplicate.id, idempotent: true } };
+                  }
+                  return { complete: { row: refund, gatewayEventId: duplicate.id, idempotent: true } };
+                }
+                const currentRequest = OnlinePaymentRefunds.prepareRefundDispatch(reservationData, id);
+                if (financialDispatchRequestDigest(currentRequest) !== requestDigest) {
+                  throw new FinancialCallbackError(
+                    "refund dispatch state changed before reservation",
+                    "REFUND_DISPATCH_STATE_CONFLICT",
+                    409
+                  );
+                }
+                const baseEvent = {
+                  id: `igw-${randomUUID()}`,
+                  direction: "outbound",
+                  adapterType: "financial",
+                  gatewayType: "PAYMENT",
+                  operation: "refund",
+                  contractId: requestPayload.contractId,
+                  domain: "PAYMENT",
+                  resource: "FinancialGatewayRequest",
+                  idempotencyKey,
+                  externalId: id,
+                  residentId: "",
+                  status: "dispatching",
+                  signatureVerified: false,
+                  outboundSigned: true,
+                  receivedBy: user.username || user.role,
+                  capacityScope: user.orgCode
+                    ? `institution:${String(user.orgCode).trim()}`
+                    : `principal:${String(user.username || user.role).trim()}`,
+                  requestPayload,
+                  payload: requestPayload.payload,
+                  retryCount: 0,
+                  deadLetter: false,
+                  reconciliationStatus: "dispatching",
+                  receivedAt: new Date().toISOString()
+                };
+                reservationData.integrationGatewayEvents = [baseEvent, ...(reservationData.integrationGatewayEvents || [])].slice(0, 200);
+                writeDatabase(reservationData, {
+                  financialGatewayWrite: { kind: "reserve", eventId: baseEvent.id, idempotencyKey, requestDigest }
+                });
+                return { baseEvent };
+              });
+              if (reserved.complete) return reserved.complete;
+
+              let receipt;
+              try {
+                receipt = await dispatchFinancialRequest(requestPayload);
+              } catch {
+                await withFinancialDispatchStateLock(() => {
+                  const failedData = readDatabase();
+                  const failedIndex = (failedData.integrationGatewayEvents || []).findIndex((item) => item.id === reserved.baseEvent.id);
+                  if (failedIndex < 0 || failedData.integrationGatewayEvents[failedIndex].status !== "dispatching") return;
+                  failedData.integrationGatewayEvents[failedIndex] = {
+                    ...reserved.baseEvent,
+                    status: "failed",
+                    deadLetter: true,
+                    deadLetterReason: "financial gateway refund dispatch failed",
+                    failureCode: "REFUND_DISPATCH_PROVIDER_REJECTED",
+                    reconciliationStatus: "dead-letter",
+                    failedAt: new Date().toISOString()
+                  };
+                  failedData.securityEvents = prependAuditTrailEntry(failedData.securityEvents, {
+                    id: randomUUID(),
+                    at: new Date().toLocaleString("zh-CN", { hour12: false }),
+                    actor: user.name,
+                    role: user.role,
+                    action: "dispatch online payment refund",
+                    target: id,
+                    result: "failed",
+                    detail: `${reserved.baseEvent.id} · ${idempotencyKey} · moved-to-reconciliation`
+                  });
+                  writeDatabase(failedData, {
+                    financialGatewayWrite: { kind: "finalize", eventId: reserved.baseEvent.id, idempotencyKey, requestDigest }
+                  });
+                });
+                throw new FinancialCallbackError(
+                  "refund gateway dispatch failed",
+                  "REFUND_DISPATCH_PROVIDER_REJECTED",
+                  502
+                );
+              }
+              return withFinancialDispatchStateLock(() => {
+                const finalData = readDatabase();
+                const finalIndex = (finalData.integrationGatewayEvents || []).findIndex((item) => item.id === reserved.baseEvent.id);
+                if (finalIndex < 0 || finalData.integrationGatewayEvents[finalIndex].status !== "dispatching") {
+                  throw new FinancialCallbackError(
+                    "refund dispatch reservation is unavailable",
+                    "REFUND_DISPATCH_RESERVATION_UNAVAILABLE",
+                    409
+                  );
+                }
+                const event = {
+                  ...reserved.baseEvent,
+                  status: receipt.status,
+                  reconciliationStatus: "provider-accepted",
+                  adapterReceipt: receipt,
+                  adapterReceiptHistory: [],
+                  providerStatus: receipt.status,
+                  callbackEvents: [],
+                  businessDate: String(receipt.acceptedAt || "").slice(0, 10),
+                  dispatchedAt: receipt.acceptedAt
+                };
+                finalData.integrationGatewayEvents[finalIndex] = event;
+                const recorded = OnlinePaymentRefunds.recordRefundDispatch(finalData, id, receipt, event.id, user);
+                writeDatabase(finalData, {
+                  financialGatewayWrite: { kind: "finalize", eventId: event.id, idempotencyKey, requestDigest }
+                });
+                return { ...recorded, gatewayEventId: event.id, idempotent: false };
+              });
+            });
+            persistedInFinancialCommand = true;
           }
-          writeDatabase(normalizeState(data));
+          if (!persistedInFinancialCommand) writeDatabase({ ...normalizeState(data), storageMeta: data.storageMeta });
           sendJson(res, action === "dispatch" ? 202 : 200, {
             refund: InsurancePaymentRefundTransaction.publicRefund(result.row),
             review: result.review,
@@ -659,7 +913,18 @@ function createRouteSegments(runtime) {
             productionReady: false
           });
         } catch (error) {
-          sendInsurancePaymentError(res, error);
+          if (action === "dispatch" && !(error instanceof FinancialCallbackError)) {
+            const versionConflict = String(error?.message || "").includes("SQLite optimistic lock conflict");
+            sendJson(res, versionConflict ? 409 : 500, {
+              error: versionConflict ? "Conflict" : "Service Unavailable",
+              code: versionConflict ? "REFUND_DISPATCH_VERSION_CONFLICT" : "REFUND_DISPATCH_STORAGE_FAILED",
+              message: versionConflict
+                ? "refund dispatch state changed; retry with a fresh snapshot"
+                : "refund dispatch storage failed"
+            });
+          } else {
+            sendInsurancePaymentError(res, error);
+          }
         }
         return true;
       }
