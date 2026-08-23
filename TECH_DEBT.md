@@ -13,7 +13,7 @@
 | ARC-001 | 超大组合根 | `server.js` 约 28.7k 行 | 变更冲突、初始化耦合、难隔离测试 |
 | ARC-003 | 宽接口 | public-health runtime context 160 个依赖 | 组合根和路由同步变化，难形成领域端口 |
 | ARC-004 | 前端超大模块 | 数智医院 app 10.5k、citizen 6k、公卫 4.4k | 全局状态、渲染和流程耦合 |
-| ARC-007 | 临床子域隔离 | 急救、血液、影像、体检首个查询端口已建立，但两个混合路由仍承载写命令；血液 GET 有内存规范化，影像和体检 GET 有审计持久化；33 个 operations 字面路径已全部移交 T02 | 按特征测试逐用例迁移；禁止 operations 回流 T06，不把兼容副作用误写成纯查询 |
+| ARC-007 | 临床子域隔离 | 急救、血液、影像、体检首个查询端口已建立；影像 share 首个公开写用例已从 `clinical-blood` 迁至 imaging route/module，并由顺序特征、真实 HTTP 和禁止回流守卫保护。两个混合路由仍承载其余写命令；血液 GET 有内存规范化，影像和体检 GET 有审计持久化；33 个 operations 字面路径已全部移交 T02 | 继续按特征测试逐用例迁移；`clinical-blood` 仍同时拥有 blood/imaging，`blood-innovation` 仍同时拥有 blood/physical-examination；禁止已迁用例和 operations 回流，不把兼容副作用误写成纯查询 |
 | CHR-001 | 慢病随访事件投递 | 仓库内闭环已建立：SQLite v16 同事务 enqueue、专用 outbox、lease owner/token hash/version/expiry fencing、有界退避、死信、digest-only replay、独立 worker/CLI/systemd 合同与 Ed25519 activation provider；HTTP 请求路径不再同步外发 | 继续 NO-GO：真实 endpoint/凭据、外部签名 activation decision、可信签名回执、供应方幂等核对、PostgreSQL 多节点主存储、监控告警、服务启用和现场验收仍外置；只能承诺至少一次，不得宣称 exactly-once |
 | OBJ-001 | 对象存储生产闭环 | 应用侧 v1 响应信任已建立；500 条兼容上限已改为网关调用前失败关闭，但仍无无损分页仓储，外部成功后再写本地状态；Proposed OBJ-ADR-002 已登记 T08 data owner/T00 technical owner 建议、v17/回填冻结/异步 API/worker/reconcile/readiness 路线和机器阻断台账，未实施任何运行时 | data owner 与 v1/v2 兼容策略仍待人类确认；ADR 未 Accepted 时 CI 禁止 v17/runtime/API/promotion。外部对象与权威元数据仍可能不一致，真实网关 capability、KMS/WORM/扫描、容量、备份恢复和现场验收继续 NO-GO |
 | OPS-001 | 连续审计耐久信任 | 仓库内来源缺口已关闭：v15 同事务 append-only source、最小投影、cursor 批次、target/source 绑定和 checkpoint v3 已有专项测试；已淘汰历史不可恢复，checkpoint/head 仍在同一本地信任域，SIEM receipt 未独立验签，filesystem 仅是 WORM rehearsal | 继续 NO-GO：需真实签名耐久 receipt、外部单调 anchor、WORM/KMS/保留与恢复能力、Data Owner 投影审批、专用账号及现场验收 |

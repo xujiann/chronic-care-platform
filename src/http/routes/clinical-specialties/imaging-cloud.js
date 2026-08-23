@@ -4,9 +4,12 @@ const {
   projectImagingErrorResponse,
   projectPublicImagingResponse
 } = require("../../../clinical-specialties/imaging/public-response");
+const {
+  createImagingStudyShare
+} = require("../../../clinical-specialties/imaging/study-share-command");
 
 function createRouteSegment(runtime) {
-  const { ImagingCloudProduction, appendSecurityEvent, buildImagingCloudProductionResponse, collectJson, readDatabase, requireApiRole, sendJson, writeDatabase } = runtime;
+  const { ImagingCloudProduction, appendDataAccessLog, appendSecurityEvent, buildImagingCloudProductionResponse, canAccessResident, collectJson, randomUUID, readDatabase, requireApiRole, sendJson, writeDatabase } = runtime;
   const sendImagingJson = (res, status, body) => sendJson(
     res,
     status,
@@ -43,6 +46,32 @@ function createRouteSegment(runtime) {
           productionReady: false,
           formalGoLiveState: "blocked-until-trusted-site-evidence-and-platform-launch-approval"
         });
+        return true;
+      }
+
+      const imagingShareMatch = url.pathname.match(/^\/api\/imaging-cloud\/studies\/([^/]+)\/share$/);
+      if (req.method === "POST" && imagingShareMatch) {
+        const user = requireApiRole(req, res, ["citizen", "institution", "commission"], "/api/imaging-cloud/studies/:id/share");
+        if (!user) return true;
+        const data = readDatabase();
+        const studyId = decodeURIComponent(imagingShareMatch[1]);
+        const study = (data.imageCloudStudies || []).find((item) => item.id === studyId);
+        if (!study) {
+          sendImagingJson(res, 404, { error: "Not Found", message: "未找到影像云检查" });
+          return true;
+        }
+        if (!canAccessResident(user, study.residentId, data)) {
+          appendSecurityEvent({ actor: user.name, role: user.role, action: "share imaging study", target: studyId, result: "denied", detail: "resident scope denied" });
+          sendImagingJson(res, 403, { error: "Forbidden", message: "无权分享该居民影像资料" });
+          return true;
+        }
+        const payload = await collectJson(req);
+        const share = createImagingStudyShare(data, user, study, studyId, payload, {
+          appendDataAccessLog,
+          randomUUID
+        });
+        writeDatabase(data);
+        sendImagingJson(res, 201, share);
         return true;
       }
 

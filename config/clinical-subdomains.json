@@ -122,6 +122,17 @@
           "ports": ["buildImagingDashboard", "redactSensitiveResponse"],
           "contracts": [],
           "sideEffects": ["resident-data-access-audit-persisted-by-http-adapter"]
+        },
+        {
+          "id": "imaging-study-share-command.v1",
+          "source": "src/clinical-specialties/imaging/study-share-command.js",
+          "route": "POST /api/imaging-cloud/studies/:id/share",
+          "ports": ["appendDataAccessLog", "randomUUID"],
+          "contracts": [],
+          "sideEffects": [
+            "imageCloudShares-state-mutation",
+            "resident-data-access-audit-persisted-by-http-adapter"
+          ]
         }
       ]
     },

@@ -371,44 +371,6 @@ function createRouteSegment(runtime) {
         return true;
       }
 
-      const imagingShareMatch = url.pathname.match(/^\/api\/imaging-cloud\/studies\/([^/]+)\/share$/);
-      if (req.method === "POST" && imagingShareMatch) {
-        const user = requireApiRole(req, res, ["citizen", "institution", "commission"], "/api/imaging-cloud/studies/:id/share");
-        if (!user) return true;
-        const data = readDatabase();
-        const studyId = decodeURIComponent(imagingShareMatch[1]);
-        const study = (data.imageCloudStudies || []).find((item) => item.id === studyId);
-        if (!study) {
-          sendImagingJson(res, 404, { error: "Not Found", message: "未找到影像云检查" });
-          return true;
-        }
-        if (!canAccessResident(user, study.residentId, data)) {
-          appendSecurityEvent({ actor: user.name, role: user.role, action: "share imaging study", target: studyId, result: "denied", detail: "resident scope denied" });
-          sendImagingJson(res, 403, { error: "Forbidden", message: "无权分享该居民影像资料" });
-          return true;
-        }
-        const payload = await collectJson(req);
-        const days = Math.min(Math.max(Number(payload.validDays || 7), 1), 90);
-        const expiresAt = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString();
-        const share = {
-          id: `ics-share-${randomUUID()}`,
-          studyId,
-          residentId: study.residentId,
-          token: `IMG-${randomUUID().slice(0, 8).toUpperCase()}`,
-          channel: String(payload.channel || "二维码/短信链接").trim(),
-          expiresAt,
-          scope: String(payload.scope || "影像报告 + 浏览级序列").trim(),
-          createdBy: user.username || user.role,
-          createdAt: new Date().toISOString(),
-          status: "active"
-        };
-        data.imageCloudShares = [share, ...(Array.isArray(data.imageCloudShares) ? data.imageCloudShares : [])].slice(0, 300);
-        appendDataAccessLog(data, user, study.residentId, "医学影像云", `分享影像 ${study.accessionNumber} 至 ${share.channel}`);
-        writeDatabase(data);
-        sendImagingJson(res, 201, share);
-        return true;
-      }
-
       const imagingQcMatch = url.pathname.match(/^\/api\/imaging-cloud\/studies\/([^/]+)\/qc$/);
       if (req.method === "POST" && imagingQcMatch) {
         const user = requireApiRole(req, res, ["commission", "institution"], "/api/imaging-cloud/studies/:id/qc");

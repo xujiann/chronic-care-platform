@@ -1,6 +1,7 @@
 "use strict";
 
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
 const path = require("node:path");
 const test = require("node:test");
 const {
@@ -31,12 +32,27 @@ test("clinical specialty governance defines exactly five bounded subdomains", ()
   );
   assert.deepEqual(
     registry.subdomains[2].implementedUseCases.map((useCase) => useCase.id),
-    ["imaging-dashboard-query.v1"]
+    ["imaging-dashboard-query.v1", "imaging-study-share-command.v1"]
   );
   assert.deepEqual(
     registry.subdomains[3].implementedUseCases.map((useCase) => useCase.id),
     ["physical-examination-dashboard-query.v1"]
   );
+});
+
+test("imaging study share command cannot return to the clinical blood route", () => {
+  const bloodRoute = fs.readFileSync(
+    path.join(ROOT, "src/http/routes/clinical-specialties/clinical-blood.js"),
+    "utf8"
+  );
+  const imagingRoute = fs.readFileSync(
+    path.join(ROOT, "src/http/routes/clinical-specialties/imaging-cloud.js"),
+    "utf8"
+  );
+
+  assert.doesNotMatch(bloodRoute, /imagingShareMatch|\/api\/imaging-cloud\/studies\/:id\/share/);
+  assert.match(imagingRoute, /\/api\/imaging-cloud\/studies\/:id\/share/);
+  assert.match(imagingRoute, /createImagingStudyShare/);
 });
 
 test("all current clinical API literals have one subdomain or explicit handoff owner", () => {

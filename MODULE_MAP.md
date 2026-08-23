@@ -46,7 +46,7 @@
 
 运行时上下文显式依赖数：public-health 160、care-coordination 102、clinical-specialties 76、citizen-chronic 64、shared 50、identity-security 45。显式依赖好于隐藏全局变量，但这些宽接口会让组合根、测试夹具和跨域演进同步变化，是当前最大的模块耦合指标。
 
-静态 CommonJS 图（排除测试）包含 526 个文件、861 条本地边。最高入度：
+静态 CommonJS 图（排除测试）包含 527 个文件、862 条本地边。最高入度：
 
 - `src/http/runtime-source.js`：62；
 - `src/platform/governance/technical-evidence.js`：22；
@@ -113,7 +113,7 @@ scripts/platform-cutover-alert-worker.js
 
 血液首个标准接口为 `blood-dashboard-query.v1`：通过 `normalizeTransactionState` 和 `buildBloodDashboard` 两个注入端口保留遗留组装顺序，并在用例内统一 commission 全域、institution 机构范围投影。HTTP 层未新增数据写入；混合路由内的影像、血液写命令和集成接口尚未迁移。
 
-影像首个标准接口为 `imaging-dashboard-query.v1`：通过 `buildImagingDashboard`、`redactSensitiveResponse` 两个注入端口生成结果，并由影像自有 `public-response` 递归剔除凭据、物理存储位置和内部 URL。HTTP 适配器继续执行居民范围检查和既有访问审计持久化；影像写命令与互认流程仍在混合路由。
+影像标准接口现包含 `imaging-dashboard-query.v1` 和首个写用例 `imaging-study-share-command.v1`。后者由既有 `imaging-cloud` HTTP 适配器保留鉴权、居民范围、body 顺序、持久化和公开响应投影，目标模块只构造既有 share 状态并调用注入的数据访问审计/UUID 端口。该用例已离开 `clinical-blood`，其余影像写命令与互认流程仍在混合路由。
 
 体检首个标准接口为 `physical-examination-dashboard-query.v1`：通过 `buildPhysicalExamOverview`、`buildPhysicalExamReadiness` 两个注入端口生成查询视图，并在用例内统一 citizen 最小 readiness 与管理角色完整投影。HTTP 适配器继续执行范围拒绝、安全事件、居民访问审计、持久化和最终脱敏；体检导入与闭环命令尚未迁移。
 

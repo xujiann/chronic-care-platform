@@ -173,6 +173,8 @@ legal-hold）不会再为新记录让位；这只关闭静默数据丢失，不�
 
 影像 dashboard 查询读取既有 studies、shares、互认和报告投影，并继续使用居民/个人记录等外部只读数据形成授权范围。带 `residentId` 的请求仍由 HTTP 适配器追加现有数据访问日志并调用原持久化边界；查询端口本身不写业务集合。本切片没有新增集合、改变 Owner、schema、migration 或事实源。
 
+影像 share 写用例继续只向既有候选集合 `imageCloudShares` 头插记录并保留 300 条上限，同时复用原数据访问审计并由 HTTP 适配器执行原单次 `writeDatabase`。该候选集合仍为 `legacy-non-authoritative`；迁移只改变源码 owner 边界，不新增字段、集合、schema、migration、双写或生产事实源资格。
+
 体检 dashboard 查询读取 `personalRecords[category=physical-exam]`、异常案例、联调、专项分流、附件、网关事件和慢病任务等既有投影。7 个体检候选集合仍为 `legacy-non-authoritative`，没有被本切片晋升为生产 Owner；显式居民查询继续由 HTTP 适配器持久化原有访问审计，查询端口不写业务集合，也不改变 schema、migration 或事实源。
 
 ## 9. REG-01A 区域共享数据合同
