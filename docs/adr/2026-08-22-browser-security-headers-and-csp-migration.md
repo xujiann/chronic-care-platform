@@ -162,6 +162,16 @@ commission 鉴权、区域发布事实、审计、schema、CI 或 CSP enforcemen
 审计、CI 或 CSP enforcement；真实血液系统、外部回执、托管头、独立渗透与现场验收继续 NO-GO，兼容
 `unsafe-inline`、严格 Report-Only 和 `productionReady=false` 保持不变。
 
+### 血液创新指挥中心可信渲染切片（2026-08-23）
+
+`blood-innovation.js` 的 10 个 `innerHTML` 覆盖摘要、能力、库存、风险、预测、符合性、事件枢纽、数字孪生及
+两类执行结果。大部分动态字段原先经过 `esc`，但 capability `order` 直接进入模板；恶意 API 回归在旧实现
+中可创建活动标签和事件属性。迁移后全部区域通过显式 `createElement`、`textContent`、文本节点、dataset 与
+`replaceChildren` 写入，原表格/卡片结构、状态 class、死信重试、创新能力执行和加载行为保持不变。
+Inventory v2 的 DOM HTML occurrence 由 836 降为 826，覆盖资产由 34 降为 33，其中 `innerHTML`
+832→822；动态 URL 6 和动态样式 45 均未改变。该切片不改变 API、鉴权、数据、schema、审计、CI 或 CSP
+enforcement；真实血液系统、设备、跨模块消费方、外部回执、托管头、独立渗透与现场验收继续 NO-GO。
+
 ## Phased enforcement and rollback
 
 1. 第一阶段：集中端口、兼容 CSP + 严格 Report-Only、风险清单、CI 增量拒绝；固定 `productionReady=false`。

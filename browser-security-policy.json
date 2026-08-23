@@ -119,7 +119,7 @@
   },
   "riskBaseline": {
     "schemaVersion": 2,
-    "sourceRevision": "origin/main@1dc96f32 + process/t00-sec004-blood-recall-20260823",
+    "sourceRevision": "origin/main@7b87d18b + process/t00-ui-blood-innovation-20260823",
     "failClosedPriorities": [
       "P0",
       "P1"
@@ -130,7 +130,6 @@
       {"asset":"blood-business.js","type":"cssom-property-mutation","priority":"P1","fingerprint":"07621fb509bcd1e37bd551cf34202ac0f1e61e53d4aabc183721b8342379b682","count":2},
       {"asset":"blood-business.js","type":"dom-inner-html","priority":"P0","fingerprint":"a102eb6a5d5f5ce86ec763e501b59594156e6fce591e98e3b17bf258825cddae","count":4},
       {"asset":"blood-business.js","type":"dynamic-html-style-attribute","priority":"P1","fingerprint":"b779451e85902cffa2b852adb057525c6474a788cd7841a8cdb95955eae6e19f","count":1},
-      {"asset":"blood-innovation.js","type":"dom-inner-html","priority":"P0","fingerprint":"a13b590ae59a4fdc4baa333fc6f650d85bb852844b4a078cac1d526b95b58f5b","count":10},
       {"asset":"browser-safe-url.js","type":"dom-url-attribute","priority":"P0","fingerprint":"8336acbe5a370cf94b4014ba2456250891d827479218f013dd5d982f2d263f9f","count":2},
       {"asset":"browser-safe-url.js","type":"navigation-call","priority":"P0","fingerprint":"5e45b286bd5a4297753d73d3b985afdaab877c139d79522ec82fb756d873558c","count":2},
       {"asset":"citizen.js","type":"cssom-property-mutation","priority":"P1","fingerprint":"19574e6338f5b225b316455cb69fe05ed719a4badd8d398ecf6fc58a01d48af7","count":3},
