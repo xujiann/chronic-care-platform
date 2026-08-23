@@ -364,7 +364,9 @@ function buildIdentityContract(options = {}) {
       residentScope: ["applyResidentScope", "canManageResidentProfile", "INSURANCE_RESIDENT_COLLECTIONS", "COUNTY_RESIDENT_COLLECTIONS"].every((marker) => serverSource.includes(marker)),
       contentSecurity: serverSource.includes("createBrowserSecurityHeaders")
         && ["script-src-attr", "report-only", "CSP_REPORT_ONLY"].every((marker) => browserSecurityPolicySource.includes(marker))
-        && [bloodBusinessSource, bloodRecallSource].every((source) => source.includes("escapeHtml")),
+        && bloodBusinessSource.includes("escapeHtml")
+        && bloodRecallSource.includes("list.replaceChildren")
+        && bloodRecallSource.includes('actionButton("确认处置", { recallAction: item.id })'),
       boundary: ["生产安全边界", "集中式会话", "不再回退到本地演示账号"].every((marker) => adapterDocument.includes(marker))
     }
   };
