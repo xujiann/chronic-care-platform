@@ -39,6 +39,10 @@ REFACTOR
 触及 runtime identity、audit chain/source、object storage trust 或 API governance 时，还必须运行
 `npm run test:coverage:boundaries`。覆盖率阈值只能持平或提高，且不能用数字替代上表的负向行为断言。
 
+T05 care owner 的遗留路由还必须运行 3 个独立 HTTP 特征测试，分别保护陪诊 handoff、护理闭环和护士
+生命周期。派单证据构造器与 owner adapter 必须处于同一测试进程信任边界；通知只断言 plan、outbox
+和可信 receipt，不得把模拟字段写成外部送达证据。
+
 ## 4. 完成条件
 
 - 公共行为未意外变化；预期变化有批准和契约更新。

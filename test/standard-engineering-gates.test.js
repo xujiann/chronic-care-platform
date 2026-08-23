@@ -170,11 +170,18 @@ test("type checking is explicitly incremental and lint ignores generated artifac
   assert.doesNotMatch(eslintSource, /files:\s*\["test\/api\.test\.js"\]/);
 });
 
-test("the former API unreachable blocks remain visible as three explicit skipped debts", () => {
+test("the former API unreachable blocks execute with independent care owner protection", () => {
   const apiTest = read("test/api.test.js");
   const explicitDebts = apiTest.match(/previously unreachable; care owner behavior revalidation required/g) || [];
 
-  assert.equal(explicitDebts.length, 3);
+  assert.equal(explicitDebts.length, 0);
+  for (const file of [
+    "test/escort-owner-route-characterization.test.js",
+    "test/internet-nursing-closed-loop-characterization.test.js",
+    "test/internet-nursing-nurse-lifecycle-characterization.test.js"
+  ]) {
+    assert.equal(fs.existsSync(path.join(ROOT, file)), true, file);
+  }
   assert.doesNotMatch(apiTest, /\n\s+return;\r?\n\s*\r?\n\s+const missingHospital/);
   assert.doesNotMatch(apiTest, /\n\s+return;\r?\n\s*\r?\n\s+const closedLoopDashboard/);
   assert.doesNotMatch(apiTest, /\n\s+return;\r?\n\s*\r?\n\s+const prematureComplete/);

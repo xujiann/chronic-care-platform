@@ -27251,7 +27251,7 @@ function careServiceCommandId(req, payload = {}) {
   return String(req.headers["idempotency-key"] || payload.commandId || payload.idempotencyKey || "").trim().slice(0, 160);
 }
 
-function careServiceCreatePayload(payload = {}, domain = "") {
+function careServiceCreatePayload(payload = {}, domain = "", user = null) {
   const next = { ...payload };
   [
     "id", "status", "state", "workerId", "workerName", "nurseId", "nurseName",
@@ -27272,6 +27272,22 @@ function careServiceCreatePayload(payload = {}, domain = "") {
     const data = readDatabase();
     const provider = (data.escortServiceProviders || []).find((item) => item.id === next.providerId);
     const registration = (data.registrationOrders || []).find((item) => item.id === next.registrationOrderId);
+    if (next.registrationOrderId && !registration) {
+      throw new CareServicePlatform.CareServicePlatformError(
+        "ESCORT_REGISTRATION_NOT_FOUND",
+        "registration order not found",
+        {},
+        400
+      );
+    }
+    if (registration && user && !canAccessRegistrationOrder(user, registration, data)) {
+      throw new CareServicePlatform.CareServicePlatformError(
+        "ESCORT_REGISTRATION_SCOPE_DENIED",
+        "registration scope denied",
+        {},
+        403
+      );
+    }
     if (!next.district && provider?.district) next.district = provider.district;
     if (registration) {
       next.hospital = registration.hospital || next.hospital;

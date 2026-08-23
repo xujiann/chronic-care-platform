@@ -299,6 +299,11 @@ PostgreSQL、release、报告或归档产物。API 热点隔离配置只登记�
 两个前端文件去重的 16 项仅是静态中文翻译键；shadow map 只存在测试代码，既不成为新的业务字典，
 也不写入运行时状态。两项历史覆盖值继续采用原 JavaScript 最终生效值，不改变数据模型或展示输入。
 
+care skip revalidation 同样没有新增表、集合、DDL 或 migration。3 个独立特征测试逐次复制受跟踪
+`data/db.json` 到系统临时目录，服务停止后删除副本；派单 capability 仅在测试进程内签发并由同进程
+owner adapter 校验，不写回源快照。陪诊引用 `registrationOrders` 仍是只读关联，创建前新增的存在性与
+scope 校验不改变该集合 owner；护理 notification plan/outbox 继续是意图与待投递事实，不等同外部回执。
+
 ## 21. Worker 观测投影不是数据模型
 
 `platform-worker-observability.v1` 是进程内返回值，不新增集合、SQLite/PostgreSQL 表、DDL、migration、

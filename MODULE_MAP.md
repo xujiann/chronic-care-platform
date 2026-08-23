@@ -129,6 +129,10 @@ scripts/platform-cutover-alert-worker.js
   integration 冻结旧 `npm test` 清单，unit 是 `test:all` 根测试集合的精确补集，smoke
   只保留隔离启动与发布健康检查。TEST-006 将 `test/api.test.js` 标为 integration isolated hotspot，
   不改变成员和执行顺序；runner 输出 batch/suite `durationMs`，不设置或放宽耗时阈值。
+- `test/escort-owner-route-characterization.test.js`、`test/internet-nursing-closed-loop-characterization.test.js`
+  与 `test/internet-nursing-nurse-lifecycle-characterization.test.js` 是 T05 owner/route 特征测试；共享
+  `test/helpers/care-api-characterization-runtime.js` 在各测试进程内启动真实 HTTP 服务并使用临时数据副本，
+  以保持派单证据能力与 owner adapter 同一信任边界。三者不拥有业务状态机或生产投递能力。
 - `eslint.config.js` 与 `jsconfig.typecheck.json` 是渐进式静态质量边界，不拥有业务接口。
   Pages、complete-unit-test、governance-api 和 release-readiness 只消费这些标准入口；
   `test:all` 仍是独立的自动发现回归保护。两个前端翻译 map 的 16 个重复键已由

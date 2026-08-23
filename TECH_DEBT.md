@@ -34,7 +34,7 @@
 | API-001 | 错误契约 | 多种 JSON 错误格式 | 新 API 使用版本化标准错误接口 |
 | API-002 | 接口目录复核 | v3 合并 601 条授权声明与 371 个字面条件路由，形成 593 项；13 项认证证据保持不变。existing-proof 现把区域共享、直接转诊、科研导出 action 和 T07 退款申请加入行为证明，并登记 2 个转诊 action-slice；连同 SMS 共 7 份合同、5 个 endpoint verified。328 个写接口仍缺 endpoint 级证明；退款入口因静态矩阵残留 runtime-role variant，330 项仍保持 review-required | 逐 owner 补 route/action、身份、幂等、CAS、错误与审计合同；`workflow-actions` 与 `tasks/:id/actions` 的非转诊 remainder、退款 action regex、科研导出创建路径和 7 个运行时策略继续 review-required。T08 普通 event/dispatch 在建立 payload 冲突绑定前不得登记。禁止把 action-slice、字符串标记或猜测 owner 当成完整 endpoint 证明 |
 | JOB-001 | Worker 一致性 | 12 个既有 worker profile、9 个部署入口已建立 `platform-worker-observability.v1` 脱敏兼容投影；领域 state/retry/lease/checkpoint/receipt 仍各自权威，仓库不据此推导生产授权 | 后续接入真实指标/日志采集器与告警路由前，必须另行确认 owner、留存、访问控制和现场启用证据；不得把兼容投影演变为统一领域状态机 |
-| TEST-006 | 静态基线与测试性能 | 已关闭 `test/api.test.js` 的全文件 `no-unreachable` 例外：3 段原不可达断言改为具名显式 skip 债务；typecheck 去重并从主线实际 9 个唯一文件扩大至 13 个；本机 Node 24 三次单文件采样约 294–371 秒，现作为独立 integration 热点批次输出 batch/suite 耗时。两个前端文件的 16 个重复翻译键已有逐键 shadow/final 值和 `displayText`/`zh`/`zhText`/`statusLabel` 调用保护，去重保持首次插入顺序及最终生效值，lint 文件级例外已归零 | 3 个显式 skip 必须由 T05 owner 逐块重验后恢复执行；API 巨型夹具仍需按共享服务生命周期拆分，耗时数据先观察多次 CI 分布，不凭单机样本设门槛；不得恢复文件级 lint 豁免 |
+| TEST-006 | 静态基线与测试性能 | `test/api.test.js` 的全文件 `no-unreachable` 已关闭，原 3 个 care 显式 skip 已由 T05 owner/route 独立特征测试逐块重验并恢复执行；陪诊引用挂号单的存在性/scope 缺口与 handoff `reject/return` 投影已最小修复。typecheck 为 13 个唯一文件；两个前端文件的 16 个重复翻译键已有逐键 shadow/final 值和真实调用保护，去重保持首次插入顺序及最终生效值，lint 文件级例外已归零；API 热点仍作为独立 integration 批次输出耗时，suite 成员、断言、超时、CI 预算与 required checks 均未降低 | API 巨型夹具仍需按共享服务生命周期渐进拆分，耗时数据先观察多次 CI 分布，不凭单机样本设门槛；不得恢复文件级 lint 豁免；外部护理/陪诊投递与现场证据继续由生产 readiness 跟踪，不以本测试关闭 |
 
 ## 已关闭
 
@@ -65,7 +65,7 @@
 | SEC-010 | 2026-08-23 | strict production preflight 不再只能靠测试注入 externalTrustVerifier；可部署 provider 使用 pinned anchor bundle、Ed25519 双角色签名、撤销/时窗和 release/source/artifact/evidence/registry 精确绑定，默认仍 NO-GO | generic signed-envelope 负向矩阵、CLI 自动装配、synthetic fixture 不提升全局生产状态、deployment package/env/CI 合同与脱敏错误 |
 | DEPLOY-002 | 2026-08-23 | 切换行动定义升级为 definitions-only v2；14/14 effective status 仅由共享 Ed25519 provider 验证的当前 release/artifact 绑定决定派生，并接入 strict preflight 与 protected manual workflow；手改 `verified` 固定失败 | 缺 provider/记录、错签/撤销、异 release/digest、过期/未来时间、角色重合、重复 signer、缺转换历史/命令回执、symlink/超限、错误脱敏与 digest-only receipt 负向测试 |
 | TEST-007 | 2026-08-23 | 复用既有 T02 handoff harness，对 operations-command 32/32 路径建立数据驱动运行时矩阵；覆盖 19 条只读、13 条写入、三条签名集成入口及 institution 范围 | 闭集唯一性、role/deny-before-read、payload/400/403/404、响应/副作用、审计—写入顺序、审计和写入失败语义；governance-api 显式专项门禁 |
-| TEST-005 | 2026-08-23 | 本地/CI 统一 Playwright Chromium；在线根 27 项与居民 13 项继续阻止 Service Worker；PWA 3 项使用独立允许策略、动态端口和临时数据 | 43 项唯一并集/漂移测试、居民同文件 13/13、PWA 重复 9/9、完整标准 E2E；不得把 PWA 仓库测试解释为真实 HTTPS 或现场安装验收 |
+| TEST-005 | 2026-08-23 | 本地/CI 统一 Playwright Chromium；在线根 28 项与居民 13 项继续阻止 Service Worker；PWA 3 项使用独立允许策略、动态端口和临时数据 | 44 项唯一并集/漂移测试、居民同文件 13/13、PWA 重复 9/9、完整标准 E2E；不得把 PWA 仓库测试解释为真实 HTTPS 或现场安装验收 |
 | TEST-008 | 2026-08-23 | 专用 PWA/Service Worker E2E 验证居民登录后安装、v60→v61 激活清理、受控 update、离线 mobile/citizen 回退、API/源快照 404 缓存边界与逐项注销/清缓存 | 真实 HTTPS 终止、OS 安装提示/策略、浏览器设备矩阵、外部 Origin、现场缓存升级与独立安全验收继续外置；仓库测试不产生生产 GO |
 | GOV-001 | 2026-08-23 | `main`/`origin/main` 成为唯一当前集成与默认开发基线；固定 governance tag 仅作可复现证据，旧日期化 workflow 原文冻结 | process plan/verify 默认值、manifest/AGENTS/iteration program 漂移和 CI 目标分支负向测试 |
 | DOC-001 | 2026-08-23 | 264 份 Markdown 以路径和 ADR 台账唯一分类为 195 current、68 snapshot、1 superseded；不删除历史证据 | 闭集路径/分类摘要、规则重叠、ADR status 和 snapshot 内容聚合摘要失败关闭 |

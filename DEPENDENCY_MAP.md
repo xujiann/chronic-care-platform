@@ -94,7 +94,7 @@ TypeScript 与 Node 类型仅用于开发门禁；lockfile audit 已修复 c8 �
 - 集中响应头端口暂保留兼容 CSP 的 `script/style 'unsafe-inline'`，并下发不含 `unsafe-inline`/`unsafe-eval`
   的严格 Report-Only 目标；动态 CSSOM、全角色浏览器回归和真实托管验证完成前不得描述为 CSP 已关闭。
 - Service Worker v61 缓存应用壳以及生成的 `data/public-demo.json`；激活时删除 v60 及其他旧缓存，只缓存同源成功响应，API、跨 Origin 与 404 拒绝响应不进入 Cache Storage。
-- E2E 依赖方向为 `npm test:e2e → root runner(27) / resident owned runner(13) → 动态回环端口 + 独立临时
+- E2E 依赖方向为 `npm test:e2e → root runner(28) / resident owned runner(13) → 动态回环端口 + 独立临时
   DATA_DIR → Playwright Chromium`。两套配置共用 `playwright-browser-policy.v1` 并设置
   `serviceWorkers=block`；系统 Chrome、固定 5210 端口和跨套件服务复用不再是标准测试依赖。
 
@@ -180,6 +180,10 @@ CORE_DATA_DEFINITIONS → collection-governance → CI/release 治理投影`。�
   每个批次和整套测试向日志输出 `durationMs`，不设性能放行阈值，也不写仓库报告。
 - 两个前端翻译 map 继续由原 `displayText` / `zh` / `zhText` / `statusLabel` 调用链消费；去重不引入
   共享运行时模块或新依赖。专项 Node 测试读取并隔离执行这些纯翻译边界，标准 unit 自动发现负责漂移门禁。
+- care revalidation 的依赖方向为
+  `HTTP route -> careServiceCreatePayload/careServiceTransitionInput -> careServicePlatformAdapter -> T05 owner service/domain -> repository + outbox`。
+  挂号关联只通过组合根现有 `canAccessRegistrationOrder` 读取校验，不让 T05 写入 T07 挂号事实；独立测试
+  通过同进程服务复用领域一次性派单证据 registry，避免跨进程伪造 capability，且没有新增反向依赖或静态环。
 - 主分支必需检查名称仍为 `complete-unit-test` 与 `test`。聚合 test 使用 `always()`
   并要求三个风险域结果全部为 success，失败、取消和跳过均 fail-closed。
 - governance-api 先校验 custom auth 控制流/负向测试证据，再校验声明级授权矩阵、显式幂等行为证据合同和派生生产 API 目录；依赖方向为 `routeSourceFiles + authentication/idempotency 小型 evidence registry → authorization matrix v3 → production catalog v3`。只有显式标记的 SMS 外部 principal 从幂等合同派生 custom auth，平台 session/RBAC 合同继续复用授权矩阵，避免重复认证声明。幂等合同的 `endpoint` 覆盖可产生 `behavior-verified`，`action-slice` 只登记已验证 action 并保留完整 endpoint 阻断；字面 inventory 只在同一未结束 handler 范围配对 method/path。T07 退款合同复用 `route → refund transaction → versioned persistence command/outbox` 的既有依赖链，未创建第二协议；授权矩阵仍把相邻 refund action 的 `runtime-policy:routeRoles` variant 合并进创建入口，目录因此继续 fail closed。证据门禁不写数据库、报告或发布制品。
