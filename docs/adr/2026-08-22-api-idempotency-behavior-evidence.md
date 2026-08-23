@@ -69,3 +69,9 @@
 在本 ADR 已接受的逐 endpoint 机制内，注册表新增第 9 份合同，只登记 `POST /api/security/controls/:id/actions`。实现复用既有 session-security-audit owner repository：commission 与 provider-verified step-up 先于 command collection；精确 control ID 缺失保持 404/零写；相同 command/intent 精确回放，异载荷返回稳定 409；同一 cloned-state UoW 只写一次 `securityAcceptanceLedger + securityEvents receipt/result snapshot/chained audit`。SQLite collection-version 冲突被投影为脱敏 409，普通写失败不触发 fallback audit。
 
 该扩展不接现有 PostgreSQL adapter，不增加 schema、migration、dependency、outbox 或新 ADR；没有真实下游语义时不为目录虚构 outbox。`securityAcceptanceLedger` data owner、跨实例耐久性和现场证据仍未决，所以该 endpoint 及全目录继续 `productionReady=false` / `NO-GO`，且不宣称 distributed exactly-once。
+
+## 2026-08-23 T02 quality-governance item action 扩展
+
+在本 ADR 已接受的逐 endpoint 机制内，注册表新增第 10 份合同，只登记 `POST /api/quality-operations-governance/items/:id/actions`。实现复用既有 quality-operations owner 状态机、来源 adapter、command receipt 和全状态 UoW：session/RBAC 在 body/state 之前拒绝，精确 record 可见性与 action/institution scope 在 receipt replay 之前重新核验；404 不写，精确重放不二次写，同键异载荷稳定 409，同 record 的同/异载荷命令在当前进程串行。来源 record、receipt 与 governance/platform/security 三类审计只通过一次 `writeDatabase` 提交；SQLite collection-version 冲突与未知写失败均映射为稳定脱敏错误，且不触发 fallback audit。
+
+该扩展不新增 schema、migration、dependency、outbox、PG adapter、外部系统或第二套状态机。既有 denied command 审计继续原子持久化，但越权响应不返回 record/audit 细节；真实多实例串行、PostgreSQL 主存储、来源集合 owner 决策和现场证据仍未关闭。合同继续 `productionReady=false`、`externalEvidenceRequired=true`、`distributedExactlyOnceClaimed=false`，593 项全部 `NO-GO`。

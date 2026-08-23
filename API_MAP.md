@@ -94,8 +94,8 @@ HTTP request
 - `PUT /api/state` 保持原路径和成功形状。审计数组以及四个 T02 区域共享集合均为服务端管理字段：省略时保留，提交时必须与当前值逐项深相等。区域集合的删除、修改、重排或伪造追加优先返回 `409 REGIONAL_SHARING_SERVER_MANAGED_COLLECTION_CONFLICT`；其他集合的乐观版本冲突仍返回 `409 STORAGE_CONFLICT`。集合级兼容入口对四个区域集合返回 `403 REGIONAL_SHARING_SERVER_MANAGED_COLLECTION_WRITE_DENIED`。
 - `npm run api:authorization-matrix` 从模块化路由源码生成/校验 owner、身份、角色、范围、用途和九条高风险接口唯一性。
 - `npm run api:authentication-evidence` 校验 13 项认证合同的 owner、mechanism、credential source、required/optional/none、replay/CSRF、scope、实现锚点和可执行负向测试。其中 SMS callback 从现有幂等合同派生；原 13 个未分类 key 中 12 个真实入口已分类，T10 cutover pack 绑定 commission 直接拒绝证据，1 个公卫词法误配已从 inventory 删除，未分类认证为 0。
-- `npm run api:production-catalog` 合并上述授权矩阵与同一 route source inventory 的字面条件；当前 593 项全部 `NO-GO`。333 个写接口中 7 个完整 endpoint 有直接幂等行为合同，326 个仍缺 endpoint 级行为证明；2 个转诊 action-slice 不晋升通用 endpoint，退款 runtime-role variant 仍复核，因此总 `review-required` 为 328。
-- `npm run api:idempotency-evidence` 校验 9 份证据合同。T01 `POST /api/security/controls/:id/actions` 先执行 commission 与 provider-verified step-up，再按精确 control ID 进入 session-security-audit repository；相同命令精确回放，异载荷稳定 409，control、receipt/result snapshot 与链式 audit 在单次状态写入中提交，写失败不补写审计，SQLite CAS 冲突投影为脱敏 `SESSION_SECURITY_AUDIT_VERSION_CONFLICT`。现有 PG adapter 未接入、无真实下游语义故未创建 outbox；进程锁和仓库测试不等于跨实例 exactly-once。同一注册表另保存 2 条 T07 `reviewedProofRequired`。
+- `npm run api:production-catalog` 合并上述授权矩阵与同一 route source inventory 的字面条件；当前 593 项全部 `NO-GO`。333 个写接口中 8 个完整 endpoint 有直接幂等行为合同，325 个仍缺 endpoint 级行为证明；2 个转诊 action-slice 不晋升通用 endpoint，退款 runtime-role variant 仍复核，因此总 `review-required` 为 327。
+- `npm run api:idempotency-evidence` 校验 10 份证据合同。T02 `POST /api/quality-operations-governance/items/:id/actions` 先完成 session/RBAC，再按精确 record 可见性与 action/institution scope 在 receipt replay 前重新授权；404 不写，精确重放不二次写，同键异载荷稳定 409，同 record 命令进程内串行。来源记录、receipt 与 governance/platform/security 三类 audit 在一次状态写入中提交，写失败不补写，SQLite CAS 冲突投影为脱敏 `QUALITY_GOVERNANCE_VERSION_CONFLICT`。没有新增 outbox、schema 或外部依赖，进程锁和仓库测试不等于跨实例 exactly-once。同一注册表另保存 2 条 T07 `reviewedProofRequired`。
 - 身份/SMS HTTP 路径保持不变；组合根已为短信发送生成随机 request ID，适配器现在拒绝缺失幂等 ID，OIDC refresh 返回的 ID token 必须通过 JWKS/claims 验证后才暴露脱敏 claims。
 - `POST /api/attachments/upload-intents` 在完成身份和居民范围校验后检查服务端元数据容量；已有
   500 条或更多记录时返回 `507 SECURE_ATTACHMENT_METADATA_CAPACITY_EXCEEDED`，且不调用对象
@@ -115,8 +115,8 @@ HTTP request
 ## 7. API 风险与缺失测试
 
 - `API-001`：机器目录已覆盖当前 601 条授权声明、371 个字面条件路由和两者并集的 593 个唯一接口，并强制 method/path/owner/auth/roles-or-scope/idempotency/生产状态完整；不再手工复制路由清单。
-- `API-002`：区域共享、直接转诊、科研导出 action、T07 退款申请与 financial reconciliation、T01 security-control action 共 7 个 endpoint 已形成行为证据；两条通用转诊入口仅登记 referrals action-slice。7 个运行时策略、326 个尚无 endpoint 级幂等行为证据合同的写接口和 role × permission × resource 运行时矩阵仍需逐 owner 扩展。financial dispatch 与 formal grouping job 继续 proof-required；T08 普通 integration event/dispatch 和 T07 退款 action regex 也未晋升。
-- API 治理脚本继续拒绝伪造认证合同、跨 handler method/path 误配、action-slice 冒充 endpoint、缺幂等行为证明和生产误 promotion；覆盖率门禁不关闭上述 328 项 `review-required`，也不构成生产放行证据。
+- `API-002`：区域共享、直接转诊、科研导出 action、T07 退款申请与 financial reconciliation、T01 security-control action、T02 quality-governance item action 共 8 个 endpoint 已形成行为证据；两条通用转诊入口仅登记 referrals action-slice。7 个运行时策略、325 个尚无 endpoint 级幂等行为证据合同的写接口和 role × permission × resource 运行时矩阵仍需逐 owner 扩展。financial dispatch 与 formal grouping job 继续 proof-required；T08 普通 integration event/dispatch 和 T07 退款 action regex 也未晋升。
+- API 治理脚本继续拒绝伪造认证合同、跨 handler method/path 误配、action-slice 冒充 endpoint、缺幂等行为证明和生产误 promotion；覆盖率门禁不关闭上述 327 项 `review-required`，也不构成生产放行证据。
 - `API-003`：错误响应契约不统一，调用方需要理解多个格式。
 - `API-004`：`shared` 有 12 个路由段，容易成为跨域逻辑聚集点。
 - `API-005`：已通过 Pages/Node 共用显式资源图和敏感路径拒绝矩阵缓解；后续新增页面资源必须同步更新清单并通过构建验证。

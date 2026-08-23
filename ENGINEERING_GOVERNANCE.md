@@ -146,6 +146,8 @@ T07 financial reconciliation 后续切片只登记 `POST /api/financial-gateways
 
 T01 security-control 后续切片只登记 `POST /api/security/controls/:id/actions`。commission 身份与 provider-verified step-up 必须先于 command collection，精确 control ID 缺失保持 404/零写；既有 session-security-audit repository 继续拥有 intent digest、精确回放/冲突、同一 cloned-state control+receipt+audit 单写和进程内串行。SQLite collection-version 冲突只投影为稳定脱敏 409，普通写失败不得补写审计。不得把未接线的 PostgreSQL adapter、进程锁或单机测试解释为跨实例 exactly-once；没有真实下游语义时不创建 outbox，data owner 与生产状态继续失败关闭。
 
+T02 quality-governance 后续切片只登记 `POST /api/quality-operations-governance/items/:id/actions`。session/RBAC 先于 body/state，action 与 institution scope 在 receipt replay 前重新核验；不存在或无法映射的精确 record ID 返回 404 且不写 receipt/audit。既有 owner 状态机和 adapter 继续拥有 expectedVersion、command fingerprint、来源状态、receipt 及 governance/platform/security 三类审计；同 record 命令只在当前进程串行，非重放结果只调用一次 `writeDatabase`。SQLite CAS 与未知写失败必须稳定脱敏且不得 fallback audit；无新 schema/outbox/外部依赖，所有目录项继续 `NO-GO`，不得宣称跨实例 exactly-once。
+
 同一幂等证据注册表允许保存最小 `reviewedProofRequired` 拒绝记录，只含 owner、endpoint、缺失证明类别和现有锚点。拒绝记录不得与行为合同使用同一 key；只有全部缺口由可执行证据关闭后，才可在一次评审变更中移除拒绝记录并添加合同。该记录不是第二份路由目录，也不能解释为已验证行为。
 
 API-AUTH-001 在 TEST PROTECTION 层新增 custom auth 证据专项：required/optional/none、credential source、replay/CSRF、scope、实现锚点和可执行负向测试必须同时一致。源码 marker 或相邻字符串不构成证明；目录解析不得跨越已结束的 handler 拼接 method/path，直接拒绝证据和解析器回归均纳入门禁。未登记入口继续 `review-required`，认证证据通过也不构成生产放行。
