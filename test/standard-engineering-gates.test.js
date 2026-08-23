@@ -78,6 +78,7 @@ test("the API hotspot is isolated without changing integration membership or ord
 
 test("the API hotspot keeps extracted lifecycles and the exact subtest order", () => {
   const apiTest = read("test/api.test.js");
+  const alertMockHelper = read("test/helpers/alert-delivery-mock-runtime.js");
   const runtimeHelper = read("test/helpers/api-regression-runtime.js");
   const hospitalMockHelper = read("test/helpers/hospital-adapter-mock-runtime.js");
   const subtestNames = [...apiTest.matchAll(/await t\.test\("([^"]+)"/g)].map((match) => match[1]);
@@ -102,6 +103,18 @@ test("the API hotspot keeps extracted lifecycles and the exact subtest order", (
   assert.match(hospitalMockHelper, /receiptId: `his-provider-\$\{requests\.length\}`/);
   assert.match(hospitalMockHelper, /HIS_ADAPTER_URL = `http:\/\/127\.0\.0\.1:\$\{port\}\/his\/events`/);
   assert.match(hospitalMockHelper, /await new Promise\(\(resolve\) => server\.close\(resolve\)\)/);
+  assert.equal((apiTest.match(/startAlertDeliveryMock\(\)/g) || []).length, 1);
+  assert.match(apiTest, /port: alertPort,\s+requests: alertRequests,\s+setDeliveryFailure,\s+stop: stopAlertDeliveryMock/);
+  assert.match(apiTest, /t\.after\(stopAlertDeliveryMock\)/);
+  assert.match(apiTest, /setDeliveryFailure\(true\)[\s\S]+setDeliveryFailure\(false\)/);
+  assert.doesNotMatch(apiTest, /const alertMock = http\.createServer|let failDelivery = false/);
+  assert.equal((alertMockHelper.match(/http\.createServer/g) || []).length, 1);
+  assert.match(alertMockHelper, /server\.listen\(0, "127\.0\.0\.1"\)/);
+  assert.match(alertMockHelper, /response\.writeHead\(failDelivery \? 503 : 200/);
+  assert.match(alertMockHelper, /receiver temporarily unavailable/);
+  assert.match(alertMockHelper, /eventId: `siem-event-\$\{requests\.length\}`/);
+  assert.match(alertMockHelper, /SIEM_ENDPOINT = `http:\/\/127\.0\.0\.1:\$\{port\}\/events`/);
+  assert.match(alertMockHelper, /server\.closeAllConnections\?\.\(\)/);
   assert.equal(subtestNames.length, 43);
   assert.equal(orderDigest, "dab18cc7fb2ae790cae552d5646c30f9ba35e8139ac47c629466001dfe6b6cea");
 });
