@@ -118,6 +118,20 @@ test("T07 public routes enforce trusted actors organization scope and production
     requestedBy: "forged-client",
     organizationId: "MR3"
   };
+  const anonymousRefund = await request(baseUrl, "/api/online-payments/refunds", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "Idempotency-Key": refundInput.idempotencyKey },
+    body: JSON.stringify(refundInput)
+  });
+  assert.equal(anonymousRefund.response.status, 401);
+
+  const unauthorizedRefund = await request(baseUrl, "/api/online-payments/refunds", {
+    method: "POST",
+    headers: authenticated(insurance.body.token, refundInput),
+    body: JSON.stringify(refundInput)
+  });
+  assert.equal(unauthorizedRefund.response.status, 403);
+
   const created = await request(baseUrl, "/api/online-payments/refunds", {
     method: "POST",
     headers: authenticated(hospital.body.token, refundInput),
