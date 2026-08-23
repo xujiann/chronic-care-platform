@@ -78,8 +78,8 @@ HTTP request
 - 静态未知/敏感路径统一 404；`GET/HEAD /data/public-demo.json` 返回合成脱敏数据，`/data/db.json`、源码、配置和仓库元数据不可发布。
 - HTML、静态资源、JSON/API、下载与错误响应由集中端口下发 `nosniff`、frame、referrer、
   permissions 与 CSP。显式发布图的内联脚本/样式静态风险已归零，但兼容 CSP 仍含 `unsafe-inline`，
-  严格目标只为 Report-Only；血液主工作台 API 字段已使用 DOM/text 节点，Inventory v2 已把
-  871 个 DOM HTML、6 个动态 URL 和 45 个动态样式
+  严格目标只为 Report-Only；血液主工作台与急救生命链 API 字段已使用 DOM/text 节点，Inventory v2 已把
+  865 个 DOM HTML、6 个动态 URL 和 45 个动态样式
   sink 作为资产级治理事实锁定。`browser-safe-url-policy.v1` 将可证明的内部导航、对象存储、`tel:120`
   和 blob 下载迁入统一协议/无凭据/exact-Origin 检查；29 个原模板 occurrence 已由 28 个真实 DOM
   绑定迁移和 1 个扫描误报校正闭合，仅 2 个 OHIF 导航保持 `review-required`。该变化不改变任何
@@ -249,3 +249,9 @@ Cache Storage 与 registration 清理不构成真实 HTTPS、生产 endpoint、�
 本切片不新增或改变任何 HTTP method/path、身份、角色、scope、错误、幂等或审计语义。
 `repository:governance:verify` 是只读 CLI/CI 门禁，仅校验当前 workflow、Markdown 路径分类与 PDF
 provenance/digest；不公开治理清单为 API，不读取 PDF 正文作为业务数据，也不产生生产 readiness。
+
+## 22. 急救生命链可信渲染（无 HTTP 变化）
+
+本切片只改变 `emergency-lifechain-ui.js` 对既有 overview、quality、command-center 响应与错误消息的浏览器
+表达，不新增或改变 method/path、响应 schema、鉴权、scope、幂等、CAS 或审计。恶意字段通过 DOM
+`textContent`/dataset 呈现且不能创建元素或事件属性；该测试不证明接口数据可信、外部系统或生产上线。

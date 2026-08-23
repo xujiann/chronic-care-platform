@@ -78,8 +78,8 @@ TypeScript 与 Node 类型仅用于开发门禁；lockfile audit 已修复 c8 �
 - 动态浏览器凭据方向为 `HttpOnly Cookie → /api/auth/context → 脱敏身份投影`；`auth.js` 在
   任何普通 API 调用前清除旧 localStorage token，Cookie 与 Authorization 并存时服务端也选择
   Cookie。bearer-only 兼容 token 仅存在页面内存，不跨重载恢复。
-- Inventory v2 在显式发布图精确锁定 866 处 `innerHTML=` 与 5 处 `insertAdjacentHTML`（合计 871，
-  覆盖 43 个资产）；血液主工作台的 25 处 `innerHTML` 已迁到 DOM/text 节点，最高仍为 citizen 94、
+- Inventory v2 在显式发布图精确锁定 860 处 `innerHTML=` 与 5 处 `insertAdjacentHTML`（合计 865，
+  覆盖 42 个资产）；血液主工作台的 25 处及急救生命链 controller 的 6 处 `innerHTML` 已迁到 DOM/text 节点，最高仍为 citizen 94、
   app 90、public-health 78、platform 72。
 - 同一清单现锁定 6 个动态 URL sink（公共 Safe URL port 内 2 个 DOM URL attribute 和 2 个导航调用、
   2 个 OHIF 导航）以及 45 个动态样式 sink（30 个模板 style 属性、
@@ -170,7 +170,7 @@ CORE_DATA_DEFINITIONS → collection-governance → CI/release 治理投影`。�
   browser-e2e 和 release-readiness 各为 15 分钟，聚合 test 为 5 分钟。
 - Chromium 安装和 Playwright E2E 独占 browser-e2e runner；发布、数据库、安全、报告和
   部署证据在 release-readiness 并行执行，不再共享浏览器外部依赖的时间预算。
-- browser-e2e 本地与 CI 均由标准 `test:e2e` 顺序执行在线根 27、居民 13、PWA 3 项；三阶段各自分配
+- browser-e2e 本地与 CI 均由标准 `test:e2e` 顺序执行在线根 28、居民 13、PWA 3 项；三阶段各自分配
   动态端口和临时数据。在线 context 阻止 Service Worker，PWA context 独立允许并逐项清理 registration/cache；
   Playwright 列表门禁拒绝遗漏、重复归属或浏览器/Service Worker 策略漂移。
 - complete-unit-test 依次运行标准 unit/integration，governance-api 运行 lint/typecheck/smoke，

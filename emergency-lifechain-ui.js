@@ -9,7 +9,47 @@ function lifeChainSafeTelephone(target) {
   });
 }
 
-function lifeChainEscape(value) { return String(value ?? "").replace(/[&<>'"]/g, (char) => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", "'":"&#39;", '"':"&quot;" }[char])); }
+function lifeChainText(value) { return value == null ? "" : String(value); }
+
+function lifeChainAppend(parent, children) {
+  (Array.isArray(children) ? children : [children]).flat(Infinity).forEach((child) => {
+    if (child == null) return;
+    parent.append(child instanceof Node ? child : document.createTextNode(lifeChainText(child)));
+  });
+  return parent;
+}
+
+function lifeChainElement(tagName, options = {}, children = []) {
+  const node = document.createElement(tagName);
+  if (options.className) node.className = options.className;
+  if (Object.hasOwn(options, "text")) node.textContent = lifeChainText(options.text);
+  if (options.type) node.type = options.type;
+  Object.entries(options.dataset || {}).forEach(([key, value]) => { node.dataset[key] = lifeChainText(value); });
+  return lifeChainAppend(node, children);
+}
+
+function lifeChainReplace(selector, children) {
+  const target = document.querySelector(selector);
+  if (!target) return;
+  const fragment = document.createDocumentFragment();
+  lifeChainAppend(fragment, children);
+  target.replaceChildren(fragment);
+}
+
+function lifeChainRow(label, children) {
+  return lifeChainElement("div", { className: "lifechain-row" }, [
+    lifeChainElement("strong", { text: label }),
+    lifeChainElement("span", {}, children)
+  ]);
+}
+
+function lifeChainButton(label, dataset) {
+  return lifeChainElement("button", { type: "button", className: "secondary", text: label, dataset });
+}
+
+function lifeChainEmpty(message) {
+  return lifeChainElement("p", { text: message });
+}
 async function lifeChainRequest(path, options = {}) {
   const authFetch = window.HealthCityAuth?.authFetch || fetch;
   const response = await authFetch(`${LIFE_CHAIN_API}${path}`, { headers:{ "Content-Type":"application/json", ...(options.headers || {}) }, ...options });
@@ -28,40 +68,89 @@ async function loadLifeChain() {
   try {
     const overview = await lifeChainRequest("/life-chain/overview");
     renderLifeChainOverview(overview);
-  } catch (error) { document.querySelector("#lifechain-overview").innerHTML = `<p>${lifeChainEscape(error.message)}</p>`; }
+  } catch (error) { lifeChainReplace("#lifechain-overview", lifeChainEmpty(error.message)); }
   try {
     const quality = await lifeChainRequest("/life-chain/quality");
     renderLifeChainQuality(quality);
-  } catch (error) { document.querySelector("#lifechain-quality").innerHTML = "<p>Quality view is available to emergency-center and hospital roles.</p>"; }
+  } catch (error) { lifeChainReplace("#lifechain-quality", lifeChainEmpty("Quality view is available to emergency-center and hospital roles.")); }
   try {
     const command = await lifeChainRequest("/life-chain/command-center");
     renderLifeChainCommandCenter(command);
-  } catch (error) { document.querySelector("#lifechain-command-center").innerHTML = "<p>Command projection is available to emergency-center and hospital roles.</p>"; }
+  } catch (error) { lifeChainReplace("#lifechain-command-center", lifeChainEmpty("Command projection is available to emergency-center and hospital roles.")); }
 }
 
 function renderLifeChainOverview(item) {
-  const node = document.querySelector("#lifechain-overview"); if (!node) return;
   const event = item.activeEvent;
   const eventText = event ? `${event.eventNo} · ${event.status}` : "No resident-scoped active event";
-  const taskRows = item.firstAidTasks.map((task) => `<div class="lifechain-row"><strong>First-aid responder</strong><span>${lifeChainEscape(task.status)} · ${lifeChainEscape(task.distanceMeters)} m</span></div>`).join("") || "<p>No first-aid task is currently generated.</p>";
-  const greenRows = item.greenChannelPreparations.map((row) => `<div class="lifechain-row"><strong>Green-channel pre-alert</strong><span>${lifeChainEscape(row.channel)} · ${lifeChainEscape(row.status)} ${row.status === "pending-hospital-confirmation" ? `<button type="button" class="secondary" data-green-channel-event="${lifeChainEscape(row.eventId)}">Confirm hospital pre-alert</button>` : ""}</span></div>`).join("") || "<p>No green-channel pre-alert is currently generated.</p>";
-  const familyRows = item.familyNotifications.map((row) => `<div class="lifechain-row"><strong>Family notification</strong><span>${lifeChainEscape(row.contactName)} · ${lifeChainEscape(row.status)}</span></div>`).join("") || "<p>No authorized family notification is currently generated.</p>";
-  const fallbackRows = item.fallbackDeliveries.map((row) => `<div class="lifechain-row"><strong>Weak-network fallback</strong><span>${lifeChainEscape(row.channel)} · ${lifeChainEscape(row.status)}</span></div>`).join("") || "<p>Network is normal; no fallback task is queued.</p>";
-  const authorizationRows = item.authorizations.map((row) => `<div class="lifechain-row"><strong>Device authorization</strong><span>${lifeChainEscape(row.deviceId)} · ${lifeChainEscape(row.active ? "active" : "revoked")} ${row.active ? `<button type="button" class="secondary" data-revoke-authorization="${lifeChainEscape(row.id)}">Revoke authorization</button>` : ""}</span></div>`).join("") || "";
-  const cancellation = event?.sos?.autoAuthorized && event?.status === "accepted" && !event?.sos?.reviewStatus ? `<div class="lifechain-row"><strong>False-alert safeguard</strong><span><button type="button" class="secondary" data-cancellation-event="${lifeChainEscape(event.id)}">Request 120 cancellation review</button></span></div>` : "";
-  node.innerHTML = `<div class="lifechain-summary"><strong>Active event</strong><span>${lifeChainEscape(eventText)}</span><span>Responder tasks ${item.summary.goldenFourMinuteTasks} · hospital confirmations pending ${item.summary.pendingHospitalConfirmation}</span></div>${authorizationRows}${cancellation}${taskRows}${greenRows}${familyRows}${fallbackRows}`;
+  const taskRows = item.firstAidTasks.length
+    ? item.firstAidTasks.map((task) => lifeChainRow("First-aid responder", `${lifeChainText(task.status)} · ${lifeChainText(task.distanceMeters)} m`))
+    : lifeChainEmpty("No first-aid task is currently generated.");
+  const greenRows = item.greenChannelPreparations.length
+    ? item.greenChannelPreparations.map((row) => lifeChainRow("Green-channel pre-alert", [
+        `${lifeChainText(row.channel)} · ${lifeChainText(row.status)} `,
+        row.status === "pending-hospital-confirmation" ? lifeChainButton("Confirm hospital pre-alert", { greenChannelEvent: row.eventId }) : null
+      ]))
+    : lifeChainEmpty("No green-channel pre-alert is currently generated.");
+  const familyRows = item.familyNotifications.length
+    ? item.familyNotifications.map((row) => lifeChainRow("Family notification", `${lifeChainText(row.contactName)} · ${lifeChainText(row.status)}`))
+    : lifeChainEmpty("No authorized family notification is currently generated.");
+  const fallbackRows = item.fallbackDeliveries.length
+    ? item.fallbackDeliveries.map((row) => lifeChainRow("Weak-network fallback", `${lifeChainText(row.channel)} · ${lifeChainText(row.status)}`))
+    : lifeChainEmpty("Network is normal; no fallback task is queued.");
+  const authorizationRows = item.authorizations.map((row) => lifeChainRow("Device authorization", [
+    `${lifeChainText(row.deviceId)} · ${row.active ? "active" : "revoked"} `,
+    row.active ? lifeChainButton("Revoke authorization", { revokeAuthorization: row.id }) : null
+  ]));
+  const cancellation = event?.sos?.autoAuthorized && event?.status === "accepted" && !event?.sos?.reviewStatus
+    ? lifeChainRow("False-alert safeguard", lifeChainButton("Request 120 cancellation review", { cancellationEvent: event.id }))
+    : null;
+  lifeChainReplace("#lifechain-overview", [
+    lifeChainElement("div", { className: "lifechain-summary" }, [
+      lifeChainElement("strong", { text: "Active event" }),
+      lifeChainElement("span", { text: eventText }),
+      lifeChainElement("span", { text: `Responder tasks ${lifeChainText(item.summary.goldenFourMinuteTasks)} · hospital confirmations pending ${lifeChainText(item.summary.pendingHospitalConfirmation)}` })
+    ]),
+    authorizationRows,
+    cancellation,
+    taskRows,
+    greenRows,
+    familyRows,
+    fallbackRows
+  ]);
 }
 
 function renderLifeChainCommandCenter(item) {
-  const node = document.querySelector("#lifechain-command-center"); if (!node) return;
   const eventRows = item.activeEvents.map((row) => `${row.eventNo} (${row.status})`).join(" · ") || "no active event";
-  const cancellationRows = (item.cancellationReviews || []).map((row) => `<div class="lifechain-row"><strong>Automatic SOS cancellation review</strong><span>${lifeChainEscape(row.eventId)} · ${lifeChainEscape(row.reason)} <button type="button" class="secondary" data-cancellation-review-event="${lifeChainEscape(row.eventId)}" data-cancellation-review-decision="keep-open">Keep queue open</button> <button type="button" class="secondary" data-cancellation-review-event="${lifeChainEscape(row.eventId)}" data-cancellation-review-decision="withdraw-before-dispatch">Withdraw before dispatch</button></span></div>`).join("") || "";
-  node.innerHTML = `<div class="lifechain-summary"><strong>Capacity</strong><span>active events ${item.coverage.activeEvents} · available vehicles ${item.coverage.availableVehicles} · available AED ${item.coverage.availableAed} · responder tasks ${item.coverage.responderTasks} · cancellation reviews ${item.coverage.pendingCancellationReviews || 0}</span></div><div class="lifechain-row"><strong>Operational gap</strong><span>${lifeChainEscape(item.coverage.gap)}</span></div><div class="lifechain-row"><strong>Active events</strong><span>${lifeChainEscape(eventRows)}</span></div>${cancellationRows}<p class="lifechain-boundary">${lifeChainEscape(item.boundary)}</p>`;
+  const cancellationRows = (item.cancellationReviews || []).map((row) => lifeChainRow("Automatic SOS cancellation review", [
+    `${lifeChainText(row.eventId)} · ${lifeChainText(row.reason)} `,
+    lifeChainButton("Keep queue open", { cancellationReviewEvent: row.eventId, cancellationReviewDecision: "keep-open" }),
+    " ",
+    lifeChainButton("Withdraw before dispatch", { cancellationReviewEvent: row.eventId, cancellationReviewDecision: "withdraw-before-dispatch" })
+  ]));
+  lifeChainReplace("#lifechain-command-center", [
+    lifeChainElement("div", { className: "lifechain-summary" }, [
+      lifeChainElement("strong", { text: "Capacity" }),
+      lifeChainElement("span", { text: `active events ${lifeChainText(item.coverage.activeEvents)} · available vehicles ${lifeChainText(item.coverage.availableVehicles)} · available AED ${lifeChainText(item.coverage.availableAed)} · responder tasks ${lifeChainText(item.coverage.responderTasks)} · cancellation reviews ${lifeChainText(item.coverage.pendingCancellationReviews || 0)}` })
+    ]),
+    lifeChainRow("Operational gap", item.coverage.gap),
+    lifeChainRow("Active events", eventRows),
+    cancellationRows,
+    lifeChainElement("p", { className: "lifechain-boundary", text: item.boundary })
+  ]);
 }
 
 function renderLifeChainQuality(item) {
-  const node = document.querySelector("#lifechain-quality"); if (!node) return;
-  node.innerHTML = `<div class="lifechain-summary"><strong>Cases ${item.summary.cases}</strong><span>Automatic SOS ${item.summary.automaticSos} · first-aid coverage ${item.summary.firstAidTaskCoverage} · hospital pre-alerts confirmed ${item.summary.hospitalPrealertsConfirmed} · duplicate signals ${item.summary.suppressedDuplicateSignals} · cancellation reviews ${item.summary.cancellationReviews}</span></div>${item.rows.map((row) => `<div class="lifechain-row"><strong>${lifeChainEscape(row.eventNo)}</strong><span>${lifeChainEscape(row.qualityState)} · ${lifeChainEscape(row.signal)} · fallback ${lifeChainEscape(row.fallback)}</span></div>`).join("") || "<p>No life-chain cases are available.</p>"}<p class="lifechain-boundary">${lifeChainEscape(item.boundary)}</p>`;
+  const rows = item.rows.length
+    ? item.rows.map((row) => lifeChainRow(row.eventNo, `${lifeChainText(row.qualityState)} · ${lifeChainText(row.signal)} · fallback ${lifeChainText(row.fallback)}`))
+    : lifeChainEmpty("No life-chain cases are available.");
+  lifeChainReplace("#lifechain-quality", [
+    lifeChainElement("div", { className: "lifechain-summary" }, [
+      lifeChainElement("strong", { text: `Cases ${lifeChainText(item.summary.cases)}` }),
+      lifeChainElement("span", { text: `Automatic SOS ${lifeChainText(item.summary.automaticSos)} · first-aid coverage ${lifeChainText(item.summary.firstAidTaskCoverage)} · hospital pre-alerts confirmed ${lifeChainText(item.summary.hospitalPrealertsConfirmed)} · duplicate signals ${lifeChainText(item.summary.suppressedDuplicateSignals)} · cancellation reviews ${lifeChainText(item.summary.cancellationReviews)}` })
+    ]),
+    rows,
+    lifeChainElement("p", { className: "lifechain-boundary", text: item.boundary })
+  ]);
 }
 
 async function submitLifeChainForm(event) {
