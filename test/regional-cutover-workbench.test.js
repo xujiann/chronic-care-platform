@@ -26,5 +26,8 @@ test("platform page loads the independent regional workbench module", () => {
   assert.match(html, /id="regional-cutover-workbench-panel"/);
   assert.match(html, /regional-cutover-workbench-ui\.js/);
   assert.match(source, /\/regional\/cutover-workbench/);
-  assert.doesNotMatch(source, /innerHTML\s*=\s*[^;]*error\.message/);
+  assert.doesNotMatch(source, /\binnerHTML\b|insertAdjacentHTML|DOMParser|createContextualFragment/);
+  assert.match(source, /textContent/);
+  assert.match(source, /replaceChildren/);
+  assert.match(source, /dataset\[key\]/);
 });

@@ -1,12 +1,23 @@
 (function (root) {
   "use strict";
 
-  function escapeHtml(value) {
-    return String(value ?? "").replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" })[character]);
+  function createElement(tagName, options = {}, children = []) {
+    const element = document.createElement(tagName);
+    if (options.className) element.className = options.className;
+    if (Object.prototype.hasOwnProperty.call(options, "text")) element.textContent = String(options.text ?? "");
+    Object.entries(options.dataset || {}).forEach(([key, value]) => {
+      element.dataset[key] = String(value ?? "");
+    });
+    const childList = Array.isArray(children) ? children : [children];
+    element.append(...childList.filter(Boolean));
+    return element;
   }
 
   function metric(label, value) {
-    return `<article class="metric"><strong>${escapeHtml(value)}</strong><span>${escapeHtml(label)}</span></article>`;
+    return createElement("article", { className: "metric" }, [
+      createElement("strong", { text: value }),
+      createElement("span", { text: label })
+    ]);
   }
 
   function render(report) {
@@ -17,20 +28,23 @@
     if (!status || !metrics || !regions || !boundary) return;
     status.textContent = report.candidateReady ? "存在候选地区" : "投产门禁关闭";
     status.className = `badge ${report.candidateReady ? "warn" : "danger"}`;
-    metrics.innerHTML = [
+    metrics.replaceChildren(...[
       metric("地区", report.summary.regions),
       metric("配置就绪", report.summary.technicalReady),
       metric("运维就绪", report.summary.operationsReady),
       metric("证据就绪", report.summary.evidenceReady),
       metric("候选就绪", report.summary.candidateReady),
       metric("阻断", report.summary.blocked)
-    ].join("");
-    regions.innerHTML = report.regions.map((item) => `<article class="evidence-card" data-regional-cutover-region="${escapeHtml(item.regionCode)}">
-      <h3>${escapeHtml(item.regionName)} · ${escapeHtml(item.regionCode)}</h3>
-      <p>发布：${escapeHtml(item.release.state)}；运维：${escapeHtml(item.operations.status)}；存储：${escapeHtml(item.storage.mode)}</p>
-      <p>证据：${escapeHtml(item.evidence.lifecycleState)}，${item.evidence.readyScopes}/${item.evidence.requiredScopes} 范围就绪</p>
-      <p class="muted">${escapeHtml(item.blockers.join("；") || "无本地阻断项")}</p>
-    </article>`).join("");
+    ]);
+    regions.replaceChildren(...report.regions.map((item) => createElement("article", {
+      className: "evidence-card",
+      dataset: { regionalCutoverRegion: item.regionCode }
+    }, [
+      createElement("h3", { text: `${item.regionName ?? ""} · ${item.regionCode ?? ""}` }),
+      createElement("p", { text: `发布：${item.release.state ?? ""}；运维：${item.operations.status ?? ""}；存储：${item.storage.mode ?? ""}` }),
+      createElement("p", { text: `证据：${item.evidence.lifecycleState ?? ""}，${item.evidence.readyScopes}/${item.evidence.requiredScopes} 范围就绪` }),
+      createElement("p", { className: "muted", text: item.blockers.join("；") || "无本地阻断项" })
+    ])));
     boundary.textContent = report.boundary;
   }
 

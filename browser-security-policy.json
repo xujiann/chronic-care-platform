@@ -119,7 +119,7 @@
   },
   "riskBaseline": {
     "schemaVersion": 2,
-    "sourceRevision": "origin/main@3658921a + process/t00-sec004-quality-safety-20260823",
+    "sourceRevision": "origin/main@5b4f0684 + process/t00-sec004-regional-cutover-20260823",
     "failClosedPriorities": [
       "P0",
       "P1"
@@ -178,7 +178,6 @@
       {"asset":"public-health-highlights.js","type":"dom-inner-html","priority":"P0","fingerprint":"f3c2e154b2ef114be6a3b5ae082f80d1c080a7ca349e9a577841adde3d2bc7c0","count":9},
       {"asset":"public-health-highlights.js","type":"dynamic-html-style-attribute","priority":"P1","fingerprint":"261a70157b72445431abc9cc45a216a4b98ac50d02d3174daf05c8f0523c4a9d","count":2},
       {"asset":"public-health.js","type":"dom-inner-html","priority":"P0","fingerprint":"01f32bea1d2b4ac357bfdae20514b6cf6358318c1957ea5d03de801a9e81557b","count":78},
-      {"asset":"regional-cutover-workbench-ui.js","type":"dom-inner-html","priority":"P0","fingerprint":"fdce526fa919c89d1f9f79d9451ec026d95fd5ce39294e8a2d12ffc640013acb","count":2},
       {"asset":"regional-data-sharing.js","type":"dom-inner-html","priority":"P0","fingerprint":"3ea342dcb9acef65e791c764033e21b51c81f89b19810e1adb024799fb502333","count":22},
       {"asset":"resident-mini-program.js","type":"cssom-set-property","priority":"P1","fingerprint":"d92c5c32f649090bf0c46bf342e579535514528170894840479f26fe65918c73","count":1},
       {"asset":"resident-mini-program.js","type":"dom-inner-html","priority":"P0","fingerprint":"6071c81f5bcf9908f7843aeb6c8a7559a53ed8bcc8d2265a93ce253c5aea555f","count":9},
