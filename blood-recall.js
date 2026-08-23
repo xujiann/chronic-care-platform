@@ -1,23 +1,38 @@
 (function () {
-  function escapeHtml(value) {
-    return String(value ?? "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]);
-  }
-
   function getState() {
     return typeof bloodState === "undefined" ? null : bloodState;
   }
 
   function panel() {
-    let element = document.querySelector("#recall-actions");
-    if (element) return element;
+    let panelElement = document.querySelector("#recall-actions");
+    if (panelElement) return panelElement;
     const safety = document.querySelector("#safety");
     if (!safety) return null;
-    element = document.createElement("section");
-    element.id = "recall-actions";
-    element.className = "panel";
-    element.innerHTML = '<div class="panel-header"><div><h2>召回机构确认</h2><p>确认库存冻结、去向核查和受影响患者处置，证据将写入审计链。</p></div></div><div class="standard-list" data-recall-list></div>';
-    safety.insertBefore(element, safety.lastElementChild);
-    return element;
+    panelElement = document.createElement("section");
+    panelElement.id = "recall-actions";
+    panelElement.className = "panel";
+    panelElement.replaceChildren(
+      element("div", { className: "panel-header" }, element("div", {}, [
+        element("h2", { text: "召回机构确认" }),
+        element("p", { text: "确认库存冻结、去向核查和受影响患者处置，证据将写入审计链。" })
+      ])),
+      element("div", { className: "standard-list", dataset: { recallList: "" } })
+    );
+    safety.insertBefore(panelElement, safety.lastElementChild);
+    return panelElement;
+  }
+
+  function recallItem(item) {
+    const pending = item.acknowledgementSummary?.pending ?? (item.affectedInstitutions || []).length;
+    return standardItem(
+      "待确认",
+      detail(item.id, `${String(item.reason ?? "")} · ${(item.bloodUnitIds || []).length} 袋 · 待确认 ${String(pending ?? "")} 家`),
+      actionButton("确认处置", { recallAction: item.id })
+    );
+  }
+
+  function emptyRecallItem() {
+    return standardItem("已完成", "当前机构没有待确认的召回通知。", signal("无待办"));
   }
 
   function renderRecallActions() {
@@ -26,7 +41,7 @@
     if (!state || !element) return;
     const list = element.querySelector("[data-recall-list]");
     const recalls = state.api?.role === "institution" ? (state.api.recalls || []).filter((item) => item.status !== "closed") : [];
-    list.innerHTML = recalls.length ? recalls.map((item) => `<div class="standard-item"><b>待确认</b><span>${escapeHtml(item.id)}<br><small>${escapeHtml(item.reason)} · ${(item.bloodUnitIds || []).length} 袋 · 待确认 ${(item.acknowledgementSummary?.pending ?? (item.affectedInstitutions || []).length)} 家</small></span><button class="blood-action" data-recall-action="${escapeHtml(item.id)}">确认处置</button></div>`).join("") : '<div class="standard-item"><b>已完成</b><span>当前机构没有待确认的召回通知。</span><span class="signal ok">无待办</span></div>';
+    list.replaceChildren(...(recalls.length ? recalls.map(recallItem) : [emptyRecallItem()]));
   }
 
   async function acknowledgeRecall(recallId) {

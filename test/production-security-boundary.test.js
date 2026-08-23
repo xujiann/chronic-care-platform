@@ -215,7 +215,7 @@ test("production runtime disables local passwords and emits browser security hea
   assert.equal(body.code, "LOCAL_PASSWORD_LOGIN_DISABLED");
 });
 
-test("browser clients fail closed and persistent blood-system fields are encoded", () => {
+test("browser clients fail closed and persistent blood-system fields use trusted rendering", () => {
   const root = path.resolve(__dirname, "..");
   const authSource = fs.readFileSync(path.join(root, "auth.js"), "utf8");
   const businessSource = fs.readFileSync(path.join(root, "blood-business.js"), "utf8");
@@ -223,6 +223,7 @@ test("browser clients fail closed and persistent blood-system fields are encoded
 
   assert.match(authSource, /return \{ ok: false, message: "认证服务暂不可用，请稍后重试" \}/);
   assert.match(businessSource, /escapeHtml\(target\)/);
-  assert.match(recallSource, /escapeHtml\(item\.reason\)/);
-  assert.match(recallSource, /data-recall-action="\$\{escapeHtml\(item\.id\)\}"/);
+  assert.doesNotMatch(recallSource, /innerHTML\s*=/);
+  assert.match(recallSource, /list\.replaceChildren/);
+  assert.match(recallSource, /actionButton\("确认处置", \{ recallAction: item\.id \}\)/);
 });

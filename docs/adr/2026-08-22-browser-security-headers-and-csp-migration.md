@@ -152,6 +152,16 @@ commission 鉴权、区域发布事实、审计、schema、CI 或 CSP enforcemen
 托管头、独立渗透与现场验收继续 NO-GO，兼容 `unsafe-inline`、严格 Report-Only 和
 `productionReady=false` 保持不变。
 
+### 血液召回可信渲染切片（2026-08-23）
+
+`blood-recall.js` 的两个 `innerHTML` 分别承载召回面板骨架及召回列表/空态；召回 ID、原因和待确认机构数
+原先直接进入模板，恶意 API 回归在旧实现中可创建活动标签和事件属性。迁移后复用既有页面 DOM helper，
+通过 `createElement`、`textContent`、dataset 与 `replaceChildren` 写入，原确认 POST、toast、确认后空态和
+加载失败行为保持不变。Inventory v2 的 DOM HTML occurrence 由 838 降为 836，覆盖资产由 35 降为 34，
+其中 `innerHTML` 834→832；动态 URL 6 和动态样式 45 均未改变。该切片不改变 API、鉴权、数据、schema、
+审计、CI 或 CSP enforcement；真实血液系统、外部回执、托管头、独立渗透与现场验收继续 NO-GO，兼容
+`unsafe-inline`、严格 Report-Only 和 `productionReady=false` 保持不变。
+
 ## Phased enforcement and rollback
 
 1. 第一阶段：集中端口、兼容 CSP + 严格 Report-Only、风险清单、CI 增量拒绝；固定 `productionReady=false`。

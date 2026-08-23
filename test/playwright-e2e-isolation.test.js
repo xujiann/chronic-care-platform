@@ -63,7 +63,7 @@ test("local and CI E2E use the same isolated Playwright Chromium policy", () => 
   assert.match(read("test/e2e/pwa-service-worker.playwright.config.js"), /createPwaBrowserUse/);
 });
 
-test("online, resident and PWA Playwright suites form an exact disjoint partition of all 52 tests", () => {
+test("online, resident and PWA Playwright suites form an exact disjoint partition of all 53 tests", () => {
   const rootTests = listTests("playwright.config.js");
   const residentTests = listTests("test/e2e/resident-mini-program.playwright.config.js");
   const pwaTests = listTests("test/e2e/pwa-service-worker.playwright.config.js");
@@ -73,11 +73,11 @@ test("online, resident and PWA Playwright suites form an exact disjoint partitio
     return total + (read(`test/e2e/${name}`).match(/^test\(/gm) || []).length;
   }, 0);
 
-  assert.equal(rootTests.length, 36);
+  assert.equal(rootTests.length, 37);
   assert.equal(residentTests.length, 13);
   assert.equal(pwaTests.length, 3);
-  assert.equal(declared, 52);
-  assert.equal(union.size, 52);
+  assert.equal(declared, 53);
+  assert.equal(union.size, 53);
   assert.equal(rootTests.some((entry) => entry.startsWith("resident-mini-program.spec.js:")), false);
   assert.equal(rootTests.some((entry) => entry.startsWith("pwa-service-worker.spec.js:")), false);
   assert.equal(residentTests.every((entry) => entry.startsWith("resident-mini-program.spec.js:")), true);
