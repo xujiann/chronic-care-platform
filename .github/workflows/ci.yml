@@ -128,6 +128,8 @@ jobs:
         run: npm run data:collection-governance:verify
       - name: Verify object storage architecture decision remains fail-closed
         run: npm run object-storage:architecture-governance:verify
+      - name: Verify worker observability compatibility contract
+        run: npm run worker:observability:verify && npm run worker:observability:test
       - name: Verify parallel development-line contracts
         run: npm run development-lines:check && npm run development-lines:test && npm run development-lines:readiness
       - name: Run standard lint and incremental type checks

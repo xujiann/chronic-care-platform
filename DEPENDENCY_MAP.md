@@ -275,3 +275,11 @@ v2 evaluator → strict preflight → protected manual workflow → digest-only 
 不依赖 `server.js`、数据库、release 文件或环境布尔，避免本地事实反向成为授权权威。默认组合没有
 external verifier，所以依赖缺失时稳定失败关闭。未来外部 CAB/provider、信任根和耐久 anti-replay store
 只能从 composition 边界注入，不得让领域模型依赖具体供应方 SDK；该依赖仍待 Accepted ADR。
+
+## Worker 共同观测依赖方向
+
+依赖方向为 `既有 worker/CLI → worker-observability-contract → versioned inventory → node:crypto`。
+共同层不依赖 `server.js`、HTTP、数据库、provider 或领域实现，也不被 repository 反向调用。12 个 profile
+保持不同 state/retry/lease/checkpoint/receipt 语义，只投影为共同 outcome/count/error-code/digest；因此
+不存在新的跨域写边或第二套任务协议。部署包显式携带模块和清单，CI 从 systemd `ExecStart` 发现 9 个
+入口并拒绝未登记或未接入适配器的 worker。对象存储 v2 的 Proposed worker 继续 blocked。

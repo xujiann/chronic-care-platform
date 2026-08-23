@@ -2,6 +2,7 @@
 
 const { randomUUID } = require("node:crypto");
 const { inspectReferralTransportReadiness } = require("./referral-delivery-transport");
+const { attachWorkerObservability } = require("../platform/operations/worker-observability-contract");
 
 const MIN_WORKER_LEASE_MS = 60 * 1000;
 const ACK_RETRY_LIMIT = 3;
@@ -131,7 +132,7 @@ async function runReferralDeliveryWorkerOnce(options = {}) {
     result[item.status] = (result[item.status] || 0) + 1;
     return result;
   }, {});
-  return Object.freeze({
+  return attachWorkerObservability("referral-delivery", {
     runId,
     workerId,
     claimed: claims.length,
@@ -140,7 +141,7 @@ async function runReferralDeliveryWorkerOnce(options = {}) {
     payloadsExposed: false,
     leaseTokensExposed: false,
     productionReady: false
-  });
+  }, { observedAt: now() });
 }
 
 module.exports = {

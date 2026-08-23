@@ -36,6 +36,10 @@ const PRODUCTION_EVIDENCE_TRUST_RUNTIME_FILES = [
   "scripts/production-release-evidence-readiness.js",
   "src/platform/governance/production-evidence-trust-provider.js"
 ];
+const WORKER_OBSERVABILITY_RUNTIME_FILES = [
+  "config/worker-observability-contract.json",
+  "src/platform/operations/worker-observability-contract.js"
+];
 const REQUIRED_RUNTIME_FILES = [
   "server.js",
   "browser-security-policy.json",
@@ -51,7 +55,8 @@ const REQUIRED_RUNTIME_FILES = [
   "scripts/postgres-shadow-reconcile.js",
   ...AUDIT_DELIVERY_RUNTIME_FILES,
   ...CHRONIC_FOLLOWUP_DISPATCH_RUNTIME_FILES,
-  ...PRODUCTION_EVIDENCE_TRUST_RUNTIME_FILES
+  ...PRODUCTION_EVIDENCE_TRUST_RUNTIME_FILES,
+  ...WORKER_OBSERVABILITY_RUNTIME_FILES
 ];
 const ADDITIONAL_RUNTIME_FILES = [
   "browser-security-policy.json",
@@ -61,7 +66,8 @@ const ADDITIONAL_RUNTIME_FILES = [
   "scripts/postgres-shadow-reconcile.js",
   ...AUDIT_DELIVERY_RUNTIME_FILES,
   ...CHRONIC_FOLLOWUP_DISPATCH_RUNTIME_FILES,
-  ...PRODUCTION_EVIDENCE_TRUST_RUNTIME_FILES
+  ...PRODUCTION_EVIDENCE_TRUST_RUNTIME_FILES,
+  ...WORKER_OBSERVABILITY_RUNTIME_FILES
 ];
 const RUNTIME_DIRECTORIES = ["src/http", "src/platform/regional", "src/platform/storage", "regions"];
 const EXCLUDED_RUNTIME_FILES = new Set(["playwright.config.js"]);

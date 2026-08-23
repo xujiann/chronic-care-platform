@@ -1,6 +1,7 @@
 "use strict";
 
 const { randomUUID } = require("node:crypto");
+const { attachWorkerObservability } = require("../platform/operations/worker-observability-contract");
 
 function workerError(code, message, statusCode = 503) {
   return Object.assign(new Error(message), { code, statusCode });
@@ -119,7 +120,7 @@ async function runEmergencySignalDeliveryWorkerOnce(options = {}) {
     retrying: results.filter((item) => item.status === "pending").length,
     deadLettered: results.filter((item) => item.status === "dead-letter").length
   };
-  return Object.freeze({
+  return attachWorkerObservability("emergency-signal-delivery", {
     ok: summary.deadLettered === 0,
     runId,
     workerId,
@@ -129,7 +130,7 @@ async function runEmergencySignalDeliveryWorkerOnce(options = {}) {
     leaseTokensExposed: false,
     productionReady: false,
     boundary: "The worker result is local operational evidence; T00 deployment, live credentials, external verification, and signed site acceptance remain required."
-  });
+  }, { observedAt: now() });
 }
 
 module.exports = {

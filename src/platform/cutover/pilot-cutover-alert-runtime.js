@@ -11,6 +11,7 @@ const {
   recoverPilotCutoverAlert,
   redrivePilotCutoverAlert
 } = require("./pilot-cutover-alert-lifecycle");
+const { attachWorkerObservability } = require("../operations/worker-observability-contract");
 
 const COMMANDS = Object.freeze({
   acknowledge: acknowledgePilotCutoverAlert,
@@ -178,7 +179,7 @@ async function runPilotCutoverAlertDeliveryCycle(options = {}) {
     now
   });
   if (!enabled || !actorAccount || before.adapter.adapterReady !== true) {
-    return Object.freeze({
+    return attachWorkerObservability("cutover-alert-delivery", {
       schema: "pilot-cutover-alert-worker-cycle-v1",
       evaluatedAt: now,
       status: "blocked",
@@ -190,7 +191,7 @@ async function runPilotCutoverAlertDeliveryCycle(options = {}) {
       failClosed: true,
       cutoverExecutionAuthorized: false,
       productionReady: false
-    });
+    }, { observedAt: now });
   }
   let control;
   try {
@@ -239,7 +240,7 @@ async function runPilotCutoverAlertDeliveryCycle(options = {}) {
   }
   const delivered = results.filter((row) => row.delivered === true).length;
   const failed = results.length - delivered;
-  return Object.freeze({
+  return attachWorkerObservability("cutover-alert-delivery", {
     schema: "pilot-cutover-alert-worker-cycle-v1",
     evaluatedAt: now,
     status: failed ? "blocked" : "completed",
@@ -254,7 +255,7 @@ async function runPilotCutoverAlertDeliveryCycle(options = {}) {
     monitoringAcceptanceProven: false,
     cutoverExecutionAuthorized: false,
     productionReady: false
-  });
+  }, { observedAt: now });
 }
 
 module.exports = {

@@ -6,6 +6,7 @@ const {
 const {
   loadPublicHealthLaneCredentials
 } = require("./public-health-external-key-provider");
+const { attachWorkerObservability } = require("./src/platform/operations/worker-observability-contract");
 
 function clean(value) {
   return String(value ?? "").trim();
@@ -157,14 +158,14 @@ async function runPublicHealthExternalWorkerCycle(options = {}) {
     currentData = result.nextData;
     results.push(result);
   }
-  return {
+  return attachWorkerObservability("public-health-external-dispatch", {
     generatedAt: now,
     due: due.length,
     processed: results.length,
     results: results.map((item) => item.attempted),
     nextData: currentData,
     productionReady: false
-  };
+  }, { observedAt: now });
 }
 
 module.exports = {

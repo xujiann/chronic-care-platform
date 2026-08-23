@@ -219,3 +219,10 @@ manual production workflow 也不调用业务 API 或执行部署。
 本切片不新增或改变任何 HTTP method/path、身份、角色、scope、错误、幂等或审计语义。
 `test/api.test.js` 的三段历史不可达断言仅改为显式 skipped debt，现有可执行断言保持原顺序；
 integration runner 只隔离该文件并输出耗时，不把通过、skip 数或耗时提升为 API 生产证据。
+
+## 19. Worker 观测合同（无 HTTP 变化）
+
+本切片不新增或改变 HTTP method/path、请求/响应 schema、鉴权、scope、幂等或审计语义。既有 worker/CLI
+报告仅 additive 地增加 `workerObservability`；原业务字段和失败/重试结果继续权威。投影字段闭集、未知
+profile、profile 替换、额外字段和生产授权扩张均失败关闭。该库接口不是公开 API，不能据此宣称 worker
+已启用、外部 delivery 已完成或平台可以生产上线。

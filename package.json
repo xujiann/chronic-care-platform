@@ -172,6 +172,8 @@
     "object-storage:architecture-governance": "node scripts/object-storage-architecture-governance.js",
     "object-storage:architecture-governance:verify": "node scripts/object-storage-architecture-governance.js",
     "object-storage:architecture-governance:test": "node --test test/object-storage-architecture-governance.test.js",
+    "worker:observability:verify": "node scripts/worker-observability-governance.js",
+    "worker:observability:test": "node --test test/worker-observability-contract.test.js",
     "evaluation:evidence": "node scripts/evaluation-evidence.js",
     "release:manifest": "node scripts/release-artifact-manifest.js",
     "release:evidence-provenance": "node scripts/release-evidence-provenance.js status",

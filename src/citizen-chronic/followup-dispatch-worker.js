@@ -7,6 +7,7 @@ const {
   createFollowupEventPublisher
 } = require("./followup-event-publisher");
 const { sha256, stableStringify } = require("./followup-dispatch-outbox");
+const { attachWorkerObservability } = require("../platform/operations/worker-observability-contract");
 
 const WORKER_CONTRACT = "citizen-chronic.followup-dispatch-worker.v1";
 
@@ -150,7 +151,7 @@ async function runFollowupDispatchWorker(options = {}) {
       }));
     }
   }
-  return Object.freeze({
+  return attachWorkerObservability("chronic-followup-dispatch", {
     contract: WORKER_CONTRACT,
     workerIdDigest: sha256(workerId),
     claimed: claims.length,
@@ -162,7 +163,7 @@ async function runFollowupDispatchWorker(options = {}) {
     health: repository.health(),
     requestPathExternalDispatch: false,
     productionReady: false
-  });
+  }, { observedAt: options.completedAt || options.at || new Date().toISOString() });
 }
 
 function inspectFollowupDispatchWorkerReadiness(env = process.env, options = {}) {

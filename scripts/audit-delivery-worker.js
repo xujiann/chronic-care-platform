@@ -20,6 +20,7 @@ const {
   AUDIT_DELIVERY_SOURCE_CONTRACT,
   readAuditDeliverySourceBatch
 } = require("../src/identity-security/audit-delivery-source");
+const { attachWorkerObservability } = require("../src/platform/operations/worker-observability-contract");
 
 const ROOT = path.resolve(__dirname, "..");
 const TRAILS = Object.freeze(["securityEvents", "dataAccessLogs"]);
@@ -359,14 +360,14 @@ async function runWorker(options = {}) {
     const pendingAfter = source
       ? source.databaseHeadCursor - (result.ok ? source.endCursor : checkpoint.sourceCursor)
       : result.ok ? pending.length - selected.length : pending.length;
-    return {
+    return attachWorkerObservability("continuous-audit-delivery", {
       ...result,
       pendingBefore,
       pendingAfter,
       sourceContract,
       sourceCursor: source ? (result.ok ? source.endCursor : checkpoint.sourceCursor) : null,
       productionReady: false
-    };
+    }, { observedAt: next.updatedAt });
   } finally { releaseLock(); }
 }
 
