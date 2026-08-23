@@ -17,6 +17,8 @@
 ## 2. 基线与所有权
 
 - `main` 是唯一集成、发布和默认分支。
+- 新工作树和本地 ownership 验证默认使用最新 fetched `origin/main`；固定
+  `baseline/governance-20260817-enhancement-v1` 仅用于可复现证据，不得作为日常开发默认基线。
 - 通过 `npm run process:plan` / `process:create` 创建 `process/tNN-topic-YYYYMMDD` 工作树。
 - T00 独占组合根、全局路由顺序、CI、治理配置和部署打包；T01–T09 只改其领域保护路径。
 - 每次交付运行 `process:verify`；跨域协议或路由顺序交 T00。
@@ -49,6 +51,10 @@
 ## 6. 数据治理
 
 - 禁止直接编辑 `data/db.json`、SQLite/WAL/SHM、报告、PDF 和归档制品。
+- 全部跟踪 Markdown 必须唯一分类为 `current`、`snapshot` 或 `superseded`；日期化 snapshot
+  保留原文，修订通过新的 current 文档或 superseding ADR 完成。
+- `output/pdf` 跟踪制品必须登记 SHA-256、页数、大小、来源、引入提交、保留理由和生成器可用性。
+  无可复现生成器的历史 PDF 只读冻结，不得手工编辑或以校验器冒充生成器。
 - schema 变化只能通过顺序 migration；历史 migration 默认不可变。
 - migration 内容必须可指纹验证，schema head、公开版本和部署门禁必须一致。
 - 生产集合必须先进入 `domain-data-ownership`，明确 owner、reader、分类、写契约、迁移和回滚。
@@ -89,6 +95,7 @@ LEGACY CODE → TEST PROTECTION → REFACTOR
 | 关键内部边界覆盖 | `npm run test:coverage:boundaries` |
 | 架构 | `npm run architecture:test` |
 | 所有权 | `npm run process:verify`、`npm run process:test` |
+| 仓库文档与制品治理 | `npm run repository:governance:verify`（只读，不生成报告或 PDF） |
 | 平台迭代 | `npm run platform:iterations:test` |
 | E2E | `npm run test:e2e` |
 | 浏览器 sink | `npm run security:browser:verify` + `npm run static:test` + `npm run test:e2e`（模板 URL 归零、OHIF 外部 Origin 继续失败关闭） |
@@ -153,6 +160,7 @@ Service Worker，PWA/离线缓存必须在独立 context 与专项套件验证�
 - `/review` 检查回归、安全、数据、并发、错误、所有权、测试真实性和文档同步。
 - PR 单一职责，说明基线、进程、问题、决策、范围、非目标、测试、风险、迁移/回滚和 ADR。
 - 未运行项明确写未运行；不删测试、不降门禁换绿灯。
+- 当前规则只来自 current 文档和 Accepted ADR；snapshot/superseded 仅作历史证据，不能覆盖当前流程。
 - merge 后更新地图、风险、ADR、路线图和发布证据。
 
 ## 11. 每日循环

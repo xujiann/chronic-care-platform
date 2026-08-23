@@ -120,6 +120,8 @@ jobs:
           fi
       - name: Test process worktree governance
         run: node --test test/process-worktree.test.js
+      - name: Verify current workflow, Markdown inventory and tracked PDF provenance
+        run: npm run repository:governance:verify
       - name: Test modular-monolith architecture contracts
         run: npm run architecture:test
       - name: Protect all operations command runtime behaviors

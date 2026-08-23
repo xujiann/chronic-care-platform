@@ -2,7 +2,9 @@
   "schemaVersion": "platform-iteration-program-v1",
   "programId": "preproduction-six-iteration-control-20260804",
   "integrationBranch": "main",
+  "developmentBase": "origin/main",
   "baselineTag": "baseline/governance-20260817-enhancement-v1",
+  "baselinePurpose": "reproducible-evidence-only",
   "policy": {
     "integrationOwner": "T00",
     "orderedExecution": true,

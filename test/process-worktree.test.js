@@ -27,11 +27,14 @@ function workflowJob(workflow, jobId) {
   return nextJob ? remainder.slice(0, nextJob.index) : remainder;
 }
 
-test("process manifest pins the unique integration baseline and evidence policy", () => {
+test("process manifest separates the current development base from the evidence baseline", () => {
   assert.equal(manifest.integrationBranch, "main");
+  assert.equal(manifest.developmentBase, "origin/main");
   assert.equal(manifest.baselineTag, "baseline/governance-20260817-enhancement-v1");
+  assert.notEqual(manifest.developmentBase, manifest.baselineTag);
   assert.equal(manifest.developmentPolicy.singleIntegrationBaseline, true);
   assert.equal(manifest.developmentPolicy.integrationOwner, "T00");
+  assert.equal(manifest.developmentPolicy.mergeDirection, "process-branch-to-main");
   assert.equal(manifest.developmentPolicy.externalEvidenceCannotBeInferred, true);
   assert.equal(manifest.developmentPolicy.productionDefaultDecision, "NO-GO");
 });
@@ -107,7 +110,7 @@ test("worktree plan stays inside its configured root", () => {
     worktreeRoot
   }, manifest);
   assert.equal(plan.branch, "process/t05-care-coordination-pilot-20260803");
-  assert.equal(plan.base, manifest.baselineTag);
+  assert.equal(plan.base, manifest.developmentBase);
   assert.equal(isWithin(worktreeRoot, plan.worktree), true);
   assert.throws(() => buildWorktreePlan({
     process: "T05",

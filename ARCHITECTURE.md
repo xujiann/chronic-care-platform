@@ -33,6 +33,7 @@
 | [DATABASE_DEVELOPMENT_STANDARD.md](./DATABASE_DEVELOPMENT_STANDARD.md) | 数据库开发规则 |
 | [CORE_DATA_DEFINITIONS.md](./CORE_DATA_DEFINITIONS.md) | 核心数据不可变概念 |
 | [ADR 台账](./docs/adr/README.md) | Accepted/Proposed 架构决策 |
+| [仓库治理机器合同](./config/repository-governance.json) | 当前工作流、Markdown 闭集分类与跟踪 PDF 来源/摘要 |
 
 ## 已接受方向
 

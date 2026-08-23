@@ -3,7 +3,9 @@
 This repository uses one integration line:
 
 - integration and release branch: `main`
-- process baseline: `baseline/governance-20260817-enhancement-v1`
+- default development base: latest fetched `origin/main`
+- reproducible evidence tag: `baseline/governance-20260817-enhancement-v1`
+  (never the default base for new development or ownership verification)
 - ownership manifest: `config/process-workstreams.json`
 
 Before changing a protected runtime file, identify the process from the current
@@ -49,10 +51,12 @@ Before changing a protected runtime file, identify the process from the current
   `npm run test:integration`, `npm run test:smoke`, and the unchanged legacy
   full-discovery guard `npm run test:all`.
 - Run `npm run routes:check`, `npm run architecture:test`, `npm run process:test`, and `npm run platform:iterations:test` for central changes.
+- Run `npm run repository:governance:verify` for workflow, Markdown or tracked PDF changes.
 - Do not weaken checks to make a merge pass. Any temporary branch-protection exception must be recorded and restored immediately after the authorized merge.
 
-The detailed Chinese workflow is in
-`docs/路由模块化与并行开发边界-2026-08-03.md`.
+The dated route workflow under `docs/` is an immutable historical snapshot.
+Current workflow rules are this file, `ENGINEERING_GOVERNANCE.md`, the process
+manifest and Accepted ADRs; do not use a snapshot as the development baseline.
 
 ## Project engineering rules
 
@@ -75,6 +79,9 @@ The detailed Chinese workflow is in
 
 - Do not directly edit `data/db.json`, SQLite/WAL/SHM files, generated reports,
   PDFs, release packages or archives.
+- Tracked Markdown must remain uniquely classified by `config/repository-governance.json`.
+  Historical snapshots are immutable. Tracked PDF replacement requires an approved
+  generation source, provenance update and digest review; manual binary editing is forbidden.
 - The main application, embedded presentation sites, external showcase, emergency
   artifacts and video projects have separate source/dependency/release boundaries.
 - `emergency-release` is a derived artifact, never a second editable source tree.
