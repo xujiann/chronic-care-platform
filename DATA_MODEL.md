@@ -24,6 +24,10 @@ Playwright E2E 只在操作系统临时目录复制开发种子，根 27 项和�
 `DATA_DIR` 消费；每次标准运行还分配独立回环端口，不能连接其他 worktree 的测试服务。测试结束删除
 临时目录，既不写回 `data/db.json`，也不形成业务事实、迁移证据或生产验收证据。
 
+PWA 专项 3 项复用相同的仓库外临时数据和动态回环端口，只在独立浏览器 context 创建 v61 Cache Storage
+与 Service Worker registration；每项结束注销 registration 并删除所有测试 origin cache。缓存只接受同源
+成功响应，`/api/*` 与被拒绝的 `/data/db.json` 不进入缓存。Cache Storage 不是业务事实源或迁移证据。
+
 ## 2. SQLite Schema
 
 主存储 migration 位于 `src/platform/storage/sqlite-migrations.js` 的版本化注册表，当前实际与公开 head 均为 v15。包括 `schema_migrations` 在内，主 SQLite 逻辑上创建 31 张表：
@@ -81,7 +85,7 @@ erDiagram
 - readiness、报告和部署检查输入；
 - 本地兼容快照与回退读取。
 
-静态页面不再直接读取该文件。Node 静态服务按源文件 mtime/size 合成 `data/public-demo.json`；Pages 在仓库外临时目录生成同名制品，Service Worker 只缓存该脱敏结果。
+静态页面不再直接读取该文件。Node 静态服务按源文件 mtime/size 合成 `data/public-demo.json`；Pages 在仓库外临时目录生成同名制品，Service Worker v61 只缓存同源成功响应中的该脱敏结果，不缓存源快照的 404 拒绝响应。
 
 `config/domain-data-ownership.json` 当前登记 87 个 owner 合同，其中 60 个集合存在于当前 252
 集合快照；27 个合同集合当前不在快照。另有 `dataAccessLogs`、`platformProcessAudit`、

@@ -1,4 +1,4 @@
-const CACHE_NAME = "chronic-care-citizen-v60-public-demo-boundary";
+const CACHE_NAME = "chronic-care-citizen-v61-public-demo-boundary";
 const APP_SHELL = [
   "./",
   "./citizen.html",
@@ -81,15 +81,16 @@ self.addEventListener("activate", (event) => {
 
 self.addEventListener("fetch", (event) => {
   const requestUrl = new URL(event.request.url);
-  if (event.request.method !== "GET" || requestUrl.pathname.startsWith("/api/")) return;
+  if (event.request.method !== "GET" || requestUrl.origin !== self.location.origin || requestUrl.pathname.startsWith("/api/")) return;
 
   if (event.request.mode === "navigate") {
     event.respondWith(
       fetch(event.request, { cache: "no-store" }).catch(() => {
-        const fallbackPage = requestUrl.pathname.endsWith("/mobile-preview.html")
+        const fallbackPath = requestUrl.pathname.endsWith("/mobile-preview.html")
           ? "./mobile-preview.html"
           : "./citizen.html";
-        return caches.match(fallbackPage);
+        const fallbackPage = new URL(fallbackPath, self.registration.scope).href;
+        return caches.match(fallbackPage).then((cached) => cached || Response.error());
       })
     );
     return;
@@ -99,8 +100,10 @@ self.addEventListener("fetch", (event) => {
     event.respondWith(
       fetch(event.request, { cache: "no-store" })
         .then((response) => {
-          const copy = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+          if (response.ok) {
+            const copy = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+          }
           return response;
         })
         .catch(() => caches.match(event.request))
@@ -112,8 +115,10 @@ self.addEventListener("fetch", (event) => {
     caches.match(event.request).then((cached) => {
       if (cached) return cached;
       return fetch(event.request).then((response) => {
-        const copy = response.clone();
-        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+        if (response.ok) {
+          const copy = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+        }
         return response;
       });
     })

@@ -240,6 +240,10 @@ TEST-005 只改变测试进程、浏览器与临时端口装配，不新增或�
 scope、错误、幂等或审计语义。根 27 项与居民 13 项继续调用现有接口；动态回环端口和临时数据只用于
 自动化验证，不能登记为公开 API、生产 endpoint 或现场证据。
 
+PWA 专项增加 3 项独立浏览器行为测试，但不新增测试控制 HTTP API：仍由现有 `/api/health` 探活并使用
+正式 `service-worker.js`。Worker 明确旁路 `/api/*`，缓存拒绝非同源和非成功响应；测试中的 offline 模式、
+Cache Storage 与 registration 清理不构成真实 HTTPS、生产 endpoint、现场浏览器策略或外部 Origin 证据。
+
 ## 21. 仓库文档与制品治理（无 HTTP 变化）
 
 本切片不新增或改变任何 HTTP method/path、身份、角色、scope、错误、幂等或审计语义。

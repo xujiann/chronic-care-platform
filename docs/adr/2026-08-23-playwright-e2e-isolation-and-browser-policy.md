@@ -57,3 +57,11 @@ trace 显示受控首请求中止后，500ms 重试仍可能与同一浏览器�
 `playwright-browser-policy.v1`、Playwright Chromium、`serviceWorkers=block` 和运行时分配的回环端口。
 保留单 worker 和既有业务断言，不扩大超时、不修改运行时代码。回滚应整体恢复前一测试拓扑，但不得以
 删除失败用例、复用外来服务或改用系统 Chrome 作为长期解决方案。
+
+### PWA 专项实施状态（2026-08-23）
+
+在线根 27 项与居民 13 项继续使用 `serviceWorkers=block`。新增的 PWA 3 项通过同一 Chromium、动态端口和
+临时数据装配，在独立 `playwright-pwa-browser-policy.v1` context 中允许 Worker；三套测试形成 43 项唯一
+并集。专项使用正式 `service-worker.js` 验证居民登录后安装、受控 update、v60→v61 清理、离线回退、
+API/404 缓存边界以及每项 unregister/Cache Storage 清理。该事实补完方案 3 预留的仓库内专项，不改变
+真实 HTTPS、OS 安装策略、外部 Origin 和现场浏览器验收仍外置的结论。
