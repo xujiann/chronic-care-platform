@@ -267,10 +267,11 @@ function createRouteSegments(runtime) {
           });
         } catch (error) {
           const known = error instanceof SessionSecurityAuditError;
-          sendJson(res, known ? error.statusCode : 500, {
+          const versionConflict = String(error?.message || "").includes("SQLite optimistic lock conflict");
+          sendJson(res, versionConflict ? 409 : known ? error.statusCode : 500, {
             ok: false,
-            code: known ? error.code : "SECURITY_CONTROL_ACTION_FAILED",
-            message: known ? error.message : "security control action failed"
+            code: versionConflict ? "SESSION_SECURITY_AUDIT_VERSION_CONFLICT" : known ? error.code : "SECURITY_CONTROL_ACTION_FAILED",
+            message: versionConflict ? "security control version conflict" : known ? error.message : "security control action failed"
           });
         }
         return true;

@@ -775,6 +775,108 @@
       ],
       "productionReady": false,
       "externalEvidenceRequired": true
+    },
+    {
+      "contractId": "identity-security.security-control-action-command.v1",
+      "key": "POST /api/security/controls/:id/actions",
+      "method": "POST",
+      "path": "/api/security/controls/:id/actions",
+      "owner": "T01",
+      "domain": "identity-security",
+      "purpose": "mutate-security-control-with-atomic-command-receipt-and-audit",
+      "customAuthenticationEvidence": false,
+      "authentication": {
+        "required": true,
+        "mechanism": "platform-session-plus-live-account-validation-and-provider-verified-step-up",
+        "principalType": "platform-user",
+        "credentialSource": ["header:authorization", "cookie:session"],
+        "replayCsrf": {
+          "replayProtection": "hashed-idempotency-key-plus-intent-digest",
+          "csrf": "platform-session-transport-policy"
+        }
+      },
+      "authorization": {
+        "model": "commission-role-plus-high-risk-step-up-and-exact-control-id",
+        "roles": ["commission"],
+        "dataScope": "platform-security-control-by-id"
+      },
+      "coverage": {
+        "level": "endpoint",
+        "selector": "entire-route",
+        "actions": ["security-control-action"],
+        "unverifiedRemainder": false
+      },
+      "idempotency": {
+        "key": "header:Idempotency-Key",
+        "payloadBinding": ["controlId", "actor", "status", "evidence", "next", "action"],
+        "exactReplay": "returns the original control result and audit correlation with idempotentReplay=true without another control or audit write",
+        "conflictingReuse": "SESSION_SECURITY_AUDIT_IDEMPOTENCY_CONFLICT",
+        "persistenceScope": "securityAcceptanceLedger control mutation plus securityEvents command receipt and chained audit in one platform state write",
+        "distributedExactlyOnceClaimed": false
+      },
+      "concurrency": {
+        "cas": {
+          "required": true,
+          "field": "per-writeDatabase in-process command tail plus SQLite storageMeta.collectionVersions",
+          "conflictCodes": ["SESSION_SECURITY_AUDIT_VERSION_CONFLICT"]
+        }
+      },
+      "errors": [
+        { "code": "SESSION_SECURITY_AUDIT_COMMAND_ID_REQUIRED", "status": 400 },
+        { "code": "AUTHENTICATION_REQUIRED", "status": 401 },
+        { "code": "STEP_UP_REQUIRED", "status": 403 },
+        { "code": "SECURITY_CONTROL_NOT_FOUND", "status": 404 },
+        { "code": "SESSION_SECURITY_AUDIT_IDEMPOTENCY_CONFLICT", "status": 409 },
+        { "code": "SESSION_SECURITY_AUDIT_VERSION_CONFLICT", "status": 409 },
+        { "code": "SECURITY_CONTROL_ACTION_FAILED", "status": 500 }
+      ],
+      "audit": {
+        "accepted": "commits one control mutation, one idempotency receipt and one chained session-security audit entry in the same platform state write",
+        "replay": "returns the original result snapshot and receipt without another control mutation, receipt or audit write",
+        "rejected": "role and step-up denials stop before command collection or mutation; missing controls and command conflicts do not write; a failed state write is redacted and is not followed by a fallback audit write"
+      },
+      "implementationEvidence": [
+        {
+          "file": "src/http/routes/identity-security.js",
+          "anchors": [
+            "url.pathname.match(/^\\/api\\/security\\/controls\\/([^/]+)\\/actions$/)",
+            "if (!enforceMutationSecurity(req, res, { stepUp: true })) return true",
+            "SESSION_SECURITY_AUDIT_VERSION_CONFLICT"
+          ]
+        },
+        {
+          "file": "src/identity-security/session-security-audit.js",
+          "anchors": [
+            "function executeSecurityControlAction",
+            "SESSION_SECURITY_AUDIT_IDEMPOTENCY_CONFLICT",
+            "working.securityEvents = this.prependAuditTrailEntry",
+            "await this.writeDatabase(working)"
+          ]
+        },
+        {
+          "file": "server.js",
+          "anchors": [
+            "function verifySqliteCollectionVersions",
+            "SQLite optimistic lock conflict on",
+            "db.exec(\"COMMIT\")"
+          ]
+        }
+      ],
+      "testEvidence": [
+        {
+          "file": "test/t01-runtime-identity-hardening.test.js",
+          "anchors": [
+            "denies before body collection or business-state read and keeps missing controls write-free",
+            "requires provider-verified step-up before collecting the command",
+            "replays equal commands and returns 409 for payload drift",
+            "serializes concurrent equal and conflicting command payloads",
+            "mutation, audit and command receipt share one commit",
+            "redacts persistence failures and maps SQLite CAS without a fallback write"
+          ]
+        }
+      ],
+      "productionReady": false,
+      "externalEvidenceRequired": true
     }
   ]
 }

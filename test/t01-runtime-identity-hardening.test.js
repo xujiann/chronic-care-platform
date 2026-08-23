@@ -273,6 +273,9 @@ test("security control route replays equal commands and returns 409 for payload 
   assert.equal(replay.statusCode, 200);
   assert.equal(replay.body.idempotentReplay, true);
   assert.equal(writes, 1);
+  assert.equal(data.securityAcceptanceLedger[0].status, "archived");
+  assert.equal(data.securityEvents.length, 1);
+  assert.equal(data.securityEvents[0].resultSnapshot.id, "control-route");
 
   payload = { status: "rejected", evidence: "drift" };
   const conflict = responseCapture();
@@ -280,6 +283,230 @@ test("security control route replays equal commands and returns 409 for payload 
   assert.equal(conflict.statusCode, 409);
   assert.equal(conflict.body.code, "SESSION_SECURITY_AUDIT_IDEMPOTENCY_CONFLICT");
   assert.equal(writes, 1);
+  assert.equal(data.securityEvents.length, 1);
+});
+
+test("security control route denies before body collection or business-state read and keeps missing controls write-free", async () => {
+  let reads = 0;
+  let collects = 0;
+  let writes = 0;
+  const deniedRuntime = {
+    collectJson: async () => { collects += 1; return {}; },
+    prependAuditTrailEntry,
+    randomUUID: () => "denied-control-audit",
+    readDatabase: () => { reads += 1; return {}; },
+    requireApiRole: (req, res) => {
+      res.send(403, { ok: false, code: "FORBIDDEN" });
+      return null;
+    },
+    sendJson: (res, status, body) => res.send(status, body),
+    writeDatabase: () => { writes += 1; }
+  };
+  const deniedSegment = createIdentitySegments(deniedRuntime).find((item) => item.id === "identity-security-02");
+  const deniedReq = {
+    method: "POST",
+    url: "/api/security/controls/control-private/actions",
+    headers: { "idempotency-key": "t01-control-denied-command" }
+  };
+  const denied = responseCapture();
+  assert.equal(await deniedSegment.handle(deniedReq, denied, new URL(`http://localhost${deniedReq.url}`)), true);
+  assert.equal(denied.statusCode, 403);
+  assert.equal(collects, 0);
+  assert.equal(reads, 0);
+  assert.equal(writes, 0);
+
+  const data = { securityAcceptanceLedger: [], securityEvents: [] };
+  const missingRuntime = {
+    collectJson: async () => ({ status: "archived" }),
+    prependAuditTrailEntry,
+    randomUUID: () => "missing-control-audit",
+    readDatabase: () => data,
+    requireApiRole: () => ({ name: "Auditor", username: "auditor", role: "commission" }),
+    sendJson: (res, status, body) => res.send(status, body),
+    writeDatabase: () => { writes += 1; }
+  };
+  const missingSegment = createIdentitySegments(missingRuntime).find((item) => item.id === "identity-security-02");
+  const missingReq = {
+    method: "POST",
+    url: "/api/security/controls/control-missing/actions",
+    headers: { "idempotency-key": "t01-control-missing-command" }
+  };
+  const missing = responseCapture();
+  assert.equal(await missingSegment.handle(missingReq, missing, new URL(`http://localhost${missingReq.url}`)), true);
+  assert.equal(missing.statusCode, 404);
+  assert.equal(missing.body.code, "SECURITY_CONTROL_NOT_FOUND");
+  assert.equal(writes, 0);
+  assert.equal(data.securityEvents.length, 0);
+});
+
+test("security control route requires provider-verified step-up before collecting the command", async () => {
+  const previous = {
+    NODE_ENV: process.env.NODE_ENV,
+    AUTH_SESSION_TRANSPORT: process.env.AUTH_SESSION_TRANSPORT,
+    AUTH_BEARER_COMPATIBILITY: process.env.AUTH_BEARER_COMPATIBILITY
+  };
+  process.env.NODE_ENV = "production";
+  process.env.AUTH_SESSION_TRANSPORT = "bearer";
+  process.env.AUTH_BEARER_COMPATIBILITY = "enabled";
+  let collects = 0;
+  let writes = 0;
+  const user = {
+    id: "security-user",
+    username: "security",
+    name: "Security Officer",
+    role: "commission",
+    accountType: "manager",
+    orgCode: "ORG-HEALTH",
+    status: "enabled",
+    assuranceLevel: "password"
+  };
+  const data = {
+    authOrganizations: [{ orgCode: "ORG-HEALTH", orgType: "health_admin", status: "enabled" }],
+    authUsers: [user],
+    securityAcceptanceLedger: [{ id: "control-step-up", status: "pending" }],
+    securityEvents: []
+  };
+  try {
+    const runtime = {
+      collectJson: async () => { collects += 1; return { status: "archived" }; },
+      currentSession: () => ({ sessionId: "step-up-session", user }),
+      isProductionRuntime: () => true,
+      prependAuditTrailEntry,
+      randomUUID: () => "step-up-control-audit",
+      readDatabase: () => data,
+      requireApiRole: () => user,
+      sendJson: (res, status, body) => res.send(status, body),
+      writeDatabase: () => { writes += 1; }
+    };
+    const segment = createIdentitySegments(runtime).find((item) => item.id === "identity-security-02");
+    const req = {
+      method: "POST",
+      url: "/api/security/controls/control-step-up/actions",
+      headers: {
+        authorization: "Bearer provider-session",
+        "idempotency-key": "t01-control-step-up-command"
+      }
+    };
+    const response = responseCapture();
+    assert.equal(await segment.handle(req, response, new URL(`http://localhost${req.url}`)), true);
+    assert.equal(response.statusCode, 403);
+    assert.equal(response.body.code, "STEP_UP_REQUIRED");
+    assert.equal(collects, 0);
+    assert.equal(writes, 0);
+  } finally {
+    for (const [name, value] of Object.entries(previous)) {
+      if (value === undefined) delete process.env[name];
+      else process.env[name] = value;
+    }
+  }
+});
+
+test("security control route serializes concurrent equal and conflicting command payloads", async () => {
+  const buildHarness = () => {
+    let data = {
+      securityAcceptanceLedger: [{ id: "control-concurrent", status: "pending", evidence: "" }],
+      securityEvents: []
+    };
+    let writes = 0;
+    let sequence = 0;
+    const runtime = {
+      collectJson: async (req) => req.payload,
+      prependAuditTrailEntry,
+      randomUUID: () => `concurrent-control-audit-${++sequence}`,
+      readDatabase: () => data,
+      requireApiRole: () => ({ name: "Auditor", username: "auditor", role: "commission" }),
+      sendJson: (res, status, body) => res.send(status, body),
+      writeDatabase: async (next) => {
+        await new Promise((resolve) => setTimeout(resolve, 2));
+        writes += 1;
+        data = next;
+      }
+    };
+    return {
+      segment: createIdentitySegments(runtime).find((item) => item.id === "identity-security-02"),
+      snapshot: () => ({ data, writes })
+    };
+  };
+  const invoke = async (harness, payload) => {
+    const req = {
+      method: "POST",
+      url: "/api/security/controls/control-concurrent/actions",
+      correlationId: "trace-control-concurrent",
+      headers: { "idempotency-key": "t01-control-concurrent-command" },
+      payload
+    };
+    const response = responseCapture();
+    await harness.segment.handle(req, response, new URL(`http://localhost${req.url}`));
+    return response;
+  };
+
+  const equalHarness = buildHarness();
+  const equal = await Promise.all([
+    invoke(equalHarness, { status: "archived", evidence: "same" }),
+    invoke(equalHarness, { evidence: "same", status: "archived" })
+  ]);
+  assert.deepEqual(equal.map((item) => item.statusCode), [200, 200]);
+  assert.equal(equal.filter((item) => item.body.idempotentReplay).length, 1);
+  assert.equal(equalHarness.snapshot().writes, 1);
+  assert.equal(equalHarness.snapshot().data.securityEvents.length, 1);
+
+  const conflictHarness = buildHarness();
+  const conflict = await Promise.all([
+    invoke(conflictHarness, { status: "archived", evidence: "first" }),
+    invoke(conflictHarness, { status: "rejected", evidence: "second" })
+  ]);
+  assert.deepEqual(conflict.map((item) => item.statusCode).sort((a, b) => a - b), [200, 409]);
+  assert.equal(conflict.find((item) => item.statusCode === 409).body.code, "SESSION_SECURITY_AUDIT_IDEMPOTENCY_CONFLICT");
+  assert.equal(conflictHarness.snapshot().writes, 1);
+  assert.equal(conflictHarness.snapshot().data.securityEvents.length, 1);
+});
+
+test("security control route redacts persistence failures and maps SQLite CAS without a fallback write", async () => {
+  const invokeFailure = async (failure) => {
+    const data = {
+      securityAcceptanceLedger: [{ id: "control-failure", status: "pending", evidence: "" }],
+      securityEvents: []
+    };
+    let writes = 0;
+    const runtime = {
+      collectJson: async () => ({ status: "archived", evidence: "must-not-commit" }),
+      prependAuditTrailEntry,
+      randomUUID: () => "failed-control-audit",
+      readDatabase: () => data,
+      requireApiRole: () => ({ name: "Auditor", username: "auditor", role: "commission" }),
+      sendJson: (res, status, body) => res.send(status, body),
+      writeDatabase: () => { writes += 1; throw failure; }
+    };
+    const segment = createIdentitySegments(runtime).find((item) => item.id === "identity-security-02");
+    const req = {
+      method: "POST",
+      url: "/api/security/controls/control-failure/actions",
+      headers: { "idempotency-key": "t01-control-failure-command" }
+    };
+    const response = responseCapture();
+    await segment.handle(req, response, new URL(`http://localhost${req.url}`));
+    return { data, response, writes };
+  };
+
+  const failed = await invokeFailure(new Error("database password=raw-secret"));
+  assert.equal(failed.response.statusCode, 500);
+  assert.equal(failed.response.body.code, "SECURITY_CONTROL_ACTION_FAILED");
+  assert.equal(JSON.stringify(failed.response.body).includes("raw-secret"), false);
+  assert.equal(failed.writes, 1);
+  assert.equal(failed.data.securityAcceptanceLedger[0].status, "pending");
+  assert.equal(failed.data.securityEvents.length, 0);
+
+  const cas = await invokeFailure(new Error("SQLite optimistic lock conflict on securityEvents: expected 1, current 2 raw-secret"));
+  assert.equal(cas.response.statusCode, 409);
+  assert.deepEqual(cas.response.body, {
+    ok: false,
+    code: "SESSION_SECURITY_AUDIT_VERSION_CONFLICT",
+    message: "security control version conflict"
+  });
+  assert.equal(JSON.stringify(cas.response.body).includes("raw-secret"), false);
+  assert.equal(cas.writes, 1);
+  assert.equal(cas.data.securityAcceptanceLedger[0].status, "pending");
+  assert.equal(cas.data.securityEvents.length, 0);
 });
 
 test("session audit query projection is exact, bounded and never exposes request secrets", () => {

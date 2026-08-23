@@ -230,7 +230,7 @@ source/sink contract、目标摘要、cursor/source hash 与 receipt 摘要；ch
 
 目录中的源码 marker 既不是认证证明，也不是幂等执行证据；只有 owner、控制流锚点和可执行负向测试一致时才产生认证 evidence contract。认证分类只描述 AS-IS 的 required/optional/none、凭据来源、replay/CSRF 和 scope，不代表目标政策充分或生产安全。幂等 `behavior-verified` 仍只证明当前仓库行为，不证明跨实例 exactly-once 或生产耐久性；所有生产状态继续 `NO-GO`。
 
-API-002 的 existing-proof 扩展现使注册表达到 8 份合同。新增 T07 对账合同继续写既有 `financialReconciliationRuns` 与 `securityEvents`，没有新增集合、表、字段、DDL、migration、outbox 或事实源；`financialReconciliationRuns` 的 data owner 仍为 `review-required`。SQLite 复用读取快照中的 `storageMeta.collectionVersions` 和全状态 `BEGIN/COMMIT`，将对账 run 与链式安全审计作为一次状态写入；JSON 兼容模式只由进程内 gateway/date 锁保护，不能据此宣称多实例 exactly-once。两个转诊 action-slice 仍不能晋升通用 endpoint。
+API-002 的 existing-proof 扩展现使注册表达到 9 份合同。新增 T01 security-control action 合同只复用既有 `securityAcceptanceLedger` 与 `securityEvents`：同一 cloned-state UoW 中更新 control，并把幂等 receipt/result snapshot 作为链式 session-security audit 一次提交；没有新增集合、表、字段、DDL、migration、outbox 或事实源。SQLite 复用读取快照中的 `storageMeta.collectionVersions` 和全状态 `BEGIN/COMMIT`，JSON 兼容模式只由同一 `writeDatabase` 端口的进程内命令尾串行保护；现有 PostgreSQL audit adapter 未接入此路由，不能据此宣称跨实例 exactly-once。`securityAcceptanceLedger` 的 data owner 仍为 `review-required`，两个转诊 action-slice 仍不能晋升通用 endpoint。
 
 T07 第二批审计的 `reviewedProofRequired` 现只保留 financial dispatch 与 formal grouping job。financial reconciliation 的拒绝记录已在同一评审变更中由直接行为合同替换；机器验证仍禁止拒绝记录和正式合同同 key 并存。
 
