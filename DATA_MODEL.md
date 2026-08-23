@@ -303,6 +303,9 @@ PostgreSQL、release、报告或归档产物。API 热点隔离配置只登记�
 它不写回源文件，不创建 migration，也不把 accepted fixture 解释为 provider receipt 或上线证据。
 第二个夹具切片只移动单个 HIS mock 的进程内请求数组、临时环境变量和 HTTP 生命周期；`receiptId` 仍是
 原 API 回归的 synthetic 响应，既不持久化到新的事实源，也不代表真实 HIS 回执、现场联调或生产证据。
+第三个夹具切片同样只移动单个 SIEM alert mock 的进程内请求数组、成功/503 失败开关、临时环境变量和
+HTTP 生命周期；`siem-event-*` 仍是 synthetic 响应，失败与恢复顺序继续由原子测试正文控制。它不新增表、
+集合、schema、migration 或耐久事实源，也不代表真实 SIEM 回执、告警送达或现场联调证据。
 两个前端文件去重的 16 项仅是静态中文翻译键；shadow map 只存在测试代码，既不成为新的业务字典，
 也不写入运行时状态。两项历史覆盖值继续采用原 JavaScript 最终生效值，不改变数据模型或展示输入。
 

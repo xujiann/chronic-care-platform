@@ -85,7 +85,7 @@ scripts/platform-cutover-alert-worker.js
 |---|---:|---|
 | `server.js` | 28,189 | 组合根、种子和领域函数仍集中；SQLite migration 已抽离 |
 | `digital-hospital-standard-platform/app.js` | 10,563 | 单文件子站 |
-| `test/api.test.js` | 约 8,300 | 回归范围仍巨大；共享运行时及单个 hospital mock 生命周期已提取，业务断言仍集中 |
+| `test/api.test.js` | 约 8,300 | 回归范围仍巨大；共享运行时、单个 hospital mock 及单个 alert mock 生命周期已提取，业务断言仍集中 |
 | `citizen.js` | 6,066 | 居民端视图、状态和流程耦合 |
 | `portal.css` | 5,243 | 全局样式影响面大 |
 | `test/static.test.js` | 5,058 | 静态结构测试集中 |
@@ -134,7 +134,10 @@ scripts/platform-cutover-alert-worker.js
   生产配置或外部证据。工程门禁锁定 43 个子测试的数量和顺序摘要，后续只能继续按一个共享生命周期小步拆分。
 - `test/helpers/hospital-adapter-mock-runtime.js` 只拥有同一 integration 子测试内的 HIS mock HTTP server、
   动态回环端口、3 个既有测试环境变量和关闭清理；请求记录仍返回原测试正文完成响应、签名和次数断言。它不是
-  hospital 生产 adapter、公共测试 SDK 或外部回执来源，financial/alert/storage mock 仍留在原测试边界。
+  hospital 生产 adapter、公共测试 SDK 或外部回执来源。
+- `test/helpers/alert-delivery-mock-runtime.js` 只拥有单个告警投递子测试内的 SIEM mock HTTP server、请求数组、
+  成功/503 失败开关、动态回环端口、3 个既有测试环境变量和关闭清理；测试正文仍显式控制失败后恢复和重试顺序。
+  它不是生产 SIEM adapter、公共测试 SDK 或外部投递证据；financial/storage mock 仍留在原测试边界。
 - `test/escort-owner-route-characterization.test.js`、`test/internet-nursing-closed-loop-characterization.test.js`
   与 `test/internet-nursing-nurse-lifecycle-characterization.test.js` 是 T05 owner/route 特征测试；共享
   `test/helpers/care-api-characterization-runtime.js` 在各测试进程内启动真实 HTTP 服务并使用临时数据副本，

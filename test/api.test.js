@@ -11,6 +11,7 @@ const { signExecutionCallback } = require("../digital-hospital-execution-securit
 const { signGatewayResponse } = require("../secure-object-storage");
 const EscortService = require("../escort-service");
 const NursingEscortDomain = require("../nursing-escort-domain");
+const { startAlertDeliveryMock } = require("./helpers/alert-delivery-mock-runtime");
 const { createApiRegressionRuntime } = require("./helpers/api-regression-runtime");
 const { startHospitalAdapterMock } = require("./helpers/hospital-adapter-mock-runtime");
 
@@ -6111,32 +6112,13 @@ test("API authentication, scoping and governance regression suite", async (t) =>
   });
 
   await t.test("routes minimized alerts to SIEM and closes delivery incidents after retry", async (t) => {
-    const alertRequests = [];
-    let failDelivery = false;
-    const alertMock = http.createServer(async (request, response) => {
-      const chunks = [];
-      for await (const chunk of request) chunks.push(chunk);
-      const bodyText = Buffer.concat(chunks).toString("utf8");
-      const body = JSON.parse(bodyText);
-      alertRequests.push({ headers: request.headers, bodyText, body });
-      response.writeHead(failDelivery ? 503 : 200, { "Content-Type": "application/json" });
-      response.end(JSON.stringify(failDelivery
-        ? { message: "receiver temporarily unavailable" }
-        : { eventId: `siem-event-${alertRequests.length}`, status: "accepted" }));
-    });
-    alertMock.listen(0, "127.0.0.1");
-    await once(alertMock, "listening");
-    const alertPort = alertMock.address().port;
-    process.env.SIEM_ENDPOINT = `http://127.0.0.1:${alertPort}/events`;
-    process.env.SIEM_SIGNING_SECRET = "api-test-siem-signing-secret";
-    process.env.ALERTING_MAX_ATTEMPTS = "1";
-    t.after(async () => {
-      delete process.env.SIEM_ENDPOINT;
-      delete process.env.SIEM_SIGNING_SECRET;
-      delete process.env.ALERTING_MAX_ATTEMPTS;
-      alertMock.closeAllConnections?.();
-      await new Promise((resolve) => alertMock.close(resolve));
-    });
+    const {
+      port: alertPort,
+      requests: alertRequests,
+      setDeliveryFailure,
+      stop: stopAlertDeliveryMock
+    } = await startAlertDeliveryMock();
+    t.after(stopAlertDeliveryMock);
 
     const commission = await login(baseUrl, "health");
     const citizen = await login(baseUrl, "citizen");
@@ -6193,7 +6175,7 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.match(sensitive.body.message, /sensitive field/);
     assert.equal(alertRequests.length, 1);
 
-    failDelivery = true;
+    setDeliveryFailure(true);
     const failed = await api(baseUrl, "/api/observability/alerts/dispatch", authorized(commission.body.token, {
       method: "POST",
       body: JSON.stringify({ route: "SIEM", idempotencyKey: "api-alert-delivery-002", alert: { ...alert, fingerprint: "api-test-alert-002", title: "Receiver failure alert" } })
@@ -6208,7 +6190,7 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(operationsAfterFailure.body.observability.summary.failed >= 1, true);
     assert.equal(operationsAfterFailure.body.runCenter.incidents.some((item) => item.id === `ops-alert-delivery-${failedDeliveryId}` && item.status === "open-delivery-failure"), true);
 
-    failDelivery = false;
+    setDeliveryFailure(false);
     const retried = await api(baseUrl, `/api/observability/alert-deliveries/${failedDeliveryId}/retry`, authorized(commission.body.token, {
       method: "POST",
       body: JSON.stringify({ reason: "receiver recovered" })

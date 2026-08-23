@@ -236,6 +236,10 @@ method/path、幂等、审计、notification plan 与 outbox 语义不变；plan
 第二个夹具切片只把 HIS hospital adapter mock 的创建、动态回环监听、3 个测试环境变量及关闭清理移入
 测试 helper；既有 `/api/integration/*` method/path、请求与 provider 响应、HMAC 签名、回执次数、鉴权、
 scope、幂等、错误和审计断言均不变。synthetic `his-provider-*` 只用于回归，不能解释为外部 HIS 投递证据。
+第三个夹具切片只把 SIEM alert delivery mock 的创建、动态回环监听、请求记录、成功/503 开关、3 个测试
+环境变量及关闭清理移入测试 helper；既有 `/api/observability/alerts/dispatch` 与 retry method/path、HMAC、
+鉴权、scope、幂等、敏感字段拒绝、失败事件及 incident 关闭断言均不变。synthetic `siem-event-*` 只用于
+回归，不能解释为外部 SIEM 投递、生产告警送达或现场证据。
 
 ## 18A. TEST-002 内部覆盖扩展（无 API 变化）
 

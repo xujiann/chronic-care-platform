@@ -185,6 +185,10 @@ CORE_DATA_DEFINITIONS → collection-governance → CI/release 治理投影`。�
   `test/api.test.js -> test/helpers/hospital-adapter-mock-runtime.js -> node:http`；helper 只管理一个子测试已有的
   HIS mock 生命周期，不依赖运行时代码、financial/alert/storage mock 或其他测试阶段，也不改变 server 共享状态、
   integration 成员、43 项顺序、CI 拓扑和预算。
+- 第三个夹具切片新增且仅新增测试依赖
+  `test/api.test.js -> test/helpers/alert-delivery-mock-runtime.js -> node:http`；helper 只管理一个子测试已有的
+  SIEM mock 生命周期，不依赖运行时代码、financial/storage mock 或其他测试阶段。失败/恢复仍由所属子测试
+  显式驱动，因此没有新增反向依赖、静态环、并行共享状态、integration 成员、CI 拓扑或预算变化。
 - 两个前端翻译 map 继续由原 `displayText` / `zh` / `zhText` / `statusLabel` 调用链消费；去重不引入
   共享运行时模块或新依赖。专项 Node 测试读取并隔离执行这些纯翻译边界，标准 unit 自动发现负责漂移门禁。
 - care revalidation 的依赖方向为
