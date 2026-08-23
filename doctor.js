@@ -126,13 +126,17 @@ function renderDoctorMetrics() {
   const registry = doctorRuntime.doctor?.electronicRegistrationVerification || doctorRuntime.doctor?.electronicRegistration || {};
   const pending = applications.filter((item) => /待|补正|pending/i.test(String(item.status || ""))).length;
   const publicRows = applications.filter((item) => item.publicVisible !== false).length;
-  target.innerHTML = [
+  doctorReplace(target, [
     ["本人申请", applications.length, "多点执业申请和备案记录"],
     ["待处理", pending, "医院端或医生端仍需处理"],
     ["临床辅助", clinicalAlerts.length, `${clinicalAlerts.filter((item) => /pending|待/i.test(`${item.status || ""} ${item.messageReceiptStatus || ""}`)).length} 条待回执`],
     ["医院消息", messages.length, "医院端确认、退回和备案通知"],
     ["电子注册", registry.verificationStatus || "待核验", registry.registryId || "医师电子化注册系统"]
-  ].map(([label, value, hint]) => `<article class="metric-card"><strong>${escapeHtml(value)}</strong><span>${escapeHtml(label)}</span><small>${escapeHtml(hint)}</small></article>`).join("");
+  ].map(([label, value, hint]) => doctorElement("article", { className: "metric-card" }, [
+    doctorElement("strong", { text: value }),
+    doctorElement("span", { text: label }),
+    doctorElement("small", { text: hint })
+  ])));
   const status = document.querySelector("#doctor-profile-status");
   if (status) status.textContent = `${publicRows} 条公开备案相关记录`;
 }
@@ -145,21 +149,30 @@ function renderDoctorClinicalAssist() {
   const alerts = assist.alerts || [];
   const pending = alerts.filter((item) => /pending|待/i.test(`${item.status || ""} ${item.messageReceiptStatus || ""}`));
   count.textContent = `${alerts.length} 条 · ${pending.length} 条待回执`;
-  target.innerHTML = alerts.map((item) => {
+  doctorReplace(target, alerts.map((item) => {
     const pendingReceipt = /pending|待/i.test(`${item.status || ""} ${item.messageReceiptStatus || ""}`);
-    return `<section class="item">
-      <div>
-        <h3>${escapeHtml(item.alertTitle || item.category || "临床辅助提醒")} · ${escapeHtml(item.residentName || item.residentId || "")}</h3>
-        <p>${escapeHtml(item.alertDetail || "")}</p>
-        <p>建议：${escapeHtml(item.recommendation || "")}</p>
-        <p>工作站：${escapeHtml(item.pluginSurface || "doctor-workstation")} · 回执 ${escapeHtml(item.messageReceiptStatus || "pending")} · ${escapeHtml(item.lastAction || "")}</p>
-      </div>
-      <div class="actions">
-        <span class="badge ${doctorStatusClass(item.status)}">${escapeHtml(item.severity || item.status || "待处理")}</span>
-        ${pendingReceipt && doctorApiBase ? `<button class="inline-action" type="button" data-clinical-assist-receipt="${escapeHtml(item.id)}" data-doctor-action="accepted-recommendation">采纳提醒</button><button class="inline-action" type="button" data-clinical-assist-receipt="${escapeHtml(item.id)}" data-doctor-action="kept-order-with-reason">保留并说明</button>` : ""}
-      </div>
-    </section>`;
-  }).join("") || `<p class="muted">暂无本人临床辅助提醒。</p>`;
+    const actions = [
+      doctorElement("span", {
+        className: `badge ${doctorStatusClass(item.status)}`,
+        text: item.severity || item.status || "待处理"
+      })
+    ];
+    if (pendingReceipt && doctorApiBase) {
+      actions.push(
+        doctorButton("采纳提醒", item.id, "accepted-recommendation"),
+        doctorButton("保留并说明", item.id, "kept-order-with-reason")
+      );
+    }
+    return doctorElement("section", { className: "item" }, [
+      doctorElement("div", {}, [
+        doctorElement("h3", { text: `${item.alertTitle || item.category || "临床辅助提醒"} · ${item.residentName || item.residentId || ""}` }),
+        doctorElement("p", { text: item.alertDetail || "" }),
+        doctorElement("p", { text: `建议：${item.recommendation || ""}` }),
+        doctorElement("p", { text: `工作站：${item.pluginSurface || "doctor-workstation"} · 回执 ${item.messageReceiptStatus || "pending"} · ${item.lastAction || ""}` })
+      ]),
+      doctorElement("div", { className: "actions" }, actions)
+    ]);
+  }), doctorElement("p", { className: "muted", text: "暂无本人临床辅助提醒。" }));
 }
 
 async function submitDoctorClinicalAssistReceipt(alertId, doctorAction) {
@@ -203,15 +216,15 @@ function renderDoctorProfile() {
   const target = document.querySelector("#doctor-profile");
   if (!target) return;
   const verified = ["已核验", "verified"].includes(String(registry.verificationStatus || ""));
-  target.innerHTML = `<section class="item">
-    <div>
-      <h3>${escapeHtml(doctor.name || "医生账户")} · ${escapeHtml(doctor.title || "职称待同步")} · ${escapeHtml(doctor.specialty || "专业待同步")}</h3>
-      <p>${escapeHtml(doctor.primaryInstitution || "第一执业地点待同步")} · ${escapeHtml(doctor.department || "科室待同步")}</p>
-      <p>执业证号：${escapeHtml(doctor.licenseNo || "待同步")} · 执业范围：${escapeHtml(doctor.practiceScope || "待同步")} · 有效期至 ${escapeHtml(doctor.registrationValidUntil || registry.validUntil || "待同步")}</p>
-      <p>电子化注册：${escapeHtml(registry.registryId || "待同步")} · ${escapeHtml(registry.verificationStatus || "待核验")} · 签章 ${escapeHtml(registry.signatureNo || "待签章")}</p>
-    </div>
-    <span class="badge ${verified ? "info" : "warn"}">${escapeHtml(doctor.accountStatus || "启用")}</span>
-  </section>`;
+  doctorReplace(target, [doctorElement("section", { className: "item" }, [
+    doctorElement("div", {}, [
+      doctorElement("h3", { text: `${doctor.name || "医生账户"} · ${doctor.title || "职称待同步"} · ${doctor.specialty || "专业待同步"}` }),
+      doctorElement("p", { text: `${doctor.primaryInstitution || "第一执业地点待同步"} · ${doctor.department || "科室待同步"}` }),
+      doctorElement("p", { text: `执业证号：${doctor.licenseNo || "待同步"} · 执业范围：${doctor.practiceScope || "待同步"} · 有效期至 ${doctor.registrationValidUntil || registry.validUntil || "待同步"}` }),
+      doctorElement("p", { text: `电子化注册：${registry.registryId || "待同步"} · ${registry.verificationStatus || "待核验"} · 签章 ${registry.signatureNo || "待签章"}` })
+    ]),
+    doctorElement("span", { className: `badge ${verified ? "info" : "warn"}`, text: doctor.accountStatus || "启用" })
+  ])]);
 }
 
 function renderDoctorPolicy() {
@@ -224,7 +237,10 @@ function renderDoctorPolicy() {
     ["公开", "公开台账只展示姓名、执业类别、执业范围、第一执业地点、拟执业机构和监管状态"],
     ["风险", "排班冲突、责任保险缺失、第一执业地点未确认时进入补正队列"]
   ];
-  target.innerHTML = rows.map(([label, detail]) => `<div><strong>${escapeHtml(label)}</strong><span>${escapeHtml(detail)}</span></div>`).join("");
+  doctorReplace(target, rows.map(([label, detail]) => doctorElement("div", {}, [
+    doctorElement("strong", { text: label }),
+    doctorElement("span", { text: detail })
+  ])));
 }
 
 function renderDoctorApplications() {
@@ -234,23 +250,29 @@ function renderDoctorApplications() {
   const applications = doctorRuntime.applications || [];
   const messages = doctorRuntime.messages || [];
   count.textContent = `${applications.length} 条`;
-  target.innerHTML = applications.map((item) => {
+  doctorReplace(target, applications.map((item) => {
     const relatedMessages = messages.filter((message) => message.sourceId === item.id).slice(0, 3);
     const riskFlags = Array.isArray(item.riskFlags) ? item.riskFlags : [];
     const externalSync = item.externalSync || {};
     const confirmation = item.primaryPracticeConfirmation || {};
-    return `<section class="item">
-      <div>
-        <h3>${escapeHtml(item.targetInstitution || "拟执业机构待定")} · ${escapeHtml(item.targetDepartment || "科室待定")}</h3>
-        <p>${escapeHtml(item.period || "期限待定")} · ${escapeHtml(item.schedule || "时间待定")} · ${escapeHtml(item.practiceScope || "范围待定")}</p>
-        <p>第一执业地点：${escapeHtml(confirmation.status || item.primaryConsent || "待确认")} · 签章 ${escapeHtml(confirmation.signatureNo || "待签章")} · 公开 ${item.publicVisible === false ? "否" : "是"}</p>
-        <p>外部同步：电子注册 ${escapeHtml(externalSync.electronicRegistration?.status || "待同步")} · 电子签章 ${escapeHtml(externalSync.eSignature?.status || "待签")} · HIS/HR ${escapeHtml(externalSync.hisHr?.status || "待映射")}</p>
-        ${riskFlags.length ? `<p class="muted">补正提示：${riskFlags.map(escapeHtml).join("、")}</p>` : ""}
-        ${relatedMessages.length ? `<div class="list compact">${relatedMessages.map((message) => `<p><strong>${escapeHtml(message.title || "医院消息")}</strong>：${escapeHtml(message.body || "待处理")}</p>`).join("")}</div>` : ""}
-      </div>
-      <span class="badge ${doctorStatusClass(item.status)}">${escapeHtml(item.status || "待处理")}</span>
-    </section>`;
-  }).join("") || `<p class="muted">暂无本人多点执业申请。</p>`;
+    const details = [
+      doctorElement("h3", { text: `${item.targetInstitution || "拟执业机构待定"} · ${item.targetDepartment || "科室待定"}` }),
+      doctorElement("p", { text: `${item.period || "期限待定"} · ${item.schedule || "时间待定"} · ${item.practiceScope || "范围待定"}` }),
+      doctorElement("p", { text: `第一执业地点：${confirmation.status || item.primaryConsent || "待确认"} · 签章 ${confirmation.signatureNo || "待签章"} · 公开 ${item.publicVisible === false ? "否" : "是"}` }),
+      doctorElement("p", { text: `外部同步：电子注册 ${externalSync.electronicRegistration?.status || "待同步"} · 电子签章 ${externalSync.eSignature?.status || "待签"} · HIS/HR ${externalSync.hisHr?.status || "待映射"}` })
+    ];
+    if (riskFlags.length) details.push(doctorElement("p", { className: "muted", text: `补正提示：${riskFlags.join("、")}` }));
+    if (relatedMessages.length) {
+      details.push(doctorElement("div", { className: "list compact" }, relatedMessages.map((message) => doctorElement("p", {}, [
+        doctorElement("strong", { text: message.title || "医院消息" }),
+        document.createTextNode(`：${message.body || "待处理"}`)
+      ]))));
+    }
+    return doctorElement("section", { className: "item" }, [
+      doctorElement("div", {}, details),
+      doctorElement("span", { className: `badge ${doctorStatusClass(item.status)}`, text: item.status || "待处理" })
+    ]);
+  }), doctorElement("p", { className: "muted", text: "暂无本人多点执业申请。" }));
 }
 
 function renderDoctorPublicLedger() {
@@ -260,16 +282,46 @@ function renderDoctorPublicLedger() {
   const doctorName = doctorRuntime.doctor?.name || "";
   const rows = (doctorRuntime.ledger || []).filter((item) => !doctorName || item.doctorName === doctorName || item.doctorId === doctorRuntime.doctor?.id);
   count.textContent = `${rows.length} 条`;
-  target.innerHTML = `<table>
-    <thead><tr><th>医生</th><th>第一执业地点</th><th>拟执业机构</th><th>范围</th><th>状态</th></tr></thead>
-    <tbody>${rows.map((item) => `<tr>
-      <td>${escapeHtml(item.doctorName || doctorName)}</td>
-      <td>${escapeHtml(item.primaryInstitution || "")}</td>
-      <td>${escapeHtml(item.targetInstitution || "")}</td>
-      <td>${escapeHtml(item.practiceScope || "")}</td>
-      <td>${escapeHtml(item.status || "")}</td>
-    </tr>`).join("") || `<tr><td colspan="5">暂无公开备案记录</td></tr>`}</tbody>
-  </table>`;
+  const bodyRows = rows.map((item) => doctorElement("tr", {}, [
+    doctorElement("td", { text: item.doctorName || doctorName }),
+    doctorElement("td", { text: item.primaryInstitution || "" }),
+    doctorElement("td", { text: item.targetInstitution || "" }),
+    doctorElement("td", { text: item.practiceScope || "" }),
+    doctorElement("td", { text: item.status || "" })
+  ]));
+  if (!bodyRows.length) {
+    bodyRows.push(doctorElement("tr", {}, [doctorElement("td", { text: "暂无公开备案记录", attributes: { colspan: "5" } })]));
+  }
+  doctorReplace(target, [doctorElement("table", {}, [
+    doctorElement("thead", {}, [doctorElement("tr", {}, ["医生", "第一执业地点", "拟执业机构", "范围", "状态"].map((label) => doctorElement("th", { text: label })))]),
+    doctorElement("tbody", {}, bodyRows)
+  ])]);
+}
+
+function doctorElement(tagName, options = {}, children = []) {
+  const element = document.createElement(tagName);
+  if (options.className) element.className = options.className;
+  if (Object.hasOwn(options, "text")) element.textContent = String(options.text ?? "");
+  Object.entries(options.attributes || {}).forEach(([name, value]) => element.setAttribute(name, String(value)));
+  Object.entries(options.dataset || {}).forEach(([name, value]) => {
+    element.dataset[name] = String(value ?? "");
+  });
+  element.append(...children.filter(Boolean));
+  return element;
+}
+
+function doctorReplace(target, children, emptyNode) {
+  const nextChildren = children.length ? children : [emptyNode];
+  target.replaceChildren(...nextChildren.filter(Boolean));
+}
+
+function doctorButton(label, alertId, action) {
+  return doctorElement("button", {
+    className: "inline-action",
+    text: label,
+    attributes: { type: "button" },
+    dataset: { clinicalAssistReceipt: alertId, doctorAction: action }
+  });
 }
 
 function doctorStatusClass(status) {
@@ -277,14 +329,4 @@ function doctorStatusClass(status) {
   if (/退回|暂停|冲突|补正|风险|danger/i.test(text)) return "danger";
   if (/待|审核|处理中|pending|review/i.test(text)) return "warn";
   return "info";
-}
-
-function escapeHtml(value) {
-  return String(value ?? "").replace(/[&<>"']/g, (char) => ({
-    "&": "&amp;",
-    "<": "&lt;",
-    ">": "&gt;",
-    "\"": "&quot;",
-    "'": "&#39;"
-  }[char]));
 }
