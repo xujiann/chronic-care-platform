@@ -170,7 +170,7 @@ CORE_DATA_DEFINITIONS → collection-governance → CI/release 治理投影`。�
   browser-e2e 和 release-readiness 各为 15 分钟，聚合 test 为 5 分钟。
 - Chromium 安装和 Playwright E2E 独占 browser-e2e runner；发布、数据库、安全、报告和
   部署证据在 release-readiness 并行执行，不再共享浏览器外部依赖的时间预算。
-- browser-e2e 本地与 CI 均由标准 `test:e2e` 顺序执行在线根 35、居民 13、PWA 3 项；三阶段各自分配
+- browser-e2e 本地与 CI 均由标准 `test:e2e` 顺序执行在线根 36、居民 13、PWA 3 项；三阶段各自分配
   动态端口和临时数据。在线 context 阻止 Service Worker，PWA context 独立允许并逐项清理 registration/cache；
   Playwright 列表门禁拒绝遗漏、重复归属或浏览器/Service Worker 策略漂移。
 - complete-unit-test 依次运行标准 unit/integration，governance-api 运行 lint/typecheck/smoke，

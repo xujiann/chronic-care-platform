@@ -50,7 +50,7 @@
         const approved = item.status === "approved";
         const current = approved && item.evidenceFingerprint === center.evidenceFingerprint;
         const disabled = !approved && !center.summary.prerequisiteReady;
-        return `<tr data-go-no-go-drift="${approved && !current ? "stale" : "current"}" data-go-no-go-approval-drift="${approved && !current ? "revoke-required" : "none"}"><td>${escapeHtml(ROLE_LABELS[item.role] || item.role)}</td><td>${escapeHtml(approved && !current ? "证据已变化，审批失效" : item.status)}</td><td>${escapeHtml(item.approvedBy || "-")}</td><td>${escapeHtml(item.evidenceRef || "-")}</td><td><button type="button" class="inline-action" data-go-no-go-approval="${approved ? "revoke" : "approve"}" data-role="${escapeHtml(item.role)}" data-id="${escapeHtml(item.id)}" ${disabled ? "disabled" : ""}>${approved ? "撤销" : "审批"}</button></td></tr>`;
+        return `<tr data-go-no-go-drift="${approved && !current ? "stale" : "current"}" data-go-no-go-approval-drift="${approved && !current ? "revoke-required" : "none"}"><td>${escapeHtml(ROLE_LABELS[item.role] || item.role)}</td><td>${escapeHtml(approved && !current ? "证据已变化，审批失效" : item.status)}</td><td>${escapeHtml(item.approvedBy || "-")}</td><td>${escapeHtml(item.evidenceRef || "-")}</td><td><button type="button" class="inline-action" data-go-no-go-approval="${approved ? "revoke" : "approve"}" data-approval-role="${escapeHtml(item.role)}" data-id="${escapeHtml(item.id)}" ${disabled ? "disabled" : ""}>${approved ? "撤销" : "审批"}</button></td></tr>`;
       }).join("")}</tbody></table>`;
       approvals.insertAdjacentHTML("beforeend", `<p class="implementation-boundary" data-go-no-go-approval-drift>${escapeHtml(center.summary.staleApprovals || 0)} stale approval(s) against the current evidence fingerprint.</p>`);
     }
@@ -109,7 +109,7 @@
         if (action === "approve" && evidenceRef === null) return;
         await request(`/approvals/${encodeURIComponent(approval.dataset.id)}/actions`, {
           action,
-          responsibility: approval.dataset.role,
+          responsibility: approval.dataset.approvalRole,
           evidenceRef,
           note
         });
