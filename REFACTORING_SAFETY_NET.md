@@ -39,6 +39,10 @@ REFACTOR
 触及 runtime identity、audit chain/source、object storage trust 或 API governance 时，还必须运行
 `npm run test:coverage:boundaries`。覆盖率阈值只能持平或提高，且不能用数字替代上表的负向行为断言。
 
+体检页面可信渲染按高风险子块推进：本切片只关闭居民解释卡和报告质检卡的 2 个属性注入 sink，
+以旧实现可创建 3 个活动元素的同一恶意响应 E2E 保护文本与既有状态类。其余 25 个 `innerHTML` 保持
+Inventory v2 失败关闭，不能因局部通过而宣称整页、真实设备或现场验收完成。
+
 T05 care owner 的遗留路由还必须运行 3 个独立 HTTP 特征测试，分别保护陪诊 handoff、护理闭环和护士
 生命周期。派单证据构造器与 owner adapter 必须处于同一测试进程信任边界；通知只断言 plan、outbox
 和可信 receipt，不得把模拟字段写成外部送达证据。

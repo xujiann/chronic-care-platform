@@ -172,6 +172,16 @@ Inventory v2 的 DOM HTML occurrence 由 836 降为 826，覆盖资产由 34 降
 832→822；动态 URL 6 和动态样式 45 均未改变。该切片不改变 API、鉴权、数据、schema、审计、CI 或 CSP
 enforcement；真实血液系统、设备、跨模块消费方、外部回执、托管头、独立渗透与现场验收继续 NO-GO。
 
+### 体检风险卡可信渲染切片（2026-08-23）
+
+`physical-examination.js` 本批只迁移 `renderHighlightTranslations` 与 `renderQualityReviews` 两个高风险
+`innerHTML`。翻译结论、质检说明和问题文本原先可与服务端状态共同进入模板；恶意 API 回归在旧实现中
+创建 3 个活动元素。迁移后文本通过显式节点写入，translation、quality 与 issue class 分别由三个闭集映射
+决定，未知值不能进入 class；其他交互和接口保持不变。Inventory v2 的 DOM HTML occurrence 由 826 降为
+824，`innerHTML` 822→820，覆盖资产仍为 33；physical-examination 由 27 降为 25，动态 URL 6 和动态样式
+45 均未改变。其余 25 个 HTML sink 继续失败关闭；真实体检设备、外部回执、托管头、独立渗透与现场验收
+继续 NO-GO。
+
 ## Phased enforcement and rollback
 
 1. 第一阶段：集中端口、兼容 CSP + 严格 Report-Only、风险清单、CI 增量拒绝；固定 `productionReady=false`。
