@@ -1,6 +1,7 @@
 "use strict";
 
 const BROWSER_POLICY_VERSION = "playwright-browser-policy.v1";
+const PWA_BROWSER_POLICY_VERSION = "playwright-pwa-browser-policy.v1";
 
 function createBrowserUse(baseURL) {
   return {
@@ -13,7 +14,16 @@ function createBrowserUse(baseURL) {
   };
 }
 
+function createPwaBrowserUse(baseURL) {
+  return {
+    ...createBrowserUse(baseURL),
+    serviceWorkers: "allow"
+  };
+}
+
 module.exports = {
   BROWSER_POLICY_VERSION,
-  createBrowserUse
+  PWA_BROWSER_POLICY_VERSION,
+  createBrowserUse,
+  createPwaBrowserUse
 };

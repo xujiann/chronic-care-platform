@@ -8,7 +8,7 @@ const baseURL = createE2EBaseURL(port);
 module.exports = defineConfig({
   testDir: "./test/e2e",
   testMatch: "*.spec.js",
-  testIgnore: "resident-mini-program.spec.js",
+  testIgnore: ["resident-mini-program.spec.js", "pwa-service-worker.spec.js"],
   fullyParallel: false,
   workers: 1,
   timeout: 30_000,

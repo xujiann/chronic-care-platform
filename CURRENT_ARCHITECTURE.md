@@ -41,8 +41,8 @@ flowchart TB
 | `config/` | 进程、数据所有权、区域、迁移和发布策略 | 多数为机器可读治理事实 |
 | `data/` | 被跟踪的 `db.json` 开发/迁移输入 | 浏览器只读取运行时或构建时生成的 `public-demo.json`；生成物不入库 |
 | `deploy/` | SQL、systemd、Compose、环境模板和现场验证 | 生产证据默认 NO-GO |
-| `scripts/` | 测试、readiness、报告、部署和后台 worker | 186 个根级文件，职责和产物较分散 |
-| `test/` | Node test 与 Playwright | 449 个 test/spec 文件（442 Node、7 E2E spec 文件） |
+| `scripts/` | 测试、readiness、报告、部署和后台 worker | 187 个根级文件，职责和产物较分散 |
+| `test/` | Node test 与 Playwright | 450 个 test/spec 文件（442 Node、8 E2E spec 文件） |
 | `regions/` | 多地区部署配置 | 由区域清单和发布注册表控制 |
 | `digital-hospital-standard-platform/` | 内嵌数智医院展示前端 | 独立页面但仍共享主仓发布生命周期 |
 | `resident-mini-program-platform/` | 居民小程序适配前端 | 独立页面但仍共享主仓发布生命周期 |
@@ -86,7 +86,9 @@ flowchart TB
 6. TEST-001 已建立统一的 `build`、`lint`、`typecheck`、`test:unit`、`test:integration`、`test:smoke` 入口；build 复用静态发布 allowlist 并默认输出到仓库外，unit/integration 完整分区根测试，smoke 独立启动临时 JSON 运行时。治理 CI 执行 `data:collection-governance:verify`，以源码、owner 和隔离清单漂移失败关闭；原 `server.js` c8 门禁保持 85/85/55，内部边界现以 10 个职责独立组锁定真实覆盖基线和直接负向矩阵：原 identity、audit、object storage、API governance 四组，加上 worker observability、区域共享命令、转诊 owner command、科研合规导出、浏览器响应头策略和 Safe URL 端口六组。所有报告只存在临时目录。TEST-006 增量已把 `test/api.test.js` 的 3 段不可达断言转成可见的显式 skip 债务并恢复全文件 `no-unreachable`；`internet-nursing.js` 与 `quality-safety.js` 的 16 个重复翻译键已按显式 shadow map 去重，保留原首次插入顺序和最终生效值，lint 不再有文件级规则例外。typecheck 去重后由 9 个唯一文件扩大到 13 个治理/安全边界文件。集成套件成员、顺序、断言和超时不变，但本机三次采样约 294–371 秒的 API 热点现在独立进程执行，并向 CI 日志输出无阈值的批次/套件耗时。
    TEST-005 将浏览器 E2E 精确分为根 27 项与居民 13 项：两套配置统一使用 Playwright Chromium、
    `serviceWorkers=block` 和动态回环端口；居民套件复用独占 runner、独立临时数据目录并在结束后释放服务。
-   40 项并集/唯一性、浏览器策略和 runner 生命周期由专项测试锁定；PWA/离线行为仍需独立专项证明。
+   在线 40 项并集/唯一性、浏览器策略和 runner 生命周期由专项测试锁定。PWA 专项另以 3 项独占套件允许
+   Service Worker，验证居民登录后的 v61 安装、v60 清理、同源成功响应缓存边界、离线导航回退及最终
+   unregister/Cache Storage 清理；标准在线 context 仍保持阻止 Service Worker。
 7. 审计验证已收敛到 `src/identity-security/audit-chain.js` 的 v2 严格端口；内容、链接、结构和重复 ID 任一异常均失败，验证 API/合规报告不再读取时重封。全量状态写入中的审计数组由服务端管理。
 8. 机器 API 授权矩阵现从路由扫描和小型认证证据合同派生 601 条声明；`production-api-catalog-v3` 与 371 个字面条件路由取并集，形成 593 个唯一接口条目（586 个字面路由、7 个运行时策略）。认证证据共 13 项：复用 SMS callback 既有合同，并对原 13 个未分类 key 中 12 个真实入口完成 required/optional/none、credential source、replay/CSRF 和 scope 分类；T10 真实入口以 401/403 直接拒绝测试闭合，公卫相邻 GET/POST 误配 key 已从解析器中消除，当前无未分类认证。幂等证据注册表现有 6 份直接行为合同：SMS callback、区域共享调阅、直接转诊和科研合规导出 action 共 4 个完整 endpoint，以及 `workflow-actions[collection=referrals]`、`tasks[referrals:*]` 2 个 action-slice。333 个写接口中 4 个 endpoint 为 `behavior-verified`，329 个仍为 `behavior-proof-required`，2 个 action-slice 不晋升其通用 endpoint；当前 330 项需复核，593 项全部 `NO-GO`。
 9. P1 生产适配器增量保持现有 owner：T01 的 `production-adapters.js` 承担 JWKS/JWT 与 SMS 协议；OTP、发送/登录限流和失败锁定由共享 `auth-security-state-store` 承载，单主机 SQLite 复用 `state_collections`、生产多实例使用组合根长期 PostgreSQL pool；T00 的 PostgreSQL 组合保持 shadow/rehearsal 且 `productionPrimary=false`，受控迁移评估继续失败关闭。连续审计已使用 v15 同事务 append-only source、最小投影和 checkpoint v3，worker/preflight/systemd 已进入部署制品；未签名 receipt、外部单调 anchor、真实 WORM/KMS 与现场证据使 `productionReady=false` 继续失败关闭。

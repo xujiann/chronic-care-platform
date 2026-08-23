@@ -41,7 +41,7 @@
 | ID | 关闭日期 | 结果 | 回归保护 |
 |---|---|---|---|
 | SEC-001 | 2026-08-19 | Node 与 Pages 共用 44 入口显式资源图，未知、越界和敏感路径默认拒绝 | 静态清单构建、HTTP 负向矩阵、PR/main CI 与 Pages 构建 |
-| SEC-002 | 2026-08-19 | 浏览器和 Service Worker 只消费生成的 `public-demo.json`；凭据删除、身份联系字段掩码、v60 撤销旧缓存 | 共享脱敏纯函数、源快照拒绝、Pages 仓库外构建；仓库历史分类残余风险继续由 `DATA_MODEL.md` 的 DATA-006 跟踪 |
+| SEC-002 | 2026-08-19 | 浏览器和 Service Worker 只消费生成的 `public-demo.json`；凭据删除、身份联系字段掩码；v61 激活清理 v60 并拒绝缓存源快照 404 | 共享脱敏纯函数、源快照拒绝、Pages 仓库外构建和 PWA 缓存边界 E2E；仓库历史分类残余风险继续由 `DATA_MODEL.md` 的 DATA-006 跟踪 |
 | CI-001 | 2026-08-19 | 综合 CI 拆为 governance-api、browser-e2e、release-readiness，并保留 fail-closed 聚合 test | workflow 契约测试锁定步骤归属、预算、always 聚合和三个上游结果 |
 | TEST-004 | 2026-08-19 | 居民小程序 JSON 制品改为递归扫描语义字符串值，仅跳过精确摘要字段中的合法 SHA-256；非 JSON 仍全文扫描 | 摘要命中放行，伪造摘要字段、`123456`、`888888`、`DEMO-MOBILE` 语义值和非 JSON 文本均拒绝 |
 | DATA-001 | 2026-08-22 | `STORAGE_SCHEMA_VERSION`、storageMeta、部署/readiness/release 门禁统一派生注册表 head v16 | 静态契约、storage、部署、生产就绪与发布报告测试 |
@@ -65,7 +65,8 @@
 | SEC-010 | 2026-08-23 | strict production preflight 不再只能靠测试注入 externalTrustVerifier；可部署 provider 使用 pinned anchor bundle、Ed25519 双角色签名、撤销/时窗和 release/source/artifact/evidence/registry 精确绑定，默认仍 NO-GO | generic signed-envelope 负向矩阵、CLI 自动装配、synthetic fixture 不提升全局生产状态、deployment package/env/CI 合同与脱敏错误 |
 | DEPLOY-002 | 2026-08-23 | 切换行动定义升级为 definitions-only v2；14/14 effective status 仅由共享 Ed25519 provider 验证的当前 release/artifact 绑定决定派生，并接入 strict preflight 与 protected manual workflow；手改 `verified` 固定失败 | 缺 provider/记录、错签/撤销、异 release/digest、过期/未来时间、角色重合、重复 signer、缺转换历史/命令回执、symlink/超限、错误脱敏与 digest-only receipt 负向测试 |
 | TEST-007 | 2026-08-23 | 复用既有 T02 handoff harness，对 operations-command 32/32 路径建立数据驱动运行时矩阵；覆盖 19 条只读、13 条写入、三条签名集成入口及 institution 范围 | 闭集唯一性、role/deny-before-read、payload/400/403/404、响应/副作用、审计—写入顺序、审计和写入失败语义；governance-api 显式专项门禁 |
-| TEST-005 | 2026-08-23 | 本地/CI 统一 Playwright Chromium；根 27 项与居民 13 项使用独立 runner、动态端口和临时数据，E2E context 阻止 Service Worker；不再自动使用系统 Chrome 或固定 5210 | 40 项唯一并集/漂移测试、居民同文件 13/13、超时恢复重复 3/3、完整标准 E2E；PWA/离线缓存仍保留独立专项缺口 |
+| TEST-005 | 2026-08-23 | 本地/CI 统一 Playwright Chromium；在线根 27 项与居民 13 项继续阻止 Service Worker；PWA 3 项使用独立允许策略、动态端口和临时数据 | 43 项唯一并集/漂移测试、居民同文件 13/13、PWA 重复 9/9、完整标准 E2E；不得把 PWA 仓库测试解释为真实 HTTPS 或现场安装验收 |
+| TEST-008 | 2026-08-23 | 专用 PWA/Service Worker E2E 验证居民登录后安装、v60→v61 激活清理、受控 update、离线 mobile/citizen 回退、API/源快照 404 缓存边界与逐项注销/清缓存 | 真实 HTTPS 终止、OS 安装提示/策略、浏览器设备矩阵、外部 Origin、现场缓存升级与独立安全验收继续外置；仓库测试不产生生产 GO |
 | GOV-001 | 2026-08-23 | `main`/`origin/main` 成为唯一当前集成与默认开发基线；固定 governance tag 仅作可复现证据，旧日期化 workflow 原文冻结 | process plan/verify 默认值、manifest/AGENTS/iteration program 漂移和 CI 目标分支负向测试 |
 | DOC-001 | 2026-08-23 | 264 份 Markdown 以路径和 ADR 台账唯一分类为 195 current、68 snapshot、1 superseded；不删除历史证据 | 闭集路径/分类摘要、规则重叠、ADR status 和 snapshot 内容聚合摘要失败关闭 |
 | REPO-001 | 2026-08-23 | 3 个跟踪 PDF 均登记 SHA-256、大小、页数、引入提交、来源、保留理由和真实 generator 可用性；二进制本体未修改 | exact tracked inventory、digest/size/page/source 漂移负向测试；替换前必须补可复现生成源，禁止手工编辑 |

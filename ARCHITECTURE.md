@@ -46,6 +46,9 @@
 - State collection 数据 owner 只来自现有 owner/system 合同；process owner 和源码引用仅作为证据。
   无明确 owner 的集合必须显式 `review-required` 或 `legacy-quarantined`，仓库检查不能授权生产晋升。
 - 关键内部边界现按 10 个职责独立组测量覆盖率：identity、audit、object storage、API governance、worker observability、区域共享、转诊、科研导出、浏览器响应头与 Safe URL；原 server.js 门禁保持不变，基线只能持平或提高，临时覆盖报告不构成浏览器页面或生产证据。
+- 在线 Playwright 继续在 27 + 13 项 context 中阻止 Service Worker；PWA 只在独立 3 项 context 中允许，
+  使用同一 Chromium/动态端口策略并逐项注销 registration、删除 Cache Storage。v61 只缓存同源成功响应，
+  仓库测试不替代真实 HTTPS、设备策略或现场安装验收。
 - strict production preflight 通过 T00 受控文件 provider 装配既有 external trust verifier；只接受独立
   pin 的 Ed25519 anchor bundle、双角色签名和当前 release/artifact/evidence/registry 绑定，默认继续 NO-GO。
 
