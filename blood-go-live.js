@@ -1,13 +1,3 @@
-const escapeHtml = (value) => String(value ?? "").replace(/[&<>"']/g, (character) => ({
-  "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
-})[character]);
-
-const table = (headers, rows) => `
-  <table class="gl-table">
-    <thead><tr>${headers.map((item) => `<th>${escapeHtml(item)}</th>`).join("")}</tr></thead>
-    <tbody>${rows.map((row) => `<tr>${row.map((cell) => `<td>${cell}</td>`).join("")}</tr>`).join("")}</tbody>
-  </table>`;
-
 const clinicalGateLabels = {
   receiptsValid: "现场证据回执双签",
   mastersValid: "BIS/BTIS 主数据契约",
@@ -34,55 +24,91 @@ function render(data) {
     ["演练", `${summary.drillsPassed}/${summary.drills}`],
     ["迁移对账", `${summary.migrationsReconciled}/${summary.migrations}`]
   ];
-  document.querySelector("#gl-summary").innerHTML = summaryRows.map(([label, value]) => `
-    <article class="gl-card">
-      <small>${escapeHtml(label)}</small>
-      <strong class="${data.productionReady ? "ready" : "blocked"}">${escapeHtml(value)}</strong>
-    </article>`).join("");
+  bloodGoLiveReplace("#gl-summary", summaryRows.map(([label, value]) => bloodGoLiveElement("article", { className: "gl-card" }, [
+    bloodGoLiveElement("small", { text: label }),
+    bloodGoLiveElement("strong", { className: data.productionReady ? "ready" : "blocked", text: value })
+  ])));
 
   const gates = data.clinicalProduction?.gates || {};
-  document.querySelector("#gl-clinical-gates").innerHTML = table(
+  bloodGoLiveReplace("#gl-clinical-gates", [bloodGoLiveTable(
     ["生产门禁", "状态", "上线判定"],
     Object.entries(clinicalGateLabels).map(([key, label]) => [
-      escapeHtml(label),
-      `<span class="${gates[key] ? "ready" : "blocked"}">${gates[key] ? "已签收" : "待现场签收"}</span>`,
+      label,
+      bloodGoLiveStatus(gates[key] ? "已签收" : "待现场签收", Boolean(gates[key])),
       gates[key] ? "通过" : "No-Go"
     ])
-  );
+  )]);
 
   const registry = window.BloodStandardRegistry;
   const coverage = registry.coverage();
-  document.querySelector("#gl-standard-registry").innerHTML = table(
+  bloodGoLiveReplace("#gl-standard-registry", [bloodGoLiveTable(
     ["标准", "数据子集", "登记数据元", "状态"],
     [[
-      `${escapeHtml(coverage.standard.number)}<br><small>${escapeHtml(coverage.standard.datasetId)} · ${escapeHtml(coverage.standard.effectiveAt)} 生效</small>`,
+      [
+        document.createTextNode(String(coverage.standard.number ?? "")),
+        bloodGoLiveElement("br"),
+        bloodGoLiveElement("small", { text: `${coverage.standard.datasetId || ""} · ${coverage.standard.effectiveAt || ""} 生效` })
+      ],
       `${coverage.representedSubsets}/${coverage.subsets}`,
       String(coverage.registeredElements),
-      `<span class="${coverage.completeSubsetCoverage ? "ready" : "blocked"}">${coverage.completeSubsetCoverage ? "十二类子集已建档" : "存在缺失"}</span>`
+      bloodGoLiveStatus(coverage.completeSubsetCoverage ? "十二类子集已建档" : "存在缺失", coverage.completeSubsetCoverage)
     ]]
-  );
+  )]);
 
-  document.querySelector("#gl-endpoints").innerHTML = table(
+  bloodGoLiveReplace("#gl-endpoints", [bloodGoLiveTable(
     ["接口/设备", "责任方", "状态"],
-    data.endpoints.map((item) => [escapeHtml(item.name), escapeHtml(item.owner), escapeHtml(item.status)])
-  );
-  document.querySelector("#gl-requirements").innerHTML = table(
+    data.endpoints.map((item) => [item.name, item.owner, item.status])
+  )]);
+  bloodGoLiveReplace("#gl-requirements", [bloodGoLiveTable(
     ["要求", "责任方", "状态"],
-    data.requirements.map((item) => [escapeHtml(item.title), escapeHtml(item.owner), escapeHtml(item.status)])
-  );
-  document.querySelector("#gl-drills").innerHTML = table(
+    data.requirements.map((item) => [item.title, item.owner, item.status])
+  )]);
+  bloodGoLiveReplace("#gl-drills", [bloodGoLiveTable(
     ["演练", "状态", "证据"],
-    data.drills.map((item) => [escapeHtml(item.title), escapeHtml(item.status), escapeHtml(item.evidenceRef || "待现场执行")])
-  );
-  document.querySelector("#gl-migrations").innerHTML = table(
+    data.drills.map((item) => [item.title, item.status, item.evidenceRef || "待现场执行"])
+  )]);
+  bloodGoLiveReplace("#gl-migrations", [bloodGoLiveTable(
     ["批次", "源/目标", "状态"],
-    data.migrations.map((item) => [escapeHtml(item.name), `${escapeHtml(item.sourceCount ?? "-")}/${escapeHtml(item.targetCount ?? "-")}`, escapeHtml(item.status)])
-  );
-  document.querySelector("#gl-approvals").innerHTML = table(
+    data.migrations.map((item) => [item.name, `${item.sourceCount ?? "-"}/${item.targetCount ?? "-"}`, item.status])
+  )]);
+  bloodGoLiveReplace("#gl-approvals", [bloodGoLiveTable(
     ["审批", "状态", "签署人"],
-    data.approvals.map((item) => [escapeHtml(item.title), escapeHtml(item.status), escapeHtml(item.signedBy || "待签")])
-  );
+    data.approvals.map((item) => [item.title, item.status, item.signedBy || "待签"])
+  )]);
   document.querySelector("#gl-rollback").textContent = `回滚：${data.rollback.strategy}；RPO ${data.rollback.rpoMinutes}分钟，RTO ${data.rollback.rtoMinutes}分钟；触发条件：${data.rollback.triggers.join("、")}`;
+}
+
+function bloodGoLiveElement(tagName, options = {}, children = []) {
+  const element = document.createElement(tagName);
+  if (options.className) element.className = options.className;
+  if (options.text !== undefined) element.textContent = String(options.text ?? "");
+  element.append(...children.filter(Boolean));
+  return element;
+}
+
+function bloodGoLiveReplace(selector, children) {
+  document.querySelector(selector).replaceChildren(...children);
+}
+
+function bloodGoLiveStatus(label, ready) {
+  return bloodGoLiveElement("span", { className: ready ? "ready" : "blocked", text: label });
+}
+
+function bloodGoLiveTable(headers, rows) {
+  return bloodGoLiveElement("table", { className: "gl-table" }, [
+    bloodGoLiveElement("thead", {}, [
+      bloodGoLiveElement("tr", {}, headers.map((header) => bloodGoLiveElement("th", { text: header })))
+    ]),
+    bloodGoLiveElement("tbody", {}, rows.map((row) => bloodGoLiveElement("tr", {}, row.map(bloodGoLiveCell))))
+  ]);
+}
+
+function bloodGoLiveCell(value) {
+  const cell = bloodGoLiveElement("td");
+  if (Array.isArray(value)) cell.append(...value);
+  else if (value instanceof Node) cell.append(value);
+  else cell.textContent = String(value ?? "");
+  return cell;
 }
 
 document.addEventListener("DOMContentLoaded", () => load().catch((error) => alert(error.message)));
