@@ -6,6 +6,26 @@ const path = require("node:path");
 
 const ROOT = path.resolve(__dirname, "..");
 const DEFAULT_REGISTRY = require("../config/api-idempotency-evidence.json");
+const REVIEW_MISSING_PROOF_CODES = new Set([
+  "resource-scope",
+  "payload-conflict",
+  "cas-or-concurrency",
+  "stable-error-contract",
+  "atomic-audit-or-outbox"
+]);
+
+function validateEvidenceAnchors(evidenceItems, subject, root, errors) {
+  for (const evidence of evidenceItems || []) {
+    const file = path.resolve(root, String(evidence.file || ""));
+    if (!evidence.file || !file.startsWith(`${path.resolve(root)}${path.sep}`) || !fs.existsSync(file)) {
+      errors.push(`missing evidence file for ${subject}: ${evidence.file || "unknown"}`);
+      continue;
+    }
+    const source = fs.readFileSync(file, "utf8");
+    for (const anchor of evidence.anchors || []) if (!source.includes(anchor)) errors.push(`missing evidence anchor for ${subject}: ${evidence.file}:${anchor}`);
+    if (!Array.isArray(evidence.anchors) || evidence.anchors.length === 0) errors.push(`evidence anchors required for ${subject}: ${evidence.file}`);
+  }
+}
 
 function validateEvidenceRegistry(registry = DEFAULT_REGISTRY, root = ROOT) {
   const errors = [];
@@ -37,17 +57,24 @@ function validateEvidenceRegistry(registry = DEFAULT_REGISTRY, root = ROOT) {
     if (!Array.isArray(contract.errors) || contract.errors.length === 0 || contract.errors.some((item) => !item.code || !Number.isInteger(item.status))) errors.push(`stable error contract required: ${contract.key || "unknown"}`);
     if (!contract.audit?.accepted || !contract.audit?.replay || !contract.audit?.rejected) errors.push(`audit behavior contract required: ${contract.key || "unknown"}`);
     if (contract.productionReady !== false || contract.externalEvidenceRequired !== true) errors.push(`evidence contract must remain production fail closed: ${contract.key || "unknown"}`);
-    for (const evidence of [...(contract.implementationEvidence || []), ...(contract.testEvidence || [])]) {
-      const file = path.resolve(root, String(evidence.file || ""));
-      if (!evidence.file || !file.startsWith(`${path.resolve(root)}${path.sep}`) || !fs.existsSync(file)) {
-        errors.push(`missing evidence file for ${contract.key}: ${evidence.file || "unknown"}`);
-        continue;
-      }
-      const source = fs.readFileSync(file, "utf8");
-      for (const anchor of evidence.anchors || []) if (!source.includes(anchor)) errors.push(`missing evidence anchor for ${contract.key}: ${evidence.file}:${anchor}`);
-      if (!Array.isArray(evidence.anchors) || evidence.anchors.length === 0) errors.push(`evidence anchors required for ${contract.key}: ${evidence.file}`);
-    }
+    validateEvidenceAnchors([...(contract.implementationEvidence || []), ...(contract.testEvidence || [])], contract.key, root, errors);
     if (!(contract.implementationEvidence || []).length || !(contract.testEvidence || []).length) errors.push(`implementation and test evidence required: ${contract.key || "unknown"}`);
+  }
+  const reviewIds = new Set();
+  const reviewedKeys = new Set();
+  for (const review of registry?.reviewedProofRequired || []) {
+    if (!review.reviewId || reviewIds.has(review.reviewId)) errors.push(`duplicate or missing proof-required review id: ${review.reviewId || "unknown"}`);
+    reviewIds.add(review.reviewId);
+    if (!review.key || review.key !== `${review.method} ${review.path}` || reviewedKeys.has(review.key)) errors.push(`duplicate or invalid proof-required review key: ${review.key || "unknown"}`);
+    reviewedKeys.add(review.key);
+    if (keys.has(review.key)) errors.push(`proof-required review cannot coexist with behavior contract: ${review.key}`);
+    if (!/^T\d{2}$/.test(review.owner || "") || !review.domain) errors.push(`incomplete proof-required review ownership: ${review.key || "unknown"}`);
+    if (!Array.isArray(review.missingProof) || review.missingProof.length === 0 || review.missingProof.some((code) => !REVIEW_MISSING_PROOF_CODES.has(code))) {
+      errors.push(`invalid proof-required review reasons: ${review.key || "unknown"}`);
+    }
+    if (review.productionReady !== false) errors.push(`proof-required review must remain production fail closed: ${review.key || "unknown"}`);
+    if (!Array.isArray(review.evidence) || review.evidence.length === 0) errors.push(`proof-required review evidence required: ${review.key || "unknown"}`);
+    validateEvidenceAnchors(review.evidence, review.key, root, errors);
   }
   return errors;
 }
@@ -64,6 +91,10 @@ function actionSliceEvidenceContracts(registry = DEFAULT_REGISTRY) {
   return (registry.contracts || []).filter((contract) => contract.coverage?.level === "action-slice");
 }
 
+function proofRequiredReviews(registry = DEFAULT_REGISTRY) {
+  return registry.reviewedProofRequired || [];
+}
+
 function runCli(argv = process.argv.slice(2)) {
   const errors = validateEvidenceRegistry();
   const output = argv.includes("--check")
@@ -71,6 +102,7 @@ function runCli(argv = process.argv.slice(2)) {
       contracts: DEFAULT_REGISTRY.contracts.length,
       endpointContracts: endpointEvidenceContracts().length,
       actionSliceContracts: actionSliceEvidenceContracts().length,
+      reviewedProofRequired: proofRequiredReviews().length,
       productionReady: DEFAULT_REGISTRY.contracts.filter((item) => item.productionReady).length
     } }
     : DEFAULT_REGISTRY;
@@ -85,5 +117,6 @@ module.exports = {
   actionSliceEvidenceContracts,
   endpointEvidenceContracts,
   evidenceByKey,
+  proofRequiredReviews,
   validateEvidenceRegistry
 };

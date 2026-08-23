@@ -6,6 +6,7 @@ const {
   DEFAULT_REGISTRY,
   actionSliceEvidenceContracts,
   endpointEvidenceContracts,
+  proofRequiredReviews,
   validateEvidenceRegistry
 } = require("../scripts/api-idempotency-evidence");
 const { buildProductionApiCatalog } = require("../scripts/production-api-catalog");
@@ -19,6 +20,7 @@ test("idempotency evidence registry validates only directly proven endpoint and 
   assert.equal(DEFAULT_REGISTRY.contracts.length, 7);
   assert.equal(endpointEvidenceContracts().length, 5);
   assert.equal(actionSliceEvidenceContracts().length, 2);
+  assert.equal(proofRequiredReviews().length, 3);
   assert.equal(DEFAULT_REGISTRY.contracts[0].key, "POST /api/auth/sms-delivery-callback");
   assert.equal(DEFAULT_REGISTRY.contracts[0].owner, "T01");
   assert.equal(DEFAULT_REGISTRY.contracts.every((contract) => contract.productionReady === false), true);
@@ -35,6 +37,25 @@ test("idempotency evidence registry validates only directly proven endpoint and 
     "POST /api/research/compliant-exports/:id/actions",
     "POST /api/online-payments/refunds"
   ]);
+});
+
+test("reviewed T07 candidates remain proof-required and cannot be mistaken for behavior contracts", () => {
+  const expected = [
+    "POST /api/financial-gateways/dispatch",
+    "POST /api/financial-gateways/reconciliation-runs",
+    "POST /api/disease-payment/formal-grouping/jobs"
+  ];
+  assert.deepEqual(proofRequiredReviews().map((review) => review.key), expected);
+
+  const catalog = buildProductionApiCatalog();
+  for (const key of expected) {
+    assert.equal(DEFAULT_REGISTRY.contracts.some((contract) => contract.key === key), false, key);
+    const entry = catalog.entries.find((candidate) => candidate.key === key);
+    assert.ok(entry, key);
+    assert.equal(entry.idempotency.behaviorEvidence.status, "behavior-proof-required", key);
+    assert.equal(entry.production.repositoryReview, "review-required", key);
+    assert.equal(entry.production.status, "NO-GO", key);
+  }
 });
 
 test("catalog promotes only whole endpoints and retains generic action routes as review-required", () => {
@@ -117,4 +138,22 @@ test("idempotency evidence registry rejects marker promotion, production promoti
   const missingRefundConflict = clone(DEFAULT_REGISTRY);
   delete missingRefundConflict.contracts.find((contract) => contract.key === "POST /api/online-payments/refunds").idempotency.conflictingReuse;
   assert.match(validateEvidenceRegistry(missingRefundConflict).join("\n"), /replay and conflict behavior required/);
+
+  const forgedReviewedPromotion = clone(DEFAULT_REGISTRY);
+  forgedReviewedPromotion.contracts.push({
+    ...clone(forgedReviewedPromotion.contracts[0]),
+    contractId: "forged-reviewed-promotion",
+    key: "POST /api/financial-gateways/dispatch",
+    method: "POST",
+    path: "/api/financial-gateways/dispatch"
+  });
+  assert.match(validateEvidenceRegistry(forgedReviewedPromotion).join("\n"), /cannot coexist with behavior contract/);
+
+  const missingReviewReason = clone(DEFAULT_REGISTRY);
+  missingReviewReason.reviewedProofRequired[0].missingProof = [];
+  assert.match(validateEvidenceRegistry(missingReviewReason).join("\n"), /invalid proof-required review reasons/);
+
+  const missingReviewAnchor = clone(DEFAULT_REGISTRY);
+  missingReviewAnchor.reviewedProofRequired[0].evidence[0].anchors.push("this reviewed proof anchor does not exist");
+  assert.match(validateEvidenceRegistry(missingReviewAnchor).join("\n"), /missing evidence anchor/);
 });

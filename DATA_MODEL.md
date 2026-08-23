@@ -232,6 +232,8 @@ source/sink contract、目标摘要、cursor/source hash 与 receipt 摘要；ch
 
 API-002 的 existing-proof 扩展现只增加治理合同，使注册表达到 7 份：区域共享回执、转诊 inbox/outbox、科研导出 `commandReceipts` 与 T07 退款 `refundTransactionRuntime` command/outbox checkpoint 均为既有状态表达，没有新增集合、表、字段、DDL、migration 或事实源。退款幂等键仅以 SHA-256 摘要进入既有事务状态，公开投影继续移除运行时 checkpoint 与 key hash。两个转诊兼容 action-slice 仍属于通用 endpoint 的局部证据，不能据此把其他 collection/task action 宣称为幂等；科研导出创建路径只有重复 ID 冲突，没有同键精确重放合同，继续 `behavior-proof-required`。
 
+T07 第二批审计只在同一幂等证据注册表增加 3 条 `reviewedProofRequired` 治理元数据，记录 financial dispatch、financial reconciliation 和 formal grouping job 尚缺的并发/CAS、payload conflict、资源范围、稳定错误或原子审计/outbox 证明。它们不复制路由目录、不保存业务载荷，也不新增任何行为合同、集合、schema 或事实源；与正式合同并存会使验证失败。
+
 ## 14. 内部边界覆盖率数据边界
 
 `internal-boundary-coverage-v1` 只登记测试文件、源码范围和当前覆盖率阈值，不新增集合、表、字段、DDL、migration、outbox 或生产事实源。c8 原始数据和报告只进入操作系统临时目录并在命令结束时删除，不得提交或归档为平台数据。

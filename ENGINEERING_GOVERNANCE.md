@@ -138,6 +138,8 @@ API-IDEM-001 在 TEST PROTECTION 层新增幂等证据专项：源码 marker 只
 
 API-002 的 T07 退款切片只登记 `POST /api/online-payments/refunds`：匿名和非授权角色拒绝、可信 actor 机构绑定、精确回放、同键异载荷冲突、事务 CAS 及 command/outbox 原子性均有真实行为测试。相邻退款 action regex、T08 普通 integration event/dispatch 和静态 runtime-role variant 不随该证据晋升；目录继续保留 `review-required`、外部证据阻断和全量 `NO-GO`。
 
+同一幂等证据注册表允许保存最小 `reviewedProofRequired` 拒绝记录，只含 owner、endpoint、缺失证明类别和现有锚点。拒绝记录不得与行为合同使用同一 key；只有全部缺口由可执行证据关闭后，才可在一次评审变更中移除拒绝记录并添加合同。该记录不是第二份路由目录，也不能解释为已验证行为。
+
 API-AUTH-001 在 TEST PROTECTION 层新增 custom auth 证据专项：required/optional/none、credential source、replay/CSRF、scope、实现锚点和可执行负向测试必须同时一致。源码 marker 或相邻字符串不构成证明；目录解析不得跨越已结束的 handler 拼接 method/path，直接拒绝证据和解析器回归均纳入门禁。未登记入口继续 `review-required`，认证证据通过也不构成生产放行。
 
 TEST-007 在既有 operations handoff harness 上建立 32 条路径的唯一数据驱动矩阵，并由 governance-api
