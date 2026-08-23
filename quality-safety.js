@@ -285,9 +285,59 @@ function zhText(value) {
   return zh(text(value));
 }
 
-function setHtml(id, html) {
-  const element = document.getElementById(id);
-  if (element) element.innerHTML = html;
+function createQualityElement(tagName, options = {}, children = []) {
+  const element = document.createElement(tagName);
+  if (options.className) element.className = options.className;
+  if (Object.prototype.hasOwnProperty.call(options, "text")) element.textContent = String(options.text ?? "");
+  if (options.type) element.type = options.type;
+  if (options.colSpan) element.colSpan = options.colSpan;
+  Object.entries(options.dataset || {}).forEach(([key, value]) => {
+    element.dataset[key] = String(value ?? "");
+  });
+  const childList = Array.isArray(children) ? children : [children];
+  element.append(...childList.filter(Boolean));
+  return element;
+}
+
+function qualityTextElement(tagName, value, options = {}) {
+  return createQualityElement(tagName, { ...options, text: value });
+}
+
+function mountQualityContent(id, children) {
+  const target = document.getElementById(id);
+  if (!target || typeof target.replaceChildren !== "function") return null;
+  const childList = Array.isArray(children) ? children : [children];
+  target.replaceChildren(...childList.filter(Boolean));
+  return target;
+}
+
+function qualityActionButton(label, dataset) {
+  return qualityTextElement("button", label, {
+    className: "inline-action",
+    type: "button",
+    dataset
+  });
+}
+
+function qualityLine(primary, secondary, { primaryTag = "strong" } = {}) {
+  const children = [qualityTextElement(primaryTag, primary)];
+  if (secondary !== undefined && secondary !== null && secondary !== "") {
+    children.push(createQualityElement("br"), qualityTextElement("small", secondary));
+  }
+  return children;
+}
+
+function qualityTable(headers, rows, emptyMessage = "") {
+  const headRow = createQualityElement("tr", {}, headers.map((header) => qualityTextElement("th", header)));
+  const bodyRows = rows.length
+    ? rows
+    : emptyMessage
+      ? [createQualityEmptyRow(headers.length, emptyMessage)]
+      : [];
+  return createQualityElement("table", {}, [
+    createQualityElement("thead", {}, headRow),
+    createQualityElement("tbody", {}, bodyRows)
+  ]);
 }
 
 function statusLabel(value) {
@@ -300,8 +350,8 @@ function normalizeFilterText(value) {
   return zh(String(value)).toLowerCase();
 }
 
-function emptyRow(colspan, message = "当前筛选条件下暂无记录") {
-  return `<tr><td colspan="${colspan}" class="empty-cell">${message}</td></tr>`;
+function createQualityEmptyRow(colspan, message = "当前筛选条件下暂无记录") {
+  return createQualityElement("tr", {}, qualityTextElement("td", message, { className: "empty-cell", colSpan: colspan }));
 }
 
 function filterQualityRows(rows, accessors = {}) {
@@ -325,33 +375,22 @@ function renderOperationsBrief(data, filtered = {}) {
   const pendingSignoffs = (data.siteSignoffs || []).filter((item) => statusLabel(item.status) !== "具备联调条件").length;
   const highRisk = (data.institutionRisks || []).filter((item) => statusLabel(item.riskLevel) === "高").length;
   const activeFilters = [qualitySafetyFilters.status, qualitySafetyFilters.domain, qualitySafetyFilters.search].filter(Boolean).length;
-  setHtml("quality-safety-brief", `
-    <article>
-      <span>逾期整改</span>
-      <strong>${overdueRectifications}</strong>
-      <small>需监管升级或复核</small>
-    </article>
-    <article>
-      <span>待处置危急值</span>
-      <strong>${openCritical}</strong>
-      <small>确认、通知、处置闭环</small>
-    </article>
-    <article>
-      <span>待现场签收</span>
-      <strong>${pendingSignoffs}</strong>
-      <small>生产切换前补证</small>
-    </article>
-    <article>
-      <span>高风险机构</span>
-      <strong>${highRisk}</strong>
-      <small>优先纳入监管计划</small>
-    </article>
-    <article>
-      <span>当前筛选命中</span>
-      <strong>${(filtered.issues || []).length + (filtered.rectifications || []).length + (filtered.siteSignoffs || []).length}</strong>
-      <small>${activeFilters ? `${activeFilters} 个条件生效` : "未启用筛选"}</small>
-    </article>
-  `);
+  const cards = [
+    ["逾期整改", overdueRectifications, "需监管升级或复核"],
+    ["待处置危急值", openCritical, "确认、通知、处置闭环"],
+    ["待现场签收", pendingSignoffs, "生产切换前补证"],
+    ["高风险机构", highRisk, "优先纳入监管计划"],
+    [
+      "当前筛选命中",
+      (filtered.issues || []).length + (filtered.rectifications || []).length + (filtered.siteSignoffs || []).length,
+      activeFilters ? `${activeFilters} 个条件生效` : "未启用筛选"
+    ]
+  ];
+  mountQualityContent("quality-safety-brief", cards.map(([label, value, note]) => createQualityElement("article", {}, [
+    qualityTextElement("span", label),
+    qualityTextElement("strong", value),
+    qualityTextElement("small", note)
+  ])));
 }
 
 function qualityDepartmentProfile(role) {
@@ -426,58 +465,44 @@ function renderDepartmentView(data) {
   const orgText = view.orgName || user.orgName || profile.name;
   const scopeText = view.dataScope || user.dataScope || profile.scope;
   const queue = Array.isArray(view.queue) ? view.queue : [];
-  setHtml("quality-safety-department-view", `
-    <article class="primary">
-      <span>当前登录部门</span>
-      <strong>${zhText(roleText)}</strong>
-      <small>${zhText(orgText)} · ${zhText(scopeText)}</small>
-    </article>
-    <article>
-      <span>数据范围</span>
-      <strong>${zhText(profile.name)}</strong>
-      <small>${zhText(profile.scope)}</small>
-    </article>
-    <article>
-      <span>可执行动作</span>
-      <div class="quality-action-list">
-        ${actions.map((action) => `<span>${zhText(action)}</span>`).join("")}
-      </div>
-    </article>
-    <article>
-      <span>重点待办</span>
-      <small>${zhText(profile.focus)}</small>
-      <div class="quality-task-list">
-        ${tasks.map(([label, value]) => `<p><b>${zhText(label)}</b><strong>${value}</strong></p>`).join("")}
-      </div>
-      ${queue.length ? `
-        <div class="quality-queue-list">
-          ${queue.slice(0, 3).map((item) => `<p><b>${zhText(item.priority)}</b>${zhText(item.title)}</p>`).join("")}
-        </div>
-      ` : ""}
-    </article>
-  `);
+  const actionList = createQualityElement("div", { className: "quality-action-list" }, actions.map((action) => qualityTextElement("span", zhText(action))));
+  const taskList = createQualityElement("div", { className: "quality-task-list" }, tasks.map(([label, value]) => createQualityElement("p", {}, [
+    qualityTextElement("b", zhText(label)),
+    qualityTextElement("strong", value)
+  ])));
+  const queueList = queue.length ? createQualityElement("div", { className: "quality-queue-list" }, queue.slice(0, 3).map((item) => createQualityElement("p", {}, [
+    qualityTextElement("b", zhText(item.priority)),
+    qualityTextElement("span", zhText(item.title))
+  ]))) : null;
+  mountQualityContent("quality-safety-department-view", [
+    createQualityElement("article", { className: "primary" }, [
+      qualityTextElement("span", "当前登录部门"),
+      qualityTextElement("strong", zhText(roleText)),
+      qualityTextElement("small", `${zhText(orgText)} · ${zhText(scopeText)}`)
+    ]),
+    createQualityElement("article", {}, [
+      qualityTextElement("span", "数据范围"),
+      qualityTextElement("strong", zhText(profile.name)),
+      qualityTextElement("small", zhText(profile.scope))
+    ]),
+    createQualityElement("article", {}, [qualityTextElement("span", "可执行动作"), actionList]),
+    createQualityElement("article", {}, [qualityTextElement("span", "重点待办"), qualityTextElement("small", zhText(profile.focus)), taskList, queueList])
+  ]);
 }
 
 function renderDepartmentTaskQueue(data) {
   const rows = data.departmentTaskView?.queue || [];
-  setHtml("quality-safety-department-queue", `
-    <table>
-      <thead><tr><th>优先级</th><th>任务</th><th>责任方与来源</th><th>下一步</th></tr></thead>
-      <tbody>
-        ${rows.length ? rows.map((item) => `
-          <tr>
-            <td>${statusLabel(item.priority)}<br /><small>${statusLabel(item.kind)}</small></td>
-            <td><strong>${zhText(item.title)}</strong><br /><small>${zhText(item.context || "")}</small></td>
-            <td>${zhText(item.owner)}<br /><small>${zhText(item.source || item.id)}</small></td>
-            <td>
-              ${item.dueAt ? `截止 ${text(item.dueAt)}<br />` : ""}
-              <button class="inline-action" type="button" data-scroll-target="${text(item.targetSection || "quality-safety-actions")}">${zhText(item.actionLabel || "定位")}</button>
-            </td>
-          </tr>
-        `).join("") : emptyRow(4, "当前部门暂无待办任务")}
-      </tbody>
-    </table>
-  `);
+  const tableRows = rows.map((item) => createQualityElement("tr", {}, [
+    createQualityElement("td", {}, [qualityTextElement("span", statusLabel(item.priority)), createQualityElement("br"), qualityTextElement("small", statusLabel(item.kind))]),
+    createQualityElement("td", {}, qualityLine(zhText(item.title), zhText(item.context || ""))),
+    createQualityElement("td", {}, [qualityTextElement("span", zhText(item.owner)), createQualityElement("br"), qualityTextElement("small", zhText(item.source || item.id))]),
+    createQualityElement("td", {}, [
+      item.dueAt ? qualityTextElement("span", `截止 ${text(item.dueAt)}`) : null,
+      item.dueAt ? createQualityElement("br") : null,
+      qualityActionButton(zhText(item.actionLabel || "定位"), { scrollTarget: text(item.targetSection || "quality-safety-actions") })
+    ])
+  ]));
+  mountQualityContent("quality-safety-department-queue", qualityTable(["优先级", "任务", "责任方与来源", "下一步"], tableRows, "当前部门暂无待办任务"));
 }
 
 function renderMetrics(summary) {
@@ -504,145 +529,88 @@ function renderMetrics(summary) {
     ["即将到期", summary.sla?.dueSoon || 0],
     ["已逾期", summary.sla?.overdue || 0]
   ];
-  setHtml("quality-safety-metrics", metrics.map(([label, value]) => `
-    <article class="metric-card">
-      <span>${label}</span>
-      <strong>${value}</strong>
-    </article>
-  `).join(""));
+  mountQualityContent("quality-safety-metrics", metrics.map(([label, value]) => createQualityElement("article", { className: "metric-card" }, [
+    qualityTextElement("span", label),
+    qualityTextElement("strong", value)
+  ])));
 }
 
 function renderNationalQualityGoals(rows) {
-  setHtml("quality-safety-national-goals", `
-    <table>
-      <thead><tr><th>目标</th><th>监测重点</th><th>平台证据源</th><th>现场采集字段</th><th>下一步采集边界</th></tr></thead>
-      <tbody>
-        ${rows.length ? rows.map((item) => `
-          <tr>
-            <td><strong>${text(item.code)}</strong><br />${zhText(item.title)}<br /><small>${statusLabel(item.currentStatus)} · ${zhText(item.cadence)}</small></td>
-            <td>${statusLabel(item.domain)}<br /><small>${zhText(item.strategy)}</small></td>
-            <td>${(item.evidenceCollections || []).map((collection) => zhText(collection)).join("、")}<br /><small>${item.evidenceRows || 0} 条现有证据</small></td>
-            <td>${(item.siteInputs || []).map((input) => zhText(input)).join("、") || "-"}</td>
-            <td>${zhText(item.nextAction || "")}</td>
-          </tr>
-        `).join("") : emptyRow(5, "暂无国家改进目标映射")}
-      </tbody>
-    </table>
-  `);
+  const tableRows = rows.map((item) => createQualityElement("tr", {}, [
+    createQualityElement("td", {}, [qualityTextElement("strong", text(item.code)), createQualityElement("br"), qualityTextElement("span", zhText(item.title)), createQualityElement("br"), qualityTextElement("small", `${statusLabel(item.currentStatus)} · ${zhText(item.cadence)}`)]),
+    createQualityElement("td", {}, [qualityTextElement("span", statusLabel(item.domain)), createQualityElement("br"), qualityTextElement("small", zhText(item.strategy))]),
+    createQualityElement("td", {}, [qualityTextElement("span", (item.evidenceCollections || []).map((collection) => zhText(collection)).join("、")), createQualityElement("br"), qualityTextElement("small", `${item.evidenceRows || 0} 条现有证据`)]),
+    qualityTextElement("td", (item.siteInputs || []).map((input) => zhText(input)).join("、") || "-"),
+    qualityTextElement("td", zhText(item.nextAction || ""))
+  ]));
+  mountQualityContent("quality-safety-national-goals", qualityTable(["目标", "监测重点", "平台证据源", "现场采集字段", "下一步采集边界"], tableRows, "暂无国家改进目标映射"));
 }
 
 function renderNationalGoalCadencePlan(rows) {
-  setHtml("quality-safety-national-goal-cadence", `
-    <table>
-      <thead><tr><th>复盘周期</th><th>覆盖目标</th><th>复盘窗口</th><th>牵头部门</th><th>现场准备</th><th>下一步动作</th></tr></thead>
-      <tbody>
-        ${rows.length ? rows.map((item) => `
-          <tr>
-            <td><strong>${zhText(item.cadenceLabel)}</strong><br /><small>${statusLabel(item.cadenceType)}</small></td>
-            <td>${item.goalCount || 0} 项<br /><small>${(item.goals || []).map((goal) => text(goal.code)).join("、")}</small></td>
-            <td>${zhText(item.reviewWindow)}</td>
-            <td>${zhText(item.owner)}</td>
-            <td>${item.evidenceRows || 0} 条证据<br /><small>${item.siteInputFields || 0} 个采集字段</small></td>
-            <td>${zhText(item.nextAction)}</td>
-          </tr>
-        `).join("") : emptyRow(6, "暂无国家目标复盘节奏")}
-      </tbody>
-    </table>
-  `);
+  const tableRows = rows.map((item) => createQualityElement("tr", {}, [
+    createQualityElement("td", {}, qualityLine(zhText(item.cadenceLabel), statusLabel(item.cadenceType))),
+    createQualityElement("td", {}, [qualityTextElement("span", `${item.goalCount || 0} 项`), createQualityElement("br"), qualityTextElement("small", (item.goals || []).map((goal) => text(goal.code)).join("、"))]),
+    qualityTextElement("td", zhText(item.reviewWindow)),
+    qualityTextElement("td", zhText(item.owner)),
+    createQualityElement("td", {}, [qualityTextElement("span", `${item.evidenceRows || 0} 条证据`), createQualityElement("br"), qualityTextElement("small", `${item.siteInputFields || 0} 个采集字段`)]),
+    qualityTextElement("td", zhText(item.nextAction))
+  ]));
+  mountQualityContent("quality-safety-national-goal-cadence", qualityTable(["复盘周期", "覆盖目标", "复盘窗口", "牵头部门", "现场准备", "下一步动作"], tableRows, "暂无国家目标复盘节奏"));
 }
 
 function renderCoreSystemMatrix(rows) {
-  setHtml("quality-safety-core-systems", `
-    <table>
-      <thead><tr><th>核心制度</th><th>平台落实要求</th><th>证据源</th><th>状态与下一步</th><th>操作</th></tr></thead>
-      <tbody>
-        ${rows.length ? rows.map((item) => `
-          <tr>
-            <td><strong>${zhText(item.name)}</strong><br /><small>${zhText(item.sourcePolicy)}</small></td>
-            <td>${zhText(item.requirement)}<br /><small>${zhText(item.platformControl)}</small></td>
-            <td>${(item.evidenceCollections || []).map(zh).join("、")}<br /><small>${item.evidenceRows || 0} 条证据记录，${item.submittedEvidenceCount || 0} 条制度证据</small></td>
-            <td>${zhText(item.status)}<br /><small>${zhText(item.nextAction)}</small></td>
-            <td><button class="inline-action" type="button" data-core-system-evidence="${text(item.id)}">提交证据</button></td>
-          </tr>
-        `).join("") : emptyRow(5, "暂无核心制度矩阵")}
-      </tbody>
-    </table>
-  `);
+  const tableRows = rows.map((item) => createQualityElement("tr", {}, [
+    createQualityElement("td", {}, qualityLine(zhText(item.name), zhText(item.sourcePolicy))),
+    createQualityElement("td", {}, [qualityTextElement("span", zhText(item.requirement)), createQualityElement("br"), qualityTextElement("small", zhText(item.platformControl))]),
+    createQualityElement("td", {}, [qualityTextElement("span", (item.evidenceCollections || []).map(zh).join("、")), createQualityElement("br"), qualityTextElement("small", `${item.evidenceRows || 0} 条证据记录，${item.submittedEvidenceCount || 0} 条制度证据`)]),
+    createQualityElement("td", {}, [qualityTextElement("span", zhText(item.status)), createQualityElement("br"), qualityTextElement("small", zhText(item.nextAction))]),
+    createQualityElement("td", {}, qualityActionButton("提交证据", { coreSystemEvidence: text(item.id) }))
+  ]));
+  mountQualityContent("quality-safety-core-systems", qualityTable(["核心制度", "平台落实要求", "证据源", "状态与下一步", "操作"], tableRows, "暂无核心制度矩阵"));
 }
 
 function renderReuse(rows) {
-  setHtml("quality-safety-reuse", rows.map((item) => `
-    <div class="rule-card">
-      <strong>${zhText(item.collection)}</strong>
-      <span>${item.rows} 条记录</span>
-      <p>${zhText(item.reusedFor || "")}</p>
-    </div>
-  `).join(""));
+  mountQualityContent("quality-safety-reuse", rows.map((item) => createQualityElement("div", { className: "rule-card" }, [
+    qualityTextElement("strong", zhText(item.collection)),
+    qualityTextElement("span", `${item.rows} 条记录`),
+    qualityTextElement("p", zhText(item.reusedFor || ""))
+  ])));
 }
 
 function renderRisks(rows) {
-  setHtml("quality-safety-risks", `
-    <table>
-      <thead><tr><th>机构</th><th>等级</th><th>分值</th><th>信号</th><th>下一步</th></tr></thead>
-      <tbody>
-        ${rows.map((item) => `
-          <tr>
-            <td><strong>${zhText(item.institutionName)}</strong><br /><small>${(item.domains || []).map(statusLabel).join("、")}</small></td>
-            <td>${statusLabel(item.riskLevel)}</td>
-            <td>${item.score}</td>
-            <td>${zhText((item.drivers || []).join("、"))}<br /><small>${item.openIssues || 0} 个待处理，${item.dueSoon || 0} 个即将到期，${item.overdue || 0} 个逾期</small></td>
-            <td>${zhText(item.nextAction)}</td>
-          </tr>
-        `).join("")}
-      </tbody>
-    </table>
-  `);
+  const tableRows = rows.map((item) => createQualityElement("tr", {}, [
+    createQualityElement("td", {}, qualityLine(zhText(item.institutionName), (item.domains || []).map(statusLabel).join("、"))),
+    qualityTextElement("td", statusLabel(item.riskLevel)),
+    qualityTextElement("td", item.score),
+    createQualityElement("td", {}, [qualityTextElement("span", zhText((item.drivers || []).join("、"))), createQualityElement("br"), qualityTextElement("small", `${item.openIssues || 0} 个待处理，${item.dueSoon || 0} 个即将到期，${item.overdue || 0} 个逾期`)]),
+    qualityTextElement("td", zhText(item.nextAction))
+  ]));
+  mountQualityContent("quality-safety-risks", qualityTable(["机构", "等级", "分值", "信号", "下一步"], tableRows));
 }
 
 function renderActionPlan(rows) {
-  setHtml("quality-safety-actions", `
-    <table>
-      <thead><tr><th>优先级</th><th>责任方</th><th>行动</th><th>原因</th><th>证据</th></tr></thead>
-      <tbody>
-        ${rows.map((item) => `
-          <tr>
-            <td>${statusLabel(item.priority)}</td>
-            <td><strong>${zhText(item.owner)}</strong><br /><small>${statusLabel(item.domain)} / ${text(item.source)}</small></td>
-            <td>${zhText(item.action)}<br /><small>${item.dueAt ? `截止 ${text(item.dueAt)}` : ""}</small></td>
-            <td>${zhText(item.reason)}</td>
-            <td>${zhText(item.evidence)}</td>
-          </tr>
-        `).join("")}
-      </tbody>
-    </table>
-  `);
+  const tableRows = rows.map((item) => createQualityElement("tr", {}, [
+    qualityTextElement("td", statusLabel(item.priority)),
+    createQualityElement("td", {}, qualityLine(zhText(item.owner), `${statusLabel(item.domain)} / ${text(item.source)}`)),
+    createQualityElement("td", {}, [qualityTextElement("span", zhText(item.action)), createQualityElement("br"), qualityTextElement("small", item.dueAt ? `截止 ${text(item.dueAt)}` : "")]),
+    qualityTextElement("td", zhText(item.reason)),
+    qualityTextElement("td", zhText(item.evidence))
+  ]));
+  mountQualityContent("quality-safety-actions", qualityTable(["优先级", "责任方", "行动", "原因", "证据"], tableRows));
 }
 
 function renderGoLiveReadiness(readiness = {}) {
   const checks = readiness.checks || [];
   const signoffs = readiness.productionSignoffPending || [];
-  setHtml("quality-safety-readiness", `
-    <div class="rule-card">
-      <strong>${readiness.usable ? "已具备受控试点条件" : "发布候选"}</strong>
-      <span>${text(readiness.score)} / 100</span>
-      <p>${zhText(readiness.nextAction)}</p>
-    </div>
-    <div class="rule-card">
-      <strong>${statusLabel(readiness.stage)}</strong>
-      <span>${readiness.blockers?.length ? `${readiness.blockers.length} 个阻断项` : "无模块阻断项"}</span>
-      <p>${readiness.blockers?.length ? readiness.blockers.map(statusLabel).join("、") : "看板、闭环、复用、风险和行动计划检查已具备试点使用条件。"}</p>
-    </div>
-    <div class="rule-card">
-      <strong>就绪检查</strong>
-      <span>${checks.filter((item) => item.passed).length}/${checks.length}</span>
-      <p>${checks.map((item) => `${item.passed ? "通过" : "未通过"} ${zhText(item.id)}`).join("；")}</p>
-    </div>
-    <div class="rule-card">
-      <strong>生产签收</strong>
-      <span>${signoffs.length} 个现场事项</span>
-      <p>${signoffs.map(zh).join("；")}</p>
-    </div>
-  `);
+  const cards = [
+    [readiness.usable ? "已具备受控试点条件" : "发布候选", `${text(readiness.score)} / 100`, zhText(readiness.nextAction)],
+    [statusLabel(readiness.stage), readiness.blockers?.length ? `${readiness.blockers.length} 个阻断项` : "无模块阻断项", readiness.blockers?.length ? readiness.blockers.map(statusLabel).join("、") : "看板、闭环、复用、风险和行动计划检查已具备试点使用条件。"],
+    ["就绪检查", `${checks.filter((item) => item.passed).length}/${checks.length}`, checks.map((item) => `${item.passed ? "通过" : "未通过"} ${zhText(item.id)}`).join("；")],
+    ["生产签收", `${signoffs.length} 个现场事项`, signoffs.map(zh).join("；")]
+  ];
+  mountQualityContent("quality-safety-readiness", cards.map(([heading, summary, body]) => createQualityElement("div", { className: "rule-card" }, [
+    qualityTextElement("strong", heading), qualityTextElement("span", summary), qualityTextElement("p", body)
+  ])));
 }
 
 function renderPrelaunchGaps(readiness = {}, siteSignoffs = []) {
@@ -658,166 +626,104 @@ function renderPrelaunchGaps(readiness = {}, siteSignoffs = []) {
       nextAction: signoff.latestNote || readiness.nextAction || "完成现场签收并归档生产证据"
     };
   });
-  setHtml("quality-safety-prelaunch-gaps", `
-    <table>
-      <thead><tr><th>上线前事项</th><th>责任方</th><th>证据状态</th><th>下一步</th></tr></thead>
-      <tbody>
-        ${rows.length ? rows.map((item) => `
-          <tr>
-            <td><strong>${zhText(item.name)}</strong></td>
-            <td>${zhText(item.owner)}</td>
-            <td>${statusLabel(item.status)}<br /><small>${zhText(item.evidence)}</small></td>
-            <td>${zhText(item.nextAction)}</td>
-          </tr>
-        `).join("") : emptyRow(4, "暂无上线前缺口")}
-      </tbody>
-    </table>
-  `);
+  const tableRows = rows.map((item) => createQualityElement("tr", {}, [
+    createQualityElement("td", {}, qualityTextElement("strong", zhText(item.name))),
+    qualityTextElement("td", zhText(item.owner)),
+    createQualityElement("td", {}, [qualityTextElement("span", statusLabel(item.status)), createQualityElement("br"), qualityTextElement("small", zhText(item.evidence))]),
+    qualityTextElement("td", zhText(item.nextAction))
+  ]));
+  mountQualityContent("quality-safety-prelaunch-gaps", qualityTable(["上线前事项", "责任方", "证据状态", "下一步"], tableRows, "暂无上线前缺口"));
 }
 
 function renderOperationsRunbook(rows = []) {
-  setHtml("quality-safety-operations-runbook", `
-    <table>
-      <thead><tr><th>值守事项</th><th>责任方</th><th>运行信号</th><th>触发阈值</th><th>升级和证据</th></tr></thead>
-      <tbody>
-        ${rows.length ? rows.map((item) => `
-          <tr>
-            <td><strong>${zhText(item.watchItem)}</strong><br /><small>${statusLabel(item.domain)} / ${text(item.id)}</small></td>
-            <td>${zhText(item.owner)}<br /><small>${statusLabel(item.ownerRole)}</small></td>
-            <td>${statusLabel(item.currentStatus)}<br /><small>${zhText(item.signal)}</small></td>
-            <td>${zhText(item.threshold)}</td>
-            <td>${zhText(item.escalation)}<br /><small>${zhText(item.evidence)}</small></td>
-          </tr>
-        `).join("") : emptyRow(5, "暂无运行值守事项")}
-      </tbody>
-    </table>
-  `);
+  const tableRows = rows.map((item) => createQualityElement("tr", {}, [
+    createQualityElement("td", {}, qualityLine(zhText(item.watchItem), `${statusLabel(item.domain)} / ${text(item.id)}`)),
+    createQualityElement("td", {}, [qualityTextElement("span", zhText(item.owner)), createQualityElement("br"), qualityTextElement("small", statusLabel(item.ownerRole))]),
+    createQualityElement("td", {}, [qualityTextElement("span", statusLabel(item.currentStatus)), createQualityElement("br"), qualityTextElement("small", zhText(item.signal))]),
+    qualityTextElement("td", zhText(item.threshold)),
+    createQualityElement("td", {}, [qualityTextElement("span", zhText(item.escalation)), createQualityElement("br"), qualityTextElement("small", zhText(item.evidence))])
+  ]));
+  mountQualityContent("quality-safety-operations-runbook", qualityTable(["值守事项", "责任方", "运行信号", "触发阈值", "升级和证据"], tableRows, "暂无运行值守事项"));
 }
 
 function renderWarningIndicators(rows = []) {
-  setHtml("quality-safety-warning-indicators", `
-    <table>
-      <thead><tr><th>预警指标</th><th>等级与信号</th><th>触发阈值</th><th>责任方</th><th>闭环动作</th><th>定位</th></tr></thead>
-      <tbody>
-        ${rows.length ? rows.map((item) => `
-          <tr>
-            <td><strong>${zhText(item.name)}</strong><br /><small>${statusLabel(item.domain)} / ${text(item.id)}</small></td>
-            <td>${statusLabel(item.level)}<br /><small>${zhText(item.signal || item.currentStatus)}</small></td>
-            <td>${zhText(item.threshold)}</td>
-            <td>${zhText(item.owner)}<br /><small>${statusLabel(item.ownerRole)}</small></td>
-            <td>${zhText(item.nextAction)}<br /><small>${zhText(item.evidence)} / ${item.closedLoopReady ? "闭环证据已绑定" : "待补齐闭环证据"}</small></td>
-            <td><button class="inline-action" type="button" data-scroll-target="${text(item.targetSection || "quality-safety-actions")}">定位</button></td>
-          </tr>
-        `).join("") : emptyRow(6, "暂无预警指标")}
-      </tbody>
-    </table>
-  `);
+  const tableRows = rows.map((item) => createQualityElement("tr", {}, [
+    createQualityElement("td", {}, qualityLine(zhText(item.name), `${statusLabel(item.domain)} / ${text(item.id)}`)),
+    createQualityElement("td", {}, [qualityTextElement("span", statusLabel(item.level)), createQualityElement("br"), qualityTextElement("small", zhText(item.signal || item.currentStatus))]),
+    qualityTextElement("td", zhText(item.threshold)),
+    createQualityElement("td", {}, [qualityTextElement("span", zhText(item.owner)), createQualityElement("br"), qualityTextElement("small", statusLabel(item.ownerRole))]),
+    createQualityElement("td", {}, [qualityTextElement("span", zhText(item.nextAction)), createQualityElement("br"), qualityTextElement("small", `${zhText(item.evidence)} / ${item.closedLoopReady ? "闭环证据已绑定" : "待补齐闭环证据"}`)]),
+    createQualityElement("td", {}, qualityActionButton("定位", { scrollTarget: text(item.targetSection || "quality-safety-actions") }))
+  ]));
+  mountQualityContent("quality-safety-warning-indicators", qualityTable(["预警指标", "等级与信号", "触发阈值", "责任方", "闭环动作", "定位"], tableRows, "暂无预警指标"));
 }
 
 function renderOnsiteRequirements(rows = []) {
-  setHtml("quality-safety-onsite-requirements", `
-    <table>
-      <thead><tr><th>现场功能需求</th><th>责任方</th><th>现场输入</th><th>验收证据</th><th>状态和来源</th></tr></thead>
-      <tbody>
-        ${rows.length ? rows.map((item) => `
-          <tr>
-            <td><strong>${zhText(item.requirement)}</strong><br /><small>${statusLabel(item.domain)} / ${text(item.id)}</small></td>
-            <td>${zhText(item.owner)}<br /><small>${statusLabel(item.ownerRole)}</small></td>
-            <td>${zhText(item.onsiteInput)}</td>
-            <td>${zhText(item.acceptanceEvidence)}</td>
-            <td>${statusLabel(item.currentStatus)}<br /><small>${zhText(item.source)}</small></td>
-          </tr>
-        `).join("") : emptyRow(5, "暂无现场上线需求")}
-      </tbody>
-    </table>
-  `);
+  const tableRows = rows.map((item) => createQualityElement("tr", {}, [
+    createQualityElement("td", {}, qualityLine(zhText(item.requirement), `${statusLabel(item.domain)} / ${text(item.id)}`)),
+    createQualityElement("td", {}, [qualityTextElement("span", zhText(item.owner)), createQualityElement("br"), qualityTextElement("small", statusLabel(item.ownerRole))]),
+    qualityTextElement("td", zhText(item.onsiteInput)),
+    qualityTextElement("td", zhText(item.acceptanceEvidence)),
+    createQualityElement("td", {}, [qualityTextElement("span", statusLabel(item.currentStatus)), createQualityElement("br"), qualityTextElement("small", zhText(item.source))])
+  ]));
+  mountQualityContent("quality-safety-onsite-requirements", qualityTable(["现场功能需求", "责任方", "现场输入", "验收证据", "状态和来源"], tableRows, "暂无现场上线需求"));
 }
 
 function renderCutoverSequence(rows = []) {
-  setHtml("quality-safety-cutover-sequence", `
-    <table>
-      <thead><tr><th>阶段</th><th>时间窗口</th><th>责任方</th><th>现场动作</th><th>验收门槛</th><th>状态</th></tr></thead>
-      <tbody>
-        ${rows.length ? rows.map((item) => `
-          <tr>
-            <td><strong>${zhText(item.phase)}</strong><br /><small>${text(item.id)}</small></td>
-            <td>${zhText(item.window)}</td>
-            <td>${(item.owners || []).map(zhText).join("、") || "-"}</td>
-            <td>${zhText(item.objective)}<br /><small>${(item.requirements || []).map((requirement) => zhText(requirement.requirement)).join("；")}</small></td>
-            <td>${zhText(item.acceptanceGate)}</td>
-            <td>${statusLabel(item.currentStatus)}<br /><small>${item.readyCount || 0}/${item.totalCount || 0} 已就绪</small></td>
-          </tr>
-        `).join("") : emptyRow(6, "暂无上线执行顺序")}
-      </tbody>
-    </table>
-  `);
+  const tableRows = rows.map((item) => createQualityElement("tr", {}, [
+    createQualityElement("td", {}, qualityLine(zhText(item.phase), text(item.id))),
+    qualityTextElement("td", zhText(item.window)),
+    qualityTextElement("td", (item.owners || []).map(zhText).join("、") || "-"),
+    createQualityElement("td", {}, [qualityTextElement("span", zhText(item.objective)), createQualityElement("br"), qualityTextElement("small", (item.requirements || []).map((requirement) => zhText(requirement.requirement)).join("；"))]),
+    qualityTextElement("td", zhText(item.acceptanceGate)),
+    createQualityElement("td", {}, [qualityTextElement("span", statusLabel(item.currentStatus)), createQualityElement("br"), qualityTextElement("small", `${item.readyCount || 0}/${item.totalCount || 0} 已就绪`)])
+  ]));
+  mountQualityContent("quality-safety-cutover-sequence", qualityTable(["阶段", "时间窗口", "责任方", "现场动作", "验收门槛", "状态"], tableRows, "暂无上线执行顺序"));
 }
 
 function renderNextDevelopmentPlan(rows = []) {
-  setHtml("quality-safety-next-development", `
-    <table>
-      <thead><tr><th>优先级</th><th>阶段</th><th>责任方</th><th>开发增量</th><th>验收证据</th><th>验证命令</th><th>状态</th></tr></thead>
-      <tbody>
-        ${rows.length ? rows.map((item) => `
-          <tr>
-            <td>${statusLabel(item.priority)}</td>
-            <td><strong>${zhText(item.phase)}</strong><br /><small>${text(item.id)}</small></td>
-            <td>${zhText(item.owner)}<br /><small>${zhText(item.source)}</small></td>
-            <td>${zhText(item.developmentIncrement)}<br /><small>${zhText(item.currentGap || item.scope)}</small></td>
-            <td>${zhText(item.acceptanceEvidence)}</td>
-            <td><code>${text(item.verificationCommand)}</code></td>
-            <td>${statusLabel(item.status)}<br /><small>${item.requiresAttention ? "需要现场推进" : "可进入联调"}</small></td>
-          </tr>
-        `).join("") : emptyRow(7, "暂无下一步开发计划")}
-      </tbody>
-    </table>
-  `);
+  const tableRows = rows.map((item) => createQualityElement("tr", {}, [
+    qualityTextElement("td", statusLabel(item.priority)),
+    createQualityElement("td", {}, qualityLine(zhText(item.phase), text(item.id))),
+    createQualityElement("td", {}, [qualityTextElement("span", zhText(item.owner)), createQualityElement("br"), qualityTextElement("small", zhText(item.source))]),
+    createQualityElement("td", {}, [qualityTextElement("span", zhText(item.developmentIncrement)), createQualityElement("br"), qualityTextElement("small", zhText(item.currentGap || item.scope))]),
+    qualityTextElement("td", zhText(item.acceptanceEvidence)),
+    createQualityElement("td", {}, qualityTextElement("code", text(item.verificationCommand))),
+    createQualityElement("td", {}, [qualityTextElement("span", statusLabel(item.status)), createQualityElement("br"), qualityTextElement("small", item.requiresAttention ? "需要现场推进" : "可进入联调")])
+  ]));
+  mountQualityContent("quality-safety-next-development", qualityTable(["优先级", "阶段", "责任方", "开发增量", "验收证据", "验证命令", "状态"], tableRows, "暂无下一步开发计划"));
 }
 
 function renderIssues(rows) {
   const canDispatch = qualitySafetyState?.role === "commission";
-  setHtml("quality-safety-issues", `
-    <table>
-      <thead><tr><th>领域</th><th>问题</th><th>状态</th><th>责任方</th><th>操作</th></tr></thead>
-      <tbody>
-        ${rows.length ? rows.map((item) => `
-          <tr>
-            <td>${statusLabel(item.domain)}</td>
-            <td><strong>${zhText(item.title)}</strong><br /><small>${zhText(item.sourceCollection)} ${text(item.sourceId)}</small></td>
-            <td>${statusLabel(item.normalizedStatus || item.status)}</td>
-            <td>${zhText(item.owner || item.institutionName)}</td>
-            <td>${canDispatch ? `<button class="inline-action" type="button" data-dispatch="${item.id}">派发</button>` : statusLabel(item.ownerRole || "view")}</td>
-          </tr>
-        `).join("") : emptyRow(5)}
-      </tbody>
-    </table>
-  `);
+  const tableRows = rows.map((item) => createQualityElement("tr", {}, [
+    qualityTextElement("td", statusLabel(item.domain)),
+    createQualityElement("td", {}, qualityLine(zhText(item.title), `${zhText(item.sourceCollection)} ${text(item.sourceId)}`)),
+    qualityTextElement("td", statusLabel(item.normalizedStatus || item.status)),
+    qualityTextElement("td", zhText(item.owner || item.institutionName)),
+    createQualityElement("td", {}, canDispatch ? qualityActionButton("派发", { dispatch: item.id }) : qualityTextElement("span", statusLabel(item.ownerRole || "view")))
+  ]));
+  mountQualityContent("quality-safety-issues", qualityTable(["领域", "问题", "状态", "责任方", "操作"], tableRows, "当前筛选条件下暂无记录"));
 }
 
 function renderSiteSignoffs(rows) {
   const role = qualitySafetyState?.role || "";
   const canReview = qualitySafetyState?.role === "commission";
   const canSubmit = (item) => role === "commission" || item.ownerRole === role;
-  setHtml("quality-safety-signoffs", `
-    <table>
-      <thead><tr><th>事项</th><th>责任方</th><th>状态</th><th>证据</th><th>操作</th></tr></thead>
-      <tbody>
-        ${rows.length ? rows.map((item) => `
-          <tr>
-            <td><strong>${zhText(item.item)}</strong><br /><small>${statusLabel(item.domain)} / ${(item.sourceCollections || []).map(zh).join("、")}</small></td>
-            <td>${zhText(item.owner)}<br /><small>${statusLabel(item.ownerRole)}</small></td>
-            <td>${statusLabel(item.status)}<br /><small>截止 ${text(item.dueAt)}</small></td>
-            <td>${zhText(item.requiredEvidenceText)}<br /><small>${item.evidenceCount || 0} 项证据，${item.auditCount || 0} 条审计</small></td>
-            <td>
-              ${canSubmit(item) ? `<button class="inline-action" type="button" data-signoff-evidence="${item.id}">提交证据</button>` : ""}
-              ${canReview ? `<button class="inline-action" type="button" data-signoff-review="${item.id}">记录联调</button>` : ""}
-              ${!canSubmit(item) && !canReview ? statusLabel("view") : ""}
-            </td>
-          </tr>
-        `).join("") : emptyRow(5)}
-      </tbody>
-    </table>
-  `);
+  const tableRows = rows.map((item) => {
+    const actions = [];
+    if (canSubmit(item)) actions.push(qualityActionButton("提交证据", { signoffEvidence: item.id }));
+    if (canReview) actions.push(qualityActionButton("记录联调", { signoffReview: item.id }));
+    if (!actions.length) actions.push(qualityTextElement("span", statusLabel("view")));
+    return createQualityElement("tr", {}, [
+      createQualityElement("td", {}, qualityLine(zhText(item.item), `${statusLabel(item.domain)} / ${(item.sourceCollections || []).map(zh).join("、")}`)),
+      createQualityElement("td", {}, [qualityTextElement("span", zhText(item.owner)), createQualityElement("br"), qualityTextElement("small", statusLabel(item.ownerRole))]),
+      createQualityElement("td", {}, [qualityTextElement("span", statusLabel(item.status)), createQualityElement("br"), qualityTextElement("small", `截止 ${text(item.dueAt)}`)]),
+      createQualityElement("td", {}, [qualityTextElement("span", zhText(item.requiredEvidenceText)), createQualityElement("br"), qualityTextElement("small", `${item.evidenceCount || 0} 项证据，${item.auditCount || 0} 条审计`)]),
+      createQualityElement("td", {}, actions)
+    ]);
+  });
+  mountQualityContent("quality-safety-signoffs", qualityTable(["事项", "责任方", "状态", "证据", "操作"], tableRows, "当前筛选条件下暂无记录"));
 }
 
 function renderInterfaceJointTestPack(pack, validationResult = null) {
@@ -825,54 +731,43 @@ function renderInterfaceJointTestPack(pack, validationResult = null) {
   const sampleRows = pack.sampleRequests || [];
   const acceptanceRows = pack.siteSampleAcceptance || [];
   const resultText = validationResult ? `${statusLabel(validationResult.status)}：${validationResult.errors?.map((item) => item.code).join("、") || "已通过"}` : "尚未手动校验";
-  setHtml("quality-safety-interface-pack", `
-    <div class="rules">
-      <div class="rule-card">
-        <strong>${pack.ok ? "联调包已就绪" : "联调包需复核"}</strong>
-        <span>${pack.summary.sampleAccepted}/${pack.summary.sampleRequests} 个样例通过</span>
-        <p>${(pack.checks || []).map((item) => `${item.passed ? "通过" : "未通过"} ${zhText(item.id)}`).join("；")}</p>
-      </div>
-      <div class="rule-card">
-        <strong>${pack.securityFixture.algorithm}</strong>
-        <span>${pack.securityFixture.demoSecretName}</span>
-        <p>${zhText(pack.securityFixture.signatureBase)}</p>
-      </div>
-      <div class="rule-card">
-        <strong>最近校验</strong>
-        <span>${validationResult?.ok ? "已通过" : validationResult ? "未通过" : "待校验"}</span>
-        <p>${resultText}</p>
-      </div>
-    </div>
-    <table>
-      <thead><tr><th>接口</th><th>路径</th><th>幂等键</th><th>正文哈希</th><th>操作</th></tr></thead>
-      <tbody>
-        ${sampleRows.map((item) => `
-          <tr>
-            <td><strong>${zhText(item.interfaceId)}</strong><br /><small>${zhText(item.message?.eventType)}</small></td>
-            <td>${text(item.method)} ${text(item.path)}</td>
-            <td>${text(item.headers?.["X-Idempotency-Key"])}</td>
-            <td>${text(item.bodySha256).slice(0, 16)}...</td>
-            <td><button class="inline-action" type="button" data-interface-validate="${item.interfaceId}">校验样例</button></td>
-          </tr>
-        `).join("")}
-      </tbody>
-    </table>
-    <table>
-      <thead><tr><th>现场样例</th><th>责任系统</th><th>现场输入</th><th>验收证据</th><th>验证命令</th><th>状态</th></tr></thead>
-      <tbody>
-        ${acceptanceRows.length ? acceptanceRows.map((item) => `
-          <tr>
-            <td><strong>${zhText(item.interfaceId)}</strong><br /><small>${zhText(item.eventType)} / ${text(item.sampleMessageId)}</small></td>
-            <td>${zhText(item.owner)}<br /><small>${zhText(item.targetCollection)}</small></td>
-            <td>${(item.siteInputs || []).map(zhText).join("、")}</td>
-            <td>${(item.acceptanceEvidence || []).map(zhText).join("、")}<br /><small>${text(item.bodySha256).slice(0, 16)}...</small></td>
-            <td><code>${text(item.verificationCommand)}</code></td>
-            <td>${statusLabel(item.status)}<br /><small>${zhText(item.validationStatus)}</small></td>
-          </tr>
-        `).join("") : emptyRow(6, "暂无现场样例验收")}
-      </tbody>
-    </table>
-  `);
+  const rules = createQualityElement("div", { className: "rules" }, [
+    createQualityElement("div", { className: "rule-card" }, [
+      qualityTextElement("strong", pack.ok ? "联调包已就绪" : "联调包需复核"),
+      qualityTextElement("span", `${pack.summary.sampleAccepted}/${pack.summary.sampleRequests} 个样例通过`),
+      qualityTextElement("p", (pack.checks || []).map((item) => `${item.passed ? "通过" : "未通过"} ${zhText(item.id)}`).join("；"))
+    ]),
+    createQualityElement("div", { className: "rule-card" }, [
+      qualityTextElement("strong", pack.securityFixture.algorithm),
+      qualityTextElement("span", pack.securityFixture.demoSecretName),
+      qualityTextElement("p", zhText(pack.securityFixture.signatureBase))
+    ]),
+    createQualityElement("div", { className: "rule-card" }, [
+      qualityTextElement("strong", "最近校验"),
+      qualityTextElement("span", validationResult?.ok ? "已通过" : validationResult ? "未通过" : "待校验"),
+      qualityTextElement("p", resultText)
+    ])
+  ]);
+  const sampleTableRows = sampleRows.map((item) => createQualityElement("tr", {}, [
+    createQualityElement("td", {}, qualityLine(zhText(item.interfaceId), zhText(item.message?.eventType))),
+    qualityTextElement("td", `${text(item.method)} ${text(item.path)}`),
+    qualityTextElement("td", text(item.headers?.["X-Idempotency-Key"])),
+    qualityTextElement("td", `${text(item.bodySha256).slice(0, 16)}...`),
+    createQualityElement("td", {}, qualityActionButton("校验样例", { interfaceValidate: item.interfaceId }))
+  ]));
+  const acceptanceTableRows = acceptanceRows.map((item) => createQualityElement("tr", {}, [
+    createQualityElement("td", {}, qualityLine(zhText(item.interfaceId), `${zhText(item.eventType)} / ${text(item.sampleMessageId)}`)),
+    createQualityElement("td", {}, [qualityTextElement("span", zhText(item.owner)), createQualityElement("br"), qualityTextElement("small", zhText(item.targetCollection))]),
+    qualityTextElement("td", (item.siteInputs || []).map(zhText).join("、")),
+    createQualityElement("td", {}, [qualityTextElement("span", (item.acceptanceEvidence || []).map(zhText).join("、")), createQualityElement("br"), qualityTextElement("small", `${text(item.bodySha256).slice(0, 16)}...`)]),
+    createQualityElement("td", {}, qualityTextElement("code", text(item.verificationCommand))),
+    createQualityElement("td", {}, [qualityTextElement("span", statusLabel(item.status)), createQualityElement("br"), qualityTextElement("small", zhText(item.validationStatus))])
+  ]));
+  mountQualityContent("quality-safety-interface-pack", [
+    rules,
+    qualityTable(["接口", "路径", "幂等键", "正文哈希", "操作"], sampleTableRows),
+    qualityTable(["现场样例", "责任系统", "现场输入", "验收证据", "验证命令", "状态"], acceptanceTableRows, "暂无现场样例验收")
+  ]);
 }
 
 function renderRectifications(rows) {
@@ -880,41 +775,33 @@ function renderRectifications(rows) {
   const canReview = role === "commission";
   const canFeedback = ["institution", "county", "commission"].includes(role);
   const canEscalate = role === "commission";
-  setHtml("quality-safety-rectifications", `
-    <table>
-      <thead><tr><th>工单</th><th>整改要求</th><th>状态</th><th>SLA</th><th>证据</th><th>操作</th></tr></thead>
-      <tbody>
-        ${rows.length ? rows.map((item) => `
-          <tr>
-            <td><strong>${item.id}</strong><br /><small>${zhText(item.institutionName)}</small></td>
-            <td>${zhText(item.requirement)}</td>
-            <td>${statusLabel(item.normalizedStatus || item.status)}</td>
-            <td>${statusLabel(item.slaStatus)}<br /><small>${item.daysRemaining === null ? "-" : `${item.daysRemaining} 天`}</small></td>
-            <td>${item.evidenceComplete ? "完整" : "待补充"}<br /><small>${(item.feedback || []).length} 条反馈</small></td>
-            <td>
-              ${canFeedback ? `<button class="inline-action" type="button" data-feedback="${item.id}">反馈</button>` : ""}
-              ${canReview ? `<button class="inline-action" type="button" data-review="${item.id}">复核</button>` : ""}
-              ${canEscalate && item.normalizedStatus !== "closed" ? `<button class="inline-action" type="button" data-escalate="${item.id}">升级</button>` : ""}
-            </td>
-          </tr>
-        `).join("") : emptyRow(6)}
-      </tbody>
-    </table>
-  `);
+  const tableRows = rows.map((item) => {
+    const actions = [];
+    if (canFeedback) actions.push(qualityActionButton("反馈", { feedback: item.id }));
+    if (canReview) actions.push(qualityActionButton("复核", { review: item.id }));
+    if (canEscalate && item.normalizedStatus !== "closed") actions.push(qualityActionButton("升级", { escalate: item.id }));
+    return createQualityElement("tr", {}, [
+      createQualityElement("td", {}, qualityLine(item.id, zhText(item.institutionName))),
+      qualityTextElement("td", zhText(item.requirement)),
+      qualityTextElement("td", statusLabel(item.normalizedStatus || item.status)),
+      createQualityElement("td", {}, [qualityTextElement("span", statusLabel(item.slaStatus)), createQualityElement("br"), qualityTextElement("small", item.daysRemaining === null ? "-" : `${item.daysRemaining} 天`)]),
+      createQualityElement("td", {}, [qualityTextElement("span", item.evidenceComplete ? "完整" : "待补充"), createQualityElement("br"), qualityTextElement("small", `${(item.feedback || []).length} 条反馈`)]),
+      createQualityElement("td", {}, actions)
+    ]);
+  });
+  mountQualityContent("quality-safety-rectifications", qualityTable(["工单", "整改要求", "状态", "SLA", "证据", "操作"], tableRows, "当前筛选条件下暂无记录"));
 }
 
 function renderCritical(rows) {
   const canHandleCritical = ["institution", "commission"].includes(qualitySafetyState?.role || "");
-  setHtml("quality-safety-critical", rows.map((item) => `
-    <div class="rule-card">
-      <strong>${zhText(item.item)} ${text(item.value)}</strong>
-      <span>${statusLabel(item.status)}</span>
-      <p>${zhText(item.action)}</p>
-      <small>${item.acknowledgementComplete ? "已确认" : "待确认"} / ${item.dispositionComplete ? "已处置" : "待处置"}</small>
-      ${canHandleCritical && !item.acknowledgementComplete ? `<button class="inline-action" type="button" data-critical-ack="${item.id}">确认</button>` : ""}
-      ${canHandleCritical && item.acknowledgementComplete && !item.dispositionComplete ? `<button class="inline-action" type="button" data-critical-dispose="${item.id}">处置</button>` : ""}
-    </div>
-  `).join(""));
+  mountQualityContent("quality-safety-critical", rows.map((item) => createQualityElement("div", { className: "rule-card" }, [
+    qualityTextElement("strong", `${zhText(item.item)} ${text(item.value)}`),
+    qualityTextElement("span", statusLabel(item.status)),
+    qualityTextElement("p", zhText(item.action)),
+    qualityTextElement("small", `${item.acknowledgementComplete ? "已确认" : "待确认"} / ${item.dispositionComplete ? "已处置" : "待处置"}`),
+    canHandleCritical && !item.acknowledgementComplete ? qualityActionButton("确认", { criticalAck: item.id }) : null,
+    canHandleCritical && item.acknowledgementComplete && !item.dispositionComplete ? qualityActionButton("处置", { criticalDispose: item.id }) : null
+  ])));
 }
 
 function renderBoundaries(data) {
@@ -924,22 +811,14 @@ function renderBoundaries(data) {
     ...(data.medicalRecordQualityReviews || []).map((item) => ({ id: item.id, type: "Medical record QC", name: item.sampleNo, status: item.status, next: item.nextAction })),
     ...(data.mutualRecognitionQualityReviews || []).map((item) => ({ id: item.id, type: "Mutual recognition QC", name: item.item, status: item.status, next: item.nextAction }))
   ];
-  setHtml("quality-safety-boundaries", `
-    <table>
-      <thead><tr><th>边界</th><th>名称</th><th>状态</th><th>下一步</th><th>操作</th></tr></thead>
-      <tbody>
-        ${rows.map((item) => `
-          <tr>
-            <td>${zh(item.type)}</td>
-            <td>${zhText(item.name)}</td>
-            <td>${statusLabel(item.status)}</td>
-            <td>${zhText(item.next)}</td>
-            <td>${canReviewPathway && item.reviewable ? `<button class="inline-action" type="button" data-pathway-review="${item.id}">复核路径</button>` : statusLabel(item.type === "Clinical pathway" ? "tracked" : "view")}</td>
-          </tr>
-        `).join("")}
-      </tbody>
-    </table>
-  `);
+  const tableRows = rows.map((item) => createQualityElement("tr", {}, [
+    qualityTextElement("td", zh(item.type)),
+    qualityTextElement("td", zhText(item.name)),
+    qualityTextElement("td", statusLabel(item.status)),
+    qualityTextElement("td", zhText(item.next)),
+    createQualityElement("td", {}, canReviewPathway && item.reviewable ? qualityActionButton("复核路径", { pathwayReview: item.id }) : qualityTextElement("span", statusLabel(item.type === "Clinical pathway" ? "tracked" : "view")))
+  ]));
+  mountQualityContent("quality-safety-boundaries", qualityTable(["边界", "名称", "状态", "下一步", "操作"], tableRows));
 }
 
 function renderQualitySafety(data) {
@@ -1011,7 +890,7 @@ async function loadQualitySafety() {
   try {
     renderQualitySafety(await qualityApi("/quality-safety/dashboard"));
   } catch (error) {
-    setHtml("quality-safety-issues", `<p>${error.message}</p>`);
+    mountQualityContent("quality-safety-issues", qualityTextElement("p", error.message));
   }
 }
 
@@ -1020,7 +899,7 @@ async function loadQualitySafetyInterfacePack() {
     qualitySafetyInterfacePack = await qualityApi("/quality-safety/interface-joint-test-pack");
     renderInterfaceJointTestPack(qualitySafetyInterfacePack, qualitySafetyValidationResult);
   } catch (error) {
-    setHtml("quality-safety-interface-pack", `<p>${error.message}</p>`);
+    mountQualityContent("quality-safety-interface-pack", qualityTextElement("p", error.message));
   }
 }
 

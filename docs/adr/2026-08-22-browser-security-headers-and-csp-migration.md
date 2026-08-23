@@ -129,6 +129,17 @@ NO-GO，兼容 `unsafe-inline`、严格 Report-Only 和 `productionReady=false` 
 OHIF/外部 Origin、独立渗透与现场验收继续 NO-GO，兼容 `unsafe-inline`、严格 Report-Only 和
 `productionReady=false` 保持不变。
 
+### 质量安全工作台可信渲染切片（2026-08-23）
+
+`quality-safety.js` 原有唯一 `innerHTML` 是整页共享挂载入口，实际承载 dashboard 与 interface joint-test
+pack 的二十余个渲染区，而非一个低风险文本点。迁移前先以恶意 API 字段冻结文本、dataset 与委托按钮
+交互，迁移后将表头、空态、固定 class、dataset 和动作节点改为显式 `createElement`、`textContent`、
+`append` 与 `replaceChildren`，且不新增 sanitizer 或扫描忽略。Inventory v2 的 DOM HTML occurrence
+由 841 降为 840，覆盖资产由 37 降为 36，其中 `innerHTML` 837→836；动态 URL 6 和动态样式 45 均未改变。
+该切片不改变 API、commission 鉴权、数据、schema、审计、CI 或 CSP enforcement；真实托管头、
+OHIF/外部 Origin、独立渗透与现场验收继续 NO-GO，兼容 `unsafe-inline`、严格 Report-Only 和
+`productionReady=false` 保持不变。
+
 ## Phased enforcement and rollback
 
 1. 第一阶段：集中端口、兼容 CSP + 严格 Report-Only、风险清单、CI 增量拒绝；固定 `productionReady=false`。
