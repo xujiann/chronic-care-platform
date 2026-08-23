@@ -301,6 +301,8 @@ PostgreSQL、release、报告或归档产物。API 热点隔离配置只登记�
 首个 API 夹具切片把原测试正文已有的 seed 变换原样封装到 `test/helpers/api-regression-runtime.js`：仍从受跟踪
 `data/db.json` 只读复制到系统临时目录，只向副本加入相同测试账号、机构和 SMS accepted fixture，服务停止后删除；
 它不写回源文件，不创建 migration，也不把 accepted fixture 解释为 provider receipt 或上线证据。
+第二个夹具切片只移动单个 HIS mock 的进程内请求数组、临时环境变量和 HTTP 生命周期；`receiptId` 仍是
+原 API 回归的 synthetic 响应，既不持久化到新的事实源，也不代表真实 HIS 回执、现场联调或生产证据。
 两个前端文件去重的 16 项仅是静态中文翻译键；shadow map 只存在测试代码，既不成为新的业务字典，
 也不写入运行时状态。两项历史覆盖值继续采用原 JavaScript 最终生效值，不改变数据模型或展示输入。
 

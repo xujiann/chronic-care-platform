@@ -181,6 +181,10 @@ CORE_DATA_DEFINITIONS → collection-governance → CI/release 治理投影`。�
 - 首个夹具切片的测试依赖方向为 `test/api.test.js -> test/helpers/api-regression-runtime.js -> server.js + 临时 JSON 副本`。
   helper 不被运行时代码或其他领域模块反向引用；server 仍只启动一次，43 个子测试仍在同一进程按原顺序共享状态，
   因此没有新增运行时依赖、静态环、并行写入或 CI 拓扑变化。
+- 第二个夹具切片新增且仅新增测试依赖
+  `test/api.test.js -> test/helpers/hospital-adapter-mock-runtime.js -> node:http`；helper 只管理一个子测试已有的
+  HIS mock 生命周期，不依赖运行时代码、financial/alert/storage mock 或其他测试阶段，也不改变 server 共享状态、
+  integration 成员、43 项顺序、CI 拓扑和预算。
 - 两个前端翻译 map 继续由原 `displayText` / `zh` / `zhText` / `statusLabel` 调用链消费；去重不引入
   共享运行时模块或新依赖。专项 Node 测试读取并隔离执行这些纯翻译边界，标准 unit 自动发现负责漂移门禁。
 - care revalidation 的依赖方向为

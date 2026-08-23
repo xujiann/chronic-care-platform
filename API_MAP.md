@@ -233,6 +233,9 @@ method/path、幂等、审计、notification plan 与 outbox 语义不变；plan
 首个 API 夹具切片只把临时数据副本、环境变量和同一 HTTP server 生命周期移动到测试 helper；测试正文的
 43 个有序子测试及其请求、身份、scope、幂等、错误和审计断言原样保留。helper 暴露的 fixture 与数字医院
 配置函数仅供同一测试进程继续执行既有断言，不是新 API、公共 SDK 或生产信任接口。
+第二个夹具切片只把 HIS hospital adapter mock 的创建、动态回环监听、3 个测试环境变量及关闭清理移入
+测试 helper；既有 `/api/integration/*` method/path、请求与 provider 响应、HMAC 签名、回执次数、鉴权、
+scope、幂等、错误和审计断言均不变。synthetic `his-provider-*` 只用于回归，不能解释为外部 HIS 投递证据。
 
 ## 18A. TEST-002 内部覆盖扩展（无 API 变化）
 
