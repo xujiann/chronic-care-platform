@@ -43,7 +43,7 @@
 - 核心数据采用 closed-world 定义，不随功能任务创建平行概念。
 - 临床五子域继续在模块化单体内逐用例迁移；影像 share 首个公开写用例已进入 imaging route/module，中央路由顺序、公开 API、数据集合和部署边界均未改变，其余混合路由债务继续按 Accepted ADR 治理。
 - 静态内容安全边界已按 Accepted ADR 实施并合入 `main@6c18221`；Node 与 Pages 共用显式发布清单，浏览器只消费合成脱敏快照。
-- 生产 API 目录从现有 route source inventory 与授权矩阵派生；所有条目默认 `NO-GO`，静态幂等标记和仓库门禁不构成生产证据。
+- 生产 API 目录从现有 route source inventory 与授权矩阵派生；当前 12 份行为合同覆盖 10 个完整 endpoint 与 2 个 action-slice。T07 formal grouping create 已建立市级资源范围、单进程命令锁、锁内重读、稳定错误和 queued job+audit 单次提交，但不宣称跨实例 exactly-once。所有条目默认 `NO-GO`，静态幂等标记和仓库门禁不构成生产证据。
 - 区域共享两个 GET builder 已进入 `regional-sharing-read-model.v1`，shared-05 只通过显式 capability
   消费；T00 继续承担跨 owner 组合，目标 bounded context 和四个集合的数据 owner 仍为 T02，生产事务与现场证据继续 NO-GO。
 - State collection 数据 owner 只来自现有 owner/system 合同；process owner 和源码引用仅作为证据。

@@ -2,6 +2,92 @@
 
 const InsurancePaymentRefundTransaction = require("../../../insurance-payment-refund-transaction");
 
+const formalGroupingCreateTails = new Map();
+const FORMAL_GROUPING_COMMISSION_SCOPES = new Set(["city", "health_admin", "platform"]);
+const FORMAL_GROUPING_INSURANCE_SCOPES = new Set(["insurance_center", "insurance_bureau"]);
+
+function formalGroupingCreateScopeAllowed(user = {}) {
+  const role = String(user.role || "").trim();
+  const orgType = String(user.orgType || "").trim().toLowerCase();
+  if (role === "commission") return FORMAL_GROUPING_COMMISSION_SCOPES.has(orgType);
+  if (role === "insurance") return FORMAL_GROUPING_INSURANCE_SCOPES.has(orgType);
+  return false;
+}
+
+function withFormalGroupingCreateLock(commandKey, work) {
+  const previous = formalGroupingCreateTails.get(commandKey) || Promise.resolve();
+  const pending = previous.then(work, work);
+  const tail = pending.then(() => undefined, () => undefined);
+  formalGroupingCreateTails.set(commandKey, tail);
+  tail.finally(() => {
+    if (formalGroupingCreateTails.get(commandKey) === tail) formalGroupingCreateTails.delete(commandKey);
+  });
+  return pending;
+}
+
+function requireFormalGroupingCreatePayload(payload) {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    throw new SyntaxError("formal grouping body must be an object");
+  }
+  if (!new Set(["DRG", "DIP"]).has(payload.mode)) {
+    const error = new Error("formal grouping mode must be DRG or DIP");
+    error.code = "FORMAL_GROUPING_JOB_INVALID";
+    throw error;
+  }
+  if (typeof payload.schemeVersion !== "string" || !payload.schemeVersion.trim()) {
+    const error = new Error("formal grouping scheme version is required");
+    error.code = "FORMAL_GROUPING_JOB_INVALID";
+    throw error;
+  }
+  if (!Array.isArray(payload.caseIds) || payload.caseIds.length === 0 || payload.caseIds.some((item) => typeof item !== "string" || !item.trim())) {
+    const error = new Error("formal grouping case ids must be a non-empty string array");
+    error.code = "FORMAL_GROUPING_JOB_INVALID";
+    throw error;
+  }
+  if (payload.maxAttempts !== undefined && (!Number.isSafeInteger(payload.maxAttempts) || payload.maxAttempts < 1 || payload.maxAttempts > 5)) {
+    const error = new Error("formal grouping max attempts must be an integer from 1 to 5");
+    error.code = "FORMAL_GROUPING_JOB_INVALID";
+    throw error;
+  }
+  for (const field of ["id", "correlationId", "idempotencyKey"]) {
+    if (payload[field] !== undefined && (typeof payload[field] !== "string" || !payload[field].trim() || payload[field].length > 160)) {
+      const error = new Error(`formal grouping ${field} is invalid`);
+      error.code = "FORMAL_GROUPING_JOB_INVALID";
+      throw error;
+    }
+  }
+  return payload;
+}
+
+function formalGroupingCreateError(error) {
+  const message = String(error?.message || "");
+  if (error instanceof SyntaxError) {
+    return { status: 400, error: "Bad Request", code: "FORMAL_GROUPING_JOB_BODY_INVALID", message: "formal grouping job body is invalid" };
+  }
+  if (message.includes("病例不存在")) {
+    return { status: 404, error: "Not Found", code: "FORMAL_GROUPING_CASE_NOT_FOUND", message: "formal grouping case was not found" };
+  }
+  if (message.includes("幂等键已绑定不同")) {
+    return { status: 409, error: "Conflict", code: "FORMAL_GROUPING_JOB_IDEMPOTENCY_CONFLICT", message: "formal grouping idempotency key is bound to another request" };
+  }
+  if (message.includes("作业编号已存在")) {
+    return { status: 409, error: "Conflict", code: "FORMAL_GROUPING_JOB_ID_CONFLICT", message: "formal grouping job id already exists" };
+  }
+  if (message.includes("关联号已存在")) {
+    return { status: 409, error: "Conflict", code: "FORMAL_GROUPING_JOB_CORRELATION_CONFLICT", message: "formal grouping correlation id already exists" };
+  }
+  if (message.includes("交叉校验失败") || message.includes("状态投影或事件账本校验失败")) {
+    return { status: 409, error: "Conflict", code: "FORMAL_GROUPING_JOB_INTEGRITY_CONFLICT", message: "formal grouping job integrity verification failed" };
+  }
+  if (message.includes("SQLite optimistic lock conflict")) {
+    return { status: 409, error: "Conflict", code: "FORMAL_GROUPING_JOB_VERSION_CONFLICT", message: "formal grouping state changed; retry with a fresh snapshot" };
+  }
+  if (error?.code === "FORMAL_GROUPING_JOB_INVALID" || message.includes("方案版本") || message.includes("至少包含一个病例") || message.includes("最大尝试次数") || message.includes("契约校验失败")) {
+    return { status: 400, error: "Bad Request", code: "FORMAL_GROUPING_JOB_INVALID", message: "formal grouping job request is invalid" };
+  }
+  return { status: 500, error: "Service Unavailable", code: "FORMAL_GROUPING_JOB_STORAGE_FAILED", message: "formal grouping job storage failed" };
+}
+
 function createRouteSegments(runtime) {
   const { DiseasePaymentGrouperContract, DiseasePaymentIntake, DiseasePaymentService, FinancialCallbackError, OnlinePaymentRefunds, appendSecurityEvent, applyFinancialCallback, authorizeInsurancePaymentAction, collectJson, createFinancialReconciliationRun, diseasePaymentPackageSignatureOptions, dispatchFinancialRequest, financialDispatchRequestDigest, financialGatewayCenter, financialGatewayOperationsCenter, normalizeState, patchBusinessCollectionItem, prependAuditTrailEntry, randomUUID, readDatabase, requireApiRole, requireInsuranceSystemCommand, sendInsurancePaymentError, sendJson, validateFinancialRequest, verifyFinancialCallback, withFinancialDispatchLock, withFinancialDispatchStateLock, withFinancialReconciliationLock, writeDatabase } = runtime;
   return [
@@ -942,14 +1028,60 @@ function createRouteSegments(runtime) {
         const user = requireApiRole(req, res, ["insurance", "commission"], url.pathname);
         if (!user) return true;
         if (!authorizeInsurancePaymentAction("formal-grouping.create", user, res, url.pathname)) return true;
-        const data = readDatabase();
+        if (!formalGroupingCreateScopeAllowed(user)) {
+          try {
+            appendSecurityEvent({
+              actor: user.name,
+              role: user.role,
+              action: "create formal grouping job",
+              target: url.pathname,
+              result: "denied",
+              detail: "FORMAL_GROUPING_CASE_SCOPE_DENIED"
+            });
+          } catch (error) {
+            const response = formalGroupingCreateError(error);
+            sendJson(res, response.status, { error: response.error, code: response.code, message: response.message });
+            return true;
+          }
+          sendJson(res, 403, {
+            error: "Forbidden",
+            code: "FORMAL_GROUPING_CASE_SCOPE_DENIED",
+            message: "formal grouping creation requires a city-level platform or insurance scope"
+          });
+          return true;
+        }
         try {
-          const result = DiseasePaymentIntake.createFormalGroupingJob(DiseasePaymentService.normalizeState(data.diseasePayment), await collectJson(req), user.name);
-          data.diseasePayment = result.state;
-          writeDatabase(data);
+          const payload = requireFormalGroupingCreatePayload(await collectJson(req));
+          const explicitIdempotencyKey = String(payload.idempotencyKey || "").trim();
+          const commandKey = explicitIdempotencyKey
+            ? `explicit:${DiseasePaymentIntake.digest(explicitIdempotencyKey)}`
+            : "implicit-formal-grouping-create";
+          const result = await withFormalGroupingCreateLock(commandKey, () => {
+            const data = readDatabase();
+            const created = DiseasePaymentIntake.createFormalGroupingJob(
+              DiseasePaymentService.normalizeState(data.diseasePayment),
+              payload,
+              user.name
+            );
+            if (created.idempotent) return created;
+            data.diseasePayment = created.state;
+            data.securityEvents = prependAuditTrailEntry(data.securityEvents, {
+              id: randomUUID(),
+              at: new Date().toLocaleString("zh-CN", { hour12: false }),
+              actor: user.name,
+              role: user.role,
+              action: "create formal grouping job",
+              target: created.job.id,
+              result: "allowed",
+              detail: `${created.job.correlationId}:${created.job.requestDigest}:${created.job.caseIds.length}`
+            });
+            writeDatabase(data);
+            return created;
+          });
           sendJson(res, result.idempotent ? 200 : 201, { job: result.job, envelope: result.envelope, idempotent: result.idempotent });
         } catch (error) {
-          sendJson(res, 409, { error: "Conflict", message: error.message });
+          const response = formalGroupingCreateError(error);
+          sendJson(res, response.status, { error: response.error, code: response.code, message: response.message });
         }
         return true;
       }
