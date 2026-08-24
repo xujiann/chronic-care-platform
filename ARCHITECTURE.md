@@ -41,6 +41,7 @@
 - 采用模块化单体；微服务提取必须达到机器评分和运维/数据门槛。
 - v1–v14 SQLite migration 语义冻结，后续采用独立、内容指纹化 migration。
 - 核心数据采用 closed-world 定义，不随功能任务创建平行概念。
+- 临床五子域继续在模块化单体内逐用例迁移；影像 share 首个公开写用例已进入 imaging route/module，中央路由顺序、公开 API、数据集合和部署边界均未改变，其余混合路由债务继续按 Accepted ADR 治理。
 - 静态内容安全边界已按 Accepted ADR 实施并合入 `main@6c18221`；Node 与 Pages 共用显式发布清单，浏览器只消费合成脱敏快照。
 - 生产 API 目录从现有 route source inventory 与授权矩阵派生；所有条目默认 `NO-GO`，静态幂等标记和仓库门禁不构成生产证据。
 - 区域共享两个 GET builder 已进入 `regional-sharing-read-model.v1`，shared-05 只通过显式 capability
