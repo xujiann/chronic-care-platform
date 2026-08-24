@@ -1,8 +1,8 @@
 # CURRENT ARCHITECTURE — 主线现状地图
 
 > 实施分支 AS-IS 快照：历史采样基于 `main@a15d10dc67a7fd89540d3073ece34b5d8c7b942e`；
-> 当前对账基线为 `origin/main@1b976b5dd26d43b93aa41553c4296f766881434c` 加
-> `process/t06-imaging-qc-boundary-20260824`
+> 当前对账基线为 `origin/main@fbe815dcb17ddb5a87874e6c6db16aaf8a4d5d70` 加
+> `process/t00-postgres-transition-ops-20260824`
 > 采集日期：2026-08-24
 > 性质：AS-IS，只描述已存在实现，不表达目标状态或实施授权。
 
@@ -29,7 +29,7 @@ flowchart TB
 
 ## 2. 仓库结构
 
-本治理切片闭集盘点 1,571 个受跟踪及本分支待跟踪文件，其中 JavaScript 1,073、Markdown 264、JSON 106、HTML 44。主要目录：
+本治理切片闭集盘点 1,576 个受跟踪及本分支待跟踪文件，其中 JavaScript 1,077、Markdown 265、JSON 106、HTML 44。主要目录：
 
 | 路径 | 作用 | 当前边界 |
 |---|---|---|
@@ -42,7 +42,7 @@ flowchart TB
 | `data/` | 被跟踪的 `db.json` 开发/迁移输入 | 浏览器只读取运行时或构建时生成的 `public-demo.json`；生成物不入库 |
 | `deploy/` | SQL、systemd、Compose、环境模板和现场验证 | 生产证据默认 NO-GO |
 | `scripts/` | 测试、readiness、报告、部署和后台 worker | 187 个根级文件，职责和产物较分散 |
-| `test/` | Node test 与 Playwright | 477 个 test/spec 文件（457 Node、20 个 Playwright E2E spec 文件，含居民与 PWA 专项） |
+| `test/` | Node test 与 Playwright | 480 个 test/spec 文件（460 Node、20 个 Playwright E2E spec 文件，含居民与 PWA 专项） |
 | `regions/` | 多地区部署配置 | 由区域清单和发布注册表控制 |
 | `digital-hospital-standard-platform/` | 内嵌数智医院展示前端 | 独立页面但仍共享主仓发布生命周期 |
 | `resident-mini-program-platform/` | 居民小程序适配前端 | 独立页面但仍共享主仓发布生命周期 |
@@ -253,7 +253,7 @@ Worker、外部数字医院注册及仍为 Proposed 的对象存储 v2 worker �
 `baseline/governance-20260817-enhancement-v1` 仅保留为可复现证据 tag。历史日期化路由/治理文档不再被
 `AGENTS.md` 作为当前工作流入口引用，原文和摘要保持不变。
 
-`repository-governance-v1` 从 Git 路径派生 264 份 Markdown 的闭集清单：195 份 `current`、68 份
+`repository-governance-v1` 从 Git 路径派生 265 份 Markdown 的闭集清单：196 份 `current`、68 份
 `snapshot`、1 份 `superseded`，每个路径必须唯一命中规则；snapshot 内容聚合摘要失败关闭。
 `output/pdf` 的 3 个 PDF 未修改，分别绑定 SHA-256、大小、页数、引入提交、来源与保留理由。现有仓库
 没有任何一个 PDF 的可复现生成器；医院运行脚本只是 verifier，不能被描述为 generator。机器门禁只读，
@@ -262,3 +262,12 @@ Worker、外部数字医院注册及仍为 Proposed 的对象存储 v2 worker �
 ## 2026-08-23 金融写入证据边界
 
 金融 callback 的中央落盘守卫只接受 HMAC 验签器生成、绑定目标 gateway event 的进程内单次证明，并在全账本拒绝 callback event/nonce 跨账项重放。证明不入库、不写日志、不出公共响应。成功 finalize 必须携带与 gateway type、operation、status 一致的 provider receipt 和 dispatchedAt；失败 finalize 必须携带稳定失败码、失败时间、死信原因和死信标记。该边界仍不替代真实 provider、PostgreSQL 多实例和现场验收。
+
+## 2026-08-24 PostgreSQL 受控切换评估与部署闭包
+
+T00 新增独立 `postgres-primary-transition-readiness-v1` CLI，只读取仓库外绝对路径的普通非 symlink、
+不超过 1 MiB 的闭集 metadata-only JSON，并以调用方必填的小写 SHA-256 固定打开 descriptor 的内容，
+再复用现有主存储配置和七门评估。部署包现包含 migration、
+primary-read、adapter、storage-admin、shadow sync/reconciliation 的脚本、schema、service/timer 与 env
+模板；两个 PostgreSQL job 已登记但不启动。七门全部通过最多表示可进入受控演练，所有 production/activation
+标志保持 false，`DATABASE_URL` 只登记为 secret 引用；HTTP、SQLite、schema 和 strict preflight 未改变。

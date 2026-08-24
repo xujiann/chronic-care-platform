@@ -40,6 +40,68 @@ const WORKER_OBSERVABILITY_RUNTIME_FILES = [
   "config/worker-observability-contract.json",
   "src/platform/operations/worker-observability-contract.js"
 ];
+const POSTGRES_TRANSITION_RUNTIME_FILES = [
+  "postgres-runtime-sync.js",
+  "postgres-production-adapter.js",
+  "src/platform/storage/postgres-primary-storage-contract.js",
+  "src/platform/storage/postgres-primary-driver.js",
+  "scripts/postgres-primary-transition-readiness.js",
+  "scripts/postgres-migration-package.js",
+  "scripts/postgres-primary-read-rehearsal.js",
+  "scripts/postgres-production-adapter.js",
+  "scripts/storage-admin.js",
+  "src/platform/data/public-demo-snapshot.js",
+  "scripts/postgres-sync-worker.js",
+  "scripts/postgres-shadow-reconcile.js",
+  "deploy/postgres-primary-storage-schema.sql",
+  "deploy/postgres-sync-worker.service.template",
+  "deploy/postgres-sync-worker.timer.template",
+  "deploy/postgres-shadow-reconcile.service.template",
+  "deploy/postgres-shadow-reconcile.timer.template",
+  "deploy/platform-production-adapters.env.template"
+];
+const POSTGRES_TRANSITION_CONFIGURATION_VARIABLES = Object.freeze([
+  "POSTGRES_PRIMARY_TRANSITION_INPUT_FILE",
+  "POSTGRES_PRIMARY_TRANSITION_INPUT_SHA256",
+  "POSTGRES_PRIMARY_STORAGE_MODE",
+  "POSTGRES_SYNC_MODE",
+  "POSTGRES_PRIMARY_READ_MODE",
+  "POSTGRES_ADAPTER_MODE",
+  "POSTGRES_PRODUCTION_WRITE_MODE",
+  "POSTGRES_SSL_MODE",
+  "POSTGRES_CA_FILE",
+  "POSTGRES_SCHEMA",
+  "POSTGRES_POOL_MAX",
+  "POSTGRES_SYNC_BACKLOG_SLO_MAX",
+  "POSTGRES_SYNC_PENDING_AGE_SLO_SECONDS",
+  "POSTGRES_RECONCILIATION_AGE_SLO_SECONDS",
+  "POSTGRES_RECONCILIATION_OPEN_CASES_SLO_MAX",
+  "POSTGRES_PRIMARY_READ_MAX_COLLECTIONS",
+  "POSTGRES_PRIMARY_READ_MAX_BYTES",
+  "POSTGRES_PRIMARY_POOL_MAX",
+  "POSTGRES_PRIMARY_CONNECT_TIMEOUT_MS",
+  "POSTGRES_PRIMARY_IDLE_TIMEOUT_MS",
+  "POSTGRES_PRIMARY_APPLICATION_NAME",
+  "POSTGRES_SCHEMA_EVIDENCE_ID",
+  "POSTGRES_MIGRATION_EVIDENCE_ID",
+  "POSTGRES_RECONCILIATION_EVIDENCE_ID",
+  "POSTGRES_BACKUP_EVIDENCE_ID",
+  "POSTGRES_RTO_RPO_EVIDENCE_ID",
+  "POSTGRES_ROLLBACK_EVIDENCE_ID",
+  "POSTGRES_CUTOVER_APPROVAL_ID"
+]);
+const POSTGRES_SYNC_JOB_VARIABLES = Object.freeze([
+  "POSTGRES_SYNC_MODE",
+  "POSTGRES_SSL_MODE",
+  "POSTGRES_CA_FILE",
+  "POSTGRES_SCHEMA",
+  "POSTGRES_POOL_MAX"
+]);
+const POSTGRES_RECONCILIATION_JOB_VARIABLES = Object.freeze([
+  ...POSTGRES_SYNC_JOB_VARIABLES,
+  "POSTGRES_RECONCILIATION_AGE_SLO_SECONDS",
+  "POSTGRES_RECONCILIATION_OPEN_CASES_SLO_MAX"
+]);
 const REQUIRED_RUNTIME_FILES = [
   "server.js",
   "browser-security-policy.json",
@@ -50,9 +112,7 @@ const REQUIRED_RUNTIME_FILES = [
   "package-lock.json",
   "service-worker.js",
   "manifest.webmanifest",
-  "deploy/postgres-primary-storage-schema.sql",
-  "scripts/postgres-sync-worker.js",
-  "scripts/postgres-shadow-reconcile.js",
+  ...POSTGRES_TRANSITION_RUNTIME_FILES,
   ...AUDIT_DELIVERY_RUNTIME_FILES,
   ...CHRONIC_FOLLOWUP_DISPATCH_RUNTIME_FILES,
   ...PRODUCTION_EVIDENCE_TRUST_RUNTIME_FILES,
@@ -61,9 +121,7 @@ const REQUIRED_RUNTIME_FILES = [
 const ADDITIONAL_RUNTIME_FILES = [
   "browser-security-policy.json",
   "config/regions.json",
-  "deploy/postgres-primary-storage-schema.sql",
-  "scripts/postgres-sync-worker.js",
-  "scripts/postgres-shadow-reconcile.js",
+  ...POSTGRES_TRANSITION_RUNTIME_FILES,
   ...AUDIT_DELIVERY_RUNTIME_FILES,
   ...CHRONIC_FOLLOWUP_DISPATCH_RUNTIME_FILES,
   ...PRODUCTION_EVIDENCE_TRUST_RUNTIME_FILES,
@@ -87,6 +145,7 @@ const SECRET_CONTRACT = [
   ["SIEM_AUDIT_SIGNING_SECRET", "continuous audit request signing"],
   ["CITIZEN_CHRONIC_FOLLOWUP_PUBLISHER_HMAC_SECRET", "chronic followup external dispatch and receipt verification"],
   ["ALERT_WEBHOOK_SECRET", "operations webhook signing"],
+  ["DATABASE_URL", "PostgreSQL connection secret"],
   ["DEPLOYMENT_ARTIFACT_DIGEST", "immutable artifact registry digest"]
 ].map(([name, purpose]) => ({
   name,
@@ -126,7 +185,11 @@ function collectRuntimeFiles(root = ROOT) {
       return ALLOWED_RUNTIME_EXTENSIONS.has(path.extname(name).toLowerCase());
     })
   const directoryFiles = RUNTIME_DIRECTORIES.flatMap((directory) => collectRuntimeDirectoryFiles(root, directory));
-  return [...rootFiles, ...directoryFiles, ...ADDITIONAL_RUNTIME_FILES.filter((name) => fs.existsSync(path.join(root, name)))].sort();
+  return [...new Set([
+    ...rootFiles,
+    ...directoryFiles,
+    ...ADDITIONAL_RUNTIME_FILES.filter((name) => fs.existsSync(path.join(root, name)))
+  ])].sort();
 }
 
 function fileEvidence(root, relativePath) {
@@ -155,6 +218,144 @@ function artifactDigest(files) {
 
 function check(id, passed, detail) {
   return { id, passed: Boolean(passed), detail };
+}
+
+function templateHasVariables(root, relativePath, variables) {
+  try {
+    const source = fs.readFileSync(path.join(root, relativePath), "utf8");
+    const names = new Set(source.split(/\r?\n/).map((line) => /^([A-Z][A-Z0-9_]*)=/.exec(line)?.[1]).filter(Boolean));
+    return variables.every((name) => names.has(name));
+  } catch {
+    return false;
+  }
+}
+
+function templateHasExactValues(root, relativePath, expectedValues) {
+  try {
+    const source = fs.readFileSync(path.join(root, relativePath), "utf8");
+    const values = new Map();
+    for (const line of source.split(/\r?\n/)) {
+      const match = /^([A-Z][A-Z0-9_]*)=(.*)$/.exec(line);
+      if (!match) continue;
+      if (values.has(match[1])) return false;
+      values.set(match[1], match[2]);
+    }
+    return Object.entries(expectedValues).every(([name, value]) => values.get(name) === value);
+  } catch {
+    return false;
+  }
+}
+
+function systemdTemplateMatches(root, relativePath, expectedSections) {
+  try {
+    const source = fs.readFileSync(path.join(root, relativePath), "utf8");
+    const sections = new Map();
+    let currentSection;
+    for (const rawLine of source.split(/\r?\n/)) {
+      const line = rawLine.trim();
+      if (!line || line.startsWith("#") || line.startsWith(";")) continue;
+      const sectionMatch = /^\[([A-Za-z][A-Za-z0-9]*)\]$/.exec(line);
+      if (sectionMatch) {
+        currentSection = sectionMatch[1];
+        if (sections.has(currentSection)) return false;
+        sections.set(currentSection, new Map());
+        continue;
+      }
+      const directiveMatch = /^([A-Za-z][A-Za-z0-9]*)=(.*)$/.exec(line);
+      if (!currentSection || !directiveMatch) return false;
+      const directives = sections.get(currentSection);
+      const values = directives.get(directiveMatch[1]) || [];
+      values.push(directiveMatch[2]);
+      directives.set(directiveMatch[1], values);
+    }
+    const expectedNames = Object.keys(expectedSections);
+    if (sections.size !== expectedNames.length || expectedNames.some((name) => !sections.has(name))) return false;
+    return expectedNames.every((sectionName) => {
+      const actual = sections.get(sectionName);
+      const expected = expectedSections[sectionName];
+      const expectedKeys = Object.keys(expected);
+      if (actual.size !== expectedKeys.length) return false;
+      return expectedKeys.every((key) => {
+        const actualValues = actual.get(key);
+        const expectedValues = Array.isArray(expected[key]) ? expected[key] : [expected[key]];
+        return Array.isArray(actualValues)
+          && actualValues.length === expectedValues.length
+          && actualValues.every((value, index) => value === expectedValues[index]);
+      });
+    });
+  } catch {
+    return false;
+  }
+}
+
+function postgresDeploymentTemplatesValid(root) {
+  const serviceBoundary = {
+    Type: "oneshot",
+    User: "__SERVICE_USER__",
+    Group: "__SERVICE_GROUP__",
+    WorkingDirectory: "__APP_DIR__",
+    EnvironmentFile: "__SECRET_ENV_FILE__",
+    NoNewPrivileges: "true",
+    PrivateTmp: "true",
+    ProtectHome: "true",
+    ProtectSystem: "strict",
+    ReadWritePaths: "__DATA_DIR__ __LOG_DIR__",
+    UMask: "0077",
+    TimeoutStartSec: "120"
+  };
+  return templateHasExactValues(root, "deploy/platform-production-adapters.env.template", {
+    POSTGRES_SYNC_MODE: "disabled",
+    POSTGRES_PRIMARY_READ_MODE: "disabled",
+    POSTGRES_ADAPTER_MODE: "disabled",
+    POSTGRES_PRODUCTION_WRITE_MODE: "disabled",
+    POSTGRES_PRIMARY_STORAGE_MODE: "disabled"
+  })
+    && systemdTemplateMatches(root, "deploy/postgres-sync-worker.service.template", {
+      Unit: {
+        Description: "Chronic Care Platform PostgreSQL Outbox Worker",
+        After: "network-online.target chronic-care-platform.service",
+        Wants: "network-online.target"
+      },
+      Service: {
+        ...serviceBoundary,
+        Environment: ["NODE_ENV=production", "POSTGRES_SYNC_MODE=outbox"],
+        ExecStart: "__NODE_BINARY__ scripts/postgres-sync-worker.js --sqlite-file=__DATA_DIR__/health-city.sqlite --limit=50 --max-attempts=5"
+      },
+      Install: { WantedBy: "multi-user.target" }
+    })
+    && systemdTemplateMatches(root, "deploy/postgres-shadow-reconcile.service.template", {
+      Unit: {
+        Description: "Health platform PostgreSQL shadow reconciliation",
+        After: "network-online.target chronic-care-platform.service postgres-sync-worker.service",
+        Wants: "network-online.target"
+      },
+      Service: {
+        ...serviceBoundary,
+        Environment: "POSTGRES_SYNC_MODE=outbox",
+        ExecStart: "__NODE_BINARY__ scripts/postgres-shadow-reconcile.js reconcile --sqlite-file=__DATA_DIR__/health-city.sqlite --output=__LOG_DIR__/postgres-shadow-reconciliation.json --markdown=__LOG_DIR__/postgres-shadow-reconciliation.md"
+      }
+    })
+    && systemdTemplateMatches(root, "deploy/postgres-sync-worker.timer.template", {
+      Unit: { Description: "Run Chronic Care Platform PostgreSQL Outbox Worker" },
+      Timer: {
+        OnBootSec: "30s",
+        OnUnitActiveSec: "15s",
+        AccuracySec: "2s",
+        Persistent: "true",
+        Unit: "postgres-sync-worker.service"
+      },
+      Install: { WantedBy: "timers.target" }
+    })
+    && systemdTemplateMatches(root, "deploy/postgres-shadow-reconcile.timer.template", {
+      Unit: { Description: "Run PostgreSQL shadow reconciliation every five minutes" },
+      Timer: {
+        OnBootSec: "2min",
+        OnUnitActiveSec: "5min",
+        Persistent: "true",
+        Unit: "postgres-shadow-reconcile.service"
+      },
+      Install: { WantedBy: "timers.target" }
+    });
 }
 
 function buildProductionDeploymentPackage(options = {}) {
@@ -238,7 +439,51 @@ function buildProductionDeploymentPackage(options = {}) {
       ],
       sourceContract: "citizen-chronic.followup-dispatch-outbox.v1",
       productionReady: false
+    }, {
+      id: "postgres-shadow-sync",
+      entrypoint: "node scripts/postgres-sync-worker.js",
+      serviceTemplate: "deploy/postgres-sync-worker.service.template",
+      timerTemplate: "deploy/postgres-sync-worker.timer.template",
+      configurationTemplate: "deploy/platform-production-adapters.env.template",
+      configurationVariables: [...POSTGRES_SYNC_JOB_VARIABLES],
+      sourceContract: "postgres-shadow-sync",
+      productionPrimary: false,
+      runtimeCutoverEnabled: false,
+      productionReady: false
+    }, {
+      id: "postgres-shadow-reconciliation",
+      entrypoint: "node scripts/postgres-shadow-reconcile.js reconcile",
+      serviceTemplate: "deploy/postgres-shadow-reconcile.service.template",
+      timerTemplate: "deploy/postgres-shadow-reconcile.timer.template",
+      configurationTemplate: "deploy/platform-production-adapters.env.template",
+      configurationVariables: [...POSTGRES_RECONCILIATION_JOB_VARIABLES],
+      sourceContract: "postgres-shadow-reconciliation",
+      productionPrimary: false,
+      runtimeCutoverEnabled: false,
+      productionReady: false
     }],
+    databaseTransition: {
+      inputContract: "postgres-primary-transition-metadata-v1",
+      configurationTemplate: "deploy/platform-production-adapters.env.template",
+      configurationVariables: [...POSTGRES_TRANSITION_CONFIGURATION_VARIABLES],
+      commands: {
+        readiness: "npm run postgres:transition-readiness",
+        migrationPackage: "npm run postgres:migration-package",
+        migrationVerify: "npm run postgres:migration-verify",
+        primaryReadRehearsal: "npm run postgres:primary-read-rehearsal",
+        adapterVerify: "npm run postgres:adapter-verify",
+        storageBackup: "npm run storage:backup",
+        storageInspect: "npm run storage:inspect",
+        storageAssess: "npm run storage:assess -- <backup-dir>",
+        shadowSync: "npm run postgres:sync-worker",
+        shadowReconciliation: "npm run postgres:shadow-reconcile"
+      },
+      readyForControlledRehearsal: false,
+      activationAuthorized: false,
+      productionPrimary: false,
+      runtimeCutoverEnabled: false,
+      productionReady: false
+    },
     template: "deploy/chronic-care-platform.service.template"
   };
   const rollbackContract = {
@@ -260,7 +505,8 @@ function buildProductionDeploymentPackage(options = {}) {
     check("deploymentPackage:runtimeFiles", files.length >= 30 && REQUIRED_RUNTIME_FILES.every((name) => files.some((item) => item.path === name)), `${files.length} runtime files with required entrypoints`),
     check("deploymentPackage:digest", /^[a-f0-9]{64}$/.test(digest) && files.every((item) => /^[a-f0-9]{64}$/.test(item.sha256)), `sha256:${digest}`),
     check("deploymentPackage:secretBoundary", secretContract.valuesPersisted === false && secretContract.variables.length >= 10 && secretContract.variables.every((item) => item.name && item.persistedInArtifact === false && !("value" in item)), `${secretContract.variables.length} secret references; values persisted false`),
-    check("deploymentPackage:processContract", processContract.healthChecks.length === 4 && processContract.healthChecks.some((item) => item.route === "/api/live" && item.purpose === "process-liveness" && item.authentication === "none") && processContract.healthChecks.some((item) => item.route === "/api/health" && item.purpose === "dependency-readiness" && item.authentication === "none") && processContract.restartPolicy === "on-failure" && processContract.gracefulShutdownSeconds >= 30 && processContract.productionPreflight.productionReady === false && processContract.backgroundJobs.some((item) => item.id === "continuous-audit-delivery" && item.productionReady === false) && processContract.backgroundJobs.some((item) => item.id === "chronic-followup-durable-dispatch" && item.productionReady === false), `${processContract.supervisor} / ${processContract.healthChecks.length} health checks / ${processContract.backgroundJobs.length} background jobs`),
+    check("deploymentPackage:processContract", processContract.healthChecks.length === 4 && processContract.healthChecks.some((item) => item.route === "/api/live" && item.purpose === "process-liveness" && item.authentication === "none") && processContract.healthChecks.some((item) => item.route === "/api/health" && item.purpose === "dependency-readiness" && item.authentication === "none") && processContract.restartPolicy === "on-failure" && processContract.gracefulShutdownSeconds >= 30 && processContract.productionPreflight.productionReady === false && processContract.backgroundJobs.some((item) => item.id === "continuous-audit-delivery" && item.productionReady === false) && processContract.backgroundJobs.some((item) => item.id === "chronic-followup-durable-dispatch" && item.productionReady === false) && processContract.backgroundJobs.some((item) => item.id === "postgres-shadow-sync" && item.productionReady === false) && processContract.backgroundJobs.some((item) => item.id === "postgres-shadow-reconciliation" && item.productionReady === false), `${processContract.supervisor} / ${processContract.healthChecks.length} health checks / ${processContract.backgroundJobs.length} background jobs`),
+    check("deploymentPackage:databaseTransition", POSTGRES_TRANSITION_RUNTIME_FILES.every((name) => files.some((item) => item.path === name)) && templateHasVariables(root, "deploy/platform-production-adapters.env.template", POSTGRES_TRANSITION_CONFIGURATION_VARIABLES) && postgresDeploymentTemplatesValid(root) && processContract.databaseTransition.productionReady === false && processContract.databaseTransition.productionPrimary === false && processContract.databaseTransition.runtimeCutoverEnabled === false && processContract.databaseTransition.activationAuthorized === false && !JSON.stringify(processContract).includes("DATABASE_URL") && secretContract.variables.some((item) => item.name === "DATABASE_URL" && !Object.hasOwn(item, "value")), "PostgreSQL transition commands, workers, hardened templates and secret boundary remain fail closed"),
     check("deploymentPackage:rollbackContract", rollbackContract.requirePreviousArtifactDigest && rollbackContract.requireStorageBackup && rollbackContract.rollbackCommand.includes("rollback:snapshot"), "previous digest, storage backup and post-rollback health are mandatory"),
     check("deploymentPackage:provenance", Boolean(source.commit) && (!strict || !source.dirty), `${source.commit} / ${source.dirty ? "working tree dirty" : "working tree clean"}${strict ? " / strict" : ""}`)
   ];
@@ -319,6 +565,35 @@ function verifyProductionDeploymentPackage(manifest, options = {}) {
   const expectedDigest = String(manifest?.artifact?.digest || "").replace(/^sha256:/, "");
   const prohibitedPaths = expectedFiles.filter((item) => /(^|\/)(\.env|[^/]+\.(pem|key|p12|pfx)|secrets?\.[^/]+)$/i.test(item.path)).map((item) => item.path);
   const secretValuesAbsent = manifest?.secretContract?.valuesPersisted === false && (manifest?.secretContract?.variables || []).every((item) => !("value" in item));
+  const postgresTransition = manifest?.processContract?.databaseTransition;
+  const postgresJobs = manifest?.processContract?.backgroundJobs || [];
+  const transitionFlagsClosed = postgresTransition?.readyForControlledRehearsal === false
+    && postgresTransition?.activationAuthorized === false
+    && postgresTransition?.productionPrimary === false
+    && postgresTransition?.runtimeCutoverEnabled === false
+    && postgresTransition?.productionReady === false;
+  const postgresFilesPresent = POSTGRES_TRANSITION_RUNTIME_FILES.every((required) => expectedFiles.some((item) => item.path === required));
+  const postgresVariablesPresent = POSTGRES_TRANSITION_CONFIGURATION_VARIABLES.every((name) => postgresTransition?.configurationVariables?.includes(name));
+  const postgresDatabaseUrlSecretOnly = manifest?.secretContract?.variables?.some((item) => item.name === "DATABASE_URL" && !("value" in item))
+    && !JSON.stringify(manifest?.processContract || {}).includes("DATABASE_URL");
+  const postgresSyncJobValid = postgresJobs.some((item) => item.id === "postgres-shadow-sync"
+    && item.entrypoint === "node scripts/postgres-sync-worker.js"
+    && item.serviceTemplate === "deploy/postgres-sync-worker.service.template"
+    && item.timerTemplate === "deploy/postgres-sync-worker.timer.template"
+    && item.configurationTemplate === "deploy/platform-production-adapters.env.template"
+    && POSTGRES_SYNC_JOB_VARIABLES.every((name) => item.configurationVariables?.includes(name))
+    && item.productionReady === false
+    && item.productionPrimary === false
+    && item.runtimeCutoverEnabled === false);
+  const postgresReconciliationJobValid = postgresJobs.some((item) => item.id === "postgres-shadow-reconciliation"
+    && item.entrypoint === "node scripts/postgres-shadow-reconcile.js reconcile"
+    && item.serviceTemplate === "deploy/postgres-shadow-reconcile.service.template"
+    && item.timerTemplate === "deploy/postgres-shadow-reconcile.timer.template"
+    && item.configurationTemplate === "deploy/platform-production-adapters.env.template"
+    && POSTGRES_RECONCILIATION_JOB_VARIABLES.every((name) => item.configurationVariables?.includes(name))
+    && item.productionReady === false
+    && item.productionPrimary === false
+    && item.runtimeCutoverEnabled === false);
   const checks = [
     check("deploymentVerify:schema", manifest?.schemaVersion === "production-deployment-package-v1", manifest?.schemaVersion || "missing"),
     check("deploymentVerify:files", expectedFiles.length >= 30 && missing.length === 0 && mismatched.length === 0, `${expectedFiles.length} expected / ${missing.length} missing / ${mismatched.length} mismatched`),
@@ -327,6 +602,7 @@ function verifyProductionDeploymentPackage(manifest, options = {}) {
     check("deploymentVerify:auditWorker", AUDIT_DELIVERY_RUNTIME_FILES.every((required) => expectedFiles.some((item) => item.path === required)) && manifest?.processContract?.backgroundJobs?.some((item) => item.id === "continuous-audit-delivery" && item.productionReady === false && item.preflight === "npm run audit:delivery:preflight" && item.configurationTemplate === "deploy/platform-production-adapters.env.template" && item.configurationVariables?.includes("AUDIT_DELIVERY_SOURCE_CONTRACT") && item.configurationVariables?.includes("PLATFORM_PILOT_CUTOVER_ALERT_JOURNAL_FILE")) && manifest?.secretContract?.variables?.some((item) => item.name === "SIEM_AUDIT_SIGNING_SECRET" && !("value" in item)), "continuous audit dependency closure, process, configuration and secret references are mandatory"),
     check("deploymentVerify:chronicFollowupWorker", CHRONIC_FOLLOWUP_DISPATCH_RUNTIME_FILES.every((required) => expectedFiles.some((item) => item.path === required)) && manifest?.processContract?.backgroundJobs?.some((item) => item.id === "chronic-followup-durable-dispatch" && item.productionReady === false && item.preflight === "npm run chronic:followup-dispatch-preflight" && item.sourceContract === "citizen-chronic.followup-dispatch-outbox.v1" && ["DATA_DIR", "CITIZEN_CHRONIC_FOLLOWUP_DISPATCH_SQLITE_FILE", "CITIZEN_CHRONIC_FOLLOWUP_PUBLISHER_HMAC_SECRET", "CITIZEN_CHRONIC_FOLLOWUP_ACTIVATION_REGISTRY_FILE", "CITIZEN_CHRONIC_FOLLOWUP_ACTIVATION_PUBLIC_KEY_FILE", "CITIZEN_CHRONIC_FOLLOWUP_ACTIVATION_PUBLIC_KEY_SHA256"].every((name) => item.configurationVariables?.includes(name))) && manifest?.secretContract?.variables?.some((item) => item.name === "CITIZEN_CHRONIC_FOLLOWUP_PUBLISHER_HMAC_SECRET" && !("value" in item)), "chronic followup durable worker, canonical SQLite source, activation trust and secret references are mandatory"),
     check("deploymentVerify:productionEvidenceTrust", PRODUCTION_EVIDENCE_TRUST_RUNTIME_FILES.every((required) => expectedFiles.some((item) => item.path === required)) && manifest?.processContract?.productionPreflight?.entrypoint === "node scripts/production-preflight.js --strict" && manifest?.processContract?.productionPreflight?.trustContract === "platform-governance.production-evidence-trust-decision.v1" && manifest?.processContract?.productionPreflight?.productionReady === false && ["PRODUCTION_EVIDENCE_TRUST_ANCHORS_FILE", "PRODUCTION_EVIDENCE_TRUST_ANCHORS_SHA256", "PRODUCTION_EVIDENCE_TRUST_ENVELOPE_FILE", "PRODUCTION_CUTOVER_ACTION_EVIDENCE_DIR"].every((name) => manifest?.processContract?.productionPreflight?.configurationVariables?.includes(name)), "strict preflight includes the pinned Ed25519 production and cutover-action evidence providers and remains NO-GO by default"),
+    check("deploymentVerify:postgresTransition", postgresFilesPresent && postgresVariablesPresent && templateHasVariables(root, "deploy/platform-production-adapters.env.template", POSTGRES_TRANSITION_CONFIGURATION_VARIABLES) && postgresDeploymentTemplatesValid(root) && transitionFlagsClosed && postgresDatabaseUrlSecretOnly && postgresTransition?.commands?.readiness === "npm run postgres:transition-readiness" && postgresTransition?.commands?.migrationPackage === "npm run postgres:migration-package" && postgresTransition?.commands?.migrationVerify === "npm run postgres:migration-verify" && postgresTransition?.commands?.primaryReadRehearsal === "npm run postgres:primary-read-rehearsal" && postgresTransition?.commands?.adapterVerify === "npm run postgres:adapter-verify" && postgresTransition?.commands?.storageBackup === "npm run storage:backup" && postgresTransition?.commands?.storageInspect === "npm run storage:inspect" && postgresTransition?.commands?.storageAssess === "npm run storage:assess -- <backup-dir>" && postgresTransition?.commands?.shadowSync === "npm run postgres:sync-worker" && postgresTransition?.commands?.shadowReconciliation === "npm run postgres:shadow-reconcile" && postgresSyncJobValid && postgresReconciliationJobValid, "PostgreSQL transition entrypoints, variables, hardened templates, secret reference and fixed NO-GO flags are mandatory"),
     check("deploymentVerify:rollback", manifest?.rollbackContract?.requirePreviousArtifactDigest === true && manifest?.rollbackContract?.requireStorageBackup === true, "rollback prerequisites declared")
   ];
   return {
@@ -427,12 +703,17 @@ if (require.main === module) {
 }
 
 module.exports = {
+  POSTGRES_TRANSITION_CONFIGURATION_VARIABLES,
+  POSTGRES_RECONCILIATION_JOB_VARIABLES,
+  POSTGRES_SYNC_JOB_VARIABLES,
+  POSTGRES_TRANSITION_RUNTIME_FILES,
   PRODUCTION_EVIDENCE_TRUST_RUNTIME_FILES,
   SECRET_CONTRACT,
   artifactDigest,
   buildProductionDeploymentPackage,
   collectRuntimeFiles,
   parseArgs,
+  postgresDeploymentTemplatesValid,
   renderMarkdown,
   verifyProductionDeploymentPackage,
   writeOutput

@@ -20,7 +20,7 @@
 | 3 | Schema migration 与指纹 | v1–v14 冻结，v15 append-only audit source、v16 慢病随访 durable outbox 已追加并覆盖空库/v11 升级/重跑/回滚门禁 / P1 | 后续 v17+ 按冻结规则追加，生产迁移仍需备份、核对和现场证据 |
 | 4 | 标准 build/lint/typecheck/unit/integration/smoke 入口 | 已合入 `main@fc42833`（PR #130）；TEST-006 已关闭 API test 的 `no-unreachable` 文件级例外，把类型边界由实际 9 个唯一文件扩大到 13 个，隔离/观测本机约 294–371 秒 API 热点，在 shadow-map/调用行为保护下消除两个前端文件的 16 个重复键和全部 lint 文件例外，完成 3 个 care skip 的 T05 owner/route 重验与恢复执行，并依次完成临时 seed/env/server、单个 HIS hospital mock、单个 SIEM alert mock、单个 financial gateway mock 与单个 object-storage gateway mock 五个共享生命周期夹具切片；TEST-002 将内部边界从 4 组扩展为 10 组，新增 worker、区域共享、转诊、科研导出及两个浏览器安全端口，并提高 API governance 基线 / P1 | 保持 test:all 与原 server.js 85/85/55 语义；API 的 43 个子测试数量/顺序摘要、单进程共享状态、断言和超时继续失败关闭；其余共享状态后续仍一次只拆一个生命周期；覆盖阈值只升不降、源码不跨组重复、负向测试必须由所属组直接执行，报告只留临时目录；浏览器端口覆盖不替代 E2E/现场验证，外部 care/HIS/SIEM/financial/storage 投递与现场验收仍 NO-GO，若改变测试拓扑再另立 ADR |
 | 5 | 移除组合根循环依赖 | 已合入 `main@21d8f3c`（PR #132）；PR/main CI 与 Pages 验证通过 / P1 | ARC-002 已关闭；后续组合根瘦身归 ARC-001，不扩大本切片 |
-| 6 | 生产身份/SMS、PostgreSQL shadow、连续审计投递 | 身份/SMS 与 PG shadow 已存在；连续审计已完成 v15 同事务 append-only source、最小投影、cursor/source binding 和 checkpoint v3，部署/preflight 默认精确合同 / P1 | 可信签名 receipt、外部单调锚、真实 provider/PG/SIEM/WORM/KMS、恢复演练和现场证据继续 NO-GO；不做 PG 主切换 |
+| 6 | 生产身份/SMS、PostgreSQL shadow、连续审计投递 | 身份/SMS 与 PG shadow 已存在；PG 已增加 metadata-only 七门评估 CLI、migration/read/adapter/storage-admin 命令闭包及 sync/reconcile systemd/env 合同；连续审计已完成 v15 同事务 append-only source、最小投影、cursor/source binding 和 checkpoint v3 / P1 | 可信签名 receipt、外部单调锚、真实 provider/PG/SIEM/WORM/KMS、容量/故障切换/恢复演练和现场证据继续 NO-GO；CLI 不接 strict preflight，不启动 worker，不做 PG 主切换 |
 | 6A | OTP/锁定共享状态 | 已纳入生产身份 ADR；#131 候选已完成 P1 代码增量，待最新 PR/main CI | 保持 SQLite 单主机、PostgreSQL 多实例及原子消费/限流/锁定契约；真实 PG 由 CI 和现场重跑 |
 | 7 | 运行时上下文瘦身 | 候选 / P1 | 按领域子端口，逐块迁移，不重写 server |
 | 7A | 临床五个可治理子域 | 治理切片完成，急救/血液/影像/体检首个查询用例已迁移；影像 share 与 QC 两个公开写用例已迁入 imaging route/module 并有单元、顺序/失败和禁止回流守卫；operations dashboard 与 command 已由 T00 移交 T02，command 32/32 路径已完成 TEST-007 行为保护 / P1 | Accepted ADR；保持协议兼容，继续按五子域逐用例迁移并禁止已迁用例及 operations 回流 T06；QC 的幂等/CAS/机构范围、外调—本地写入核对需独立行为变更审批，当前保持 NO-GO；operations 后续拆分或 ARC-008 治理必须保持矩阵通过并另行审批 |
@@ -34,7 +34,7 @@
 | 12 | 对象存储结构化元数据与耐久命令轨道 | Proposed OBJ-ADR-002；仅完成机器 decision/action register、v17 冲突预留和 CI fail-closed 治理 / P1 | 人类确认 T08 data owner 与 v1/v2 兼容策略，ADR 转 Accepted 后才可按 v17→全量回填/冻结→异步 API→fenced worker→无损分页→持久 reconcile→readiness 的独立切片实施；真实 provider/KMS/WORM/扫描/容量/备份/现场证据继续 NO-GO |
 | 13 | 严格生产预检证据信任装配 | Accepted ADR；T00 pinned-anchor/Ed25519 双角色 provider、CLI 自动装配、deployment package/env/CI 和负向矩阵已形成 / P0 | 真实 anchor/envelope、独立 signer、权限/轮换、外部 evidence 与现场执行继续由生产环境提供；provider 成功不替代完整 preflight 或最终人类授权 |
 | 14 | 生产切换行动证据与受保护晋级 | Accepted ADR；definitions-only v2、14/14 共享 Ed25519 验证、strict preflight 门禁、main/manual/production/self-hosted workflow 与 digest-only receipt 已形成 / P0 | GitHub production environment reviewers、专用 runner、真实 14 份 envelope、受控路径、外部审批和实际部署/现场签收继续 NO-GO；receipt 只证明预检资格 |
-| 15 | 当前工作流、Markdown 与跟踪 PDF 闭集治理 | GOV-001、DOC-001、REPO-001 仓库内缺口已关闭：开发默认 `origin/main`，固定 tag 仅作证据；264 份 Markdown 唯一分类；3 个 PDF 绑定来源与 digest / P2 | snapshot/superseded 保持只读；新增文档同步清单。两个历史 PDF 与一个现行校验 PDF 均无跟踪生成器，替换前必须先补可复现生成源，不得手工编辑 |
+| 15 | 当前工作流、Markdown 与跟踪 PDF 闭集治理 | GOV-001、DOC-001、REPO-001 仓库内缺口已关闭：开发默认 `origin/main`，固定 tag 仅作证据；265 份 Markdown 唯一分类；3 个 PDF 绑定来源与 digest / P2 | snapshot/superseded 保持只读；新增文档同步清单。两个历史 PDF 与一个现行校验 PDF 均无跟踪生成器，替换前必须先补可复现生成源，不得手工编辑 |
 
 ## 每日任务模板
 
@@ -69,3 +69,12 @@
 - 已建立外部 verifier 驱动的 release/artifact/time/transition/role/digest 评估与负向测试。
 - 下一步把可部署 trust provider 与 v2 action evaluation 接入 strict preflight、发布 provenance 和受保护的
   手动 promotion workflow；真实 envelope、信任锚、审批和现场执行继续外置。
+
+## 2026-08-24 PostgreSQL 受控切换评估与部署闭包
+
+- Accepted ADR 已建立独立 `postgres:transition-readiness`；输入只接受绝对路径、普通非 symlink、最多
+  1 MiB 且由必填小写 SHA-256 固定的闭集 metadata-only JSON，并复用现有七门评估。
+- 部署包登记 migration package/verify、primary-read rehearsal、adapter verify、storage-admin、shadow
+  sync/reconciliation service/timer/env；缺文件、变量或伪造 ready 状态均失败关闭。
+- 当前完成的是进入受控演练前的仓库侧闭包；真实 PostgreSQL、容量、故障切换、原生恢复、回退、审批和
+  现场签字仍未完成，所有生产标志保持 false。

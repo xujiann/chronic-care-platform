@@ -68,7 +68,7 @@
 | TEST-005 | 2026-08-23 | 本地/CI 统一 Playwright Chromium；在线根 39 项与居民 13 项继续阻止 Service Worker；PWA 3 项使用独立允许策略、动态端口和临时数据；Go/No-Go 四方业务责任属性不再复用登录角色 `data-role` | 55 项唯一并集/漂移测试、居民同文件 13/13、PWA 重复 9/9、完整标准 E2E；不得把仓库浏览器测试解释为真实 HTTPS、托管安全头或现场验收 |
 | TEST-008 | 2026-08-23 | 专用 PWA/Service Worker E2E 验证居民登录后安装、v60→v61 激活清理、受控 update、离线 mobile/citizen 回退、API/源快照 404 缓存边界与逐项注销/清缓存 | 真实 HTTPS 终止、OS 安装提示/策略、浏览器设备矩阵、外部 Origin、现场缓存升级与独立安全验收继续外置；仓库测试不产生生产 GO |
 | GOV-001 | 2026-08-23 | `main`/`origin/main` 成为唯一当前集成与默认开发基线；固定 governance tag 仅作可复现证据，旧日期化 workflow 原文冻结 | process plan/verify 默认值、manifest/AGENTS/iteration program 漂移和 CI 目标分支负向测试 |
-| DOC-001 | 2026-08-23 | 264 份 Markdown 以路径和 ADR 台账唯一分类为 195 current、68 snapshot、1 superseded；不删除历史证据 | 闭集路径/分类摘要、规则重叠、ADR status 和 snapshot 内容聚合摘要失败关闭 |
+| DOC-001 | 2026-08-24 | 265 份 Markdown 以路径和 ADR 台账唯一分类为 196 current、68 snapshot、1 superseded；不删除历史证据 | 闭集路径/分类摘要、规则重叠、ADR status 和 snapshot 内容聚合摘要失败关闭 |
 | REPO-001 | 2026-08-23 | 3 个跟踪 PDF 均登记 SHA-256、大小、页数、引入提交、来源、保留理由和真实 generator 可用性；二进制本体未修改 | exact tracked inventory、digest/size/page/source 漂移负向测试；替换前必须补可复现生成源，禁止手工编辑 |
 
 ## 重复、死代码和命名结论
@@ -120,3 +120,12 @@
 - 仓库内已关闭自报 `signatureVerified`、跨账项 callback event/nonce 重放和无 provider receipt 的成功 finalize；失败 finalize 也要求完整稳定证据。
 - 进程内 attestation 只保护当前进程到当前写调用，不等于跨实例 exactly-once、KMS/HSM 验签、生产 PostgreSQL 事务或外部供应方事实证明。
 - 真实 provider 字段映射、来源网络白名单、凭据、对账传输、归档迁移、容量基线及现场签收仍为外部/现场 NO-GO。
+
+## PostgreSQL 主库切换剩余债务
+
+- 仓库已关闭受控评估入口和 deployment artifact 缺脚本/模板/变量的闭包缺口，但没有启用 worker、主读、
+  主写、请求路径双写或 runtime cutover。
+- SHA-256 固定的 metadata-only 文件只证明交接内容、字段形状和七门计算，不能证明证据真实；真实 PostgreSQL schema 安装、全量迁移、
+  连续核对、容量、故障切换、原生备份恢复、回退、监控、审批和现场签字仍是 P0 `NO-GO`。
+- sync/reconcile 仍以 SQLite outbox 为当前提交权威；多实例 fencing、正式运维账号、TLS/CA、secret provider
+  和 systemd 实际启用必须在目标环境验证。

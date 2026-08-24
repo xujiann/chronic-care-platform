@@ -332,3 +332,11 @@ bytes/source paths → scripts/repository-governance.js → governance-api + arc
 ## 金融回调证据依赖方向
 
 依赖方向为 `provider HMAC payload → verifyFinancialCallback → process-local target-event attestation → callback route write intent → server append-only/global uniqueness guard → integrationGatewayEvents`。attestation 不进入反向读取、数据库或 API。finalize 另经过 `provider receipt/failure evidence shape → server transition guard`，防止业务路由自报无证据终态。
+
+## PostgreSQL 受控切换评估依赖方向
+
+依赖方向为 `仓库外 metadata-only JSON + 调用方 SHA-256 + 环境变量布尔/引用 → postgres-primary-transition-readiness →
+buildPostgresPrimaryStorageConfig + buildTransitionAssessment → 脱敏七门投影`。部署依赖方向为
+`migration/read/adapter/storage-admin + sync/reconcile templates → production-deployment-package → verifier/deploy-check`。
+CLI 不依赖 `server.js`、HTTP、数据库 client、strict preflight、对象存储或连续审计；`DATABASE_URL` 仅从
+secret provider 注入实际命令，不进入 process contract 或评估输出。

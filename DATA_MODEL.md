@@ -351,3 +351,12 @@ DDL、migration、业务事实或生产证据。PDF digest 只证明受跟踪字
 ## 23. 金融回调证明不是持久化数据
 
 callback 写意图中的验签证明绑定目标 gateway event，callback event/nonce 在全金融账本唯一；证明只存在于单次写调用，不属于数据库 schema、JSON collection 或公共投影。成功 finalize 的 provider receipt 必须绑定 gateway type、operation、status 与 dispatchedAt；失败 finalize 固定失败码、失败时间、死信原因和死信标记。
+
+## 24. PostgreSQL 切换评估输入不是业务事实源
+
+`postgres-primary-transition-metadata-v1` 只允许模式、状态、计数、摘要、性能数值、数据丢失布尔值和受控
+证据引用；不允许附加字段、业务 payload、连接串、凭据或原始日志。凭据属于合同禁止项，CLI 只额外拒绝
+常见凭据模式，不能替代 secret scanning 或 DLP。CLI 只读该仓库外文件，以调用方必填 SHA-256 固定
+打开 descriptor 的内容，并返回七门布尔
+投影，不写 `data/db.json`、SQLite 或 PostgreSQL，不新增集合、表、字段、DDL 或 migration。评估通过不是
+生产数据迁移事实，也不改变 PostgreSQL/SQLite 权威关系。

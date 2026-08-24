@@ -38,6 +38,7 @@
 | [API 幂等行为证据必须显式登记且默认拒绝](./2026-08-22-api-idempotency-behavior-evidence.md) | Accepted | source marker 与行为证明分层、SMS callback pilot、custom external auth 与生产 NO-GO |
 | [Custom API 认证必须绑定控制流与可执行负向测试证据](./2026-08-23-api-custom-authentication-evidence.md) | Accepted | 认证机制、credential source、required/optional/none、replay/CSRF、scope、负向测试与生产 NO-GO |
 | [PostgreSQL shadow 合同强化](./2026-08-21-postgresql-shadow-contract-hardening.md) | Accepted | schema 隔离、健康探针、batch/digest/version/tombstone 冲突 |
+| [PostgreSQL 受控切换评估与部署闭包边界](./2026-08-24-postgresql-transition-readiness-boundary.md) | Accepted | metadata-only 七门评估、迁移/演练/worker 部署闭包、secret 引用与固定生产 NO-GO |
 | [Solution A 容器部署采用安全默认值与不可变镜像](./2026-08-22-solution-a-secure-container-defaults.md) | Accepted | 容器镜像、Orthanc 认证、DICOM 绑定和生产失败关闭门禁 |
 | [连续审计投递与耐久 checkpoint](./2026-08-21-continuous-audit-delivery.md) | Accepted | SIEM/WORM rehearsal、checkpoint v2、部署信任合同 A；append-only source/可信 receipt/外部 anchor 前生产 NO-GO |
 | [连续审计采用 append-only source v2](./2026-08-22-append-only-audit-source-v2.md) | Accepted | SQLite v15 事务内审计来源、稳定 cursor、最小投影与 checkpoint v3；外部信任仍 NO-GO |
