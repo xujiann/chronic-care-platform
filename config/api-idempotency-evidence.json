@@ -1171,6 +1171,110 @@
       ],
       "productionReady": false,
       "externalEvidenceRequired": true
+    },
+    {
+      "contractId": "public-health.highlight-signal-intake-command.v1",
+      "key": "POST /api/public-health/highlights/signals",
+      "method": "POST",
+      "path": "/api/public-health/highlights/signals",
+      "owner": "T03",
+      "domain": "public-health",
+      "purpose": "ingest-scoped-public-health-highlight-signal",
+      "customAuthenticationEvidence": false,
+      "authentication": {
+        "required": true,
+        "mechanism": "bearer-or-cookie-session",
+        "principalType": "platform-user",
+        "credentialSource": ["header:authorization", "cookie:session"],
+        "replayCsrf": {
+          "replayProtection": "organization-namespaced-idempotency-key-hash-plus-in-process-command-lock",
+          "csrf": "platform-session-transport-policy"
+        }
+      },
+      "authorization": {
+        "model": "platform-rbac-plus-fail-closed-organization-and-public-health-hospital-scope",
+        "roles": ["commission"],
+        "dataScope": "city and health-admin platform; district own organization or explicit public-health hospital allowlist"
+      },
+      "coverage": {
+        "level": "endpoint",
+        "selector": "entire-route",
+        "actions": ["public-health-highlight-signal-intake"],
+        "unverifiedRemainder": false
+      },
+      "idempotency": {
+        "key": "header:Idempotency-Key-or-body:idempotencyKey-or-body:id-or-canonical-payload-digest",
+        "payloadBinding": ["actorOrganizationScope", "id", "ruleId", "sourceType", "sourceSystem", "metric", "value", "baseline", "unit", "region", "institution", "observedAt", "location", "evidenceRefs", "sourceOrgCode"],
+        "exactReplay": "returns the persisted signal with idempotent=true and status 200 without another state or audit write",
+        "conflictingReuse": "PUBLIC_HEALTH_SIGNAL_IDEMPOTENCY_CONFLICT",
+        "persistenceScope": "bounded 200-entry publicHealthSignals ledger plus one chained securityEvents entry in one platform state write",
+        "distributedExactlyOnceClaimed": false
+      },
+      "concurrency": {
+        "cas": {
+          "required": true,
+          "field": "per-organization-namespaced-key in-process command tail plus SQLite storageMeta.collectionVersions",
+          "conflictCodes": ["PUBLIC_HEALTH_SIGNAL_VERSION_CONFLICT"]
+        }
+      },
+      "errors": [
+        { "code": "PUBLIC_HEALTH_SIGNAL_BODY_INVALID", "status": 400 },
+        { "code": "PUBLIC_HEALTH_SIGNAL_INVALID", "status": 400 },
+        { "code": "PUBLIC_HEALTH_SIGNAL_SCOPE_FORBIDDEN", "status": 403 },
+        { "code": "PUBLIC_HEALTH_SIGNAL_IDEMPOTENCY_CONFLICT", "status": 409 },
+        { "code": "PUBLIC_HEALTH_SIGNAL_ID_CONFLICT", "status": 409 },
+        { "code": "PUBLIC_HEALTH_SIGNAL_VERSION_CONFLICT", "status": 409 },
+        { "code": "PUBLIC_HEALTH_SIGNAL_STORAGE_FAILED", "status": 500 }
+      ],
+      "audit": {
+        "accepted": "commits one bounded signal record and one chained security event in the same platform state write",
+        "replay": "returns the persisted signal without another signal, audit or state write",
+        "rejected": "identity and unsupported organization scope stop before body or state; district source-scope denial records a separate denied security event; validation and conflicts do not write; failed state writes are redacted without fallback audit writes"
+      },
+      "implementationEvidence": [
+        {
+          "file": "src/http/routes/public-health/public-health-operations.js",
+          "anchors": [
+            "function withPublicHealthSignalCommandLock",
+            "function publicHealthSignalScopeDecision",
+            "function publicHealthSignalCommandIdentity",
+            "PUBLIC_HEALTH_SIGNAL_IDEMPOTENCY_CONFLICT",
+            "data.publicHealthSignals = [signal, ...signals].slice(0, 200)",
+            "data.securityEvents = sealAuditTrail"
+          ]
+        },
+        {
+          "file": "server.js",
+          "anchors": [
+            "function verifySqliteCollectionVersions",
+            "SQLite optimistic lock conflict on",
+            "db.exec(\"COMMIT\")"
+          ]
+        }
+      ],
+      "testEvidence": [
+        {
+          "file": "test/public-health-highlight-signal-route-contract.test.js",
+          "anchors": [
+            "identity and unsupported organization scope stop before body and state",
+            "district scope accepts only its canonical organization allowlist",
+            "exact replay is read-only and stores only hashed command identity",
+            "conflicting key reuse and occupied signal id return stable conflicts",
+            "commits one bounded ledger record and chained audit in one write",
+            "maps scope-audit, SQLite CAS and storage failures without leaks"
+          ]
+        },
+        {
+          "file": "test/public-health-highlight-signal-api.test.js",
+          "anchors": [
+            "real API enforces scope and durable replay semantics",
+            "assert.equal(replay.body.idempotent, true)",
+            "PUBLIC_HEALTH_SIGNAL_IDEMPOTENCY_CONFLICT"
+          ]
+        }
+      ],
+      "productionReady": false,
+      "externalEvidenceRequired": true
     }
   ]
 }
