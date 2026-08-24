@@ -384,3 +384,13 @@ sink 仍在 Inventory 中失败关闭；仓库测试不证明真实体检设备�
 64 位小写 SHA-256；缺输入、摘要不符、相对路径、symlink、超限、
 非法 JSON、未知字段或无效七门状态均失败关闭且不回显路径、连接串、凭据或输入正文。CLI 通过不能写入
 `/api/production-go-no-go/*`，也不能启用 PostgreSQL 主读/主写。
+
+## 35. 预生产现场控制（无 HTTP 变化）
+
+本切片不新增或改变 HTTP method/path、身份、角色、scope、错误、幂等或审计事件。
+`platform:preproduction:*` 是部署侧只读 CLI：environment/joint-test/monitoring/rehearsal 使用
+`--require-ready`，candidate 使用 `--require-go-candidate`；NO-GO 返回进程码 2，参数/文件/证据异常返回 1
+且只输出稳定脱敏错误。candidate 会用部署环境 anchor 摘要发现文件漂移，但普通 CLI 不把同进程环境值视为
+信任授权，仍保持 NO-GO/退出 2；五份报告必须由不同账号、key ID
+与公钥材料签发、摘要绑定且签发年龄/生命周期不超过 48 小时的 Ed25519
+信封；自报 ready 或坏签名均失败。五个入口不能写入 `/api/production-go-no-go/*`，不能执行切换、回滚或 worker。

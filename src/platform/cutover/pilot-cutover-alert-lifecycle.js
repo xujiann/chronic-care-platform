@@ -207,9 +207,11 @@ function validateAlertEvent(event, index, previousDigest, events) {
 
 function readPilotCutoverAlertJournal(file, options = {}) {
   const resolved = resolveJournalFile(file);
+  const fileSystem = options.fileSystem || fs;
   let stat;
+  let descriptor = null;
   try {
-    stat = fs.lstatSync(resolved);
+    stat = fileSystem.lstatSync(resolved);
   } catch {
     if (options.allowMissing === true) return Object.freeze([]);
     throw lifecycleError(
@@ -223,7 +225,50 @@ function readPilotCutoverAlertJournal(file, options = {}) {
       "pilot cutover alert journal must be a regular file within the size limit"
     );
   }
-  const text = fs.readFileSync(resolved, "utf8");
+  let text;
+  try {
+    descriptor = fileSystem.openSync(resolved, fs.constants.O_RDONLY
+      | (fs.constants.O_NOFOLLOW || 0));
+    const opened = fileSystem.fstatSync(descriptor);
+    const current = fileSystem.lstatSync(resolved);
+    if (!opened.isFile()
+      || current.isSymbolicLink()
+      || !current.isFile()
+      || stat.dev !== opened.dev
+      || stat.ino !== opened.ino
+      || opened.dev !== current.dev
+      || opened.ino !== current.ino
+      || opened.size > MAX_ALERT_JOURNAL_BYTES
+      || current.size !== opened.size) {
+      throw lifecycleError(
+        "PILOT_CUTOVER_ALERT_JOURNAL_BOUNDARY_INVALID",
+        "pilot cutover alert journal must match the opened regular file and remain within the size limit"
+      );
+    }
+    const bytes = Buffer.alloc(opened.size + 1);
+    let offset = 0;
+    while (offset < bytes.length) {
+      const count = fileSystem.readSync(descriptor, bytes, offset, bytes.length - offset, offset);
+      if (count === 0) break;
+      offset += count;
+    }
+    const finished = fileSystem.fstatSync(descriptor);
+    if (offset !== opened.size || finished.size !== opened.size) {
+      throw lifecycleError(
+        "PILOT_CUTOVER_ALERT_JOURNAL_BOUNDARY_INVALID",
+        "pilot cutover alert journal changed while it was being read"
+      );
+    }
+    text = bytes.subarray(0, offset).toString("utf8");
+  } catch (error) {
+    if (error?.code?.startsWith("PILOT_CUTOVER_")) throw error;
+    throw lifecycleError(
+      "PILOT_CUTOVER_ALERT_JOURNAL_BOUNDARY_INVALID",
+      "pilot cutover alert journal is unavailable"
+    );
+  } finally {
+    if (descriptor !== null) fileSystem.closeSync(descriptor);
+  }
   if (!text.trim()) return Object.freeze([]);
   const events = [];
   let previousDigest = ALERT_GENESIS_DIGEST;
@@ -370,7 +415,9 @@ function alertStatusFromEvents(events) {
 }
 
 function buildPilotCutoverAlertProjection(options = {}) {
-  const events = options.events || readPilotCutoverAlertJournal(options.file);
+  const events = options.events || readPilotCutoverAlertJournal(options.file, {
+    fileSystem: options.fileSystem
+  });
   const grouped = new Map();
   events.forEach((event) => {
     const rows = grouped.get(event.alertFingerprint) || [];

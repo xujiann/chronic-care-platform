@@ -192,6 +192,7 @@ test("deploy check report covers release-critical snapshot gates", () => {
     "database:postgresPrimaryReadRehearsal",
     "database:postgresProductionAdapter",
     "database:postgresTransitionReadiness",
+    "deployment:preproductionOnsiteControl",
     "database:postgresReconciliationCaseWorkflow",
     "database:postgresReconciliationDeployment",
     "runtime:sqliteProductionProfile",

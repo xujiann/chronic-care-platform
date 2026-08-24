@@ -300,3 +300,15 @@ verifier → governance-api/architecture:test`。snapshot 与 superseded 只提�
 | `scripts/postgres-primary-transition-readiness.js` | T00 | 读取 SHA-256 固定的闭集 metadata-only 文件，复用配置与七门评估，输出脱敏资格投影 | 不连数据库、不验外部证据、不激活主库 |
 | `scripts/production-deployment-package.js` | T00 | 将 migration/read/adapter/storage-admin 与 sync/reconcile 模板登记为不可变部署闭包 | 不启动 worker，不保存 `DATABASE_URL` 值 |
 | `deploy/postgres-*.template`、`deploy/platform-production-adapters.env.template` | T00 | systemd 与变量占位符合同 | 不提供现场值或生产授权 |
+
+## 预生产现场控制模块
+
+| 模块 | Owner | 职责 | 非职责 |
+|---|---|---|---|
+| `scripts/platform-preproduction-control.js` | T00 | 五个命令的闭集参数适配、只读文件装配、Ed25519 报告信封验证、0/2/1 退出语义与稳定脱敏错误 | 不调用外部系统、不启动 worker、不执行切换/回滚 |
+| 既有 environment/joint-test/monitoring/rehearsal/candidate evaluators | T00/T08 既有边界 | 复用原证据 schema、签名、绑定、监控和演练语义 | 不建立第二套证据状态机，不产生生产授权 |
+| `production-deployment-package` preproduction controls | T00 | 登记五个入口、运行依赖、变量模板与固定非授权投影 | 不保存现场文件、凭据、签名或报告正文 |
+
+入口依赖采用 `CLI → 既有 evaluator → technical-evidence`，不依赖 `server.js`、HTTP、数据库 client 或
+strict preflight。candidate 用部署 anchor 摘要检查漂移，只聚合五份由不同账号、key ID、公钥材料签发且
+不超过 48 小时的摘要绑定报告信封；普通 CLI 固定 NO-GO，未来受信宿主绑定仍保持 `GO-CANDIDATE` 上限。

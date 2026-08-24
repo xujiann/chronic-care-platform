@@ -45,9 +45,11 @@ function resolveAbsoluteFile(value, label) {
 function readBoundedJsonFile(file, options = {}) {
   const label = options.label || "pilot cutover file";
   const resolved = resolveAbsoluteFile(file, label);
+  const fileSystem = options.fileSystem || fs;
   let stat;
+  let descriptor = null;
   try {
-    stat = fs.lstatSync(resolved);
+    stat = fileSystem.lstatSync(resolved);
   } catch {
     throw packageError("PILOT_CUTOVER_FILE_UNAVAILABLE", `${label} is unavailable`);
   }
@@ -58,8 +60,59 @@ function readBoundedJsonFile(file, options = {}) {
       `${label} must be a non-empty regular file within the size limit`
     );
   }
+  let text;
   try {
-    return JSON.parse(fs.readFileSync(resolved, "utf8"));
+    descriptor = fileSystem.openSync(resolved, fs.constants.O_RDONLY
+      | (fs.constants.O_NOFOLLOW || 0));
+    const opened = fileSystem.fstatSync(descriptor);
+    const current = fileSystem.lstatSync(resolved);
+    if (!opened.isFile()
+      || current.isSymbolicLink()
+      || !current.isFile()
+      || stat.dev !== opened.dev
+      || stat.ino !== opened.ino
+      || opened.dev !== current.dev
+      || opened.ino !== current.ino
+      || opened.size <= 0
+      || opened.size > maximumBytes
+      || current.size !== opened.size) {
+      throw packageError(
+        "PILOT_CUTOVER_FILE_BOUNDARY_INVALID",
+        `${label} must match the opened regular file and remain within the size limit`
+      );
+    }
+    const bytes = Buffer.alloc(opened.size + 1);
+    let offset = 0;
+    while (offset < bytes.length) {
+      const count = fileSystem.readSync(
+        descriptor,
+        bytes,
+        offset,
+        bytes.length - offset,
+        offset
+      );
+      if (count === 0) break;
+      offset += count;
+    }
+    const finished = fileSystem.fstatSync(descriptor);
+    if (offset !== opened.size || finished.size !== opened.size) {
+      throw packageError(
+        "PILOT_CUTOVER_FILE_BOUNDARY_INVALID",
+        `${label} changed while it was being read`
+      );
+    }
+    text = bytes.subarray(0, offset).toString("utf8");
+  } catch (error) {
+    if (error?.code?.startsWith("PILOT_CUTOVER_")) throw error;
+    throw packageError(
+      "PILOT_CUTOVER_FILE_BOUNDARY_INVALID",
+      `${label} could not be read through the regular-file boundary`
+    );
+  } finally {
+    if (descriptor !== null) fileSystem.closeSync(descriptor);
+  }
+  try {
+    return JSON.parse(text);
   } catch {
     throw packageError("PILOT_CUTOVER_JSON_INVALID", `${label} is not valid JSON`);
   }

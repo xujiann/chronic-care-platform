@@ -4,6 +4,9 @@ const path = require("node:path");
 const test = require("node:test");
 
 const {
+  PREPRODUCTION_CONTROL_CONFIGURATION_VARIABLES,
+  PREPRODUCTION_CONTROL_DEFINITIONS,
+  PREPRODUCTION_CONTROL_RUNTIME_FILES,
   buildProductionDeploymentPackage,
   parseArgs,
   postgresDeploymentTemplatesValid,
@@ -49,6 +52,8 @@ test("production deployment package hashes runtime files without persisting secr
       "deploy/postgres-shadow-reconcile.timer.template",
       "deploy/platform-production-adapters.env.template"
     ].forEach((runtimeFile) => assert.equal(manifest.artifact.files.some((item) => item.path === runtimeFile), true, runtimeFile));
+    PREPRODUCTION_CONTROL_RUNTIME_FILES.forEach((runtimeFile) =>
+      assert.equal(manifest.artifact.files.some((item) => item.path === runtimeFile), true, runtimeFile));
     assert.equal(manifest.artifact.files.some((item) => item.path === "config/regions.json"), true);
     assert.equal(manifest.artifact.files.some((item) => item.path === "src/platform/regional/regional-runtime.js"), true);
     [
@@ -112,6 +117,27 @@ test("production deployment package hashes runtime files without persisting secr
     assert.equal(manifest.processContract.databaseTransition.productionReady, false);
     assert.equal(manifest.processContract.databaseTransition.configurationVariables.includes("POSTGRES_PRIMARY_TRANSITION_INPUT_FILE"), true);
     assert.equal(manifest.processContract.databaseTransition.configurationVariables.includes("POSTGRES_PRIMARY_TRANSITION_INPUT_SHA256"), true);
+    assert.deepEqual(
+      manifest.processContract.preproductionControls.map((item) => item.id),
+      ["environment", "joint-test", "monitoring", "rehearsal", "candidate"]
+    );
+    assert.deepEqual(
+      manifest.processContract.preproductionControls.map(({ id, command, configurationVariables }) => ({
+        id,
+        command,
+        configurationVariables
+      })),
+      PREPRODUCTION_CONTROL_DEFINITIONS
+    );
+    assert.equal(manifest.processContract.preproductionControls.every((item) =>
+      item.readOnly === true
+      && item.externalEvidenceRequired === true
+      && item.executionAuthorized === false
+      && item.productionPrimary === false
+      && item.productionReady === false), true);
+    assert.equal(PREPRODUCTION_CONTROL_CONFIGURATION_VARIABLES.every((name) =>
+      manifest.processContract.preproductionControls.some((item) =>
+        item.configurationVariables.includes(name))), true);
     assert.equal(JSON.stringify(manifest.processContract).includes("DATABASE_URL"), false);
     const reconciliationService = fs.readFileSync(path.join(ROOT, "deploy", "postgres-shadow-reconcile.service.template"), "utf8");
     ["__SERVICE_USER__", "__SERVICE_GROUP__", "__APP_DIR__", "__SECRET_ENV_FILE__", "__NODE_BINARY__", "__DATA_DIR__", "__LOG_DIR__"].forEach((placeholder) => assert.match(reconciliationService, new RegExp(placeholder)));
@@ -159,6 +185,13 @@ test("deployment package verification detects file digest tampering", () => {
   assert.equal(failed.ok, false);
   assert.equal(failed.mismatched.includes(tampered.artifact.files[0].path), true);
 
+  const forgedTopLevelReady = structuredClone(manifest);
+  forgedTopLevelReady.productionReady = true;
+  const forgedTopLevelReadyFailed = verifyProductionDeploymentPackage(forgedTopLevelReady);
+  assert.equal(forgedTopLevelReadyFailed.ok, false);
+  assert.equal(forgedTopLevelReadyFailed.checks.some((item) =>
+    item.id === "deploymentVerify:schema" && !item.passed), true);
+
   const missingWorkerContract = structuredClone(manifest);
   missingWorkerContract.processContract.backgroundJobs = [];
   const workerFailed = verifyProductionDeploymentPackage(missingWorkerContract);
@@ -171,6 +204,63 @@ test("deployment package verification detects file digest tampering", () => {
   const trustProviderFailed = verifyProductionDeploymentPackage(missingTrustProvider);
   assert.equal(trustProviderFailed.ok, false);
   assert.equal(trustProviderFailed.checks.some((item) => item.id === "deploymentVerify:productionEvidenceTrust" && !item.passed), true);
+
+  const missingPreproductionRuntime = structuredClone(manifest);
+  missingPreproductionRuntime.artifact.files = missingPreproductionRuntime.artifact.files.filter((item) =>
+    item.path !== "scripts/platform-preproduction-control.js");
+  const missingPreproductionRuntimeFailed = verifyProductionDeploymentPackage(
+    missingPreproductionRuntime
+  );
+  assert.equal(missingPreproductionRuntimeFailed.ok, false);
+  assert.equal(missingPreproductionRuntimeFailed.checks.some((item) =>
+    item.id === "deploymentVerify:preproductionControls" && !item.passed), true);
+
+  for (const requiredTrustRuntime of [
+    "src/platform/cutover/pilot-cutover-trust-verifier.js",
+    "src/platform/governance/production-evidence-trust-provider.js"
+  ]) {
+    const missingTrustRuntime = structuredClone(manifest);
+    missingTrustRuntime.artifact.files = missingTrustRuntime.artifact.files.filter((item) =>
+      item.path !== requiredTrustRuntime);
+    const result = verifyProductionDeploymentPackage(missingTrustRuntime);
+    assert.equal(result.ok, false, requiredTrustRuntime);
+    assert.equal(result.checks.some((item) =>
+      item.id === "deploymentVerify:preproductionControls" && !item.passed), true,
+    requiredTrustRuntime);
+  }
+
+  for (const property of [
+    "readOnly",
+    "externalEvidenceRequired",
+    "cutoverExecutionAuthorized",
+    "executionAuthorized",
+    "runtimeCutoverEnabled",
+    "productionPrimary",
+    "productionReady"
+  ]) {
+    const forgedPreproductionControl = structuredClone(manifest);
+    const control = forgedPreproductionControl.processContract.preproductionControls[0];
+    control[property] = !control[property];
+    const forgedPreproductionControlFailed = verifyProductionDeploymentPackage(
+      forgedPreproductionControl
+    );
+    assert.equal(forgedPreproductionControlFailed.ok, false, property);
+    assert.equal(forgedPreproductionControlFailed.checks.some((item) =>
+      item.id === "deploymentVerify:preproductionControls" && !item.passed), true, property);
+  }
+
+  for (const property of ["command", "configurationVariables"]) {
+    const forgedPreproductionContract = structuredClone(manifest);
+    forgedPreproductionContract.processContract.preproductionControls[0][property] = property === "command"
+      ? "npm run platform:preproduction:environment -- --input=<unbounded-file>"
+      : [];
+    const forgedPreproductionContractFailed = verifyProductionDeploymentPackage(
+      forgedPreproductionContract
+    );
+    assert.equal(forgedPreproductionContractFailed.ok, false, property);
+    assert.equal(forgedPreproductionContractFailed.checks.some((item) =>
+      item.id === "deploymentVerify:preproductionControls" && !item.passed), true, property);
+  }
 
   const missingTransitionFile = structuredClone(manifest);
   missingTransitionFile.artifact.files = missingTransitionFile.artifact.files.filter((item) => item.path !== "scripts/postgres-primary-transition-readiness.js");

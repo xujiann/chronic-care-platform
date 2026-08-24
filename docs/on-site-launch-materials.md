@@ -10,6 +10,36 @@
 4. 委端统一工作台通过 `POST /api/site-launch-evidence` 登记身份源、接口联调、监控值守和生产签字证据，形成 `siteLaunchEvidence` 运行台账；标记为 `verified` 的证据必须带联调单号或附件摘要，并单独计入已验收模板。
 5. 任何 P0 材料缺失时，不进入正式生产切换；可降级为白名单试点、只读试运行或继续联调。
 
+## 预生产现场只读控制
+
+现场提交外部材料前，使用 `platform:preproduction:*` 五个入口按顺序评估环境、96 项双签联调、监控、
+七席位演练和统一候选。所有输入都必须位于服务账号控制的仓库外绝对路径；campaign、trust registry、
+evidence、报告和 JSONL journal 只作只读元数据输入。打开 descriptor 后执行有界读取并拒绝 symlink/换 inode
+路径替换，但通用文件没有新增内容摘要，仍必须依赖既有签名、指纹、挂载权限和现场复核证明真实性。
+
+```powershell
+npm.cmd run platform:preproduction:environment -- --input=<绝对路径> --release-id=<发布号> --package-fingerprint=<sha256> --require-ready
+npm.cmd run platform:preproduction:joint-test -- --campaign=<绝对路径> --trust-registry=<绝对路径> --evidence=<绝对路径> --release-id=<发布号> --package-fingerprint=<sha256> --require-ready
+npm.cmd run platform:preproduction:monitoring -- --journal=<绝对路径> --input=<绝对路径> --release-id=<发布号> --package-fingerprint=<sha256> --require-ready
+npm.cmd run platform:preproduction:rehearsal -- --input=<绝对路径> --release-id=<发布号> --package-fingerprint=<sha256> --require-ready
+npm.cmd run platform:preproduction:candidate -- --authorization=<签名信封> --preproduction=<签名信封> --joint-tests=<签名信封> --monitoring=<签名信封> --rehearsal=<签名信封> --release-id=<发布号> --package-fingerprint=<sha256> --require-go-candidate
+```
+
+非 candidate 命令带就绪门禁时，退出码 0 表示命令已完成且当前要求满足，2 表示命令正常完成但仍为 `NO-GO`；
+不带门禁时 0 仅表示评估正常完成。candidate 的 `NO-GO` 始终退出 2，即使省略门禁参数。退出码 1 表示参数、文件边界或证据无效。联调必须覆盖
+timeout/retry/reconciliation；监控必须覆盖 dead-letter redrive；演练必须覆盖 freeze、
+snapshot、switch-read、verify、rollback、post-rollback 以及 outbox/reconciliation 观察。五个入口均要求现场
+显式提供发布号和不可变包指纹，并只使用进程系统时钟，不接受命令行回拨时间。candidate 会用部署环境既有
+`PRODUCTION_EVIDENCE_TRUST_ANCHORS_FILE` 与摘要发现文件漂移，但不把同一进程可覆盖的环境值当作不可替换
+信任根；五类报告必须由
+五个不同账号、不同 key ID 和不同公钥材料以 Ed25519 签名，签发年龄与有效期均不得超过 48 小时，并核对报告摘要、上游 schema、完整检查项、授权账本、
+双签回执数量及发布绑定，不接受自报 ready 的 JSON。结构合法但仍 NO-GO 的签名集合退出 2；坏签名退出 1。
+普通 CLI 即使本地检查全部通过也保持 NO-GO/退出 2；形成 `GO-CANDIDATE` 所需的外部部署宿主信任集成
+不在本次实现范围内，仍是现场阻断项。候选结论最多是
+`GO-CANDIDATE`，`cutoverExecutionAuthorized`、`executionAuthorized`、`runtimeCutoverEnabled`、
+`productionPrimary`、`productionReady` 始终为 false。不得用仓库测试
+代替 120、对象存储、真实监控/灾备和四方现场签字，也不得由该 CLI 启动 worker、执行切换或回滚。
+
 ## 材料总表
 
 | 编号 | 材料域 | 必备材料 | 验收口径 | 责任方 | 归档位置 |
