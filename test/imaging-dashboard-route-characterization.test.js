@@ -283,3 +283,339 @@ test("imaging study share preserves authorization, scope, body, audit and respon
     }
   }]);
 });
+
+test("imaging quality control preserves authorization, lookup, FHIR publish and one local write", async () => {
+  const sequence = [];
+  const responses = [];
+  const user = { name: "影像质控员", role: "institution" };
+  const study = {
+    id: "study/quality-001",
+    residentId: "resident-001",
+    qcStatus: "待质控",
+    emrSyncStatus: "待报告审核后写入"
+  };
+  const data = { imageCloudStudies: [study], imageCloudQualityReviews: [] };
+  const runtime = {
+    appendSecurityEvent() {
+      sequence.push("unexpected-security-audit");
+    },
+    async collectJson() {
+      sequence.push("body");
+      return { result: " 合格 ", group: " 专项抽样 " };
+    },
+    async publishDiagnosticReportToFhir(updatedStudy, review) {
+      sequence.push("fhir-publish");
+      assert.equal(updatedStudy.id, "study/quality-001");
+      assert.equal(updatedStudy.qcStatus, "合格");
+      assert.equal(updatedStudy.emrSyncStatus, "已写入电子病历索引");
+      assert.equal(review.group, "专项抽样");
+      assert.equal(data.imageCloudStudies[0], study);
+      return {
+        diagnosticReport: { id: "diagnostic-report-quality-001" },
+        endpoint: "https://fhir.internal.test/DiagnosticReport/diagnostic-report-quality-001"
+      };
+    },
+    randomUUID() {
+      sequence.push("review-id");
+      return "quality-review-001";
+    },
+    readDatabase() {
+      sequence.push("read");
+      return data;
+    },
+    requireApiRole(_req, _res, roles, route) {
+      sequence.push("authorization");
+      assert.deepEqual(roles, ["commission", "institution"]);
+      assert.equal(route, "/api/imaging-cloud/studies/:id/qc");
+      return user;
+    },
+    sendJson(_res, status, body) {
+      sequence.push("response");
+      responses.push({ status, body });
+    },
+    writeDatabase(input) {
+      sequence.push("write");
+      assert.equal(input, data);
+    }
+  };
+  const segment = createImagingRouteSegment(new Proxy(runtime, { get: (target, key) => target[key] || (() => undefined) }));
+
+  const handled = await segment.handle(
+    { method: "POST" },
+    {},
+    new URL("http://platform.test/api/imaging-cloud/studies/study%2Fquality-001/qc")
+  );
+
+  assert.equal(handled, true);
+  assert.deepEqual(sequence, [
+    "authorization",
+    "read",
+    "body",
+    "review-id",
+    "fhir-publish",
+    "write",
+    "response"
+  ]);
+  assert.equal(data.imageCloudQualityReviews.length, 1);
+  assert.equal(data.imageCloudQualityReviews[0].id, "icq-quality-review-001");
+  assert.equal(data.imageCloudStudies[0].fhirDiagnosticReportId, "diagnostic-report-quality-001");
+  assert.equal(responses[0].status, 200);
+  assert.equal(responses[0].body.review.id, "icq-quality-review-001");
+  assert.equal(responses[0].body.fhirReportSync.endpoint, undefined);
+});
+
+test("imaging quality control does not misreport a local write failure as a FHIR failure", async () => {
+  const responses = [];
+  const securityEvents = [];
+  const data = {
+    imageCloudStudies: [{ id: "study-001", qcStatus: "待质控", emrSyncStatus: "待写入" }],
+    imageCloudQualityReviews: []
+  };
+  const runtime = {
+    appendSecurityEvent(event) {
+      securityEvents.push(event);
+    },
+    async collectJson() {
+      return {};
+    },
+    async publishDiagnosticReportToFhir() {
+      return { diagnosticReport: { id: "diagnostic-report-001" } };
+    },
+    randomUUID() {
+      return "review-001";
+    },
+    readDatabase() {
+      return data;
+    },
+    requireApiRole() {
+      return { name: "影像质控员", role: "institution" };
+    },
+    sendJson(_res, status, body) {
+      responses.push({ status, body });
+    },
+    writeDatabase() {
+      throw new Error("local persistence failed");
+    }
+  };
+  const segment = createImagingRouteSegment(new Proxy(runtime, { get: (target, key) => target[key] || (() => undefined) }));
+
+  await assert.rejects(
+    segment.handle(
+      { method: "POST" },
+      {},
+      new URL("http://platform.test/api/imaging-cloud/studies/study-001/qc")
+    ),
+    /local persistence failed/
+  );
+  assert.deepEqual(securityEvents, []);
+  assert.deepEqual(responses, []);
+});
+
+test("imaging quality control maps only provider rejection to the legacy FHIR failure response", async () => {
+  const cases = [
+    {
+      expected: /uuid failed/,
+      randomUUID() {
+        throw new Error("uuid failed");
+      },
+      async publishDiagnosticReportToFhir() {
+        throw new Error("provider must not run");
+      }
+    },
+    {
+      expected: /reading 'id'/,
+      randomUUID() {
+        return "review-001";
+      },
+      async publishDiagnosticReportToFhir() {
+        return {};
+      }
+    }
+  ];
+
+  for (const current of cases) {
+    const responses = [];
+    const securityEvents = [];
+    const data = {
+      imageCloudStudies: [{ id: "study-001", qcStatus: "待质控", emrSyncStatus: "待写入" }],
+      imageCloudQualityReviews: []
+    };
+    const runtime = {
+      appendSecurityEvent(event) {
+        securityEvents.push(event);
+      },
+      async collectJson() {
+        return {};
+      },
+      publishDiagnosticReportToFhir: current.publishDiagnosticReportToFhir,
+      randomUUID: current.randomUUID,
+      readDatabase() {
+        return data;
+      },
+      requireApiRole() {
+        return { name: "影像质控员", role: "institution" };
+      },
+      sendJson(_res, status, body) {
+        responses.push({ status, body });
+      },
+      writeDatabase() {
+        throw new Error("write must not run");
+      }
+    };
+    const segment = createImagingRouteSegment(new Proxy(runtime, { get: (target, key) => target[key] || (() => undefined) }));
+
+    await assert.rejects(
+      segment.handle(
+        { method: "POST" },
+        {},
+        new URL("http://platform.test/api/imaging-cloud/studies/study-001/qc")
+      ),
+      current.expected
+    );
+    assert.deepEqual(securityEvents, []);
+    assert.deepEqual(responses, []);
+  }
+});
+
+test("imaging quality control returns not found before body, provider and local write", async () => {
+  const sequence = [];
+  const responses = [];
+  const runtime = {
+    collectJson() {
+      sequence.push("unexpected-body");
+    },
+    publishDiagnosticReportToFhir() {
+      sequence.push("unexpected-provider");
+    },
+    readDatabase() {
+      sequence.push("read");
+      return { imageCloudStudies: [] };
+    },
+    requireApiRole() {
+      sequence.push("authorization");
+      return { name: "影像质控员", role: "institution" };
+    },
+    sendJson(_res, status, body) {
+      sequence.push("response");
+      responses.push({ status, body });
+    },
+    writeDatabase() {
+      sequence.push("unexpected-write");
+    }
+  };
+  const segment = createImagingRouteSegment(new Proxy(runtime, { get: (target, key) => target[key] || (() => undefined) }));
+
+  const handled = await segment.handle(
+    { method: "POST" },
+    {},
+    new URL("http://platform.test/api/imaging-cloud/studies/missing/qc")
+  );
+
+  assert.equal(handled, true);
+  assert.deepEqual(sequence, ["authorization", "read", "response"]);
+  assert.deepEqual(responses, [{
+    status: 404,
+    body: { error: "Not Found", code: undefined, message: "未找到影像云检查", productionReady: undefined }
+  }]);
+});
+
+test("imaging quality control stops before reading when authorization is denied", async () => {
+  const sequence = [];
+  const runtime = {
+    readDatabase() {
+      sequence.push("unexpected-read");
+    },
+    requireApiRole() {
+      sequence.push("authorization");
+      return null;
+    }
+  };
+  const segment = createImagingRouteSegment(new Proxy(runtime, { get: (target, key) => target[key] || (() => undefined) }));
+
+  const handled = await segment.handle(
+    { method: "POST" },
+    {},
+    new URL("http://platform.test/api/imaging-cloud/studies/study-001/qc")
+  );
+
+  assert.equal(handled, true);
+  assert.deepEqual(sequence, ["authorization"]);
+});
+
+test("imaging quality control audits one provider failure and performs no local business write", async () => {
+  const sequence = [];
+  const securityEvents = [];
+  const responses = [];
+  const study = { id: "study-001", qcStatus: "待质控", emrSyncStatus: "待写入" };
+  const data = { imageCloudStudies: [study], imageCloudQualityReviews: [] };
+  const runtime = {
+    appendSecurityEvent(event) {
+      sequence.push("security-audit");
+      securityEvents.push(event);
+    },
+    async collectJson() {
+      sequence.push("body");
+      return {};
+    },
+    async publishDiagnosticReportToFhir() {
+      sequence.push("fhir-publish");
+      throw new Error("FHIR provider unavailable");
+    },
+    randomUUID() {
+      sequence.push("review-id");
+      return "failed-review";
+    },
+    readDatabase() {
+      sequence.push("read");
+      return data;
+    },
+    requireApiRole() {
+      sequence.push("authorization");
+      return { name: "影像质控员", role: "institution" };
+    },
+    sendJson(_res, status, body) {
+      sequence.push("response");
+      responses.push({ status, body });
+    },
+    writeDatabase() {
+      sequence.push("unexpected-write");
+    }
+  };
+  const segment = createImagingRouteSegment(new Proxy(runtime, { get: (target, key) => target[key] || (() => undefined) }));
+
+  const handled = await segment.handle(
+    { method: "POST" },
+    {},
+    new URL("http://platform.test/api/imaging-cloud/studies/study-001/qc")
+  );
+
+  assert.equal(handled, true);
+  assert.deepEqual(sequence, [
+    "authorization",
+    "read",
+    "body",
+    "review-id",
+    "fhir-publish",
+    "security-audit",
+    "response"
+  ]);
+  assert.equal(data.imageCloudStudies[0], study);
+  assert.deepEqual(data.imageCloudQualityReviews, []);
+  assert.deepEqual(securityEvents, [{
+    actor: "影像质控员",
+    role: "institution",
+    action: "sync DiagnosticReport to FHIR",
+    target: "study-001",
+    result: "failed",
+    detail: "FHIR provider unavailable"
+  }]);
+  assert.deepEqual(responses, [{
+    status: 502,
+    body: {
+      error: "FHIR DiagnosticReport Sync Failed",
+      code: undefined,
+      message: "FHIR provider unavailable",
+      productionReady: undefined
+    }
+  }]);
+});

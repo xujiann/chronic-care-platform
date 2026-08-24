@@ -136,6 +136,13 @@ HTTP request
 
 `POST /api/imaging-cloud/studies/:id/share` 已从混合 `clinical-blood` 路由迁入 `imaging-cloud` 路由并接入 `imaging-study-share-command.v1`。角色仍为 citizen、institution、commission；鉴权后读取状态，404/居民范围 403 均在读取 body 前返回，成功继续限制 1–90 天、写入既有 share 与数据访问审计、单次持久化并返回 201。公开响应继续移除内部 token；本切片不增加幂等语义或生产批准。
 
+`POST /api/imaging-cloud/studies/:id/qc` 已从混合 `clinical-blood` 路由迁入 `imaging-cloud` 路由并接入
+`imaging-study-quality-control-command.v1`。角色仍为 commission、institution；鉴权后读取状态，检查不存在
+仍在读取 body 和调用 FHIR 前返回 404。成功继续使用原默认值、更新检查及最多 300 条质控记录、调用
+DiagnosticReport provider 后单次持久化并返回 200；provider 失败仍追加一次安全事件、返回 502 且不写本地
+业务状态。公开投影继续剔除敏感 provider 字段。本切片不新增幂等、CAS、机构范围、错误标准化或生产批准，
+该接口仍为 `behavior-proof-required` 和 `NO-GO`。
+
 `GET /api/physical-exams` 已通过兼容委托接入 `physical-examination-dashboard-query.v1`。允许角色仍为 citizen、institution、commission；显式 `residentId` 继续按 `allowedResidentIdsForUser` 拒绝越权并记录安全事件。citizen 仍不接收联调、网关和专项分流明细，readiness 只暴露代码状态、质量和阻断数量；管理角色保留完整投影。成功响应继续在既有访问审计持久化之后执行最终脱敏。
 
 TEST-007 已把 T02 `operations-command` 的 32 条路径全部纳入运行时行为矩阵：每条路径验证声明角色和

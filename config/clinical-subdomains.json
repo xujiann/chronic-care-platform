@@ -133,6 +133,18 @@
             "imageCloudShares-state-mutation",
             "resident-data-access-audit-persisted-by-http-adapter"
           ]
+        },
+        {
+          "id": "imaging-study-quality-control-command.v1",
+          "source": "src/clinical-specialties/imaging/study-quality-control-command.js",
+          "route": "POST /api/imaging-cloud/studies/:id/qc",
+          "ports": ["publishDiagnosticReportToFhir", "randomUUID"],
+          "contracts": [],
+          "sideEffects": [
+            "imageCloudStudies-state-mutation",
+            "imageCloudQualityReviews-state-mutation",
+            "external-fhir-diagnostic-report-publish-before-local-persistence"
+          ]
         }
       ]
     },

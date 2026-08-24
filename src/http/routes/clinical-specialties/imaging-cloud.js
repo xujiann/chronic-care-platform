@@ -7,9 +7,13 @@ const {
 const {
   createImagingStudyShare
 } = require("../../../clinical-specialties/imaging/study-share-command");
+const {
+  commitImagingStudyQualityControl,
+  createImagingStudyQualityControlCommand
+} = require("../../../clinical-specialties/imaging/study-quality-control-command");
 
 function createRouteSegment(runtime) {
-  const { ImagingCloudProduction, appendDataAccessLog, appendSecurityEvent, buildImagingCloudProductionResponse, canAccessResident, collectJson, randomUUID, readDatabase, requireApiRole, sendJson, writeDatabase } = runtime;
+  const { ImagingCloudProduction, appendDataAccessLog, appendSecurityEvent, buildImagingCloudProductionResponse, canAccessResident, collectJson, publishDiagnosticReportToFhir, randomUUID, readDatabase, requireApiRole, sendJson, writeDatabase } = runtime;
   const sendImagingJson = (res, status, body) => sendJson(
     res,
     status,
@@ -72,6 +76,38 @@ function createRouteSegment(runtime) {
         });
         writeDatabase(data);
         sendImagingJson(res, 201, share);
+        return true;
+      }
+
+      const imagingQcMatch = url.pathname.match(/^\/api\/imaging-cloud\/studies\/([^/]+)\/qc$/);
+      if (req.method === "POST" && imagingQcMatch) {
+        const user = requireApiRole(req, res, ["commission", "institution"], "/api/imaging-cloud/studies/:id/qc");
+        if (!user) return true;
+        const data = readDatabase();
+        const studyId = decodeURIComponent(imagingQcMatch[1]);
+        const studyIndex = (data.imageCloudStudies || []).findIndex((item) => item.id === studyId);
+        if (studyIndex < 0) {
+          sendImagingJson(res, 404, { error: "Not Found", message: "未找到影像云检查" });
+          return true;
+        }
+        const payload = await collectJson(req);
+        const command = createImagingStudyQualityControlCommand(
+          user,
+          data.imageCloudStudies[studyIndex],
+          payload,
+          { randomUUID }
+        );
+        let fhirReportSync;
+        try {
+          fhirReportSync = await publishDiagnosticReportToFhir(command.updatedStudy, command.review);
+        } catch (error) {
+          appendSecurityEvent({ actor: user.name, role: user.role, action: "sync DiagnosticReport to FHIR", target: studyId, result: "failed", detail: error.message });
+          sendImagingJson(res, 502, { error: "FHIR DiagnosticReport Sync Failed", message: error.message });
+          return true;
+        }
+        const result = commitImagingStudyQualityControl(data, studyIndex, command, fhirReportSync);
+        writeDatabase(data);
+        sendImagingJson(res, 200, result);
         return true;
       }
 
