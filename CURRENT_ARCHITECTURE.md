@@ -1,9 +1,9 @@
 # CURRENT ARCHITECTURE — 主线现状地图
 
 > 实施分支 AS-IS 快照：历史采样基于 `main@a15d10dc67a7fd89540d3073ece34b5d8c7b942e`；
-> 当前对账基线为 `origin/main@2e706d9fdf32babbe5a95c56af93571b3af2b137` 加
-> `process/t06-imaging-write-boundary-20260823`
-> 采集日期：2026-08-23
+> 当前对账基线为 `origin/main@1b976b5dd26d43b93aa41553c4296f766881434c` 加
+> `process/t06-imaging-qc-boundary-20260824`
+> 采集日期：2026-08-24
 > 性质：AS-IS，只描述已存在实现，不表达目标状态或实施授权。
 
 ## 1. 系统轮廓
@@ -29,7 +29,7 @@ flowchart TB
 
 ## 2. 仓库结构
 
-本治理切片闭集盘点 1,561 个受跟踪文件，其中 JavaScript 1,063、Markdown 264、JSON 106、HTML 44。主要目录：
+本治理切片闭集盘点 1,571 个受跟踪及本分支待跟踪文件，其中 JavaScript 1,073、Markdown 264、JSON 106、HTML 44。主要目录：
 
 | 路径 | 作用 | 当前边界 |
 |---|---|---|
@@ -42,7 +42,7 @@ flowchart TB
 | `data/` | 被跟踪的 `db.json` 开发/迁移输入 | 浏览器只读取运行时或构建时生成的 `public-demo.json`；生成物不入库 |
 | `deploy/` | SQL、systemd、Compose、环境模板和现场验证 | 生产证据默认 NO-GO |
 | `scripts/` | 测试、readiness、报告、部署和后台 worker | 187 个根级文件，职责和产物较分散 |
-| `test/` | Node test 与 Playwright | 473 个 test/spec 文件（453 Node、20 个 Playwright E2E spec 文件，含居民与 PWA 专项） |
+| `test/` | Node test 与 Playwright | 477 个 test/spec 文件（457 Node、20 个 Playwright E2E spec 文件，含居民与 PWA 专项） |
 | `regions/` | 多地区部署配置 | 由区域清单和发布注册表控制 |
 | `digital-hospital-standard-platform/` | 内嵌数智医院展示前端 | 独立页面但仍共享主仓发布生命周期 |
 | `resident-mini-program-platform/` | 居民小程序适配前端 | 独立页面但仍共享主仓发布生命周期 |
@@ -152,6 +152,12 @@ flowchart TB
 影像第四切片将 `GET /api/imaging-cloud` 的构建、脱敏和公开响应投影移入 `src/clinical-specialties/imaging/`。旧 HTTP 路由继续负责角色、居民范围和数据访问审计；带 `residentId` 的 GET 仍按遗留行为持久化审计。通用影像响应净化不再由血液混合路由实现，但旧导出保持兼容。
 
 影像首个写边界切片将 `POST /api/imaging-cloud/studies/:id/share` 从 `clinical-blood` 路由迁入既有 `imaging-cloud` 路由，并由 `imaging-study-share-command.v1` 负责既有 share 状态构造和数据访问审计。中央路由段顺序、method/path、角色、居民范围、先范围后 body、单次状态写入、201/403/404 响应及公开响应去密保持不变；其余影像写命令仍在混合路由。
+
+影像第二个写边界切片将 `POST /api/imaging-cloud/studies/:id/qc` 从 `clinical-blood` 路由迁入既有
+`imaging-cloud` 路由，并由 `imaging-study-quality-control-command.v1` 构造原质控记录、调用既有
+FHIR DiagnosticReport provider，再在成功后更新检查与最多 300 条质控记录。角色、鉴权—读取—404—body
+顺序、默认值、FHIR 失败审计、502、单次本地写入、200 响应与公开投影保持不变；没有新增幂等、CAS、机构
+范围、schema、worker 或生产授权。外部调用仍先于本地提交，因此该接口和全平台继续 `NO-GO`。
 
 体检第五切片将 `GET /api/physical-exams` 的 Overview 构建、生产 readiness 组合和角色投影移入 `src/clinical-specialties/physical-examination/dashboard-query.js`。混合 HTTP 路由仍负责鉴权、居民范围、安全事件、访问审计持久化和最终脱敏，调用顺序保持不变；体检写命令仍留在 `blood-innovation`。
 

@@ -10,10 +10,10 @@ const {
 const { createRouteSegments } = require("../src/http/routes/clinical-specialties");
 
 const EXPECTED_COUNTS = {
-  "imaging-cloud": 11,
+  "imaging-cloud": 12,
   "emergency-care": 11,
   "quality-safety": 18,
-  "clinical-blood": 31,
+  "clinical-blood": 30,
   "mutual-recognition-ingest": 9,
   "mutual-recognition-review": 8,
   "emergency-signals": 6,

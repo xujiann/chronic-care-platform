@@ -34,8 +34,8 @@ ARC-002 已把已确认的 alert runtime 反向依赖移到 worker 组合边界�
 
 ## 2. 静态依赖指标
 
-- 非测试 CommonJS 文件：526。
-- 本地 `require` 边：861。
+- 非测试 CommonJS 文件：527。
+- 本地 `require` 边：862。
 - 显式循环：当前主线为 0 条（ARC-002 实施前基线为 1 条）。
 - 最高入度模块：`runtime-source` 62、`technical-evidence` 22、`region-manifest` 18。
 - 最宽上下文：public-health 160 个依赖、care 102、clinical 76。
@@ -235,7 +235,7 @@ CORE_DATA_DEFINITIONS → collection-governance → CI/release 治理投影`。�
 
 血液 dashboard 当前依赖方向为 `HTTP route → blood-dashboard-query.v1 → 注入的 BloodService / BloodTransactionService 兼容端口`。目标模块不导入根目录服务或 `server.js`，但端口实现仍由统一组合根提供，且查询仍接收宽 JSON 快照，因此只完成用例边界，尚未完成仓储或运行时上下文隔离。
 
-影像 dashboard 当前依赖方向为 `HTTP route → imaging-dashboard-query.v1 → 注入的 dashboard builder / 脱敏端口 → imaging/public-response`。首个写边界为 `imaging-cloud route → imaging-study-share-command.v1 → appendDataAccessLog / randomUUID ports`，HTTP 层继续拥有鉴权、居民范围、body、单次持久化和响应投影。`imaging-cloud` 子上下文因此从 8 个扩大为 11 个既有端口；全域依赖集合不变，`clinical-blood` 因其余遗留影像用例仍需这些端口而暂不能收窄。
+影像 dashboard 当前依赖方向为 `HTTP route → imaging-dashboard-query.v1 → 注入的 dashboard builder / 脱敏端口 → imaging/public-response`。share 写边界为 `imaging-cloud route → imaging-study-share-command.v1 → appendDataAccessLog / randomUUID ports`；QC 写边界为 `imaging-cloud route → imaging-study-quality-control-command.v1 → publishDiagnosticReportToFhir / randomUUID ports`。HTTP 层继续拥有鉴权、查找/404、body、FHIR 错误审计、单次持久化和响应投影。`publishDiagnosticReportToFhir` 从 `clinical-blood` 子上下文转移到 `imaging-cloud`，两者依赖数分别变为 30 和 12，全域 76 项依赖集合不变；`clinical-blood` 因其余遗留影像用例仍需其他端口而暂不能完成收窄。QC 仍是请求路径外调后本地写入，未增加 outbox 或反向依赖。
 
 体检 dashboard 当前依赖方向为 `HTTP route → physical-examination-dashboard-query.v1 → 注入的 Overview / readiness 端口`。查询端口不导入根目录体检服务或 `server.js`；实现仍由组合根注入，且继续接收宽 JSON 快照。居民授权集合、生产运行标志、审计持久化和脱敏仍是 HTTP/平台端口，避免领域查询拥有身份或存储实现。
 

@@ -32,7 +32,11 @@ test("clinical specialty governance defines exactly five bounded subdomains", ()
   );
   assert.deepEqual(
     registry.subdomains[2].implementedUseCases.map((useCase) => useCase.id),
-    ["imaging-dashboard-query.v1", "imaging-study-share-command.v1"]
+    [
+      "imaging-dashboard-query.v1",
+      "imaging-study-share-command.v1",
+      "imaging-study-quality-control-command.v1"
+    ]
   );
   assert.deepEqual(
     registry.subdomains[3].implementedUseCases.map((useCase) => useCase.id),
@@ -53,6 +57,22 @@ test("imaging study share command cannot return to the clinical blood route", ()
   assert.doesNotMatch(bloodRoute, /imagingShareMatch|\/api\/imaging-cloud\/studies\/:id\/share/);
   assert.match(imagingRoute, /\/api\/imaging-cloud\/studies\/:id\/share/);
   assert.match(imagingRoute, /createImagingStudyShare/);
+});
+
+test("imaging study quality control command cannot return to the clinical blood route", () => {
+  const bloodRoute = fs.readFileSync(
+    path.join(ROOT, "src/http/routes/clinical-specialties/clinical-blood.js"),
+    "utf8"
+  );
+  const imagingRoute = fs.readFileSync(
+    path.join(ROOT, "src/http/routes/clinical-specialties/imaging-cloud.js"),
+    "utf8"
+  );
+
+  assert.doesNotMatch(bloodRoute, /imagingQcMatch|\/api\/imaging-cloud\/studies\/:id\/qc|publishDiagnosticReportToFhir/);
+  assert.match(imagingRoute, /\/api\/imaging-cloud\/studies\/:id\/qc/);
+  assert.match(imagingRoute, /createImagingStudyQualityControlCommand/);
+  assert.match(imagingRoute, /commitImagingStudyQualityControl/);
 });
 
 test("all current clinical API literals have one subdomain or explicit handoff owner", () => {

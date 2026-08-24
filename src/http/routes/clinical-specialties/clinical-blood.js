@@ -15,7 +15,7 @@ const {
 } = require("../../../clinical-specialties/imaging/public-response");
 
 function createRouteSegment(runtime) {
-  const { BloodBusinessService, BloodIntegrationGateway, BloodMasterData, BloodService, BloodTransactionService, appendDataAccessLog, appendSecurityEvent, buildImageCloudDashboard, buildImageCloudDerivedRecords, buildOhifStudyUrl, canAccessResident, collectJson, createHash, createImageCloudMutualRecognitionChain, listOrthancStudySummaries, mergeByKey, normalizeImageCloudStudy, personIndexForResident, publishDiagnosticReportToFhir, publishImagingStudyToFhir, randomUUID, readDatabase, redactSensitiveResponse, requireApiRole, reviewImageCloudRecognitionAppeal, reviewMutualRecognitionRecord, sendJson, solutionAHealth, submitImageCloudRecognitionAppeal, upsertPhase2MutualRecognitionCitation, writeDatabase } = runtime;
+  const { BloodBusinessService, BloodIntegrationGateway, BloodMasterData, BloodService, BloodTransactionService, appendDataAccessLog, appendSecurityEvent, buildImageCloudDashboard, buildImageCloudDerivedRecords, buildOhifStudyUrl, canAccessResident, collectJson, createHash, createImageCloudMutualRecognitionChain, listOrthancStudySummaries, mergeByKey, normalizeImageCloudStudy, personIndexForResident, publishImagingStudyToFhir, randomUUID, readDatabase, redactSensitiveResponse, requireApiRole, reviewImageCloudRecognitionAppeal, reviewMutualRecognitionRecord, sendJson, solutionAHealth, submitImageCloudRecognitionAppeal, upsertPhase2MutualRecognitionCitation, writeDatabase } = runtime;
   const sendImagingJson = (res, status, body, projector) => sendJson(
     res,
     status,
@@ -368,52 +368,6 @@ function createRouteSegment(runtime) {
         ].slice(0, 120);
         writeDatabase(data);
         sendImagingJson(res, existingStudyIndex >= 0 ? 200 : 201, { study, ...derived });
-        return true;
-      }
-
-      const imagingQcMatch = url.pathname.match(/^\/api\/imaging-cloud\/studies\/([^/]+)\/qc$/);
-      if (req.method === "POST" && imagingQcMatch) {
-        const user = requireApiRole(req, res, ["commission", "institution"], "/api/imaging-cloud/studies/:id/qc");
-        if (!user) return true;
-        const data = readDatabase();
-        const studyId = decodeURIComponent(imagingQcMatch[1]);
-        const index = (data.imageCloudStudies || []).findIndex((item) => item.id === studyId);
-        if (index < 0) {
-          sendImagingJson(res, 404, { error: "Not Found", message: "未找到影像云检查" });
-          return true;
-        }
-        const payload = await collectJson(req);
-        const review = {
-          id: `icq-${randomUUID()}`,
-          studyId,
-          group: String(payload.group || "影像云抽样质控").trim(),
-          scanScore: Number(payload.scanScore || 90),
-          reportScore: Number(payload.reportScore || 90),
-          reviewer: user.name,
-          result: String(payload.result || "质控通过").trim(),
-          sampledAt: new Date().toISOString(),
-          comment: String(payload.comment || "质控记录已回写影像云。").trim()
-        };
-        const updatedStudy = {
-          ...data.imageCloudStudies[index],
-          qcStatus: review.result,
-          updatedAt: new Date().toISOString(),
-          emrSyncStatus: /通过|合格|passed/i.test(review.result) ? "已写入电子病历索引" : data.imageCloudStudies[index].emrSyncStatus
-        };
-        let fhirReportSync;
-        try { fhirReportSync = await publishDiagnosticReportToFhir(updatedStudy, review); }
-        catch (error) {
-          appendSecurityEvent({ actor: user.name, role: user.role, action: "sync DiagnosticReport to FHIR", target: studyId, result: "failed", detail: error.message });
-          sendImagingJson(res, 502, { error: "FHIR DiagnosticReport Sync Failed", message: error.message });
-          return true;
-        }
-        updatedStudy.fhirDiagnosticReportId = fhirReportSync.diagnosticReport.id;
-        updatedStudy.fhirReportSyncStatus = "synced";
-        updatedStudy.fhirReportSyncedAt = new Date().toISOString();
-        data.imageCloudStudies[index] = updatedStudy;
-        data.imageCloudQualityReviews = [review, ...(Array.isArray(data.imageCloudQualityReviews) ? data.imageCloudQualityReviews : [])].slice(0, 300);
-        writeDatabase(data);
-        sendImagingJson(res, 200, { study: data.imageCloudStudies[index], review, fhirReportSync });
         return true;
       }
 
