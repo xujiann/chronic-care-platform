@@ -11,6 +11,7 @@ const {
   dispatchFinancialRequest,
   financialGatewayCenter,
   financialGatewayOperationsCenter,
+  financialIdempotencyLedgerCapacity,
   normalizeFinancialReconciliationRun,
   prepareRefundDispatch,
   reconcileRefund,
@@ -29,6 +30,20 @@ const {
 function jsonResponse(body, status = 200) {
   return { ok: status >= 200 && status < 300, status, text: async () => JSON.stringify(body) };
 }
+
+test("financial idempotency ledger capacity exposes deterministic warning and critical headroom", () => {
+  const events = Array.from({ length: 950 }, (_, index) => ({ id: `event-${index}`, adapterType: "financial" }));
+  const critical = financialIdempotencyLedgerCapacity(events, { FINANCIAL_IDEMPOTENCY_LEDGER_MAX_EVENTS: "1000" });
+  const warning = financialIdempotencyLedgerCapacity(events.slice(0, 800), { FINANCIAL_IDEMPOTENCY_LEDGER_MAX_EVENTS: "1000" });
+
+  assert.deepEqual(
+    { used: critical.used, remaining: critical.remaining, utilizationPercent: critical.utilizationPercent, status: critical.status },
+    { used: 950, remaining: 50, utilizationPercent: 95, status: "critical" }
+  );
+  assert.equal(warning.status, "warning");
+  assert.equal(critical.automaticEviction, false);
+  assert.equal(critical.archivePolicy, "migration-and-approval-required");
+});
 
 test("payment gateway signs integer-cent requests and normalizes receipts", async () => {
   let captured;
@@ -77,6 +92,7 @@ test("financial gateway retries transient errors with stable request identity", 
     }
   });
   assert.equal(receipt.attempts, 2);
+  assert.equal(receipt.status, "succeeded");
   assert.equal(new Set(requests.map((item) => item.headers["X-Request-Id"])).size, 1);
   assert.equal(new Set(requests.map((item) => item.headers["X-Signature"])).size, 1);
 });
@@ -110,6 +126,13 @@ test("financial gateway rejects permanent errors negative receipts and non-HTTPS
     env: { NODE_ENV: "production", PAYMENT_GATEWAY_URL: "http://payment.internal", PAYMENT_GATEWAY_SECRET: "secret" },
     fetchImpl: async () => jsonResponse({ tradeNo: "PAY-1" })
   }), /HTTPS/);
+
+  await assert.rejects(() => dispatchFinancialRequest({
+    type: "PAYMENT", operation: "query-payment", contractId: "payment-transaction-v1", idempotencyKey: "pay-query-invalid-time", payload: { paymentTradeNo: "PAY-TIME" }
+  }, {
+    env: { PAYMENT_GATEWAY_URL: "http://127.0.0.1/payment", PAYMENT_GATEWAY_SECRET: "secret" },
+    fetchImpl: async () => jsonResponse({ receiptId: "PAY-TIME", status: "accepted", acceptedAt: "not-a-time" })
+  }), /acceptedAt is invalid/);
 });
 
 test("financial gateway center exposes no endpoints or credentials", () => {
@@ -259,6 +282,76 @@ test("financial callback ledger is idempotent, amount-safe and reversal-aware", 
     eventId: "payment-event-replay-nonce",
     nonceDigest: "e".repeat(64)
   }), (error) => error.code === "FINANCIAL_CALLBACK_REPLAY_DETECTED");
+});
+
+test("financial callbacks fail closed for ambiguous receipts and cross-event replay evidence", () => {
+  const callback = {
+    gatewayType: "PAYMENT",
+    eventId: "shared-callback-event-001",
+    receiptId: "SHARED-RECEIPT-001",
+    status: "succeeded",
+    occurredAt: "2026-07-15T08:00:00.000Z",
+    receivedAt: "2026-07-15T08:00:01.000Z",
+    businessDate: "2026-07-15",
+    amountFen: 100,
+    providerCode: "OK",
+    failureReason: "",
+    settlementReferenceDigest: "",
+    nonceDigest: "shared-callback-nonce-digest",
+    signatureVerified: true
+  };
+  const ambiguous = {
+    integrationGatewayEvents: ["a", "b"].map((suffix) => ({
+      id: `ambiguous-event-${suffix}`,
+      adapterType: "financial",
+      gatewayType: "PAYMENT",
+      operation: "create-payment",
+      adapterReceipt: { receiptId: "SHARED-RECEIPT-001", status: "accepted" },
+      requestPayload: { payload: { orderNo: `ORDER-${suffix}`, amountFen: 100 } },
+      callbackEvents: []
+    }))
+  };
+  assert.throws(
+    () => applyFinancialCallback(ambiguous, callback),
+    (error) => error.code === "FINANCIAL_CALLBACK_RECEIPT_AMBIGUOUS"
+  );
+
+  const replay = {
+    integrationGatewayEvents: [{
+      id: "callback-owner-a",
+      adapterType: "financial",
+      gatewayType: "PAYMENT",
+      operation: "create-payment",
+      adapterReceipt: { receiptId: "RECEIPT-A", status: "accepted" },
+      requestPayload: { payload: { orderNo: "ORDER-A", amountFen: 100 } },
+      callbackEvents: []
+    }, {
+      id: "callback-owner-b",
+      adapterType: "financial",
+      gatewayType: "PAYMENT",
+      operation: "create-payment",
+      adapterReceipt: { receiptId: "RECEIPT-B", status: "accepted" },
+      requestPayload: { payload: { orderNo: "ORDER-B", amountFen: 100 } },
+      callbackEvents: []
+    }]
+  };
+  applyFinancialCallback(replay, { ...callback, receiptId: "RECEIPT-A" });
+  assert.throws(
+    () => applyFinancialCallback(replay, {
+      ...callback,
+      eventId: "shared-callback-event-002",
+      receiptId: "RECEIPT-B"
+    }),
+    (error) => error.code === "FINANCIAL_CALLBACK_REPLAY_DETECTED"
+  );
+  assert.throws(
+    () => applyFinancialCallback(replay, {
+      ...callback,
+      receiptId: "RECEIPT-B",
+      nonceDigest: "different-callback-nonce-digest"
+    }),
+    (error) => error.code === "FINANCIAL_CALLBACK_EVENT_CONFLICT"
+  );
 });
 
 test("financial reconciliation compares digest-only provider summaries", () => {

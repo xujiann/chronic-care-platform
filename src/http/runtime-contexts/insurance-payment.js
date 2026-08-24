@@ -6,10 +6,10 @@ const DEPENDENCIES = Object.freeze([
   "DiseasePaymentGrouperContract", "DiseasePaymentIntake", "DiseasePaymentService", "FinancialCallbackError",
   "OnlinePaymentRefunds", "appendSecurityEvent", "applyFinancialCallback", "authorizeInsurancePaymentAction",
   "collectJson", "createFinancialReconciliationRun", "diseasePaymentPackageSignatureOptions",
-  "dispatchFinancialRequest", "financialGatewayCenter", "financialGatewayOperationsCenter", "normalizeState",
+  "dispatchFinancialRequest", "financialDispatchRequestDigest", "financialGatewayCenter", "financialGatewayOperationsCenter", "normalizeState",
   "patchBusinessCollectionItem", "prependAuditTrailEntry", "randomUUID", "readDatabase", "requireApiRole", "requireInsuranceSystemCommand",
   "sendInsurancePaymentError", "sendJson", "validateFinancialRequest", "verifyFinancialCallback",
-  "withFinancialReconciliationLock", "writeDatabase"
+  "withFinancialDispatchLock", "withFinancialDispatchStateLock", "withFinancialReconciliationLock", "writeDatabase"
 ]);
 
 module.exports = { DEPENDENCIES, DOMAIN, PROCESS };

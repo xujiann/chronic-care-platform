@@ -137,7 +137,7 @@ test("T07 public routes enforce trusted actors organization scope and production
     headers: authenticated(hospital.body.token, refundInput),
     body: JSON.stringify(refundInput)
   });
-  assert.equal(created.response.status, 201);
+  assert.equal(created.response.status, 201, JSON.stringify(created.body));
   assert.equal(created.body.refund.requestedBy, "hospital");
   assert.equal(created.body.refund.organizationId, "MR1");
   assert.equal(created.body.refund.refundTransactionRuntime, undefined);

@@ -206,7 +206,7 @@ CORE_DATA_DEFINITIONS → collection-governance → CI/release 治理投影`。�
   通过同进程服务复用领域一次性派单证据 registry，避免跨进程伪造 capability，且没有新增反向依赖或静态环。
 - 主分支必需检查名称仍为 `complete-unit-test` 与 `test`。聚合 test 使用 `always()`
   并要求三个风险域结果全部为 success，失败、取消和跳过均 fail-closed。
-- governance-api 先校验 custom auth 控制流/负向测试证据，再校验声明级授权矩阵、显式幂等行为证据合同和派生生产 API 目录；依赖方向为 `routeSourceFiles + authentication/idempotency 小型 evidence registry → authorization matrix v3 → production catalog v3`。只有显式标记的 SMS 外部 principal 从幂等合同派生 custom auth，平台 session/RBAC 合同继续复用授权矩阵。T02 quality-governance action 的运行依赖保持 `route identity → record write tail → owner state adapter/action+scope policy → source record + command receipt + governance/platform/security audits → one writeDatabase → SQLite collection-version CAS`；没有增加 schema、outbox、worker、PG adapter 或外部依赖。`reviewedProofRequired` 现保留两个候选且仍禁止与合同同 key 并存；证据门禁不写数据库、报告或发布制品。
+- governance-api 先校验 custom auth 控制流/负向测试证据，再校验声明级授权矩阵、显式幂等行为证据合同和派生生产 API 目录；依赖方向为 `routeSourceFiles + authentication/idempotency 小型 evidence registry → authorization matrix v3 → production catalog v3`。只有显式标记的 SMS 外部 principal 从幂等合同派生 custom auth，平台 session/RBAC 合同继续复用授权矩阵。T07 financial dispatch 的运行依赖保持 `route identity/gateway/institution scope → per-key command lock → short state-write lock → ledger 重读与 canonical digest → explicit reserve intent + durable dispatching reservation + SQLite transaction 内二次 ledger 读取/校验/CAS → existing financial adapter → fresh ledger read → explicit finalize intent + final integration event + security audit atomic write`；callback 只追加 evidence/provider projection，retry finalizer 合并最新投影，人工死信不改写 provider truth，普通全状态写在 SQLite 同事务校验中保留最新金融账本。operations/Prometheus 暴露容量与分级告警。没有增加 schema、outbox、worker、PG adapter 或外部依赖。`reviewedProofRequired` 现只保留 formal grouping 候选且仍禁止与合同同 key 并存；证据门禁不写数据库、报告或发布制品。
 - governance-api 同时执行 `data:collection-governance:verify`；新集合、陈旧/重复状态、owner/reader
   边界、源码使用状态漂移或任何生产晋升标志都会失败，命令默认只输出摘要且不写 release。
 - governance-api 随后运行 10 组内部边界覆盖门禁；脚本仅依赖现有 c8、既有直接行为测试和显式配置，报告写入临时目录并在结束时删除。源码文件不得跨组重复，负向证据测试必须实际由所属组执行。该门禁与原 `server.js` 85/85/55 覆盖门禁独立，不能相互替代。
@@ -323,3 +323,7 @@ external verifier，所以依赖缺失时稳定失败关闭。未来外部 CAB/p
 bytes/source paths → scripts/repository-governance.js → governance-api + architecture:test`。验证器只读文件和 Git
 索引，不依赖 `server.js`、HTTP、数据库、外部服务或 PDF 工具链，也不生成制品。当前流程依赖
 `origin/main`，固定 baseline tag 只被证据链消费；日期化 snapshot 和 superseded ADR 不得成为开发基线。
+
+## 金融回调证据依赖方向
+
+依赖方向为 `provider HMAC payload → verifyFinancialCallback → process-local target-event attestation → callback route write intent → server append-only/global uniqueness guard → integrationGatewayEvents`。attestation 不进入反向读取、数据库或 API。finalize 另经过 `provider receipt/failure evidence shape → server transition guard`，防止业务路由自报无证据终态。

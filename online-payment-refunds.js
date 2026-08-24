@@ -483,7 +483,10 @@ function recordRefundDispatch(data, id, receipt = {}, gatewayEventId, actor = {}
   if (!gatewayEvent) throw new RefundWorkflowError("退款网关事件与回执不匹配", "REFUND_GATEWAY_EVENT_MISMATCH");
   const at = String(receipt.acceptedAt || new Date().toISOString());
   const before = row.state;
-  row.state = receipt.status === "processing" ? "PROCESSING" : "DISPATCHED";
+  const dispatchStateByStatus = { accepted: "DISPATCHED", processing: "PROCESSING", succeeded: "SUCCEEDED" };
+  const dispatchState = dispatchStateByStatus[receipt.status];
+  if (!dispatchState) throw new RefundWorkflowError("退款网关回执状态无效", "REFUND_DISPATCH_RECEIPT_STATUS_INVALID", 400);
+  row.state = dispatchState;
   row.status = REFUND_STATES[row.state];
   row.gatewayEventId = gatewayEvent.id;
   row.refundReceiptId = receiptId;

@@ -8,7 +8,7 @@ const { buildOnsiteLaunchRequirements, parseArgs, renderMarkdown, writeOutput } 
 const ROOT = path.resolve(__dirname, "..");
 
 test("onsite launch requirements model field-owned go-live blockers", () => {
-  const report = buildOnsiteLaunchRequirements();
+  const report = buildOnsiteLaunchRequirements({ releaseReport: null });
   const markdown = renderMarkdown(report);
 
   assert.equal(report.ok, true);
@@ -38,7 +38,7 @@ test("onsite launch requirements can render and write artifacts", (t) => {
   assert.equal(parsed.output, "tmp/onsite-launch-requirements-test/report.json");
   assert.equal(parsed.markdown, "tmp/onsite-launch-requirements-test/report.md");
 
-  const report = buildOnsiteLaunchRequirements(parsed);
+  const report = buildOnsiteLaunchRequirements({ ...parsed, releaseReport: null });
   writeOutput(report, parsed);
 
   const writtenJson = JSON.parse(fs.readFileSync(path.join(outputDir, "report.json"), "utf8"));

@@ -42,7 +42,7 @@ flowchart TB
 | `data/` | 被跟踪的 `db.json` 开发/迁移输入 | 浏览器只读取运行时或构建时生成的 `public-demo.json`；生成物不入库 |
 | `deploy/` | SQL、systemd、Compose、环境模板和现场验证 | 生产证据默认 NO-GO |
 | `scripts/` | 测试、readiness、报告、部署和后台 worker | 187 个根级文件，职责和产物较分散 |
-| `test/` | Node test 与 Playwright | 469 个 test/spec 文件（449 Node、20 个 Playwright E2E spec 文件，含居民与 PWA 专项） |
+| `test/` | Node test 与 Playwright | 473 个 test/spec 文件（453 Node、20 个 Playwright E2E spec 文件，含居民与 PWA 专项） |
 | `regions/` | 多地区部署配置 | 由区域清单和发布注册表控制 |
 | `digital-hospital-standard-platform/` | 内嵌数智医院展示前端 | 独立页面但仍共享主仓发布生命周期 |
 | `resident-mini-program-platform/` | 居民小程序适配前端 | 独立页面但仍共享主仓发布生命周期 |
@@ -76,7 +76,7 @@ flowchart TB
 
 1. 静态服务器与 Pages 现按 `config/static-publication.json` 的 44 个入口递归收集显式浏览器资源；未知路径统一 404。
 2. 浏览器和 Service Worker 已迁移到合成的 `data/public-demo.json`；`data/db.json` 不进入静态制品。
-3. `server.js` 仍约 28.2k 行；SQLite migration 已抽离约 550 行，但路由拆分没有同步拆完组合根和领域实现。
+3. `server.js` 仍约 28.7k 行；SQLite migration 已抽离约 550 行，但路由拆分没有同步拆完组合根和领域实现。
 4. ARC-002 已删除 `pilot-cutover-alert-runtime` 对 `server.js` 的反向
    `require`：运行时只消费显式 `controlProvider`，worker CLI 在组合边界懒注入现有
    `pilotCutoverControlPlaneReadiness`。provider 缺失、返回值无效或抛错均投影为受限
@@ -92,7 +92,7 @@ flowchart TB
    unregister/Cache Storage 清理。SEC-004 另增加急救生命链、医生工作台、血液上线看板、陪诊工作台、产品运行驾驶舱、产品区域运行驾驶舱、质量安全工作台、区域切换工作台、血液召回面板、血液创新指挥中心及体检风险卡各 1 项恶意 API 载荷回归；Go/No-Go 回归锁定四方业务责任属性不再被登录角色过滤器误删。
    当前根 39 + 居民 13 + PWA 3 = 55 项；标准在线 context 仍保持阻止 Service Worker。
 7. 审计验证已收敛到 `src/identity-security/audit-chain.js` 的 v2 严格端口；内容、链接、结构和重复 ID 任一异常均失败，验证 API/合规报告不再读取时重封。全量状态写入中的审计数组由服务端管理。
-8. 机器 API 授权矩阵现从路由扫描和小型认证证据合同派生 601 条声明；`production-api-catalog-v3` 与 371 个字面条件路由取并集，形成 593 个唯一接口条目（586 个字面路由、7 个运行时策略）。认证证据共 13 项：复用 SMS callback 既有合同，并对原 13 个未分类 key 中 12 个真实入口完成 required/optional/none、credential source、replay/CSRF 和 scope 分类；T10 真实入口以 401/403 直接拒绝测试闭合，公卫相邻 GET/POST 误配 key 已从解析器中消除，当前无未分类认证。幂等证据注册表现有 10 份直接行为合同：8 个完整 endpoint 与 2 个转诊 action-slice。T02 `POST /api/quality-operations-governance/items/:id/actions` 在既有 owner 状态机/adapter 上增加按 record 串行、scope-before-receipt、404 零写和稳定脱敏持久化错误；record、receipt 与 governance/platform/security 三类审计仍在一次状态写入中提交，SQLite CAS 与进程锁不被解释为跨实例 exactly-once。333 个写接口中 8 个 endpoint 为 `behavior-verified`，325 个仍为 `behavior-proof-required`；退款 endpoint 的 runtime-role variant 与两个通用 action endpoint 仍使当前 327 项需复核，593 项全部 `NO-GO`。T07 `reviewedProofRequired` 现保留 financial dispatch 与 formal grouping job 两项。
+8. 机器 API 授权矩阵现从路由扫描和小型认证证据合同派生 601 条声明；`production-api-catalog-v3` 与 371 个字面条件路由取并集，形成 593 个唯一接口条目（586 个字面路由、7 个运行时策略）。认证证据共 13 项：复用 SMS callback 既有合同，并对原 13 个未分类 key 中 12 个真实入口完成 required/optional/none、credential source、replay/CSRF 和 scope 分类；T10 真实入口以 401/403 直接拒绝测试闭合，公卫相邻 GET/POST 误配 key 已从解析器中消除，当前无未分类认证。幂等证据注册表现有 11 份直接行为合同：9 个完整 endpoint 与 2 个转诊 action-slice。T07 `POST /api/financial-gateways/dispatch` 现以 canonical request digest 绑定业务幂等键，并采用“按幂等键命令锁 + 短时全局状态写锁”；institution 请求绑定登录 `orgCode`，外调前提交耐久 `dispatching` reservation，外调后从新快照原子提交最终事件与审计。中央写边界要求显式金融状态转换意图与有效 SQLite collection version，并在同一 SQLite 写事务内再次读取、合并和校验金融账本；普通全状态写只能保留既有金融事件，同 ID/key/digest 不可改绑，语法错误或非数组 JSON/SQLite payload 均失败关闭。可信 callback 只追加证据和更新 provider projection，不改写 dispatch 生命周期；retry finalizer 合并最新 callback 并转人工对账，人工 dead-letter 仅允许标记既有 failed 事件。账本上限、余量和利用率进入运行中心与 Prometheus，80%/95% 分级告警且不自动淘汰。最终写失败保留 reservation 并阻止二次外调，失败重放与错误保持稳定脱敏；真实 SQLite CAS 与进程锁不被解释为跨实例 exactly-once。333 个写接口中 9 个 endpoint 为 `behavior-verified`，324 个仍为 `behavior-proof-required`；退款 endpoint 的 runtime-role variant 与两个通用 action endpoint 仍使当前 326 项需复核，593 项全部 `NO-GO`。T07 `reviewedProofRequired` 现只保留 formal grouping job。
 9. P1 生产适配器增量保持现有 owner：T01 的 `production-adapters.js` 承担 JWKS/JWT 与 SMS 协议；OTP、发送/登录限流和失败锁定由共享 `auth-security-state-store` 承载，单主机 SQLite 复用 `state_collections`、生产多实例使用组合根长期 PostgreSQL pool；T00 的 PostgreSQL 组合保持 shadow/rehearsal 且 `productionPrimary=false`，受控迁移评估继续失败关闭。连续审计已使用 v15 同事务 append-only source、最小投影和 checkpoint v3，worker/preflight/systemd 已进入部署制品；未签名 receipt、外部单调 anchor、真实 WORM/KMS 与现场证据使 `productionReady=false` 继续失败关闭。
    浏览器服务端登录不再把 token/bearer 写入 `localStorage`；Cookie 上下文在服务端和浏览器
    水合链路均优先，旧脚本可读 token 会在上下文请求前清除。生产 bearer/hybrid 只有显式
@@ -243,3 +243,7 @@ Worker、外部数字医院注册及仍为 Proposed 的对象存储 v2 worker �
 `output/pdf` 的 3 个 PDF 未修改，分别绑定 SHA-256、大小、页数、引入提交、来源与保留理由。现有仓库
 没有任何一个 PDF 的可复现生成器；医院运行脚本只是 verifier，不能被描述为 generator。机器门禁只读，
 不生成报告、PDF 或归档产物。
+
+## 2026-08-23 金融写入证据边界
+
+金融 callback 的中央落盘守卫只接受 HMAC 验签器生成、绑定目标 gateway event 的进程内单次证明，并在全账本拒绝 callback event/nonce 跨账项重放。证明不入库、不写日志、不出公共响应。成功 finalize 必须携带与 gateway type、operation、status 一致的 provider receipt 和 dispatchedAt；失败 finalize 必须携带稳定失败码、失败时间、死信原因和死信标记。该边界仍不替代真实 provider、PostgreSQL 多实例和现场验收。

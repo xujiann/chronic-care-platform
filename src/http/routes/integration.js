@@ -6,7 +6,7 @@ const externalJointTest = require("./integration/external-joint-test");
 const SECURE_ATTACHMENT_METADATA_LIMIT = 500;
 
 function createRouteSegments(runtime) {
-  const { APPOINTMENT_CONTRACT_ID, PHYSICAL_EXAM_CONTRACT_ID, appendDataAccessLog, appendSecurityEvent, applyObjectLifecycle, buildIntegrationSample, canAccessResident, canAccessSecureAttachment, collectJson, createObjectDownloadIntent, createObjectUploadIntent, dispatchFinancialRequest, dispatchHospitalRequest, finalizeObjectUpload, hospitalConnectorCenter, landAppointmentIntegrationEvent, landPhysicalExamIntegrationEvent, normalizeHospitalConnectorDomain, normalizeIntegrationEvent, objectStorageCenter, prependAuditTrailEntry, randomUUID, readDatabase, requireApiRole, sendJson, summarizeIntegrationGateway, updateIntegrationEvent, validateAttachmentMetadata, verifyIntegrationSignature, writeDatabase } = runtime;
+  const { APPOINTMENT_CONTRACT_ID, PHYSICAL_EXAM_CONTRACT_ID, appendDataAccessLog, appendSecurityEvent, applyObjectLifecycle, buildIntegrationSample, canAccessResident, canAccessSecureAttachment, collectJson, createObjectDownloadIntent, createObjectUploadIntent, dispatchFinancialRequest, dispatchHospitalRequest, financialDispatchRequestDigest, finalizeObjectUpload, hospitalConnectorCenter, landAppointmentIntegrationEvent, landPhysicalExamIntegrationEvent, normalizeHospitalConnectorDomain, normalizeIntegrationEvent, objectStorageCenter, prependAuditTrailEntry, randomUUID, readDatabase, requireApiRole, sendJson, summarizeIntegrationGateway, updateIntegrationEvent, validateAttachmentMetadata, verifyIntegrationSignature, withFinancialDispatchLock, withFinancialDispatchStateLock, writeDatabase } = runtime;
   return [
     {
       id: "integration-01",
@@ -647,6 +647,179 @@ function createRouteSegments(runtime) {
       if (req.method === "POST" && integrationRetryMatch) {
         const user = requireApiRole(req, res, ["commission"], "/api/integration/events/:id/retry");
         if (!user) return true;
+        const retryEventId = integrationRetryMatch[1];
+        const retrySource = (readDatabase().integrationGatewayEvents || []).find((item) => item.id === retryEventId);
+        if (retrySource?.adapterType === "financial") {
+          const idempotencyKey = String(retrySource.idempotencyKey || "").trim();
+          if (!retrySource.requestPayload || !idempotencyKey) {
+            sendJson(res, 409, {
+              ok: false,
+              code: "FINANCIAL_RETRY_CONTRACT_UNAVAILABLE",
+              message: "financial gateway retry contract is unavailable"
+            });
+            return true;
+          }
+          try {
+            const result = await withFinancialDispatchLock(idempotencyKey, async () => {
+              const reserved = await withFinancialDispatchStateLock(() => {
+                const reservationData = readDatabase();
+                const reservationIndex = (reservationData.integrationGatewayEvents || []).findIndex((item) => item.id === retryEventId);
+                if (reservationIndex < 0) {
+                  return { status: 404, body: { error: "Not Found", message: "未找到集成网关事件" } };
+                }
+                const current = reservationData.integrationGatewayEvents[reservationIndex];
+                if (current.adapterType !== "financial") {
+                  return { status: 409, body: { error: "Conflict", message: "integration event type changed; retry again" } };
+                }
+                if (current.status === "retrying") {
+                  return { status: 202, body: { ...current, idempotentReplay: true } };
+                }
+                if (Number(current.retryCount || 0) >= 3) {
+                  return { status: 409, body: { error: "Conflict", message: "outbound adapter event reached the manual retry limit and requires reconciliation" } };
+                }
+                if (current.reconciliationStatus === "provider-exception"
+                  || ["succeeded", "reversed"].includes(String(current.providerStatus || "").trim().toLowerCase())) {
+                  return {
+                    status: 409,
+                    body: {
+                      ok: false,
+                      code: "FINANCIAL_RETRY_RECONCILIATION_REQUIRED",
+                      message: "financial gateway provider evidence requires reconciliation before retry"
+                    }
+                  };
+                }
+                if (current.status !== "failed") {
+                  return {
+                    status: 409,
+                    body: {
+                      ok: false,
+                      code: "FINANCIAL_RETRY_NOT_ALLOWED",
+                      message: "financial gateway event is not eligible for retry"
+                    }
+                  };
+                }
+                const reservation = {
+                  ...current,
+                  status: "retrying",
+                  dispatchAttemptId: randomUUID(),
+                  retryCount: Number(current.retryCount || 0) + 1,
+                  deadLetter: false,
+                  deadLetterReason: "",
+                  failureCode: "",
+                  lastRetriedAt: new Date().toISOString(),
+                  reconciliationStatus: "retrying",
+                  lastRetryResult: "pending"
+                };
+                reservationData.integrationGatewayEvents[reservationIndex] = reservation;
+                writeDatabase(reservationData, {
+                  financialGatewayWrite: {
+                    kind: "retry-reserve",
+                    eventId: reservation.id,
+                    idempotencyKey,
+                    requestDigest: financialDispatchRequestDigest(reservation.requestPayload)
+                  }
+                });
+                return { reservation };
+              });
+              if (Object.hasOwn(reserved, "status")) return reserved;
+
+              const reservation = reserved.reservation;
+              let finalEvent;
+              try {
+                const previousReceipt = reservation.adapterReceipt;
+                const receipt = await dispatchFinancialRequest(reservation.requestPayload);
+                const adapterReceiptHistory = [previousReceipt, ...(Array.isArray(reservation.adapterReceiptHistory) ? reservation.adapterReceiptHistory : [])]
+                  .filter((item, index, list) => item?.receiptId && list.findIndex((candidate) => candidate?.receiptId === item.receiptId) === index)
+                  .slice(0, 10);
+                finalEvent = {
+                  ...reservation,
+                  status: receipt.status,
+                  adapterReceipt: receipt,
+                  adapterReceiptHistory,
+                  providerStatus: receipt.status,
+                  latestCallbackAt: "",
+                  businessDate: String(receipt.acceptedAt || "").slice(0, 10),
+                  dispatchedAt: receipt.acceptedAt,
+                  deadLetter: false,
+                  deadLetterReason: "",
+                  failureCode: "",
+                  reconciliationStatus: "provider-accepted",
+                  lastRetryResult: "provider-accepted"
+                };
+              } catch {
+                finalEvent = {
+                  ...reservation,
+                  status: "failed",
+                  deadLetter: true,
+                  deadLetterReason: "financial gateway provider retry failed",
+                  failureCode: "FINANCIAL_RETRY_PROVIDER_REJECTED",
+                  failedAt: new Date().toISOString(),
+                  reconciliationStatus: "dead-letter",
+                  lastRetryResult: "failed"
+                };
+              }
+
+              const committedEvent = await withFinancialDispatchStateLock(() => {
+                const finalData = readDatabase();
+                const finalIndex = (finalData.integrationGatewayEvents || []).findIndex((item) => item.id === retryEventId);
+                const current = finalIndex >= 0 ? finalData.integrationGatewayEvents[finalIndex] : null;
+                if (!current
+                  || current.status !== "retrying"
+                  || Number(current.retryCount || 0) !== finalEvent.retryCount
+                  || current.dispatchAttemptId !== finalEvent.dispatchAttemptId) {
+                  const error = new Error("financial retry reservation is unavailable");
+                  error.code = "FINANCIAL_RETRY_RESERVATION_UNAVAILABLE";
+                  throw error;
+                }
+                const callbackEvidenceAdvanced = JSON.stringify(current.callbackEvents || [])
+                  !== JSON.stringify(reservation.callbackEvents || []);
+                const committedFinalEvent = callbackEvidenceAdvanced ? {
+                  ...current,
+                  ...finalEvent,
+                  callbackEvents: current.callbackEvents,
+                  providerStatus: current.providerStatus,
+                  latestCallbackAt: current.latestCallbackAt,
+                  businessDate: current.businessDate,
+                  providerCode: current.providerCode,
+                  reconciliationStatus: "provider-exception",
+                  lastRetryResult: "callback-race-reconciliation-required"
+                } : finalEvent;
+                finalData.integrationGatewayEvents[finalIndex] = committedFinalEvent;
+                finalData.securityEvents = [{
+                  id: randomUUID(),
+                  at: new Date().toLocaleString("zh-CN", { hour12: false }),
+                  actor: user.name,
+                  role: user.role,
+                  action: "重试金融网关事件",
+                  target: committedFinalEvent.id,
+                  result: committedFinalEvent.reconciliationStatus === "provider-exception" ? "需复核" : committedFinalEvent.deadLetter ? "失败" : "允许",
+                  detail: `${committedFinalEvent.contractId} · ${idempotencyKey} · retry=${committedFinalEvent.retryCount} · ${committedFinalEvent.lastRetryResult}`
+                }, ...(Array.isArray(finalData.securityEvents) ? finalData.securityEvents : [])].slice(0, 120);
+                writeDatabase(finalData, {
+                  financialGatewayWrite: {
+                    kind: "retry-finalize",
+                    eventId: committedFinalEvent.id,
+                    idempotencyKey,
+                    requestDigest: financialDispatchRequestDigest(committedFinalEvent.requestPayload)
+                  }
+                });
+                return committedFinalEvent;
+              });
+              return { status: 200, body: committedEvent };
+            });
+            sendJson(res, result.status, result.body);
+          } catch (error) {
+            const versionConflict = String(error?.message || "").includes("SQLite optimistic lock conflict");
+            sendJson(res, versionConflict ? 409 : 500, {
+              ok: false,
+              code: versionConflict ? "FINANCIAL_RETRY_VERSION_CONFLICT" : "FINANCIAL_RETRY_FAILED",
+              message: versionConflict
+                ? "financial retry state changed; retry with a fresh snapshot"
+                : "financial gateway retry failed"
+            });
+          }
+          return true;
+        }
         const data = readDatabase();
         const sourceEvent = (Array.isArray(data.integrationGatewayEvents) ? data.integrationGatewayEvents : []).find((item) => item.id === integrationRetryMatch[1]);
         if (sourceEvent?.direction === "outbound" && Number(sourceEvent.retryCount || 0) >= 3) {
@@ -694,37 +867,6 @@ function createRouteSegments(runtime) {
             });
           }
         }
-        if (event.adapterType === "financial" && event.requestPayload) {
-          try {
-            const previousReceipt = event.adapterReceipt;
-            const receipt = await dispatchFinancialRequest(event.requestPayload);
-            const adapterReceiptHistory = [previousReceipt, ...(Array.isArray(event.adapterReceiptHistory) ? event.adapterReceiptHistory : [])]
-              .filter((item, index, list) => item?.receiptId && list.findIndex((candidate) => candidate?.receiptId === item.receiptId) === index)
-              .slice(0, 10);
-            Object.assign(event, {
-              status: receipt.status,
-              adapterReceipt: receipt,
-              adapterReceiptHistory,
-              providerStatus: receipt.status,
-              latestCallbackAt: "",
-              businessDate: String(receipt.acceptedAt || "").slice(0, 10),
-              dispatchedAt: receipt.acceptedAt,
-              deadLetter: false,
-              deadLetterReason: "",
-              reconciliationStatus: "provider-accepted",
-              lastRetryResult: "provider-accepted"
-            });
-          } catch (error) {
-            Object.assign(event, {
-              status: "failed",
-              deadLetter: true,
-              deadLetterReason: String(error.message || "financial gateway retry failed").slice(0, 200),
-              failedAt: new Date().toISOString(),
-              reconciliationStatus: "dead-letter",
-              lastRetryResult: "failed"
-            });
-          }
-        }
         data.securityEvents = [
           {
             id: randomUUID(),
@@ -748,6 +890,67 @@ function createRouteSegments(runtime) {
         const user = requireApiRole(req, res, ["commission"], "/api/integration/events/:id/dead-letter");
         if (!user) return true;
         const payload = await collectJson(req);
+        const deadLetterEventId = integrationDeadLetterMatch[1];
+        const deadLetterSource = (readDatabase().integrationGatewayEvents || []).find((item) => item.id === deadLetterEventId);
+        if (deadLetterSource?.adapterType === "financial") {
+          const idempotencyKey = String(deadLetterSource.idempotencyKey || "").trim();
+          if (!idempotencyKey || !deadLetterSource.requestPayload) {
+            sendJson(res, 409, {
+              ok: false,
+              code: "FINANCIAL_DEAD_LETTER_CONTRACT_UNAVAILABLE",
+              message: "financial gateway dead-letter contract is unavailable"
+            });
+            return true;
+          }
+          try {
+            const event = await withFinancialDispatchLock(idempotencyKey, () => withFinancialDispatchStateLock(() => {
+              const financialData = readDatabase();
+              const current = (financialData.integrationGatewayEvents || []).find((item) => item.id === deadLetterEventId);
+              if (!current || current.adapterType !== "financial") return null;
+              if (current.status !== "failed") {
+                return {
+                  conflict: true,
+                  code: "FINANCIAL_DEAD_LETTER_NOT_ALLOWED",
+                  message: "only failed financial gateway events can be marked as dead-letter"
+                };
+              }
+              const updated = {
+                ...current,
+                deadLetter: true,
+                deadLetterReason: "manual financial reconciliation required",
+                failedAt: new Date().toISOString(),
+                reconciliationStatus: "dead-letter"
+              };
+              const index = financialData.integrationGatewayEvents.findIndex((item) => item.id === deadLetterEventId);
+              financialData.integrationGatewayEvents[index] = updated;
+              financialData.securityEvents = prependAuditTrailEntry(financialData.securityEvents, {
+                id: randomUUID(),
+                at: new Date().toLocaleString("zh-CN", { hour12: false }),
+                actor: user.name,
+                role: user.role,
+                action: "标记金融网关死信",
+                target: updated.id,
+                result: "允许",
+                detail: `${updated.contractId} · ${idempotencyKey} · manual-reconciliation-required`
+              });
+              writeDatabase(financialData, {
+                financialGatewayWrite: {
+                  kind: "manual-dead-letter",
+                  eventId: updated.id,
+                  idempotencyKey,
+                  requestDigest: financialDispatchRequestDigest(updated.requestPayload)
+                }
+              });
+              return updated;
+            }));
+            if (!event) sendJson(res, 404, { error: "Not Found", message: "未找到集成网关事件" });
+            else if (event.conflict) sendJson(res, 409, { ok: false, code: event.code, message: event.message });
+            else sendJson(res, 200, event);
+          } catch {
+            sendJson(res, 500, { ok: false, code: "FINANCIAL_DEAD_LETTER_FAILED", message: "financial gateway dead-letter update failed" });
+          }
+          return true;
+        }
         const data = readDatabase();
         const event = updateIntegrationEvent(data, integrationDeadLetterMatch[1], () => ({
           status: "failed",

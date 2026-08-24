@@ -4611,7 +4611,7 @@ test("financial gateways enforce signed callbacks digest reconciliation and prod
   assert.match(server, /\/api\/financial-gateways\/reconciliation-runs/);
   assert.match(server, /PRODUCTION_FINANCIAL_CALLBACK_INVALID/);
   assert.match(server, /adapterType: "financial"/);
-  assert.match(server, /event\.adapterType === "financial"/);
+  assert.match(server, /retrySource\?\.adapterType === "financial"/);
   assert.match(platformHtml, /financial-gateway-operations-center/);
   assert.match(platformHtml, /financial-reconciliation-dialog/);
   assert.match(platformSource, /renderFinancialGatewayOperationsCenter/);

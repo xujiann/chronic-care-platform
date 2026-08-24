@@ -1,4 +1,4 @@
-const { createHash, createHmac, randomUUID, timingSafeEqual } = require("node:crypto");
+const { createHash, createHmac, randomBytes, randomUUID, timingSafeEqual } = require("node:crypto");
 const OnlinePaymentRefunds = require("./online-payment-refunds");
 
 const DEFAULT_FINANCIAL_CALLBACK_MAX_SKEW_SECONDS = 300;
@@ -17,7 +17,9 @@ const RECONCILIABLE_OPERATIONS = new Map([
   ["INSURANCE", new Set(["settlement", "settlement-cancel"])],
   ["CERTIFICATE", new Set(["issue", "revoke"])]
 ]);
+const financialDispatchWriteTails = new Map();
 const financialReconciliationWriteTails = new Map();
+const financialCallbackEvidenceAttestationKey = randomBytes(32);
 
 class FinancialCallbackError extends Error {
   constructor(message, code, statusCode = 400) {
@@ -66,8 +68,6 @@ const REQUIRED_FIELDS = Object.freeze({
 const FORBIDDEN_PAYLOAD_KEYS = new Set([
   "password", "token", "accessToken", "credentialToken", "idCard", "phone", "certificateContent", "documentBase64", "privateKey", "secret"
 ]);
-const FAILED_STATUSES = new Set(["rejected", "failed", "error", "denied", "invalid"]);
-
 function isProduction(env = process.env) {
   return String(env.NODE_ENV || "").toLowerCase() === "production";
 }
@@ -84,6 +84,56 @@ function stableStringify(value) {
     return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${stableStringify(value[key])}`).join(",")}}`;
   }
   return JSON.stringify(value);
+}
+
+function financialDispatchRequestDigest(input = {}) {
+  return `sha256:${sha256(stableStringify({
+    type: String(input.type || "").trim().toUpperCase(),
+    operation: String(input.operation || "").trim().toLowerCase(),
+    contractId: String(input.contractId || "").trim(),
+    idempotencyKey: String(input.idempotencyKey || "").trim(),
+    requestId: String(input.requestId || "").trim(),
+    payload: input.payload
+  }))}`;
+}
+
+function runFinancialDispatchLock(lockKey, work) {
+  const previous = financialDispatchWriteTails.get(lockKey) || Promise.resolve();
+  const pending = previous.then(work, work);
+  const tail = pending.then(() => undefined, () => undefined);
+  financialDispatchWriteTails.set(lockKey, tail);
+  tail.finally(() => {
+    if (financialDispatchWriteTails.get(lockKey) === tail) financialDispatchWriteTails.delete(lockKey);
+  });
+  return pending;
+}
+
+function withFinancialDispatchLock(idempotencyKey, work) {
+  if (typeof work !== "function") {
+    throw new FinancialCallbackError("financial dispatch work unit is required", "FINANCIAL_DISPATCH_WORK_REQUIRED", 503);
+  }
+  const commandKey = String(idempotencyKey || "").trim();
+  if (!commandKey) {
+    throw new FinancialCallbackError("financial dispatch idempotency key is required", "FINANCIAL_DISPATCH_IDEMPOTENCY_REQUIRED");
+  }
+  return runFinancialDispatchLock(`command:${commandKey}`, work);
+}
+
+function withFinancialDispatchStateLock(work) {
+  if (typeof work !== "function") {
+    throw new FinancialCallbackError("financial dispatch state work unit is required", "FINANCIAL_DISPATCH_STATE_WORK_REQUIRED", 503);
+  }
+  return runFinancialDispatchLock("state-write", () => {
+    const result = work();
+    if (result && typeof result.then === "function") {
+      throw new FinancialCallbackError(
+        "financial dispatch state work must not await external operations",
+        "FINANCIAL_DISPATCH_STATE_ASYNC_FORBIDDEN",
+        503
+      );
+    }
+    return result;
+  });
 }
 
 function normalizeGatewayType(value) {
@@ -282,7 +332,7 @@ function verifyFinancialCallback(payload, options = {}) {
   if (Date.parse(normalized.occurredAt) > nowMs + configuration.callbackMaxSkewSeconds * 1000) {
     throw new FinancialCallbackError("financial callback occurredAt is outside the allowed future window", "FINANCIAL_CALLBACK_TIME_IN_FUTURE");
   }
-  return {
+  const verified = {
     ...normalized,
     receivedAt: new Date(nowMs).toISOString(),
     nonceDigest: sha256(nonce),
@@ -290,6 +340,51 @@ function verifyFinancialCallback(payload, options = {}) {
     payloadsExposed: false,
     credentialsPersisted: false
   };
+  return {
+    ...verified,
+    verificationAttestation: createHmac("sha256", financialCallbackEvidenceAttestationKey)
+      .update(financialCallbackEvidenceAttestationPayload(verified, ""))
+      .digest("hex")
+  };
+}
+
+function financialCallbackLedgerDigest(callbackEvents = []) {
+  return sha256(stableStringify(Array.isArray(callbackEvents) ? callbackEvents : []));
+}
+
+function financialCallbackEvidenceAttestationPayload(callback = {}, gatewayEventId = "", previousCallbackLedgerDigest = "") {
+  return stableStringify({
+    gatewayEventId: safeFinancialText(gatewayEventId, 200),
+    previousCallbackLedgerDigest: safeFinancialText(previousCallbackLedgerDigest, 64),
+    eventId: callback.eventId,
+    gatewayType: callback.gatewayType,
+    receiptId: callback.receiptId,
+    status: callback.status,
+    occurredAt: callback.occurredAt,
+    receivedAt: callback.receivedAt,
+    businessDate: callback.businessDate,
+    amountFen: callback.amountFen,
+    providerCode: callback.providerCode,
+    failureReason: callback.failureReason,
+    settlementReferenceDigest: callback.settlementReferenceDigest,
+    nonceDigest: callback.nonceDigest,
+    signatureVerified: callback.signatureVerified,
+    stateApplied: callback.stateApplied,
+    ignoredReason: callback.ignoredReason
+  });
+}
+
+function createFinancialCallbackEvidenceAttestation(callback, gatewayEventId = "", previousCallbackLedgerDigest = "") {
+  return createHmac("sha256", financialCallbackEvidenceAttestationKey)
+    .update(financialCallbackEvidenceAttestationPayload(callback, gatewayEventId, previousCallbackLedgerDigest))
+    .digest("hex");
+}
+
+function verifyFinancialCallbackEvidenceAttestation(callback, attestation, gatewayEventId = "", previousCallbackLedgerDigest = "") {
+  const supplied = String(attestation || "").trim().toLowerCase();
+  if (!/^[a-f0-9]{64}$/.test(supplied)) return false;
+  const expected = createFinancialCallbackEvidenceAttestation(callback, gatewayEventId, previousCallbackLedgerDigest);
+  return timingSafeEqual(Buffer.from(expected, "hex"), Buffer.from(supplied, "hex"));
 }
 
 function financialEventReceiptIds(event = {}) {
@@ -318,6 +413,11 @@ function applyFinancialCallback(data, verifiedCallback) {
   if (!callback.signatureVerified || !callback.nonceDigest) {
     throw new FinancialCallbackError("financial callback must be verified before persistence", "FINANCIAL_CALLBACK_VERIFICATION_REQUIRED", 401);
   }
+  const verifierAttested = verifyFinancialCallbackEvidenceAttestation(
+    callback,
+    callback.verificationAttestation,
+    ""
+  );
   const events = Array.isArray(data.integrationGatewayEvents) ? data.integrationGatewayEvents : [];
   const financialEvents = events.filter((item) => item.adapterType === "financial");
   for (const item of financialEvents) {
@@ -333,13 +433,28 @@ function applyFinancialCallback(data, verifiedCallback) {
         && String(duplicate.failureReason || "") === String(callback.failureReason || "")
         && String(duplicate.settlementReferenceDigest || "") === String(callback.settlementReferenceDigest || "");
       if (!sameEvent) throw new FinancialCallbackError("financial callback event id conflicts with persisted evidence", "FINANCIAL_CALLBACK_EVENT_CONFLICT", 409);
-      return { gatewayEvent: item, callbackEvent: duplicate, idempotentReplay: true };
+      return {
+        gatewayEvent: item,
+        callbackEvent: duplicate,
+        idempotentReplay: true,
+        verificationAttestation: verifierAttested
+          ? createFinancialCallbackEvidenceAttestation(
+            duplicate,
+            item.id,
+            financialCallbackLedgerDigest(item.callbackEvents)
+          )
+          : ""
+      };
     }
     if ((item.callbackEvents || []).some((entry) => entry.nonceDigest === callback.nonceDigest)) {
       throw new FinancialCallbackError("financial callback nonce was already used", "FINANCIAL_CALLBACK_REPLAY_DETECTED", 409);
     }
   }
-  const gatewayEvent = financialEvents.find((item) => item.gatewayType === callback.gatewayType && financialEventReceiptIds(item).includes(callback.receiptId));
+  const matchingGatewayEvents = financialEvents.filter((item) => item.gatewayType === callback.gatewayType && financialEventReceiptIds(item).includes(callback.receiptId));
+  if (matchingGatewayEvents.length > 1) {
+    throw new FinancialCallbackError("financial callback receipt is bound to multiple events", "FINANCIAL_CALLBACK_RECEIPT_AMBIGUOUS", 409);
+  }
+  const gatewayEvent = matchingGatewayEvents[0];
   if (!gatewayEvent) throw new FinancialCallbackError("financial callback receipt was not found", "FINANCIAL_CALLBACK_RECEIPT_NOT_FOUND", 404);
   const currentStatus = financialEventProviderStatus(gatewayEvent);
   const currentReceiptId = safeFinancialText(gatewayEvent.adapterReceipt?.receiptId, 200);
@@ -383,7 +498,16 @@ function applyFinancialCallback(data, verifiedCallback) {
     stateApplied,
     ignoredReason
   };
-  gatewayEvent.callbackEvents = [callbackEvent, ...(Array.isArray(gatewayEvent.callbackEvents) ? gatewayEvent.callbackEvents : [])].slice(0, 30);
+  const existingCallbackEvents = Array.isArray(gatewayEvent.callbackEvents) ? gatewayEvent.callbackEvents : [];
+  const callbackLedgerMaximum = financialCallbackLedgerCapacity([], process.env).maximumPerRequest;
+  if (existingCallbackEvents.length >= callbackLedgerMaximum) {
+    throw new FinancialCallbackError(
+      "financial callback evidence ledger capacity reached",
+      "FINANCIAL_CALLBACK_LEDGER_CAPACITY_REACHED",
+      507
+    );
+  }
+  gatewayEvent.callbackEvents = [callbackEvent, ...existingCallbackEvents];
   gatewayEvent.updatedAt = callback.receivedAt;
   if (stateApplied) {
     gatewayEvent.providerStatus = callback.status;
@@ -397,7 +521,18 @@ function applyFinancialCallback(data, verifiedCallback) {
     gatewayEvent.reconciliationStatus = "provider-exception";
   }
   data.integrationGatewayEvents = events;
-  return { gatewayEvent, callbackEvent, idempotentReplay: false };
+  return {
+    gatewayEvent,
+    callbackEvent,
+    idempotentReplay: false,
+    verificationAttestation: verifierAttested
+      ? createFinancialCallbackEvidenceAttestation(
+        callbackEvent,
+        gatewayEvent.id,
+        financialCallbackLedgerDigest(existingCallbackEvents)
+      )
+      : ""
+  };
 }
 
 function normalizedReconciliationInteger(value, label) {
@@ -553,7 +688,9 @@ function normalizeFinancialReconciliationRun(item = {}) {
 
 function financialGatewayOperationsCenter(data = {}, env = process.env, scopeType = "") {
   const scopedType = scopeType ? normalizeGatewayType(scopeType) : "";
-  const events = (Array.isArray(data.integrationGatewayEvents) ? data.integrationGatewayEvents : [])
+  const allFinancialEvents = (Array.isArray(data.integrationGatewayEvents) ? data.integrationGatewayEvents : [])
+    .filter((item) => item.adapterType === "financial");
+  const events = allFinancialEvents
     .filter((item) => item.adapterType === "financial" && (!scopedType || item.gatewayType === scopedType));
   const runs = (Array.isArray(data.financialReconciliationRuns) ? data.financialReconciliationRuns : [])
     .filter((item) => !scopedType || item.gatewayType === scopedType)
@@ -565,6 +702,8 @@ function financialGatewayOperationsCenter(data = {}, env = process.env, scopeTyp
   const eventStatuses = new Map(events.map((item) => [item, financialEventProviderStatus(item)]));
   const gatewayCenter = financialGatewayCenter(env);
   const refundOperations = !scopedType || scopedType === "PAYMENT" ? OnlinePaymentRefunds.buildRefundOperations(data) : null;
+  const ledgerCapacity = financialIdempotencyLedgerCapacity(allFinancialEvents, env);
+  const callbackLedgerCapacity = financialCallbackLedgerCapacity(allFinancialEvents, env);
   return {
     ok: true,
     productionReady: false,
@@ -581,7 +720,19 @@ function financialGatewayOperationsCenter(data = {}, env = process.env, scopeTyp
       reconciliationRuns: runs.length,
       reconciliationDifferences: runs.filter((item) => item.status === "difference").length,
       refundRequests: refundOperations?.summary.total || 0,
-      refundExceptions: refundOperations?.summary.failed || 0
+      refundExceptions: refundOperations?.summary.failed || 0,
+      ledgerEvents: ledgerCapacity.used,
+      ledgerCapacity: ledgerCapacity.maximum,
+      ledgerCapacityPerScope: ledgerCapacity.maximumPerScope,
+      ledgerRemaining: ledgerCapacity.remaining,
+      ledgerUtilizationPercent: ledgerCapacity.utilizationPercent,
+      ledgerCapacityStatus: ledgerCapacity.status,
+      ledgerPeakScopeUsed: ledgerCapacity.peakScopeUsed,
+      ledgerPeakScopeUtilizationPercent: ledgerCapacity.peakScopeUtilizationPercent,
+      callbackLedgerMaximumPerRequest: callbackLedgerCapacity.maximumPerRequest,
+      callbackLedgerPeakPerRequest: callbackLedgerCapacity.peakPerRequest,
+      callbackLedgerUtilizationPercent: callbackLedgerCapacity.utilizationPercent,
+      callbackLedgerCapacityStatus: callbackLedgerCapacity.status
     },
     gateways: gatewayCenter.gateways.filter((item) => !scopedType || item.type === scopedType),
     events: events.slice(0, 100).map((item) => ({
@@ -599,9 +750,81 @@ function financialGatewayOperationsCenter(data = {}, env = process.env, scopeTyp
       productionEvidence: false
     })),
     reconciliationRuns: runs,
+    ledgerCapacity,
+    callbackLedgerCapacity,
     refundOperations,
     boundary: "Signed generic callbacks and digest-only daily reconciliation are runnable. Provider-specific fields, source allowlists, managed callback keys, statement transport and agency signoff remain production dependencies."
   };
+}
+
+function financialIdempotencyLedgerCapacity(events = [], env = process.env) {
+  const configured = Number(env.FINANCIAL_IDEMPOTENCY_LEDGER_MAX_EVENTS || 100000);
+  const maximum = Number.isFinite(configured)
+    ? Math.min(1000000, Math.max(1000, Math.trunc(configured)))
+    : 100000;
+  const configuredPerScope = Number(env.FINANCIAL_IDEMPOTENCY_LEDGER_MAX_EVENTS_PER_SCOPE || 10000);
+  const maximumPerScope = Number.isFinite(configuredPerScope)
+    ? Math.min(maximum, Math.max(100, Math.trunc(configuredPerScope)))
+    : Math.min(maximum, 10000);
+  const financialEvents = (Array.isArray(events) ? events : []).filter((item) => item?.adapterType === "financial");
+  const used = financialEvents.length;
+  const scopeCounts = new Map();
+  financialEvents.forEach((item) => {
+    const scope = financialIdempotencyScopeKey(item);
+    scopeCounts.set(scope, (scopeCounts.get(scope) || 0) + 1);
+  });
+  const peakScope = [...scopeCounts.entries()].sort((left, right) => right[1] - left[1])[0] || ["", 0];
+  const remaining = Math.max(0, maximum - used);
+  const utilizationPercent = maximum ? Number(((used / maximum) * 100).toFixed(2)) : 100;
+  const status = utilizationPercent >= 95 ? "critical" : utilizationPercent >= 80 ? "warning" : "healthy";
+  return Object.freeze({
+    maximum,
+    maximumPerScope,
+    used,
+    remaining,
+    utilizationPercent,
+    warningAtPercent: 80,
+    criticalAtPercent: 95,
+    status,
+    peakScopeKey: peakScope[0],
+    peakScopeUsed: peakScope[1],
+    peakScopeRemaining: Math.max(0, maximumPerScope - peakScope[1]),
+    peakScopeUtilizationPercent: maximumPerScope ? Number(((peakScope[1] / maximumPerScope) * 100).toFixed(2)) : 100,
+    automaticEviction: false,
+    archivePolicy: "migration-and-approval-required"
+  });
+}
+
+function financialIdempotencyScopeKey(event = {}) {
+  const immutableScope = safeFinancialText(event.capacityScope, 160);
+  const institutionCode = safeFinancialText(event.requestPayload?.payload?.institutionCode, 120);
+  const principal = safeFinancialText(event.receivedBy, 120);
+  const gatewayType = safeFinancialText(event.gatewayType || event.requestPayload?.type || "UNKNOWN", 20).toUpperCase();
+  return immutableScope || (institutionCode ? `institution:${institutionCode}` : principal ? `principal:${principal}` : `gateway-unscoped:${gatewayType}`);
+}
+
+function financialCallbackLedgerCapacity(events = [], env = process.env) {
+  const configured = Number(env.FINANCIAL_CALLBACK_LEDGER_MAX_EVENTS_PER_REQUEST || 1000);
+  const maximumPerRequest = Number.isFinite(configured)
+    ? Math.min(10000, Math.max(30, Math.trunc(configured)))
+    : 1000;
+  const callbackCounts = (Array.isArray(events) ? events : [])
+    .filter((item) => item?.adapterType === "financial")
+    .map((item) => Array.isArray(item.callbackEvents) ? item.callbackEvents.length : 0);
+  const peakPerRequest = callbackCounts.length ? Math.max(...callbackCounts) : 0;
+  const remainingAtPeak = Math.max(0, maximumPerRequest - peakPerRequest);
+  const utilizationPercent = maximumPerRequest
+    ? Number(((peakPerRequest / maximumPerRequest) * 100).toFixed(2))
+    : 100;
+  return Object.freeze({
+    maximumPerRequest,
+    peakPerRequest,
+    remainingAtPeak,
+    utilizationPercent,
+    status: utilizationPercent >= 95 ? "critical" : utilizationPercent >= 80 ? "warning" : "healthy",
+    automaticEviction: false,
+    archivePolicy: "migration-and-approval-required"
+  });
 }
 
 function validatePayloadKeys(value, path = "payload") {
@@ -741,9 +964,15 @@ async function dispatchFinancialRequest(input, options = {}) {
   }
   if (lastError) throw lastError;
   const receiptId = String(body.receiptId || body.tradeNo || body.settlementNo || body.certificateNo || body.requestId || "").trim();
-  const status = String(body.status || "accepted").trim().toLowerCase();
+  const status = normalizeFinancialCallbackStatus(body.status || "accepted");
+  const acceptedAtValue = String(body.acceptedAt || body.processedAt || new Date().toISOString()).trim();
+  const acceptedAtMs = Date.parse(acceptedAtValue);
   if (!receiptId) throw new Error("financial gateway response is missing receipt id");
-  if (body.success === false || FAILED_STATUSES.has(status)) throw new Error(`financial gateway rejected the request (${status})`);
+  if (body.success === false || ["failed", "cancelled", "reversed"].includes(status)) throw new Error(`financial gateway rejected the request (${status})`);
+  if (!Number.isFinite(acceptedAtMs)
+    || acceptedAtMs > Date.now() + configuration.callbackMaxSkewSeconds * 1000) {
+    throw new Error("financial gateway response acceptedAt is invalid");
+  }
   return {
     type: validated.type,
     operation: validated.operation,
@@ -752,7 +981,7 @@ async function dispatchFinancialRequest(input, options = {}) {
     requestId,
     receiptId,
     status,
-    acceptedAt: String(body.acceptedAt || body.processedAt || new Date().toISOString()),
+    acceptedAt: new Date(acceptedAtMs).toISOString(),
     providerCode: String(body.code || ""),
     attempts,
     adapter: "financial-http-json-hmac"
@@ -773,6 +1002,11 @@ module.exports = {
   createRefundRequest: OnlinePaymentRefunds.createRefundRequest,
   createFinancialReconciliationRun,
   dispatchFinancialRequest,
+  financialDispatchRequestDigest,
+  financialCallbackLedgerCapacity,
+  financialCallbackLedgerDigest,
+  financialIdempotencyLedgerCapacity,
+  financialIdempotencyScopeKey,
   financialGatewayOperationsCenter,
   financialGatewayCenter,
   gatewayConfiguration,
@@ -791,6 +1025,9 @@ module.exports = {
   syncRefundFromFinancialCallback: OnlinePaymentRefunds.syncRefundFromFinancialCallback,
   validateFinancialRequest,
   verifyFinancialCallback,
+  verifyFinancialCallbackEvidenceAttestation,
+  withFinancialDispatchLock,
+  withFinancialDispatchStateLock,
   withFinancialReconciliationLock,
   verifyRefundLedger: OnlinePaymentRefunds.verifyRefundLedger,
   verifyRefundStateProjection: OnlinePaymentRefunds.verifyRefundStateProjection
