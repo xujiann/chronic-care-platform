@@ -271,3 +271,20 @@ T00 新增独立 `postgres-primary-transition-readiness-v1` CLI，只读取仓�
 primary-read、adapter、storage-admin、shadow sync/reconciliation 的脚本、schema、service/timer 与 env
 模板；两个 PostgreSQL job 已登记但不启动。七门全部通过最多表示可进入受控演练，所有 production/activation
 标志保持 false，`DATABASE_URL` 只登记为 secret 引用；HTTP、SQLite、schema 和 strict preflight 未改变。
+
+## 2026-08-25 预生产现场控制闭包
+
+`scripts/platform-preproduction-control.js` 现提供 environment、joint-test、monitoring、rehearsal、candidate
+五个只读评估入口。入口参数按命令闭集验证，运行结果用 0/2/1 区分满足门禁、正常 NO-GO 与输入/运行异常；
+错误只输出稳定脱敏投影。JSON 与 alert journal 通过打开 descriptor 的有界读取拒绝 symlink 和换 inode 路径
+替换；通用输入没有新增内容摘要，真实性仍由既有签名/指纹、权限和现场流程负责。
+
+deployment package 已登记五个入口、完整直接/传递源码、环境变量模板和固定非授权字段。联调仍使用现有
+12 系统 × 8 场景（96 份双签回执），监控复用 dead-letter redrive 检查，演练复用六检查点与 outbox/
+reconciliation 观察。所有入口要求调用方提供发布号和包指纹并使用系统时钟；candidate 用部署环境 anchor
+摘要发现文件漂移，但普通 CLI 不信任同进程可覆盖的环境值并固定 NO-GO/退出 2；五个不同账号、key ID、
+公钥材料仍须提交摘要绑定且不超过 48 小时的 Ed25519
+签名报告信封，并强校验上游报告与授权账本契约。候选最多
+`GO-CANDIDATE`；所有入口固定 `cutoverExecutionAuthorized=false`、
+`executionAuthorized=false`、`runtimeCutoverEnabled=false`、`productionPrimary=false`、
+`productionReady=false`，没有启动 worker、执行 rollback、写数据库或修改 HTTP。

@@ -102,6 +102,94 @@ const POSTGRES_RECONCILIATION_JOB_VARIABLES = Object.freeze([
   "POSTGRES_RECONCILIATION_AGE_SLO_SECONDS",
   "POSTGRES_RECONCILIATION_OPEN_CASES_SLO_MAX"
 ]);
+const PREPRODUCTION_CONTROL_RUNTIME_FILES = Object.freeze([
+  "scripts/platform-preproduction-control.js",
+  "src/platform/cutover/pilot-cutover-package.js",
+  "src/platform/cutover/preproduction-environment-readiness.js",
+  "src/platform/cutover/pilot-cutover-rehearsal-session.js",
+  "src/platform/cutover/pilot-cutover-candidate-review.js",
+  "src/platform/cutover/pilot-cutover-command-plan.js",
+  "src/platform/cutover/pilot-cutover-rehearsal.js",
+  "src/platform/cutover/pilot-cutover-orchestrator.js",
+  "src/platform/cutover/pilot-cutover-alert-lifecycle.js",
+  "src/platform/cutover/pilot-cutover-monitoring-acceptance.js",
+  "src/platform/cutover/pilot-cutover-trust-verifier.js",
+  "src/platform/governance/production-evidence-trust-provider.js",
+  "src/platform/integration/external-joint-test-campaign.js",
+  "src/platform/governance/technical-evidence.js",
+  "observability-alerting.js",
+  "config/external-joint-test-campaign.json",
+  "config/platform-iteration-program.json",
+  "deploy/platform-production-adapters.env.template"
+]);
+const PREPRODUCTION_CONTROL_CONFIGURATION_VARIABLES = Object.freeze([
+  "DEPLOYMENT_RELEASE_ID",
+  "DEPLOYMENT_ARTIFACT_DIGEST",
+  "PLATFORM_PREPRODUCTION_ENVIRONMENT_EVIDENCE_FILE",
+  "PLATFORM_EXTERNAL_JOINT_TEST_CAMPAIGN_FILE",
+  "PLATFORM_EXTERNAL_JOINT_TEST_TRUST_REGISTRY_FILE",
+  "PLATFORM_EXTERNAL_JOINT_TEST_EVIDENCE_FILE",
+  "PLATFORM_PILOT_CUTOVER_ALERT_JOURNAL_FILE",
+  "PLATFORM_PILOT_CUTOVER_MONITORING_ACCEPTANCE_FILE",
+  "PLATFORM_PILOT_CUTOVER_REHEARSAL_SESSION_FILE",
+  "PLATFORM_PILOT_CUTOVER_AUTHORIZATION_REPORT_FILE",
+  "PLATFORM_PILOT_CUTOVER_PREPRODUCTION_REPORT_FILE",
+  "PLATFORM_PILOT_CUTOVER_JOINT_TEST_REPORT_FILE",
+  "PLATFORM_PILOT_CUTOVER_MONITORING_REPORT_FILE",
+  "PLATFORM_PILOT_CUTOVER_REHEARSAL_REPORT_FILE",
+  "PRODUCTION_EVIDENCE_TRUST_ANCHORS_FILE",
+  "PRODUCTION_EVIDENCE_TRUST_ANCHORS_SHA256"
+]);
+const PREPRODUCTION_CONTROL_DEFINITIONS = Object.freeze([{
+  id: "environment",
+  command: "npm run platform:preproduction:environment -- --input=<absolute-file> --release-id=<release-id> --package-fingerprint=<sha256> --require-ready",
+  configurationVariables: [
+    "DEPLOYMENT_RELEASE_ID",
+    "DEPLOYMENT_ARTIFACT_DIGEST",
+    "PLATFORM_PREPRODUCTION_ENVIRONMENT_EVIDENCE_FILE"
+  ]
+}, {
+  id: "joint-test",
+  command: "npm run platform:preproduction:joint-test -- --campaign=<absolute-file> --trust-registry=<absolute-file> --evidence=<absolute-file> --release-id=<release-id> --package-fingerprint=<sha256> --require-ready",
+  configurationVariables: [
+    "DEPLOYMENT_RELEASE_ID",
+    "DEPLOYMENT_ARTIFACT_DIGEST",
+    "PLATFORM_EXTERNAL_JOINT_TEST_CAMPAIGN_FILE",
+    "PLATFORM_EXTERNAL_JOINT_TEST_TRUST_REGISTRY_FILE",
+    "PLATFORM_EXTERNAL_JOINT_TEST_EVIDENCE_FILE"
+  ]
+}, {
+  id: "monitoring",
+  command: "npm run platform:preproduction:monitoring -- --journal=<absolute-file> --input=<absolute-file> --release-id=<release-id> --package-fingerprint=<sha256> --require-ready",
+  configurationVariables: [
+    "DEPLOYMENT_RELEASE_ID",
+    "DEPLOYMENT_ARTIFACT_DIGEST",
+    "PLATFORM_PILOT_CUTOVER_ALERT_JOURNAL_FILE",
+    "PLATFORM_PILOT_CUTOVER_MONITORING_ACCEPTANCE_FILE"
+  ]
+}, {
+  id: "rehearsal",
+  command: "npm run platform:preproduction:rehearsal -- --input=<absolute-file> --release-id=<release-id> --package-fingerprint=<sha256> --require-ready",
+  configurationVariables: [
+    "DEPLOYMENT_RELEASE_ID",
+    "DEPLOYMENT_ARTIFACT_DIGEST",
+    "PLATFORM_PILOT_CUTOVER_REHEARSAL_SESSION_FILE"
+  ]
+}, {
+  id: "candidate",
+  command: "npm run platform:preproduction:candidate -- --authorization=<signed-envelope> --preproduction=<signed-envelope> --joint-tests=<signed-envelope> --monitoring=<signed-envelope> --rehearsal=<signed-envelope> --release-id=<release-id> --package-fingerprint=<sha256> --require-go-candidate",
+  configurationVariables: [
+    "DEPLOYMENT_RELEASE_ID",
+    "DEPLOYMENT_ARTIFACT_DIGEST",
+    "PLATFORM_PILOT_CUTOVER_AUTHORIZATION_REPORT_FILE",
+    "PLATFORM_PILOT_CUTOVER_PREPRODUCTION_REPORT_FILE",
+    "PLATFORM_PILOT_CUTOVER_JOINT_TEST_REPORT_FILE",
+    "PLATFORM_PILOT_CUTOVER_MONITORING_REPORT_FILE",
+    "PLATFORM_PILOT_CUTOVER_REHEARSAL_REPORT_FILE",
+    "PRODUCTION_EVIDENCE_TRUST_ANCHORS_FILE",
+    "PRODUCTION_EVIDENCE_TRUST_ANCHORS_SHA256"
+  ]
+}]);
 const REQUIRED_RUNTIME_FILES = [
   "server.js",
   "browser-security-policy.json",
@@ -116,7 +204,8 @@ const REQUIRED_RUNTIME_FILES = [
   ...AUDIT_DELIVERY_RUNTIME_FILES,
   ...CHRONIC_FOLLOWUP_DISPATCH_RUNTIME_FILES,
   ...PRODUCTION_EVIDENCE_TRUST_RUNTIME_FILES,
-  ...WORKER_OBSERVABILITY_RUNTIME_FILES
+  ...WORKER_OBSERVABILITY_RUNTIME_FILES,
+  ...PREPRODUCTION_CONTROL_RUNTIME_FILES
 ];
 const ADDITIONAL_RUNTIME_FILES = [
   "browser-security-policy.json",
@@ -125,7 +214,8 @@ const ADDITIONAL_RUNTIME_FILES = [
   ...AUDIT_DELIVERY_RUNTIME_FILES,
   ...CHRONIC_FOLLOWUP_DISPATCH_RUNTIME_FILES,
   ...PRODUCTION_EVIDENCE_TRUST_RUNTIME_FILES,
-  ...WORKER_OBSERVABILITY_RUNTIME_FILES
+  ...WORKER_OBSERVABILITY_RUNTIME_FILES,
+  ...PREPRODUCTION_CONTROL_RUNTIME_FILES
 ];
 const RUNTIME_DIRECTORIES = ["src/http", "src/platform/regional", "src/platform/storage", "regions"];
 const EXCLUDED_RUNTIME_FILES = new Set(["playwright.config.js"]);
@@ -484,6 +574,19 @@ function buildProductionDeploymentPackage(options = {}) {
       runtimeCutoverEnabled: false,
       productionReady: false
     },
+    preproductionControls: PREPRODUCTION_CONTROL_DEFINITIONS.map((control) => ({
+      ...control,
+      configurationVariables: [...control.configurationVariables],
+      configurationTemplate: "deploy/platform-production-adapters.env.template",
+      inputBoundary: "absolute-bounded-regular-file",
+      readOnly: true,
+      externalEvidenceRequired: true,
+      cutoverExecutionAuthorized: false,
+      executionAuthorized: false,
+      runtimeCutoverEnabled: false,
+      productionPrimary: false,
+      productionReady: false
+    })),
     template: "deploy/chronic-care-platform.service.template"
   };
   const rollbackContract = {
@@ -505,8 +608,9 @@ function buildProductionDeploymentPackage(options = {}) {
     check("deploymentPackage:runtimeFiles", files.length >= 30 && REQUIRED_RUNTIME_FILES.every((name) => files.some((item) => item.path === name)), `${files.length} runtime files with required entrypoints`),
     check("deploymentPackage:digest", /^[a-f0-9]{64}$/.test(digest) && files.every((item) => /^[a-f0-9]{64}$/.test(item.sha256)), `sha256:${digest}`),
     check("deploymentPackage:secretBoundary", secretContract.valuesPersisted === false && secretContract.variables.length >= 10 && secretContract.variables.every((item) => item.name && item.persistedInArtifact === false && !("value" in item)), `${secretContract.variables.length} secret references; values persisted false`),
-    check("deploymentPackage:processContract", processContract.healthChecks.length === 4 && processContract.healthChecks.some((item) => item.route === "/api/live" && item.purpose === "process-liveness" && item.authentication === "none") && processContract.healthChecks.some((item) => item.route === "/api/health" && item.purpose === "dependency-readiness" && item.authentication === "none") && processContract.restartPolicy === "on-failure" && processContract.gracefulShutdownSeconds >= 30 && processContract.productionPreflight.productionReady === false && processContract.backgroundJobs.some((item) => item.id === "continuous-audit-delivery" && item.productionReady === false) && processContract.backgroundJobs.some((item) => item.id === "chronic-followup-durable-dispatch" && item.productionReady === false) && processContract.backgroundJobs.some((item) => item.id === "postgres-shadow-sync" && item.productionReady === false) && processContract.backgroundJobs.some((item) => item.id === "postgres-shadow-reconciliation" && item.productionReady === false), `${processContract.supervisor} / ${processContract.healthChecks.length} health checks / ${processContract.backgroundJobs.length} background jobs`),
+    check("deploymentPackage:processContract", processContract.healthChecks.length === 4 && processContract.healthChecks.some((item) => item.route === "/api/live" && item.purpose === "process-liveness" && item.authentication === "none") && processContract.healthChecks.some((item) => item.route === "/api/health" && item.purpose === "dependency-readiness" && item.authentication === "none") && processContract.restartPolicy === "on-failure" && processContract.gracefulShutdownSeconds >= 30 && processContract.productionPreflight.productionReady === false && processContract.backgroundJobs.some((item) => item.id === "continuous-audit-delivery" && item.productionReady === false) && processContract.backgroundJobs.some((item) => item.id === "chronic-followup-durable-dispatch" && item.productionReady === false) && processContract.backgroundJobs.some((item) => item.id === "postgres-shadow-sync" && item.productionReady === false) && processContract.backgroundJobs.some((item) => item.id === "postgres-shadow-reconciliation" && item.productionReady === false) && processContract.preproductionControls.length === 5 && processContract.preproductionControls.every((item) => item.readOnly === true && item.externalEvidenceRequired === true && item.cutoverExecutionAuthorized === false && item.executionAuthorized === false && item.runtimeCutoverEnabled === false && item.productionPrimary === false && item.productionReady === false), `${processContract.supervisor} / ${processContract.healthChecks.length} health checks / ${processContract.backgroundJobs.length} background jobs / ${processContract.preproductionControls.length} pre-production controls`),
     check("deploymentPackage:databaseTransition", POSTGRES_TRANSITION_RUNTIME_FILES.every((name) => files.some((item) => item.path === name)) && templateHasVariables(root, "deploy/platform-production-adapters.env.template", POSTGRES_TRANSITION_CONFIGURATION_VARIABLES) && postgresDeploymentTemplatesValid(root) && processContract.databaseTransition.productionReady === false && processContract.databaseTransition.productionPrimary === false && processContract.databaseTransition.runtimeCutoverEnabled === false && processContract.databaseTransition.activationAuthorized === false && !JSON.stringify(processContract).includes("DATABASE_URL") && secretContract.variables.some((item) => item.name === "DATABASE_URL" && !Object.hasOwn(item, "value")), "PostgreSQL transition commands, workers, hardened templates and secret boundary remain fail closed"),
+    check("deploymentPackage:preproductionControls", PREPRODUCTION_CONTROL_RUNTIME_FILES.every((name) => files.some((item) => item.path === name)) && templateHasVariables(root, "deploy/platform-production-adapters.env.template", PREPRODUCTION_CONTROL_CONFIGURATION_VARIABLES) && processContract.preproductionControls.length === 5, "five read-only pre-production control entrypoints and their runtime/configuration closure are mandatory"),
     check("deploymentPackage:rollbackContract", rollbackContract.requirePreviousArtifactDigest && rollbackContract.requireStorageBackup && rollbackContract.rollbackCommand.includes("rollback:snapshot"), "previous digest, storage backup and post-rollback health are mandatory"),
     check("deploymentPackage:provenance", Boolean(source.commit) && (!strict || !source.dirty), `${source.commit} / ${source.dirty ? "working tree dirty" : "working tree clean"}${strict ? " / strict" : ""}`)
   ];
@@ -594,8 +698,26 @@ function verifyProductionDeploymentPackage(manifest, options = {}) {
     && item.productionReady === false
     && item.productionPrimary === false
     && item.runtimeCutoverEnabled === false);
+  const preproductionControls = manifest?.processContract?.preproductionControls || [];
+  const preproductionControlsValid = preproductionControls.length === PREPRODUCTION_CONTROL_DEFINITIONS.length
+    && PREPRODUCTION_CONTROL_DEFINITIONS.every((expected) => {
+      const actual = preproductionControls.find((item) => item.id === expected.id);
+      return actual?.command === expected.command
+        && JSON.stringify(actual.configurationVariables) === JSON.stringify(expected.configurationVariables);
+    })
+    && preproductionControls.every((item) => item.configurationTemplate === "deploy/platform-production-adapters.env.template"
+      && item.inputBoundary === "absolute-bounded-regular-file"
+      && item.readOnly === true
+      && item.externalEvidenceRequired === true
+      && item.cutoverExecutionAuthorized === false
+      && item.executionAuthorized === false
+      && item.runtimeCutoverEnabled === false
+      && item.productionPrimary === false
+      && item.productionReady === false)
+    && PREPRODUCTION_CONTROL_CONFIGURATION_VARIABLES.every((name) =>
+      preproductionControls.some((item) => item.configurationVariables?.includes(name)));
   const checks = [
-    check("deploymentVerify:schema", manifest?.schemaVersion === "production-deployment-package-v1", manifest?.schemaVersion || "missing"),
+    check("deploymentVerify:schema", manifest?.schemaVersion === "production-deployment-package-v1" && manifest?.productionReady === false, manifest?.schemaVersion || "missing"),
     check("deploymentVerify:files", expectedFiles.length >= 30 && missing.length === 0 && mismatched.length === 0, `${expectedFiles.length} expected / ${missing.length} missing / ${mismatched.length} mismatched`),
     check("deploymentVerify:digest", expectedDigest === currentDigest, `expected sha256:${expectedDigest} / current sha256:${currentDigest}`),
     check("deploymentVerify:secretBoundary", secretValuesAbsent && prohibitedPaths.length === 0, prohibitedPaths.join(",") || "secret values and prohibited files absent"),
@@ -603,6 +725,7 @@ function verifyProductionDeploymentPackage(manifest, options = {}) {
     check("deploymentVerify:chronicFollowupWorker", CHRONIC_FOLLOWUP_DISPATCH_RUNTIME_FILES.every((required) => expectedFiles.some((item) => item.path === required)) && manifest?.processContract?.backgroundJobs?.some((item) => item.id === "chronic-followup-durable-dispatch" && item.productionReady === false && item.preflight === "npm run chronic:followup-dispatch-preflight" && item.sourceContract === "citizen-chronic.followup-dispatch-outbox.v1" && ["DATA_DIR", "CITIZEN_CHRONIC_FOLLOWUP_DISPATCH_SQLITE_FILE", "CITIZEN_CHRONIC_FOLLOWUP_PUBLISHER_HMAC_SECRET", "CITIZEN_CHRONIC_FOLLOWUP_ACTIVATION_REGISTRY_FILE", "CITIZEN_CHRONIC_FOLLOWUP_ACTIVATION_PUBLIC_KEY_FILE", "CITIZEN_CHRONIC_FOLLOWUP_ACTIVATION_PUBLIC_KEY_SHA256"].every((name) => item.configurationVariables?.includes(name))) && manifest?.secretContract?.variables?.some((item) => item.name === "CITIZEN_CHRONIC_FOLLOWUP_PUBLISHER_HMAC_SECRET" && !("value" in item)), "chronic followup durable worker, canonical SQLite source, activation trust and secret references are mandatory"),
     check("deploymentVerify:productionEvidenceTrust", PRODUCTION_EVIDENCE_TRUST_RUNTIME_FILES.every((required) => expectedFiles.some((item) => item.path === required)) && manifest?.processContract?.productionPreflight?.entrypoint === "node scripts/production-preflight.js --strict" && manifest?.processContract?.productionPreflight?.trustContract === "platform-governance.production-evidence-trust-decision.v1" && manifest?.processContract?.productionPreflight?.productionReady === false && ["PRODUCTION_EVIDENCE_TRUST_ANCHORS_FILE", "PRODUCTION_EVIDENCE_TRUST_ANCHORS_SHA256", "PRODUCTION_EVIDENCE_TRUST_ENVELOPE_FILE", "PRODUCTION_CUTOVER_ACTION_EVIDENCE_DIR"].every((name) => manifest?.processContract?.productionPreflight?.configurationVariables?.includes(name)), "strict preflight includes the pinned Ed25519 production and cutover-action evidence providers and remains NO-GO by default"),
     check("deploymentVerify:postgresTransition", postgresFilesPresent && postgresVariablesPresent && templateHasVariables(root, "deploy/platform-production-adapters.env.template", POSTGRES_TRANSITION_CONFIGURATION_VARIABLES) && postgresDeploymentTemplatesValid(root) && transitionFlagsClosed && postgresDatabaseUrlSecretOnly && postgresTransition?.commands?.readiness === "npm run postgres:transition-readiness" && postgresTransition?.commands?.migrationPackage === "npm run postgres:migration-package" && postgresTransition?.commands?.migrationVerify === "npm run postgres:migration-verify" && postgresTransition?.commands?.primaryReadRehearsal === "npm run postgres:primary-read-rehearsal" && postgresTransition?.commands?.adapterVerify === "npm run postgres:adapter-verify" && postgresTransition?.commands?.storageBackup === "npm run storage:backup" && postgresTransition?.commands?.storageInspect === "npm run storage:inspect" && postgresTransition?.commands?.storageAssess === "npm run storage:assess -- <backup-dir>" && postgresTransition?.commands?.shadowSync === "npm run postgres:sync-worker" && postgresTransition?.commands?.shadowReconciliation === "npm run postgres:shadow-reconcile" && postgresSyncJobValid && postgresReconciliationJobValid, "PostgreSQL transition entrypoints, variables, hardened templates, secret reference and fixed NO-GO flags are mandatory"),
+    check("deploymentVerify:preproductionControls", PREPRODUCTION_CONTROL_RUNTIME_FILES.every((required) => expectedFiles.some((item) => item.path === required)) && templateHasVariables(root, "deploy/platform-production-adapters.env.template", PREPRODUCTION_CONTROL_CONFIGURATION_VARIABLES) && preproductionControlsValid, "five read-only pre-production controls require complete runtime files, configuration references and fixed non-authorization flags"),
     check("deploymentVerify:rollback", manifest?.rollbackContract?.requirePreviousArtifactDigest === true && manifest?.rollbackContract?.requireStorageBackup === true, "rollback prerequisites declared")
   ];
   return {
@@ -703,6 +826,9 @@ if (require.main === module) {
 }
 
 module.exports = {
+  PREPRODUCTION_CONTROL_CONFIGURATION_VARIABLES,
+  PREPRODUCTION_CONTROL_DEFINITIONS,
+  PREPRODUCTION_CONTROL_RUNTIME_FILES,
   POSTGRES_TRANSITION_CONFIGURATION_VARIABLES,
   POSTGRES_RECONCILIATION_JOB_VARIABLES,
   POSTGRES_SYNC_JOB_VARIABLES,

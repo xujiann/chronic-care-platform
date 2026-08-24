@@ -78,3 +78,14 @@
   sync/reconciliation service/timer/env；缺文件、变量或伪造 ready 状态均失败关闭。
 - 当前完成的是进入受控演练前的仓库侧闭包；真实 PostgreSQL、容量、故障切换、原生恢复、回退、审批和
   现场签字仍未完成，所有生产标志保持 false。
+
+## 2026-08-25 预生产现场只读控制闭包
+
+- environment/joint-test/monitoring/rehearsal/candidate 五入口已建立命令参数闭集、descriptor 有界读取、
+  anchor 漂移校验、普通 CLI 固定 NO-GO、五账号/五 key/五公钥 Ed25519 报告信封、48 小时时效、
+  可达的 0/2/1 退出语义、
+  完整 CLI 负向矩阵与 deployment process contract。
+- 候选最多 `GO-CANDIDATE`，execution/primary/production 三类授权固定 false；不会启动 worker、切换存储、
+  执行 rollback 或写数据库。
+- 通用输入没有新增可信摘要；真实 96 双签回执、120、对象存储、监控/灾备、四方签字和现场执行继续
+  `NO-GO`，由外部系统与现场推进。

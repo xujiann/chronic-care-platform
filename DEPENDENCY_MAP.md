@@ -340,3 +340,11 @@ buildPostgresPrimaryStorageConfig + buildTransitionAssessment → 脱敏七门�
 `migration/read/adapter/storage-admin + sync/reconcile templates → production-deployment-package → verifier/deploy-check`。
 CLI 不依赖 `server.js`、HTTP、数据库 client、strict preflight、对象存储或连续审计；`DATABASE_URL` 仅从
 secret provider 注入实际命令，不进入 process contract 或评估输出。
+
+## 预生产现场控制依赖方向
+
+依赖方向为 `受控绝对路径 → descriptor 有界读取 → 既有 environment/joint-test/monitoring/rehearsal
+evaluators → 部署 anchor 漂移校验 → Ed25519 报告信封验证 → 受信宿主绑定门禁 → candidate review → 脱敏只读结果`。joint-test 的 campaign、trust registry、evidence 三个输入先
+经过同一 JSON 读取边界，再由既有 Ed25519/96 场景合同验证；alert journal 单独按 JSONL 链合同验证。
+CLI 不依赖 `server.js`、HTTP、数据库 client、worker runtime、rollback executor 或外部网络。deployment package
+只登记源码闭包、既有生产 trust-anchor 变量名称，不携带文件值、凭据或现场证据。

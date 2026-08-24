@@ -512,3 +512,39 @@ Do not enable either timer from repository automation. Even when all seven gates
 independently approved controlled rehearsal: `activationAuthorized=false`, `productionPrimary=false`,
 `runtimeCutoverEnabled=false` and `productionReady=false`. Real migration, capacity, failover, native restore,
 fallback, monitoring, approvals and site acceptance remain external blockers.
+
+## Pre-production onsite control
+
+The deployment package carries one read-only CLI with five closed commands. Each command accepts only its documented
+flags; unknown, positional, duplicate, empty, or value-bearing boolean flags fail with exit code 1 and a stable redacted
+error. A completed non-candidate evaluation exits 0 by default; `--require-ready` exits 2 when the evidence remains
+`NO-GO`. The `candidate` command always exits 2 for `NO-GO`, even if `--require-go-candidate` is omitted.
+
+```powershell
+npm.cmd run platform:preproduction:environment -- --input=<absolute-file> --release-id=<release-id> --package-fingerprint=<sha256> --require-ready
+npm.cmd run platform:preproduction:joint-test -- --campaign=<absolute-file> --trust-registry=<absolute-file> --evidence=<absolute-file> --release-id=<release-id> --package-fingerprint=<sha256> --require-ready
+npm.cmd run platform:preproduction:monitoring -- --journal=<absolute-file> --input=<absolute-file> --release-id=<release-id> --package-fingerprint=<sha256> --require-ready
+npm.cmd run platform:preproduction:rehearsal -- --input=<absolute-file> --release-id=<release-id> --package-fingerprint=<sha256> --require-ready
+npm.cmd run platform:preproduction:candidate -- --authorization=<signed-envelope> --preproduction=<signed-envelope> --joint-tests=<signed-envelope> --monitoring=<signed-envelope> --rehearsal=<signed-envelope> --release-id=<release-id> --package-fingerprint=<sha256> --require-go-candidate
+```
+
+JSON inputs and the alert journal must be absolute, bounded, ordinary non-symlink files. The reader opens a descriptor,
+performs bounded reads, and rejects path replacement that changes the opened inode. Generic files do not gain a new
+content digest from this CLI: signatures, existing evidence fingerprints, service-account permissions, and controlled
+mounts remain authoritative. The joint-test command reads campaign, trust registry, and evidence through the same
+boundary before evaluating all 12 systems × 8 scenarios, including timeout/retry and reconciliation.
+
+Monitoring requires the existing `receiver-outage-dead-letter-redrive` evidence and a closed alert journal. Rehearsal
+requires freeze, snapshot, read switch, business verification, rollback, post-rollback verification, plus outbox/
+reconciliation observation. Every command requires the operator-supplied release ID and immutable package digest and
+uses the process system clock; no CLI time override is accepted. `candidate` reads the existing
+`PRODUCTION_EVIDENCE_TRUST_ANCHORS_FILE` and digest environment contract to detect file drift, but does not treat those
+same-process values as an unreplaceable authority. It requires five at-most-48-hour, digest-bound Ed25519 report envelopes with distinct
+key IDs, accounts, and public-key fingerprints, then validates the upstream report and authorization-ledger contracts
+instead of accepting self-reported `ready` JSON. A trusted, structurally valid NO-GO set exits 2; bad signatures or
+invalid evidence exit 1. The ordinary CLI remains NO-GO/exit 2 even when these local checks pass. The external deployment-host trust
+integration required for `GO-CANDIDATE` is not implemented in this slice and remains an onsite blocker.
+Every process-contract entry fixes `cutoverExecutionAuthorized=false`, `executionAuthorized=false`,
+`runtimeCutoverEnabled=false`, `productionPrimary=false`, and `productionReady=false`. These commands do not call an
+external system, start a worker, switch storage, execute rollback, write a database, or replace four-party approval.
+Real signed evidence, 120 field integration, object storage, production monitoring, DR, and site signoff remain `NO-GO`.

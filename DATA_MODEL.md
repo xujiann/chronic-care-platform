@@ -360,3 +360,16 @@ callback 写意图中的验签证明绑定目标 gateway event，callback event/
 打开 descriptor 的内容，并返回七门布尔
 投影，不写 `data/db.json`、SQLite 或 PostgreSQL，不新增集合、表、字段、DDL 或 migration。评估通过不是
 生产数据迁移事实，也不改变 PostgreSQL/SQLite 权威关系。
+
+## 25. 预生产现场控制输入不是业务事实源
+
+environment、joint-test、monitoring、rehearsal 与 candidate 文件均为仓库外 metadata-only 输入或派生报告，
+不写 `data/db.json`、SQLite/PostgreSQL，不新增 collection、表、字段、DDL、migration、outbox 或事实 Owner。
+通用读取边界只限制绝对路径、symlink、普通文件、大小和换 inode 路径替换，不为每份文件新增可信摘要；
+联调双签、既有 evidence fingerprint、服务账号权限和现场复核继续承担真实性证明。候选聚合不持久化，
+调用方必须显式提供发布号与包指纹，candidate 用部署环境 anchor 摘要发现文件漂移，但不把同进程环境值
+当作信任授权，普通 CLI 固定 NO-GO/退出 2；它只接收五个不同
+账号、key ID、公钥材料提交且签发年龄/生命周期不超过 48 小时的 Ed25519 签名报告信封，并校验报告摘要、
+上游 schema、完整检查项和授权账本，不接受自报 ready 的 JSON。
+`cutoverExecutionAuthorized=false`、`executionAuthorized=false`、
+`runtimeCutoverEnabled=false`、`productionPrimary=false`、`productionReady=false` 固定不变。
