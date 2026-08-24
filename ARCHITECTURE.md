@@ -43,6 +43,8 @@
 - 核心数据采用 closed-world 定义，不随功能任务创建平行概念。
 - 静态内容安全边界已按 Accepted ADR 实施并合入 `main@6c18221`；Node 与 Pages 共用显式发布清单，浏览器只消费合成脱敏快照。
 - 生产 API 目录从现有 route source inventory 与授权矩阵派生；所有条目默认 `NO-GO`，静态幂等标记和仓库门禁不构成生产证据。
+- 区域共享两个 GET builder 已进入 `regional-sharing-read-model.v1`，shared-05 只通过显式 capability
+  消费；T00 继续承担跨 owner 组合，目标 bounded context 和四个集合的数据 owner 仍为 T02，生产事务与现场证据继续 NO-GO。
 - State collection 数据 owner 只来自现有 owner/system 合同；process owner 和源码引用仅作为证据。
   无明确 owner 的集合必须显式 `review-required` 或 `legacy-quarantined`，仓库检查不能授权生产晋升。
 - 关键内部边界现按 10 个职责独立组测量覆盖率：identity、audit、object storage、API governance、worker observability、区域共享、转诊、科研导出、浏览器响应头与 Safe URL；原 server.js 门禁保持不变，基线只能持平或提高，临时覆盖报告不构成浏览器页面或生产证据。

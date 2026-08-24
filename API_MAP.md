@@ -143,6 +143,12 @@ deny-before-read，19 条 GET 验证只读响应，13 条 POST 验证 payload/�
 
 ## 9. 区域共享调阅 API
 
+`GET /api/regional-data-sharing` 与 `GET /api/regional-data-sharing/handoff-report` 保持原 method/path、
+commission/institution 角色、机构可见范围、状态码和响应 shape。`shared-05` 现在通过显式
+`regional-sharing-read-model.v1` capability 构建结果：前者仍执行专用 access-review 投影后再按角色脱敏；
+后者仍在构建成功后追加一条“生成区域共享交接清单”安全审计，再执行角色脱敏。拒绝发生在读取和 builder
+之前，`latestRecords` 降序/最多五项、交接证据汇总和 Markdown 内容保持兼容。
+
 `POST /api/regional-data-sharing/access-reviews` 保持原 method/path、commission/institution 角色声明和 `shared-05` 顺序。institution 继续按精确 `orgCode` 访问来源或目标共享包；commission 在非生产兼容模式保留原有全域服务端范围并增加 `COMMISSION_LEGACY_SCOPE` blocker。成功新建仍返回 201，幂等重放返回 200，授权拒绝返回 403，版本/幂等冲突返回 409，审计或生产仓储不可用返回 503。
 
 生产请求合同为：`Idempotency-Key` 请求头，以及 `packageId`、`authorizationId`、`authorizationVersion`、`expectedVersion`、稳定 `purposeCode` 和与共享包完全相同的 `scopes`。服务端忽略客户端 `decision`、`consentStatus` 和 `note`；请求和持久化证据的过长/畸形字段均失败关闭，不做截断比较。共享包只接受明确 `ready + passed`。命令在 inbox 重放前重新核验 lifecycle、grantee、用途、范围与版本，撤销、失效或版本冲突不得复用历史 allowed 回执。单进程兼容适配器按 `packageId` 串行化 read/execute/write，避免当前全状态写入丢失；生产还必须同时满足 capability、`productionCutoverAuthorized=true`、PostgreSQL 和 atomic repository，当前注入值为 false，因此 generic JSON/SQLite 即使开启 capability 也返回 503。POST 成功/重放响应和 GET `accessReviews` 均经过专用 allowlist，不返回居民标识、授权引用/meta、用途/范围、幂等/请求摘要、关联 ID、主体标识、blocker 或共享包居民绑定载荷。非生产历史缺字段会返回 `legacyCompatibility=true`、稳定 `compatibilityBlockers`、`productionReady=false`，并设置 `Deprecation`、`Warning` 和 `X-Regional-Sharing-Compatibility`。

@@ -157,6 +157,13 @@ flowchart TB
 
 `POST /api/regional-data-sharing/access-reviews` 的 method/path、commission/institution 角色声明和 `shared-05` 全局插槽保持不变；T00 integration 切片把写决策接到 `src/platform/governance/regional-sharing-access-command.js` 的目标 T02 命令端口，并通过同目录 anti-corruption adapter 只读消费 T04 授权事实。institution 按精确 `orgCode` 调阅来源或目标共享包；commission 在非生产兼容模式保留历史全域范围并显式标记 blocker。GET 的 `accessReviews` 与 POST 响应均使用专用最小投影。
 
+两个区域共享 GET builder 已从 `server.js` 移入 `src/platform/governance/regional-sharing-read-model.js` 的
+`regional-sharing-read-model.v1` 只读端口；`shared-05` 继续保留原 URL 插槽，并通过 shared runtime context
+消费一个显式、冻结的 read-model capability。组合根只注入现有 normalize、seed、scope、handoff evidence、
+UUID 和时钟端口；鉴权先行、一次读取、专用 review 投影、角色脱敏、`latestRecords` 排序以及 handoff
+成功后追加安全审计的顺序均保持不变。该模块仍由 T00 integration 源码 owner 承载，目标 bounded context
+和四个集合的数据 owner 仍为 T02。
+
 `personalRecords[category=authorizations]` 是当前唯一居民许可事实，撤销状态在每次执行及 inbox replay 前重新读取。客户端 `decision`、`consentStatus` 和备注不参与结论。共享包只允许明确 `ready + passed`，请求与存量边界都拒绝超长或畸形证据。兼容 HTTP 层以模块级 package queue 串行化当前单进程全状态写入；这不等于跨进程事务，因此 production 还要求已授权的 PostgreSQL atomic repository，当前门禁固定 NO-GO。区域现场 evidence lifecycle 仍只证明部署/验收状态，不提供居民数据访问许可。
 
 T00 同时在 T02 `state-data` 兼容边界关闭通用写旁路：四个已登记的区域 owner 集合在 `PUT /api/state` 中只能省略或与当前服务端值深相等，集合级 legacy writer 一律拒绝。命令回执不能由 commission 删除、改写、重排或伪造追加，共享包版本和 `lastAccessReviewId` 也不能绕过命令改写。

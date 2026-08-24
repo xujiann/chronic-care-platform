@@ -144,6 +144,7 @@
     { "pattern": "src/platform/governance/technical-evidence.js", "owner": "T00" },
     { "pattern": "src/platform/governance/operational-control-runtime.js", "owner": "T00" },
     { "pattern": "src/platform/governance/regional-sharing-access-command.js", "owner": "T00" },
+    { "pattern": "src/platform/governance/regional-sharing-read-model.js", "owner": "T00" },
     { "pattern": "src/platform/governance/resident-authorization-decision-adapter.js", "owner": "T00" },
     { "pattern": "src/platform/cutover/pilot-cutover-orchestrator.js", "owner": "T00" },
     { "pattern": "src/platform/cutover/pilot-cutover-package.js", "owner": "T00" },

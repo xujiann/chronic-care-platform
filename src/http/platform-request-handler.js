@@ -1,5 +1,6 @@
 "use strict";
 
+const { createBrowserSecurityHeaders } = require("./browser-security-policy");
 const { createStaticContentRuntime } = require("./static-content-runtime");
 
 function requiredFunction(options, name) {
@@ -69,4 +70,4 @@ function createPlatformRequestHandler(options = {}) {
   };
 }
 
-module.exports = { createPlatformRequestHandler, createStaticContentRuntime };
+module.exports = { createBrowserSecurityHeaders, createPlatformRequestHandler, createStaticContentRuntime };

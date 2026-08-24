@@ -55,8 +55,9 @@ test("promotion evidence keeps frozen SQLite DDL unchanged and production cutove
   assert.equal(dataContract.productionReady, false);
 });
 
-test("legacy route remains in shared-05 while command logic has no composition-root dependency or client decision input", () => {
+test("legacy route remains in shared-05 while regional read and command ports stay independent from the composition root", () => {
   const commandSource = fs.readFileSync(path.join(ROOT, "src/platform/governance/regional-sharing-access-command.js"), "utf8");
+  const readModelSource = fs.readFileSync(path.join(ROOT, "src/platform/governance/regional-sharing-read-model.js"), "utf8");
   const authorizationAdapterSource = fs.readFileSync(path.join(ROOT, "src/platform/governance/resident-authorization-decision-adapter.js"), "utf8");
   const routeSource = fs.readFileSync(path.join(ROOT, "src/http/routes/shared.js"), "utf8");
   const routeIndexSource = fs.readFileSync(path.join(ROOT, "src/http/routes/index.js"), "utf8");
@@ -66,6 +67,9 @@ test("legacy route remains in shared-05 while command logic has no composition-r
   const readinessSource = fs.readFileSync(path.join(ROOT, "scripts/regional-data-sharing.js"), "utf8");
 
   assert.doesNotMatch(commandSource, /require\s*\(\s*["'][^"']*server(?:\.js)?["']\s*\)/);
+  assert.doesNotMatch(readModelSource, /require\s*\(\s*["'][^"']*server(?:\.js)?["']\s*\)/);
+  assert.match(readModelSource, /regional-sharing-read-model\.v1/);
+  assert.match(readModelSource, /function createRegionalSharingReadModel/);
   assert.doesNotMatch(commandSource, /payload\.(?:decision|consentStatus|note)/);
   assert.doesNotMatch(commandSource, /source\.personalRecords|record\?\.meta/);
   assert.match(authorizationAdapterSource, /data\?\.personalRecords/);
@@ -75,7 +79,8 @@ test("legacy route remains in shared-05 while command logic has no composition-r
   assert.match(commandSource, /function projectRegionalSharingAccessResponse/);
   assert.match(commandSource, /function projectRegionalSharingReadResponse/);
   assert.match(routeSource, /projectRegionalSharingAccessResponse\(result\.body\)/);
-  assert.match(routeSource, /projectRegionalSharingReadResponse\(buildRegionalDataSharingView/);
+  assert.match(routeSource, /projectRegionalSharingReadResponse\(regionalSharingReadModel\.buildRegionalDataSharingView/);
+  assert.match(routeSource, /regionalSharingReadModel\.buildRegionalHandoffReport/);
   assert.match(routeSource, /withRegionalSharingPackageWriteLock/);
   assert.match(routeIndexSource, /atomicRepositoryReady:\s*false/);
   assert.match(routeIndexSource, /productionCutoverAuthorized:\s*regionalSharingAccessDataContract\.migration\.productionCutoverAuthorized === true/);
@@ -86,11 +91,18 @@ test("legacy route remains in shared-05 while command logic has no composition-r
   assert.match(routeSource, /id: "shared-05"[\s\S]*POST" && url\.pathname === "\/api\/regional-data-sharing\/access-reviews"/);
   assert.match(routeSource, /target: "regional-sharing-access"[\s\S]*detail: result\.body\.code/);
   assert.doesNotMatch(runtimeSource, /createRegionalSharingAccessReview/);
+  assert.doesNotMatch(runtimeSource, /"buildRegionalDataSharingView"|"buildRegionalHandoffReport"/);
+  assert.match(runtimeSource, /"regionalSharingReadModel"/);
   assert.doesNotMatch(serverSource, /function createRegionalSharingAccessReview/);
+  assert.doesNotMatch(serverSource, /function buildRegionalDataSharingView|function buildRegionalHandoffReport/);
+  assert.match(serverSource, /createRegionalSharingReadModel\(\{/);
   assert.match(readinessSource, /productionReady: false/);
   assert.match(readinessSource, /postgresql-atomic-command-repository/);
+  assert.match(readinessSource, /src\/platform\/governance\/regional-sharing-read-model\.js/);
+  assert.match(readinessSource, /regionalSharingReadModel\\\.buildRegionalHandoffReport/);
 
   const protectedOwner = (file) => processWorkstreams.protectedPaths.find((item) => item.pattern === file)?.owner;
   assert.equal(protectedOwner("src/platform/governance/regional-sharing-access-command.js"), "T00");
+  assert.equal(protectedOwner("src/platform/governance/regional-sharing-read-model.js"), "T00");
   assert.equal(protectedOwner("src/platform/governance/resident-authorization-decision-adapter.js"), "T00");
 });

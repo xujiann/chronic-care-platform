@@ -188,6 +188,11 @@ legal-hold）不会再为新记录让位；这只关闭静默数据丢失，不�
 区域共享回执保存授权引用/版本、结构化用途、范围、共享包版本和稳定摘要；不保存原始幂等键或自由文本用途。展示集合 `dataAccessLogs/securityEvents` 仍受 120 条上限约束，v15 source 只保留它们今后的最小投影；区域共享的权威业务回执仍是未截断的 `regionalSharingAccessReviews`。区域切片本身未增 DDL；当前主 schema 因连续审计来源已进至 v15，其生产切换授权仍为 false。
 
 四个区域 owner 集合均为 legacy state writer 的 server-managed 字段：全量提交时只能省略或深相等，省略从现有状态恢复；集合级写入被拒绝。该规则同时保护 receipt 顺序/原值以及 package `version`、`lastAccessReviewId`，避免客户端绕过命令 CAS。演示 reset 仅允许非生产，生产固定失败关闭。
+
+`regional-sharing-read-model.v1` 只读取上述四个区域集合及既有 residents、诊断报告、个人记录、互认记录和
+接口契约投影；它不创建集合、表、字段、DDL、migration、审计事实或缓存。交接清单的 report ID 和生成时间
+只存在响应及既有安全审计投影中，不成为新的事实源；本次 builder 归位不改变 SQLite v16 head、JSON/SQLite/
+PostgreSQL 拓扑或任何 data owner。
 ## 10. 健康驾驶舱指标测量
 
 `population-service-visits.v1` 是代码内版本化逻辑合同，不新增集合、表、DDL 或 migration。

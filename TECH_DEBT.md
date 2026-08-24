@@ -92,7 +92,9 @@
 - `regionalSharingPackages` 与回执仍通过全状态 JSON/SQLite payload 写入；模块级 package queue 已消除当前单进程并发丢写，但不提供跨进程事务，生产必须绑定 PostgreSQL atomic repository，当前门禁继续 NO-GO。
 - legacy full-state writer 已拒绝区域集合删改并在省略时保留，生产 reset 也已关闭；非生产 demo reset 仍会恢复 seed，因此演示环境不提供跨 reset 的永久保全，不能作为法定生产 WORM 证据。
 - 历史共享包缺少 `regionCode`、`version`、`requiredAuthorizationScopes`，历史授权缺少 grantee/purpose/scopes/version；非生产兼容不能替代回填与核对。
-- 两个区域共享 GET builder 和 `shared-05` 混合路由尚未移交 T02；当前只完成 access command 的唯一实现，不能宣称整个区域共享模块已解耦。
+- 两个区域共享 GET builder 已归位到 `regional-sharing-read-model.v1` 并从 shared runtime 的两个散函数收敛为
+  一个 capability；`shared-05` 仍是混合兼容路由，legacy normalize/seed/handoff evidence 仍由组合根注入，
+  三个 regional-sharing governance 源文件也仍由 T00 integration 保护，因此不能宣称整个区域共享模块已解耦或已正式完成源码 owner 移交。
 - 仍需生产级 role × org × region × purpose × scope × revoke 运行矩阵、真实多实例并发冲突、遮罩全量迁移/回滚及不可变外部审计留存证据。
 - 通用 `dataAccessLogs/securityEvents` 仍只有 120 条保留窗口；未截断 access receipt 是当前权威历史，长期 WORM/SIEM 留存仍待生产适配。
 ## 健康驾驶舱指标治理状态

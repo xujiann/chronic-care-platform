@@ -249,6 +249,11 @@ route segment`。它用注入 spy 验证授权、读取、构建、审计、持�
 
 当前方向为 `shared-05 兼容 HTTP 适配器 → regional-sharing-access-command.v1（目标 T02） → resident-authorization-decision.v1 anti-corruption adapter → T04 授权状态/lifecycle`，居民范围、审计和持久化继续作为注入端口。T00 integration 拥有本次跨 owner 接线；命令不直接读取 `personalRecords.meta`、不导入 `server.js`，旧 `createRegionalSharingAccessReview` 已从组合根和 shared runtime context 删除。
 
+只读方向现为 `shared-05 → shared runtime regionalSharingReadModel capability → regional-sharing-read-model.v1
+→ 注入的 legacy normalize/seed/scope/handoff evidence/UUID/clock ports`。read model 不导入组合根、HTTP route、
+存储实现或写命令；shared context 的两个散 builder 依赖已收敛为一个冻结 capability。`readDatabase`、
+review allowlist、角色脱敏和 handoff 安全审计仍位于兼容 HTTP 边界，避免读模型取得身份或持久化职责。
+
 数据依赖为 `T02 regionalSharingPackages/accessReviews → resident-authorization-decision.v1 → T04 personalRecords`。反向只允许 T04/identity-security 消费 `regional-sharing-access-receipt.v1`，不得由 T02 写授权事实。单进程 package queue 只保护当前兼容适配器，生产仍因 `productionCutoverAuthorized=false`、非 PostgreSQL 或 atomic repository 缺失而失败关闭；regional site evidence lifecycle 不进入授权决策。
 
 遗留状态写方向被限制为 `commission PUT /api/state → state-data guard → 非区域集合`：四个区域 owner 集合只能省略或深相等，不能流入 `normalizeState/writeDatabase`；`/api/state-collections/:collection` 同样拒绝它们。`POST /api/reset` 只在非生产到达 seed/write，production 在边界失败关闭。
