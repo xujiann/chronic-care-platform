@@ -83,3 +83,11 @@
 callback 持久化守卫要求由 HMAC 验签器生成且绑定目标 gateway event 的进程内 attestation，并全账本拒绝 callback event/nonce 跨账项重放；attestation 不落库或出现在响应中。成功 finalize 必须携带与 gateway type、operation、status 一致的 provider receipt 和 dispatchedAt，失败 finalize 必须携带稳定失败码、失败时间、死信原因和死信标记。
 
 该扩展不新增 schema、migration、dependency、outbox、PG adapter 或第二套 gateway。进程写尾只覆盖当前 Node 实例，外调成功而本地提交失败仍是必须由真实 provider 对账和生产存储设计处理的边界；因此不宣称跨实例 exactly-once。真实支付/医保/证照 provider、凭据和网络、PostgreSQL 多实例耐久性、对账回执及现场证据仍未关闭；合同继续 `productionReady=false`、`externalEvidenceRequired=true`、`distributedExactlyOnceClaimed=false`，593 项全部 `NO-GO`。
+
+## 2026-08-24 T07 formal grouping create 扩展
+
+在本 ADR 已接受的逐 endpoint 机制内，注册表新增第 12 份合同，只登记 `POST /api/disease-payment/formal-grouping/jobs`。现有 session/RBAC 和保险支付职责校验保持不变，并在业务读库前显式拒绝非市级的 commission scope；只有 city/health-admin/platform 与 insurance bureau/center 可以创建正式分组作业。body 幂等键存在时按其摘要建立当前进程命令尾，缺省键则保守串行；锁内读取最新 `diseasePayment`，精确重放返回既有 job/envelope、HTTP 200 且不再次写库，同键异模式/方案/病例快照返回稳定 409。
+
+新建作业继续使用既有 `createFormalGroupingJob` 与 queued job/envelope 形状，成功 HTTP 201 不变。queued job 与链式 `securityEvents` 审计在同一快照中只调用一次 `writeDatabase`；SQLite 复用 `storageMeta.collectionVersions` 与既有事务 CAS，冲突映射为稳定脱敏 409。body/validation、资源范围、病例不存在、幂等/标识冲突、完整性和未知存储失败均建立稳定错误 code，内部存储错误正文不返回。正式分组没有新的外部消息提交语义，因此不虚构 outbox；queued job 本身仍是既有耐久工作事实。
+
+该扩展不新增 schema、migration、dependency、outbox、worker、PG adapter 或第二套状态机。进程命令尾只覆盖当前 Node 实例，SQLite CAS 也不构成跨实例 exactly-once。真实正式分组器 endpoint、凭据/证书、签名回执、PostgreSQL 多实例、worker 运维与现场验收仍未关闭；合同继续 `productionReady=false`、`externalEvidenceRequired=true`、`distributedExactlyOnceClaimed=false`，593 项全部 `NO-GO`。

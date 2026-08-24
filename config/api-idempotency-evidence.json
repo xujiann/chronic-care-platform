@@ -5,47 +5,7 @@
     "unregisteredWriteStatus": "behavior-proof-required",
     "productionPromotionAllowed": false
   },
-  "reviewedProofRequired": [
-    {
-      "reviewId": "T07-formal-grouping-job-20260823",
-      "key": "POST /api/disease-payment/formal-grouping/jobs",
-      "method": "POST",
-      "path": "/api/disease-payment/formal-grouping/jobs",
-      "owner": "T07",
-      "domain": "insurance-payment",
-      "missingProof": [
-        "resource-scope",
-        "cas-or-concurrency",
-        "stable-error-contract",
-        "atomic-audit-or-outbox"
-      ],
-      "evidence": [
-        {
-          "file": "src/http/routes/insurance-payment.js",
-          "anchors": [
-            "url.pathname === \"/api/disease-payment/formal-grouping/jobs\"",
-            "authorizeInsurancePaymentAction(\"formal-grouping.create\""
-          ]
-        },
-        {
-          "file": "disease-payment-intake.js",
-          "anchors": [
-            "function createFormalGroupingJob",
-            "正式分组作业幂等键已绑定不同",
-            "idempotent: true"
-          ]
-        },
-        {
-          "file": "test/insurance-payment-formal-grouper-projection.test.js",
-          "anchors": [
-            "formal grouper idempotency key cannot alias a different case snapshot",
-            "幂等键已绑定不同"
-          ]
-        }
-      ],
-      "productionReady": false
-    }
-  ],
+  "reviewedProofRequired": [],
   "contracts": [
     {
       "contractId": "identity-security.sms-delivery-callback-idempotency.v1",
@@ -1100,6 +1060,112 @@
             "serializes same-record concurrent equal and conflicting commands",
             "commits record receipt and three audit projections in one write",
             "redacts persistence failures and maps SQLite CAS without fallback audit write"
+          ]
+        }
+      ],
+      "productionReady": false,
+      "externalEvidenceRequired": true
+    },
+    {
+      "contractId": "insurance-payment.formal-grouping-create-command.v1",
+      "key": "POST /api/disease-payment/formal-grouping/jobs",
+      "method": "POST",
+      "path": "/api/disease-payment/formal-grouping/jobs",
+      "owner": "T07",
+      "domain": "insurance-payment",
+      "purpose": "create-durable-formal-grouping-job",
+      "customAuthenticationEvidence": false,
+      "authentication": {
+        "required": true,
+        "mechanism": "bearer-or-cookie-session",
+        "principalType": "platform-user",
+        "credentialSource": ["header:authorization", "cookie:session"],
+        "replayCsrf": {
+          "replayProtection": "body-idempotency-key-or-canonical-case-snapshot-digest-plus-in-process-command-lock",
+          "csrf": "platform-session-transport-policy"
+        }
+      },
+      "authorization": {
+        "model": "platform-rbac-plus-insurance-responsibility-and-city-level-resource-scope",
+        "roles": ["insurance", "commission"],
+        "dataScope": "city or health-admin platform; insurance bureau or insurance center"
+      },
+      "coverage": {
+        "level": "endpoint",
+        "selector": "entire-route",
+        "actions": ["formal-grouping.create"],
+        "unverifiedRemainder": false
+      },
+      "idempotency": {
+        "key": "body:idempotencyKey-or-derived-mode-schemeVersion-caseSnapshots-digest",
+        "payloadBinding": ["mode", "schemeVersion", "caseSnapshots"],
+        "exactReplay": "returns the persisted queued or later-state job with idempotent=true and status 200 without another state or audit write",
+        "conflictingReuse": "FORMAL_GROUPING_JOB_IDEMPOTENCY_CONFLICT",
+        "persistenceScope": "diseasePayment.formalGroupingJobs durable queued job plus one chained securityEvents entry in one platform state write",
+        "distributedExactlyOnceClaimed": false
+      },
+      "concurrency": {
+        "cas": {
+          "required": true,
+          "field": "per-idempotency-key in-process command tail plus SQLite storageMeta.collectionVersions",
+          "conflictCodes": ["FORMAL_GROUPING_JOB_VERSION_CONFLICT"]
+        }
+      },
+      "errors": [
+        { "code": "FORMAL_GROUPING_JOB_BODY_INVALID", "status": 400 },
+        { "code": "FORMAL_GROUPING_JOB_INVALID", "status": 400 },
+        { "code": "FORMAL_GROUPING_CASE_SCOPE_DENIED", "status": 403 },
+        { "code": "FORMAL_GROUPING_CASE_NOT_FOUND", "status": 404 },
+        { "code": "FORMAL_GROUPING_JOB_IDEMPOTENCY_CONFLICT", "status": 409 },
+        { "code": "FORMAL_GROUPING_JOB_ID_CONFLICT", "status": 409 },
+        { "code": "FORMAL_GROUPING_JOB_CORRELATION_CONFLICT", "status": 409 },
+        { "code": "FORMAL_GROUPING_JOB_INTEGRITY_CONFLICT", "status": 409 },
+        { "code": "FORMAL_GROUPING_JOB_VERSION_CONFLICT", "status": 409 },
+        { "code": "FORMAL_GROUPING_JOB_STORAGE_FAILED", "status": 500 }
+      ],
+      "audit": {
+        "accepted": "commits one durable queued grouping job and one chained security event in the same platform state write",
+        "replay": "returns the persisted job and envelope without another job or audit write",
+        "rejected": "identity, responsibility and city-level resource scope stop before body or business-state access; validation and conflicts do not write; a failed state write is redacted and has no fallback audit write"
+      },
+      "implementationEvidence": [
+        {
+          "file": "src/http/routes/insurance-payment.js",
+          "anchors": [
+            "function formalGroupingCreateScopeAllowed",
+            "function withFormalGroupingCreateLock",
+            "FORMAL_GROUPING_JOB_VERSION_CONFLICT",
+            "if (created.idempotent) return created",
+            "data.securityEvents = prependAuditTrailEntry"
+          ]
+        },
+        {
+          "file": "disease-payment-intake.js",
+          "anchors": [
+            "function createFormalGroupingJob",
+            "正式分组作业幂等键已绑定不同",
+            "idempotent: true"
+          ]
+        },
+        {
+          "file": "server.js",
+          "anchors": [
+            "function verifySqliteCollectionVersions",
+            "SQLite optimistic lock conflict on",
+            "db.exec(\"COMMIT\")"
+          ]
+        }
+      ],
+      "testEvidence": [
+        {
+          "file": "test/formal-grouping-job-route-contract.test.js",
+          "anchors": [
+            "rejects district commission scope before body or state access",
+            "exact replay is read-only and preserves one durable job and audit",
+            "serializes concurrent replay and conflicting reuse",
+            "commits queued job and chained audit in one write",
+            "returns stable validation, not-found and conflict errors",
+            "maps CAS and storage failures without leaking internal details"
           ]
         }
       ],

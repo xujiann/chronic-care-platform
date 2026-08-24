@@ -237,9 +237,9 @@ source/sink contract、目标摘要、cursor/source hash 与 receipt 摘要；ch
 
 目录中的源码 marker 既不是认证证明，也不是幂等执行证据；只有 owner、控制流锚点和可执行负向测试一致时才产生认证 evidence contract。认证分类只描述 AS-IS 的 required/optional/none、凭据来源、replay/CSRF 和 scope，不代表目标政策充分或生产安全。幂等 `behavior-verified` 仍只证明当前仓库行为，不证明跨实例 exactly-once 或生产耐久性；所有生产状态继续 `NO-GO`。
 
-API-002 的 existing-proof 扩展现使注册表达到 11 份合同。新增 T07 financial dispatch 合同继续复用 `integrationGatewayEvents`、`securityEvents`、既有 gateway adapter 与状态写入端口；第一次状态写以 `reserve` 意图把既有 event shape 的 `dispatching` reservation 持久化，第二次状态写以 `finalize` 意图从新快照替换最终事件并追加审计。`id ↔ idempotencyKey ↔ requestDigest` 为不可变绑定，状态转换必须显式属于 reserve/finalize/callback/retry/manual-dead-letter；callback 仅追加 evidence 与更新 provider projection，不能改写 dispatch lifecycle，manual dead-letter 仅能标记 failed。普通全状态写只能保留已持久化金融事件，SQLite 会在同一写事务内基于最新 collection 再次合并和校验。金融事件有显式容量上限，语法错误或非数组的 JSON/SQLite payload 均失败关闭；利用率、余量、80% warning 与 95% critical 进入 operations/Prometheus，禁止自动淘汰，归档/扩容需 migration 与审批。没有新增集合、表、字段、DDL、migration、outbox 或事实源；显式金融 SQLite 写必须携带有效的 `storageMeta.collectionVersions.integrationGatewayEvents`，JSON 兼容路径由短时状态写锁保护，不能据此宣称跨实例 exactly-once。相关集合的既有 owner 状态未改变，两个转诊 action-slice 仍不能晋升通用 endpoint。
+API-002 的 existing-proof 扩展现使注册表达到 12 份合同。T07 financial dispatch 合同继续复用 `integrationGatewayEvents`、`securityEvents`、既有 gateway adapter 与状态写入端口并保持 reservation/finalize/CAS 边界。新增 formal grouping create 合同不改变数据模型：仍只写既有 `diseasePayment.formalGroupingJobs` 和 `securityEvents`，queued job 与链式审计在同一个全状态快照中由一次 `writeDatabase` 提交；精确重放不写。SQLite 继续消费 `storageMeta.collectionVersions` 做事务内乐观锁，JSON 兼容路径只受当前进程的按幂等键命令尾保护。没有新增集合、表、字段、DDL、migration、outbox 或事实源，也不宣称跨实例 exactly-once；相关集合 owner、正式分组适配器与生产 PostgreSQL 状态均未改变。
 
-T07 第二批审计的 `reviewedProofRequired` 现只保留 formal grouping job。financial reconciliation 与 financial dispatch 的拒绝记录均已在相应评审变更中由直接行为合同替换；机器验证仍禁止拒绝记录和正式合同同 key 并存。
+T07 第二批审计的 3 条 `reviewedProofRequired` 已全部由直接 endpoint 行为合同替换；formal grouping create 最后关闭资源范围、并发/CAS、稳定错误和原子审计证据缺口。机器验证仍禁止拒绝记录和正式合同同 key 并存，当前 `reviewedProofRequired` 为 0。
 
 ## 14. 内部边界覆盖率数据边界
 

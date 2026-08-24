@@ -15,12 +15,29 @@ function clone(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
+function formalGroupingReviewFixture() {
+  return {
+    reviewId: "forged-formal-grouping-review",
+    key: "POST /api/disease-payment/formal-grouping/jobs",
+    method: "POST",
+    path: "/api/disease-payment/formal-grouping/jobs",
+    owner: "T07",
+    domain: "insurance-payment",
+    missingProof: ["resource-scope"],
+    evidence: [{
+      file: "src/http/routes/insurance-payment.js",
+      anchors: ["function formalGroupingCreateScopeAllowed"]
+    }],
+    productionReady: false
+  };
+}
+
 test("idempotency evidence registry validates only directly proven endpoint and action-slice contracts", () => {
   assert.deepEqual(validateEvidenceRegistry(), []);
-  assert.equal(DEFAULT_REGISTRY.contracts.length, 11);
-  assert.equal(endpointEvidenceContracts().length, 9);
+  assert.equal(DEFAULT_REGISTRY.contracts.length, 12);
+  assert.equal(endpointEvidenceContracts().length, 10);
   assert.equal(actionSliceEvidenceContracts().length, 2);
-  assert.equal(proofRequiredReviews().length, 1);
+  assert.equal(proofRequiredReviews().length, 0);
   assert.equal(DEFAULT_REGISTRY.contracts[0].key, "POST /api/auth/sms-delivery-callback");
   assert.equal(DEFAULT_REGISTRY.contracts[0].owner, "T01");
   assert.equal(DEFAULT_REGISTRY.contracts.every((contract) => contract.productionReady === false), true);
@@ -39,33 +56,30 @@ test("idempotency evidence registry validates only directly proven endpoint and 
     "POST /api/financial-gateways/dispatch",
     "POST /api/financial-gateways/reconciliation-runs",
     "POST /api/security/controls/:id/actions",
-    "POST /api/quality-operations-governance/items/:id/actions"
+    "POST /api/quality-operations-governance/items/:id/actions",
+    "POST /api/disease-payment/formal-grouping/jobs"
   ]);
 });
 
-test("remaining reviewed T07 candidate stays proof-required after financial dispatch closure", () => {
-  const expected = [
-    "POST /api/disease-payment/formal-grouping/jobs"
-  ];
-  assert.deepEqual(proofRequiredReviews().map((review) => review.key), expected);
-
+test("formal grouping create replaces the final reviewed T07 proof gap with endpoint evidence", () => {
+  const key = "POST /api/disease-payment/formal-grouping/jobs";
+  assert.deepEqual(proofRequiredReviews(), []);
   const catalog = buildProductionApiCatalog();
-  for (const key of expected) {
-    assert.equal(DEFAULT_REGISTRY.contracts.some((contract) => contract.key === key), false, key);
-    const entry = catalog.entries.find((candidate) => candidate.key === key);
-    assert.ok(entry, key);
-    assert.equal(entry.idempotency.behaviorEvidence.status, "behavior-proof-required", key);
-    assert.equal(entry.production.repositoryReview, "review-required", key);
-    assert.equal(entry.production.status, "NO-GO", key);
-  }
+  const contract = DEFAULT_REGISTRY.contracts.find((candidate) => candidate.key === key);
+  const entry = catalog.entries.find((candidate) => candidate.key === key);
+  assert.equal(contract.contractId, "insurance-payment.formal-grouping-create-command.v1");
+  assert.equal(contract.idempotency.distributedExactlyOnceClaimed, false);
+  assert.equal(entry.idempotency.behaviorEvidence.status, "behavior-verified");
+  assert.equal(entry.production.repositoryReview, "catalogued");
+  assert.equal(entry.production.status, "NO-GO");
 });
 
 test("catalog promotes only whole endpoints and retains generic action routes as review-required", () => {
   const catalog = buildProductionApiCatalog();
-  assert.equal(catalog.summary.writeIdempotencyBehaviorVerified, 9);
+  assert.equal(catalog.summary.writeIdempotencyBehaviorVerified, 10);
   assert.equal(catalog.summary.writeIdempotencyActionSlicesVerified, 2);
-  assert.equal(catalog.summary.writeIdempotencyBehaviorProofRequired, 324);
-  assert.equal(catalog.summary.reviewRequired, 326);
+  assert.equal(catalog.summary.writeIdempotencyBehaviorProofRequired, 323);
+  assert.equal(catalog.summary.reviewRequired, 325);
 
   for (const key of [
     "POST /api/auth/sms-delivery-callback",
@@ -76,7 +90,8 @@ test("catalog promotes only whole endpoints and retains generic action routes as
     "POST /api/financial-gateways/dispatch",
     "POST /api/financial-gateways/reconciliation-runs",
     "POST /api/security/controls/:id/actions",
-    "POST /api/quality-operations-governance/items/:id/actions"
+    "POST /api/quality-operations-governance/items/:id/actions",
+    "POST /api/disease-payment/formal-grouping/jobs"
   ]) {
     const entry = catalog.entries.find((candidate) => candidate.key === key);
     assert.equal(entry.idempotency.behaviorEvidence.status, "behavior-verified", key);
@@ -119,6 +134,11 @@ test("catalog promotes only whole endpoints and retains generic action routes as
   assert.deepEqual(qualityGovernance.authorization.roles, ["commission", "institution", "insurance"]);
   assert.equal(qualityGovernance.production.repositoryReview, "catalogued");
   assert.equal(qualityGovernance.production.status, "NO-GO");
+  const formalGrouping = catalog.entries.find((entry) => entry.key === "POST /api/disease-payment/formal-grouping/jobs");
+  assert.equal(formalGrouping.idempotency.behaviorEvidence.contractId, "insurance-payment.formal-grouping-create-command.v1");
+  assert.deepEqual(formalGrouping.authorization.roles, ["commission", "insurance"]);
+  assert.equal(formalGrouping.production.repositoryReview, "catalogued");
+  assert.equal(formalGrouping.production.status, "NO-GO");
   for (const runtimePolicy of catalog.entries.filter((entry) => entry.owner === "T07" && entry.routeResolution === "runtime-policy" && entry.idempotency.required)) {
     assert.equal(runtimePolicy.idempotency.behaviorEvidence.status, "behavior-proof-required", runtimePolicy.key);
     assert.deepEqual(runtimePolicy.idempotency.behaviorEvidence.verifiedActionContracts, [], runtimePolicy.key);
@@ -164,20 +184,16 @@ test("idempotency evidence registry rejects marker promotion, production promoti
   assert.match(validateEvidenceRegistry(missingRefundConflict).join("\n"), /replay and conflict behavior required/);
 
   const forgedReviewedPromotion = clone(DEFAULT_REGISTRY);
-  forgedReviewedPromotion.contracts.push({
-    ...clone(forgedReviewedPromotion.contracts[0]),
-    contractId: "forged-reviewed-promotion",
-    key: "POST /api/disease-payment/formal-grouping/jobs",
-    method: "POST",
-    path: "/api/disease-payment/formal-grouping/jobs"
-  });
+  forgedReviewedPromotion.reviewedProofRequired.push(formalGroupingReviewFixture());
   assert.match(validateEvidenceRegistry(forgedReviewedPromotion).join("\n"), /cannot coexist with behavior contract/);
 
   const missingReviewReason = clone(DEFAULT_REGISTRY);
+  missingReviewReason.reviewedProofRequired.push(formalGroupingReviewFixture());
   missingReviewReason.reviewedProofRequired[0].missingProof = [];
   assert.match(validateEvidenceRegistry(missingReviewReason).join("\n"), /invalid proof-required review reasons/);
 
   const missingReviewAnchor = clone(DEFAULT_REGISTRY);
+  missingReviewAnchor.reviewedProofRequired.push(formalGroupingReviewFixture());
   missingReviewAnchor.reviewedProofRequired[0].evidence[0].anchors.push("this reviewed proof anchor does not exist");
   assert.match(validateEvidenceRegistry(missingReviewAnchor).join("\n"), /missing evidence anchor/);
 });
