@@ -1,5 +1,246 @@
 "use strict";
 
+const { createHash } = require("node:crypto");
+
+const publicHealthSignalCommandTails = new Map();
+const PUBLIC_HEALTH_SIGNAL_ALLOWED_ORG_TYPES = new Set(["city", "health_admin", "district"]);
+
+function stableStringify(value) {
+  if (Array.isArray(value)) return `[${value.map((item) => stableStringify(item)).join(",")}]`;
+  if (value && typeof value === "object") {
+    return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${stableStringify(value[key])}`).join(",")}}`;
+  }
+  return JSON.stringify(value);
+}
+
+function sha256(value) {
+  return createHash("sha256").update(String(value)).digest("hex");
+}
+
+function withPublicHealthSignalCommandLock(commandKeyHash, work) {
+  const previous = publicHealthSignalCommandTails.get(commandKeyHash) || Promise.resolve();
+  const pending = previous.then(work, work);
+  const tail = pending.then(() => undefined, () => undefined);
+  publicHealthSignalCommandTails.set(commandKeyHash, tail);
+  tail.finally(() => {
+    if (publicHealthSignalCommandTails.get(commandKeyHash) === tail) publicHealthSignalCommandTails.delete(commandKeyHash);
+  });
+  return pending;
+}
+
+function publicHealthSignalError(code, message) {
+  return Object.assign(new Error(message), { code });
+}
+
+function boundedText(value, field, options = {}) {
+  if (value === undefined && options.optional) return "";
+  if (typeof value !== "string") throw publicHealthSignalError("PUBLIC_HEALTH_SIGNAL_INVALID", `${field} must be a string`);
+  const normalized = value.trim();
+  if ((!normalized && !options.allowEmpty) || normalized.length > (options.maxLength || 200)) {
+    throw publicHealthSignalError("PUBLIC_HEALTH_SIGNAL_INVALID", `${field} is invalid`);
+  }
+  return normalized;
+}
+
+function canonicalOrganizationCode(payload = {}) {
+  const sourceOrgCode = payload.sourceOrgCode === undefined
+    ? ""
+    : boundedText(payload.sourceOrgCode, "sourceOrgCode", { maxLength: 80 });
+  const institutionCode = payload.institutionCode === undefined
+    ? ""
+    : boundedText(payload.institutionCode, "institutionCode", { maxLength: 80 });
+  if (sourceOrgCode && institutionCode && sourceOrgCode.toUpperCase() !== institutionCode.toUpperCase()) {
+    throw publicHealthSignalError("PUBLIC_HEALTH_SIGNAL_INVALID", "source organization codes conflict");
+  }
+  return (sourceOrgCode || institutionCode).toUpperCase();
+}
+
+function requirePublicHealthSignalPayload(payload) {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    throw publicHealthSignalError("PUBLIC_HEALTH_SIGNAL_INVALID", "signal body must be an object");
+  }
+  const sourceType = boundedText(payload.sourceType, "sourceType", { maxLength: 40 });
+  const value = payload.value;
+  if (typeof value !== "number" || !Number.isFinite(value) || value < 0) {
+    throw publicHealthSignalError("PUBLIC_HEALTH_SIGNAL_INVALID", "value must be a non-negative number");
+  }
+  if (payload.baseline !== undefined && (typeof payload.baseline !== "number" || !Number.isFinite(payload.baseline))) {
+    throw publicHealthSignalError("PUBLIC_HEALTH_SIGNAL_INVALID", "baseline must be a finite number");
+  }
+  for (const field of ["id", "idempotencyKey", "ruleId", "sourceSystem", "metric", "unit", "region", "institution"]) {
+    if (payload[field] !== undefined) boundedText(payload[field], field, { maxLength: field === "idempotencyKey" ? 160 : 200 });
+  }
+  if (payload.observedAt !== undefined) {
+    const observedAt = boundedText(payload.observedAt, "observedAt", { maxLength: 80 });
+    if (!Number.isFinite(Date.parse(observedAt))) throw publicHealthSignalError("PUBLIC_HEALTH_SIGNAL_INVALID", "observedAt must be a valid timestamp");
+  }
+  for (const field of ["x", "y"]) {
+    if (payload[field] !== undefined && (typeof payload[field] !== "number" || !Number.isFinite(payload[field]))) {
+      throw publicHealthSignalError("PUBLIC_HEALTH_SIGNAL_INVALID", `${field} must be a finite number`);
+    }
+  }
+  if (payload.evidenceRefs !== undefined && (
+    !Array.isArray(payload.evidenceRefs)
+    || payload.evidenceRefs.length > 12
+    || payload.evidenceRefs.some((item) => typeof item !== "string" || !item.trim() || item.trim().length > 200)
+  )) {
+    throw publicHealthSignalError("PUBLIC_HEALTH_SIGNAL_INVALID", "evidenceRefs must contain at most 12 non-empty strings");
+  }
+  return {
+    payload,
+    sourceType,
+    sourceOrgCode: canonicalOrganizationCode(payload)
+  };
+}
+
+function canonicalPublicHealthSignalRequest(validated) {
+  const payload = validated.payload;
+  return {
+    id: payload.id === undefined ? "" : String(payload.id).trim(),
+    ruleId: payload.ruleId === undefined ? "" : String(payload.ruleId).trim(),
+    sourceType: validated.sourceType,
+    sourceSystem: payload.sourceSystem === undefined ? "人工上报" : String(payload.sourceSystem).trim(),
+    metric: payload.metric === undefined ? "manual-signal" : String(payload.metric).trim(),
+    value: payload.value,
+    baseline: payload.baseline === undefined ? 0 : payload.baseline,
+    unit: payload.unit === undefined ? "条" : String(payload.unit).trim(),
+    region: payload.region === undefined ? "未分区" : String(payload.region).trim(),
+    institution: payload.institution === undefined ? "待核实机构" : String(payload.institution).trim(),
+    observedAt: payload.observedAt === undefined ? "" : String(payload.observedAt).trim(),
+    location: {
+      x: Math.max(5, Math.min(95, payload.x === undefined ? 50 : payload.x || 50)),
+      y: Math.max(5, Math.min(90, payload.y === undefined ? 50 : payload.y || 50))
+    },
+    evidenceRefs: Array.isArray(payload.evidenceRefs) ? payload.evidenceRefs.map((item) => item.trim()) : [],
+    sourceOrgCode: validated.sourceOrgCode
+  };
+}
+
+function publicHealthSignalScopeDecision(user = {}, sourceOrgCode = "") {
+  const orgType = String(user.orgType || "").trim().toLowerCase();
+  const orgCode = String(user.orgCode || "").trim().toUpperCase();
+  if (!PUBLIC_HEALTH_SIGNAL_ALLOWED_ORG_TYPES.has(orgType) || !orgCode) return false;
+  if (orgType === "city" || orgType === "health_admin") return true;
+  if (!sourceOrgCode) return false;
+  const allowed = new Set([
+    orgCode,
+    ...(Array.isArray(user.publicHealthHospitalCodes) ? user.publicHealthHospitalCodes : [])
+      .map((item) => String(item || "").trim().toUpperCase())
+      .filter(Boolean)
+  ]);
+  return allowed.has(sourceOrgCode);
+}
+
+function publicHealthSignalCommandIdentity(req, user, validated) {
+  const canonicalRequest = canonicalPublicHealthSignalRequest(validated);
+  const headerKey = Array.isArray(req.headers?.["idempotency-key"])
+    ? req.headers["idempotency-key"][0]
+    : req.headers?.["idempotency-key"];
+  const explicitHeaderKey = headerKey === undefined ? "" : boundedText(headerKey, "Idempotency-Key", { maxLength: 160 });
+  const bodyKey = validated.payload.idempotencyKey === undefined ? "" : String(validated.payload.idempotencyKey).trim();
+  const bodyId = validated.payload.id === undefined ? "" : String(validated.payload.id).trim();
+  const selectedKey = explicitHeaderKey || bodyKey || bodyId || `canonical:${sha256(stableStringify(canonicalRequest))}`;
+  const actorScope = {
+    role: String(user.role || "").trim(),
+    orgType: String(user.orgType || "").trim().toLowerCase(),
+    orgCode: String(user.orgCode || "").trim().toUpperCase()
+  };
+  return {
+    commandKeyHash: sha256(stableStringify({ actorScope, selectedKey })),
+    requestDigest: sha256(stableStringify(canonicalRequest)),
+    canonicalRequest
+  };
+}
+
+function projectPublicHealthSignal(signal = {}) {
+  const { commandKeyHash, requestDigest, ...publicSignal } = signal;
+  return publicSignal;
+}
+
+function projectPublicHealthSignalHighlights(highlights, user) {
+  if (String(user.orgType || "").trim().toLowerCase() !== "district") return highlights;
+  const allowedCodes = new Set([
+    String(user.orgCode || "").trim().toUpperCase(),
+    ...(Array.isArray(user.publicHealthHospitalCodes) ? user.publicHealthHospitalCodes : [])
+      .map((item) => String(item || "").trim().toUpperCase())
+      .filter(Boolean)
+  ]);
+  const signals = (Array.isArray(highlights.triggerCenter?.signals) ? highlights.triggerCenter.signals : [])
+    .filter((item) => allowedCodes.has(String(item.sourceOrgCode || "").trim().toUpperCase()));
+  const signalIds = new Set(signals.map((item) => item.id));
+  const alerts = (Array.isArray(highlights.triggerCenter?.alerts) ? highlights.triggerCenter.alerts : [])
+    .filter((item) => {
+      const linkedSignalIds = Array.isArray(item.signalIds) ? item.signalIds : [];
+      return linkedSignalIds.length > 0 && linkedSignalIds.every((id) => signalIds.has(id));
+    });
+  const alertIds = new Set(alerts.map((item) => item.id));
+  const nodes = (Array.isArray(highlights.mapBoard?.nodes) ? highlights.mapBoard.nodes : [])
+    .filter((item) => (item.type === "signal" && signalIds.has(item.id)) || (item.type === "alert" && alertIds.has(item.id)));
+  const regions = [...new Set(nodes.map((item) => item.region).filter(Boolean))].map((region, index) => ({
+    id: `region-${index + 1}`,
+    name: region,
+    signalCount: nodes.filter((item) => item.region === region && item.type === "signal").length,
+    alertCount: nodes.filter((item) => item.region === region && item.type === "alert").length
+  }));
+  const quality = {
+    verifiedSignals: signals.filter((item) => item.qualityStatus === "verified").length,
+    reviewSignals: signals.filter((item) => /review|pending/i.test(String(item.qualityStatus || ""))).length,
+    ruleCoverage: highlights.triggerCenter?.quality?.ruleCoverage || 0,
+    sourceTypes: [...new Set(signals.map((item) => item.sourceType))]
+  };
+  return {
+    ...highlights,
+    summary: {
+      ...highlights.summary,
+      signals: signals.length,
+      sourceTypes: quality.sourceTypes.length,
+      activeAlerts: alerts.length,
+      criticalAlerts: alerts.filter((item) => item.severity === "critical").length,
+      openTasks: 0,
+      resources: 0,
+      readyResources: 0,
+      aiReviews: 0,
+      aiPendingReviews: 0,
+      evidenceScore: 0,
+      evidenceVerified: 0,
+      evidencePending: 0,
+      auditEvents: 0
+    },
+    triggerCenter: { ...highlights.triggerCenter, signals, alerts, quality },
+    mapBoard: { ...highlights.mapBoard, regions, nodes, resourceSummary: [], taskSummary: [] },
+    aiCenter: { ...highlights.aiCenter, reviews: [] },
+    commandCenter: { tasks: [], openTasks: [], resources: [], readyResources: [], escalationQueue: [] },
+    evidenceCenter: {
+      ...highlights.evidenceCenter,
+      records: [],
+      summary: { score: 0, verified: 0, pending: 0, total: 0 },
+      quality
+    }
+  };
+}
+
+function publicHealthSignalHttpError(error) {
+  if (error instanceof SyntaxError) {
+    return { status: 400, error: "Bad Request", code: "PUBLIC_HEALTH_SIGNAL_BODY_INVALID", message: "public health signal body is invalid" };
+  }
+  if (error?.code === "PUBLIC_HEALTH_SIGNAL_INVALID") {
+    return { status: 400, error: "Bad Request", code: error.code, message: "public health signal request is invalid" };
+  }
+  if (error?.code === "PUBLIC_HEALTH_SIGNAL_SCOPE_FORBIDDEN") {
+    return { status: 403, error: "Forbidden", code: error.code, message: "public health signal source is outside the current organization scope" };
+  }
+  if (error?.code === "PUBLIC_HEALTH_SIGNAL_IDEMPOTENCY_CONFLICT") {
+    return { status: 409, error: "Conflict", code: error.code, message: "public health signal idempotency key is bound to another request" };
+  }
+  if (error?.code === "PUBLIC_HEALTH_SIGNAL_ID_CONFLICT") {
+    return { status: 409, error: "Conflict", code: error.code, message: "public health signal id already exists" };
+  }
+  if (String(error?.message || "").includes("SQLite optimistic lock conflict")) {
+    return { status: 409, error: "Conflict", code: "PUBLIC_HEALTH_SIGNAL_VERSION_CONFLICT", message: "public health signal state changed; retry with a fresh snapshot" };
+  }
+  return { status: 500, error: "Service Unavailable", code: "PUBLIC_HEALTH_SIGNAL_STORAGE_FAILED", message: "public health signal storage failed" };
+}
+
 function createRouteSegment(runtime) {
   const { PUBLIC_HEALTH_SITE_EVIDENCE_LINKS, appendSecurityEvent, buildPublicHealthCutoverReadiness, buildPublicHealthHighlights, buildPublicHealthSiteEvidenceBridge, buildPublicHealthSystem, collectJson, mergeByKey, normalizePublicHealthAiReviewAction, normalizePublicHealthCommandTaskAction, normalizePublicHealthCutoverBlockerAction, normalizePublicHealthCutoverDrillAction, normalizePublicHealthCutoverEvidencePacketAction, normalizePublicHealthEventAction, normalizePublicHealthEvidenceAction, normalizePublicHealthExchangeExceptionAction, normalizePublicHealthExchangeRun, normalizePublicHealthGoLiveObservationAction, normalizePublicHealthHighlightAlertAction, normalizePublicHealthInstitutionTaskAction, normalizePublicHealthLaunchCommandBriefAction, normalizePublicHealthLaunchDutyShiftAction, normalizePublicHealthLaunchGateAction, normalizePublicHealthLaunchIncidentAction, normalizePublicHealthOnsiteAcceptanceAction, normalizePublicHealthProductionHandoffAction, normalizePublicHealthSignal, normalizePublicHealthSiteEvidenceVerificationTaskAction, normalizePublicHealthStandardImplementationAction, normalizeState, randomUUID, readDatabase, requireApiRole, sealAuditTrail, seedPublicHealthAiReviews, seedPublicHealthAlerts, seedPublicHealthCommandTasks, seedPublicHealthCutoverBlockers, seedPublicHealthCutoverDrills, seedPublicHealthCutoverEvidencePackets, seedPublicHealthEvents, seedPublicHealthEvidenceRecords, seedPublicHealthExchangeRuns, seedPublicHealthExchangeTasks, seedPublicHealthGoLiveObservations, seedPublicHealthInstitutionTasks, seedPublicHealthLaunchApprovals, seedPublicHealthLaunchCommandBriefs, seedPublicHealthLaunchDutyShifts, seedPublicHealthLaunchIncidents, seedPublicHealthOnsiteAcceptances, seedPublicHealthProductionHandoffs, seedPublicHealthReadinessEvidence, seedPublicHealthSignals, seedPublicHealthSiteEvidenceVerificationTasks, seedPublicHealthStandardImplementationLedger, sendJson, upsertSiteLaunchEvidence, writeDatabase } = runtime;
   return {
@@ -54,35 +295,106 @@ function createRouteSegment(runtime) {
       if (req.method === "POST" && url.pathname === "/api/public-health/highlights/signals") {
         const user = requireApiRole(req, res, ["commission"], "/api/public-health/highlights/signals");
         if (!user) return true;
-        const payload = await collectJson(req);
-        const data = readDatabase();
-        let signal;
-        try {
-          signal = normalizePublicHealthSignal(payload, user);
-        } catch (error) {
-          sendJson(res, 400, { error: "Bad Request", message: error.message });
+        const orgType = String(user.orgType || "").trim().toLowerCase();
+        if (!PUBLIC_HEALTH_SIGNAL_ALLOWED_ORG_TYPES.has(orgType) || !String(user.orgCode || "").trim()) {
+          try {
+            appendSecurityEvent({
+              actor: user.name,
+              role: user.role,
+              action: "public-health-highlight-signal",
+              target: url.pathname,
+              result: "denied",
+              detail: "PUBLIC_HEALTH_SIGNAL_SCOPE_FORBIDDEN"
+            });
+          } catch (error) {
+            const response = publicHealthSignalHttpError(error);
+            sendJson(res, response.status, { error: response.error, code: response.code, message: response.message });
+            return true;
+          }
+          const response = publicHealthSignalHttpError(publicHealthSignalError("PUBLIC_HEALTH_SIGNAL_SCOPE_FORBIDDEN", "organization scope denied"));
+          sendJson(res, response.status, { error: response.error, code: response.code, message: response.message });
           return true;
         }
-        data.publicHealthSignals = [signal, ...mergeByKey(seedPublicHealthSignals(), data.publicHealthSignals, "id")].slice(0, 200);
-        data.securityEvents = sealAuditTrail([
-          {
-            id: randomUUID(),
-            at: new Date().toLocaleString("zh-CN", { hour12: false }),
-            actor: user.name,
-            role: user.role,
-            action: "public-health-highlight-signal",
-            target: signal.id,
-            result: "allowed",
-            detail: `${signal.sourceType} / ${signal.metric} / ${signal.value}`
-          },
-          ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
-        ].slice(0, 120), { recompute: true });
-        writeDatabase(data);
-        sendJson(res, 201, {
-          ok: true,
-          signal,
-          highlights: buildPublicHealthHighlights({ data: readDatabase() })
-        });
+        try {
+          const validated = requirePublicHealthSignalPayload(await collectJson(req));
+          if (!publicHealthSignalScopeDecision(user, validated.sourceOrgCode)) {
+            try {
+              appendSecurityEvent({
+                actor: user.name,
+                role: user.role,
+                action: "public-health-highlight-signal",
+                target: url.pathname,
+                result: "denied",
+                detail: "PUBLIC_HEALTH_SIGNAL_SCOPE_FORBIDDEN"
+              });
+            } catch (error) {
+              const response = publicHealthSignalHttpError(error);
+              sendJson(res, response.status, { error: response.error, code: response.code, message: response.message });
+              return true;
+            }
+            throw publicHealthSignalError("PUBLIC_HEALTH_SIGNAL_SCOPE_FORBIDDEN", "organization scope denied");
+          }
+          let normalizedSignal;
+          try {
+            normalizedSignal = normalizePublicHealthSignal(validated.payload, user);
+          } catch (error) {
+            throw publicHealthSignalError("PUBLIC_HEALTH_SIGNAL_INVALID", String(error?.message || "signal normalization failed"));
+          }
+          if (validated.payload.id === undefined) {
+            normalizedSignal = { ...normalizedSignal, id: `phsig-${randomUUID()}` };
+          }
+          const command = publicHealthSignalCommandIdentity(req, user, validated);
+          const result = await withPublicHealthSignalCommandLock(command.commandKeyHash, () => {
+            const data = readDatabase();
+            const signals = mergeByKey(seedPublicHealthSignals(), data.publicHealthSignals, "id");
+            const replay = signals.find((item) => item.commandKeyHash === command.commandKeyHash);
+            if (replay) {
+              if (replay.requestDigest !== command.requestDigest) {
+                throw publicHealthSignalError("PUBLIC_HEALTH_SIGNAL_IDEMPOTENCY_CONFLICT", "idempotency key conflict");
+              }
+              return { data, signal: replay, idempotent: true };
+            }
+            if (signals.some((item) => item.id === normalizedSignal.id)) {
+              throw publicHealthSignalError("PUBLIC_HEALTH_SIGNAL_ID_CONFLICT", "signal id conflict");
+            }
+            const signal = {
+              ...normalizedSignal,
+              ...(validated.sourceOrgCode ? { sourceOrgCode: validated.sourceOrgCode } : {}),
+              commandKeyHash: command.commandKeyHash,
+              requestDigest: command.requestDigest
+            };
+            data.publicHealthSignals = [signal, ...signals].slice(0, 200);
+            data.securityEvents = sealAuditTrail([
+              {
+                id: randomUUID(),
+                at: new Date().toLocaleString("zh-CN", { hour12: false }),
+                actor: user.name,
+                role: user.role,
+                action: "public-health-highlight-signal",
+                target: signal.id,
+                result: "allowed",
+                detail: `signal=${signal.id}; requestDigest=${command.requestDigest}; scope=${sha256(`${user.orgType}:${user.orgCode}`).slice(0, 16)}`
+              },
+              ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+            ].slice(0, 120), { recompute: true });
+            writeDatabase(data);
+            return { data, signal, idempotent: false };
+          });
+          const publicSignals = (Array.isArray(result.data.publicHealthSignals) ? result.data.publicHealthSignals : [])
+            .map((item) => projectPublicHealthSignal(item));
+          const highlights = buildPublicHealthHighlights({
+            data: { ...result.data, publicHealthSignals: publicSignals }
+          });
+          sendJson(res, result.idempotent ? 200 : 201, {
+            ok: true,
+            signal: projectPublicHealthSignal(result.signal),
+            idempotent: result.idempotent,
+            highlights: projectPublicHealthSignalHighlights(highlights, user)
+          });
+        } catch (error) {
+          const response = publicHealthSignalHttpError(error);
+          sendJson(res, response.status, { error: response.error, code: response.code, message: response.message });
+        }
         return true;
       }
 

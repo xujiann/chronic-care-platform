@@ -243,7 +243,7 @@ source/sink contract、目标摘要、cursor/source hash 与 receipt 摘要；ch
 
 目录中的源码 marker 既不是认证证明，也不是幂等执行证据；只有 owner、控制流锚点和可执行负向测试一致时才产生认证 evidence contract。认证分类只描述 AS-IS 的 required/optional/none、凭据来源、replay/CSRF 和 scope，不代表目标政策充分或生产安全。幂等 `behavior-verified` 仍只证明当前仓库行为，不证明跨实例 exactly-once 或生产耐久性；所有生产状态继续 `NO-GO`。
 
-API-002 的 existing-proof 扩展现使注册表达到 12 份合同。T07 financial dispatch 合同继续复用 `integrationGatewayEvents`、`securityEvents`、既有 gateway adapter 与状态写入端口并保持 reservation/finalize/CAS 边界。新增 formal grouping create 合同不改变数据模型：仍只写既有 `diseasePayment.formalGroupingJobs` 和 `securityEvents`，queued job 与链式审计在同一个全状态快照中由一次 `writeDatabase` 提交；精确重放不写。SQLite 继续消费 `storageMeta.collectionVersions` 做事务内乐观锁，JSON 兼容路径只受当前进程的按幂等键命令尾保护。没有新增集合、表、字段、DDL、migration、outbox 或事实源，也不宣称跨实例 exactly-once；相关集合 owner、正式分组适配器与生产 PostgreSQL 状态均未改变。
+API-002 的 existing-proof 扩展现使注册表达到 13 份合同。T07 financial dispatch/formal grouping 继续保持既有 reservation/job、审计和 CAS 边界。T03 highlight signal intake 仍只使用既有 `publicHealthSignals` 与 `securityEvents`：新记录保存组织命名空间后的 `commandKeyHash` 和 canonical `requestDigest`，绝不保存原始幂等键；signal 与链式审计在同一全状态快照中由一次 `writeDatabase` 提交，精确重放不写，ledger 保持既有 200 条上限。SQLite 继续消费 `storageMeta.collectionVersions` 做事务内乐观锁，JSON 兼容路径只受当前进程的按 key 命令尾保护。没有新增集合、表、DDL、migration、outbox 或事实源，也不宣称跨实例 exactly-once；`publicHealthSignals` 仍为 review-required 数据 owner 状态，生产 PostgreSQL 状态未改变。
 
 T07 第二批审计的 3 条 `reviewedProofRequired` 已全部由直接 endpoint 行为合同替换；formal grouping create 最后关闭资源范围、并发/CAS、稳定错误和原子审计证据缺口。机器验证仍禁止拒绝记录和正式合同同 key 并存，当前 `reviewedProofRequired` 为 0。
 

@@ -91,3 +91,11 @@ callback 持久化守卫要求由 HMAC 验签器生成且绑定目标 gateway ev
 新建作业继续使用既有 `createFormalGroupingJob` 与 queued job/envelope 形状，成功 HTTP 201 不变。queued job 与链式 `securityEvents` 审计在同一快照中只调用一次 `writeDatabase`；SQLite 复用 `storageMeta.collectionVersions` 与既有事务 CAS，冲突映射为稳定脱敏 409。body/validation、资源范围、病例不存在、幂等/标识冲突、完整性和未知存储失败均建立稳定错误 code，内部存储错误正文不返回。正式分组没有新的外部消息提交语义，因此不虚构 outbox；queued job 本身仍是既有耐久工作事实。
 
 该扩展不新增 schema、migration、dependency、outbox、worker、PG adapter 或第二套状态机。进程命令尾只覆盖当前 Node 实例，SQLite CAS 也不构成跨实例 exactly-once。真实正式分组器 endpoint、凭据/证书、签名回执、PostgreSQL 多实例、worker 运维与现场验收仍未关闭；合同继续 `productionReady=false`、`externalEvidenceRequired=true`、`distributedExactlyOnceClaimed=false`，593 项全部 `NO-GO`。
+
+## 2026-08-24 T03 highlight signal intake 扩展
+
+在本 ADR 已接受的逐 endpoint 机制内，注册表新增第 13 份合同，只登记 `POST /api/public-health/highlights/signals`。既有 commission session/RBAC 保持先行；city 与 health-admin 保留无来源机构代码的旧 payload 兼容，district 必须把 canonical `sourceOrgCode/institutionCode` 限定为自身 `orgCode` 或服务端 `publicHealthHospitalCodes`，其他 `orgType` 失败关闭。资源拒绝使用既有安全审计端口单独记录，但不被描述成与业务状态原子提交。
+
+命令 key 按 `Idempotency-Key` header、body `idempotencyKey`、body `id`、canonical payload digest 依次选择，并在 actor role/orgType/orgCode 命名空间后只保存 SHA-256；请求载荷绑定独立 digest。相同 key 在当前进程串行并在锁内重读，首次创建返回 201/`idempotent=false`，精确重放返回 200/`true` 且不再次写入，同键异载荷和 ID 占用返回稳定 409。新 signal 继续进入既有 200 条 `publicHealthSignals` 上限，并与链式 `securityEvents` 在一次 `writeDatabase` 中提交；SQLite collection-version 冲突映射为脱敏 409，普通失败为脱敏 500且不触发 fallback audit write。
+
+该扩展不新增集合、DDL、migration、dependency、outbox、worker、PG adapter 或第二套状态机。200 条 bounded ledger 会在容量滚动后失去旧命令证明，进程尾只覆盖当前 Node 实例，SQLite CAS 也不构成跨实例 exactly-once。`publicHealthSignals` data owner、PostgreSQL 多实例、长期审计/归档、真实来源系统与现场验收仍未关闭；合同继续 `productionReady=false`、`externalEvidenceRequired=true`、`distributedExactlyOnceClaimed=false`，593 项全部 `NO-GO`。
