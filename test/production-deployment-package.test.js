@@ -6,6 +6,7 @@ const test = require("node:test");
 const {
   buildProductionDeploymentPackage,
   parseArgs,
+  postgresDeploymentTemplatesValid,
   renderMarkdown,
   verifyProductionDeploymentPackage,
   writeOutput
@@ -30,6 +31,24 @@ test("production deployment package hashes runtime files without persisting secr
     assert.equal(manifest.artifact.files.some((item) => item.path === "session-store.js"), true);
     assert.equal(manifest.artifact.files.some((item) => item.path === "scripts/postgres-sync-worker.js"), true);
     assert.equal(manifest.artifact.files.some((item) => item.path === "scripts/postgres-shadow-reconcile.js"), true);
+    [
+      "postgres-runtime-sync.js",
+      "postgres-production-adapter.js",
+      "src/platform/storage/postgres-primary-storage-contract.js",
+      "src/platform/storage/postgres-primary-driver.js",
+      "scripts/postgres-primary-transition-readiness.js",
+      "scripts/postgres-migration-package.js",
+      "scripts/postgres-primary-read-rehearsal.js",
+      "scripts/postgres-production-adapter.js",
+      "scripts/storage-admin.js",
+      "src/platform/data/public-demo-snapshot.js",
+      "deploy/postgres-primary-storage-schema.sql",
+      "deploy/postgres-sync-worker.service.template",
+      "deploy/postgres-sync-worker.timer.template",
+      "deploy/postgres-shadow-reconcile.service.template",
+      "deploy/postgres-shadow-reconcile.timer.template",
+      "deploy/platform-production-adapters.env.template"
+    ].forEach((runtimeFile) => assert.equal(manifest.artifact.files.some((item) => item.path === runtimeFile), true, runtimeFile));
     assert.equal(manifest.artifact.files.some((item) => item.path === "config/regions.json"), true);
     assert.equal(manifest.artifact.files.some((item) => item.path === "src/platform/regional/regional-runtime.js"), true);
     [
@@ -68,9 +87,35 @@ test("production deployment package hashes runtime files without persisting secr
     assert.equal(manifest.secretContract.variables.every((item) => item.persistedInArtifact === false && !("value" in item)), true);
     assert.equal(manifest.secretContract.variables.some((item) => item.name === "OBJECT_STORAGE_RECEIPT_SIGNING_SECRET" && item.purpose === "object storage gateway response verification"), true);
     assert.equal(manifest.secretContract.variables.some((item) => item.name === "SIEM_AUDIT_SIGNING_SECRET" && item.purpose === "continuous audit request signing"), true);
+    assert.equal(manifest.secretContract.variables.some((item) => item.name === "DATABASE_URL" && !Object.hasOwn(item, "value")), true);
     assert.equal(manifest.processContract.backgroundJobs.some((item) => item.id === "continuous-audit-delivery" && item.productionReady === false && item.preflight === "npm run audit:delivery:preflight"), true);
     assert.equal(manifest.processContract.backgroundJobs.find((item) => item.id === "continuous-audit-delivery").sourceContract, "append-only-audit-source-v2");
     assert.equal(manifest.processContract.backgroundJobs.some((item) => item.id === "chronic-followup-durable-dispatch" && item.preflight === "npm run chronic:followup-dispatch-preflight" && item.sourceContract === "citizen-chronic.followup-dispatch-outbox.v1" && item.productionReady === false && ["DATA_DIR", "CITIZEN_CHRONIC_FOLLOWUP_DISPATCH_SQLITE_FILE", "CITIZEN_CHRONIC_FOLLOWUP_ACTIVATION_REGISTRY_FILE", "CITIZEN_CHRONIC_FOLLOWUP_ACTIVATION_PUBLIC_KEY_FILE", "CITIZEN_CHRONIC_FOLLOWUP_ACTIVATION_PUBLIC_KEY_SHA256"].every((name) => item.configurationVariables.includes(name))), true);
+    assert.equal(manifest.processContract.backgroundJobs.some((item) => item.id === "postgres-shadow-sync" && item.sourceContract === "postgres-shadow-sync" && item.productionReady === false && item.productionPrimary === false && item.runtimeCutoverEnabled === false), true);
+    assert.equal(manifest.processContract.backgroundJobs.some((item) => item.id === "postgres-shadow-reconciliation" && item.sourceContract === "postgres-shadow-reconciliation" && item.productionReady === false && item.productionPrimary === false && item.runtimeCutoverEnabled === false), true);
+    assert.deepEqual(manifest.processContract.databaseTransition.commands, {
+      readiness: "npm run postgres:transition-readiness",
+      migrationPackage: "npm run postgres:migration-package",
+      migrationVerify: "npm run postgres:migration-verify",
+      primaryReadRehearsal: "npm run postgres:primary-read-rehearsal",
+      adapterVerify: "npm run postgres:adapter-verify",
+      storageBackup: "npm run storage:backup",
+      storageInspect: "npm run storage:inspect",
+      storageAssess: "npm run storage:assess -- <backup-dir>",
+      shadowSync: "npm run postgres:sync-worker",
+      shadowReconciliation: "npm run postgres:shadow-reconcile"
+    });
+    assert.equal(manifest.processContract.databaseTransition.readyForControlledRehearsal, false);
+    assert.equal(manifest.processContract.databaseTransition.activationAuthorized, false);
+    assert.equal(manifest.processContract.databaseTransition.productionPrimary, false);
+    assert.equal(manifest.processContract.databaseTransition.runtimeCutoverEnabled, false);
+    assert.equal(manifest.processContract.databaseTransition.productionReady, false);
+    assert.equal(manifest.processContract.databaseTransition.configurationVariables.includes("POSTGRES_PRIMARY_TRANSITION_INPUT_FILE"), true);
+    assert.equal(manifest.processContract.databaseTransition.configurationVariables.includes("POSTGRES_PRIMARY_TRANSITION_INPUT_SHA256"), true);
+    assert.equal(JSON.stringify(manifest.processContract).includes("DATABASE_URL"), false);
+    const reconciliationService = fs.readFileSync(path.join(ROOT, "deploy", "postgres-shadow-reconcile.service.template"), "utf8");
+    ["__SERVICE_USER__", "__SERVICE_GROUP__", "__APP_DIR__", "__SECRET_ENV_FILE__", "__NODE_BINARY__", "__DATA_DIR__", "__LOG_DIR__"].forEach((placeholder) => assert.match(reconciliationService, new RegExp(placeholder)));
+    assert.doesNotMatch(reconciliationService, /DEPLOYMENT_(?:APP|DATA|LOG|SECRET)|User=health-platform|\/usr\/bin\/node/);
     assert.equal(manifest.processContract.productionPreflight.entrypoint, "node scripts/production-preflight.js --strict");
     assert.equal(manifest.processContract.productionPreflight.trustContract, "platform-governance.production-evidence-trust-decision.v1");
     assert.equal(manifest.processContract.productionPreflight.productionReady, false);
@@ -126,6 +171,68 @@ test("deployment package verification detects file digest tampering", () => {
   const trustProviderFailed = verifyProductionDeploymentPackage(missingTrustProvider);
   assert.equal(trustProviderFailed.ok, false);
   assert.equal(trustProviderFailed.checks.some((item) => item.id === "deploymentVerify:productionEvidenceTrust" && !item.passed), true);
+
+  const missingTransitionFile = structuredClone(manifest);
+  missingTransitionFile.artifact.files = missingTransitionFile.artifact.files.filter((item) => item.path !== "scripts/postgres-primary-transition-readiness.js");
+  const missingTransitionFileFailed = verifyProductionDeploymentPackage(missingTransitionFile);
+  assert.equal(missingTransitionFileFailed.ok, false);
+  assert.equal(missingTransitionFileFailed.checks.some((item) => item.id === "deploymentVerify:postgresTransition" && !item.passed), true);
+
+  const missingTransitionVariable = structuredClone(manifest);
+  missingTransitionVariable.processContract.databaseTransition.configurationVariables = [];
+  const missingTransitionVariableFailed = verifyProductionDeploymentPackage(missingTransitionVariable);
+  assert.equal(missingTransitionVariableFailed.ok, false);
+  assert.equal(missingTransitionVariableFailed.checks.some((item) => item.id === "deploymentVerify:postgresTransition" && !item.passed), true);
+
+  const missingJobVariable = structuredClone(manifest);
+  missingJobVariable.processContract.backgroundJobs.find((item) => item.id === "postgres-shadow-reconciliation").configurationVariables = [];
+  const missingJobVariableFailed = verifyProductionDeploymentPackage(missingJobVariable);
+  assert.equal(missingJobVariableFailed.ok, false);
+  assert.equal(missingJobVariableFailed.checks.some((item) => item.id === "deploymentVerify:postgresTransition" && !item.passed), true);
+
+  for (const property of ["readyForControlledRehearsal", "activationAuthorized", "productionPrimary", "runtimeCutoverEnabled", "productionReady"]) {
+    const forgedReady = structuredClone(manifest);
+    forgedReady.processContract.databaseTransition[property] = true;
+    const forgedReadyFailed = verifyProductionDeploymentPackage(forgedReady);
+    assert.equal(forgedReadyFailed.ok, false, property);
+    assert.equal(forgedReadyFailed.checks.some((item) => item.id === "deploymentVerify:postgresTransition" && !item.passed), true, property);
+  }
+});
+
+test("PostgreSQL deployment templates keep disabled defaults, placeholders and hardening", (t) => {
+  const temporaryRoot = fs.mkdtempSync(path.join(require("node:os").tmpdir(), "postgres-deployment-templates-"));
+  t.after(() => fs.rmSync(temporaryRoot, { recursive: true, force: true }));
+  const temporaryDeploy = path.join(temporaryRoot, "deploy");
+  fs.mkdirSync(temporaryDeploy, { recursive: true });
+  for (const name of [
+    "platform-production-adapters.env.template",
+    "postgres-sync-worker.service.template",
+    "postgres-sync-worker.timer.template",
+    "postgres-shadow-reconcile.service.template",
+    "postgres-shadow-reconcile.timer.template"
+  ]) {
+    fs.copyFileSync(path.join(ROOT, "deploy", name), path.join(temporaryDeploy, name));
+  }
+  assert.equal(postgresDeploymentTemplatesValid(temporaryRoot), true);
+
+  const envFile = path.join(temporaryDeploy, "platform-production-adapters.env.template");
+  const originalEnv = fs.readFileSync(envFile, "utf8");
+  fs.writeFileSync(envFile, originalEnv.replace("POSTGRES_PRIMARY_STORAGE_MODE=disabled", "POSTGRES_PRIMARY_STORAGE_MODE=primary-read"));
+  assert.equal(postgresDeploymentTemplatesValid(temporaryRoot), false);
+  fs.writeFileSync(envFile, originalEnv);
+
+  const serviceFile = path.join(temporaryDeploy, "postgres-shadow-reconcile.service.template");
+  const originalService = fs.readFileSync(serviceFile, "utf8");
+  fs.writeFileSync(serviceFile, originalService.replace("ProtectSystem=strict", "ProtectSystem=full"));
+  assert.equal(postgresDeploymentTemplatesValid(temporaryRoot), false);
+  fs.writeFileSync(serviceFile, `${originalService}\nProtectSystem=false\nUser=root\n`);
+  assert.equal(postgresDeploymentTemplatesValid(temporaryRoot), false);
+  fs.writeFileSync(serviceFile, originalService);
+
+  const timerFile = path.join(temporaryDeploy, "postgres-shadow-reconcile.timer.template");
+  const originalTimer = fs.readFileSync(timerFile, "utf8");
+  fs.writeFileSync(timerFile, `${originalTimer}\nOnUnitActiveSec=1s\n`);
+  assert.equal(postgresDeploymentTemplatesValid(temporaryRoot), false);
 });
 
 test("deployment package renders writes and parses CLI flags", (t) => {

@@ -473,3 +473,42 @@ Use `docs/on-site-launch-materials.md` as the field material collection checklis
 package, the signed production evidence decision and all 14 signed cutover-action decisions before issuing a
 create-once digest-only receipt. It does not deploy the platform or replace external change approval, environment
 reviewers, target credentials, joint testing, site acceptance or rollback execution.
+
+## PostgreSQL controlled transition readiness
+
+`npm.cmd run postgres:transition-readiness` reads the absolute path in
+`POSTGRES_PRIMARY_TRANSITION_INPUT_FILE` and requires its 64-character lowercase digest in
+`POSTGRES_PRIMARY_TRANSITION_INPUT_SHA256`. The input must be a non-empty regular non-symlink JSON file of at most
+1 MiB and must contain only the closed metadata fields for requested mode, migration, reconciliation, delivery,
+recovery, capacity, failover and fallback. Missing, malformed, oversized or expanded input fails closed without
+printing the path, credentials or input body. The bounded bytes read from the opened descriptor must match the
+declared digest, so same-size in-place replacement also fails closed.
+
+The configured `POSTGRES_PRIMARY_STORAGE_MODE` must exactly match the input `requestedMode`; readiness for one
+mode cannot be reused to approve another mode.
+
+The immutable deployment package now carries the transition CLI, migration package, primary-read rehearsal,
+adapter verification, storage-admin, PostgreSQL schema, shadow-sync and shadow-reconciliation service/timer templates,
+and their environment contract. Render both services with `__SERVICE_USER__`, `__SERVICE_GROUP__`, `__APP_DIR__`,
+`__SECRET_ENV_FILE__`, `__NODE_BINARY__`, `__DATA_DIR__` and `__LOG_DIR__`; inject `DATABASE_URL` only through the
+declared secret provider.
+
+Run the repository-side sequence in a controlled rehearsal environment:
+
+```powershell
+npm.cmd run postgres:migration-package
+npm.cmd run postgres:migration-verify
+npm.cmd run storage:backup
+npm.cmd run storage:inspect
+npm.cmd run storage:assess -- <backup-dir>
+npm.cmd run postgres:sync-worker
+npm.cmd run postgres:shadow-reconcile
+npm.cmd run postgres:primary-read-rehearsal
+npm.cmd run postgres:adapter-verify
+npm.cmd run postgres:transition-readiness
+```
+
+Do not enable either timer from repository automation. Even when all seven gates pass, the result only permits an
+independently approved controlled rehearsal: `activationAuthorized=false`, `productionPrimary=false`,
+`runtimeCutoverEnabled=false` and `productionReady=false`. Real migration, capacity, failover, native restore,
+fallback, monitoring, approvals and site acceptance remain external blockers.

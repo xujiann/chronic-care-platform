@@ -168,6 +168,9 @@ psql "$env:DATABASE_URL" `
    故障切换已验证、耗时不超过目标且未观察到数据丢失。
 7. 已验证切回 SQLite 且未观察到数据丢失。
 
+其中当前配置的 `POSTGRES_PRIMARY_STORAGE_MODE` 必须与输入中的 `requestedMode` 完全一致；
+不能用已配置的 `primary-read` 环境评估 `primary-write`，也不能用其他模式的配置代替目标模式。
+
 容量与故障切换只接收元数据和受控证据引用，不接收测试数据、日志正文、连接串或凭据。
 `capacity.profileRef`、`capacity.evidenceRef` 和 `failover.evidenceRef` 必须是 4 至 240 字符且不含
 换行的字符串受控引用；目标数值必须为规范十进制有限正数，实测耗时和延迟必须为规范十进制
@@ -177,6 +180,24 @@ psql "$env:DATABASE_URL" `
 即使全部通过，`activationAuthorized`、`productionReady` 和
 `productionPrimary` 仍为 `false`。正式启用必须由 T00 在中央装配根接线，
 并在现场证据和独立审批完成后另行发布。
+
+### 可部署评估入口
+
+将七门元数据写入仓库之外的受控 JSON 普通文件，并设置：
+
+```dotenv
+POSTGRES_PRIMARY_TRANSITION_INPUT_FILE=/run/health-platform/postgres-transition-readiness.json
+POSTGRES_PRIMARY_TRANSITION_INPUT_SHA256=<该文件的 64 位小写 SHA-256>
+```
+
+然后执行 `npm run postgres:transition-readiness`。文件必须使用绝对路径、不是 symlink、非空且不超过
+1 MiB；顶层和每个 section 都是闭集 metadata-only 字段，未知字段、业务 payload 和连接信息会被拒绝；
+合同禁止任何凭据，CLI 额外拒绝常见凭据模式，但该启发式检查不替代 secret scanning 或 DLP。
+CLI 从已打开的文件描述符有界读取，并要求内容与必填的预期 SHA-256 完全一致；摘要缺失、格式错误或
+内容在交接后被同长度原地改写都会失败关闭。
+命令复用 `buildPostgresPrimaryStorageConfig` 与 `buildTransitionAssessment`；七项检查全部通过时最多
+返回 `readyForControlledRehearsal=true`，而 `activationAuthorized`、`productionReady`、
+`productionPrimary`、`runtimeCutoverEnabled` 始终为 `false`。该入口没有接入 strict preflight。
 
 ## 建议集成顺序
 

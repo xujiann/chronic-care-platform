@@ -152,6 +152,8 @@
     "postgres:adapter-verify": "node scripts/postgres-production-adapter.js verify",
     "postgres:primary-storage-contract:check": "node --check src/platform/storage/postgres-primary-storage-contract.js && node --check src/platform/storage/memory-postgres-primary-driver.js && node --check src/platform/storage/postgres-primary-driver.js",
     "postgres:primary-storage-contract:test": "node --test test/postgres-primary-storage-contract.test.js test/postgres-primary-driver.test.js",
+    "postgres:transition-readiness": "node scripts/postgres-primary-transition-readiness.js",
+    "postgres:transition-readiness:test": "node --test test/postgres-primary-transition-readiness.test.js",
     "platform:production-audit": "node scripts/platform-production-audit.js",
     "platform:capability-map": "node scripts/platform-capability-map.js",
     "platform:go-live-slices": "node scripts/platform-go-live-slices.js",

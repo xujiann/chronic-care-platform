@@ -376,3 +376,11 @@ sink 仍在 Inventory 中失败关闭；仓库测试不证明真实体检设备�
 ## 33. 金融 callback/finalize 写入约束（HTTP 兼容）
 
 `POST /api/financial-gateways/callbacks/:type` 的 method、path 和公共响应不变；内部写意图新增不落库的目标账项 attestation，中央守卫拒绝伪造 `signatureVerified`、跨账项 event/nonce 重放及无新增 evidence 的 provider projection。dispatch/retry 成功 finalize 必须包含匹配 type/operation/status 的 provider receipt 与 dispatchedAt，失败 finalize 必须包含完整稳定失败证据。
+
+## 34. PostgreSQL 受控切换评估（无 HTTP 变化）
+
+本切片没有新增或改变任何 HTTP method/path、身份、角色、scope、错误、幂等或审计事件。
+`npm run postgres:transition-readiness` 是仅供受控部署流程使用的 CLI；输入文件还必须绑定调用方提供的
+64 位小写 SHA-256；缺输入、摘要不符、相对路径、symlink、超限、
+非法 JSON、未知字段或无效七门状态均失败关闭且不回显路径、连接串、凭据或输入正文。CLI 通过不能写入
+`/api/production-go-no-go/*`，也不能启用 PostgreSQL 主读/主写。

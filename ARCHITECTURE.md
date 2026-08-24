@@ -58,6 +58,9 @@
   不替代真实托管头、渗透或现场验收。
 - strict production preflight 通过 T00 受控文件 provider 装配既有 external trust verifier；只接受独立
   pin 的 Ed25519 anchor bundle、双角色签名和当前 release/artifact/evidence/registry 绑定，默认继续 NO-GO。
+- PostgreSQL 受控切换采用独立 metadata-only CLI 与部署闭包：七门全部通过最多形成
+  `readyForControlledRehearsal=true`，不接入 strict preflight、不启用 worker 或主库；部署合同中的
+  `activationAuthorized`、`productionPrimary`、`runtimeCutoverEnabled` 和 `productionReady` 固定为 false。
 
 ## Proposed 方向（不授权实施）
 

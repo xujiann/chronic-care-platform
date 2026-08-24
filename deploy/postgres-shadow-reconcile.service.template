@@ -5,14 +5,16 @@ Wants=network-online.target
 
 [Service]
 Type=oneshot
-User=health-platform
-Group=health-platform
-WorkingDirectory=DEPLOYMENT_APP_DIR
-EnvironmentFile=DEPLOYMENT_SECRET_ENV_FILE
+User=__SERVICE_USER__
+Group=__SERVICE_GROUP__
+WorkingDirectory=__APP_DIR__
+EnvironmentFile=__SECRET_ENV_FILE__
 Environment=POSTGRES_SYNC_MODE=outbox
-ExecStart=/usr/bin/node DEPLOYMENT_APP_DIR/scripts/postgres-shadow-reconcile.js reconcile --sqlite-file=DEPLOYMENT_DATA_DIR/health-city.sqlite --output=DEPLOYMENT_LOG_DIR/postgres-shadow-reconciliation.json --markdown=DEPLOYMENT_LOG_DIR/postgres-shadow-reconciliation.md
+ExecStart=__NODE_BINARY__ scripts/postgres-shadow-reconcile.js reconcile --sqlite-file=__DATA_DIR__/health-city.sqlite --output=__LOG_DIR__/postgres-shadow-reconciliation.json --markdown=__LOG_DIR__/postgres-shadow-reconciliation.md
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectHome=true
 ProtectSystem=strict
-ReadWritePaths=DEPLOYMENT_DATA_DIR DEPLOYMENT_LOG_DIR
+ReadWritePaths=__DATA_DIR__ __LOG_DIR__
+UMask=0077
+TimeoutStartSec=120

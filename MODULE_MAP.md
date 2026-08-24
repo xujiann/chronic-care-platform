@@ -283,7 +283,7 @@ Accepted、data owner 与兼容策略获人类批准后才能进入逐切片实�
 |---|---|---|---|
 | `config/repository-governance.json` | T00 | 当前 workflow、Markdown 分类规则/闭集摘要、3 个 PDF 来源与 digest 的机器合同 | 不定义业务 owner，不包含 PDF 正文 |
 | `scripts/repository-governance.js` | T00 | 只读枚举 Git 路径，拒绝漏分/重叠/快照改写/旧 baseline/PDF 漂移 | 不生成或修改文档、PDF、报告和归档 |
-| `test/repository-governance.test.js` | T00 / TEST-001 | 锁定 264 份 Markdown、三类边界、当前 main 流程和 3 个 PDF 负向漂移 | 不证明 PDF 内容正确或生产可用 |
+| `test/repository-governance.test.js` | T00 / TEST-001 | 锁定 265 份 Markdown、三类边界、当前 main 流程和 3 个 PDF 负向漂移 | 不证明 PDF 内容正确或生产可用 |
 
 依赖方向为 `Git 跟踪路径 + ADR 状态 + 当前进程清单 + PDF bytes/source paths → repository governance
 verifier → governance-api/architecture:test`。snapshot 与 superseded 只提供历史证据，不得反向覆盖 current
@@ -292,3 +292,11 @@ verifier → governance-api/architecture:test`。snapshot 与 superseded 只提�
 ## 金融 callback/finalize 守卫
 
 `financial-gateways.js` 独占回调验签与进程内 attestation 密钥；只导出验证能力，不导出签发密钥。`src/http/routes/insurance-payment.js` 将 `applyFinancialCallback` 返回的目标账项证明作为单次写意图传给 `server.js`；`server.js` 复验证明、全账本 event/nonce 唯一性及 finalize 回执/失败证据形状。attestation 不进入领域集合或 API projection，模块依赖保持 `route → gateway verifier → storage guard`。
+
+## PostgreSQL 受控切换评估模块
+
+| 模块 | Owner | 职责 | 非职责 |
+|---|---|---|---|
+| `scripts/postgres-primary-transition-readiness.js` | T00 | 读取 SHA-256 固定的闭集 metadata-only 文件，复用配置与七门评估，输出脱敏资格投影 | 不连数据库、不验外部证据、不激活主库 |
+| `scripts/production-deployment-package.js` | T00 | 将 migration/read/adapter/storage-admin 与 sync/reconcile 模板登记为不可变部署闭包 | 不启动 worker，不保存 `DATABASE_URL` 值 |
+| `deploy/postgres-*.template`、`deploy/platform-production-adapters.env.template` | T00 | systemd 与变量占位符合同 | 不提供现场值或生产授权 |
