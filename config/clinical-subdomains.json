@@ -184,6 +184,26 @@
           "ports": ["buildPhysicalExamOverview", "buildPhysicalExamReadiness"],
           "contracts": [],
           "sideEffects": ["resident-data-access-audit-persisted-by-http-adapter"]
+        },
+        {
+          "id": "physical-examination-specialized-intake-action-command.v1",
+          "source": "src/clinical-specialties/physical-examination/specialized-intake-action-command.js",
+          "route": "POST /api/physical-exams/specialized-intakes/:id/actions",
+          "ports": [
+            "applySpecializedIntakeAction",
+            "appendDataAccessLog",
+            "appendSecurityEvent",
+            "normalizeState",
+            "now",
+            "writeDatabase"
+          ],
+          "contracts": [],
+          "sideEffects": [
+            "physicalExamSpecializedIntakes-state-mutation",
+            "resident-data-access-audit",
+            "security-event-audit",
+            "legacy-database-persistence"
+          ]
         }
       ]
     },

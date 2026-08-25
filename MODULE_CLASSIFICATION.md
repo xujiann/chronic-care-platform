@@ -50,6 +50,7 @@
 | blood dashboard query | T06/blood | B | 首个查询用例已隔离角色范围并具备特征/单元测试；仍接收宽快照并保留内存规范化兼容 |
 | imaging dashboard query / public response | T06/imaging | B | 查询和响应安全策略已归位并有单元、特征及真实 API 安全测试；审计与宽快照仍在兼容边界 |
 | physical examination dashboard query | T06/physical-examination | B | 构建、readiness 和角色投影已有标准查询端口与测试；范围、审计、脱敏和宽快照仍在适配边界 |
+| physical examination specialized intake action | T06/physical-examination | B | 业务动作、双审计和持久化已进入版本化命令端口并有顺序/失败保护；仍依赖宽快照、同步写入且无新增幂等/CAS |
 | insurance-payment | T07 | B | 聚合、仓储、outbox 边界较清楚 |
 | integration | T08 | B | 契约和外部联合测试边界明确 |
 | research | T09 | B | 范围小，有授权和审计要求 |

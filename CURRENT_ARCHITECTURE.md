@@ -159,7 +159,7 @@ FHIR DiagnosticReport provider，再在成功后更新检查与最多 300 条质
 顺序、默认值、FHIR 失败审计、502、单次本地写入、200 响应与公开投影保持不变；没有新增幂等、CAS、机构
 范围、schema、worker 或生产授权。外部调用仍先于本地提交，因此该接口和全平台继续 `NO-GO`。
 
-体检第五切片将 `GET /api/physical-exams` 的 Overview 构建、生产 readiness 组合和角色投影移入 `src/clinical-specialties/physical-examination/dashboard-query.js`。混合 HTTP 路由仍负责鉴权、居民范围、安全事件、访问审计持久化和最终脱敏，调用顺序保持不变；体检写命令仍留在 `blood-innovation`。
+体检第五切片将 `GET /api/physical-exams` 的 Overview 构建、生产 readiness 组合和角色投影移入 `src/clinical-specialties/physical-examination/dashboard-query.js`。后续专项分流切片将 `POST /api/physical-exams/specialized-intakes/:id/actions` 的业务动作、访问审计、安全审计和规范化持久化委托给 `physical-examination-specialized-intake-action-command.v1`；混合 HTTP 路由继续负责鉴权、body、读取/定位、居民范围、错误映射和响应，公开顺序与协议不变。其余体检写命令仍留在 `blood-innovation`，该路由仍是 blood/physical-examination 的遗留混合边界。
 
 ## 7. REG-01A 区域共享调阅现状
 
