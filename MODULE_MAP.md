@@ -104,7 +104,7 @@ scripts/platform-cutover-alert-worker.js
 | emergency | T06/emergency | 37 | 急救/信号前缀已唯一归属；dashboard 查询已进入目标源码根 |
 | blood | T06/blood | 28 | dashboard 查询已进入目标源码根；其余仍与 imaging、physical-examination 混合 |
 | imaging | T06/imaging | 17 | dashboard、公开响应净化及 share/QC 两个写用例已进入目标源码根 |
-| physical-examination | T06/physical-examination | 7 | dashboard 查询已进入目标源码根；写命令仍与 blood-innovation 混合 |
+| physical-examination | T06/physical-examination | 7 | dashboard 查询与专项分流 action command 已进入目标源码根；其余写命令仍与 blood-innovation 混合 |
 | quality-safety | T06/quality-safety | 14 | 写模型限定为质量自有数据 |
 
 原有 33 个 `/api/operations` 字面路径已全部移交 T02：dashboard 由 `platform-governance/operations-dashboard` 承载，其余 32 个由 `platform-governance/operations-command` 承载。两次移交都只替换各自原全局 manifest 插槽的 owner segment，没有改变公开路由顺序、method/path、鉴权、响应、数据副作用或部署方式；T06 facade 和 runtime context 已无 operations 依赖。
@@ -120,7 +120,7 @@ QC 同样保留原 commission/institution、先查检查再读 body、FHIR 失�
 只消费 `publishDiagnosticReportToFhir` 与 UUID 端口。两个写用例均已离开 `clinical-blood`，其余影像写命令
 与互认流程仍在混合路由。QC 的外部调用先于本地提交、无幂等/CAS/机构范围等既有债务未被本切片关闭。
 
-体检首个标准接口为 `physical-examination-dashboard-query.v1`：通过 `buildPhysicalExamOverview`、`buildPhysicalExamReadiness` 两个注入端口生成查询视图，并在用例内统一 citizen 最小 readiness 与管理角色完整投影。HTTP 适配器继续执行范围拒绝、安全事件、居民访问审计、持久化和最终脱敏；体检导入与闭环命令尚未迁移。
+体检标准接口现包括 `physical-examination-dashboard-query.v1` 和 `physical-examination-specialized-intake-action-command.v1`。前者通过两个注入端口生成查询视图并统一角色投影；后者通过显式业务、审计、时钟、规范化和持久化端口执行专项分流动作。HTTP 适配器继续执行鉴权、请求解析、记录定位、居民范围、错误映射及响应；体检导入、异常处置、联调等命令尚未迁移。
 
 ## 9. SQLite migration 模块
 

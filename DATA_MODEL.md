@@ -181,7 +181,7 @@ legal-hold）不会再为新记录让位；这只关闭静默数据丢失，不�
 表、schema、migration、outbox 或生产事实源资格。外部 FHIR 成功而本地写失败仍可能不一致，继续作为
 `NO-GO` 风险保留。
 
-体检 dashboard 查询读取 `personalRecords[category=physical-exam]`、异常案例、联调、专项分流、附件、网关事件和慢病任务等既有投影。7 个体检候选集合仍为 `legacy-non-authoritative`，没有被本切片晋升为生产 Owner；显式居民查询继续由 HTTP 适配器持久化原有访问审计，查询端口不写业务集合，也不改变 schema、migration 或事实源。
+体检 dashboard 查询读取 `personalRecords[category=physical-exam]`、异常案例、联调、专项分流、附件、网关事件和慢病任务等既有投影。专项分流命令继续调用既有服务修改 `physicalExamSpecializedIntakes` 中的目标记录，并按原顺序追加居民访问审计、安全事件后规范化写回；未引入新集合、字段、索引、事务或迁移。7 个体检候选集合仍为 `legacy-non-authoritative`，没有被本切片晋升为生产 Owner；查询与命令端口都不改变 schema、migration 或事实源。
 
 ## 9. REG-01A 区域共享数据合同
 

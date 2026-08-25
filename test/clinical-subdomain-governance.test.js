@@ -40,8 +40,22 @@ test("clinical specialty governance defines exactly five bounded subdomains", ()
   );
   assert.deepEqual(
     registry.subdomains[3].implementedUseCases.map((useCase) => useCase.id),
-    ["physical-examination-dashboard-query.v1"]
+    [
+      "physical-examination-dashboard-query.v1",
+      "physical-examination-specialized-intake-action-command.v1"
+    ]
   );
+});
+
+test("physical examination specialized intake command remains in its target source root", () => {
+  const route = fs.readFileSync(
+    path.join(ROOT, "src/http/routes/clinical-specialties/blood-innovation.js"),
+    "utf8"
+  );
+
+  assert.match(route, /createPhysicalExaminationSpecializedIntakeActionCommand/);
+  assert.match(route, /\/api\/physical-exams\/specialized-intakes\/:id\/actions/);
+  assert.doesNotMatch(route, /PhysicalExaminationService\.applySpecializedIntakeAction\(data, intakeId, payload/);
 });
 
 test("imaging study share command cannot return to the clinical blood route", () => {

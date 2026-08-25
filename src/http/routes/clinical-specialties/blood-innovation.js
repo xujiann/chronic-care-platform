@@ -3,6 +3,9 @@
 const {
   createPhysicalExaminationDashboardQuery
 } = require("../../../clinical-specialties/physical-examination/dashboard-query");
+const {
+  createPhysicalExaminationSpecializedIntakeActionCommand
+} = require("../../../clinical-specialties/physical-examination/specialized-intake-action-command");
 
 function createRouteSegment(runtime) {
   const { BloodEventHub, BloodGoLiveService, BloodInnovationService, PhysicalExaminationService, allowedResidentIdsForUser, appendDataAccessLog, appendSecurityEvent, buildPhysicalExamProductionReadiness, canAccessResident, canAccessSecureAttachment, collectJson, isProductionRuntime, normalizeState, randomUUID, readDatabase, redactSensitiveResponse, requireApiRole, rowMatchesOrganizationScope, sendJson, writeDatabase } = runtime;
@@ -193,10 +196,15 @@ function createRouteSegment(runtime) {
           return true;
         }
         try {
-          const intake = PhysicalExaminationService.applySpecializedIntakeAction(data, intakeId, payload, { actor: user.username || user.role, now: new Date().toISOString() });
-          appendDataAccessLog(data, user, intake.residentId, "专项体检分流处置", `${intake.examProgramName} · ${payload.action}`);
-          appendSecurityEvent({ actor: user.name, role: user.role, action: "专项体检分流处置", target: intake.id, result: "成功", detail: `${payload.action} · ${payload.evidenceRef}` });
-          writeDatabase(normalizeState(data));
+          const physicalExaminationSpecializedIntakeActionCommand = createPhysicalExaminationSpecializedIntakeActionCommand({
+            applySpecializedIntakeAction: (...args) => PhysicalExaminationService.applySpecializedIntakeAction(...args),
+            appendDataAccessLog,
+            appendSecurityEvent,
+            normalizeState,
+            now: () => new Date().toISOString(),
+            writeDatabase
+          });
+          const intake = physicalExaminationSpecializedIntakeActionCommand.execute({ data, intakeId, payload, user });
           sendJson(res, 200, { ok: true, intake });
         } catch (error) {
           const status = Number(error?.statusCode || 400);

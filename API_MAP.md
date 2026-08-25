@@ -146,6 +146,8 @@ DiagnosticReport provider 后单次持久化并返回 200；provider 失败仍�
 
 `GET /api/physical-exams` 已通过兼容委托接入 `physical-examination-dashboard-query.v1`。允许角色仍为 citizen、institution、commission；显式 `residentId` 继续按 `allowedResidentIdsForUser` 拒绝越权并记录安全事件。citizen 仍不接收联调、网关和专项分流明细，readiness 只暴露代码状态、质量和阻断数量；管理角色保留完整投影。成功响应继续在既有访问审计持久化之后执行最终脱敏。
 
+`POST /api/physical-exams/specialized-intakes/:id/actions` 已通过兼容委托接入 `physical-examination-specialized-intake-action-command.v1`。允许角色仍为 institution、commission；调用顺序仍为鉴权 → body → 数据读取/记录定位 → 居民范围 → 业务动作 → 访问审计 → 安全审计 → 规范化写入 → `200 { ok, intake }`。范围拒绝仍为 403，领域错误仍映射 404/409/400；method、path、请求/响应、路由插槽、幂等和并发语义均未改变。
+
 TEST-007 已把 T02 `operations-command` 的 32 条路径全部纳入运行时行为矩阵：每条路径验证声明角色和
 deny-before-read，19 条 GET 验证只读响应，13 条 POST 验证 payload/错误、响应、状态副作用及审计—写入
 顺序；三条 integration POST 另验证签名与 institution 机构范围。该矩阵没有新增 idempotency、CAS 或

@@ -237,7 +237,7 @@ CORE_DATA_DEFINITIONS → collection-governance → CI/release 治理投影`。�
 
 影像 dashboard 当前依赖方向为 `HTTP route → imaging-dashboard-query.v1 → 注入的 dashboard builder / 脱敏端口 → imaging/public-response`。share 写边界为 `imaging-cloud route → imaging-study-share-command.v1 → appendDataAccessLog / randomUUID ports`；QC 写边界为 `imaging-cloud route → imaging-study-quality-control-command.v1 → publishDiagnosticReportToFhir / randomUUID ports`。HTTP 层继续拥有鉴权、查找/404、body、FHIR 错误审计、单次持久化和响应投影。`publishDiagnosticReportToFhir` 从 `clinical-blood` 子上下文转移到 `imaging-cloud`，两者依赖数分别变为 30 和 12，全域 76 项依赖集合不变；`clinical-blood` 因其余遗留影像用例仍需其他端口而暂不能完成收窄。QC 仍是请求路径外调后本地写入，未增加 outbox 或反向依赖。
 
-体检 dashboard 当前依赖方向为 `HTTP route → physical-examination-dashboard-query.v1 → 注入的 Overview / readiness 端口`。查询端口不导入根目录体检服务或 `server.js`；实现仍由组合根注入，且继续接收宽 JSON 快照。居民授权集合、生产运行标志、审计持久化和脱敏仍是 HTTP/平台端口，避免领域查询拥有身份或存储实现。
+体检 dashboard 当前依赖方向为 `HTTP route → physical-examination-dashboard-query.v1 → 注入的 Overview / readiness 端口`。专项分流写边界为 `blood-innovation HTTP adapter → physical-examination-specialized-intake-action-command.v1 → 注入的既有业务动作 / 审计 / 时钟 / 规范化 / 持久化端口`；适配器继续拥有鉴权、body、读取/定位、居民范围、错误映射与响应。两个体检端口均不导入根目录体检服务或 `server.js`，但仍接收宽 JSON 快照；混合路由和共享存储耦合尚未消除。
 
 医院运行依赖方向现为 `platform-governance/operations-dashboard|operations-command HTTP route → 注入的既有 operations builders / 数据与审计端口`。dashboard 保留 8 项只读依赖，command 的 20 项依赖完整迁入 T02 runtime context；T06 已删除两个 operations 子上下文及其独占依赖。builder、组合根、数据、响应和写入顺序均未移动，原两个全局路由插槽保持不变；本切片只关闭错误领域归属，不把宽 handler 误述为已完成用例拆分。
 
