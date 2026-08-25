@@ -348,3 +348,7 @@ evaluators → 部署 anchor 漂移校验 → Ed25519 报告信封验证 → 受
 经过同一 JSON 读取边界，再由既有 Ed25519/96 场景合同验证；alert journal 单独按 JSONL 链合同验证。
 CLI 不依赖 `server.js`、HTTP、数据库 client、worker runtime、rollback executor 或外部网络。deployment package
 只登记源码闭包、既有生产 trust-anchor 变量名称，不携带文件值、凭据或现场证据。
+
+## 9+5 开发组织依赖方向
+
+治理依赖固定为 `process-workstreams + clinical-subdomains + service-extraction-scorecard → development-organization-governance → architecture/governance CI`。组合合同不被运行时、路由或 repository 反向依赖，不读取业务数据库，也不改变 T01–T09 或 T06 子域的实现依赖。开发协作方向为 `领域工作树 → main/T00 集成 → 共享门禁 → 模块化单体部署`。

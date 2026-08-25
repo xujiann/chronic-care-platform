@@ -396,3 +396,7 @@ sink 仍在 Inventory 中失败关闭；仓库测试不证明真实体检设备�
 信任授权，仍保持 NO-GO/退出 2；五份报告必须由不同账号、key ID
 与公钥材料签发、摘要绑定且签发年龄/生命周期不超过 48 小时的 Ed25519
 信封；自报 ready 或坏签名均失败。五个入口不能写入 `/api/production-go-no-go/*`，不能执行切换、回滚或 worker。
+
+## 36. 9+5 开发组织（无 HTTP 变化）
+
+组织合同不新增或改变任何 HTTP method/path、路由顺序、认证、角色、scope、错误、幂等或审计语义。九个一级域继续以 `process-workstreams` 的路由 Owner 为权威，五个临床子域继续以 `clinical-subdomains` 的 API 前缀归属为权威；组织门禁不建立第三份 API 清单。

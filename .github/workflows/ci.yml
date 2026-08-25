@@ -122,6 +122,8 @@ jobs:
         run: node --test test/process-worktree.test.js
       - name: Verify current workflow, Markdown inventory and tracked PDF provenance
         run: npm run repository:governance:verify
+      - name: Verify nine plus five development organization
+        run: npm run development-organization:verify
       - name: Test modular-monolith architecture contracts
         run: npm run architecture:test
       - name: Protect all operations command runtime behaviors

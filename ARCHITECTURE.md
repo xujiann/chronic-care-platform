@@ -29,6 +29,7 @@
 | [MODULE_CLASSIFICATION.md](./MODULE_CLASSIFICATION.md) | A/B/C/D 模块处置 |
 | [MODULE_INTERFACE_STANDARD.md](./MODULE_INTERFACE_STANDARD.md) | 标准依赖方向和接口约束 |
 | [REFACTORING_SAFETY_NET.md](./REFACTORING_SAFETY_NET.md) | 遗留代码测试保护 |
+| [DEVELOPMENT_ORGANIZATION.md](./DEVELOPMENT_ORGANIZATION.md) | 9 个一级开发域、5 个临床子域和 T00 集成权 |
 | [DATABASE_SCHEMA.md](./DATABASE_SCHEMA.md) | 当前 schema/migration 台账 |
 | [DATABASE_DEVELOPMENT_STANDARD.md](./DATABASE_DEVELOPMENT_STANDARD.md) | 数据库开发规则 |
 | [CORE_DATA_DEFINITIONS.md](./CORE_DATA_DEFINITIONS.md) | 核心数据不可变概念 |
@@ -38,6 +39,7 @@
 ## 已接受方向
 
 - `main` 是唯一集成和发布主干。
+- 开发组织采用 T01–T09 九个一级开发域，T00 仅作为集成治理单元；急救、血液、影像、体检、质量安全作为 T06 下五个嵌套开发子域。各单元可独立计划、工作树和测试，但继续使用单仓、共享运行时和模块化单体部署。
 - 采用模块化单体；微服务提取必须达到机器评分和运维/数据门槛。
 - v1–v14 SQLite migration 语义冻结，后续采用独立、内容指纹化 migration。
 - 核心数据采用 closed-world 定义，不随功能任务创建平行概念。
