@@ -19,6 +19,7 @@
 |---|---|---|---|---|
 | `src/http/api-router.js` + route registry | T00 | A | 顺序、ID 唯一和短路有测试 | 保持稳定，不加领域逻辑 |
 | process worktree/ownership | T00 | A | 可执行计划、创建和越界验证 | 保持主线唯一性 |
+| 9+5 development organization governance | T00 | B | 只组合既有 Owner 权威，闭集、统一部署和漂移有负向测试 | 不复制 API/数据 Owner；随正式 Owner 决策小步同步 |
 | regional manifests/runtime | T00 | B | 边界明确、入度较高 | 逐步降低 manifest 耦合 |
 | `server.js` 组合根 | T00 | C | 28.2k 行、职责过多 | 先测后抽端口，不整体重写 |
 | 静态资源发布实现 | T00 | B | Node/Pages 共用显式 allowlist 与负向测试 | 新资源必须注册，不扩大默认发布面 |

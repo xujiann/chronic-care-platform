@@ -15,6 +15,8 @@ Before changing a protected runtime file, identify the process from the current
 
 1. T00 exclusively owns `server.js`, the router, route order, runtime-source
    composition, workflow/ownership configuration, CI, and deployment packaging.
+   T00 is the integration governance unit and is not counted as one of the nine
+   primary development domains defined by `DEVELOPMENT_ORGANIZATION.md`.
 2. T01-T09 may edit only their owned route modules among protected files.
 3. Domain code, tests, and documentation may be changed by the responsible
    process, but cross-domain protocol or route-order changes must be handed to T00.
@@ -108,7 +110,8 @@ At the start of each development day:
 1. Inspect branch, worktree and user changes. Pull only when safe.
 2. Inspect latest default-branch/current-PR CI and yesterday's PR/review state.
 3. Read `ROADMAP.md`, `ARCHITECTURE.md`, this file,
-   `ENGINEERING_GOVERNANCE.md`, the six AS-IS maps and relevant ADRs.
+   `ENGINEERING_GOVERNANCE.md`, `DEVELOPMENT_ORGANIZATION.md`, the six AS-IS
+   maps and relevant ADRs.
 4. Search existing implementations and produce a PLAN with goal, scope,
    non-goals, owner, options, risk, migration/rollback, tests and completion.
 5. Do not code before the user or designated owner approves the direction.

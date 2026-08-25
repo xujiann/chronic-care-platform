@@ -373,3 +373,7 @@ environment、joint-test、monitoring、rehearsal 与 candidate 文件均为仓�
 上游 schema、完整检查项和授权账本，不接受自报 ready 的 JSON。
 `cutoverExecutionAuthorized=false`、`executionAuthorized=false`、
 `runtimeCutoverEnabled=false`、`productionPrimary=false`、`productionReady=false` 固定不变。
+
+## 26. 9+5 开发组织不是数据模型
+
+开发组织合同只保存进程 ID、父子关系和开发政策，不新增 collection、表、字段、DDL、migration、数据分类或事实源。process Owner、临床子域 Owner 和数据 Owner 继续分别由现有权威清单管理；T01–T09 或 T06 子域身份不能自动推断生产数据 Owner。

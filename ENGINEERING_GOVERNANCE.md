@@ -212,3 +212,5 @@ PLAN 前不得编码；批准只覆盖明示范围。任何阶段失败都回到
 `self-hosted, production-promotion` 的受控 runner 上执行 immutable package verify 与 strict preflight。
 仓库工作流只上传 digest-only、create-once 的 eligibility receipt；它不执行生产部署，也不替代 environment
 reviewer、变更审批、现场签收或回滚指令。
+
+开发组织的唯一组合合同是 `config/development-organization.json`。它只引用现有 Owner 权威：T00 是不计入九域的集成治理单元，T01–T09 是九个一级开发域，五个临床子域嵌套在 T06。任何团队拆仓、独立运行时或独立部署仍须通过服务提取评分和独立 ADR。

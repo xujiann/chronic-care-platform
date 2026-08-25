@@ -283,7 +283,7 @@ Accepted、data owner 与兼容策略获人类批准后才能进入逐切片实�
 |---|---|---|---|
 | `config/repository-governance.json` | T00 | 当前 workflow、Markdown 分类规则/闭集摘要、3 个 PDF 来源与 digest 的机器合同 | 不定义业务 owner，不包含 PDF 正文 |
 | `scripts/repository-governance.js` | T00 | 只读枚举 Git 路径，拒绝漏分/重叠/快照改写/旧 baseline/PDF 漂移 | 不生成或修改文档、PDF、报告和归档 |
-| `test/repository-governance.test.js` | T00 / TEST-001 | 锁定 265 份 Markdown、三类边界、当前 main 流程和 3 个 PDF 负向漂移 | 不证明 PDF 内容正确或生产可用 |
+| `test/repository-governance.test.js` | T00 / TEST-001 | 锁定 267 份 Markdown、三类边界、当前 main 流程和 3 个 PDF 负向漂移 | 不证明 PDF 内容正确或生产可用 |
 
 依赖方向为 `Git 跟踪路径 + ADR 状态 + 当前进程清单 + PDF bytes/source paths → repository governance
 verifier → governance-api/architecture:test`。snapshot 与 superseded 只提供历史证据，不得反向覆盖 current
@@ -312,3 +312,7 @@ verifier → governance-api/architecture:test`。snapshot 与 superseded 只提�
 入口依赖采用 `CLI → 既有 evaluator → technical-evidence`，不依赖 `server.js`、HTTP、数据库 client 或
 strict preflight。candidate 用部署 anchor 摘要检查漂移，只聚合五份由不同账号、key ID、公钥材料签发且
 不超过 48 小时的摘要绑定报告信封；普通 CLI 固定 NO-GO，未来受信宿主绑定仍保持 `GO-CANDIDATE` 上限。
+
+## 9+5 开发组织模块
+
+`config/development-organization.json` 将 T01–T09 组合为九个一级开发域，并将五个临床子域作为 T06 的唯一嵌套组；T00 是独立的集成治理单元。`development-organization-governance` 只读取现有 process、clinical 和 service-extraction 权威并校验闭集、一致性与统一部署政策，不拥有路由、数据集合或业务状态。该模块分类为 B（KEEP + IMPROVE）：边界小且有负向测试，后续只随 Owner 决策同步演进。

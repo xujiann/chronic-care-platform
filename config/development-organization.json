@@ -1,0 +1,53 @@
+{
+  "schemaVersion": "development-organization-v1",
+  "model": "nine-primary-development-domains-plus-five-clinical-subdomains",
+  "status": "accepted",
+  "authorities": {
+    "processOwnership": "config/process-workstreams.json",
+    "clinicalSubdomains": "config/clinical-subdomains.json",
+    "dataOwnership": "config/domain-data-ownership.json",
+    "serviceExtraction": "config/service-extraction-scorecard.json"
+  },
+  "integrationUnit": {
+    "processId": "T00",
+    "countsAsPrimaryDevelopmentDomain": false,
+    "responsibility": "integration-governance"
+  },
+  "primaryDevelopmentDomainIds": [
+    "T01",
+    "T02",
+    "T03",
+    "T04",
+    "T05",
+    "T06",
+    "T07",
+    "T08",
+    "T09"
+  ],
+  "nestedDevelopmentGroups": [
+    {
+      "id": "clinical-five",
+      "parentProcessId": "T06",
+      "ownerNamespace": "T06",
+      "memberIds": [
+        "emergency",
+        "blood",
+        "imaging",
+        "physical-examination",
+        "quality-safety"
+      ]
+    }
+  ],
+  "developmentPolicy": {
+    "planningBoundary": "independent-domain-plan",
+    "worktreeBoundary": "independent-process-worktree",
+    "sourceOwnership": "delegated-by-authority",
+    "testBoundary": "domain-tests-plus-shared-gates",
+    "integrationBranch": "main",
+    "repositoryBoundary": "single-repository",
+    "runtimeBoundary": "shared-node-runtime",
+    "deploymentBoundary": "modular-monolith",
+    "independentDeploymentAuthorized": false,
+    "crossDomainChangeOwner": "T00"
+  }
+}

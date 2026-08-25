@@ -29,7 +29,7 @@ flowchart TB
 
 ## 2. 仓库结构
 
-本治理切片闭集盘点 1,576 个受跟踪及本分支待跟踪文件，其中 JavaScript 1,077、Markdown 265、JSON 106、HTML 44。主要目录：
+本治理切片闭集盘点 1,585 个受跟踪及本分支待跟踪文件，其中 JavaScript 1,083、Markdown 267、JSON 107、HTML 44。主要目录：
 
 | 路径 | 作用 | 当前边界 |
 |---|---|---|
@@ -253,7 +253,7 @@ Worker、外部数字医院注册及仍为 Proposed 的对象存储 v2 worker �
 `baseline/governance-20260817-enhancement-v1` 仅保留为可复现证据 tag。历史日期化路由/治理文档不再被
 `AGENTS.md` 作为当前工作流入口引用，原文和摘要保持不变。
 
-`repository-governance-v1` 从 Git 路径派生 265 份 Markdown 的闭集清单：196 份 `current`、68 份
+`repository-governance-v1` 从 Git 路径派生 267 份 Markdown 的闭集清单：198 份 `current`、68 份
 `snapshot`、1 份 `superseded`，每个路径必须唯一命中规则；snapshot 内容聚合摘要失败关闭。
 `output/pdf` 的 3 个 PDF 未修改，分别绑定 SHA-256、大小、页数、引入提交、来源与保留理由。现有仓库
 没有任何一个 PDF 的可复现生成器；医院运行脚本只是 verifier，不能被描述为 generator。机器门禁只读，
@@ -288,3 +288,7 @@ reconciliation 观察。所有入口要求调用方提供发布号和包指纹�
 `GO-CANDIDATE`；所有入口固定 `cutoverExecutionAuthorized=false`、
 `executionAuthorized=false`、`runtimeCutoverEnabled=false`、`productionPrimary=false`、
 `productionReady=false`，没有启动 worker、执行 rollback、写数据库或修改 HTTP。
+
+## 2026-08-25 9+5 开发组织
+
+当前开发组织由 T00 集成治理单元、T01–T09 九个一级开发域和 T06 下五个临床子域组成。T00 不计入一级开发域；五个临床子域也不提升为一级域。机器合同只组合既有 process 与 clinical Owner 权威，不复制路由或数据 Owner。各域可以独立 PLAN、工作树和领域测试，但仓库、`main`、Node.js 运行时、CI 和模块化单体部署保持统一，独立部署继续未授权。
