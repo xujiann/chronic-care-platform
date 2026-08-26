@@ -439,6 +439,13 @@
       "classification": "internal",
       "readers": ["platform-governance", "care-coordination", "clinical-specialties", "public-health"]
     },
+    "secureAttachments": {
+      "owner": "integration",
+      "classification": "restricted",
+      "readers": ["citizen-chronic", "clinical-specialties", "platform-governance"],
+      "writeContract": "object-storage-durable-command-and-metadata.v2",
+      "productionWriteAllowed": false
+    },
     "platformIntegrations": {
       "owner": "integration",
       "classification": "internal",

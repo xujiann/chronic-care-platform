@@ -67,5 +67,5 @@ owner 登记或 CI 通过自动晋升。
 
 Proposed ADR 可以在机器决策台账中预留“当前 head + 1”供冲突检测，但预留不是 migration、owner 或实施
 授权。台账必须默认关闭 migration/runtime/API/production promotion；若 head 在 ADR Accepted 前前进，
-应失败关闭并重新评审版本，而不是覆盖已合入 migration。本规则当前用于对象存储 v17 提案；实际 DDL、
+应失败关闭并重新评审版本，而不是覆盖已合入 migration。本规则已用于对象存储 v17；实际 DDL、
 回填、冻结和回滚只能在 ADR Accepted 与 data owner 确认后的独立切片中建立。

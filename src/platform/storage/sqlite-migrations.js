@@ -14,6 +14,12 @@ const {
   createFollowupDispatchOutboxSchema,
   followupDispatchMigrationFingerprintDependencies
 } = require("../../citizen-chronic/followup-dispatch-outbox");
+const {
+  backfillObjectStorageFromLegacyCollection,
+  createObjectStorageDurableSchema,
+  createSqliteObjectStorageRepository,
+  objectStorageMigrationFingerprintDependencies
+} = require("./object-storage-durable");
 
 const MIGRATION_OWNER = "T00/data-governance";
 const FROZEN_LEGACY_MAX_VERSION = 14;
@@ -582,6 +588,19 @@ const MIGRATION_DEFINITIONS = [
       createFollowupDispatchOutboxSchema(db);
       backfillFollowupDispatchOutboxFromCollections(db);
     }
+  },
+  {
+    version: 17,
+    name: "add durable object storage metadata and command track",
+    fingerprintDependencies: [
+      createObjectStorageDurableSchema,
+      backfillObjectStorageFromLegacyCollection,
+      ...objectStorageMigrationFingerprintDependencies
+    ],
+    apply(db) {
+      createObjectStorageDurableSchema(db);
+      backfillObjectStorageFromLegacyCollection(db);
+    }
   }
 ].map((migration) => ({ ...migration, owner: MIGRATION_OWNER }));
 
@@ -733,6 +752,7 @@ module.exports = {
   appendFollowupDispatchOutboxChanges,
   applySqliteMigrations,
   createSqliteFollowupDispatchRepository,
+  createSqliteObjectStorageRepository,
   legacyLedgerChecksum,
   migrationContentFingerprint,
   readSqliteSchemaFingerprint,

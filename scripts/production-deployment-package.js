@@ -47,6 +47,22 @@ const WORKER_OBSERVABILITY_RUNTIME_FILES = [
 const PRODUCTION_RELEASE_SCOPE_RUNTIME_FILES = [
   "config/production-release-scope.json"
 ];
+const OBJECT_STORAGE_COMMAND_RUNTIME_FILES = [
+  "scripts/object-storage-command-worker.js",
+  "src/platform/operations/object-storage-command-worker.js",
+  "src/platform/storage/object-storage-durable.js",
+  "deploy/object-storage-command-worker.service.template",
+  "deploy/object-storage-command-worker.timer.template",
+  "deploy/object-storage-command-worker.env.template"
+];
+const OBJECT_STORAGE_COMMAND_CONFIGURATION_VARIABLES = Object.freeze([
+  "DATA_DIR", "OBJECT_STORAGE_COMMAND_SQLITE_FILE", "OBJECT_STORAGE_COMMAND_WORKER_ID",
+  "OBJECT_STORAGE_CURSOR_SIGNING_SECRET", "OBJECT_STORAGE_COMMAND_WORKER_LIMIT",
+  "OBJECT_STORAGE_COMMAND_LEASE_SECONDS", "OBJECT_STORAGE_COMMAND_BASE_BACKOFF_SECONDS",
+  "OBJECT_STORAGE_GATEWAY_URL", "OBJECT_STORAGE_BUCKET", "OBJECT_STORAGE_GATEWAY_CONTRACT_VERSION",
+  "OBJECT_STORAGE_SIGNING_SECRET", "OBJECT_STORAGE_RECEIPT_SIGNING_SECRET",
+  "OBJECT_STORAGE_UPLOAD_URL_ALLOWED_ORIGINS", "OBJECT_STORAGE_DOWNLOAD_URL_ALLOWED_ORIGINS"
+]);
 const POSTGRES_TRANSITION_RUNTIME_FILES = [
   "postgres-runtime-sync.js",
   "postgres-production-adapter.js",
@@ -213,6 +229,7 @@ const REQUIRED_RUNTIME_FILES = [
   ...PRODUCTION_EVIDENCE_TRUST_RUNTIME_FILES,
   ...WORKER_OBSERVABILITY_RUNTIME_FILES,
   ...PRODUCTION_RELEASE_SCOPE_RUNTIME_FILES,
+  ...OBJECT_STORAGE_COMMAND_RUNTIME_FILES,
   ...PREPRODUCTION_CONTROL_RUNTIME_FILES
 ];
 const ADDITIONAL_RUNTIME_FILES = [
@@ -224,6 +241,7 @@ const ADDITIONAL_RUNTIME_FILES = [
   ...PRODUCTION_EVIDENCE_TRUST_RUNTIME_FILES,
   ...WORKER_OBSERVABILITY_RUNTIME_FILES,
   ...PRODUCTION_RELEASE_SCOPE_RUNTIME_FILES,
+  ...OBJECT_STORAGE_COMMAND_RUNTIME_FILES,
   ...PREPRODUCTION_CONTROL_RUNTIME_FILES
 ];
 const RUNTIME_DIRECTORIES = ["src/http", "src/platform/regional", "src/platform/storage", "regions"];
@@ -238,6 +256,7 @@ const SECRET_CONTRACT = [
   ["HOSPITAL_ADAPTER_SECRET", "hospital connector signing"],
   ["OBJECT_STORAGE_SIGNING_SECRET", "object storage request signing"],
   ["OBJECT_STORAGE_RECEIPT_SIGNING_SECRET", "object storage gateway response verification"],
+  ["OBJECT_STORAGE_CURSOR_SIGNING_SECRET", "object storage scope-bound keyset cursor signing"],
   ["FINANCIAL_GATEWAY_SECRET", "payment insurance and certificate signing"],
   ["FINANCIAL_CALLBACK_SECRET", "payment insurance and certificate callback verification"],
   ["SIEM_SIGNING_SECRET", "SIEM alert signing"],
@@ -552,6 +571,17 @@ function buildProductionDeploymentPackage(options = {}) {
       sourceContract: "citizen-chronic.followup-dispatch-outbox.v1",
       productionReady: false
     }, {
+      id: "object-storage-durable-command-v2",
+      entrypoint: "node scripts/object-storage-command-worker.js",
+      preflight: "npm run object-storage:command-preflight",
+      serviceTemplate: "deploy/object-storage-command-worker.service.template",
+      timerTemplate: "deploy/object-storage-command-worker.timer.template",
+      configurationTemplate: "deploy/object-storage-command-worker.env.template",
+      configurationVariables: [...OBJECT_STORAGE_COMMAND_CONFIGURATION_VARIABLES],
+      sourceContract: "object-storage-durable-command-and-metadata.v2",
+      externalEvidenceRequired: true,
+      productionReady: false
+    }, {
       id: "postgres-shadow-sync",
       entrypoint: "node scripts/postgres-sync-worker.js",
       serviceTemplate: "deploy/postgres-sync-worker.service.template",
@@ -630,7 +660,7 @@ function buildProductionDeploymentPackage(options = {}) {
     check("deploymentPackage:runtimeFiles", files.length >= 30 && REQUIRED_RUNTIME_FILES.every((name) => files.some((item) => item.path === name)), `${files.length} runtime files with required entrypoints`),
     check("deploymentPackage:digest", /^[a-f0-9]{64}$/.test(digest) && files.every((item) => /^[a-f0-9]{64}$/.test(item.sha256)), `sha256:${digest}`),
     check("deploymentPackage:secretBoundary", secretContract.valuesPersisted === false && secretContract.variables.length >= 10 && secretContract.variables.every((item) => item.name && item.persistedInArtifact === false && !("value" in item)), `${secretContract.variables.length} secret references; values persisted false`),
-    check("deploymentPackage:processContract", processContract.healthChecks.length === 4 && processContract.healthChecks.some((item) => item.route === "/api/live" && item.purpose === "process-liveness" && item.authentication === "none") && processContract.healthChecks.some((item) => item.route === "/api/health" && item.purpose === "dependency-readiness" && item.authentication === "none") && processContract.restartPolicy === "on-failure" && processContract.gracefulShutdownSeconds >= 30 && processContract.productionPreflight.productionReady === false && processContract.backgroundJobs.some((item) => item.id === "continuous-audit-delivery" && item.productionReady === false) && processContract.backgroundJobs.some((item) => item.id === "chronic-followup-durable-dispatch" && item.productionReady === false) && processContract.backgroundJobs.some((item) => item.id === "postgres-shadow-sync" && item.productionReady === false) && processContract.backgroundJobs.some((item) => item.id === "postgres-shadow-reconciliation" && item.productionReady === false) && processContract.preproductionControls.length === 5 && processContract.preproductionControls.every((item) => item.readOnly === true && item.externalEvidenceRequired === true && item.cutoverExecutionAuthorized === false && item.executionAuthorized === false && item.runtimeCutoverEnabled === false && item.productionPrimary === false && item.productionReady === false), `${processContract.supervisor} / ${processContract.healthChecks.length} health checks / ${processContract.backgroundJobs.length} background jobs / ${processContract.preproductionControls.length} pre-production controls`),
+    check("deploymentPackage:processContract", processContract.healthChecks.length === 4 && processContract.healthChecks.some((item) => item.route === "/api/live" && item.purpose === "process-liveness" && item.authentication === "none") && processContract.healthChecks.some((item) => item.route === "/api/health" && item.purpose === "dependency-readiness" && item.authentication === "none") && processContract.restartPolicy === "on-failure" && processContract.gracefulShutdownSeconds >= 30 && processContract.productionPreflight.productionReady === false && processContract.backgroundJobs.some((item) => item.id === "continuous-audit-delivery" && item.productionReady === false) && processContract.backgroundJobs.some((item) => item.id === "chronic-followup-durable-dispatch" && item.productionReady === false) && processContract.backgroundJobs.some((item) => item.id === "object-storage-durable-command-v2" && item.productionReady === false && item.externalEvidenceRequired === true) && processContract.backgroundJobs.some((item) => item.id === "postgres-shadow-sync" && item.productionReady === false) && processContract.backgroundJobs.some((item) => item.id === "postgres-shadow-reconciliation" && item.productionReady === false) && processContract.preproductionControls.length === 5 && processContract.preproductionControls.every((item) => item.readOnly === true && item.externalEvidenceRequired === true && item.cutoverExecutionAuthorized === false && item.executionAuthorized === false && item.runtimeCutoverEnabled === false && item.productionPrimary === false && item.productionReady === false), `${processContract.supervisor} / ${processContract.healthChecks.length} health checks / ${processContract.backgroundJobs.length} background jobs / ${processContract.preproductionControls.length} pre-production controls`),
     check("deploymentPackage:releaseScope", productionReleaseScope.ok === true && productionReleaseScope.productionReady === false && productionReleaseScope.externalEvidenceRequired === true && PRODUCTION_RELEASE_SCOPE_RUNTIME_FILES.every((name) => files.some((item) => item.path === name)) && processContract.productionReleaseScope.scopeFingerprint === productionReleaseScope.scopeFingerprint, `${productionReleaseScope.scopeId} / ${productionReleaseScope.scopeFingerprint} / FROZEN-NO-GO`),
     check("deploymentPackage:databaseTransition", POSTGRES_TRANSITION_RUNTIME_FILES.every((name) => files.some((item) => item.path === name)) && templateHasVariables(root, "deploy/platform-production-adapters.env.template", POSTGRES_TRANSITION_CONFIGURATION_VARIABLES) && postgresDeploymentTemplatesValid(root) && processContract.databaseTransition.productionReady === false && processContract.databaseTransition.productionPrimary === false && processContract.databaseTransition.runtimeCutoverEnabled === false && processContract.databaseTransition.activationAuthorized === false && !JSON.stringify(processContract).includes("DATABASE_URL") && secretContract.variables.some((item) => item.name === "DATABASE_URL" && !Object.hasOwn(item, "value")), "PostgreSQL transition commands, workers, hardened templates and secret boundary remain fail closed"),
     check("deploymentPackage:preproductionControls", PREPRODUCTION_CONTROL_RUNTIME_FILES.every((name) => files.some((item) => item.path === name)) && templateHasVariables(root, "deploy/platform-production-adapters.env.template", PREPRODUCTION_CONTROL_CONFIGURATION_VARIABLES) && processContract.preproductionControls.length === 5, "five read-only pre-production control entrypoints and their runtime/configuration closure are mandatory"),
@@ -703,6 +733,16 @@ function verifyProductionDeploymentPackage(manifest, options = {}) {
   const secretValuesAbsent = manifest?.secretContract?.valuesPersisted === false && (manifest?.secretContract?.variables || []).every((item) => !("value" in item));
   const postgresTransition = manifest?.processContract?.databaseTransition;
   const postgresJobs = manifest?.processContract?.backgroundJobs || [];
+  const objectStorageJob = postgresJobs.find((item) => item.id === "object-storage-durable-command-v2");
+  const objectStorageJobValid = OBJECT_STORAGE_COMMAND_RUNTIME_FILES.every((required) => expectedFiles.some((item) => item.path === required))
+    && objectStorageJob?.entrypoint === "node scripts/object-storage-command-worker.js"
+    && objectStorageJob?.preflight === "npm run object-storage:command-preflight"
+    && objectStorageJob?.configurationTemplate === "deploy/object-storage-command-worker.env.template"
+    && OBJECT_STORAGE_COMMAND_CONFIGURATION_VARIABLES.every((name) => objectStorageJob.configurationVariables?.includes(name))
+    && templateHasVariables(root, "deploy/object-storage-command-worker.env.template", OBJECT_STORAGE_COMMAND_CONFIGURATION_VARIABLES)
+    && objectStorageJob?.sourceContract === "object-storage-durable-command-and-metadata.v2"
+    && objectStorageJob?.externalEvidenceRequired === true
+    && objectStorageJob?.productionReady === false;
   const transitionFlagsClosed = postgresTransition?.readyForControlledRehearsal === false
     && postgresTransition?.activationAuthorized === false
     && postgresTransition?.productionPrimary === false
@@ -769,6 +809,7 @@ function verifyProductionDeploymentPackage(manifest, options = {}) {
     check("deploymentVerify:secretBoundary", secretValuesAbsent && prohibitedPaths.length === 0, prohibitedPaths.join(",") || "secret values and prohibited files absent"),
     check("deploymentVerify:auditWorker", AUDIT_DELIVERY_RUNTIME_FILES.every((required) => expectedFiles.some((item) => item.path === required)) && manifest?.processContract?.backgroundJobs?.some((item) => item.id === "continuous-audit-delivery" && item.productionReady === false && item.preflight === "npm run audit:delivery:preflight" && item.configurationTemplate === "deploy/platform-production-adapters.env.template" && item.configurationVariables?.includes("AUDIT_DELIVERY_SOURCE_CONTRACT") && item.configurationVariables?.includes("PLATFORM_PILOT_CUTOVER_ALERT_JOURNAL_FILE")) && manifest?.secretContract?.variables?.some((item) => item.name === "SIEM_AUDIT_SIGNING_SECRET" && !("value" in item)), "continuous audit dependency closure, process, configuration and secret references are mandatory"),
     check("deploymentVerify:chronicFollowupWorker", CHRONIC_FOLLOWUP_DISPATCH_RUNTIME_FILES.every((required) => expectedFiles.some((item) => item.path === required)) && manifest?.processContract?.backgroundJobs?.some((item) => item.id === "chronic-followup-durable-dispatch" && item.productionReady === false && item.preflight === "npm run chronic:followup-dispatch-preflight" && item.sourceContract === "citizen-chronic.followup-dispatch-outbox.v1" && ["DATA_DIR", "CITIZEN_CHRONIC_FOLLOWUP_DISPATCH_SQLITE_FILE", "CITIZEN_CHRONIC_FOLLOWUP_PUBLISHER_HMAC_SECRET", "CITIZEN_CHRONIC_FOLLOWUP_ACTIVATION_REGISTRY_FILE", "CITIZEN_CHRONIC_FOLLOWUP_ACTIVATION_PUBLIC_KEY_FILE", "CITIZEN_CHRONIC_FOLLOWUP_ACTIVATION_PUBLIC_KEY_SHA256"].every((name) => item.configurationVariables?.includes(name))) && manifest?.secretContract?.variables?.some((item) => item.name === "CITIZEN_CHRONIC_FOLLOWUP_PUBLISHER_HMAC_SECRET" && !("value" in item)), "chronic followup durable worker, canonical SQLite source, activation trust and secret references are mandatory"),
+    check("deploymentVerify:objectStorageWorker", objectStorageJobValid && manifest?.secretContract?.variables?.some((item) => item.name === "OBJECT_STORAGE_CURSOR_SIGNING_SECRET" && !("value" in item)), "object storage durable worker, canonical SQLite source, cursor signing and fixed external-evidence NO-GO are mandatory"),
     check("deploymentVerify:productionEvidenceTrust", PRODUCTION_EVIDENCE_TRUST_RUNTIME_FILES.every((required) => expectedFiles.some((item) => item.path === required)) && manifest?.processContract?.productionPreflight?.entrypoint === "node scripts/production-preflight.js --strict" && manifest?.processContract?.productionPreflight?.trustContract === "platform-governance.production-evidence-trust-decision.v1" && manifest?.processContract?.productionPreflight?.productionReady === false && ["PRODUCTION_EVIDENCE_TRUST_ANCHORS_FILE", "PRODUCTION_EVIDENCE_TRUST_ANCHORS_SHA256", "PRODUCTION_EVIDENCE_TRUST_ENVELOPE_FILE", "PRODUCTION_CUTOVER_ACTION_EVIDENCE_DIR"].every((name) => manifest?.processContract?.productionPreflight?.configurationVariables?.includes(name)), "strict preflight includes the pinned Ed25519 production and cutover-action evidence providers and remains NO-GO by default"),
     check("deploymentVerify:releaseScope", releaseScopeValid, packagedReleaseScope?.scopeFingerprint || "missing"),
     check("deploymentVerify:postgresTransition", postgresFilesPresent && postgresVariablesPresent && templateHasVariables(root, "deploy/platform-production-adapters.env.template", POSTGRES_TRANSITION_CONFIGURATION_VARIABLES) && postgresDeploymentTemplatesValid(root) && transitionFlagsClosed && postgresDatabaseUrlSecretOnly && postgresTransition?.commands?.readiness === "npm run postgres:transition-readiness" && postgresTransition?.commands?.migrationPackage === "npm run postgres:migration-package" && postgresTransition?.commands?.migrationVerify === "npm run postgres:migration-verify" && postgresTransition?.commands?.primaryReadRehearsal === "npm run postgres:primary-read-rehearsal" && postgresTransition?.commands?.adapterVerify === "npm run postgres:adapter-verify" && postgresTransition?.commands?.storageBackup === "npm run storage:backup" && postgresTransition?.commands?.storageInspect === "npm run storage:inspect" && postgresTransition?.commands?.storageAssess === "npm run storage:assess -- <backup-dir>" && postgresTransition?.commands?.shadowSync === "npm run postgres:sync-worker" && postgresTransition?.commands?.shadowReconciliation === "npm run postgres:shadow-reconcile" && postgresSyncJobValid && postgresReconciliationJobValid, "PostgreSQL transition entrypoints, variables, hardened templates, secret reference and fixed NO-GO flags are mandatory"),
@@ -873,6 +914,8 @@ if (require.main === module) {
 }
 
 module.exports = {
+  OBJECT_STORAGE_COMMAND_CONFIGURATION_VARIABLES,
+  OBJECT_STORAGE_COMMAND_RUNTIME_FILES,
   PREPRODUCTION_CONTROL_CONFIGURATION_VARIABLES,
   PREPRODUCTION_CONTROL_DEFINITIONS,
   PREPRODUCTION_CONTROL_RUNTIME_FILES,

@@ -77,9 +77,9 @@ function inspectWorkerObservabilityGovernance(options = {}) {
     }))
   });
   checks.push({
-    id: "worker-observability:no-proposed-object-storage-runtime",
-    passed: profiles.every((profile) => !/object-storage/i.test(profile.id))
-      && source.excludedWorkerLikeAssets?.some((item) => item.path === "object-storage-command-worker-v2")
+    id: "worker-observability:accepted-object-storage-runtime",
+    passed: profiles.filter((profile) => profile.id === "object-storage-command-v2").length === 1
+      && !source.excludedWorkerLikeAssets?.some((item) => /object-storage-command-worker-v2/.test(item.path))
   });
   checks.push({
     id: "worker-observability:production-authority",

@@ -270,19 +270,17 @@ row，并可对应多个 append-only replay 记录。
 token、原始错误、原始 provider receipt、凭据和人工审批正文不入库。外部供应方幂等、可信签名回执和
 PostgreSQL 多节点主存储尚未建立，`productionReady=false`。
 
-## 16. 对象存储 v17 候选模型（Proposed，未实施）
+## 16. 对象存储 v17 耐久模型（Accepted，仓库内已实施）
 
-当前权威事实没有变化：`secureAttachments` 仍在遗留 state collection 中，data owner 未确认，SQLite
-head 为 v16。Proposed ADR 仅为未来 v17 预留
+T08 integration 已确认为 data owner，T00 为 technical owner；SQLite head 为 v17。结构化权威模型包括
 `secure_attachment_records`、`object_storage_commands`、`object_storage_command_receipts`、
-`object_storage_reconciliation_cases`、`object_storage_reconciliation_actions` 五组候选关系；仓库当前
-不存在这些表、DDL、回填或 PostgreSQL 对应实现。
+`object_storage_reconciliation_cases`、`object_storage_reconciliation_actions` 五组关系。
 
-候选关系为一条附件元数据对应多个稳定命令；一条命令最多一个当前投递状态并可绑定不可变最小回执；
-附件/命令可关联多个对账 case/action。若 ADR Accepted，回填必须覆盖全部遗留行并以 count/digest/orphan
-失败关闭，通过后冻结遗留写入，不允许结构化表与 collection 在请求路径双写。列表候选使用绑定 scope、
-排序版本和 high-water mark 的 keyset cursor，不能以 500 条数组切片或 offset 替代。上述均非当前 schema
-事实或生产授权；data owner 与 API 兼容仍需人类确认。
+一条附件元数据对应多个稳定命令；一条命令最多一个当前投递状态并可绑定不可变最小回执；
+附件/命令可关联多个对账 case/action。回填覆盖全部遗留行并以 count/digest/orphan 失败关闭，通过后冻结
+遗留写入；v2 请求路径只在本地事务创建附件/命令，不调用 provider。列表使用绑定 scope、版本和固定
+high-water mark 的 HMAC keyset cursor。外部状态/abort capability、KMS/WORM/扫描和现场证据未完成，
+`productionWriteAllowed=false`。
 
 ## 17. 生产证据信任材料的数据边界
 
@@ -290,7 +288,7 @@ head 为 v16。Proposed ADR 仅为未来 v17 预留
 不是业务集合、数据库事实、migration 或生产证据正文。anchor bundle 只含公钥、摘要、角色、状态和有效期；
 envelope 只含受控引用、SHA-256、release/artifact/evidence/registry 绑定与签名。preflight 只输出 decision ID、
 envelope digest、角色和 signer 数量，不持久化文件、绝对路径、公钥正文或原始错误。本切片不改变 SQLite
-head v16、PostgreSQL 结构、`data/db.json` 或任何 data owner。
+head v17、PostgreSQL 结构、`data/db.json` 或任何其他 data owner。
 
 ## 18. 生产切换行动证据数据边界
 
@@ -342,7 +340,7 @@ scope 校验不改变该集合 owner；护理 notification plan/outbox 继续是
 
 `platform-worker-observability.v1` 是进程内返回值，不新增集合、SQLite/PostgreSQL 表、DDL、migration、
 data owner 或权威事实。`sourceReportDigest` 只对已脱敏的 profile/outcome/time/identity digest/count/error code
-输入计算，不对业务报告正文、患者数据、凭据或 lease token 计算可关联摘要。本切片保持 schema head v16
+输入计算，不对业务报告正文、患者数据、凭据或 lease token 计算可关联摘要。当前 schema head v17
 和所有核心表冻结；后续若要持久化指标或日志，必须由独立 owner/留存/访问控制决策处理。
 
 ## 22. 仓库清单与 PDF 摘要不是业务数据

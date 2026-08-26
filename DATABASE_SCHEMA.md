@@ -4,8 +4,8 @@
 
 ## 1. Schema Head
 
-- SQLite migration 注册表：v1–v16，位于 `src/platform/storage/sqlite-migrations.js`。
-- 运行时公开常量：`STORAGE_SCHEMA_VERSION = SQLITE_SCHEMA_HEAD = 16`。
+- SQLite migration 注册表：v1–v17，位于 `src/platform/storage/sqlite-migrations.js`。
+- 运行时公开常量：`STORAGE_SCHEMA_VERSION = SQLITE_SCHEMA_HEAD = 17`。
 - migration ledger：`schema_migrations`。
 - v1–v14 ledger checksum 保持历史兼容，源码内容由冻结 SHA-256 保护；v15+ ledger checksum 为内容 SHA-256。
 - PostgreSQL：5 份跟踪 SQL，共 13 张显式候选表；另有脚本生成的迁移包/MPI 结构。
@@ -30,6 +30,7 @@
 | 14 | official exchange replay | receipt/audit key 表 |
 | 15 | append-only continuous audit source | `audit_delivery_source_events`、stream/time 索引和禁止 UPDATE/DELETE 触发器 |
 | 16 | durable chronic followup dispatch outbox | `chronic_followup_dispatch_outbox`、`chronic_followup_dispatch_replays`、due/lease 索引和不可变 source/replay 触发器 |
+| 17 | durable object storage metadata and command track | `secure_attachment_records`、`object_storage_commands`、不可变 receipts、reconciliation case/action、keyset 索引和 legacy 写冻结触发器 |
 
 完整表分组与关系见 `DATA_MODEL.md`。
 
@@ -66,13 +67,10 @@
 `server.js` 在 followups 的 SQLite 状态写事务内调用 enqueue/一致性 hook；回滚同时撤销业务状态和 outbox
 插入。真实 PostgreSQL 对应表、全量迁移、供应方回执、备份恢复和现场验收不在 v16 内，生产仍 NO-GO。
 
-## 6. SQLite v17 对象存储预留（Proposed，未实施）
+## 6. SQLite v17 对象存储耐久轨道（Accepted，仓库内已实施）
 
-`OBJ-ADR-002` 为结构化附件元数据、耐久对象存储命令/回执和持久对账提出 v17 候选，但当前注册表
-head、运行时常量与 ledger 仍精确为 v16；仓库没有 v17 migration、表、索引、trigger、回填或
-PostgreSQL 对应 DDL。候选表名和实施阶段只存在于 Proposed ADR，不构成 schema 事实。
-
-机器台账预留 v17 并由 `object-storage:architecture-governance:verify` 核对当前 head=16；若其他主题先占用
-v17，必须重新评审本提案而不能改写迁移历史。只有 ADR Accepted、`secureAttachments` data owner 与 v1/v2
-兼容策略经人类确认后，才可另开 migration 切片；届时必须同步空库/历史升级/重跑/失败回滚、全量
-count/digest/orphan 核对、遗留写冻结和生产恢复证据。当前 production promotion 保持 false。
+`OBJ-ADR-002` 已接受并追加内容指纹 v17。migration 创建五张结构化表，以 count/digest/orphan 核对全量
+回填遗留 `secureAttachments`，发现重复 ID、缺失关键绑定或摘要漂移即事务回滚；核对通过后 trigger 冻结
+legacy collection 更新/删除。附件事实和命令 source 字段不可变，回执/对账 action 仅追加；命令状态支持
+完整 lease fencing、有界退避、dead-letter 与审计 replay。真实 PostgreSQL DDL、生产回填/恢复和外部
+provider/KMS/WORM/扫描证据仍未完成，因此 production promotion 保持 false。

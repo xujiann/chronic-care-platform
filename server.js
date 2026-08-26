@@ -46,7 +46,8 @@ const {
   SQLITE_SCHEMA_HEAD,
   appendFollowupDispatchOutboxChanges,
   applySqliteMigrations,
-  createSqliteFollowupDispatchRepository
+  createSqliteFollowupDispatchRepository,
+  createSqliteObjectStorageRepository
 } = require("./src/platform/storage/sqlite-migrations");
 const { createHash, createHmac, pbkdf2Sync, randomUUID, timingSafeEqual } = require("crypto");
 const { auditHashFor, verifyAuditTrail } = require("./src/identity-security/audit-chain");
@@ -7972,6 +7973,27 @@ function openSqliteDatabase() {
   return db;
 }
 
+function withObjectStorageDurableRepository(callback) {
+  if (!shouldUseSqlite()) {
+    const error = new Error("object storage v2 requires SQLite durable storage");
+    error.code = "OBJECT_STORAGE_V2_DURABLE_STORAGE_REQUIRED";
+    throw error;
+  }
+  if (typeof callback !== "function") throw new TypeError("object storage repository callback is required");
+  const db = openSqliteDatabase();
+  try {
+    applySqliteMigrations(db);
+    const cursorSecret = String(process.env.OBJECT_STORAGE_CURSOR_SIGNING_SECRET || "");
+    return callback(createSqliteObjectStorageRepository(db, { cursorSecret }));
+  } finally {
+    db.close();
+  }
+}
+
+function objectStorageLegacyWritesAllowed() {
+  return !shouldUseSqlite();
+}
+
 function configureSqliteConnection(db) {
   db.exec("PRAGMA foreign_keys = ON");
   db.exec(`PRAGMA journal_mode = ${SQLITE_JOURNAL_MODE}`);
@@ -8149,7 +8171,20 @@ function writeSqliteState(
     syncPublicHealthModernizationUniqueKeys(db, normalized, now);
     syncPublicHealthRespiratoryLifecycleUniqueKeys(db, normalized, now);
     syncPublicHealthOfficialExchangeUniqueKeys(db, normalized, now);
-    const entries = Object.entries(normalized).filter(([key]) => key !== "storageMeta" && !RUNTIME_INTERNAL_COLLECTION_KEYS.has(key));
+    const legacyAttachmentPayload = JSON.stringify(Array.isArray(normalized.secureAttachments) ? normalized.secureAttachments : []);
+    const persistedLegacyAttachmentRow = db.prepare("SELECT payload FROM state_collections WHERE key = 'secureAttachments'").get();
+    if (persistedLegacyAttachmentRow && persistedLegacyAttachmentRow.payload !== legacyAttachmentPayload) {
+      const error = new Error("legacy secureAttachments writes are frozen; use object storage v2");
+      error.code = "OBJECT_STORAGE_LEGACY_WRITE_FROZEN";
+      throw error;
+    }
+    if (!persistedLegacyAttachmentRow && legacyAttachmentPayload !== "[]") {
+      const error = new Error("legacy secureAttachments cannot be seeded after v17; migrate through object storage v2");
+      error.code = "OBJECT_STORAGE_LEGACY_SEED_FROZEN";
+      throw error;
+    }
+    const entries = Object.entries(normalized).filter(([key]) => key !== "storageMeta"
+      && key !== "secureAttachments" && !RUNTIME_INTERNAL_COLLECTION_KEYS.has(key));
     verifySqliteCollectionVersions(db, entries.map(([key]) => key), expectedVersions);
     const incomingKeys = new Set(entries.map(([key]) => key));
     const existingRows = db.prepare("SELECT key, payload, version FROM state_collections").all();
@@ -8175,6 +8210,7 @@ function writeSqliteState(
     );
     const postgresSyncChanges = POSTGRES_SYNC_MODE === "outbox" ? buildCollectionChanges(businessExistingRows, entries) : [];
     const existingPayloads = existingByKey;
+    if (existingPayloads.has("secureAttachments")) incomingKeys.add("secureAttachments");
     const deleteStatement = db.prepare("DELETE FROM state_collections WHERE key = ?");
     existingPayloads.forEach((_, key) => {
       if (!incomingKeys.has(key)) deleteStatement.run(key);
@@ -28194,6 +28230,7 @@ function createRuntimeCapabilitySource() {
   normalizeServiceOrders,
   normalizeState,
   objectStorageCenter,
+  objectStorageLegacyWritesAllowed,
   patchBusinessCollectionItem,
   patchCollectionItem,
   personIndexForResident,
@@ -28414,6 +28451,7 @@ function createRuntimeCapabilitySource() {
   withFinancialDispatchLock,
   withFinancialDispatchStateLock,
   withFinancialReconciliationLock,
+  withObjectStorageDurableRepository,
   });
 }
 
@@ -28581,6 +28619,7 @@ module.exports = {
   ensureDatabase,
   issuePhoneVerificationCode,
   openSqliteDatabase,
+  withObjectStorageDurableRepository,
   readFollowupDispatchOutboxHealth,
   productionSessionSecretErrors,
   productionSessionRetentionErrors,

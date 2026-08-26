@@ -67,7 +67,7 @@ test("v16 hook enqueues atomically, is idempotent, and rejects immutable event d
   }
 });
 
-test("v15 history upgrades to v16 by backfilling embedded events without fabricating delivery evidence", () => {
+test("v15 history upgrades through v17 without fabricating delivery evidence", () => {
   const db = new DatabaseSync(":memory:");
   try {
     db.exec("PRAGMA foreign_keys = ON");
@@ -77,7 +77,7 @@ test("v15 history upgrades to v16 by backfilling embedded events without fabrica
       .run(JSON.stringify(state(legacyPublished).followups), T0);
     const upgraded = applySqliteMigrations(db);
     const row = db.prepare("SELECT status, receipt_sha256 FROM chronic_followup_dispatch_outbox WHERE event_id = ?").get(legacyPublished.id);
-    assert.equal(upgraded.applied, 1);
+    assert.equal(upgraded.applied, 2);
     assert.equal(row.status, "pending");
     assert.equal(row.receipt_sha256, null);
     assert.equal(applySqliteMigrations(db).applied, 0);

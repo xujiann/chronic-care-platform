@@ -5,6 +5,8 @@ const path = require("node:path");
 const test = require("node:test");
 
 const {
+  OBJECT_STORAGE_COMMAND_CONFIGURATION_VARIABLES,
+  OBJECT_STORAGE_COMMAND_RUNTIME_FILES,
   PREPRODUCTION_CONTROL_CONFIGURATION_VARIABLES,
   PREPRODUCTION_CONTROL_DEFINITIONS,
   PREPRODUCTION_CONTROL_RUNTIME_FILES,
@@ -95,11 +97,14 @@ test("production deployment package hashes runtime files without persisting secr
     assert.equal(manifest.artifact.files.some((item) => item.path === ".env"), false);
     assert.equal(manifest.secretContract.variables.every((item) => item.persistedInArtifact === false && !("value" in item)), true);
     assert.equal(manifest.secretContract.variables.some((item) => item.name === "OBJECT_STORAGE_RECEIPT_SIGNING_SECRET" && item.purpose === "object storage gateway response verification"), true);
+    assert.equal(manifest.secretContract.variables.some((item) => item.name === "OBJECT_STORAGE_CURSOR_SIGNING_SECRET" && !Object.hasOwn(item, "value")), true);
     assert.equal(manifest.secretContract.variables.some((item) => item.name === "SIEM_AUDIT_SIGNING_SECRET" && item.purpose === "continuous audit request signing"), true);
     assert.equal(manifest.secretContract.variables.some((item) => item.name === "DATABASE_URL" && !Object.hasOwn(item, "value")), true);
     assert.equal(manifest.processContract.backgroundJobs.some((item) => item.id === "continuous-audit-delivery" && item.productionReady === false && item.preflight === "npm run audit:delivery:preflight"), true);
     assert.equal(manifest.processContract.backgroundJobs.find((item) => item.id === "continuous-audit-delivery").sourceContract, "append-only-audit-source-v2");
     assert.equal(manifest.processContract.backgroundJobs.some((item) => item.id === "chronic-followup-durable-dispatch" && item.preflight === "npm run chronic:followup-dispatch-preflight" && item.sourceContract === "citizen-chronic.followup-dispatch-outbox.v1" && item.productionReady === false && ["DATA_DIR", "CITIZEN_CHRONIC_FOLLOWUP_DISPATCH_SQLITE_FILE", "CITIZEN_CHRONIC_FOLLOWUP_ACTIVATION_REGISTRY_FILE", "CITIZEN_CHRONIC_FOLLOWUP_ACTIVATION_PUBLIC_KEY_FILE", "CITIZEN_CHRONIC_FOLLOWUP_ACTIVATION_PUBLIC_KEY_SHA256"].every((name) => item.configurationVariables.includes(name))), true);
+    OBJECT_STORAGE_COMMAND_RUNTIME_FILES.forEach((runtimeFile) => assert.equal(manifest.artifact.files.some((item) => item.path === runtimeFile), true, runtimeFile));
+    assert.equal(manifest.processContract.backgroundJobs.some((item) => item.id === "object-storage-durable-command-v2" && item.preflight === "npm run object-storage:command-preflight" && item.sourceContract === "object-storage-durable-command-and-metadata.v2" && item.externalEvidenceRequired === true && item.productionReady === false && OBJECT_STORAGE_COMMAND_CONFIGURATION_VARIABLES.every((name) => item.configurationVariables.includes(name))), true);
     assert.equal(manifest.processContract.backgroundJobs.some((item) => item.id === "postgres-shadow-sync" && item.sourceContract === "postgres-shadow-sync" && item.productionReady === false && item.productionPrimary === false && item.runtimeCutoverEnabled === false), true);
     assert.equal(manifest.processContract.backgroundJobs.some((item) => item.id === "postgres-shadow-reconciliation" && item.sourceContract === "postgres-shadow-reconciliation" && item.productionReady === false && item.productionPrimary === false && item.runtimeCutoverEnabled === false), true);
     assert.deepEqual(manifest.processContract.databaseTransition.commands, {
