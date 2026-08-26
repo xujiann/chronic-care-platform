@@ -6,6 +6,43 @@ const {
   createReferralCommandService,
   createReferralDeliveryService
 } = require("../../care-coordination/referral-command-service");
+const {
+  StateCommandError,
+  buildStateCommand,
+  isStorageConflict,
+  prepareCollectionCas,
+  sha256,
+  withStateCommandLock
+} = require("../../platform/storage/state-command-consistency");
+
+function teleconsultationCommandPayload(payload = {}) {
+  const canonical = { ...payload };
+  delete canonical.idempotencyKey;
+  delete canonical.commandId;
+  return canonical;
+}
+
+function publicTeleconsultation(item) {
+  const projected = structuredClone(item);
+  delete projected._writeCommandReceipts;
+  return projected;
+}
+
+function teleconsultationCommandError(res, sendJson, error, codes) {
+  if (error instanceof StateCommandError) {
+    sendJson(res, error.statusCode, { error: error.statusCode === 409 ? "Conflict" : "Bad Request", code: error.code, ...(codes.collection ? { collection: codes.collection } : {}), message: error.message });
+    return;
+  }
+  if (isStorageConflict(error)) {
+    sendJson(res, 409, { error: "Conflict", code: codes.version, ...(codes.collection ? { collection: codes.collection } : {}), message: "state version conflict" });
+    return;
+  }
+  if (error?.stateCommandPersistenceFailure) {
+    sendJson(res, 500, { error: "Internal Server Error", code: codes.storage, message: "state command persistence failed" });
+    return;
+  }
+  sendJson(res, 400, { error: "Bad Request", message: error?.message || "invalid state command" });
+}
 
 function createRouteSegments(runtime) {
   const { APPOINTMENT_CONTRACT_ID, CareServiceRuntime, RegistrationReferralService, WORKFLOW_COLLECTIONS, WORKFLOW_ROLE_COLLECTIONS, acknowledgeReferralTeleconsultationEscalation, appendDataAccessLog, appendDrugConsumableAuditTrail, appendReferralTeleconsultationNotifications, appendSecurityEvent, applyAppointmentIntegrationReconciliationAction, applyCitizenTaskAction, applyInternetNursingOrderAction, applyReferralTeleconsultationAction, applyRegistrationCancel, applyRegistrationDisruptionAction, applyRegistrationJourneyAction, applyRegistrationWaitlistAction, assertReferralCallbackResident, buildCareServiceProductionReadiness, buildCitizenTaskActionMessage, buildCountyAcceptanceLedger, buildEscortServiceDashboard, buildInternetNursingActionMessage, buildInternetNursingDashboard, buildLifecycleActionClosureMessage, buildMultiPracticeRegistry, buildMultiPracticeTaskMessage, buildPrimaryPracticeConfirmation, buildReferralConsortiumClosedLoopMetrics, buildReferralInsurancePerformancePolicy, buildReferralTeleconsultationEscalations, buildReferralTeleconsultationJointTestLedger, buildReferralTeleconsultationJointTestPack, buildReferralTeleconsultationPersonalRecord, buildReferralTeleconsultationSignoffSummary, buildRegistrationDashboard, buildRegistrationIntegrationCenter, buildRegistrationJourneyTaskMessage, buildRegistrationNotificationDeliveries, buildRegistrationTaskMessage, buildRegistrationWaitlistCenter, buildRegistrationWaitlistDeliveries, buildRegistrationWaitlistTaskMessage, buildUnifiedTasks, canAccessEscortOrder, canAccessInternetNursingOrder, canAccessMultiPracticeApplication, canAccessReferralTeleconsultation, canAccessRegistrationOrder, canAccessRegistrationSchedule, canAccessRegistrationWaitlistEntry, canAccessResident, canAccessTaskMessage, canManageAppointmentIntegrationEvent, careServiceActor, careServiceCommandId, careServiceCreatePayload, careServicePlatformAdapter, careServiceReadinessPublicSummary, careServiceTransitionInput, cleanMultiPracticePatch, cleanWorkflowUpdates, collectJson, completeReferralTeleconsultationJointTestTask, createReferralTeleconsultationEscalationMessage, createReferralTeleconsultationJointTestTasks, createTaskMessage, findWorkflowCollection, isClosedTaskStatus, landAppointmentIntegrationEvent, normalizeInternetNursingOrder, normalizeMultiPracticeApplication, normalizeReferralTeleconsultation, normalizeReferralTeleconsultationCallback, normalizeReferralTeleconsultationFeedbackCallback, normalizeReferralTeleconsultationScheduleCallback, normalizeReferralTeleconsultationStatus, normalizeRegistrationOrder, normalizeRegistrationWaitlistEntry, normalizeState, patchBusinessCollectionItem, prependAuditTrailEntry, promoteNextRegistrationWaitlist, randomUUID, readDatabase, redactSensitiveResponse, refreshBirthStatistics, refreshMultiPracticeReviewState, requireApiRole, resealAuditTrail, resolveMultiPracticeLifecyclePatch, sealAuditTrail, seedRegistrationSchedules, sendCareServiceError, sendJson, updateIntegrationEvent, upsertReferralTeleconsultationSignoff, verifyDoctorElectronicRegistration, verifyIntegrationSignature, workflowStateCollectionKey, writeDatabase } = runtime;
@@ -114,7 +151,8 @@ function createRouteSegments(runtime) {
         if (!user) return true;
         const data = readDatabase();
         const rows = (Array.isArray(data.referralTeleconsultations) ? data.referralTeleconsultations : [])
-          .filter((item) => canAccessReferralTeleconsultation(user, item, data));
+          .filter((item) => canAccessReferralTeleconsultation(user, item, data))
+          .map(publicTeleconsultation);
         const escalations = buildReferralTeleconsultationEscalations(rows);
         const performancePolicy = buildReferralInsurancePerformancePolicy({ ...data, referralTeleconsultations: rows });
         sendJson(res, 200, {
@@ -275,34 +313,59 @@ function createRouteSegments(runtime) {
       if (req.method === "POST" && url.pathname === "/api/referral-teleconsultations") {
         const user = requireApiRole(req, res, ["institution", "county", "commission"], "/api/referral-teleconsultations");
         if (!user) return true;
-        const data = readDatabase();
         const payload = await collectJson(req);
         try {
-          const consultation = normalizeReferralTeleconsultation(payload, user, data);
-          if (!canAccessReferralTeleconsultation(user, consultation, data)) {
-            appendSecurityEvent({ actor: user.name, role: user.role, action: "create referral teleconsultation", target: consultation.residentId, result: "denied", detail: "organization scope denied" });
-            sendJson(res, 403, { error: "Forbidden", message: "organization scope denied" });
-            return true;
-          }
-          data.referralTeleconsultations = [consultation, ...(Array.isArray(data.referralTeleconsultations) ? data.referralTeleconsultations : [])].slice(0, 300);
-          data.securityEvents = resealAuditTrail([
-            {
-              id: randomUUID(),
-              at: new Date().toLocaleString("zh-CN", { hour12: false }),
-              actor: user.name,
-              role: user.role,
-              action: "create referral teleconsultation",
-              target: consultation.id,
-              result: "allowed",
+          const canonical = teleconsultationCommandPayload(payload);
+          const naturalKey = `create:${String(payload.id || "").trim() || sha256(canonical)}`;
+          const command = buildStateCommand({ req, payload, user, endpoint: "POST /api/referral-teleconsultations", naturalKey, canonicalPayload: canonical });
+          const result = await withStateCommandLock(`referral-teleconsultation-create:${command.commandKeyHash}`, () => {
+            const data = readDatabase();
+            const consultation = normalizeReferralTeleconsultation(payload, user, data);
+            const institutionSourceAllowed = user.role !== "institution" ||
+              (Boolean(user.orgCode) && consultation.sourceInstitutionCode === user.orgCode) ||
+              (Boolean(user.orgName) && consultation.sourceInstitution === user.orgName);
+            if (!institutionSourceAllowed || !canAccessReferralTeleconsultation(user, consultation, data)) {
+              appendSecurityEvent({ actor: user.name, role: user.role, action: "create referral teleconsultation", target: consultation.residentId, result: "denied", detail: "organization scope denied" });
+              return { status: 403, body: { error: "Forbidden", message: "organization scope denied" } };
+            }
+            const rows = Array.isArray(data.referralTeleconsultations) ? data.referralTeleconsultations : [];
+            const priorReceipt = rows.flatMap((item) => Array.isArray(item._writeCommandReceipts) ? item._writeCommandReceipts : [])
+              .find((item) => item.commandKeyHash === command.commandKeyHash);
+            if (priorReceipt) {
+              if (priorReceipt.requestDigest !== command.requestDigest) {
+                return { status: 409, body: { error: "Conflict", code: "REFERRAL_TELECONSULTATION_CREATE_IDEMPOTENCY_CONFLICT", message: "idempotency key was already used for another teleconsultation" } };
+              }
+              return { status: 200, body: structuredClone(priorReceipt.response), replayed: true };
+            }
+            if (rows.some((item) => item.id === consultation.id)) {
+              return { status: 409, body: { error: "Conflict", code: "REFERRAL_TELECONSULTATION_ID_CONFLICT", message: "referral teleconsultation id already exists" } };
+            }
+            prepareCollectionCas(data, ["referralTeleconsultations", "securityEvents", "dataAccessLogs"], "referralTeleconsultations", payload.expectedVersion, "REFERRAL_TELECONSULTATION_VERSION_CONFLICT");
+            const response = publicTeleconsultation(consultation);
+            consultation._writeCommandReceipts = [{
+              commandKeyHash: command.commandKeyHash,
+              requestDigest: command.requestDigest,
+              response: structuredClone(response),
+              recordedAt: consultation.createdAt
+            }];
+            data.referralTeleconsultations = [consultation, ...rows].slice(0, 300);
+            data.securityEvents = resealAuditTrail([{
+              id: randomUUID(), at: new Date().toLocaleString("zh-CN", { hour12: false }), actor: user.name, role: user.role,
+              action: "create referral teleconsultation", target: consultation.id, result: "allowed",
               detail: `${consultation.sourceInstitution} -> ${consultation.targetInstitution}`
-            },
-            ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
-          ].slice(0, 120));
-          appendDataAccessLog(data, user, consultation.residentId, "referral teleconsultation", "create teleconsultation with resident authorization", "allowed");
-          writeDatabase(data);
-          sendJson(res, 201, consultation);
+            }, ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])].slice(0, 120));
+            appendDataAccessLog(data, user, consultation.residentId, "referral teleconsultation", "create teleconsultation with resident authorization", "allowed");
+            try {
+              writeDatabase(data);
+            } catch (error) {
+              error.stateCommandPersistenceFailure = true;
+              throw error;
+            }
+            return { status: 201, body: response, replayed: false };
+          });
+          sendJson(res, result.status, result.body);
         } catch (error) {
-          if (/resident authorization/i.test(error.message || "")) {
+          if (!error?.stateCommandPersistenceFailure && /resident authorization/i.test(error?.message || "")) {
             appendSecurityEvent({
               actor: user.name,
               role: user.role,
@@ -312,7 +375,11 @@ function createRouteSegments(runtime) {
               detail: error.message
             });
           }
-          sendJson(res, 400, { error: "Bad Request", message: error.message });
+          teleconsultationCommandError(res, sendJson, error, {
+            version: "REFERRAL_TELECONSULTATION_VERSION_CONFLICT",
+            storage: "REFERRAL_TELECONSULTATION_PERSISTENCE_FAILED",
+            collection: "referralTeleconsultations"
+          });
         }
         return true;
       }
@@ -321,37 +388,61 @@ function createRouteSegments(runtime) {
       if (req.method === "POST" && teleconsultationActionMatch) {
         const user = requireApiRole(req, res, ["institution", "county", "commission"], "/api/referral-teleconsultations/:id/actions");
         if (!user) return true;
-        const data = readDatabase();
-        const rows = Array.isArray(data.referralTeleconsultations) ? data.referralTeleconsultations : [];
-        const index = rows.findIndex((item) => item.id === decodeURIComponent(teleconsultationActionMatch[1]));
-        if (index < 0) {
-          sendJson(res, 404, { error: "Not Found", message: "referral teleconsultation not found" });
-          return true;
-        }
-        if (!canAccessReferralTeleconsultation(user, rows[index], data)) {
-          appendSecurityEvent({ actor: user.name, role: user.role, action: "update referral teleconsultation", target: rows[index].id, result: "denied", detail: "scope denied" });
-          sendJson(res, 403, { error: "Forbidden", message: "scope denied" });
-          return true;
-        }
         const payload = await collectJson(req);
-        rows[index] = applyReferralTeleconsultationAction(rows[index], payload, user);
-        data.referralTeleconsultations = rows;
-        data.securityEvents = resealAuditTrail([
-          {
-            id: randomUUID(),
-            at: new Date().toLocaleString("zh-CN", { hour12: false }),
-            actor: user.name,
-            role: user.role,
-            action: "update referral teleconsultation",
-            target: rows[index].id,
-            result: "allowed",
-            detail: rows[index].status
-          },
-          ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
-        ].slice(0, 120));
-        appendDataAccessLog(data, user, rows[index].residentId, "referral teleconsultation", payload.note || rows[index].status, "allowed");
-        writeDatabase(data);
-        sendJson(res, 200, rows[index]);
+        const id = decodeURIComponent(teleconsultationActionMatch[1]);
+        try {
+          const canonical = teleconsultationCommandPayload(payload);
+          const naturalKey = `action:${id}:v${Object.hasOwn(payload, "expectedVersion") ? payload.expectedVersion : sha256(canonical)}`;
+          const command = buildStateCommand({ req, payload, user, endpoint: "POST /api/referral-teleconsultations/:id/actions", naturalKey, canonicalPayload: { id, ...canonical } });
+          const result = await withStateCommandLock(`referral-teleconsultation:${id}`, () => {
+            const data = readDatabase();
+            const rows = Array.isArray(data.referralTeleconsultations) ? data.referralTeleconsultations : [];
+            const index = rows.findIndex((item) => item.id === id);
+            if (index < 0) return { status: 404, body: { error: "Not Found", message: "referral teleconsultation not found" } };
+            if (!canAccessReferralTeleconsultation(user, rows[index], data)) {
+              appendSecurityEvent({ actor: user.name, role: user.role, action: "update referral teleconsultation", target: rows[index].id, result: "denied", detail: "scope denied" });
+              return { status: 403, body: { error: "Forbidden", message: "scope denied" } };
+            }
+            const receipt = (Array.isArray(rows[index]._writeCommandReceipts) ? rows[index]._writeCommandReceipts : [])
+              .find((item) => item.commandKeyHash === command.commandKeyHash);
+            if (receipt) {
+              if (receipt.requestDigest !== command.requestDigest) {
+                return { status: 409, body: { error: "Conflict", code: "REFERRAL_TELECONSULTATION_ACTION_IDEMPOTENCY_CONFLICT", message: "idempotency key was already used for another action" } };
+              }
+              return { status: 200, body: structuredClone(receipt.response), replayed: true };
+            }
+            prepareCollectionCas(data, ["referralTeleconsultations", "securityEvents", "dataAccessLogs"], "referralTeleconsultations", payload.expectedVersion, "REFERRAL_TELECONSULTATION_VERSION_CONFLICT");
+            const updated = applyReferralTeleconsultationAction(rows[index], payload, user);
+            const response = publicTeleconsultation(updated);
+            updated._writeCommandReceipts = [{
+              commandKeyHash: command.commandKeyHash,
+              requestDigest: command.requestDigest,
+              response: structuredClone(response),
+              recordedAt: updated.lastUpdated
+            }, ...(Array.isArray(rows[index]._writeCommandReceipts) ? rows[index]._writeCommandReceipts : [])].slice(0, 20);
+            rows[index] = updated;
+            data.referralTeleconsultations = rows;
+            data.securityEvents = resealAuditTrail([{
+              id: randomUUID(), at: new Date().toLocaleString("zh-CN", { hour12: false }), actor: user.name, role: user.role,
+              action: "update referral teleconsultation", target: updated.id, result: "allowed", detail: updated.status
+            }, ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])].slice(0, 120));
+            appendDataAccessLog(data, user, updated.residentId, "referral teleconsultation", payload.note || updated.status, "allowed");
+            try {
+              writeDatabase(data);
+            } catch (error) {
+              error.stateCommandPersistenceFailure = true;
+              throw error;
+            }
+            return { status: 200, body: response, replayed: false };
+          });
+          sendJson(res, result.status, result.body);
+        } catch (error) {
+          teleconsultationCommandError(res, sendJson, error, {
+            version: "REFERRAL_TELECONSULTATION_VERSION_CONFLICT",
+            storage: "REFERRAL_TELECONSULTATION_ACTION_PERSISTENCE_FAILED",
+            collection: "referralTeleconsultations"
+          });
+        }
         return true;
       }
 

@@ -38,7 +38,9 @@
       "coverage": {
         "level": "endpoint",
         "selector": "entire-route",
-        "actions": ["apply-delivery-status"],
+        "actions": [
+          "apply-delivery-status"
+        ],
         "unverifiedRemainder": false
       },
       "idempotency": {
@@ -56,10 +58,17 @@
         "distributedExactlyOnceClaimed": false
       },
       "concurrency": {
-        "cas": { "required": false, "field": "", "conflictCodes": [] }
+        "cas": {
+          "required": false,
+          "field": "",
+          "conflictCodes": []
+        }
       },
       "errors": [
-        { "code": "SMS_CALLBACK_EVENT_CONFLICT", "status": 409 }
+        {
+          "code": "SMS_CALLBACK_EVENT_CONFLICT",
+          "status": 409
+        }
       ],
       "audit": {
         "accepted": "persists one delivery-ledger event",
@@ -117,7 +126,10 @@
         "required": true,
         "mechanism": "bearer-or-cookie-session",
         "principalType": "platform-user",
-        "credentialSource": ["header:authorization", "cookie:session"],
+        "credentialSource": [
+          "header:authorization",
+          "cookie:session"
+        ],
         "replayCsrf": {
           "replayProtection": "idempotency-key-plus-current-authorization-reevaluation",
           "csrf": "platform-session-transport-policy"
@@ -125,18 +137,32 @@
       },
       "authorization": {
         "model": "platform-rbac-plus-organization-region-purpose-scope-and-resident-authorization",
-        "roles": ["commission", "institution"],
+        "roles": [
+          "commission",
+          "institution"
+        ],
         "dataScope": "institution"
       },
       "coverage": {
         "level": "endpoint",
         "selector": "entire-route",
-        "actions": ["regional-sharing-access-review"],
+        "actions": [
+          "regional-sharing-access-review"
+        ],
         "unverifiedRemainder": false
       },
       "idempotency": {
         "key": "header:Idempotency-Key",
-        "payloadBinding": ["packageId", "authorizationId", "authorizationVersion", "expectedVersion", "actorOrgCode", "purposeCode", "regionCode", "scopes"],
+        "payloadBinding": [
+          "packageId",
+          "authorizationId",
+          "authorizationVersion",
+          "expectedVersion",
+          "actorOrgCode",
+          "purposeCode",
+          "regionCode",
+          "scopes"
+        ],
         "exactReplay": "returns the persisted receipt with replayed=true after current authorization is reevaluated",
         "conflictingReuse": "REGIONAL_SHARING_IDEMPOTENCY_CONFLICT",
         "persistenceScope": "regionalSharingAccessReviews receipt history",
@@ -146,14 +172,29 @@
         "cas": {
           "required": true,
           "field": "expectedVersion plus authorizationVersion",
-          "conflictCodes": ["REGIONAL_SHARING_PACKAGE_VERSION_CONFLICT", "REGIONAL_SHARING_AUTHORIZATION_VERSION_CONFLICT"]
+          "conflictCodes": [
+            "REGIONAL_SHARING_PACKAGE_VERSION_CONFLICT",
+            "REGIONAL_SHARING_AUTHORIZATION_VERSION_CONFLICT"
+          ]
         }
       },
       "errors": [
-        { "code": "REGIONAL_SHARING_ORGANIZATION_SCOPE_DENIED", "status": 403 },
-        { "code": "REGIONAL_SHARING_IDEMPOTENCY_CONFLICT", "status": 409 },
-        { "code": "REGIONAL_SHARING_PACKAGE_VERSION_CONFLICT", "status": 409 },
-        { "code": "REGIONAL_SHARING_AUDIT_UNAVAILABLE", "status": 503 }
+        {
+          "code": "REGIONAL_SHARING_ORGANIZATION_SCOPE_DENIED",
+          "status": 403
+        },
+        {
+          "code": "REGIONAL_SHARING_IDEMPOTENCY_CONFLICT",
+          "status": 409
+        },
+        {
+          "code": "REGIONAL_SHARING_PACKAGE_VERSION_CONFLICT",
+          "status": 409
+        },
+        {
+          "code": "REGIONAL_SHARING_AUDIT_UNAVAILABLE",
+          "status": 503
+        }
       ],
       "audit": {
         "accepted": "appends an immutable access receipt plus security and data-access audit projections before state persistence",
@@ -163,21 +204,37 @@
       "implementationEvidence": [
         {
           "file": "src/platform/governance/regional-sharing-access-command.js",
-          "anchors": ["REGIONAL_SHARING_IDEMPOTENCY_CONFLICT", "REGIONAL_SHARING_PACKAGE_VERSION_CONFLICT", "auditDecision(nextData, user, currentPackage, receipt"]
+          "anchors": [
+            "REGIONAL_SHARING_IDEMPOTENCY_CONFLICT",
+            "REGIONAL_SHARING_PACKAGE_VERSION_CONFLICT",
+            "auditDecision(nextData, user, currentPackage, receipt"
+          ]
         },
         {
           "file": "src/http/routes/shared.js",
-          "anchors": ["POST\" && url.pathname === \"/api/regional-data-sharing/access-reviews", "withRegionalSharingPackageWriteLock", "REGIONAL_SHARING_AUDIT_UNAVAILABLE"]
+          "anchors": [
+            "POST\" && url.pathname === \"/api/regional-data-sharing/access-reviews",
+            "withRegionalSharingPackageWriteLock",
+            "REGIONAL_SHARING_AUDIT_UNAVAILABLE"
+          ]
         }
       ],
       "testEvidence": [
         {
           "file": "test/regional-sharing-access-command.test.js",
-          "anchors": ["same idempotency key replays exactly once and conflicting reuse is rejected", "package and authorization versions provide application-level compare-and-swap", "audit failure aborts the state transition"]
+          "anchors": [
+            "same idempotency key replays exactly once and conflicting reuse is rejected",
+            "package and authorization versions provide application-level compare-and-swap",
+            "audit failure aborts the state transition"
+          ]
         },
         {
           "file": "test/regional-sharing-access-api.test.js",
-          "anchors": ["replayAfterRevoke.response.status, 403", "REGIONAL_SHARING_AUTHORIZATION_REVOKED", "concurrent.map((item) => item.response.status).sort(), [201, 409]"]
+          "anchors": [
+            "replayAfterRevoke.response.status, 403",
+            "REGIONAL_SHARING_AUTHORIZATION_REVOKED",
+            "concurrent.map((item) => item.response.status).sort(), [201, 409]"
+          ]
         }
       ],
       "productionReady": false,
@@ -196,35 +253,70 @@
         "required": true,
         "mechanism": "bearer-or-cookie-session",
         "principalType": "platform-user",
-        "credentialSource": ["header:authorization", "cookie:session"],
-        "replayCsrf": { "replayProtection": "referral-command-inbox", "csrf": "platform-session-transport-policy" }
+        "credentialSource": [
+          "header:authorization",
+          "cookie:session"
+        ],
+        "replayCsrf": {
+          "replayProtection": "referral-command-inbox",
+          "csrf": "platform-session-transport-policy"
+        }
       },
       "authorization": {
         "model": "platform-rbac-plus-referral-organization-and-region-scope",
-        "roles": ["commission", "county", "institution"],
+        "roles": [
+          "commission",
+          "county",
+          "institution"
+        ],
         "dataScope": "institution"
       },
       "coverage": {
         "level": "endpoint",
         "selector": "entire-route",
-        "actions": ["update-referral"],
+        "actions": [
+          "update-referral"
+        ],
         "unverifiedRemainder": false
       },
       "idempotency": {
         "key": "header:Idempotency-Key",
-        "payloadBinding": ["referralId", "expectedVersion", "source", "actor.id", "actor.role", "actor.orgCode", "patch"],
+        "payloadBinding": [
+          "referralId",
+          "expectedVersion",
+          "source",
+          "actor.id",
+          "actor.role",
+          "actor.orgCode",
+          "patch"
+        ],
         "exactReplay": "returns the persisted inbox receipt and original outbox event without a second state commit",
         "conflictingReuse": "REFERRAL_COMMAND_IDEMPOTENCY_CONFLICT",
         "persistenceScope": "referralCommandInbox plus referralOutbox UoW",
         "distributedExactlyOnceClaimed": false
       },
       "concurrency": {
-        "cas": { "required": true, "field": "expectedVersion", "conflictCodes": ["REFERRAL_VERSION_CONFLICT"] }
+        "cas": {
+          "required": true,
+          "field": "expectedVersion",
+          "conflictCodes": [
+            "REFERRAL_VERSION_CONFLICT"
+          ]
+        }
       },
       "errors": [
-        { "code": "REFERRAL_SCOPE_DENIED", "status": 403 },
-        { "code": "REFERRAL_COMMAND_IDEMPOTENCY_CONFLICT", "status": 409 },
-        { "code": "REFERRAL_VERSION_CONFLICT", "status": 409 }
+        {
+          "code": "REFERRAL_SCOPE_DENIED",
+          "status": 403
+        },
+        {
+          "code": "REFERRAL_COMMAND_IDEMPOTENCY_CONFLICT",
+          "status": 409
+        },
+        {
+          "code": "REFERRAL_VERSION_CONFLICT",
+          "status": 409
+        }
       ],
       "audit": {
         "accepted": "appends the referral aggregate audit trail and emits an allowed HTTP security event",
@@ -234,21 +326,36 @@
       "implementationEvidence": [
         {
           "file": "src/care-coordination/referral-command-service.js",
-          "anchors": ["REFERRAL_COMMAND_IDEMPOTENCY_CONFLICT", "REFERRAL_VERSION_CONFLICT", "patch.auditTrail = ["]
+          "anchors": [
+            "REFERRAL_COMMAND_IDEMPOTENCY_CONFLICT",
+            "REFERRAL_VERSION_CONFLICT",
+            "patch.auditTrail = ["
+          ]
         },
         {
           "file": "src/http/routes/care-coordination.js",
-          "anchors": ["/api/referrals/:id/actions", "executeReferralCommand({", "idempotentReplay: result.replayed"]
+          "anchors": [
+            "/api/referrals/:id/actions",
+            "executeReferralCommand({",
+            "idempotentReplay: result.replayed"
+          ]
         }
       ],
       "testEvidence": [
         {
           "file": "test/t05-referral-command-contracts.test.js",
-          "anchors": ["referral command rejects stale versions and idempotency-key intent drift", "assert.equal(replay.replayed, true)", "assert.equal(securityEvents[0].result, \"allowed\")"]
+          "anchors": [
+            "referral command rejects stale versions and idempotency-key intent drift",
+            "assert.equal(replay.replayed, true)",
+            "assert.equal(securityEvents[0].result, \"allowed\")"
+          ]
         },
         {
           "file": "test/t05-referral-single-command-track.test.js",
-          "anchors": ["owner command authorizes actor and organization before inbox replay or CAS", "three public referral action paths prove route identity, replay, conflict, CAS, audit, and response contracts"]
+          "anchors": [
+            "owner command authorizes actor and organization before inbox replay or CAS",
+            "three public referral action paths prove route identity, replay, conflict, CAS, audit, and response contracts"
+          ]
         }
       ],
       "productionReady": false,
@@ -267,35 +374,73 @@
         "required": true,
         "mechanism": "bearer-or-cookie-session",
         "principalType": "platform-user",
-        "credentialSource": ["header:authorization", "cookie:session"],
-        "replayCsrf": { "replayProtection": "referral-command-inbox", "csrf": "platform-session-transport-policy" }
+        "credentialSource": [
+          "header:authorization",
+          "cookie:session"
+        ],
+        "replayCsrf": {
+          "replayProtection": "referral-command-inbox",
+          "csrf": "platform-session-transport-policy"
+        }
       },
       "authorization": {
         "model": "platform-rbac-plus-referral-organization-and-region-scope",
-        "roles": ["commission", "county", "institution", "insurance"],
+        "roles": [
+          "commission",
+          "county",
+          "institution",
+          "insurance"
+        ],
         "dataScope": "institution"
       },
       "coverage": {
         "level": "action-slice",
         "selector": "body.collection=referrals",
-        "actions": ["update-referral-workflow"],
+        "actions": [
+          "update-referral-workflow"
+        ],
         "unverifiedRemainder": true
       },
       "idempotency": {
         "key": "header:Idempotency-Key",
-        "payloadBinding": ["collection", "id", "expectedVersion", "source", "actor.id", "actor.role", "actor.orgCode", "status", "updates"],
+        "payloadBinding": [
+          "collection",
+          "id",
+          "expectedVersion",
+          "source",
+          "actor.id",
+          "actor.role",
+          "actor.orgCode",
+          "status",
+          "updates"
+        ],
         "exactReplay": "the referrals slice returns the persisted referral without a second inbox or outbox entry",
         "conflictingReuse": "REFERRAL_COMMAND_IDEMPOTENCY_CONFLICT",
         "persistenceScope": "referralCommandInbox plus referralOutbox UoW for collection=referrals only",
         "distributedExactlyOnceClaimed": false
       },
       "concurrency": {
-        "cas": { "required": true, "field": "expectedVersion", "conflictCodes": ["REFERRAL_VERSION_CONFLICT"] }
+        "cas": {
+          "required": true,
+          "field": "expectedVersion",
+          "conflictCodes": [
+            "REFERRAL_VERSION_CONFLICT"
+          ]
+        }
       },
       "errors": [
-        { "code": "REFERRAL_SCOPE_DENIED", "status": 403 },
-        { "code": "REFERRAL_COMMAND_IDEMPOTENCY_CONFLICT", "status": 409 },
-        { "code": "REFERRAL_VERSION_CONFLICT", "status": 409 }
+        {
+          "code": "REFERRAL_SCOPE_DENIED",
+          "status": 403
+        },
+        {
+          "code": "REFERRAL_COMMAND_IDEMPOTENCY_CONFLICT",
+          "status": 409
+        },
+        {
+          "code": "REFERRAL_VERSION_CONFLICT",
+          "status": 409
+        }
       ],
       "audit": {
         "accepted": "the referrals slice emits an allowed workflow security event and persists the aggregate audit trail",
@@ -305,21 +450,35 @@
       "implementationEvidence": [
         {
           "file": "src/http/routes/care-coordination.js",
-          "anchors": ["url.pathname === \"/api/workflow-actions\"", "if (collection === \"referrals\")", "source: \"workflow\""]
+          "anchors": [
+            "url.pathname === \"/api/workflow-actions\"",
+            "if (collection === \"referrals\")",
+            "source: \"workflow\""
+          ]
         },
         {
           "file": "src/care-coordination/referral-command-service.js",
-          "anchors": ["REFERRAL_COMMAND_IDEMPOTENCY_CONFLICT", "REFERRAL_VERSION_CONFLICT", "referralCommandInbox"]
+          "anchors": [
+            "REFERRAL_COMMAND_IDEMPOTENCY_CONFLICT",
+            "REFERRAL_VERSION_CONFLICT",
+            "referralCommandInbox"
+          ]
         }
       ],
       "testEvidence": [
         {
           "file": "test/t05-referral-single-command-track.test.js",
-          "anchors": ["pathname: \"/api/workflow-actions\"", "three public referral action paths prove route identity, replay, conflict, CAS, audit, and response contracts"]
+          "anchors": [
+            "pathname: \"/api/workflow-actions\"",
+            "three public referral action paths prove route identity, replay, conflict, CAS, audit, and response contracts"
+          ]
         },
         {
           "file": "test/t05-referral-command-contracts.test.js",
-          "anchors": ["referral command rejects stale versions and idempotency-key intent drift", "assert.equal(replay.replayed, true)"]
+          "anchors": [
+            "referral command rejects stale versions and idempotency-key intent drift",
+            "assert.equal(replay.replayed, true)"
+          ]
         }
       ],
       "productionReady": false,
@@ -338,36 +497,85 @@
         "required": true,
         "mechanism": "bearer-or-cookie-session",
         "principalType": "platform-user",
-        "credentialSource": ["header:authorization", "cookie:session"],
-        "replayCsrf": { "replayProtection": "referral-command-inbox", "csrf": "platform-session-transport-policy" }
+        "credentialSource": [
+          "header:authorization",
+          "cookie:session"
+        ],
+        "replayCsrf": {
+          "replayProtection": "referral-command-inbox",
+          "csrf": "platform-session-transport-policy"
+        }
       },
       "authorization": {
         "model": "platform-rbac-plus-referral-resident-family-organization-or-region-scope",
-        "roles": ["citizen", "commission", "county", "institution", "insurance"],
+        "roles": [
+          "citizen",
+          "commission",
+          "county",
+          "institution",
+          "insurance"
+        ],
         "dataScope": "resident"
       },
       "coverage": {
         "level": "action-slice",
         "selector": "decoded-path-id-prefix=referrals:",
-        "actions": ["resident-confirm", "cancel-request", "update", "accept", "complete", "return", "cancel"],
+        "actions": [
+          "resident-confirm",
+          "cancel-request",
+          "update",
+          "accept",
+          "complete",
+          "return",
+          "cancel"
+        ],
         "unverifiedRemainder": true
       },
       "idempotency": {
         "key": "header:Idempotency-Key",
-        "payloadBinding": ["referralId", "expectedVersion", "source", "actor.id", "actor.role", "actor.residentId", "action", "comment", "satisfaction", "patch"],
+        "payloadBinding": [
+          "referralId",
+          "expectedVersion",
+          "source",
+          "actor.id",
+          "actor.role",
+          "actor.residentId",
+          "action",
+          "comment",
+          "satisfaction",
+          "patch"
+        ],
         "exactReplay": "the referrals: task slice returns the persisted referral without duplicate inbox, outbox, or citizen task-message state",
         "conflictingReuse": "REFERRAL_COMMAND_IDEMPOTENCY_CONFLICT",
         "persistenceScope": "referralCommandInbox plus referralOutbox UoW for referrals: task IDs only",
         "distributedExactlyOnceClaimed": false
       },
       "concurrency": {
-        "cas": { "required": true, "field": "expectedVersion", "conflictCodes": ["REFERRAL_VERSION_CONFLICT"] }
+        "cas": {
+          "required": true,
+          "field": "expectedVersion",
+          "conflictCodes": [
+            "REFERRAL_VERSION_CONFLICT"
+          ]
+        }
       },
       "errors": [
-        { "code": "REFERRAL_ACTION_DENIED", "status": 403 },
-        { "code": "REFERRAL_SCOPE_DENIED", "status": 403 },
-        { "code": "REFERRAL_COMMAND_IDEMPOTENCY_CONFLICT", "status": 409 },
-        { "code": "REFERRAL_VERSION_CONFLICT", "status": 409 }
+        {
+          "code": "REFERRAL_ACTION_DENIED",
+          "status": 403
+        },
+        {
+          "code": "REFERRAL_SCOPE_DENIED",
+          "status": 403
+        },
+        {
+          "code": "REFERRAL_COMMAND_IDEMPOTENCY_CONFLICT",
+          "status": 409
+        },
+        {
+          "code": "REFERRAL_VERSION_CONFLICT",
+          "status": 409
+        }
       ],
       "audit": {
         "accepted": "the referrals: slice emits an allowed task security event and persists the aggregate audit trail",
@@ -377,21 +585,35 @@
       "implementationEvidence": [
         {
           "file": "src/http/routes/care-coordination.js",
-          "anchors": ["const [collection, id] = taskId.split(\":\")", "if (collection === \"referrals\")", "source: \"task\""]
+          "anchors": [
+            "const [collection, id] = taskId.split(\":\")",
+            "if (collection === \"referrals\")",
+            "source: \"task\""
+          ]
         },
         {
           "file": "src/care-coordination/referral-command-service.js",
-          "anchors": ["function taskCommandIntent(input, actor)", "REFERRAL_COMMAND_IDEMPOTENCY_CONFLICT", "REFERRAL_VERSION_CONFLICT"]
+          "anchors": [
+            "function taskCommandIntent(input, actor)",
+            "REFERRAL_COMMAND_IDEMPOTENCY_CONFLICT",
+            "REFERRAL_VERSION_CONFLICT"
+          ]
         }
       ],
       "testEvidence": [
         {
           "file": "test/t05-referral-single-command-track.test.js",
-          "anchors": ["pathname: \"/api/tasks/referrals%3Arf1/actions\"", "owner command enforces citizen family scope and action-specific allowlists"]
+          "anchors": [
+            "pathname: \"/api/tasks/referrals%3Arf1/actions\"",
+            "owner command enforces citizen family scope and action-specific allowlists"
+          ]
         },
         {
           "file": "test/t05-referral-command-api.test.js",
-          "anchors": ["t05-citizen-task-command-001", "finalPersisted.referralSystem.referralCommandInbox.length, 3"]
+          "anchors": [
+            "t05-citizen-task-command-001",
+            "finalPersisted.referralSystem.referralCommandInbox.length, 3"
+          ]
         }
       ],
       "productionReady": false,
@@ -410,36 +632,74 @@
         "required": true,
         "mechanism": "bearer-or-cookie-session",
         "principalType": "platform-user",
-        "credentialSource": ["header:authorization", "cookie:session"],
-        "replayCsrf": { "replayProtection": "compliant-export-command-receipts", "csrf": "platform-session-transport-policy" }
+        "credentialSource": [
+          "header:authorization",
+          "cookie:session"
+        ],
+        "replayCsrf": {
+          "replayProtection": "compliant-export-command-receipts",
+          "csrf": "platform-session-transport-policy"
+        }
       },
       "authorization": {
         "model": "commission-role-plus-requester-reviewer-separation",
-        "roles": ["commission"],
+        "roles": [
+          "commission"
+        ],
         "dataScope": "platform"
       },
       "coverage": {
         "level": "endpoint",
         "selector": "body.action",
-        "actions": ["approve", "reject", "release"],
+        "actions": [
+          "approve",
+          "reject",
+          "release"
+        ],
         "unverifiedRemainder": false
       },
       "idempotency": {
         "key": "header:Idempotency-Key or body.commandId",
-        "payloadBinding": ["action", "expectedVersion", "reviewEvidenceRef", "reviewNote", "releaseEvidenceRef", "releaseNote", "watermark"],
+        "payloadBinding": [
+          "action",
+          "expectedVersion",
+          "reviewEvidenceRef",
+          "reviewNote",
+          "releaseEvidenceRef",
+          "releaseNote",
+          "watermark"
+        ],
         "exactReplay": "returns the persisted export record with replayed=true and no duplicate decision or audit write",
         "conflictingReuse": "RESEARCH_EXPORT_IDEMPOTENCY_CONFLICT",
         "persistenceScope": "compliantDataExports commandReceipts",
         "distributedExactlyOnceClaimed": false
       },
       "concurrency": {
-        "cas": { "required": true, "field": "expectedVersion", "conflictCodes": ["RESEARCH_EXPORT_VERSION_CONFLICT"] }
+        "cas": {
+          "required": true,
+          "field": "expectedVersion",
+          "conflictCodes": [
+            "RESEARCH_EXPORT_VERSION_CONFLICT"
+          ]
+        }
       },
       "errors": [
-        { "code": "RESEARCH_EXPORT_REVIEW_ROLE_REQUIRED", "status": 403 },
-        { "code": "RESEARCH_EXPORT_REVIEWER_SEPARATION_REQUIRED", "status": 403 },
-        { "code": "RESEARCH_EXPORT_IDEMPOTENCY_CONFLICT", "status": 409 },
-        { "code": "RESEARCH_EXPORT_VERSION_CONFLICT", "status": 409 }
+        {
+          "code": "RESEARCH_EXPORT_REVIEW_ROLE_REQUIRED",
+          "status": 403
+        },
+        {
+          "code": "RESEARCH_EXPORT_REVIEWER_SEPARATION_REQUIRED",
+          "status": 403
+        },
+        {
+          "code": "RESEARCH_EXPORT_IDEMPOTENCY_CONFLICT",
+          "status": 409
+        },
+        {
+          "code": "RESEARCH_EXPORT_VERSION_CONFLICT",
+          "status": 409
+        }
       ],
       "audit": {
         "accepted": "appends one decision history entry, one command receipt, and one allowed research audit before persistence",
@@ -449,17 +709,30 @@
       "implementationEvidence": [
         {
           "file": "src/http/research/compliant-export-workflow.js",
-          "anchors": ["RESEARCH_EXPORT_IDEMPOTENCY_CONFLICT", "RESEARCH_EXPORT_VERSION_CONFLICT", "next.commandReceipts.push"]
+          "anchors": [
+            "RESEARCH_EXPORT_IDEMPOTENCY_CONFLICT",
+            "RESEARCH_EXPORT_VERSION_CONFLICT",
+            "next.commandReceipts.push"
+          ]
         },
         {
           "file": "src/http/routes/research.js",
-          "anchors": ["/api/research/compliant-exports/:id/actions", "commandId: req.headers[\"idempotency-key\"] || payload.commandId", "if (result.replayed)"]
+          "anchors": [
+            "/api/research/compliant-exports/:id/actions",
+            "commandId: req.headers[\"idempotency-key\"] || payload.commandId",
+            "if (result.replayed)"
+          ]
         }
       ],
       "testEvidence": [
         {
           "file": "test/research-compliant-export-workflow.test.js",
-          "anchors": ["compliant export commands enforce CAS and idempotency", "research action route proves identity, replay, conflict, CAS, and audit behavior", "RESEARCH_EXPORT_IDEMPOTENCY_CONFLICT", "RESEARCH_EXPORT_VERSION_CONFLICT"]
+          "anchors": [
+            "compliant export commands enforce CAS and idempotency",
+            "research action route proves identity, replay, conflict, CAS, and audit behavior",
+            "RESEARCH_EXPORT_IDEMPOTENCY_CONFLICT",
+            "RESEARCH_EXPORT_VERSION_CONFLICT"
+          ]
         }
       ],
       "productionReady": false,
@@ -478,7 +751,10 @@
         "required": true,
         "mechanism": "bearer-or-cookie-session",
         "principalType": "platform-user",
-        "credentialSource": ["header:authorization", "cookie:session"],
+        "credentialSource": [
+          "header:authorization",
+          "cookie:session"
+        ],
         "replayCsrf": {
           "replayProtection": "hashed-idempotency-key-plus-versioned-command-receipt",
           "csrf": "platform-session-transport-policy"
@@ -486,18 +762,31 @@
       },
       "authorization": {
         "model": "platform-rbac-plus-insurance-payment-operating-model-and-trusted-actor-organization-binding",
-        "roles": ["institution", "commission"],
+        "roles": [
+          "institution",
+          "commission"
+        ],
         "dataScope": "institution"
       },
       "coverage": {
         "level": "endpoint",
         "selector": "entire-route",
-        "actions": ["refund.request"],
+        "actions": [
+          "refund.request"
+        ],
         "unverifiedRemainder": false
       },
       "idempotency": {
         "key": "header:Idempotency-Key or body.idempotencyKey",
-        "payloadBinding": ["paymentEventId", "paymentTradeNo", "orderReference", "refundAmountFen", "refundReason", "reasonCode", "actor.organizationId"],
+        "payloadBinding": [
+          "paymentEventId",
+          "paymentTradeNo",
+          "orderReference",
+          "refundAmountFen",
+          "refundReason",
+          "reasonCode",
+          "actor.organizationId"
+        ],
         "exactReplay": "returns the original public refund and command/outbox receipt with idempotent=true without creating a second refund",
         "conflictingReuse": "PERSISTENCE_COMMAND_CONFLICT",
         "persistenceScope": "onlinePaymentRefunds refundTransactionRuntime versioned command receipt and outbox checkpoint",
@@ -507,16 +796,36 @@
         "cas": {
           "required": true,
           "field": "paymentEventId-scoped in-process write lock plus refund aggregate expectedVersion",
-          "conflictCodes": ["PERSISTENCE_VERSION_CONFLICT"]
+          "conflictCodes": [
+            "PERSISTENCE_VERSION_CONFLICT"
+          ]
         }
       },
       "errors": [
-        { "code": "REFUND_CONTRACT_FIELD_INVALID", "status": 400 },
-        { "code": "INSURANCE_PAYMENT_RESPONSIBILITY_DENIED", "status": 403 },
-        { "code": "PERSISTENCE_COMMAND_CONFLICT", "status": 409 },
-        { "code": "PERSISTENCE_VERSION_CONFLICT", "status": 409 },
-        { "code": "REFUND_AMOUNT_EXCEEDS_AVAILABLE", "status": 409 },
-        { "code": "REFUND_LEDGER_UNAVAILABLE", "status": 503 }
+        {
+          "code": "REFUND_CONTRACT_FIELD_INVALID",
+          "status": 400
+        },
+        {
+          "code": "INSURANCE_PAYMENT_RESPONSIBILITY_DENIED",
+          "status": 403
+        },
+        {
+          "code": "PERSISTENCE_COMMAND_CONFLICT",
+          "status": 409
+        },
+        {
+          "code": "PERSISTENCE_VERSION_CONFLICT",
+          "status": 409
+        },
+        {
+          "code": "REFUND_AMOUNT_EXCEEDS_AVAILABLE",
+          "status": 409
+        },
+        {
+          "code": "REFUND_LEDGER_UNAVAILABLE",
+          "status": 503
+        }
       ],
       "audit": {
         "accepted": "commits one versioned command receipt and one correlated refund-request outbox event with the refund state",
@@ -607,7 +916,10 @@
         "required": true,
         "mechanism": "bearer-or-cookie-session",
         "principalType": "platform-user",
-        "credentialSource": ["header:authorization", "cookie:session"],
+        "credentialSource": [
+          "header:authorization",
+          "cookie:session"
+        ],
         "replayCsrf": {
           "replayProtection": "idempotency-key-plus-canonical-request-digest-and-persisted-dispatch-ledger",
           "csrf": "platform-session-transport-policy"
@@ -615,18 +927,29 @@
       },
       "authorization": {
         "model": "platform-rbac-plus-server-side-financial-gateway-scope",
-        "roles": ["commission", "institution", "insurance"],
+        "roles": [
+          "commission",
+          "institution",
+          "insurance"
+        ],
         "dataScope": "commission-all-gateway-types; institution-payload-bound-to-authenticated-orgCode; insurance-only-INSURANCE"
       },
       "coverage": {
         "level": "endpoint",
         "selector": "entire-route",
-        "actions": ["financial-gateway.dispatch"],
+        "actions": [
+          "financial-gateway.dispatch"
+        ],
         "unverifiedRemainder": false
       },
       "idempotency": {
         "key": "body:idempotencyKey",
-        "payloadBinding": ["type", "operation", "contractId", "payload"],
+        "payloadBinding": [
+          "type",
+          "operation",
+          "contractId",
+          "payload"
+        ],
         "exactReplay": "returns the persisted accepted, failed or dispatching financial event with stable status semantics and without another adapter call or state write",
         "conflictingReuse": "FINANCIAL_DISPATCH_IDEMPOTENCY_CONFLICT",
         "persistenceScope": "durable integrationGatewayEvents reservation before adapter call, explicit guarded state-transition intent, bounded retained financial ledger, followed by final event plus securityEvents in one platform state write",
@@ -636,18 +959,44 @@
         "cas": {
           "required": true,
           "field": "per-command in-process lock plus short global state-write lock, durable idempotency reservation and storageMeta.collectionVersions",
-          "conflictCodes": ["FINANCIAL_DISPATCH_VERSION_CONFLICT"]
+          "conflictCodes": [
+            "FINANCIAL_DISPATCH_VERSION_CONFLICT"
+          ]
         }
       },
       "errors": [
-        { "code": "FINANCIAL_DISPATCH_BODY_INVALID", "status": 400 },
-        { "code": "FINANCIAL_DISPATCH_GATEWAY_SCOPE_DENIED", "status": 403 },
-        { "code": "FINANCIAL_DISPATCH_INSTITUTION_SCOPE_DENIED", "status": 403 },
-        { "code": "FINANCIAL_DISPATCH_IDEMPOTENCY_CONFLICT", "status": 409 },
-        { "code": "FINANCIAL_DISPATCH_RESERVATION_UNAVAILABLE", "status": 409 },
-        { "code": "FINANCIAL_DISPATCH_VERSION_CONFLICT", "status": 409 },
-        { "code": "FINANCIAL_DISPATCH_PROVIDER_REJECTED", "status": 502 },
-        { "code": "FINANCIAL_DISPATCH_FAILED", "status": 500 }
+        {
+          "code": "FINANCIAL_DISPATCH_BODY_INVALID",
+          "status": 400
+        },
+        {
+          "code": "FINANCIAL_DISPATCH_GATEWAY_SCOPE_DENIED",
+          "status": 403
+        },
+        {
+          "code": "FINANCIAL_DISPATCH_INSTITUTION_SCOPE_DENIED",
+          "status": 403
+        },
+        {
+          "code": "FINANCIAL_DISPATCH_IDEMPOTENCY_CONFLICT",
+          "status": 409
+        },
+        {
+          "code": "FINANCIAL_DISPATCH_RESERVATION_UNAVAILABLE",
+          "status": 409
+        },
+        {
+          "code": "FINANCIAL_DISPATCH_VERSION_CONFLICT",
+          "status": 409
+        },
+        {
+          "code": "FINANCIAL_DISPATCH_PROVIDER_REJECTED",
+          "status": 502
+        },
+        {
+          "code": "FINANCIAL_DISPATCH_FAILED",
+          "status": 500
+        }
       ],
       "audit": {
         "accepted": "commits a durable dispatch reservation before the adapter call, then replaces it with the final financial event and appends one security event in the same final state write",
@@ -760,7 +1109,10 @@
         "required": true,
         "mechanism": "bearer-or-cookie-session",
         "principalType": "platform-user",
-        "credentialSource": ["header:authorization", "cookie:session"],
+        "credentialSource": [
+          "header:authorization",
+          "cookie:session"
+        ],
         "replayCsrf": {
           "replayProtection": "provider-statement-digest-plus-server-side-reconciliation-ledger",
           "csrf": "platform-session-transport-policy"
@@ -768,13 +1120,18 @@
       },
       "authorization": {
         "model": "platform-rbac-plus-server-side-financial-gateway-scope",
-        "roles": ["commission", "insurance"],
+        "roles": [
+          "commission",
+          "insurance"
+        ],
         "dataScope": "commission-all-gateway-types-or-insurance-only-INSURANCE"
       },
       "coverage": {
         "level": "endpoint",
         "selector": "entire-route",
-        "actions": ["financial-reconciliation.record"],
+        "actions": [
+          "financial-reconciliation.record"
+        ],
         "unverifiedRemainder": false
       },
       "idempotency": {
@@ -797,15 +1154,32 @@
         "cas": {
           "required": true,
           "field": "gatewayType/businessDate in-process write lock plus storageMeta.collectionVersions",
-          "conflictCodes": ["FINANCIAL_RECONCILIATION_VERSION_CONFLICT"]
+          "conflictCodes": [
+            "FINANCIAL_RECONCILIATION_VERSION_CONFLICT"
+          ]
         }
       },
       "errors": [
-        { "code": "FINANCIAL_RECONCILIATION_GATEWAY_SCOPE_DENIED", "status": 403 },
-        { "code": "FINANCIAL_RECONCILIATION_DIGEST_CONFLICT", "status": 409 },
-        { "code": "FINANCIAL_RECONCILIATION_VERSION_CONFLICT", "status": 409 },
-        { "code": "FINANCIAL_RECONCILIATION_FAILED", "status": 500 },
-        { "code": "FINANCIAL_RECONCILIATION_LEDGER_UNAVAILABLE", "status": 503 }
+        {
+          "code": "FINANCIAL_RECONCILIATION_GATEWAY_SCOPE_DENIED",
+          "status": 403
+        },
+        {
+          "code": "FINANCIAL_RECONCILIATION_DIGEST_CONFLICT",
+          "status": 409
+        },
+        {
+          "code": "FINANCIAL_RECONCILIATION_VERSION_CONFLICT",
+          "status": 409
+        },
+        {
+          "code": "FINANCIAL_RECONCILIATION_FAILED",
+          "status": 500
+        },
+        {
+          "code": "FINANCIAL_RECONCILIATION_LEDGER_UNAVAILABLE",
+          "status": 503
+        }
       ],
       "audit": {
         "accepted": "commits one reconciliation run and one chained security event in the same platform state write",
@@ -871,7 +1245,10 @@
         "required": true,
         "mechanism": "platform-session-plus-live-account-validation-and-provider-verified-step-up",
         "principalType": "platform-user",
-        "credentialSource": ["header:authorization", "cookie:session"],
+        "credentialSource": [
+          "header:authorization",
+          "cookie:session"
+        ],
         "replayCsrf": {
           "replayProtection": "hashed-idempotency-key-plus-intent-digest",
           "csrf": "platform-session-transport-policy"
@@ -879,18 +1256,29 @@
       },
       "authorization": {
         "model": "commission-role-plus-high-risk-step-up-and-exact-control-id",
-        "roles": ["commission"],
+        "roles": [
+          "commission"
+        ],
         "dataScope": "platform-security-control-by-id"
       },
       "coverage": {
         "level": "endpoint",
         "selector": "entire-route",
-        "actions": ["security-control-action"],
+        "actions": [
+          "security-control-action"
+        ],
         "unverifiedRemainder": false
       },
       "idempotency": {
         "key": "header:Idempotency-Key",
-        "payloadBinding": ["controlId", "actor", "status", "evidence", "next", "action"],
+        "payloadBinding": [
+          "controlId",
+          "actor",
+          "status",
+          "evidence",
+          "next",
+          "action"
+        ],
         "exactReplay": "returns the original control result and audit correlation with idempotentReplay=true without another control or audit write",
         "conflictingReuse": "SESSION_SECURITY_AUDIT_IDEMPOTENCY_CONFLICT",
         "persistenceScope": "securityAcceptanceLedger control mutation plus securityEvents command receipt and chained audit in one platform state write",
@@ -900,17 +1288,40 @@
         "cas": {
           "required": true,
           "field": "per-writeDatabase in-process command tail plus SQLite storageMeta.collectionVersions",
-          "conflictCodes": ["SESSION_SECURITY_AUDIT_VERSION_CONFLICT"]
+          "conflictCodes": [
+            "SESSION_SECURITY_AUDIT_VERSION_CONFLICT"
+          ]
         }
       },
       "errors": [
-        { "code": "SESSION_SECURITY_AUDIT_COMMAND_ID_REQUIRED", "status": 400 },
-        { "code": "AUTHENTICATION_REQUIRED", "status": 401 },
-        { "code": "STEP_UP_REQUIRED", "status": 403 },
-        { "code": "SECURITY_CONTROL_NOT_FOUND", "status": 404 },
-        { "code": "SESSION_SECURITY_AUDIT_IDEMPOTENCY_CONFLICT", "status": 409 },
-        { "code": "SESSION_SECURITY_AUDIT_VERSION_CONFLICT", "status": 409 },
-        { "code": "SECURITY_CONTROL_ACTION_FAILED", "status": 500 }
+        {
+          "code": "SESSION_SECURITY_AUDIT_COMMAND_ID_REQUIRED",
+          "status": 400
+        },
+        {
+          "code": "AUTHENTICATION_REQUIRED",
+          "status": 401
+        },
+        {
+          "code": "STEP_UP_REQUIRED",
+          "status": 403
+        },
+        {
+          "code": "SECURITY_CONTROL_NOT_FOUND",
+          "status": 404
+        },
+        {
+          "code": "SESSION_SECURITY_AUDIT_IDEMPOTENCY_CONFLICT",
+          "status": 409
+        },
+        {
+          "code": "SESSION_SECURITY_AUDIT_VERSION_CONFLICT",
+          "status": 409
+        },
+        {
+          "code": "SECURITY_CONTROL_ACTION_FAILED",
+          "status": 500
+        }
       ],
       "audit": {
         "accepted": "commits one control mutation, one idempotency receipt and one chained session-security audit entry in the same platform state write",
@@ -973,7 +1384,10 @@
         "required": true,
         "mechanism": "bearer-or-cookie-session",
         "principalType": "platform-user",
-        "credentialSource": ["header:authorization", "cookie:session"],
+        "credentialSource": [
+          "header:authorization",
+          "cookie:session"
+        ],
         "replayCsrf": {
           "replayProtection": "idempotency-key-plus-command-fingerprint-and-record-write-tail",
           "csrf": "platform-session-transport-policy"
@@ -981,18 +1395,34 @@
       },
       "authorization": {
         "model": "platform-rbac-plus-action-policy-and-record-institution-scope",
-        "roles": ["commission", "institution", "insurance"],
+        "roles": [
+          "commission",
+          "institution",
+          "insurance"
+        ],
         "dataScope": "governance-record-institution"
       },
       "coverage": {
         "level": "endpoint",
         "selector": "entire-route",
-        "actions": ["quality-operations-governance-item-action"],
+        "actions": [
+          "quality-operations-governance-item-action"
+        ],
         "unverifiedRemainder": false
       },
       "idempotency": {
         "key": "header:Idempotency-Key",
-        "payloadBinding": ["domain", "recordId", "action", "actor.id", "actor.role", "actor.institutionId", "actor.scopeInstitutionIds", "expectedVersion", "payload"],
+        "payloadBinding": [
+          "domain",
+          "recordId",
+          "action",
+          "actor.id",
+          "actor.role",
+          "actor.institutionId",
+          "actor.scopeInstitutionIds",
+          "expectedVersion",
+          "payload"
+        ],
         "exactReplay": "returns the persisted record and audit snapshot with replayed=true without a second state write",
         "conflictingReuse": "IDEMPOTENCY_CONFLICT",
         "persistenceScope": "source governance record plus command receipt and governance/platform/security audit projections in one platform state write",
@@ -1002,19 +1432,49 @@
         "cas": {
           "required": true,
           "field": "per-record in-process write tail plus expectedVersion and SQLite storageMeta.collectionVersions",
-          "conflictCodes": ["VERSION_CONFLICT", "QUALITY_GOVERNANCE_VERSION_CONFLICT"]
+          "conflictCodes": [
+            "VERSION_CONFLICT",
+            "QUALITY_GOVERNANCE_VERSION_CONFLICT"
+          ]
         }
       },
       "errors": [
-        { "code": "INVALID_COMMAND", "status": 400 },
-        { "code": "ACTOR_FORBIDDEN", "status": 403 },
-        { "code": "INSTITUTION_SCOPE_DENIED", "status": 403 },
-        { "code": "RECORD_NOT_FOUND", "status": 404 },
-        { "code": "DOMAIN_MISMATCH", "status": 409 },
-        { "code": "VERSION_CONFLICT", "status": 409 },
-        { "code": "IDEMPOTENCY_CONFLICT", "status": 409 },
-        { "code": "QUALITY_GOVERNANCE_VERSION_CONFLICT", "status": 409 },
-        { "code": "QUALITY_GOVERNANCE_COMMAND_FAILED", "status": 500 }
+        {
+          "code": "INVALID_COMMAND",
+          "status": 400
+        },
+        {
+          "code": "ACTOR_FORBIDDEN",
+          "status": 403
+        },
+        {
+          "code": "INSTITUTION_SCOPE_DENIED",
+          "status": 403
+        },
+        {
+          "code": "RECORD_NOT_FOUND",
+          "status": 404
+        },
+        {
+          "code": "DOMAIN_MISMATCH",
+          "status": 409
+        },
+        {
+          "code": "VERSION_CONFLICT",
+          "status": 409
+        },
+        {
+          "code": "IDEMPOTENCY_CONFLICT",
+          "status": 409
+        },
+        {
+          "code": "QUALITY_GOVERNANCE_VERSION_CONFLICT",
+          "status": 409
+        },
+        {
+          "code": "QUALITY_GOVERNANCE_COMMAND_FAILED",
+          "status": 500
+        }
       ],
       "audit": {
         "accepted": "commits the source record, command receipt and governance, platform-process and chained security audit projections in one state write",
@@ -1079,7 +1539,10 @@
         "required": true,
         "mechanism": "bearer-or-cookie-session",
         "principalType": "platform-user",
-        "credentialSource": ["header:authorization", "cookie:session"],
+        "credentialSource": [
+          "header:authorization",
+          "cookie:session"
+        ],
         "replayCsrf": {
           "replayProtection": "body-idempotency-key-or-canonical-case-snapshot-digest-plus-in-process-command-lock",
           "csrf": "platform-session-transport-policy"
@@ -1087,18 +1550,27 @@
       },
       "authorization": {
         "model": "platform-rbac-plus-insurance-responsibility-and-city-level-resource-scope",
-        "roles": ["insurance", "commission"],
+        "roles": [
+          "insurance",
+          "commission"
+        ],
         "dataScope": "city or health-admin platform; insurance bureau or insurance center"
       },
       "coverage": {
         "level": "endpoint",
         "selector": "entire-route",
-        "actions": ["formal-grouping.create"],
+        "actions": [
+          "formal-grouping.create"
+        ],
         "unverifiedRemainder": false
       },
       "idempotency": {
         "key": "body:idempotencyKey-or-derived-mode-schemeVersion-caseSnapshots-digest",
-        "payloadBinding": ["mode", "schemeVersion", "caseSnapshots"],
+        "payloadBinding": [
+          "mode",
+          "schemeVersion",
+          "caseSnapshots"
+        ],
         "exactReplay": "returns the persisted queued or later-state job with idempotent=true and status 200 without another state or audit write",
         "conflictingReuse": "FORMAL_GROUPING_JOB_IDEMPOTENCY_CONFLICT",
         "persistenceScope": "diseasePayment.formalGroupingJobs durable queued job plus one chained securityEvents entry in one platform state write",
@@ -1108,20 +1580,52 @@
         "cas": {
           "required": true,
           "field": "per-idempotency-key in-process command tail plus SQLite storageMeta.collectionVersions",
-          "conflictCodes": ["FORMAL_GROUPING_JOB_VERSION_CONFLICT"]
+          "conflictCodes": [
+            "FORMAL_GROUPING_JOB_VERSION_CONFLICT"
+          ]
         }
       },
       "errors": [
-        { "code": "FORMAL_GROUPING_JOB_BODY_INVALID", "status": 400 },
-        { "code": "FORMAL_GROUPING_JOB_INVALID", "status": 400 },
-        { "code": "FORMAL_GROUPING_CASE_SCOPE_DENIED", "status": 403 },
-        { "code": "FORMAL_GROUPING_CASE_NOT_FOUND", "status": 404 },
-        { "code": "FORMAL_GROUPING_JOB_IDEMPOTENCY_CONFLICT", "status": 409 },
-        { "code": "FORMAL_GROUPING_JOB_ID_CONFLICT", "status": 409 },
-        { "code": "FORMAL_GROUPING_JOB_CORRELATION_CONFLICT", "status": 409 },
-        { "code": "FORMAL_GROUPING_JOB_INTEGRITY_CONFLICT", "status": 409 },
-        { "code": "FORMAL_GROUPING_JOB_VERSION_CONFLICT", "status": 409 },
-        { "code": "FORMAL_GROUPING_JOB_STORAGE_FAILED", "status": 500 }
+        {
+          "code": "FORMAL_GROUPING_JOB_BODY_INVALID",
+          "status": 400
+        },
+        {
+          "code": "FORMAL_GROUPING_JOB_INVALID",
+          "status": 400
+        },
+        {
+          "code": "FORMAL_GROUPING_CASE_SCOPE_DENIED",
+          "status": 403
+        },
+        {
+          "code": "FORMAL_GROUPING_CASE_NOT_FOUND",
+          "status": 404
+        },
+        {
+          "code": "FORMAL_GROUPING_JOB_IDEMPOTENCY_CONFLICT",
+          "status": 409
+        },
+        {
+          "code": "FORMAL_GROUPING_JOB_ID_CONFLICT",
+          "status": 409
+        },
+        {
+          "code": "FORMAL_GROUPING_JOB_CORRELATION_CONFLICT",
+          "status": 409
+        },
+        {
+          "code": "FORMAL_GROUPING_JOB_INTEGRITY_CONFLICT",
+          "status": 409
+        },
+        {
+          "code": "FORMAL_GROUPING_JOB_VERSION_CONFLICT",
+          "status": 409
+        },
+        {
+          "code": "FORMAL_GROUPING_JOB_STORAGE_FAILED",
+          "status": 500
+        }
       ],
       "audit": {
         "accepted": "commits one durable queued grouping job and one chained security event in the same platform state write",
@@ -1185,7 +1689,10 @@
         "required": true,
         "mechanism": "bearer-or-cookie-session",
         "principalType": "platform-user",
-        "credentialSource": ["header:authorization", "cookie:session"],
+        "credentialSource": [
+          "header:authorization",
+          "cookie:session"
+        ],
         "replayCsrf": {
           "replayProtection": "organization-namespaced-idempotency-key-hash-plus-in-process-command-lock",
           "csrf": "platform-session-transport-policy"
@@ -1193,18 +1700,38 @@
       },
       "authorization": {
         "model": "platform-rbac-plus-fail-closed-organization-and-public-health-hospital-scope",
-        "roles": ["commission"],
+        "roles": [
+          "commission"
+        ],
         "dataScope": "city and health-admin platform; district own organization or explicit public-health hospital allowlist"
       },
       "coverage": {
         "level": "endpoint",
         "selector": "entire-route",
-        "actions": ["public-health-highlight-signal-intake"],
+        "actions": [
+          "public-health-highlight-signal-intake"
+        ],
         "unverifiedRemainder": false
       },
       "idempotency": {
         "key": "header:Idempotency-Key-or-body:idempotencyKey-or-body:id-or-canonical-payload-digest",
-        "payloadBinding": ["actorOrganizationScope", "id", "ruleId", "sourceType", "sourceSystem", "metric", "value", "baseline", "unit", "region", "institution", "observedAt", "location", "evidenceRefs", "sourceOrgCode"],
+        "payloadBinding": [
+          "actorOrganizationScope",
+          "id",
+          "ruleId",
+          "sourceType",
+          "sourceSystem",
+          "metric",
+          "value",
+          "baseline",
+          "unit",
+          "region",
+          "institution",
+          "observedAt",
+          "location",
+          "evidenceRefs",
+          "sourceOrgCode"
+        ],
         "exactReplay": "returns the persisted signal with idempotent=true and status 200 without another state or audit write",
         "conflictingReuse": "PUBLIC_HEALTH_SIGNAL_IDEMPOTENCY_CONFLICT",
         "persistenceScope": "bounded 200-entry publicHealthSignals ledger plus one chained securityEvents entry in one platform state write",
@@ -1214,17 +1741,40 @@
         "cas": {
           "required": true,
           "field": "per-organization-namespaced-key in-process command tail plus SQLite storageMeta.collectionVersions",
-          "conflictCodes": ["PUBLIC_HEALTH_SIGNAL_VERSION_CONFLICT"]
+          "conflictCodes": [
+            "PUBLIC_HEALTH_SIGNAL_VERSION_CONFLICT"
+          ]
         }
       },
       "errors": [
-        { "code": "PUBLIC_HEALTH_SIGNAL_BODY_INVALID", "status": 400 },
-        { "code": "PUBLIC_HEALTH_SIGNAL_INVALID", "status": 400 },
-        { "code": "PUBLIC_HEALTH_SIGNAL_SCOPE_FORBIDDEN", "status": 403 },
-        { "code": "PUBLIC_HEALTH_SIGNAL_IDEMPOTENCY_CONFLICT", "status": 409 },
-        { "code": "PUBLIC_HEALTH_SIGNAL_ID_CONFLICT", "status": 409 },
-        { "code": "PUBLIC_HEALTH_SIGNAL_VERSION_CONFLICT", "status": 409 },
-        { "code": "PUBLIC_HEALTH_SIGNAL_STORAGE_FAILED", "status": 500 }
+        {
+          "code": "PUBLIC_HEALTH_SIGNAL_BODY_INVALID",
+          "status": 400
+        },
+        {
+          "code": "PUBLIC_HEALTH_SIGNAL_INVALID",
+          "status": 400
+        },
+        {
+          "code": "PUBLIC_HEALTH_SIGNAL_SCOPE_FORBIDDEN",
+          "status": 403
+        },
+        {
+          "code": "PUBLIC_HEALTH_SIGNAL_IDEMPOTENCY_CONFLICT",
+          "status": 409
+        },
+        {
+          "code": "PUBLIC_HEALTH_SIGNAL_ID_CONFLICT",
+          "status": 409
+        },
+        {
+          "code": "PUBLIC_HEALTH_SIGNAL_VERSION_CONFLICT",
+          "status": 409
+        },
+        {
+          "code": "PUBLIC_HEALTH_SIGNAL_STORAGE_FAILED",
+          "status": 500
+        }
       ],
       "audit": {
         "accepted": "commits one bounded signal record and one chained security event in the same platform state write",
@@ -2371,6 +2921,454 @@
             "T09 research commands enforce ethics, minimum-necessary, independent approval, and institution evidence boundaries",
             "T09 routes authenticate before body/state access and map persistence failure without fallback writes",
             "T09 aggregate locks re-read inside the lock and collapse concurrent exact replays to one write"
+          ]
+        }
+      ],
+      "productionReady": false,
+      "externalEvidenceRequired": true
+    },
+    {
+      "contractId": "citizen-chronic.management-plan-patch-command.v1",
+      "key": "PATCH /api/chronic-management-plans/:id",
+      "method": "PATCH",
+      "path": "/api/chronic-management-plans/:id",
+      "owner": "T04",
+      "domain": "citizen-chronic",
+      "purpose": "update-scoped-chronic-management-plan",
+      "customAuthenticationEvidence": false,
+      "authentication": {
+        "required": true,
+        "mechanism": "bearer-or-cookie-session",
+        "principalType": "platform-user",
+        "credentialSource": [
+          "header:authorization",
+          "cookie:session"
+        ],
+        "replayCsrf": {
+          "replayProtection": "actor-scoped-idempotency-key-hash-plus-resource-lock",
+          "csrf": "platform-session-transport-policy"
+        }
+      },
+      "authorization": {
+        "model": "platform-rbac-plus-resident-and-institution-business-row-scope",
+        "roles": [
+          "institution",
+          "commission"
+        ],
+        "dataScope": "resident"
+      },
+      "coverage": {
+        "level": "endpoint",
+        "selector": "entire-route",
+        "actions": [
+          "patch-management-plan"
+        ],
+        "unverifiedRemainder": false
+      },
+      "idempotency": {
+        "key": "header:Idempotency-Key-or-body-key-or-target-plus-expectedVersion/payload-digest",
+        "payloadBinding": [
+          "actorScope",
+          "planId",
+          "expectedVersion",
+          "safePatch"
+        ],
+        "exactReplay": "returns the persisted response snapshot with status 200 and no second state or audit write",
+        "conflictingReuse": "CHRONIC_MANAGEMENT_PLAN_IDEMPOTENCY_CONFLICT",
+        "persistenceScope": "bounded aggregate-embedded receipt plus plan and chained security audit in one platform state write",
+        "distributedExactlyOnceClaimed": false
+      },
+      "concurrency": {
+        "cas": {
+          "required": true,
+          "field": "per-plan process lock plus chronicManagementPlans collection version",
+          "conflictCodes": [
+            "CHRONIC_MANAGEMENT_PLAN_VERSION_CONFLICT"
+          ]
+        }
+      },
+      "errors": [
+        {
+          "code": "CHRONIC_MANAGEMENT_PLAN_IDEMPOTENCY_CONFLICT",
+          "status": 409
+        },
+        {
+          "code": "CHRONIC_MANAGEMENT_PLAN_VERSION_CONFLICT",
+          "status": 409
+        },
+        {
+          "code": "CHRONIC_MANAGEMENT_PLAN_PERSISTENCE_FAILED",
+          "status": 500
+        }
+      ],
+      "audit": {
+        "accepted": "commits the scoped plan patch, bounded receipt and chained security event in one platform state write",
+        "replay": "returns the original response snapshot without another receipt, audit or state write",
+        "rejected": "identity and row scope are reevaluated before replay; conflicts do not write; failed SQLite transactions roll back business, receipt and audit without fallback writes"
+      },
+      "implementationEvidence": [
+        {
+          "file": "src/http/routes/citizen-chronic.js",
+          "anchors": [
+            "CHRONIC_MANAGEMENT_PLAN_IDEMPOTENCY_CONFLICT",
+            "withStateCommandLock(`chronic-management-plan:${id}`",
+            "CHRONIC_MANAGEMENT_PLAN_PERSISTENCE_FAILED"
+          ]
+        },
+        {
+          "file": "server.js",
+          "anchors": [
+            "_writeCommandReceipts",
+            "prepareCas(data, [collection, \"securityEvents\"]",
+            "writeDatabase(data)"
+          ]
+        }
+      ],
+      "testEvidence": [
+        {
+          "file": "test/frozen-launch-write-api-contract.test.js",
+          "anchors": [
+            "CHRONIC_MANAGEMENT_PLAN_IDEMPOTENCY_CONFLICT",
+            "CHRONIC_MANAGEMENT_PLAN_VERSION_CONFLICT",
+            "CHRONIC_MANAGEMENT_PLAN_PERSISTENCE_FAILED"
+          ]
+        }
+      ],
+      "productionReady": false,
+      "externalEvidenceRequired": true
+    },
+    {
+      "contractId": "citizen-chronic.followup-feedback-command.v1",
+      "key": "POST /api/chronic/followup-feedback",
+      "method": "POST",
+      "path": "/api/chronic/followup-feedback",
+      "owner": "T04",
+      "domain": "citizen-chronic",
+      "purpose": "submit-scoped-chronic-followup-feedback",
+      "customAuthenticationEvidence": false,
+      "authentication": {
+        "required": true,
+        "mechanism": "bearer-or-cookie-session",
+        "principalType": "platform-user",
+        "credentialSource": [
+          "header:authorization",
+          "cookie:session"
+        ],
+        "replayCsrf": {
+          "replayProtection": "actor-scoped-idempotency-key-hash-plus-command-lock",
+          "csrf": "platform-session-transport-policy"
+        }
+      },
+      "authorization": {
+        "model": "platform-rbac-plus-current-resident-and-family/institution-scope",
+        "roles": [
+          "citizen",
+          "institution",
+          "commission"
+        ],
+        "dataScope": "resident"
+      },
+      "coverage": {
+        "level": "endpoint",
+        "selector": "entire-route",
+        "actions": [
+          "submit-followup-feedback"
+        ],
+        "unverifiedRemainder": false
+      },
+      "idempotency": {
+        "key": "header:Idempotency-Key-or-body-key-or-record-id/canonical-payload-digest",
+        "payloadBinding": [
+          "actorScope",
+          "residentId",
+          "followupId",
+          "expectedVersion",
+          "feedback"
+        ],
+        "exactReplay": "returns the persisted feedback and message receipt with status 200 and no duplicate record, followup update, task message or audit",
+        "conflictingReuse": "CHRONIC_FEEDBACK_IDEMPOTENCY_CONFLICT",
+        "persistenceScope": "personalRecords feedback receipt plus existing followup/taskMessage and audit projections in one platform state write",
+        "distributedExactlyOnceClaimed": false
+      },
+      "concurrency": {
+        "cas": {
+          "required": true,
+          "field": "per-command process lock plus touched collection versions",
+          "conflictCodes": [
+            "CHRONIC_FEEDBACK_VERSION_CONFLICT"
+          ]
+        }
+      },
+      "errors": [
+        {
+          "code": "CHRONIC_FEEDBACK_IDEMPOTENCY_CONFLICT",
+          "status": 409
+        },
+        {
+          "code": "CHRONIC_FEEDBACK_VERSION_CONFLICT",
+          "status": 409
+        },
+        {
+          "code": "CHRONIC_FEEDBACK_PERSISTENCE_FAILED",
+          "status": 500
+        }
+      ],
+      "audit": {
+        "accepted": "commits feedback, existing followup/message projections, receipt, data-access and security audit in one platform state write",
+        "replay": "returns the original feedback response without another state or audit write",
+        "rejected": "identity and resident scope precede replay; conflicts do not write; forced SQLite failure rolls back every projection and has no fallback audit write"
+      },
+      "implementationEvidence": [
+        {
+          "file": "src/http/routes/citizen-chronic.js",
+          "anchors": [
+            "POST /api/chronic/followup-feedback",
+            "withStateCommandLock(`chronic-feedback:${command.commandKeyHash}`",
+            "CHRONIC_FEEDBACK_PERSISTENCE_FAILED"
+          ]
+        },
+        {
+          "file": "server.js",
+          "anchors": [
+            "CHRONIC_FEEDBACK_IDEMPOTENCY_CONFLICT",
+            "_writeCommandReceipt",
+            "writeDatabase(normalizeState(data))"
+          ]
+        }
+      ],
+      "testEvidence": [
+        {
+          "file": "test/frozen-launch-write-api-contract.test.js",
+          "anchors": [
+            "CHRONIC_FEEDBACK_IDEMPOTENCY_CONFLICT",
+            "CHRONIC_FEEDBACK_PERSISTENCE_FAILED",
+            "feedbackScopeDenied.response.status, 403"
+          ]
+        }
+      ],
+      "productionReady": false,
+      "externalEvidenceRequired": true
+    },
+    {
+      "contractId": "care-coordination.referral-teleconsultation-create-command.v1",
+      "key": "POST /api/referral-teleconsultations",
+      "method": "POST",
+      "path": "/api/referral-teleconsultations",
+      "owner": "T05",
+      "domain": "care-coordination",
+      "purpose": "create-authorized-referral-teleconsultation",
+      "customAuthenticationEvidence": false,
+      "authentication": {
+        "required": true,
+        "mechanism": "bearer-or-cookie-session",
+        "principalType": "platform-user",
+        "credentialSource": [
+          "header:authorization",
+          "cookie:session"
+        ],
+        "replayCsrf": {
+          "replayProtection": "actor-scoped-idempotency-key-hash-plus-command-lock",
+          "csrf": "platform-session-transport-policy"
+        }
+      },
+      "authorization": {
+        "model": "platform-rbac-plus-current-resident-authorization-and-source-institution/region-scope",
+        "roles": [
+          "institution",
+          "county",
+          "commission"
+        ],
+        "dataScope": "institution"
+      },
+      "coverage": {
+        "level": "endpoint",
+        "selector": "entire-route",
+        "actions": [
+          "create-teleconsultation"
+        ],
+        "unverifiedRemainder": false
+      },
+      "idempotency": {
+        "key": "header:Idempotency-Key-or-body-key-or-client-id/canonical-payload-digest",
+        "payloadBinding": [
+          "actorScope",
+          "residentId",
+          "authorizationId",
+          "sourceInstitution",
+          "targetInstitution",
+          "expectedVersion",
+          "consultationPayload"
+        ],
+        "exactReplay": "reevaluates authorization and returns the persisted creation response with status 200 and no duplicate state or audit",
+        "conflictingReuse": "REFERRAL_TELECONSULTATION_CREATE_IDEMPOTENCY_CONFLICT",
+        "persistenceScope": "bounded aggregate receipt plus consultation and audit projections in one platform state write",
+        "distributedExactlyOnceClaimed": false
+      },
+      "concurrency": {
+        "cas": {
+          "required": true,
+          "field": "per-command process lock plus referralTeleconsultations collection version",
+          "conflictCodes": [
+            "REFERRAL_TELECONSULTATION_VERSION_CONFLICT"
+          ]
+        }
+      },
+      "errors": [
+        {
+          "code": "REFERRAL_TELECONSULTATION_CREATE_IDEMPOTENCY_CONFLICT",
+          "status": 409
+        },
+        {
+          "code": "REFERRAL_TELECONSULTATION_VERSION_CONFLICT",
+          "status": 409
+        },
+        {
+          "code": "REFERRAL_TELECONSULTATION_PERSISTENCE_FAILED",
+          "status": 500
+        }
+      ],
+      "audit": {
+        "accepted": "commits the consultation, bounded receipt, data-access and chained security audit in one platform state write",
+        "replay": "returns the original creation response without another consultation, receipt or audit",
+        "rejected": "identity, authorization and source-organization scope precede replay; conflicts do not write; storage failure rolls back atomically without fallback audit"
+      },
+      "implementationEvidence": [
+        {
+          "file": "src/http/routes/care-coordination.js",
+          "anchors": [
+            "REFERRAL_TELECONSULTATION_CREATE_IDEMPOTENCY_CONFLICT",
+            "institutionSourceAllowed",
+            "REFERRAL_TELECONSULTATION_PERSISTENCE_FAILED"
+          ]
+        },
+        {
+          "file": "src/platform/storage/state-command-consistency.js",
+          "anchors": [
+            "function withStateCommandLock",
+            "function prepareCollectionCas",
+            "function buildStateCommand"
+          ]
+        }
+      ],
+      "testEvidence": [
+        {
+          "file": "test/frozen-launch-write-api-contract.test.js",
+          "anchors": [
+            "REFERRAL_TELECONSULTATION_CREATE_IDEMPOTENCY_CONFLICT",
+            "createScopeDenied.response.status, 403",
+            "REFERRAL_TELECONSULTATION_PERSISTENCE_FAILED"
+          ]
+        }
+      ],
+      "productionReady": false,
+      "externalEvidenceRequired": true
+    },
+    {
+      "contractId": "care-coordination.referral-teleconsultation-action-command.v1",
+      "key": "POST /api/referral-teleconsultations/:id/actions",
+      "method": "POST",
+      "path": "/api/referral-teleconsultations/:id/actions",
+      "owner": "T05",
+      "domain": "care-coordination",
+      "purpose": "update-scoped-referral-teleconsultation",
+      "customAuthenticationEvidence": false,
+      "authentication": {
+        "required": true,
+        "mechanism": "bearer-or-cookie-session",
+        "principalType": "platform-user",
+        "credentialSource": [
+          "header:authorization",
+          "cookie:session"
+        ],
+        "replayCsrf": {
+          "replayProtection": "actor-scoped-idempotency-key-hash-plus-aggregate-lock",
+          "csrf": "platform-session-transport-policy"
+        }
+      },
+      "authorization": {
+        "model": "platform-rbac-plus-resident-source/target-institution-or-region-scope",
+        "roles": [
+          "institution",
+          "county",
+          "commission"
+        ],
+        "dataScope": "institution"
+      },
+      "coverage": {
+        "level": "endpoint",
+        "selector": "entire-route",
+        "actions": [
+          "update-teleconsultation"
+        ],
+        "unverifiedRemainder": false
+      },
+      "idempotency": {
+        "key": "header:Idempotency-Key-or-body-key-or-target-plus-expectedVersion/payload-digest",
+        "payloadBinding": [
+          "actorScope",
+          "teleconsultationId",
+          "expectedVersion",
+          "action",
+          "updates"
+        ],
+        "exactReplay": "reevaluates current scope and returns the persisted action response with status 200 and no duplicate state or audit",
+        "conflictingReuse": "REFERRAL_TELECONSULTATION_ACTION_IDEMPOTENCY_CONFLICT",
+        "persistenceScope": "bounded aggregate receipt plus teleconsultation and audit projections in one platform state write",
+        "distributedExactlyOnceClaimed": false
+      },
+      "concurrency": {
+        "cas": {
+          "required": true,
+          "field": "per-teleconsultation process lock plus referralTeleconsultations collection version",
+          "conflictCodes": [
+            "REFERRAL_TELECONSULTATION_VERSION_CONFLICT"
+          ]
+        }
+      },
+      "errors": [
+        {
+          "code": "REFERRAL_TELECONSULTATION_ACTION_IDEMPOTENCY_CONFLICT",
+          "status": 409
+        },
+        {
+          "code": "REFERRAL_TELECONSULTATION_VERSION_CONFLICT",
+          "status": 409
+        },
+        {
+          "code": "REFERRAL_TELECONSULTATION_ACTION_PERSISTENCE_FAILED",
+          "status": 500
+        }
+      ],
+      "audit": {
+        "accepted": "commits the aggregate update, bounded receipt, data-access and chained security audit in one platform state write",
+        "replay": "returns the original action response without another aggregate, receipt or audit write",
+        "rejected": "identity and current resident/institution scope precede replay; CAS/conflicts do not write; storage failure rolls back atomically without fallback audit"
+      },
+      "implementationEvidence": [
+        {
+          "file": "src/http/routes/care-coordination.js",
+          "anchors": [
+            "REFERRAL_TELECONSULTATION_ACTION_IDEMPOTENCY_CONFLICT",
+            "withStateCommandLock(`referral-teleconsultation:${id}`",
+            "REFERRAL_TELECONSULTATION_ACTION_PERSISTENCE_FAILED"
+          ]
+        },
+        {
+          "file": "src/platform/storage/state-command-consistency.js",
+          "anchors": [
+            "function withStateCommandLock",
+            "function assertExpectedVersion",
+            "function prepareCollectionCas"
+          ]
+        }
+      ],
+      "testEvidence": [
+        {
+          "file": "test/frozen-launch-write-api-contract.test.js",
+          "anchors": [
+            "REFERRAL_TELECONSULTATION_ACTION_IDEMPOTENCY_CONFLICT",
+            "concurrent.map((item) => item.response.status).sort(), [200, 409]",
+            "REFERRAL_TELECONSULTATION_ACTION_PERSISTENCE_FAILED"
           ]
         }
       ],

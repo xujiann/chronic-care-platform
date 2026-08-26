@@ -69,6 +69,7 @@
     "test/platform-production-audit.test.js",
     "test/financial-gateways.test.js",
     "test/financial-gateway-readiness.test.js",
+    "test/frozen-launch-write-api-contract.test.js",
     "test/platform-standards-ledgers.test.js",
     "test/standard-smoke.test.js"
   ],
