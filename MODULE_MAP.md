@@ -177,7 +177,7 @@ QC 同样保留原 commission/institution、先查检查再读 body、FHIR 失�
 | `src/platform/governance/regional-sharing-read-model.js` | 机器 owner T00 integration；目标 platform-governance / T02 | `regional-sharing-read-model.v1` 两查询只读端口 | 构建共享视图和交接清单；只依赖组合根注入的 legacy normalize/seed/scope/handoff/UUID/clock 端口，不导入 `server.js` 或 HTTP 路由 |
 | `src/platform/governance/resident-authorization-decision-adapter.js` | 机器 owner T00 integration；目标 T02 consumer adapter | `resident-authorization-decision.v1` anti-corruption adapter | 唯一读取 T04 `personalRecords` meta 的边界；命令只消费结构化决策端口 |
 | `src/http/routes/shared.js` 的 `shared-05` | 兼容 HTTP 适配器 | 原 method/path/顺序 | 认证外层、读取/写入端口、兼容响应头；不再拥有旧 review 决策函数 |
-| `src/http/routes/state-data.js` | platform-state / T02；跨 owner 收口 T00 | legacy state 兼容边界 | 四个区域集合只能省略或深相等，拒绝全量/集合级客户端旁路 |
+| `src/http/routes/state-data.js` | platform-state / T02；跨 owner 收口 T00 | legacy state 兼容边界 | 四个区域集合只能省略或深相等，拒绝全量/集合级客户端旁路；GET 的 `authUsers` 专用投影移除 `password/passwordHash` 且不修改底层快照 |
 | `citizen-records-v1/v2` | citizen-chronic / T04 | 授权事实端口 | 提供授权状态与 lifecycle；T02 只读消费，不复制授权模型 |
 | `config/regional-sharing-access-data-contract.json` | T00/T02 治理证据 | 数据晋升合同 | 锁定 owner、跨域合同、无 DDL 迁移理由、回滚和生产 NO-GO |
 

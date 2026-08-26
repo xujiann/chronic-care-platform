@@ -18,6 +18,21 @@ const SERVER_MANAGED_REGIONAL_COLLECTIONS = Object.freeze([
   "regionalSharingAccessReviews"
 ]);
 
+const AUTH_USER_READ_SECRET_FIELDS = Object.freeze([
+  "password",
+  "passwordHash"
+]);
+
+function projectAuthUsersForStateRead(state = {}) {
+  if (!Array.isArray(state.authUsers)) return state;
+  return {
+    ...state,
+    authUsers: state.authUsers.map((user) => Object.fromEntries(
+      Object.entries(user).filter(([field]) => !AUTH_USER_READ_SECRET_FIELDS.includes(field))
+    ))
+  };
+}
+
 function serverManagedRegionalState(currentData = {}) {
   return Object.fromEntries(SERVER_MANAGED_REGIONAL_COLLECTIONS
     .filter((collection) => Object.hasOwn(currentData, collection))
@@ -60,7 +75,8 @@ function createRouteSegments(runtime, options = {}) {
     if (req.method === "GET" && url.pathname === "/api/state") {
         const user = requireApiRole(req, res, ["commission", "institution", "insurance", "citizen", "county"], "/api/state");
         if (!user) return true;
-        sendJson(res, 200, redactSensitiveResponse(scopeStateForUser(readDatabase(), user), user));
+        const scopedState = scopeStateForUser(readDatabase(), user);
+        sendJson(res, 200, redactSensitiveResponse(projectAuthUsersForStateRead(scopedState), user));
         return true;
       }
         return false;
@@ -281,8 +297,10 @@ function createRouteSegments(runtime, options = {}) {
 }
 
 module.exports = {
+  AUTH_USER_READ_SECRET_FIELDS,
   SERVER_MANAGED_REGIONAL_COLLECTIONS,
   createRouteSegments,
   firstServerManagedRegionalConflict,
+  projectAuthUsersForStateRead,
   serverManagedRegionalState
 };
