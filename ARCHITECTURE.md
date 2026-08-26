@@ -57,8 +57,9 @@
   使用同一 Chromium/动态端口策略并逐项注销 registration、删除 Cache Storage。v61 只缓存同源成功响应，
   仓库测试不替代真实 HTTPS、设备策略或现场安装验收。
 - 急救生命链、医生工作台、血液上线看板、陪诊工作台、产品运行驾驶舱、产品区域运行驾驶舱、质量安全工作台、区域切换工作台、血液召回面板与血液创新指挥中心十个单页 controller 分别将 6、6、8、8、1、1、1、2、2、10 个 API 驱动 HTML sink 迁为显式
-  DOM/text/class/dataset；体检页面另将居民解释卡和报告质检卡 2 个高风险 sink 迁为闭集 class 与文本节点，
-  其余 25 个仍失败关闭。Inventory v2 的 HTML occurrence 由 871 降至 824；十一项恶意响应浏览器测试
+  DOM/text/class/dataset；体检页面已将全部 27 个 HTML sink 迁为显式 DOM/text/class/dataset，
+  并把轨迹高度与 toast 显隐改为固定 CSS class。Inventory v2 的 HTML occurrence 由 871 降至 799、
+  动态样式由 45 降至 42；体检工作台恶意响应浏览器测试
   不替代真实托管头、渗透或现场验收。
 - strict production preflight 通过 T00 受控文件 provider 装配既有 external trust verifier；只接受独立
   pin 的 Ed25519 anchor bundle、双角色签名和当前 release/artifact/evidence/registry 绑定，默认继续 NO-GO。
