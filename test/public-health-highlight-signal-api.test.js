@@ -143,4 +143,13 @@ test("public health highlight signal real API enforces scope and durable replay 
   assert.match(created[0].commandKeyHash, /^[a-f0-9]{64}$/);
   assert.equal(state.securityEvents.filter((item) => item.action === "public-health-highlight-signal" && item.target === "phsig-city-legacy").length, 1);
   assert.doesNotMatch(JSON.stringify(state.publicHealthSignals), /city-real-api-command|ignored-lower-priority-body-key/);
+
+  const districtSystem = await request(baseUrl, "/api/public-health/system", districtToken);
+  assert.equal(districtSystem.response.status, 200, JSON.stringify(districtSystem.body));
+  assert.equal(districtSystem.body.highlights.triggerCenter.signals.some((item) => item.id === "phsig-district-allowed"), true);
+  assert.equal(districtSystem.body.highlights.triggerCenter.signals.some((item) => item.id === "phsig-city-legacy"), false);
+  assert.equal(districtSystem.body.summary.highlightActiveAlerts, districtSystem.body.highlights.summary.activeAlerts);
+  assert.equal(districtSystem.body.summary.highlightOpenTasks, 0);
+  assert.equal(districtSystem.body.summary.highlightEvidenceScore, 0);
+  assert.doesNotMatch(JSON.stringify(districtSystem.body), /commandKeyHash|requestDigest|phsig-city-legacy/);
 });
