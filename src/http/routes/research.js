@@ -10,9 +10,14 @@ const {
 const {
   ResearchExportWorkflowError,
   applyCompliantExportAction,
-  createCompliantExportRequest,
   isExportVisibleToUser
 } = require("../research/compliant-export-workflow");
+const {
+  ResearchDatasetCommandError,
+  applyResearchDatasetCommand,
+  projectResearchDataset,
+  withResearchDatasetWriteLock
+} = require("../research/dataset-write-command");
 
 function sendResearchExportError(sendJson, res, error) {
   const knownError = error instanceof ResearchExportWorkflowError;
@@ -22,6 +27,27 @@ function sendResearchExportError(sendJson, res, error) {
     error: errorName,
     code: knownError ? error.code : "RESEARCH_EXPORT_INVALID_REQUEST",
     message: error.message
+  });
+}
+
+function idempotencyHeader(req) {
+  const value = req.headers?.["idempotency-key"];
+  return Array.isArray(value) ? value[0] : value;
+}
+
+function sendResearchCommandError(sendJson, res, error) {
+  const versionConflict = String(error?.message || "").includes("SQLite optimistic lock conflict");
+  const known = error instanceof ResearchDatasetCommandError || error instanceof ResearchExportWorkflowError;
+  const status = versionConflict ? 409 : known ? (error.status || 400) : error instanceof SyntaxError ? 400 : 500;
+  const code = versionConflict
+    ? "RESEARCH_COMMAND_VERSION_CONFLICT"
+    : known ? error.code
+      : error instanceof SyntaxError ? "RESEARCH_COMMAND_BODY_INVALID" : "RESEARCH_COMMAND_STORAGE_FAILED";
+  const errorName = status === 403 ? "Forbidden" : status === 404 ? "Not Found" : status === 409 ? "Conflict" : status >= 500 ? "Service Unavailable" : "Bad Request";
+  sendJson(res, status, {
+    error: errorName,
+    code,
+    message: known ? error.message : versionConflict ? "Research dataset version changed; retry with a fresh snapshot" : status >= 500 ? "Research command storage failed" : "Research command body is invalid"
   });
 }
 
@@ -35,7 +61,7 @@ function createRouteSegments(runtime) {
     if (req.method === "GET" && url.pathname === "/api/research/datasets") {
         const user = requireApiRole(req, res, ["commission"], "/api/research/datasets");
         if (!user) return true;
-        sendJson(res, 200, { datasets: readDatabase().researchDatasets || [] });
+        sendJson(res, 200, { datasets: (readDatabase().researchDatasets || []).map(projectResearchDataset) });
         return true;
       }
 
@@ -154,18 +180,23 @@ function createRouteSegments(runtime) {
       if (req.method === "POST" && researchDatasetApprovalMatch) {
         const user = requireApiRole(req, res, ["commission"], "/api/research/datasets/:id/approval");
         if (!user) return true;
-        const data = readDatabase();
         const id = decodeURIComponent(researchDatasetApprovalMatch[1]);
-        const index = (data.researchDatasets || []).findIndex((item) => item.id === id);
-        if (index < 0) {
-          sendJson(res, 404, { error: "Not Found", message: "Research dataset not found" });
-          return true;
+        try {
+          const payload = await collectJson(req);
+          const result = await withResearchDatasetWriteLock(id, () => {
+            const data = structuredClone(readDatabase());
+            const executed = applyResearchDatasetCommand({
+              state: data, datasetId: id, endpoint: "approval", payload, user,
+              headerKey: idempotencyHeader(req), appendResearchAudit, normalizeResearchApproval,
+              normalizeResearchEvidenceDocument, requireDatasetSandboxAccess
+            });
+            if (!executed.replayed) writeDatabase(executed.state);
+            return executed;
+          });
+          sendJson(res, 200, { ...result.response, idempotentReplay: result.replayed });
+        } catch (error) {
+          sendResearchCommandError(sendJson, res, error);
         }
-        const payload = await collectJson(req);
-        data.researchDatasets[index] = normalizeResearchApproval(data.researchDatasets[index], payload, user);
-        appendResearchAudit(data, user, data.researchDatasets[index], "ethics-approval", data.researchDatasets[index].approval?.decision || "approved");
-        writeDatabase(data);
-        sendJson(res, 200, data.researchDatasets[index]);
         return true;
       }
 
@@ -173,25 +204,22 @@ function createRouteSegments(runtime) {
       if (req.method === "POST" && researchDatasetEvidenceMatch) {
         const user = requireApiRole(req, res, ["commission", "institution"], "/api/research/datasets/:id/evidence");
         if (!user) return true;
-        const data = readDatabase();
         const id = decodeURIComponent(researchDatasetEvidenceMatch[1]);
-        const index = (data.researchDatasets || []).findIndex((item) => item.id === id);
-        if (index < 0) {
-          sendJson(res, 404, { error: "Not Found", message: "Research dataset not found" });
-          return true;
-        }
         try {
           const payload = await collectJson(req);
-          const document = normalizeResearchEvidenceDocument(payload, user, data.researchDatasets[index]);
-          data.researchDatasets[index].evidenceDocuments = [
-            document,
-            ...(Array.isArray(data.researchDatasets[index].evidenceDocuments) ? data.researchDatasets[index].evidenceDocuments : [])
-          ].slice(0, 50);
-          appendResearchAudit(data, user, data.researchDatasets[index], "evidence-document", `${document.type}:${document.referenceNo}`);
-          writeDatabase(data);
-          sendJson(res, 200, data.researchDatasets[index]);
+          const result = await withResearchDatasetWriteLock(id, () => {
+            const data = structuredClone(readDatabase());
+            const executed = applyResearchDatasetCommand({
+              state: data, datasetId: id, endpoint: "evidence", payload, user,
+              headerKey: idempotencyHeader(req), appendResearchAudit, normalizeResearchApproval,
+              normalizeResearchEvidenceDocument, requireDatasetSandboxAccess
+            });
+            if (!executed.replayed) writeDatabase(executed.state);
+            return executed;
+          });
+          sendJson(res, 200, { ...result.response, idempotentReplay: result.replayed });
         } catch (error) {
-          sendJson(res, 400, { error: "Bad Request", message: error.message });
+          sendResearchCommandError(sendJson, res, error);
         }
         return true;
       }
@@ -200,59 +228,23 @@ function createRouteSegments(runtime) {
       if (req.method === "POST" && researchSandboxAccessMatch) {
         const user = requireApiRole(req, res, ["commission", "institution"], "/api/research/datasets/:id/sandbox-access");
         if (!user) return true;
-        const data = readDatabase();
         const id = decodeURIComponent(researchSandboxAccessMatch[1]);
-        const index = (data.researchDatasets || []).findIndex((item) => item.id === id);
-        if (index < 0) {
-          sendJson(res, 404, { error: "Not Found", message: "Research dataset not found" });
-          return true;
-        }
-        if (!canReadResearchDataset(user, data.researchDatasets[index])) {
-          appendResearchAudit(data, user, data.researchDatasets[index], "sandbox-access", "dataset scope denied", "denied");
-          writeDatabase(data);
-          sendJson(res, 403, { error: "Forbidden", code: "RESEARCH_DATASET_SCOPE_DENIED", message: "Dataset is outside the caller research scope" });
-          return true;
-        }
-        if (!requireDatasetSandboxAccess(data.researchDatasets[index])) {
-          appendResearchAudit(data, user, data.researchDatasets[index], "sandbox-access", "blocked by ethics/de-identification/authorization/governance/evidence status", "denied");
-          writeDatabase(data);
-          sendJson(res, 403, { error: "Forbidden", message: "Dataset is not approved, de-identified, governance-ready, evidence-ready, and active for sandbox access" });
-          return true;
-        }
-        const payload = await collectJson(req);
-        let purpose;
         try {
-          purpose = normalizeResearchPurpose(payload.purpose);
+          const payload = await collectJson(req);
+          const result = await withResearchDatasetWriteLock(id, () => {
+            const data = structuredClone(readDatabase());
+            const executed = applyResearchDatasetCommand({
+              state: data, datasetId: id, endpoint: "sandbox-access", payload, user,
+              headerKey: idempotencyHeader(req), appendResearchAudit, normalizeResearchApproval,
+              normalizeResearchEvidenceDocument, requireDatasetSandboxAccess
+            });
+            if (!executed.replayed) writeDatabase(executed.state);
+            return executed;
+          });
+          sendJson(res, 200, { ...result.response, idempotentReplay: result.replayed });
         } catch (error) {
-          appendResearchAudit(data, user, data.researchDatasets[index], "sandbox-access", error.code || "invalid purpose", "denied");
-          writeDatabase(data);
-          sendJson(res, 400, { error: "Bad Request", code: error.code || "RESEARCH_PURPOSE_INVALID", message: error.message });
-          return true;
+          sendResearchCommandError(sendJson, res, error);
         }
-        data.researchDatasets[index].sandbox = {
-          ...(data.researchDatasets[index].sandbox || {}),
-          status: "active",
-          lastAccessAt: new Date().toISOString(),
-          lastAccessBy: user.username || user.role
-        };
-        appendResearchAudit(data, user, data.researchDatasets[index], "sandbox-access", purpose);
-        writeDatabase(data);
-        sendJson(res, 200, {
-          datasetId: id,
-          deidentified: true,
-          access: {
-            mode: "read-only",
-            contractId: CONTRACT_ID,
-            contractVersion: CONTRACT_VERSION,
-            endpoint: `/api/research/datasets/${encodeURIComponent(id)}/read-model`,
-            expiresInMinutes: 120
-          },
-          controls: {
-            minimumNecessary: data.researchDatasets[index].governance?.minimumNecessary === true,
-            reidentificationProhibited: data.researchDatasets[index].governance?.reidentificationProhibited === true,
-            exportReviewRequired: data.researchDatasets[index].governance?.exportReviewRequired !== false
-          }
-        });
         return true;
       }
 
@@ -305,42 +297,22 @@ function createRouteSegments(runtime) {
       if (req.method === "POST" && researchCompliantExportMatch) {
         const user = requireApiRole(req, res, ["commission", "institution"], "/api/research/datasets/:id/compliant-exports");
         if (!user) return true;
-        const data = readDatabase();
         const id = decodeURIComponent(researchCompliantExportMatch[1]);
-        const index = (data.researchDatasets || []).findIndex((item) => item.id === id);
-        if (index < 0) {
-          sendJson(res, 404, { error: "Not Found", code: "RESEARCH_DATASET_NOT_FOUND", message: "Research dataset not found" });
-          return true;
-        }
-        if (!canReadResearchDataset(user, data.researchDatasets[index])) {
-          appendResearchAudit(data, user, data.researchDatasets[index], "compliant-export-request", "dataset scope denied", "denied");
-          writeDatabase(data);
-          sendJson(res, 403, { error: "Forbidden", code: "RESEARCH_DATASET_SCOPE_DENIED", message: "Dataset is outside the caller research scope" });
-          return true;
-        }
-        if (!requireDatasetSandboxAccess(data.researchDatasets[index])) {
-          appendResearchAudit(data, user, data.researchDatasets[index], "compliant-data-export", "blocked by ethics/de-identification/authorization/governance/evidence status", "denied");
-          writeDatabase(data);
-          sendJson(res, 403, { error: "Forbidden", message: "Dataset is not approved, de-identified, governance-ready, evidence-ready, and active for compliant export" });
-          return true;
-        }
         try {
           const payload = await collectJson(req);
-          const exportRequest = createCompliantExportRequest(payload, user, data.researchDatasets[index]);
-          if ((data.compliantDataExports || []).some((item) => item.id === exportRequest.id)) {
-            throw new ResearchExportWorkflowError("RESEARCH_EXPORT_ID_CONFLICT", "Compliant export id already exists", 409);
-          }
-          data.compliantDataExports = [
-            exportRequest,
-            ...(Array.isArray(data.compliantDataExports) ? data.compliantDataExports : [])
-          ].slice(0, 120);
-          appendResearchAudit(data, user, data.researchDatasets[index], "compliant-export-request", `${exportRequest.id}:${exportRequest.destination}`, "submitted");
-          writeDatabase(data);
-          sendJson(res, 201, exportRequest);
+          const result = await withResearchDatasetWriteLock(id, () => {
+            const data = structuredClone(readDatabase());
+            const executed = applyResearchDatasetCommand({
+              state: data, datasetId: id, endpoint: "compliant-export", payload, user,
+              headerKey: idempotencyHeader(req), appendResearchAudit, normalizeResearchApproval,
+              normalizeResearchEvidenceDocument, requireDatasetSandboxAccess
+            });
+            if (!executed.replayed) writeDatabase(executed.state);
+            return executed;
+          });
+          sendJson(res, result.replayed ? 200 : 201, { ...result.response, idempotentReplay: result.replayed });
         } catch (error) {
-          appendResearchAudit(data, user, data.researchDatasets[index], "compliant-export-request", error.code || error.message, "denied");
-          writeDatabase(data);
-          sendResearchExportError(sendJson, res, error);
+          sendResearchCommandError(sendJson, res, error);
         }
         return true;
       }
@@ -388,27 +360,23 @@ function createRouteSegments(runtime) {
       if (req.method === "POST" && researchOutcomeMatch) {
         const user = requireApiRole(req, res, ["commission", "institution"], "/api/research/datasets/:id/outcomes");
         if (!user) return true;
-        const data = readDatabase();
         const id = decodeURIComponent(researchOutcomeMatch[1]);
-        const index = (data.researchDatasets || []).findIndex((item) => item.id === id);
-        if (index < 0) {
-          sendJson(res, 404, { error: "Not Found", message: "Research dataset not found" });
-          return true;
+        try {
+          const payload = await collectJson(req);
+          const result = await withResearchDatasetWriteLock(id, () => {
+            const data = structuredClone(readDatabase());
+            const executed = applyResearchDatasetCommand({
+              state: data, datasetId: id, endpoint: "outcomes", payload, user,
+              headerKey: idempotencyHeader(req), appendResearchAudit, normalizeResearchApproval,
+              normalizeResearchEvidenceDocument, requireDatasetSandboxAccess
+            });
+            if (!executed.replayed) writeDatabase(executed.state);
+            return executed;
+          });
+          sendJson(res, 200, { ...result.response, idempotentReplay: result.replayed });
+        } catch (error) {
+          sendResearchCommandError(sendJson, res, error);
         }
-        const payload = await collectJson(req);
-        const now = new Date().toISOString();
-        const outcome = {
-          at: now,
-          by: user.username || user.role,
-          title: String(payload.title || "research outcome").trim(),
-          summary: String(payload.summary || "").trim(),
-          registryImpact: String(payload.registryImpact || "").trim(),
-          returnedTo: Array.isArray(payload.returnedTo) ? payload.returnedTo.map((item) => String(item).trim()).filter(Boolean) : ["diseaseRegistryModels"]
-        };
-        data.researchDatasets[index].outcomes = [outcome, ...(Array.isArray(data.researchDatasets[index].outcomes) ? data.researchDatasets[index].outcomes : [])].slice(0, 50);
-        appendResearchAudit(data, user, data.researchDatasets[index], "outcome-return", outcome.title);
-        writeDatabase(data);
-        sendJson(res, 200, data.researchDatasets[index]);
         return true;
       }
         return false;
