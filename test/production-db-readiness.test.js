@@ -2,6 +2,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const test = require("node:test");
+const { readRuntimeSource } = require("../src/http/runtime-source");
 
 const {
   applyProductionDatabaseCutoverAction,
@@ -19,7 +20,15 @@ test("production database readiness validates migration and rehearsal evidence",
   const report = buildProductionDbReadinessReport();
   assert.equal(report.ok, true);
   assert.equal(report.productionTrack.id, "prod-storage-adapter");
+  assert.equal(report.migrationEvidence.runtimeAdapterImplemented, true);
+  assert.equal(report.migrationEvidence.runtimeMode, "disabled");
+  assert.equal(report.migrationEvidence.runtimePostgresEnabled, false);
   assert.equal(report.migrationEvidence.runtimePostgresBlocked, true);
+  assert.equal(report.migrationEvidence.productionPrimary, false);
+  assert.equal(report.migrationEvidence.runtimeCutoverEnabled, false);
+  assert.match(report.migrationEvidence.declaredNextAction, /Implement PostgreSQL adapter/);
+  assert.doesNotMatch(report.migrationEvidence.nextAction, /Implement PostgreSQL adapter/);
+  assert.match(report.migrationEvidence.nextAction, /Keep the adapter disabled/);
   assert.equal(report.checks.some((item) => item.id === "production-db:runtimeBlock" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "production-db:sqliteSchema" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "production-db:sqliteMigrationRegistry" && item.passed), true);
@@ -58,6 +67,9 @@ test("production database readiness validates migration and rehearsal evidence",
   assert.match(markdown, /postgresql/);
   assert.match(markdown, /DATABASE_URL/);
   assert.match(markdown, /Production database cutover center/);
+  assert.match(markdown, /PostgreSQL adapter implemented: yes/);
+  assert.match(markdown, /PostgreSQL runtime mode: disabled/);
+  assert.match(markdown, /PostgreSQL production primary enabled: no/);
   assert.match(markdown, /SQLite production profile: configured/);
   assert.match(markdown, /PostgreSQL manifest package: verified/);
   assert.match(markdown, /Transactional PostgreSQL outbox: configured/);
@@ -68,6 +80,25 @@ test("production database readiness validates migration and rehearsal evidence",
   assert.match(markdown, /Reconciliation case workflow: configured/);
   assert.match(markdown, /Reconciliation operations UI: configured/);
   assert.match(markdown, /Prometheus SLO metrics: configured/);
+});
+
+test("production database readiness stays blocked when stale source prose is absent", () => {
+  const serverSource = readRuntimeSource(ROOT).replaceAll(
+    "PostgreSQL is tracked in productionDeploymentPlan but the runtime adapter is not enabled yet",
+    "PostgreSQL runtime state is reported by the storage contract"
+  );
+  assert.doesNotMatch(serverSource, /PostgreSQL is tracked in productionDeploymentPlan/);
+  const report = buildProductionDbReadinessReport({
+    serverSource,
+    env: {
+      POSTGRES_PRIMARY_STORAGE_MODE: "disabled"
+    }
+  });
+
+  assert.equal(report.migrationEvidence.runtimeAdapterImplemented, true);
+  assert.equal(report.migrationEvidence.runtimePostgresEnabled, false);
+  assert.equal(report.migrationEvidence.runtimePostgresBlocked, true);
+  assert.equal(report.checks.some((item) => item.id === "production-db:runtimeBlock" && item.passed), true);
 });
 
 test("production database readiness fails when secure export boundaries are removed", () => {
