@@ -151,24 +151,20 @@ function requireApprovalEvidence(dataset) {
   }
 }
 
-function receiptReplay(dataset, identity, state, endpoint) {
+function receiptReplay(dataset, identity, endpoint) {
   const receipts = Array.isArray(dataset.commandReceipts) ? dataset.commandReceipts : [];
   const receipt = receipts.find((item) => item.endpoint === endpoint && item.commandKeyHash === identity.commandKeyHash);
   if (!receipt) return null;
   if (receipt.requestDigest !== identity.requestDigest) {
     commandError("RESEARCH_COMMAND_IDEMPOTENCY_CONFLICT", "Idempotency-Key is bound to another research command", 409);
   }
-  if (endpoint === "compliant-export") {
-    const exportRecord = (Array.isArray(state.compliantDataExports) ? state.compliantDataExports : [])
-      .find((item) => item.id === receipt.resultId);
-    if (!exportRecord) commandError("RESEARCH_COMMAND_RECEIPT_INVALID", "Research command receipt target is missing", 409);
-    return { response: { ...structuredClone(exportRecord), commandReceipts: [] }, replayed: true };
+  if (!receipt.response || typeof receipt.response !== "object" || Array.isArray(receipt.response)) {
+    commandError("RESEARCH_COMMAND_RECEIPT_INVALID", "Research command receipt response is missing", 409);
   }
-  if (endpoint === "sandbox-access") return { response: buildSandboxResponse(dataset), replayed: true };
-  return { response: projectResearchDataset(dataset), replayed: true };
+  return { response: structuredClone(receipt.response), replayed: true };
 }
 
-function appendReceipt(dataset, identity, endpoint, resultId, now) {
+function appendReceipt(dataset, identity, endpoint, resultId, response, now) {
   const receipts = Array.isArray(dataset.commandReceipts) ? dataset.commandReceipts : [];
   if (receipts.length >= MAX_COMMAND_RECEIPTS) {
     commandError("RESEARCH_COMMAND_RECEIPT_CAPACITY_EXCEEDED", "Research command receipt capacity is exhausted", 409);
@@ -182,6 +178,7 @@ function appendReceipt(dataset, identity, endpoint, resultId, now) {
       requestDigest: identity.requestDigest,
       resultVersion: dataset.domainVersion,
       resultId: text(resultId || dataset.id),
+      response: structuredClone(response),
       at: now
     }
   ];
@@ -229,8 +226,11 @@ function applyResearchDatasetCommand(options) {
   const dataset = datasets[index];
   authorizeDataset(user, dataset, endpoint);
   const identity = commandIdentity({ endpoint, datasetId, payload, user, headerKey, version: currentVersion(dataset) });
-  const replay = receiptReplay(dataset, identity, state, endpoint);
+  const replay = receiptReplay(dataset, identity, endpoint);
   if (replay) return { state, ...replay };
+  if ((Array.isArray(dataset.commandReceipts) ? dataset.commandReceipts : []).length >= MAX_COMMAND_RECEIPTS) {
+    commandError("RESEARCH_COMMAND_RECEIPT_CAPACITY_EXCEEDED", "Research command receipt capacity is exhausted", 409);
+  }
   if (identity.expectedVersion !== currentVersion(dataset)) {
     commandError("RESEARCH_COMMAND_VERSION_CONFLICT", "Research dataset version changed; retry with a fresh snapshot", 409);
   }
@@ -325,8 +325,8 @@ function applyResearchDatasetCommand(options) {
   datasets[index] = nextDataset;
   state.researchDatasets = datasets;
   appendResearchAudit(state, user, nextDataset, auditAction, auditDetail, auditResult);
-  appendReceipt(nextDataset, identity, endpoint, resultId, now);
   if (!response) response = endpoint === "sandbox-access" ? buildSandboxResponse(nextDataset) : projectResearchDataset(nextDataset);
+  appendReceipt(nextDataset, identity, endpoint, resultId, response, now);
   return { state, response, replayed: false };
 }
 

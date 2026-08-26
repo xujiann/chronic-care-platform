@@ -8,7 +8,7 @@
 | 字段 | 语义 | 约束 |
 |---|---|---|
 | `domainVersion` | 聚合乐观版本 | 遗留缺失值解释为 0；成功命令加 1；显式 `expectedVersion` 不匹配返回 409 |
-| `commandReceipts[]` | actor-scoped 命令回执 | 最多 100 条；只保存 key hash、request digest、动作、结果版本/ID和时间，不保存原始 key；公共投影删除 |
+| `commandReceipts[]` | actor-scoped 命令回执 | 最多 100 条；保存 key hash、request digest、动作、结果版本/ID、首次公共响应快照和时间，不保存原始 key；公共投影删除 |
 
 科研合规导出申请继续写入既有 `compliantDataExports[]`；数据集、导出申请、`usageAudit` 与
 `dataAccessLogs` 在一次状态持久化中提交。药械记录、记录内 `auditTrail` 与 `securityEvents` 同样一次提交。
@@ -262,7 +262,7 @@ source/sink contract、目标摘要、cursor/source hash 与 receipt 摘要；ch
 
 目录中的源码 marker 既不是认证证明，也不是幂等执行证据；只有 owner、控制流锚点和可执行负向测试一致时才产生认证 evidence contract。认证分类只描述 AS-IS 的 required/optional/none、凭据来源、replay/CSRF 和 scope，不代表目标政策充分或生产安全。幂等 `behavior-verified` 仍只证明当前仓库行为，不证明跨实例 exactly-once 或生产耐久性；所有生产状态继续 `NO-GO`。
 
-API-002 的 existing-proof 扩展现使注册表达到 13 份合同。T07 financial dispatch/formal grouping 继续保持既有 reservation/job、审计和 CAS 边界。T03 highlight signal intake 仍只使用既有 `publicHealthSignals` 与 `securityEvents`：新记录保存组织命名空间后的 `commandKeyHash` 和 canonical `requestDigest`，绝不保存原始幂等键；这两个字段是服务端持久化的幂等元数据，所有出站 highlight 响应均通过公开投影删除。signal 与链式审计在同一全状态快照中由一次 `writeDatabase` 提交，精确重放不写，ledger 保持既有 200 条上限。SQLite 继续消费 `storageMeta.collectionVersions` 做事务内乐观锁，JSON 兼容路径只受当前进程的按 key 命令尾保护。读取投影没有新增集合、表、字段、DDL、migration、outbox 或事实源，也不宣称跨实例 exactly-once；`publicHealthSignals` 仍为 review-required 数据 owner 状态，生产 PostgreSQL 状态未改变。
+API-002 的 existing-proof 扩展现使注册表达到 21 份合同，其中 19 个为完整 endpoint、2 个为 action-slice。新增八份 T09 合同使用既有 `researchDatasets`、`compliantDataExports`、`drugConsumableSupervisions` 与审计集合；有界 receipt 保存散列命令身份和首次公共响应快照，使聚合后续变化后仍可零写返回原响应。T07 标准药械状态机和 T03 highlight signal 合同保持既有边界。没有新增集合、表、DDL、migration、outbox 或事实源，也不宣称跨实例 exactly-once；生产 PostgreSQL 状态未改变。
 
 T07 第二批审计的 3 条 `reviewedProofRequired` 已全部由直接 endpoint 行为合同替换；formal grouping create 最后关闭资源范围、并发/CAS、稳定错误和原子审计证据缺口。机器验证仍禁止拒绝记录和正式合同同 key 并存，当前 `reviewedProofRequired` 为 0。
 
