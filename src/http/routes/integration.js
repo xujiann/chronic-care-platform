@@ -2,16 +2,19 @@
 
 const clinicalResultExchange = require("./t08-clinical-result-exchange");
 const externalJointTest = require("./integration/external-joint-test");
+const objectStorageV2 = require("./integration/object-storage-v2");
 
 const SECURE_ATTACHMENT_METADATA_LIMIT = 500;
 
 function createRouteSegments(runtime) {
-  const { APPOINTMENT_CONTRACT_ID, PHYSICAL_EXAM_CONTRACT_ID, appendDataAccessLog, appendSecurityEvent, applyObjectLifecycle, buildIntegrationSample, canAccessResident, canAccessSecureAttachment, collectJson, createObjectDownloadIntent, createObjectUploadIntent, dispatchFinancialRequest, dispatchHospitalRequest, financialDispatchRequestDigest, finalizeObjectUpload, hospitalConnectorCenter, landAppointmentIntegrationEvent, landPhysicalExamIntegrationEvent, normalizeHospitalConnectorDomain, normalizeIntegrationEvent, objectStorageCenter, prependAuditTrailEntry, randomUUID, readDatabase, requireApiRole, sendJson, summarizeIntegrationGateway, updateIntegrationEvent, validateAttachmentMetadata, verifyIntegrationSignature, withFinancialDispatchLock, withFinancialDispatchStateLock, writeDatabase } = runtime;
+  const { APPOINTMENT_CONTRACT_ID, PHYSICAL_EXAM_CONTRACT_ID, appendDataAccessLog, appendSecurityEvent, applyObjectLifecycle, buildIntegrationSample, canAccessResident, canAccessSecureAttachment, collectJson, createObjectDownloadIntent, createObjectUploadIntent, dispatchFinancialRequest, dispatchHospitalRequest, financialDispatchRequestDigest, finalizeObjectUpload, hospitalConnectorCenter, landAppointmentIntegrationEvent, landPhysicalExamIntegrationEvent, normalizeHospitalConnectorDomain, normalizeIntegrationEvent, objectStorageCenter, objectStorageLegacyWritesAllowed, prependAuditTrailEntry, randomUUID, readDatabase, requireApiRole, sendJson, summarizeIntegrationGateway, updateIntegrationEvent, validateAttachmentMetadata, verifyIntegrationSignature, withFinancialDispatchLock, withFinancialDispatchStateLock, withObjectStorageDurableRepository, writeDatabase } = runtime;
+  const handleObjectStorageV2 = objectStorageV2.createHandler({ ...runtime, withObjectStorageDurableRepository });
   return [
     {
       id: "integration-01",
       domain: "integration",
       async handle(req, res, url) {
+    if (await handleObjectStorageV2(req, res, url)) return true;
     if (req.method === "GET" && url.pathname === "/api/attachments/storage") {
         const user = requireApiRole(req, res, ["commission", "institution"], "/api/attachments/storage");
         if (!user) return true;
@@ -46,6 +49,10 @@ function createRouteSegments(runtime) {
       if (req.method === "POST" && url.pathname === "/api/attachments/upload-intents") {
         const user = requireApiRole(req, res, ["commission", "institution", "citizen"], "/api/attachments/upload-intents");
         if (!user) return true;
+        if (objectStorageLegacyWritesAllowed() !== true) {
+          sendJson(res, 410, { ok: false, code: "OBJECT_STORAGE_V1_WRITE_FROZEN", message: "附件 v1 写入已冻结，请使用 /api/attachments/v2", productionReady: false });
+          return true;
+        }
         const payload = await collectJson(req);
         const data = readDatabase();
         const residentId = String(payload.residentId || user.residentId || "").trim();
@@ -136,6 +143,10 @@ function createRouteSegments(runtime) {
       if (req.method === "POST" && attachmentCompleteMatch) {
         const user = requireApiRole(req, res, ["commission", "institution", "citizen"], "/api/attachments/:id/complete");
         if (!user) return true;
+        if (objectStorageLegacyWritesAllowed() !== true) {
+          sendJson(res, 410, { ok: false, code: "OBJECT_STORAGE_V1_WRITE_FROZEN", message: "附件 v1 写入已冻结，请使用 /api/attachments/v2", productionReady: false });
+          return true;
+        }
         const data = readDatabase();
         const attachmentId = decodeURIComponent(attachmentCompleteMatch[1]);
         const index = (data.secureAttachments || []).findIndex((item) => item.id === attachmentId);
@@ -243,6 +254,10 @@ function createRouteSegments(runtime) {
       if (req.method === "POST" && attachmentActionMatch) {
         const user = requireApiRole(req, res, ["commission", "institution"], "/api/attachments/:id/actions");
         if (!user) return true;
+        if (objectStorageLegacyWritesAllowed() !== true) {
+          sendJson(res, 410, { ok: false, code: "OBJECT_STORAGE_V1_WRITE_FROZEN", message: "附件 v1 写入已冻结，请使用 /api/attachments/v2", productionReady: false });
+          return true;
+        }
         const payload = await collectJson(req);
         const data = readDatabase();
         const attachmentId = decodeURIComponent(attachmentActionMatch[1]);

@@ -10,8 +10,8 @@ test("P0 data promotion and T02 regional ownership reduce legacy authority debt"
   const report = buildDataPromotionCenter(data, { now: "2026-08-17T01:00:00.000Z" });
   assert.equal(report.ok, true);
   assert.equal(report.summary.promotedP0, 12);
-  assert.equal(report.summary.authoritative, 60);
-  assert.equal(report.summary.legacyBlocked, 189);
+  assert.equal(report.summary.authoritative, 61);
+  assert.equal(report.summary.legacyBlocked, 188);
   for (const collection of [
     "regionalDataSharingScope",
     "regionalSharingPackages",

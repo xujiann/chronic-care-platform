@@ -277,18 +277,15 @@ worker 依赖 repository 端口和 publisher 端口，repository 不依赖 HTTP�
 activation provider 只验证仓库外 registry 的逐事件 Ed25519 签名决定，不持有审批私钥。跨 T04/T00 的改动由
 T00 集成分支承载。
 
-## 对象存储 ADR 前置治理依赖方向
+## 对象存储耐久 v2 依赖方向
 
-当前运行依赖保持 `T08 integration HTTP caller → T00 secure-object-storage v1 gateway port → 外部网关`，
-本切片没有增加数据库或 worker 边。新增治理依赖是
-`Proposed ADR + machine decision/action register + domain owner manifest(read-only) + SQLite schema head(read-only)
-→ object-storage architecture verifier → architecture:test/governance-api`；验证器不依赖 `server.js`、不写
-数据库、不生成报告。
+运行依赖为 `T08 integration v2 HTTP → T00 SQLite v17 repository/transactional command → T00 fenced worker
+→ secure-object-storage v1 trust port → 外部网关`；HTTP 路径不含网络边。列表依赖 scope-bound HMAC keyset
+cursor 与固定 high-water；对账写持久 case/action，不覆盖附件不可变事实。
 
-若决策 Accepted，建议目标依赖为 `T08 data-owner command/API → T00 v17 repository + transactional command
-enqueue → T00 fenced worker → gateway`，另由 lossless keyset scan 驱动 reconcile/readiness。该目标不是
-AS-IS。T08 route owner 不能反向推断 data owner，T00 技术端口不能取得业务事实所有权；在 owner 与兼容
-策略批准前，所有 v17/runtime/API/promotion 依赖均保持 blocked。
+T08 已确认为 data owner，T00 仅持有技术端口。架构 verifier 绑定 Accepted ADR、v17 head、owner 和
+promotion=false；worker/deployment/readiness 依赖真实 provider status/abort capability 与现场证据，缺失即
+失败关闭。
 
 ## Production evidence trust 依赖方向
 

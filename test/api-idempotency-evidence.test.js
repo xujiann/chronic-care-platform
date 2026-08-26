@@ -79,8 +79,8 @@ test("catalog promotes only whole endpoints and retains generic action routes as
   const catalog = buildProductionApiCatalog();
   assert.equal(catalog.summary.writeIdempotencyBehaviorVerified, 11);
   assert.equal(catalog.summary.writeIdempotencyActionSlicesVerified, 2);
-  assert.equal(catalog.summary.writeIdempotencyBehaviorProofRequired, 322);
-  assert.equal(catalog.summary.reviewRequired, 324);
+  assert.equal(catalog.summary.writeIdempotencyBehaviorProofRequired, 325);
+  assert.equal(catalog.summary.reviewRequired, 327);
 
   for (const key of [
     "POST /api/auth/sms-delivery-callback",

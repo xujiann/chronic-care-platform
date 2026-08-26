@@ -29,6 +29,7 @@ const REPORTS = Object.freeze({
   "care-service-outbox": { ok: true, runId: "care-run", workerId: "care-worker", claimed: 2, delivered: 1, retried: 1, deadLetters: 0, resultCodes: [{ errorCode: "CARE_DELIVERY_TIMEOUT" }] },
   "continuous-audit-delivery": { ok: true, pendingBefore: 2, delivered: 2, pendingAfter: 0, errorCode: "" },
   "chronic-followup-dispatch": { workerIdDigest: "a".repeat(64), claimed: 2, delivered: 1, retryScheduled: 1, deadLettered: 0, persistenceRejected: 0 },
+  "object-storage-command-v2": { workerIdDigest: "b".repeat(64), claimed: 2, delivered: 1, retryScheduled: 1, deadLettered: 0, persistenceRejected: 0 },
   "public-health-direct-report": { ok: true, workerId: "public-health-worker", processed: 2, awaitingCallback: 1, retryScheduled: 1, deadLetters: 0, deliveries: [] },
   "referral-delivery": { runId: "referral-run", workerId: "referral-worker", claimed: 1, counts: { delivered: 1 }, outcomes: [] },
   "emergency-signal-delivery": { ok: true, runId: "emergency-run", workerId: "emergency-worker", summary: { claimed: 1, published: 1, retrying: 0, deadLettered: 0 }, results: [] },
@@ -42,7 +43,7 @@ test("worker semantics inventory is closed, versioned, and never authorizes prod
   assert.equal(report.contractVersion, CONTRACT_VERSION);
   assert.equal(report.profileCount, inventory.profiles.length);
   assert.equal(inventory.productionAuthorization, "never");
-  assert.equal(inventory.profiles.some((item) => /object-storage/i.test(item.id)), false);
+  assert.equal(inventory.profiles.filter((item) => item.id === "object-storage-command-v2").length, 1);
 });
 
 test("every inventoried worker report projects the same bounded metadata-only shape", () => {
@@ -162,6 +163,7 @@ test("all deployed server-side worker entrypoints are inventoried and integrated
     "scripts/audit-delivery-worker.js",
     "scripts/care-service-outbox-worker.js",
     "scripts/chronic-followup-dispatch-worker.js",
+    "scripts/object-storage-command-worker.js",
     "scripts/platform-cutover-alert-worker.js",
     "scripts/platform-shadow-relay.js",
     "scripts/postgres-shadow-reconcile.js",

@@ -217,6 +217,35 @@
       }
     },
     {
+      "id": "object-storage-command-v2",
+      "ownerProcess": "T00",
+      "entrypoints": ["scripts/object-storage-command-worker.js"],
+      "implementationSources": ["src/platform/operations/object-storage-command-worker.js", "src/platform/storage/object-storage-durable.js"],
+      "stateMachine": "object-storage-command-worker.v2",
+      "deliveryGuarantee": "at-least-once",
+      "retryModel": "bounded-exponential-backoff-with-audited-dead-letter-replay",
+      "leaseModel": "owner-token-digest-version-expiry-fencing",
+      "checkpointModel": "sqlite-v17-authoritative-command-receipt-and-reconciliation-ledgers",
+      "terminalStates": ["delivered", "dead-letter", "persistence-rejected"],
+      "observability": {
+        "workerIdentityPaths": ["workerIdDigest"],
+        "runIdentityPaths": [],
+        "observedAtPaths": [],
+        "okPaths": [],
+        "skippedPaths": [],
+        "statusPaths": [],
+        "countPaths": {
+          "claimed": ["claimed"],
+          "succeeded": ["delivered"],
+          "retryScheduled": ["retryScheduled"],
+          "deadLettered": ["deadLettered"],
+          "persistenceRejected": ["persistenceRejected"],
+          "failed": []
+        },
+        "errorCollections": []
+      }
+    },
+    {
       "id": "public-health-direct-report",
       "ownerProcess": "T03",
       "entrypoints": ["scripts/public-health-direct-report-worker.js"],
@@ -378,10 +407,6 @@
     {
       "path": "POST /api/digital-hospital/execution/workers",
       "reason": "external execution-worker registration API; the external worker implementation and site identity remain outside this repository"
-    },
-    {
-      "path": "object-storage-command-worker-v2",
-      "reason": "Proposed ADR only; runtime implementation is explicitly forbidden before owner and compatibility decisions are accepted"
     }
   ]
 }

@@ -11,7 +11,7 @@ test("object storage readiness separates adapter foundation from production acce
   const report = buildObjectStorageReadiness();
   assert.equal(report.ok, true);
   assert.equal(report.productionReady, false);
-  assert.equal(report.status, "adapter-foundation-ready-site-acceptance-pending");
+  assert.equal(report.status, "durable-v2-repository-ready-external-evidence-pending");
   assert.equal(report.summary.controlsReady, report.summary.controls);
   assert.equal(report.summary.apiGroupsReady, report.summary.apiGroups);
   assert.equal(report.controls.every((item) => item.passed), true);
@@ -19,7 +19,10 @@ test("object storage readiness separates adapter foundation from production acce
   assert.equal(report.controls.some((item) => item.id === "signed-url-boundary" && item.passed), true);
   assert.equal(report.controls.some((item) => item.id === "explicit-receipts" && item.passed), true);
   assert.equal(report.apiRoutes.every((item) => item.passed), true);
-  assert.equal(report.blockers.length, 8);
+  assert.equal(report.controls.some((item) => item.id === "durable-command-track" && item.passed), true);
+  assert.equal(report.controls.some((item) => item.id === "fenced-worker-dlq" && item.passed), true);
+  assert.equal(report.controls.some((item) => item.id === "sqlite-v17" && item.passed), true);
+  assert.equal(report.blockers.length, 10);
 });
 
 test("object storage readiness fails when malware enforcement is removed", () => {

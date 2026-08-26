@@ -3,42 +3,42 @@
   "decision": {
     "id": "OBJ-ADR-002",
     "adrPath": "docs/adr/2026-08-23-object-storage-durable-command-and-metadata-v2.md",
-    "status": "proposed",
+    "status": "accepted",
     "defaultDecision": "NO-GO",
     "recommendedOption": "versioned-async-command-and-structured-metadata",
     "recommendedOwnership": {
       "dataOwner": {
         "process": "T08",
         "domain": "integration",
-        "status": "recommendation-only"
+        "status": "confirmed"
       },
       "technicalOwner": {
         "process": "T00",
         "scope": "shared-storage-worker-readiness-deployment",
-        "status": "recommendation-only"
+        "status": "confirmed"
       }
     },
     "recommendedCompatibility": {
       "strategy": "parallel-versioned-v2-async-api",
-      "status": "recommendation-only"
+      "status": "approved"
     },
     "reservedSqliteMigrationVersion": 17,
     "requiredHumanDecisions": [
       {
         "id": "confirm-secure-attachment-data-owner",
-        "status": "unresolved",
+        "status": "resolved",
         "requiredDecision": "Confirm or reject T08 integration as the secure attachment data owner."
       },
       {
         "id": "confirm-v1-v2-api-compatibility",
-        "status": "unresolved",
+        "status": "resolved",
         "requiredDecision": "Approve the compatibility, deprecation and consumer migration strategy for synchronous v1 and asynchronous v2 APIs."
       }
     ],
     "authorization": {
-      "v17MigrationAuthorized": false,
-      "runtimeImplementationAuthorized": false,
-      "apiImplementationAuthorized": false,
+      "v17MigrationAuthorized": true,
+      "runtimeImplementationAuthorized": true,
+      "apiImplementationAuthorized": true,
       "productionPromotionAllowed": false
     }
   },
@@ -46,21 +46,21 @@
     {
       "id": "human-confirm-data-owner",
       "owner": "T08/T00 review",
-      "status": "blocked-human-decision",
+      "status": "completed",
       "dependsOn": [],
       "deliverable": "Approved data-owner decision before changing the machine ownership manifest."
     },
     {
       "id": "human-confirm-api-compatibility",
       "owner": "T08 and current API consumers",
-      "status": "blocked-human-decision",
+      "status": "completed",
       "dependsOn": [],
       "deliverable": "Approved v1/v2 compatibility, deprecation and migration window."
     },
     {
       "id": "accept-architecture-decision",
       "owner": "T00 architecture review",
-      "status": "blocked-human-decision",
+      "status": "completed",
       "dependsOn": [
         "human-confirm-data-owner",
         "human-confirm-api-compatibility"
@@ -70,7 +70,7 @@
     {
       "id": "sqlite-v17-structured-storage",
       "owner": "T00 technical storage",
-      "status": "blocked-until-accepted",
+      "status": "completed",
       "dependsOn": [
         "accept-architecture-decision"
       ],
@@ -79,7 +79,7 @@
     {
       "id": "legacy-backfill-and-freeze",
       "owner": "confirmed data owner with T00 migration support",
-      "status": "blocked-until-accepted",
+      "status": "completed",
       "dependsOn": [
         "sqlite-v17-structured-storage"
       ],
@@ -88,7 +88,7 @@
     {
       "id": "versioned-async-api-v2",
       "owner": "T08 API with T00 integration review",
-      "status": "blocked-until-accepted",
+      "status": "completed",
       "dependsOn": [
         "legacy-backfill-and-freeze"
       ],
@@ -97,7 +97,7 @@
     {
       "id": "durable-object-storage-worker",
       "owner": "T00 technical worker",
-      "status": "blocked-until-accepted",
+      "status": "completed",
       "dependsOn": [
         "sqlite-v17-structured-storage"
       ],
@@ -106,7 +106,7 @@
     {
       "id": "lossless-keyset-pagination",
       "owner": "confirmed data owner with T00 storage support",
-      "status": "blocked-until-accepted",
+      "status": "completed",
       "dependsOn": [
         "legacy-backfill-and-freeze"
       ],
@@ -115,7 +115,7 @@
     {
       "id": "persistent-provider-reconciliation",
       "owner": "T00 technical worker with T08 provider contract",
-      "status": "blocked-until-accepted",
+      "status": "repository-complete-external-capability-blocked",
       "dependsOn": [
         "durable-object-storage-worker",
         "lossless-keyset-pagination"
@@ -125,7 +125,7 @@
     {
       "id": "readiness-deployment-and-operations",
       "owner": "T00 release governance",
-      "status": "blocked-until-accepted",
+      "status": "repository-complete-site-evidence-blocked",
       "dependsOn": [
         "versioned-async-api-v2",
         "persistent-provider-reconciliation"

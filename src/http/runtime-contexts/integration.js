@@ -7,10 +7,10 @@ const DEPENDENCIES = Object.freeze([
   "applyObjectLifecycle", "buildIntegrationSample", "canAccessResident", "canAccessSecureAttachment", "collectJson",
   "createObjectDownloadIntent", "createObjectUploadIntent", "dispatchFinancialRequest", "dispatchHospitalRequest", "financialDispatchRequestDigest",
   "finalizeObjectUpload", "hospitalConnectorCenter", "landAppointmentIntegrationEvent", "landPhysicalExamIntegrationEvent",
-  "normalizeHospitalConnectorDomain", "normalizeIntegrationEvent", "objectStorageCenter", "prependAuditTrailEntry",
+  "normalizeHospitalConnectorDomain", "normalizeIntegrationEvent", "objectStorageCenter", "objectStorageLegacyWritesAllowed", "prependAuditTrailEntry",
   "randomUUID", "readDatabase", "requireApiRole", "sendJson", "summarizeIntegrationGateway",
   "updateIntegrationEvent", "validateAttachmentMetadata", "verifyIntegrationSignature", "withFinancialDispatchLock",
-  "withFinancialDispatchStateLock", "writeDatabase"
+  "withFinancialDispatchStateLock", "withObjectStorageDurableRepository", "writeDatabase"
 ]);
 
 module.exports = { DEPENDENCIES, DOMAIN, PROCESS };

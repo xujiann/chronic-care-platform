@@ -200,16 +200,15 @@ process 自动成为数据 owner。252 个集合的 `productionPromotionAllowed`
   返回 503，institution 虽不获取全局计数，仍使用同一真实健康判定。
 - 人工 dead-letter replay 仅经受控 CLI digest 参数执行，尚未新增公网 HTTP 管理接口。
 
-## 14. 对象存储异步 API 候选（Proposed，未实施）
+## 14. 对象存储异步 API v2（Accepted，仓库内已实施）
 
-现有安全附件 method/path、同步响应、鉴权、范围、错误和审计行为均未改变。Proposed ADR 建议未来另发
-版本化 v2：创建命令返回 `202 + commandId + statusUrl`，状态查询和人工 replay 使用稳定错误、幂等键与
-资源范围；生产请求路径不得直接调用 provider。具体 path、v1 是否继续同步、弃用窗口和调用方迁移顺序
-尚未获人类批准，不能登记为现有 API 或进入 production catalog 的 GO。
+v1 路径在有界迁移窗口保留；v2 新增 `GET /api/attachments/v2`、`POST /api/attachments/v2/upload-intents`、
+`GET /api/attachments/v2/commands/:id`、commission-only replay，以及 complete/download/lifecycle 命令入口。
+创建返回 `202 + commandId + statusUrl`，相同幂等键和请求返回既有结果；所有查询绑定角色/机构/居民范围，
+不返回对象键。v2 请求路径只提交本地耐久命令，provider 调用由独立 worker 执行。
 
-机器治理 CLI 不是 HTTP API。ADR 未 Accepted 或 data owner/v1-v2 兼容策略未确认时，v17、runtime/API
-implementation 和 production promotion 全部失败关闭。真实 provider endpoint、凭据、回执、capability
-与现场验收继续是外部 NO-GO 边界。
+机器治理 CLI 不是 HTTP API。实现已获授权但 production promotion 仍为 false；真实 provider endpoint、
+凭据、签名状态/abort capability、KMS/WORM/扫描和现场验收继续是外部 NO-GO 边界。
 
 ## 15. 严格生产预检 provider（无 HTTP 变化）
 

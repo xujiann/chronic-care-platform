@@ -6,6 +6,19 @@
 
 ## 运行接口
 
+### v2 耐久异步接口
+
+`POST /api/attachments/v2/upload-intents`、complete/download/lifecycle v2 入口只在 SQLite v17 本地事务中
+登记结构化附件和命令，返回 `202 + commandId + statusUrl`；`GET /api/attachments/v2/commands/:id` 查询
+状态，commission 可对 dead-letter 执行带幂等键和摘要审计的 replay。列表使用角色范围绑定、固定 high-water
+的 HMAC keyset cursor。请求路径不调用外部网关，独立 worker 才执行 provider 操作，并以完整 lease fencing、
+有界退避、dead-letter 和不可变摘要回执收敛。短效上传/下载 URL 到期即从命令结果持久清除，对外永不返回
+对象键。worker 每次首次执行和重试都固定使用 `commandId` 作为 provider `requestId`，使外部幂等键保持稳定；
+该设计仍是 at-least-once，不宣称 exactly-once。
+
+v1 在获批的有界迁移窗口保留，调用方应迁移到 v2 异步合同。仓库实现与测试不代表外部 provider status/
+abort capability、KMS/WORM、恶意文件扫描、备份恢复或现场验收已经完成；`productionReady=false`。
+
 - `GET /api/attachments/storage`：监管和医疗机构角色查看适配器配置与控制状态，不返回网关地址、存储桶、密钥或令牌。
 - `GET /api/attachments`：按居民、创建机构和角色范围查询附件安全元数据，不返回上传凭据。
 - `POST /api/attachments/upload-intents`：校验文件名、类型、大小、SHA-256、数据分类和留存策略，再向对象存储网关申请短期直传授权。

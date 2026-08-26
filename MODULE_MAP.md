@@ -31,7 +31,7 @@
 | 领域事件 | `src/platform/events/`、各领域 worker | outbox/inbox、幂等和后台投递 |
 | 慢病随访 durable dispatch | `citizen-chronic-followup-event-service.js`、`src/citizen-chronic/followup-event-publisher.js`、`followup-dispatch-*` | T04 v1 事件/投递语义 + T00 SQLite v16/outbox/worker/部署装配；真实外部 activation decision、回执与现场启用仍 NO-GO |
 | 审计投递 | `src/identity-security/audit-delivery-source.js`、`src/platform/operations/audit-delivery.js`、`scripts/audit-delivery-worker.js`、`scripts/audit-delivery-preflight.js` | v15 同事务 append-only source、最小投影、cursor 批次和 checkpoint v3 已实现；v2 snapshot 不静默提升，可信 receipt、外部 anchor 和真实 WORM capability 仍使生产失败关闭 |
-| 安全对象存储端口 | `secure-object-storage.js`、`scripts/object-storage-readiness.js` | T00 管版本化请求/响应信任、精确 Origin/TTL、严格回执和生产门禁；T08 附件路由在兼容容量达到 500 条时先失败关闭，不再静默淘汰既有元数据；持久命令、无损分页和对账仍未建立 |
+| 安全对象存储端口 | `secure-object-storage.js`、`src/platform/storage/object-storage-durable.js`、`src/platform/operations/object-storage-command-worker.js`、`scripts/object-storage-readiness.js` | T08 管附件业务数据，T00 管 v17 结构化仓储、v2 耐久命令/worker、keyset 分页、持久对账与生产门禁；外部 provider/KMS/WORM/扫描和现场证据仍 NO-GO |
 | 区域运行 | `src/platform/regional/`、`regions/` | 多地区清单、能力包、复制和发布注册 |
 | 领域实现 | `src/care-coordination/` 等与根目录服务 | 新旧实现并存，边界尚未完全迁移 |
 | 前端共享 | `auth.js`、`shared.js`、`platform-api-client.js`、`platform-shell.js` | 身份上下文、API 调用、壳和设计系统；服务端 token 不进入 localStorage，Cookie 上下文优先，陈旧凭据启动即清理 |
@@ -126,7 +126,7 @@ QC 同样保留原 commission/institution、先查检查再读 body、FHIR 失�
 
 ## 9. SQLite migration 模块
 
-`src/platform/storage/sqlite-migrations.js` 是 T00 管理的单一注册表和执行入口。`server.js` 与部署/readiness/发布报告消费同一注册表结果。v1–v14 保持历史 ledger checksum 并冻结源码指纹；v15 追加 append-only 审计 source，v16 追加慢病随访 durable outbox，当前 head 为 16。任何后续 DDL 必须从 v17 连续追加，不允许领域模块绕过注册表。
+`src/platform/storage/sqlite-migrations.js` 是 T00 管理的单一注册表和执行入口。`server.js` 与部署/readiness/发布报告消费同一注册表结果。v1–v14 保持历史 ledger checksum 并冻结源码指纹；v15 追加 append-only 审计 source，v16 追加慢病随访 durable outbox，v17 追加对象存储耐久轨道，当前 head 为 17。任何后续 DDL 必须从 v18 连续追加，不允许领域模块绕过注册表。
 
 ## 10. 标准工程门禁模块
 
@@ -230,18 +230,17 @@ owner、文件引用和 closed-world 核心概念匹配只是证据，不能自�
 - 边界：HTTP 路由只提交/查询本地队列；worker 才能调用 publisher。内嵌 outbox 保留 API 兼容，专用
   SQLite outbox 是外部投递权威状态。跨主机 PostgreSQL 实现尚不存在。
 
-## 17. 对象存储 ADR 前置治理模块
+## 17. 对象存储耐久 v2 模块
 
 | 模块 | Owner / Process | 类型 | 当前边界 |
 |---|---|---|---|
-| `config/object-storage-architecture-decision.json` | T00 治理；建议 T08 data owner 待确认 | machine decision/action register | 记录 Proposed 状态、两项人类决策、v17 预留和十项 blocked 行动；不是数据 owner 合同或实施授权 |
-| `scripts/object-storage-architecture-governance.js` | T00 | 只读 fail-closed CLI | 核对 ADR 状态/章节、行动覆盖、owner 未推断、SQLite head v16/v17 预留和 promotion=false；不写数据库或报告 |
-| `test/object-storage-architecture-governance.test.js` | T00 | TEST-001/architecture 保护 | 覆盖误启用 v17/runtime/API/promotion、行动提前、owner 推断、ADR 漂移、版本冲突和未决人类审批 |
-| `secure-object-storage.js`、`src/http/routes/integration.js` | 既有 T00/T08 | 未修改运行时 | 保持 v1 信任与同步兼容行为；没有在本切片实现 v17、异步 API、worker 或 reconcile |
+| `config/object-storage-architecture-decision.json` | T00 治理；T08 data owner | machine decision/action register | 记录 Accepted、v17/runtime/API 授权和 production promotion=false |
+| `src/platform/storage/object-storage-durable.js` | T00 technical | SQLite v17 repository | 结构化附件/命令/不可变回执/持久对账、回填冻结、fencing 和 keyset cursor |
+| `src/http/routes/integration/object-storage-v2.js` | T08 data / T00 integration | versioned async API | 鉴权/资源范围后本地事务 enqueue，202/status/replay；不在请求路径调用 provider |
+| `src/platform/operations/object-storage-command-worker.js`、CLI/systemd | T00 technical | durable worker | 围栏租约、有界退避、DLQ、摘要回执和审计 replay；外部证据未完成时 readiness NO-GO |
 
-建议目标边界是 `T08 owner command/API → T00 structured repository + durable worker → gateway`，但只有 ADR
-Accepted、data owner 与兼容策略获人类批准后才能进入逐切片实现。Proposed 台账不能替代
-`config/domain-data-ownership.json`，也不能把 T08 route owner 自动解释为 data owner。
+边界固定为 `T08 owner command/API → T00 structured repository + durable worker → gateway`。owner 已写入
+`config/domain-data-ownership.json`，但 `productionWriteAllowed=false`，不得把仓库测试当外部网关或现场证据。
 
 ## 18. Production evidence trust provider
 
