@@ -158,23 +158,28 @@ function projectPublicHealthSignal(signal = {}) {
 }
 
 function projectPublicHealthSignalHighlights(highlights, user) {
-  if (String(user.orgType || "").trim().toLowerCase() !== "district") return highlights;
+  const publicSignals = (Array.isArray(highlights.triggerCenter?.signals) ? highlights.triggerCenter.signals : [])
+    .map((item) => projectPublicHealthSignal(item));
+  const publicHighlights = {
+    ...highlights,
+    triggerCenter: { ...highlights.triggerCenter, signals: publicSignals }
+  };
+  if (String(user.orgType || "").trim().toLowerCase() !== "district") return publicHighlights;
   const allowedCodes = new Set([
     String(user.orgCode || "").trim().toUpperCase(),
     ...(Array.isArray(user.publicHealthHospitalCodes) ? user.publicHealthHospitalCodes : [])
       .map((item) => String(item || "").trim().toUpperCase())
-      .filter(Boolean)
-  ]);
-  const signals = (Array.isArray(highlights.triggerCenter?.signals) ? highlights.triggerCenter.signals : [])
+  ].filter(Boolean));
+  const signals = publicSignals
     .filter((item) => allowedCodes.has(String(item.sourceOrgCode || "").trim().toUpperCase()));
   const signalIds = new Set(signals.map((item) => item.id));
-  const alerts = (Array.isArray(highlights.triggerCenter?.alerts) ? highlights.triggerCenter.alerts : [])
+  const alerts = (Array.isArray(publicHighlights.triggerCenter?.alerts) ? publicHighlights.triggerCenter.alerts : [])
     .filter((item) => {
       const linkedSignalIds = Array.isArray(item.signalIds) ? item.signalIds : [];
       return linkedSignalIds.length > 0 && linkedSignalIds.every((id) => signalIds.has(id));
     });
   const alertIds = new Set(alerts.map((item) => item.id));
-  const nodes = (Array.isArray(highlights.mapBoard?.nodes) ? highlights.mapBoard.nodes : [])
+  const nodes = (Array.isArray(publicHighlights.mapBoard?.nodes) ? publicHighlights.mapBoard.nodes : [])
     .filter((item) => (item.type === "signal" && signalIds.has(item.id)) || (item.type === "alert" && alertIds.has(item.id)));
   const regions = [...new Set(nodes.map((item) => item.region).filter(Boolean))].map((region, index) => ({
     id: `region-${index + 1}`,
@@ -185,13 +190,13 @@ function projectPublicHealthSignalHighlights(highlights, user) {
   const quality = {
     verifiedSignals: signals.filter((item) => item.qualityStatus === "verified").length,
     reviewSignals: signals.filter((item) => /review|pending/i.test(String(item.qualityStatus || ""))).length,
-    ruleCoverage: highlights.triggerCenter?.quality?.ruleCoverage || 0,
+    ruleCoverage: publicHighlights.triggerCenter?.quality?.ruleCoverage || 0,
     sourceTypes: [...new Set(signals.map((item) => item.sourceType))]
   };
   return {
-    ...highlights,
+    ...publicHighlights,
     summary: {
-      ...highlights.summary,
+      ...publicHighlights.summary,
       signals: signals.length,
       sourceTypes: quality.sourceTypes.length,
       activeAlerts: alerts.length,
@@ -206,17 +211,27 @@ function projectPublicHealthSignalHighlights(highlights, user) {
       evidencePending: 0,
       auditEvents: 0
     },
-    triggerCenter: { ...highlights.triggerCenter, signals, alerts, quality },
-    mapBoard: { ...highlights.mapBoard, regions, nodes, resourceSummary: [], taskSummary: [] },
-    aiCenter: { ...highlights.aiCenter, reviews: [] },
+    triggerCenter: { ...publicHighlights.triggerCenter, signals, alerts, quality },
+    mapBoard: { ...publicHighlights.mapBoard, regions, nodes, resourceSummary: [], taskSummary: [] },
+    aiCenter: { ...publicHighlights.aiCenter, reviews: [] },
     commandCenter: { tasks: [], openTasks: [], resources: [], readyResources: [], escalationQueue: [] },
     evidenceCenter: {
-      ...highlights.evidenceCenter,
+      ...publicHighlights.evidenceCenter,
       records: [],
       summary: { score: 0, verified: 0, pending: 0, total: 0 },
       quality
     }
   };
+}
+
+function buildPublicHealthHighlightsProjection({ data, user, buildPublicHealthHighlights }) {
+  return projectPublicHealthSignalHighlights(buildPublicHealthHighlights({ data }), user);
+}
+
+function publicHealthHighlightReadScopeDecision(user = {}) {
+  const orgType = String(user.orgType || "").trim().toLowerCase();
+  const orgCode = String(user.orgCode || "").trim();
+  return PUBLIC_HEALTH_SIGNAL_ALLOWED_ORG_TYPES.has(orgType) && Boolean(orgCode);
 }
 
 function publicHealthSignalHttpError(error) {
@@ -278,8 +293,30 @@ function createRouteSegment(runtime) {
       if (req.method === "GET" && url.pathname === "/api/public-health/highlights") {
         const user = requireApiRole(req, res, ["commission"], "/api/public-health/highlights");
         if (!user) return true;
+        if (!publicHealthHighlightReadScopeDecision(user)) {
+          try {
+            appendSecurityEvent({
+              actor: user.name,
+              role: user.role,
+              action: "public-health-highlight-read",
+              target: "/api/public-health/highlights",
+              result: "denied",
+              detail: "PUBLIC_HEALTH_HIGHLIGHT_SCOPE_FORBIDDEN"
+            });
+          } catch (error) {
+            const response = publicHealthSignalHttpError(error);
+            sendJson(res, response.status, { error: response.error, code: response.code, message: response.message });
+            return true;
+          }
+          sendJson(res, 403, {
+            error: "Forbidden",
+            code: "PUBLIC_HEALTH_HIGHLIGHT_SCOPE_FORBIDDEN",
+            message: "public health highlights are outside the current organization scope"
+          });
+          return true;
+        }
         const data = readDatabase();
-        const highlights = buildPublicHealthHighlights({ data });
+        const highlights = buildPublicHealthHighlightsProjection({ data, user, buildPublicHealthHighlights });
         appendSecurityEvent({
           actor: user.name,
           role: user.role,
@@ -380,16 +417,12 @@ function createRouteSegment(runtime) {
             writeDatabase(data);
             return { data, signal, idempotent: false };
           });
-          const publicSignals = (Array.isArray(result.data.publicHealthSignals) ? result.data.publicHealthSignals : [])
-            .map((item) => projectPublicHealthSignal(item));
-          const highlights = buildPublicHealthHighlights({
-            data: { ...result.data, publicHealthSignals: publicSignals }
-          });
+          const highlights = buildPublicHealthHighlightsProjection({ data: result.data, user, buildPublicHealthHighlights });
           sendJson(res, result.idempotent ? 200 : 201, {
             ok: true,
             signal: projectPublicHealthSignal(result.signal),
             idempotent: result.idempotent,
-            highlights: projectPublicHealthSignalHighlights(highlights, user)
+            highlights
           });
         } catch (error) {
           const response = publicHealthSignalHttpError(error);
