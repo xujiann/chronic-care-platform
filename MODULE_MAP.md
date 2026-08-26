@@ -1,5 +1,15 @@
 # MODULE MAP — 主线模块地图
 
+## 2026-08-26 T09 command 边界
+
+| 模块 | Owner | 责任 | 明确不负责 |
+|---|---|---|---|
+| `src/http/shared/drug-consumable-command.js` | T09 | 三个遗留药械监管写入口的身份/职责/居民范围、幂等 receipt、版本 CAS、业务与链式安全审计聚合 | T07 `src/insurance-payment/drug-consumable/supervision-use-case.js` 的医师/药师/委员会标准状态机；外部医保回执；跨实例 exactly-once |
+| `src/http/research/dataset-write-command.js` | T09 | 五个科研数据集写入口的伦理、数据最小化、独立审批、幂等 receipt、版本 CAS、数据访问审计与导出申请 | 合规导出的独立审批/发布 action 状态机；外部伦理系统；真实导出 worker/outbox |
+| `src/http/routes/shared.js`、`src/http/routes/research.js` | T09 | 身份先行、锁内重读、单次持久化和稳定 HTTP 错误/回放投影 | 事实源选择、跨域组合、机器发布目录 |
+
+内部 `commandReceipts` 不属于公共响应；GET/写响应通过投影移除。T07 标准 use-case 未修改，避免把两个不同聚合的状态机合并。
+
 > 实施分支 AS-IS 快照：基于 `main@a15d10d`。模块是可分配责任和验证的架构单元，不等同于每一个 JavaScript 文件。
 
 ## 1. HTTP 模块与所有权

@@ -1,5 +1,20 @@
 # API MAP — 主线接口地图
 
+## 2026-08-26 T09 八个写入口行为
+
+| 接口 | 角色/职责 | 成功副作用 |
+|---|---|---|
+| `POST /api/drug-consumable-supervision/:id/review` | commission 或 insurance；医保角色必须是医保机构；居民范围 | 监管记录 + 记录审计 + 安全审计 |
+| `POST /api/drug-consumable-supervision/:id/remediation` | commission 或 institution；医保不得代机构整改 | 监管记录 + 整改证据引用 + 两级审计 |
+| `POST /api/drug-consumable-supervision/:id/insurance-sync` | commission 或 insurance；机构不得代医保确认 | 监管记录 + 结算批次引用 + 两级审计 |
+| `POST /api/research/datasets/:id/approval` | 独立 commission；申请人不得自批 | 数据集审批/治理状态 + usage/data-access 审计 |
+| `POST /api/research/datasets/:id/evidence` | commission 或有数据集范围的 institution | 证据文件元数据；机构证据保持 submitted + 审计 |
+| `POST /api/research/datasets/:id/sandbox-access` | commission 或有数据集范围的 institution；数据集已治理发布 | sandbox access 元数据 + 审计 |
+| `POST /api/research/datasets/:id/compliant-exports` | commission 或有数据集范围的 institution；数据集已治理发布 | blocked/pending 导出申请 + 数据集命令 receipt + 审计 |
+| `POST /api/research/datasets/:id/outcomes` | commission 或有数据集范围的 institution；数据集已治理发布 | 去标识成果摘要 + 审计 |
+
+八个入口均支持 header `Idempotency-Key`，并保留既有 body command id 的必要兼容；key 按 actor、角色、机构、资源和动作散列命名空间。精确回放返回 `idempotentReplay: true` 且零写；异载荷复用返回 409。显式 `expectedVersion` 执行 CAS；未传版本沿用当前聚合版本兼容旧客户端。路由仅在锁内重读后调用一次 `writeDatabase`，存储失败返回脱敏 500/409，不做 JSON/SQLite fallback。所有入口继续 `productionReady=false`。
+
 > 实施分支 AS-IS 快照：历史静态分析识别的 368 条精确路由是下限；当前扫描识别 371 个字面条件路由和 601 条授权声明，派生目录取并集后形成 593 个唯一接口（586 个字面路由、7 个运行时策略）。其中 13 条声明来自机器认证证据合同，不新增路由；相邻 handler 不再被跨块拼接成虚假 method/path。动态 ID、请求体 action 和外部回调变体仍需以运行时路由测试为准。
 
 ## 1. 请求链

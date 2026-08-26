@@ -1,5 +1,16 @@
 # 遗留代码重构安全网
 
+## T09 八个首发写入口保护
+
+`test/t09-release-write-api-behavior.test.js` 是药械监管三个兼容写入口和科研数据集五个写入口的专项负向安全网。以后触及这些路由、命令 receipt、版本字段、科研治理或职责分离时，至少运行：
+
+```powershell
+node --test test/t09-release-write-api-behavior.test.js
+node --test test/research-compliant-export-workflow.test.js test/research-sandbox-read-model.test.js test/drug-consumable-supervision-use-case.test.js
+```
+
+不得删除 actor/org/resource scope，不得把 exact replay 改为二次业务/审计写入，不得在持久化失败时补写另一事实源；也不得把进程锁、JSON/SQLite 测试或 synthetic receipt 描述为跨实例 exactly-once、真实外部回执或现场上线证据。
+
 ```text
 LEGACY CODE
     ↓

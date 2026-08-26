@@ -1,5 +1,20 @@
 # DATA MODEL — 主线数据地图
 
+## 2026-08-26 T09 兼容聚合元数据
+
+本切片没有新增表、SQLite DDL 或 migration，也未直接编辑数据快照。现有 `researchDatasets[]` 与
+`drugConsumableSupervisions[]` 仅在被命令触及时追加内部兼容元数据：
+
+| 字段 | 语义 | 约束 |
+|---|---|---|
+| `domainVersion` | 聚合乐观版本 | 遗留缺失值解释为 0；成功命令加 1；显式 `expectedVersion` 不匹配返回 409 |
+| `commandReceipts[]` | actor-scoped 命令回执 | 最多 100 条；只保存 key hash、request digest、动作、结果版本/ID和时间，不保存原始 key；公共投影删除 |
+
+科研合规导出申请继续写入既有 `compliantDataExports[]`；数据集、导出申请、`usageAudit` 与
+`dataAccessLogs` 在一次状态持久化中提交。药械记录、记录内 `auditTrail` 与 `securityEvents` 同样一次提交。
+这些 JSON/SQLite 兼容元数据不是生产 PostgreSQL schema 冻结或跨实例事务证明；正式迁移仍须由 T00
+依据核心数据定义和 migration 规则另行登记。
+
 > 实施分支 AS-IS 快照：基于 `main@a15d10d`。禁止据此直接编辑数据库或 `data/db.json`；schema 事实必须由运行时与 migration 再验证。
 
 ## 1. 存储拓扑
