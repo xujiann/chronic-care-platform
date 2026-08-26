@@ -3,6 +3,20 @@
 const {
   createQualitySafetyDashboardQuery
 } = require("../../../clinical-specialties/quality-safety/dashboard-query");
+const {
+  appendApiCommandReceipt,
+  apiCommandHttpError,
+  assertApiCommandExpectedVersion,
+  createApiCommandIdentity,
+  findApiCommandReceipt,
+  projectApiCommandRecord,
+  requireGovernanceOrganization,
+  requireQualityFeedbackOrganization,
+  requireQualityOrderScope,
+  withApiCommandResourceLock
+} = require("../../api-command-behavior");
+
+const QUALITY_SAFETY_COMMAND_ERROR_PREFIX = "QUALITY_SAFETY_COMMAND";
 
 function createRouteSegment(runtime) {
   const { BloodEventHub, appendQualitySafetyAudit, appendSecurityEvent, buildQualitySafetyCoreSystemMatrix, buildQualitySafetyDashboard, buildQualitySafetyInterfaceJointTestPack, buildQualitySafetyInterfaceStandard, buildQualitySafetyIssues, collectJson, integrationGatewaySecret, normalizeQualitySafetyStatus, qualitySafetySlaState, randomUUID, readDatabase, requireApiRole, sendJson, validateQualitySafetyInterfaceMessage, writeDatabase } = runtime;
@@ -62,40 +76,69 @@ function createRouteSegment(runtime) {
       if (req.method === "POST" && qualityDispatchMatch) {
         const user = requireApiRole(req, res, ["commission"], "/api/quality-safety/issues/:id/dispatch");
         if (!user) return true;
-        const data = readDatabase();
         const issueId = decodeURIComponent(qualityDispatchMatch[1]);
-        const issue = buildQualitySafetyIssues(data).find((item) => item.id === issueId || item.sourceId === issueId);
-        if (!issue) {
-          sendJson(res, 404, { error: "Not Found", message: "Quality safety issue not found" });
-          return true;
+        try {
+          requireGovernanceOrganization(user, QUALITY_SAFETY_COMMAND_ERROR_PREFIX);
+          const payload = await collectJson(req);
+          const command = createApiCommandIdentity({
+            req,
+            user,
+            payload,
+            route: "/api/quality-safety/issues/:id/dispatch",
+            resourceId: issueId,
+            errorPrefix: QUALITY_SAFETY_COMMAND_ERROR_PREFIX
+          });
+          const result = await withApiCommandResourceLock(`quality-safety-issue:${issueId}`, () => {
+            const data = readDatabase();
+            const currentOrders = Array.isArray(data.qualityRectificationOrders) ? data.qualityRectificationOrders : [];
+            const replay = findApiCommandReceipt(currentOrders, command);
+            if (replay) return { status: replay.statusCode, response: structuredClone(replay.response) };
+            const issue = buildQualitySafetyIssues(data).find((item) => item.id === issueId || item.sourceId === issueId);
+            if (!issue) return { status: 404, response: { error: "Not Found", message: "Quality safety issue not found" } };
+            const issueVersion = currentOrders
+              .filter((item) => item.issueId === issue.id)
+              .reduce((maximum, item) => Math.max(maximum, Number(item.issueVersion || 0)), Number(issue.version || 0));
+            assertApiCommandExpectedVersion({ version: issueVersion }, command);
+            const now = new Date().toISOString();
+            const order = {
+              id: `qro-${randomUUID()}`,
+              issueId: issue.id,
+              issueVersion: issueVersion + 1,
+              version: 1,
+              sourceType: issue.type || issue.sourceType || "quality_safety_issue",
+              institutionId: String(payload.institutionId || issue.institutionId || "").trim(),
+              institutionName: String(payload.institutionName || issue.institutionName || issue.owner || "site-pending").trim(),
+              ownerRole: String(payload.ownerRole || issue.ownerRole || "institution").trim(),
+              owner: String(payload.owner || issue.owner || user.name || "").trim(),
+              requirement: String(payload.requirement || issue.description || issue.title || "Complete quality-safety rectification.").trim(),
+              status: "dispatched",
+              dispatchedAt: now,
+              dueAt: String(payload.dueAt || issue.dueAt || "").trim(),
+              feedback: [],
+              review: [],
+              auditTrail: [{ at: now, by: user.username || user.role, action: "dispatch", note: String(payload.comment || "").trim() }]
+            };
+            const response = projectApiCommandRecord(order);
+            data.qualityRectificationOrders = [
+              appendApiCommandReceipt(order, command, response, 201, now),
+              ...currentOrders
+            ].slice(0, 300);
+            data.qualitySafetyEvents = (Array.isArray(data.qualitySafetyEvents) ? data.qualitySafetyEvents : []).map((item) => item.id === issue.sourceId || item.id === issue.id ? {
+              ...item,
+              version: issueVersion + 1,
+              status: "dispatched",
+              rectificationOrderId: order.id,
+              auditTrail: [{ at: now, by: user.username || user.role, action: "dispatch", note: order.requirement }, ...(item.auditTrail || [])].slice(0, 50)
+            } : item);
+            appendQualitySafetyAudit(data, user, "quality-safety dispatch", issue.id, order.requirement);
+            writeDatabase(data);
+            return { status: 201, response };
+          });
+          sendJson(res, result.status, result.response);
+        } catch (error) {
+          const response = apiCommandHttpError(error, QUALITY_SAFETY_COMMAND_ERROR_PREFIX);
+          sendJson(res, response.status, response.body);
         }
-        const payload = await collectJson(req);
-        const now = new Date().toISOString();
-        const order = {
-          id: `qro-${randomUUID()}`,
-          issueId: issue.id,
-          sourceType: issue.type || issue.sourceType || "quality_safety_issue",
-          institutionName: String(payload.institutionName || issue.institutionName || issue.owner || "site-pending").trim(),
-          ownerRole: String(payload.ownerRole || issue.ownerRole || "institution").trim(),
-          owner: String(payload.owner || issue.owner || user.name || "").trim(),
-          requirement: String(payload.requirement || issue.description || issue.title || "Complete quality-safety rectification.").trim(),
-          status: "dispatched",
-          dispatchedAt: now,
-          dueAt: String(payload.dueAt || issue.dueAt || "").trim(),
-          feedback: [],
-          review: [],
-          auditTrail: [{ at: now, by: user.username || user.role, action: "dispatch", note: String(payload.comment || "").trim() }]
-        };
-        data.qualityRectificationOrders = [order, ...(Array.isArray(data.qualityRectificationOrders) ? data.qualityRectificationOrders : [])].slice(0, 300);
-        data.qualitySafetyEvents = (Array.isArray(data.qualitySafetyEvents) ? data.qualitySafetyEvents : []).map((item) => item.id === issue.sourceId || item.id === issue.id ? {
-          ...item,
-          status: "dispatched",
-          rectificationOrderId: order.id,
-          auditTrail: [{ at: now, by: user.username || user.role, action: "dispatch", note: order.requirement }, ...(item.auditTrail || [])].slice(0, 50)
-        } : item);
-        appendQualitySafetyAudit(data, user, "quality-safety dispatch", issue.id, order.requirement);
-        writeDatabase(data);
-        sendJson(res, 201, order);
         return true;
       }
 
@@ -103,37 +146,54 @@ function createRouteSegment(runtime) {
       if (req.method === "POST" && qualityFeedbackMatch) {
         const user = requireApiRole(req, res, ["institution", "county", "commission"], "/api/quality-safety/rectifications/:id/feedback");
         if (!user) return true;
-        const data = readDatabase();
         const id = decodeURIComponent(qualityFeedbackMatch[1]);
-        const orders = Array.isArray(data.qualityRectificationOrders) ? data.qualityRectificationOrders : [];
-        const index = orders.findIndex((item) => item.id === id);
-        if (index < 0) {
-          sendJson(res, 404, { error: "Not Found", message: "Quality rectification order not found" });
-          return true;
+        try {
+          requireQualityFeedbackOrganization(user, QUALITY_SAFETY_COMMAND_ERROR_PREFIX);
+          const result = await withApiCommandResourceLock(`quality-safety-order:${id}`, async () => {
+            const data = readDatabase();
+            const orders = Array.isArray(data.qualityRectificationOrders) ? data.qualityRectificationOrders : [];
+            const index = orders.findIndex((item) => item.id === id);
+            if (index < 0) return { status: 404, response: { error: "Not Found", message: "Quality rectification order not found" } };
+            requireQualityOrderScope(user, orders[index], QUALITY_SAFETY_COMMAND_ERROR_PREFIX, data);
+            const payload = await collectJson(req);
+            const command = createApiCommandIdentity({
+              req,
+              user,
+              payload,
+              route: "/api/quality-safety/rectifications/:id/feedback",
+              resourceId: id,
+              errorPrefix: QUALITY_SAFETY_COMMAND_ERROR_PREFIX
+            });
+            const replay = findApiCommandReceipt([orders[index]], command);
+            if (replay) return { status: replay.statusCode, response: structuredClone(replay.response) };
+            const version = assertApiCommandExpectedVersion(orders[index], command) + 1;
+            const now = new Date().toISOString();
+            const feedback = {
+              at: now,
+              by: user.username || user.role,
+              byName: user.name,
+              content: String(payload.content || payload.feedback || "").trim(),
+              attachments: Array.isArray(payload.attachments) ? payload.attachments.map((item) => String(item).trim()).filter(Boolean) : []
+            };
+            const updated = {
+              ...orders[index],
+              version,
+              status: "feedback_submitted",
+              feedback: [feedback, ...(orders[index].feedback || [])].slice(0, 50),
+              auditTrail: [{ at: now, by: user.username || user.role, action: "feedback", note: feedback.content }, ...(orders[index].auditTrail || [])].slice(0, 50)
+            };
+            const response = projectApiCommandRecord(updated);
+            orders[index] = appendApiCommandReceipt(updated, command, response, 200, now);
+            data.qualityRectificationOrders = orders;
+            appendQualitySafetyAudit(data, user, "quality-safety feedback", id, feedback.content);
+            writeDatabase(data);
+            return { status: 200, response };
+          });
+          sendJson(res, result.status, result.response);
+        } catch (error) {
+          const response = apiCommandHttpError(error, QUALITY_SAFETY_COMMAND_ERROR_PREFIX);
+          sendJson(res, response.status, response.body);
         }
-        if (user.role !== "commission" && ![user.role, ""].includes(String(orders[index].ownerRole || ""))) {
-          sendJson(res, 403, { error: "Forbidden", message: "Current role cannot submit this rectification feedback" });
-          return true;
-        }
-        const payload = await collectJson(req);
-        const now = new Date().toISOString();
-        const feedback = {
-          at: now,
-          by: user.username || user.role,
-          byName: user.name,
-          content: String(payload.content || payload.feedback || "").trim(),
-          attachments: Array.isArray(payload.attachments) ? payload.attachments.map((item) => String(item).trim()).filter(Boolean) : []
-        };
-        orders[index] = {
-          ...orders[index],
-          status: "feedback_submitted",
-          feedback: [feedback, ...(orders[index].feedback || [])].slice(0, 50),
-          auditTrail: [{ at: now, by: user.username || user.role, action: "feedback", note: feedback.content }, ...(orders[index].auditTrail || [])].slice(0, 50)
-        };
-        data.qualityRectificationOrders = orders;
-        appendQualitySafetyAudit(data, user, "quality-safety feedback", id, feedback.content);
-        writeDatabase(data);
-        sendJson(res, 200, orders[index]);
         return true;
       }
 
@@ -141,45 +201,64 @@ function createRouteSegment(runtime) {
       if (req.method === "POST" && qualityReviewMatch) {
         const user = requireApiRole(req, res, ["commission"], "/api/quality-safety/rectifications/:id/review");
         if (!user) return true;
-        const data = readDatabase();
         const id = decodeURIComponent(qualityReviewMatch[1]);
-        const orders = Array.isArray(data.qualityRectificationOrders) ? data.qualityRectificationOrders : [];
-        const index = orders.findIndex((item) => item.id === id);
-        if (index < 0) {
-          sendJson(res, 404, { error: "Not Found", message: "Quality rectification order not found" });
-          return true;
+        try {
+          requireGovernanceOrganization(user, QUALITY_SAFETY_COMMAND_ERROR_PREFIX);
+          const result = await withApiCommandResourceLock(`quality-safety-order:${id}`, async () => {
+            const data = readDatabase();
+            const orders = Array.isArray(data.qualityRectificationOrders) ? data.qualityRectificationOrders : [];
+            const index = orders.findIndex((item) => item.id === id);
+            if (index < 0) return { status: 404, response: { error: "Not Found", message: "Quality rectification order not found" } };
+            const payload = await collectJson(req);
+            const command = createApiCommandIdentity({
+              req,
+              user,
+              payload,
+              route: "/api/quality-safety/rectifications/:id/review",
+              resourceId: id,
+              errorPrefix: QUALITY_SAFETY_COMMAND_ERROR_PREFIX
+            });
+            const replay = findApiCommandReceipt([orders[index]], command);
+            if (replay) return { status: replay.statusCode, response: structuredClone(replay.response) };
+            const version = assertApiCommandExpectedVersion(orders[index], command) + 1;
+            const decision = String(payload.decision || "approved").trim();
+            if (!["approved", "returned", "closed"].includes(decision)) {
+              return { status: 400, response: { error: "Bad Request", message: "decision must be approved, returned or closed" } };
+            }
+            const now = new Date().toISOString();
+            const review = {
+              at: now,
+              by: user.username || user.role,
+              byName: user.name,
+              decision,
+              comment: String(payload.comment || "").trim()
+            };
+            const status = decision === "returned" ? "returned" : "closed";
+            const updated = {
+              ...orders[index],
+              version,
+              status,
+              review: [review, ...(orders[index].review || [])].slice(0, 50),
+              auditTrail: [{ at: now, by: user.username || user.role, action: "review", note: `${decision}: ${review.comment}` }, ...(orders[index].auditTrail || [])].slice(0, 50)
+            };
+            const response = projectApiCommandRecord(updated);
+            orders[index] = appendApiCommandReceipt(updated, command, response, 200, now);
+            data.qualityRectificationOrders = orders;
+            data.qualitySafetyEvents = (Array.isArray(data.qualitySafetyEvents) ? data.qualitySafetyEvents : []).map((item) => item.id === updated.issueId ? {
+              ...item,
+              status,
+              reviewedAt: now,
+              reviewedBy: user.username || user.role
+            } : item);
+            appendQualitySafetyAudit(data, user, "quality-safety review", id, `${decision}: ${review.comment}`);
+            writeDatabase(data);
+            return { status: 200, response };
+          });
+          sendJson(res, result.status, result.response);
+        } catch (error) {
+          const response = apiCommandHttpError(error, QUALITY_SAFETY_COMMAND_ERROR_PREFIX);
+          sendJson(res, response.status, response.body);
         }
-        const payload = await collectJson(req);
-        const decision = String(payload.decision || "approved").trim();
-        if (!["approved", "returned", "closed"].includes(decision)) {
-          sendJson(res, 400, { error: "Bad Request", message: "decision must be approved, returned or closed" });
-          return true;
-        }
-        const now = new Date().toISOString();
-        const review = {
-          at: now,
-          by: user.username || user.role,
-          byName: user.name,
-          decision,
-          comment: String(payload.comment || "").trim()
-        };
-        const status = decision === "returned" ? "returned" : "closed";
-        orders[index] = {
-          ...orders[index],
-          status,
-          review: [review, ...(orders[index].review || [])].slice(0, 50),
-          auditTrail: [{ at: now, by: user.username || user.role, action: "review", note: `${decision}: ${review.comment}` }, ...(orders[index].auditTrail || [])].slice(0, 50)
-        };
-        data.qualityRectificationOrders = orders;
-        data.qualitySafetyEvents = (Array.isArray(data.qualitySafetyEvents) ? data.qualitySafetyEvents : []).map((item) => item.id === orders[index].issueId ? {
-          ...item,
-          status,
-          reviewedAt: now,
-          reviewedBy: user.username || user.role
-        } : item);
-        appendQualitySafetyAudit(data, user, "quality-safety review", id, `${decision}: ${review.comment}`);
-        writeDatabase(data);
-        sendJson(res, 200, orders[index]);
         return true;
       }
 

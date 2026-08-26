@@ -122,4 +122,12 @@ data-access 与 security audit；SQLite 临时失败 trigger 的负向测试证�
 该扩展不新增 collection、DDL、migration、dependency、外部调用、worker、PG adapter 或 outbox；四条命令
 没有新的真实外部投递语义，因此不为目录虚构 outbox。receipt 有界、进程尾只覆盖当前 Node 实例，SQLite CAS
 也不构成 distributed exactly-once。真实 PostgreSQL 多实例、外部会诊/通知回执、Origin/TLS、现场联调和验收
-仍未关闭；17 份合同全部继续 `productionReady=false`、`externalEvidenceRequired=true`，593 项仍为 `NO-GO`。
+仍未关闭；相关合同全部继续 `productionReady=false`、`externalEvidenceRequired=true`，目录仍为 `NO-GO`。
+
+## 2026-08-27 冻结首发仓库行为证据收口
+
+在本 ADR 已接受的逐 endpoint 机制内，T09 增加药耗监管 3 项与科研数据治理 5 项，T04/T05 增加慢病计划/反馈与转诊会诊 4 项，T02/T06 增加运行调度/对账复核与质量安全 5 项，共关闭冻结首发范围原有 17 个 API 行为复核缺口。注册表当前为 30 份合同，其中 28 个完整 endpoint、2 个 action-slice；`production-release-scope` 的 `apiReviewRequired=0`，数据 owner 复核也为 0。
+
+T02/T06 复用新的轻量 `api-command-behavior` 端口，只提供 actor-scope key hash、canonical request digest、expectedVersion、同资源当前进程命令尾和有界 receipt；T04/T05 继续复用 `state-command-consistency`，T09 receipt 保存首次公共响应快照。所有入口都要求授权和资源范围在 receipt replay 前重新验证，同键异载荷、陈旧版本、并发冲突和持久化失败映射为稳定脱敏错误，业务与既有审计在一次状态写入中提交。测试同时证明后续命令推进聚合后，旧 key 仍返回首次响应且零写。
+
+对象存储 v2 新增路由后，当前目录为 598 项、336 个写接口、28 个完整 endpoint 已验证、308 个 `behavior-proof-required` 和 310 项总复核；这些余项不属于冻结首发 32 API 的仓库行为缺口。五项 operations/quality receipt 每资源最多 50 条，其他 aggregate receipt 也有界；进程锁、JSON 状态与 SQLite CAS 均不构成 PostgreSQL 多实例 exactly-once。21 个首发数据引用仍无生产写资格，真实数据库、外部系统、密钥/端点、worker 激活和现场验收未关闭，因此 598 项继续 `productionReady=false`、`externalEvidenceRequired=true`、`NO-GO`。

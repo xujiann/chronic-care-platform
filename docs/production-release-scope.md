@@ -38,7 +38,7 @@ The selected applications are regional data sharing, referral and teleconsultati
 
 ## Current blockers
 
-Repository verification currently identifies 9 scoped APIs needing behavior review and no scoped data reference needing owner/governance review. Eight T09 drug/research behavior gaps are closed by direct endpoint contracts. The 19 reviewed legacy collections, exact T05 `referrals` owner binding and T00 `operationsReadiness` derived read model remain production-write blocked until explicit migration/promotion standards are met, so the scope reports 21 blocked data references. All scoped APIs remain catalogued as production NO-GO. Worker activation, external joint-test results, signed cutover evidence, PostgreSQL primary selection and site acceptance remain external or release-specific work.
+Repository verification now identifies no scoped API behavior-review gap and no scoped data owner/governance-review gap. T09, T04/T05 and T02/T06 close all 17 original API gaps with direct endpoint contracts. The 19 reviewed legacy collections, exact T05 `referrals` owner binding and T00 `operationsReadiness` derived read model remain production-write blocked until explicit migration/promotion standards are met, so the scope still reports 21 blocked data references. All scoped APIs remain catalogued as production NO-GO. Worker activation, external joint-test results, signed cutover evidence, PostgreSQL primary selection and site acceptance remain external or release-specific work.
 
 No generated report, external evidence, completion status or production authorization is created by this verifier.
 

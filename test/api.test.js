@@ -2536,6 +2536,7 @@ test("API authentication, scoping and governance regression suite", async (t) =>
       method: "POST",
       body: JSON.stringify({
         id: "dispatch-api-test",
+        expectedVersion: 0,
         category: "equipment",
         priority: "high",
         status: "assigned",
@@ -2562,6 +2563,7 @@ test("API authentication, scoping and governance regression suite", async (t) =>
       method: "POST",
       body: JSON.stringify({
         id: "dispatch-integration-feedback-test",
+        expectedVersion: 0,
         category: "bed",
         priority: "high",
         status: "assigned",
@@ -2596,7 +2598,7 @@ test("API authentication, scoping and governance regression suite", async (t) =>
 
     const reconReview = await api(baseUrl, "/api/operations/reconciliation/recon-mr1-20260622-am/review", authorized(accountLogin.body.token, {
       method: "POST",
-      body: JSON.stringify({ status: "approved", reviewNote: "API regression approved" })
+      body: JSON.stringify({ status: "approved", reviewNote: "API regression approved", expectedVersion: 0 })
     }));
     assert.equal(reconReview.response.status, 200);
     assert.equal(reconReview.body.status, "approved");
@@ -2605,7 +2607,7 @@ test("API authentication, scoping and governance regression suite", async (t) =>
 
     const reconCorrection = await api(baseUrl, "/api/operations/reconciliation/recon-mr3-20260622-am/review", authorized(accountLogin.body.token, {
       method: "POST",
-      body: JSON.stringify({ status: "correcting", reviewNote: "API regression correction requested" })
+      body: JSON.stringify({ status: "correcting", reviewNote: "API regression correction requested", expectedVersion: 0 })
     }));
     assert.equal(reconCorrection.response.status, 200);
     assert.equal(reconCorrection.body.status, "correcting");

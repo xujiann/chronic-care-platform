@@ -242,7 +242,8 @@ function createBehaviorHarness(entry, options = {}) {
     username: "health",
     name: "治理人员",
     role: "commission",
-    orgCode: "ORG-1"
+    orgCode: "ORG-1",
+    orgType: "health_admin"
   };
   const dashboard = createDashboardFixture();
   const state = {
@@ -572,7 +573,7 @@ test("operations command preserves the representative GET response deeply", asyn
 
 test("operations dispatch preserves read-write-audit order and response without clock coupling", async () => {
   const payload = { resourceType: "bed", quantity: 2 };
-  const user = { id: "commission-operator", name: "治理人员", role: "commission" };
+  const user = { id: "commission-operator", name: "治理人员", role: "commission", orgCode: "ORG-1", orgType: "health_admin" };
   const dispatch = {
     id: "dispatch-fixed-1",
     resourceType: "bed",
@@ -635,8 +636,12 @@ test("operations dispatch preserves read-write-audit order and response without 
     "writeDatabase",
     "sendJson"
   ]);
-  assert.deepEqual(response, { status: 201, payload: dispatch });
-  assert.deepEqual(written.resourceDispatchRequests, [dispatch]);
+  assert.deepEqual(response, { status: 201, payload: { ...dispatch, version: 1 } });
+  assert.deepEqual(
+    { ...written.resourceDispatchRequests[0], _apiCommandReceipts: undefined },
+    { ...dispatch, version: 1, _apiCommandReceipts: undefined }
+  );
+  assert.equal(written.resourceDispatchRequests[0]._apiCommandReceipts.length, 1);
   const { at, ...audit } = written.securityEvents[0];
   assert.equal(typeof at, "string");
   assert.notEqual(at.length, 0);
@@ -678,7 +683,7 @@ test("TEST-007 behavior matrix has a named fail-closed CI gate", () => {
   const workflow = fs.readFileSync(path.join(ROOT, ".github/workflows/ci.yml"), "utf8");
   assert.equal(
     packageJson.scripts["operations-command:behavior-test"],
-    "node --test test/operations-command-handoff.test.js"
+    "node --test test/operations-command-handoff.test.js test/operations-quality-api-behavior.test.js"
   );
   assert.match(
     workflow,
@@ -778,7 +783,7 @@ test("TEST-007 executes the 32-path success matrix with roles, responses, mutati
         });
         break;
       case "/api/operations/dispatch":
-        assert.deepEqual(result.response().payload, result.dispatch);
+        assert.deepEqual(result.response().payload, { ...result.dispatch, version: 1 });
         break;
       case "/api/operations/dispatch/:id/status":
         assert.equal(result.response().payload.id, "dispatch-1");
@@ -866,12 +871,19 @@ test("TEST-007 locks each write path payload and error behavior", async () => {
   };
 
   for (const entry of writes) {
-    if (["handover-normalizer", "dispatch-normalizer"].includes(entry.invalid)) {
+    if (entry.invalid === "handover-normalizer") {
       await assert.rejects(
         () => invokeBehavior(entry, { invalid: entry.invalid }),
         /invalid .* payload/,
         entry.path
       );
+      continue;
+    }
+    if (entry.invalid === "dispatch-normalizer") {
+      const result = await invokeBehavior(entry, { invalid: entry.invalid });
+      assert.equal(result.response().status, 400, entry.path);
+      assert.equal(result.response().payload.code, "OPERATIONS_COMMAND_INVALID", entry.path);
+      assert.equal(callNames(result.calls).includes("writeDatabase"), false, entry.path);
       continue;
     }
     const result = await invokeBehavior(entry, { invalid: entry.invalid });
@@ -886,6 +898,20 @@ test("TEST-007 makes audit and write failures explicit for every write path", as
   const writes = OPERATIONS_BEHAVIOR_MATRIX.filter(({ method }) => method === "POST");
   for (const entry of writes) {
     const auditFailure = createBehaviorHarness(entry, { failAudit: true });
+    const hasStableCommandError = [
+      "/api/operations/dispatch",
+      "/api/operations/reconciliation/:id/review"
+    ].includes(entry.path);
+    if (hasStableCommandError) {
+      await auditFailure.segment.handle(
+        { method: entry.method },
+        {},
+        new URL(`http://localhost${entry.requestPath || entry.path}`)
+      );
+      assert.equal(auditFailure.response().status, 500, `${entry.path}: audit failure`);
+      assert.equal(auditFailure.response().payload.code, "OPERATIONS_COMMAND_STORAGE_FAILED");
+      assert.equal(callNames(auditFailure.calls).includes("writeDatabase"), false, `${entry.path}: audit blocks write`);
+    } else {
     await assert.rejects(
       () => auditFailure.segment.handle(
         { method: entry.method },
@@ -897,8 +923,20 @@ test("TEST-007 makes audit and write failures explicit for every write path", as
     );
     assert.equal(callNames(auditFailure.calls).includes("writeDatabase"), false, `${entry.path}: audit blocks write`);
     assert.equal(callNames(auditFailure.calls).includes("sendJson"), false, `${entry.path}: audit blocks response`);
+    }
 
     const writeFailure = createBehaviorHarness(entry, { failWrite: true });
+    if (hasStableCommandError) {
+      await writeFailure.segment.handle(
+        { method: entry.method },
+        {},
+        new URL(`http://localhost${entry.requestPath || entry.path}`)
+      );
+      assert.equal(writeFailure.response().status, 500, `${entry.path}: write failure`);
+      assert.equal(writeFailure.response().payload.code, "OPERATIONS_COMMAND_STORAGE_FAILED");
+      assert.equal(callNames(writeFailure.calls).filter((name) => name === "writeDatabase").length, 1);
+      continue;
+    }
     await assert.rejects(
       () => writeFailure.segment.handle(
         { method: entry.method },

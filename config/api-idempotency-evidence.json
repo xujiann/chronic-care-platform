@@ -1677,6 +1677,257 @@
       "externalEvidenceRequired": true
     },
     {
+      "contractId": "platform-governance.operations-dispatch-command.v1",
+      "key": "POST /api/operations/dispatch",
+      "method": "POST",
+      "path": "/api/operations/dispatch",
+      "owner": "T02",
+      "domain": "platform-governance",
+      "purpose": "create-or-update-resource-dispatch-command",
+      "customAuthenticationEvidence": false,
+      "authentication": {
+        "required": true,
+        "mechanism": "bearer-or-cookie-session",
+        "principalType": "platform-user",
+        "credentialSource": ["header:authorization", "cookie:session"],
+        "replayCsrf": { "replayProtection": "actor-scoped-hashed-command-key-plus-resource-lock", "csrf": "platform-session-transport-policy" }
+      },
+      "authorization": {
+        "model": "platform-rbac-plus-city-or-health-admin-organization-scope",
+        "roles": ["commission"],
+        "dataScope": "city and health-admin platform resource dispatch scope"
+      },
+      "coverage": { "level": "endpoint", "selector": "entire-route", "actions": ["operations.dispatch.upsert"], "unverifiedRemainder": false },
+      "idempotency": {
+        "key": "header:Idempotency-Key-or-body:idempotencyKey-or-canonical-payload-digest",
+        "payloadBinding": ["actorOrganizationScope", "id", "category", "priority", "status", "sourceInstitutionId", "targetInstitutionId", "resourceType", "quantity", "expectedVersion"],
+        "exactReplay": "returns the original persisted response and status without another business or audit write",
+        "conflictingReuse": "OPERATIONS_COMMAND_IDEMPOTENCY_CONFLICT",
+        "persistenceScope": "bounded resourceDispatchRequests record receipt plus one securityEvents entry in one platform state write",
+        "distributedExactlyOnceClaimed": false
+      },
+      "concurrency": { "cas": { "required": true, "field": "record.version plus resource lock and SQLite storageMeta.collectionVersions", "conflictCodes": ["OPERATIONS_COMMAND_VERSION_CONFLICT"] } },
+      "errors": [
+        { "code": "OPERATIONS_COMMAND_INVALID", "status": 400 },
+        { "code": "OPERATIONS_COMMAND_EXPECTED_VERSION_REQUIRED", "status": 400 },
+        { "code": "OPERATIONS_COMMAND_SCOPE_FORBIDDEN", "status": 403 },
+        { "code": "OPERATIONS_COMMAND_IDEMPOTENCY_CONFLICT", "status": 409 },
+        { "code": "OPERATIONS_COMMAND_VERSION_CONFLICT", "status": 409 },
+        { "code": "OPERATIONS_COMMAND_STORAGE_FAILED", "status": 500 }
+      ],
+      "audit": {
+        "accepted": "commits the dispatch record, hashed receipt and one security event in the same platform state write",
+        "replay": "returns the receipt snapshot without another state or audit write",
+        "rejected": "identity and organization scope stop before body or state; validation and conflicts do not write; audit and storage failure have no fallback write"
+      },
+      "implementationEvidence": [
+        { "file": "src/http/api-command-behavior.js", "anchors": ["function withApiCommandResourceLock", "function createApiCommandIdentity", "function appendApiCommandReceipt", "function assertApiCommandExpectedVersion"] },
+        { "file": "src/http/routes/platform-governance/operations-command.js", "anchors": ["operations-dispatch:${String(payload.id || command.commandKeyHash)}", "findApiCommandReceipt(current, command)", "data.resourceDispatchRequests = current.slice(0, 100)", "writeDatabase(data)"] },
+        { "file": "server.js", "anchors": ["function verifySqliteCollectionVersions", "SQLite optimistic lock conflict on", "db.exec(\"COMMIT\")"] }
+      ],
+      "testEvidence": [
+        { "file": "test/operations-quality-api-behavior.test.js", "anchors": ["five release-scope commands enforce durable replay, payload conflicts and expectedVersion", "explicit idempotency contract requires expectedVersion while legacy calls remain compatible", "audit and storage failures produce stable errors without fallback writes"] }
+      ],
+      "productionReady": false,
+      "externalEvidenceRequired": true
+    },
+    {
+      "contractId": "platform-governance.operations-reconciliation-review-command.v1",
+      "key": "POST /api/operations/reconciliation/:id/review",
+      "method": "POST",
+      "path": "/api/operations/reconciliation/:id/review",
+      "owner": "T02",
+      "domain": "platform-governance",
+      "purpose": "review-statistics-reconciliation-record",
+      "customAuthenticationEvidence": false,
+      "authentication": {
+        "required": true,
+        "mechanism": "bearer-or-cookie-session",
+        "principalType": "platform-user",
+        "credentialSource": ["header:authorization", "cookie:session"],
+        "replayCsrf": { "replayProtection": "actor-scoped-hashed-command-key-plus-resource-lock", "csrf": "platform-session-transport-policy" }
+      },
+      "authorization": { "model": "platform-rbac-plus-city-or-health-admin-organization-scope", "roles": ["commission"], "dataScope": "city and health-admin statistics reconciliation scope" },
+      "coverage": { "level": "endpoint", "selector": "entire-route", "actions": ["operations.reconciliation.review"], "unverifiedRemainder": false },
+      "idempotency": {
+        "key": "header:Idempotency-Key-or-body:idempotencyKey-or-canonical-payload-digest",
+        "payloadBinding": ["actorOrganizationScope", "path:id", "status", "reviewNote", "expectedVersion"],
+        "exactReplay": "returns the original persisted response and status without another business or audit write",
+        "conflictingReuse": "OPERATIONS_COMMAND_IDEMPOTENCY_CONFLICT",
+        "persistenceScope": "statisticsReconciliationReviews record receipt plus one securityEvents entry in one platform state write",
+        "distributedExactlyOnceClaimed": false
+      },
+      "concurrency": { "cas": { "required": true, "field": "record.version plus resource lock and SQLite storageMeta.collectionVersions", "conflictCodes": ["OPERATIONS_COMMAND_VERSION_CONFLICT"] } },
+      "errors": [
+        { "code": "OPERATIONS_COMMAND_INVALID", "status": 400 },
+        { "code": "OPERATIONS_COMMAND_EXPECTED_VERSION_REQUIRED", "status": 400 },
+        { "code": "OPERATIONS_COMMAND_SCOPE_FORBIDDEN", "status": 403 },
+        { "code": "OPERATIONS_COMMAND_IDEMPOTENCY_CONFLICT", "status": 409 },
+        { "code": "OPERATIONS_COMMAND_VERSION_CONFLICT", "status": 409 },
+        { "code": "OPERATIONS_COMMAND_STORAGE_FAILED", "status": 500 }
+      ],
+      "audit": {
+        "accepted": "commits the reviewed reconciliation record, hashed receipt and one security event in the same platform state write",
+        "replay": "returns the receipt snapshot without another state or audit write",
+        "rejected": "identity and organization scope stop before body or state; missing record, validation and conflicts do not write; failures have no fallback write"
+      },
+      "implementationEvidence": [
+        { "file": "src/http/api-command-behavior.js", "anchors": ["function withApiCommandResourceLock", "function findApiCommandReceipt", "function assertApiCommandExpectedVersion"] },
+        { "file": "src/http/routes/platform-governance/operations-command.js", "anchors": ["operations-reconciliation:${id}", "data.statisticsReconciliationReviews = rows", "statistics-reconciliation-review", "writeDatabase(data)"] },
+        { "file": "server.js", "anchors": ["function verifySqliteCollectionVersions", "SQLite optimistic lock conflict on", "db.exec(\"COMMIT\")"] }
+      ],
+      "testEvidence": [{ "file": "test/operations-quality-api-behavior.test.js", "anchors": ["operations reconciliation review", "exact replay must not write", "-stale-key"] }],
+      "productionReady": false,
+      "externalEvidenceRequired": true
+    },
+    {
+      "contractId": "clinical-specialties.quality-issue-dispatch-command.v1",
+      "key": "POST /api/quality-safety/issues/:id/dispatch",
+      "method": "POST",
+      "path": "/api/quality-safety/issues/:id/dispatch",
+      "owner": "T06",
+      "domain": "clinical-specialties",
+      "purpose": "dispatch-quality-safety-rectification",
+      "customAuthenticationEvidence": false,
+      "authentication": {
+        "required": true,
+        "mechanism": "bearer-or-cookie-session",
+        "principalType": "platform-user",
+        "credentialSource": ["header:authorization", "cookie:session"],
+        "replayCsrf": { "replayProtection": "actor-scoped-hashed-command-key-plus-issue-lock", "csrf": "platform-session-transport-policy" }
+      },
+      "authorization": { "model": "platform-rbac-plus-city-or-health-admin-organization-scope", "roles": ["commission"], "dataScope": "city and health-admin quality-safety issue scope" },
+      "coverage": { "level": "endpoint", "selector": "entire-route", "actions": ["quality-safety.issue.dispatch"], "unverifiedRemainder": false },
+      "idempotency": {
+        "key": "header:Idempotency-Key-or-body:idempotencyKey-or-canonical-payload-digest",
+        "payloadBinding": ["actorOrganizationScope", "path:issueId", "institutionId", "institutionName", "ownerRole", "owner", "requirement", "dueAt", "expectedVersion"],
+        "exactReplay": "returns the original persisted response and status without another order, issue or audit write",
+        "conflictingReuse": "QUALITY_SAFETY_COMMAND_IDEMPOTENCY_CONFLICT",
+        "persistenceScope": "qualityRectificationOrders receipt, matching qualitySafetyEvents transition and one securityEvents audit in one platform state write",
+        "distributedExactlyOnceClaimed": false
+      },
+      "concurrency": { "cas": { "required": true, "field": "issueVersion plus issue lock and SQLite storageMeta.collectionVersions", "conflictCodes": ["QUALITY_SAFETY_COMMAND_VERSION_CONFLICT"] } },
+      "errors": [
+        { "code": "QUALITY_SAFETY_COMMAND_INVALID", "status": 400 },
+        { "code": "QUALITY_SAFETY_COMMAND_EXPECTED_VERSION_REQUIRED", "status": 400 },
+        { "code": "QUALITY_SAFETY_COMMAND_SCOPE_FORBIDDEN", "status": 403 },
+        { "code": "QUALITY_SAFETY_COMMAND_IDEMPOTENCY_CONFLICT", "status": 409 },
+        { "code": "QUALITY_SAFETY_COMMAND_VERSION_CONFLICT", "status": 409 },
+        { "code": "QUALITY_SAFETY_COMMAND_STORAGE_FAILED", "status": 500 }
+      ],
+      "audit": {
+        "accepted": "commits one rectification order, issue transition, hashed receipt and security audit in one platform state write",
+        "replay": "returns the receipt snapshot without another order, issue, state or audit write",
+        "rejected": "identity and organization scope stop before body or state; missing issues and conflicts do not write; failures have no fallback write"
+      },
+      "implementationEvidence": [
+        { "file": "src/http/api-command-behavior.js", "anchors": ["function withApiCommandResourceLock", "function appendApiCommandReceipt", "function requireGovernanceOrganization"] },
+        { "file": "src/http/routes/clinical-specialties/quality-safety.js", "anchors": ["quality-safety-issue:${issueId}", "findApiCommandReceipt(currentOrders, command)", "issueVersion: issueVersion + 1", "appendQualitySafetyAudit(data, user, \"quality-safety dispatch\""] },
+        { "file": "server.js", "anchors": ["function verifySqliteCollectionVersions", "db.exec(\"COMMIT\")"] }
+      ],
+      "testEvidence": [{ "file": "test/operations-quality-api-behavior.test.js", "anchors": ["quality issue dispatch", "concurrent exact duplicates serialize and commit business plus audit once", "audit and storage failures produce stable errors without fallback writes"] }],
+      "productionReady": false,
+      "externalEvidenceRequired": true
+    },
+    {
+      "contractId": "clinical-specialties.quality-rectification-feedback-command.v1",
+      "key": "POST /api/quality-safety/rectifications/:id/feedback",
+      "method": "POST",
+      "path": "/api/quality-safety/rectifications/:id/feedback",
+      "owner": "T06",
+      "domain": "clinical-specialties",
+      "purpose": "submit-scoped-quality-rectification-feedback",
+      "customAuthenticationEvidence": false,
+      "authentication": {
+        "required": true,
+        "mechanism": "bearer-or-cookie-session",
+        "principalType": "platform-user",
+        "credentialSource": ["header:authorization", "cookie:session"],
+        "replayCsrf": { "replayProtection": "actor-scoped-hashed-command-key-plus-order-lock", "csrf": "platform-session-transport-policy" }
+      },
+      "authorization": { "model": "platform-rbac-plus-role-organization-and-assigned-order-resource-scope", "roles": ["institution", "county", "commission"], "dataScope": "commission city scope or assigned institution/county order by canonical organization code/name" },
+      "coverage": { "level": "endpoint", "selector": "entire-route", "actions": ["quality-safety.rectification.feedback"], "unverifiedRemainder": false },
+      "idempotency": {
+        "key": "header:Idempotency-Key-or-body:idempotencyKey-or-canonical-payload-digest",
+        "payloadBinding": ["actorOrganizationScope", "path:orderId", "content", "attachments", "expectedVersion"],
+        "exactReplay": "returns the original persisted response and status without another feedback or audit write",
+        "conflictingReuse": "QUALITY_SAFETY_COMMAND_IDEMPOTENCY_CONFLICT",
+        "persistenceScope": "qualityRectificationOrders feedback and receipt plus one securityEvents audit in one platform state write",
+        "distributedExactlyOnceClaimed": false
+      },
+      "concurrency": { "cas": { "required": true, "field": "record.version plus order lock and SQLite storageMeta.collectionVersions", "conflictCodes": ["QUALITY_SAFETY_COMMAND_VERSION_CONFLICT"] } },
+      "errors": [
+        { "code": "QUALITY_SAFETY_COMMAND_INVALID", "status": 400 },
+        { "code": "QUALITY_SAFETY_COMMAND_EXPECTED_VERSION_REQUIRED", "status": 400 },
+        { "code": "QUALITY_SAFETY_COMMAND_SCOPE_FORBIDDEN", "status": 403 },
+        { "code": "QUALITY_SAFETY_COMMAND_IDEMPOTENCY_CONFLICT", "status": 409 },
+        { "code": "QUALITY_SAFETY_COMMAND_VERSION_CONFLICT", "status": 409 },
+        { "code": "QUALITY_SAFETY_COMMAND_STORAGE_FAILED", "status": 500 }
+      ],
+      "audit": {
+        "accepted": "commits one versioned feedback, hashed receipt and security audit in one platform state write",
+        "replay": "reevaluates order resource scope and returns the receipt snapshot without another state or audit write",
+        "rejected": "identity and organization scope stop before state; assigned-order denial stops before body; missing orders, validation and conflicts do not write; failures have no fallback write"
+      },
+      "implementationEvidence": [
+        { "file": "src/http/api-command-behavior.js", "anchors": ["function requireQualityFeedbackOrganization", "function requireQualityOrderScope", "function findApiCommandReceipt", "function appendApiCommandReceipt"] },
+        { "file": "src/http/routes/clinical-specialties/quality-safety.js", "anchors": ["quality-safety-order:${id}", "requireQualityOrderScope(user, orders[index]", "feedback: [feedback", "appendQualitySafetyAudit(data, user, \"quality-safety feedback\""] },
+        { "file": "server.js", "anchors": ["function verifySqliteCollectionVersions", "db.exec(\"COMMIT\")"] }
+      ],
+      "testEvidence": [{ "file": "test/operations-quality-api-behavior.test.js", "anchors": ["quality rectification feedback", "rectification resource scope fail before protected work", "exact replay must not write"] }],
+      "productionReady": false,
+      "externalEvidenceRequired": true
+    },
+    {
+      "contractId": "clinical-specialties.quality-rectification-review-command.v1",
+      "key": "POST /api/quality-safety/rectifications/:id/review",
+      "method": "POST",
+      "path": "/api/quality-safety/rectifications/:id/review",
+      "owner": "T06",
+      "domain": "clinical-specialties",
+      "purpose": "review-quality-rectification-feedback",
+      "customAuthenticationEvidence": false,
+      "authentication": {
+        "required": true,
+        "mechanism": "bearer-or-cookie-session",
+        "principalType": "platform-user",
+        "credentialSource": ["header:authorization", "cookie:session"],
+        "replayCsrf": { "replayProtection": "actor-scoped-hashed-command-key-plus-order-lock", "csrf": "platform-session-transport-policy" }
+      },
+      "authorization": { "model": "platform-rbac-plus-city-or-health-admin-organization-scope", "roles": ["commission"], "dataScope": "city and health-admin quality rectification review scope" },
+      "coverage": { "level": "endpoint", "selector": "entire-route", "actions": ["quality-safety.rectification.review"], "unverifiedRemainder": false },
+      "idempotency": {
+        "key": "header:Idempotency-Key-or-body:idempotencyKey-or-canonical-payload-digest",
+        "payloadBinding": ["actorOrganizationScope", "path:orderId", "decision", "comment", "expectedVersion"],
+        "exactReplay": "returns the original persisted response and status without another review, issue transition or audit write",
+        "conflictingReuse": "QUALITY_SAFETY_COMMAND_IDEMPOTENCY_CONFLICT",
+        "persistenceScope": "qualityRectificationOrders review and receipt, matching qualitySafetyEvents transition and one securityEvents audit in one platform state write",
+        "distributedExactlyOnceClaimed": false
+      },
+      "concurrency": { "cas": { "required": true, "field": "record.version plus order lock and SQLite storageMeta.collectionVersions", "conflictCodes": ["QUALITY_SAFETY_COMMAND_VERSION_CONFLICT"] } },
+      "errors": [
+        { "code": "QUALITY_SAFETY_COMMAND_INVALID", "status": 400 },
+        { "code": "QUALITY_SAFETY_COMMAND_EXPECTED_VERSION_REQUIRED", "status": 400 },
+        { "code": "QUALITY_SAFETY_COMMAND_SCOPE_FORBIDDEN", "status": 403 },
+        { "code": "QUALITY_SAFETY_COMMAND_IDEMPOTENCY_CONFLICT", "status": 409 },
+        { "code": "QUALITY_SAFETY_COMMAND_VERSION_CONFLICT", "status": 409 },
+        { "code": "QUALITY_SAFETY_COMMAND_STORAGE_FAILED", "status": 500 }
+      ],
+      "audit": {
+        "accepted": "commits one versioned review, matching issue transition, hashed receipt and security audit in one platform state write",
+        "replay": "returns the receipt snapshot without another order, issue, state or audit write",
+        "rejected": "identity and organization scope stop before body or state; missing orders, invalid decisions and conflicts do not write; failures have no fallback write"
+      },
+      "implementationEvidence": [
+        { "file": "src/http/api-command-behavior.js", "anchors": ["function withApiCommandResourceLock", "function findApiCommandReceipt", "function assertApiCommandExpectedVersion"] },
+        { "file": "src/http/routes/clinical-specialties/quality-safety.js", "anchors": ["/api/quality-safety/rectifications/:id/review", "review: [review", "data.qualitySafetyEvents =", "appendQualitySafetyAudit(data, user, \"quality-safety review\""] },
+        { "file": "server.js", "anchors": ["function verifySqliteCollectionVersions", "db.exec(\"COMMIT\")"] }
+      ],
+      "testEvidence": [{ "file": "test/operations-quality-api-behavior.test.js", "anchors": ["quality rectification review", "five release-scope commands enforce durable replay, payload conflicts and expectedVersion", "audit and storage failures produce stable errors without fallback writes"] }],
+      "productionReady": false,
+      "externalEvidenceRequired": true
+    },
+    {
       "contractId": "public-health.highlight-signal-intake-command.v1",
       "key": "POST /api/public-health/highlights/signals",
       "method": "POST",
