@@ -159,8 +159,14 @@ function buildProductionReleaseScopeReport(options = {}) {
   ];
   const apiReviewRequired = apis.items.filter((item) => catalogByKey.get(item)?.production?.repositoryReview === "review-required");
   const collectionReviewRequired = collections.items.filter((item) =>
-    !["owned-contract", "governed-system"].includes(collectionByName.get(item)?.governanceStatus)
+    !["owned-contract", "owner-reviewed-legacy", "governed-system"].includes(collectionByName.get(item)?.governanceStatus)
     && !bindingIsValid(item));
+  const collectionProductionWriteBlocked = collections.items.filter((item) => {
+    const governed = collectionByName.get(item);
+    return governed
+      ? governed.productionWriteAllowed !== true
+      : true;
+  });
   const deploymentScope = options.deploymentPackage?.processContract?.productionReleaseScope;
   const deploymentBound = !options.deploymentPackage || (
     deploymentScope?.contract === scope.schemaVersion
@@ -184,13 +190,16 @@ function buildProductionReleaseScopeReport(options = {}) {
     inventories,
     repositoryReview: Object.freeze({
       apiReviewRequired: Object.freeze(apiReviewRequired),
-      collectionReviewRequired: Object.freeze(collectionReviewRequired)
+      collectionReviewRequired: Object.freeze(collectionReviewRequired),
+      collectionProductionWriteBlocked: Object.freeze(collectionProductionWriteBlocked)
     }),
     checks: Object.freeze(checks),
     blockers: Object.freeze([
       ...(apiReviewRequired.length ? [`${apiReviewRequired.length} scoped APIs require repository behavior review`] : []),
       ...(collectionReviewRequired.length ? [`${collectionReviewRequired.length} scoped collections require data-owner review`] : []),
+      ...(collectionProductionWriteBlocked.length ? [`${collectionProductionWriteBlocked.length} scoped collection references remain blocked from production writes pending versioned contracts, migrations and external evidence`] : []),
       "all scoped APIs remain production NO-GO",
+      "all scoped collections remain production-promotion NO-GO",
       "all scoped workers require explicit external activation and site evidence",
       "fourteen cutover actions require externally verified release-bound evidence"
     ]),

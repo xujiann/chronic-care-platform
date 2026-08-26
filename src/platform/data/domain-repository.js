@@ -1,6 +1,10 @@
 "use strict";
 
 const ownershipManifest = require("../../../config/domain-data-ownership.json");
+const {
+  productionWriteAllowed,
+  validateManifest: validateCollectionOwnershipManifest
+} = require("./collection-governance");
 
 function assertIdentifier(label, value) {
   if (typeof value !== "string" || !/^[a-z][a-z0-9-]*$/.test(value)) {
@@ -10,7 +14,7 @@ function assertIdentifier(label, value) {
 }
 
 function validateOwnershipManifest(manifest = ownershipManifest) {
-  if (!manifest || typeof manifest !== "object") throw new TypeError("data ownership manifest is required");
+  validateCollectionOwnershipManifest(manifest);
   const nonOwners = new Set(manifest.nonOwningDomains || []);
   const entries = Object.entries(manifest.collections || {});
   if (entries.length === 0) throw new TypeError("data ownership manifest requires collections");
@@ -59,6 +63,16 @@ function assertWriteAccess(domain, collection, manifest = ownershipManifest) {
   const policy = policyFor(collection, manifest);
   if (policy.owner !== domain) {
     throw new Error(`${domain} cannot write ${collection}; owner is ${policy.owner}`);
+  }
+  return policy;
+}
+
+function assertProductionWriteAccess(domain, collection, manifest = ownershipManifest) {
+  const policy = assertWriteAccess(domain, collection, manifest);
+  if (!productionWriteAllowed(policy, false)) {
+    const error = new Error(`${collection} has an owner but no production write contract`);
+    error.code = "PRODUCTION_WRITE_CONTRACT_REQUIRED";
+    throw error;
   }
   return policy;
 }
@@ -156,6 +170,7 @@ class DomainRepository {
 module.exports = {
   DomainRepository,
   DomainUnitOfWork,
+  assertProductionWriteAccess,
   assertReadAccess,
   assertWriteAccess,
   validateOwnershipManifest

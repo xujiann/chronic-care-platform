@@ -50,6 +50,8 @@
   消费；T00 继续承担跨 owner 组合，目标 bounded context 和四个集合的数据 owner 仍为 T02，生产事务与现场证据继续 NO-GO。
 - State collection 数据 owner 只来自现有 owner/system 合同；process owner 和源码引用仅作为证据。
   无明确 owner 的集合必须显式 `review-required` 或 `legacy-quarantined`，仓库检查不能授权生产晋升。
+- 首发范围 19 个 legacy 集合可按实际读写调用点确认唯一 owner/readers/classification，但必须使用
+  fail-closed write policy 与既有可写合同分离；owner review 完成不等于生产可写、已迁移或可晋级。
 - 关键内部边界现按 10 个职责独立组测量覆盖率：identity、audit、object storage、API governance、worker observability、区域共享、转诊、科研导出、浏览器响应头与 Safe URL；原 server.js 门禁保持不变，基线只能持平或提高，临时覆盖报告不构成浏览器页面或生产证据。
 - 在线 Playwright 继续在 39 + 13 项 context 中阻止 Service Worker；PWA 只在独立 3 项 context 中允许，
   使用同一 Chromium/动态端口策略并逐项注销 registration、删除 Cache Storage。v61 只缓存同源成功响应，
@@ -74,3 +76,7 @@
 ## 首批生产范围合同
 
 Accepted ADR `2026-08-26-production-release-scope-freeze.md` 确立 `production-release-scope.v1`：从既有权威派生八个优先应用的入口、API、数据引用、worker、外部依赖和证据清单，以摘要冻结并绑定 deployment package、standard smoke 与 strict preflight。它是 T00 发布治理投影，不进入运行时业务依赖，不能生成外部证据或把 `productionReady` 改为 `true`。
+
+Accepted ADR `2026-08-26-first-release-legacy-owner-review.md` 进一步将范围内 19 个 legacy 引用从
+owner 未决转为 `owner-reviewed-legacy`，发布报告 `collectionReviewRequired=0`。该状态明确
+`productionWriteAllowed=false`、`migrationRequired=true`，不改变 schema、运行时 writer 或生产 NO-GO。

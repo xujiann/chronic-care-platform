@@ -72,9 +72,11 @@ scripts/platform-cutover-alert-worker.js
 
 - 根目录与 `src/` 存在同名模块：`blood-innovation`、`digital-hospital-governance`、`imaging-cloud`、`public-health`、`quality-safety`、`shared`。部分是前端/后端同名，部分是迁移期并存；命名本身不足以判定死代码。
 - `server.js` 内仍有大量种子、规范化、存储和领域函数，而相同领域也已在 `src/` 建立模块。
-- 数据 owner 清单现有 87 个合同，其中 60 个存在于 252 集合快照；另有 3 个系统集合。其余 189 个
-  不复制 owner：188 个精确源码引用登记为 `review-required`，1 个种子专有集合登记为
-  `legacy-quarantined`，全部禁止生产晋升。
+- 数据 owner 清单现有 106 个合同，其中 60 个是快照内既有可写合同，19 个是首发范围内完成唯一
+  owner/reader/classification 审查但显式禁止生产写入的 legacy 合同，27 个当前不在 252 集合快照；
+  另有 3 个系统集合。其余 170 个不复制 owner：169 个精确源码引用登记为 `review-required`，1 个
+  种子专有集合登记为 `legacy-quarantined`。19 个 owner-reviewed legacy 与 170 个未分配 legacy
+  均禁止生产写入和晋升。
 - 许多 readiness/report 脚本重复读取 `data/db.json` 并各自产生报告，证据生成接口尚未统一。
 - 静态发布与 storage-admin 原有脱敏逻辑已收敛到同一纯函数；其他报告脚本的重复读取仍未治理。
 - `server.js` 与 `scripts/audit-retention.js` 已统一消费 `src/identity-security/audit-chain.js`；审计验证不再保留两份平行语义。
@@ -326,3 +328,6 @@ strict preflight。candidate 用部署 anchor 摘要检查漂移，只聚合五�
 | `scripts/production-release-scope.js` | CLI 适配器 | 同上 | `FROZEN-NO-GO` 校验结果 | 失败仅表示合同漂移，不生成外部证据 |
 
 该模块由部署包 builder/verifier、standard smoke 与 strict preflight 消费；它不被 HTTP router 或业务服务调用。
+首发 19 个 legacy 集合的 owner 审查通过冻结 decision digest 与实际读写源码证据闭合，发布范围的
+`collectionReviewRequired` 因此为 0；这不改变它们的 `productionWriteAllowed=false`，也不改变所有
+集合的 `productionPromotionAllowed=false`。

@@ -36,6 +36,7 @@
 | [生产身份与短信适配器信任边界](./2026-08-21-production-identity-sms-trust-boundary.md) | Accepted | JWKS/JWT、脱敏 transport、SMS 凭据/幂等/重试/健康及共享 OTP/锁定状态 |
 | [生产 API 目录从现有授权清单派生并默认拒绝](./2026-08-22-production-api-catalog.md) | Accepted | method/path/owner/auth/scope/idempotency/生产状态机器目录与 CI 门禁 |
 | [JSON/SQLite State Collection 的 Owner 与隔离治理](./2026-08-22-state-collection-ownership-and-quarantine.md) | Accepted | 252/252 集合状态、源码使用证据、owner/共享边界、隔离和生产晋升失败关闭 |
+| [首发范围遗留集合采用 Owner 归属与生产写策略分离](./2026-08-26-first-release-legacy-owner-review.md) | Accepted | 19 个首发集合的实际调用证据、唯一 Owner/reader、显式生产写失败关闭与冻结决策摘要 |
 | [API 幂等行为证据必须显式登记且默认拒绝](./2026-08-22-api-idempotency-behavior-evidence.md) | Accepted | source marker 与行为证明分层、SMS callback pilot、custom external auth 与生产 NO-GO |
 | [Custom API 认证必须绑定控制流与可执行负向测试证据](./2026-08-23-api-custom-authentication-evidence.md) | Accepted | 认证机制、credential source、required/optional/none、replay/CSRF、scope、负向测试与生产 NO-GO |
 | [PostgreSQL shadow 合同强化](./2026-08-21-postgresql-shadow-contract-hardening.md) | Accepted | schema 隔离、健康探针、batch/digest/version/tombstone 冲突 |
