@@ -16,6 +16,8 @@ research route
      -> researchDatasets + compliantDataExports + dataAccessLogs（同一状态提交）
 ```
 
+两个命令边界都把首次公共响应快照写入聚合内的有界 receipt；后续聚合版本变化不会改变精确回放响应。公共投影删除 receipt，依赖方向仍为 route → command → state/audit，不产生反向依赖或外部投递声明。
+
 两个命令模块都不依赖 `server.js`，也不相互依赖。T09 未修改或反向依赖 T07 药械标准
 `supervision-use-case`，未引入外部 SDK、数据库驱动、消息系统或 outbox。聚合锁为进程内兼容保护，生产多实例仍依赖未来的 PostgreSQL atomic repository/CAS。
 

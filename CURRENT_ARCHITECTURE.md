@@ -3,10 +3,10 @@
 ## 2026-08-26 T09 写接口行为增量
 
 - 药械监管的 `review`、`remediation`、`insurance-sync` 三个兼容写入口，以及科研数据集的 `approval`、`evidence`、`sandbox-access`、`compliant-exports`、`outcomes` 五个入口，已收敛到两个 T09 command/service 边界。
-- 两个边界均在身份/角色/机构与资源范围校验后处理 actor-scoped `Idempotency-Key`，同键同载荷回放不写入，同键异载荷返回稳定 409；`expectedVersion` 显式请求执行聚合 CAS，旧调用未传版本时保留兼容模式。
+- 两个边界均在身份/角色/机构与资源范围校验后处理 actor-scoped `Idempotency-Key`，同键同载荷返回首次提交的公共响应快照且不写入，同键异载荷返回稳定 409；`expectedVersion` 显式请求执行聚合 CAS，旧调用未传版本时保留兼容模式。
 - 路由按聚合串行并在锁内重读；业务状态、内部 receipt 与既有审计集合只调用一次持久化端口。持久层失败不会回退或二次写。该进程锁不构成跨实例 exactly-once。
 - 科研审批要求伦理与数据使用证据、最小必要和禁止再识别，并拒绝申请人自批；机构提交的证据固定为 `submitted`，合规导出仍需后续独立审批/发布。药械监管继续区分机构整改与医保同步职责。
-- 仓库没有为这八个入口虚构外部 outbox；真实 PostgreSQL、多实例、外部系统和现场证据仍未闭合，全部保持 `productionReady=false`、生产 `NO-GO`。机器证据注册由 T00 在集成边界统一完成。
+- 仓库没有为这八个入口虚构外部 outbox；T00 已登记八份直接行为合同并验证首发范围缺口减少八项。真实 PostgreSQL、多实例、外部系统和现场证据仍未闭合，全部保持 `productionReady=false`、生产 `NO-GO`。
 
 > 实施分支 AS-IS 快照：历史采样基于 `main@a15d10dc67a7fd89540d3073ece34b5d8c7b942e`；
 > 当前对账基线为 `origin/main@fbe815dcb17ddb5a87874e6c6db16aaf8a4d5d70` 加
@@ -100,7 +100,7 @@ flowchart TB
    unregister/Cache Storage 清理。SEC-004 另增加急救生命链、医生工作台、血液上线看板、陪诊工作台、产品运行驾驶舱、产品区域运行驾驶舱、质量安全工作台、区域切换工作台、血液召回面板、血液创新指挥中心及体检风险卡各 1 项恶意 API 载荷回归；Go/No-Go 回归锁定四方业务责任属性不再被登录角色过滤器误删。
    当前根 39 + 居民 13 + PWA 3 = 55 项；标准在线 context 仍保持阻止 Service Worker。
 7. 审计验证已收敛到 `src/identity-security/audit-chain.js` 的 v2 严格端口；内容、链接、结构和重复 ID 任一异常均失败，验证 API/合规报告不再读取时重封。全量状态写入中的审计数组由服务端管理。
-8. 机器 API 授权矩阵现从路由扫描和小型认证证据合同派生 601 条声明；`production-api-catalog-v3` 与 371 个字面条件路由取并集，形成 593 个唯一接口条目（585 个字面路由、8 个运行时策略）。认证证据共 13 项且无未分类。幂等证据注册表现有 13 份直接行为合同：11 个完整 endpoint 与 2 个转诊 action-slice。T07 financial dispatch/formal grouping 合同保持原边界；T03 `POST /api/public-health/highlights/signals` 现以身份/RBAC、city/health-admin/district 资源范围、canonical 来源机构、actor 组织命名空间的 key hash、单进程按键串行、锁内重读、稳定脱敏错误以及 signal+链式审计单次提交形成完整 endpoint 证明。`GET /api/public-health/highlights` 与 `GET /api/public-health/system` 的嵌入式 highlights 复用同一公开投影：city/health-admin 保留合法全平台业务视图，district 只见自身组织和服务端医院 allowlist 内的 signal，且只有全部关联 signal 均可见的 alert 才返回；所有角色的响应均删除 `commandKeyHash`、`requestDigest`。system 只重算四项 highlight 外层摘要，其他字段保持遗留响应，不能据此宣称整个 system 已完成资源范围治理。精确重放返回 200 且不二次写入；key hash ledger 有界 200 条。进程锁和 SQLite collection-version CAS 均不被解释为跨实例 exactly-once。333 个写接口中 11 个 endpoint 为 `behavior-verified`，322 个仍为 `behavior-proof-required`；退款 endpoint 的 runtime-role variant 与两个通用 action endpoint 仍使当前 324 项需复核，593 项全部 `NO-GO`。`reviewedProofRequired` 保持为零。
+8. 机器 API 授权矩阵现从路由扫描和小型认证证据合同派生 601 条声明；`production-api-catalog-v3` 与 371 个字面条件路由取并集，形成 593 个唯一接口条目（585 个字面路由、8 个运行时策略）。认证证据共 13 项且无未分类。幂等证据注册表现有 21 份直接行为合同：19 个完整 endpoint 与 2 个转诊 action-slice。新增八份 T09 合同覆盖药械监管与科研数据集首发写入口，原响应快照回放、职责/资源范围、CAS、单次状态/审计提交与错误负测均由机器锚点校验；T07 标准药械状态机保持原边界。333 个写接口中 19 个 endpoint 为 `behavior-verified`，314 个仍为 `behavior-proof-required`；两个通用 action endpoint 使当前 316 项需复核，593 项全部 `NO-GO`。进程锁和 SQLite collection-version CAS 均不被解释为跨实例 exactly-once，`reviewedProofRequired` 保持为零。
 9. P1 生产适配器增量保持现有 owner：T01 的 `production-adapters.js` 承担 JWKS/JWT 与 SMS 协议；OTP、发送/登录限流和失败锁定由共享 `auth-security-state-store` 承载，单主机 SQLite 复用 `state_collections`、生产多实例使用组合根长期 PostgreSQL pool；T00 的 PostgreSQL 组合保持 shadow/rehearsal 且 `productionPrimary=false`，受控迁移评估继续失败关闭。连续审计已使用 v15 同事务 append-only source、最小投影和 checkpoint v3，worker/preflight/systemd 已进入部署制品；未签名 receipt、外部单调 anchor、真实 WORM/KMS 与现场证据使 `productionReady=false` 继续失败关闭。
    浏览器服务端登录不再把 token/bearer 写入 `localStorage`；Cookie 上下文在服务端和浏览器
    水合链路均优先，旧脚本可读 token 会在上下文请求前清除。生产 bearer/hybrid 只有显式
@@ -308,4 +308,4 @@ reconciliation 观察。所有入口要求调用方提供发布号和包指纹�
 
 ## 2026-08-26 首批生产范围冻结
 
-T00 新增只读 `production-release-scope.v1`，从现有八应用清单、静态发布清单、生产 API 目录、数据集合治理、worker 观测合同、外部联调活动及切换行动定义派生并冻结范围。当前指纹覆盖 8 个应用、9 个页面、32 个 API、38 个数据引用、7 个 worker、14 个外部依赖、16 个应用证据名和 14 个 definitions-only 切换动作。完整校验只在 CI/build-time 读取仓库权威；部署包仅保存已验证的冻结 config 与同一指纹并声明 runtime verifier 不可用，standard smoke 与 strict preflight 失败关闭校验绑定。`referrals` 以 T05 exact owner JSON 合同、`operationsReadiness` 以 T00 导出只读模型校验，不伪装为顶层 collection。19 个首发 legacy 引用的 owner/governance review 已关闭，范围内 `collectionReviewRequired=0`；其中 19 个 legacy 集合连同上述 2 个显式来源绑定共 21 个引用仍不具备生产写合同。此增量不新增路由、Schema、业务 API、数据或 worker 激活；17 个 API 仍需仓库复核，所有集合生产晋级保持 NO-GO，`productionReady=false`。
+T00 新增只读 `production-release-scope.v1`，从现有八应用清单、静态发布清单、生产 API 目录、数据集合治理、worker 观测合同、外部联调活动及切换行动定义派生并冻结范围。当前指纹覆盖 8 个应用、9 个页面、32 个 API、38 个数据引用、7 个 worker、14 个外部依赖、16 个应用证据名和 14 个 definitions-only 切换动作。完整校验只在 CI/build-time 读取仓库权威；部署包仅保存已验证的冻结 config 与同一指纹并声明 runtime verifier 不可用，standard smoke 与 strict preflight 失败关闭校验绑定。19 个首发 legacy 引用的 owner/governance review 已关闭，范围内 `collectionReviewRequired=0`；19 个 legacy 集合连同 `referrals` 精确 owner 绑定和 `operationsReadiness` 派生只读模型共 21 个引用仍不具备生产写合同。八份 T09 行为合同使范围内 API 仓库复核由 17 降至 9；所有 API、集合生产晋级与 worker 激活仍保持 NO-GO，`productionReady=false`。

@@ -193,7 +193,10 @@ function executeDrugConsumableCommand(options) {
     if (prior.requestDigest !== command.requestDigest) {
       commandError("DRUG_CONSUMABLE_IDEMPOTENCY_CONFLICT", "Idempotency-Key is bound to another drug-consumable command", 409);
     }
-    return { state, response: projectDrugConsumableRecord(record), replayed: true };
+    if (!prior.response || typeof prior.response !== "object" || Array.isArray(prior.response)) {
+      commandError("DRUG_CONSUMABLE_COMMAND_RECEIPT_INVALID", "Drug-consumable command receipt response is missing", 409);
+    }
+    return { state, response: structuredClone(prior.response), replayed: true };
   }
   if (command.expectedVersion !== currentVersion(record)) {
     commandError("DRUG_CONSUMABLE_VERSION_CONFLICT", "Drug-consumable record version changed; retry with a fresh snapshot", 409);
@@ -217,21 +220,23 @@ function executeDrugConsumableCommand(options) {
     ...patch,
     domainVersion: version,
     auditTrail: [event, ...(Array.isArray(record.auditTrail) ? record.auditTrail : [])].slice(0, 20),
-    commandReceipts: [
-      ...receipts,
-      {
-        contractId: CONTRACT_ID,
-        action,
-        commandKeyHash: command.commandKeyHash,
-        requestDigest: command.requestDigest,
-        resultVersion: version,
-        at: now
-      }
-    ],
     updatedBy: scope.id,
     updatedByName: text(user.name),
     lastUpdated: now
   };
+  const response = projectDrugConsumableRecord(updated);
+  updated.commandReceipts = [
+    ...receipts,
+    {
+      contractId: CONTRACT_ID,
+      action,
+      commandKeyHash: command.commandKeyHash,
+      requestDigest: command.requestDigest,
+      resultVersion: version,
+      response: structuredClone(response),
+      at: now
+    }
+  ];
   records[index] = updated;
   state.drugConsumableSupervisions = records;
   state.securityEvents = prependAuditTrailEntry(state.securityEvents, {
@@ -244,7 +249,7 @@ function executeDrugConsumableCommand(options) {
     result: "allowed",
     detail: patch.nextAction || patch.status || "drug consumable supervision updated"
   });
-  return { state, response: projectDrugConsumableRecord(updated), replayed: false };
+  return { state, response, replayed: false };
 }
 
 module.exports = {

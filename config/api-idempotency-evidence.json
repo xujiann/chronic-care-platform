@@ -1275,6 +1275,1107 @@
       ],
       "productionReady": false,
       "externalEvidenceRequired": true
+    },
+    {
+      "contractId": "shared.drug-consumable-review-command.v1",
+      "key": "POST /api/drug-consumable-supervision/:id/review",
+      "method": "POST",
+      "path": "/api/drug-consumable-supervision/:id/review",
+      "owner": "T09",
+      "domain": "shared",
+      "purpose": "review-scoped-drug-consumable-supervision",
+      "customAuthenticationEvidence": false,
+      "authentication": {
+        "required": true,
+        "mechanism": "bearer-or-cookie-session",
+        "principalType": "platform-user",
+        "credentialSource": [
+          "header:authorization",
+          "cookie:session"
+        ],
+        "replayCsrf": {
+          "replayProtection": "actor-scoped-hashed-key-plus-bounded-aggregate-command-receipt",
+          "csrf": "platform-session-transport-policy"
+        }
+      },
+      "authorization": {
+        "model": "platform-rbac-plus-insurance-or-commission-organization-and-resident-scope",
+        "roles": [
+          "commission",
+          "insurance"
+        ],
+        "dataScope": "resident"
+      },
+      "coverage": {
+        "level": "endpoint",
+        "selector": "entire-route",
+        "actions": [
+          "review"
+        ],
+        "unverifiedRemainder": false
+      },
+      "idempotency": {
+        "key": "header:Idempotency-Key or body.commandId/body.idempotencyKey with canonical payload fallback for legacy callers",
+        "payloadBinding": [
+          "recordId",
+          "actor.id",
+          "actor.role",
+          "actor.orgCode",
+          "actor.orgType",
+          "expectedVersion",
+          "reviewStatus",
+          "insuranceStatus",
+          "status",
+          "nextAction",
+          "note"
+        ],
+        "exactReplay": "returns the persisted public projection with idempotentReplay=true and performs zero business, receipt, audit, message, task, outbox, or fallback writes",
+        "conflictingReuse": "DRUG_CONSUMABLE_IDEMPOTENCY_CONFLICT",
+        "persistenceScope": "drugConsumableSupervisions commandReceipts plus record auditTrail and securityEvents in one state commit",
+        "distributedExactlyOnceClaimed": false
+      },
+      "concurrency": {
+        "cas": {
+          "required": true,
+          "field": "expectedVersion (explicit CAS; omitted only for legacy compatibility and bound to the lock-time current version)",
+          "conflictCodes": [
+            "DRUG_CONSUMABLE_VERSION_CONFLICT"
+          ]
+        }
+      },
+      "errors": [
+        {
+          "code": "DRUG_CONSUMABLE_ROLE_DENIED",
+          "status": 403
+        },
+        {
+          "code": "DRUG_CONSUMABLE_RESIDENT_SCOPE_DENIED",
+          "status": 403
+        },
+        {
+          "code": "DRUG_CONSUMABLE_IDEMPOTENCY_CONFLICT",
+          "status": 409
+        },
+        {
+          "code": "DRUG_CONSUMABLE_VERSION_CONFLICT",
+          "status": 409
+        },
+        {
+          "code": "DRUG_CONSUMABLE_RECEIPT_CAPACITY_EXCEEDED",
+          "status": 409
+        },
+        {
+          "code": "DRUG_CONSUMABLE_STORAGE_FAILED",
+          "status": 500
+        },
+        {
+          "code": "DRUG_CONSUMABLE_INSURANCE_SCOPE_DENIED",
+          "status": 403
+        },
+        {
+          "code": "DRUG_CONSUMABLE_COMMISSION_SCOPE_DENIED",
+          "status": 403
+        }
+      ],
+      "audit": {
+        "accepted": "commits the allowlisted record mutation, bounded hashed receipt, record auditTrail entry, and chained securityEvents entry in one persistence call",
+        "replay": "returns after current authorization and receipt validation without appending audit or calling the persistence port",
+        "rejected": "returns a stable scoped validation, authorization, conflict, or redacted storage error without fallback or second persistence"
+      },
+      "implementationEvidence": [
+        {
+          "file": "src/http/shared/drug-consumable-command.js",
+          "anchors": [
+            "review: \"drug-consumable-review\"",
+            "DRUG_CONSUMABLE_IDEMPOTENCY_CONFLICT",
+            "DRUG_CONSUMABLE_VERSION_CONFLICT",
+            "DRUG_CONSUMABLE_RECEIPT_CAPACITY_EXCEEDED"
+          ]
+        },
+        {
+          "file": "src/http/routes/shared.js",
+          "anchors": [
+            "\"/api/drug-consumable-supervision/:id/review\"",
+            "withDrugConsumableWriteLock",
+            "if (!executed.replayed) writeDatabase(data)"
+          ]
+        }
+      ],
+      "testEvidence": [
+        {
+          "file": "test/t09-release-write-api-behavior.test.js",
+          "anchors": [
+            "T09 drug write commands bind actor-scoped keys, replay with zero writes, reject conflicts, and persist audit atomically",
+            "T09 drug commands preserve institution and insurance separation of duties",
+            "T09 routes authenticate before body/state access and map persistence failure without fallback writes",
+            "T09 aggregate locks re-read inside the lock and collapse concurrent exact replays to one write"
+          ]
+        }
+      ],
+      "productionReady": false,
+      "externalEvidenceRequired": true
+    },
+    {
+      "contractId": "shared.drug-consumable-remediation-command.v1",
+      "key": "POST /api/drug-consumable-supervision/:id/remediation",
+      "method": "POST",
+      "path": "/api/drug-consumable-supervision/:id/remediation",
+      "owner": "T09",
+      "domain": "shared",
+      "purpose": "submit-institution-drug-consumable-remediation",
+      "customAuthenticationEvidence": false,
+      "authentication": {
+        "required": true,
+        "mechanism": "bearer-or-cookie-session",
+        "principalType": "platform-user",
+        "credentialSource": [
+          "header:authorization",
+          "cookie:session"
+        ],
+        "replayCsrf": {
+          "replayProtection": "actor-scoped-hashed-key-plus-bounded-aggregate-command-receipt",
+          "csrf": "platform-session-transport-policy"
+        }
+      },
+      "authorization": {
+        "model": "platform-rbac-plus-institution-remediation-or-commission-organization-and-resident-scope",
+        "roles": [
+          "commission",
+          "institution"
+        ],
+        "dataScope": "resident"
+      },
+      "coverage": {
+        "level": "endpoint",
+        "selector": "entire-route",
+        "actions": [
+          "remediation"
+        ],
+        "unverifiedRemainder": false
+      },
+      "idempotency": {
+        "key": "header:Idempotency-Key or body.commandId/body.idempotencyKey with canonical payload fallback for legacy callers",
+        "payloadBinding": [
+          "recordId",
+          "actor.id",
+          "actor.role",
+          "actor.orgCode",
+          "actor.orgType",
+          "expectedVersion",
+          "remediationStatus",
+          "status",
+          "evidence",
+          "nextAction",
+          "note"
+        ],
+        "exactReplay": "returns the persisted public projection with idempotentReplay=true and performs zero business, receipt, audit, message, task, outbox, or fallback writes",
+        "conflictingReuse": "DRUG_CONSUMABLE_IDEMPOTENCY_CONFLICT",
+        "persistenceScope": "drugConsumableSupervisions commandReceipts plus record auditTrail and securityEvents in one state commit",
+        "distributedExactlyOnceClaimed": false
+      },
+      "concurrency": {
+        "cas": {
+          "required": true,
+          "field": "expectedVersion (explicit CAS; omitted only for legacy compatibility and bound to the lock-time current version)",
+          "conflictCodes": [
+            "DRUG_CONSUMABLE_VERSION_CONFLICT"
+          ]
+        }
+      },
+      "errors": [
+        {
+          "code": "DRUG_CONSUMABLE_ROLE_DENIED",
+          "status": 403
+        },
+        {
+          "code": "DRUG_CONSUMABLE_RESIDENT_SCOPE_DENIED",
+          "status": 403
+        },
+        {
+          "code": "DRUG_CONSUMABLE_IDEMPOTENCY_CONFLICT",
+          "status": 409
+        },
+        {
+          "code": "DRUG_CONSUMABLE_VERSION_CONFLICT",
+          "status": 409
+        },
+        {
+          "code": "DRUG_CONSUMABLE_RECEIPT_CAPACITY_EXCEEDED",
+          "status": 409
+        },
+        {
+          "code": "DRUG_CONSUMABLE_STORAGE_FAILED",
+          "status": 500
+        },
+        {
+          "code": "DRUG_CONSUMABLE_DUTY_SEPARATION_REQUIRED",
+          "status": 403
+        },
+        {
+          "code": "DRUG_CONSUMABLE_COMMISSION_SCOPE_DENIED",
+          "status": 403
+        }
+      ],
+      "audit": {
+        "accepted": "commits the allowlisted record mutation, bounded hashed receipt, record auditTrail entry, and chained securityEvents entry in one persistence call",
+        "replay": "returns after current authorization and receipt validation without appending audit or calling the persistence port",
+        "rejected": "returns a stable scoped validation, authorization, conflict, or redacted storage error without fallback or second persistence"
+      },
+      "implementationEvidence": [
+        {
+          "file": "src/http/shared/drug-consumable-command.js",
+          "anchors": [
+            "remediation: \"drug-consumable-remediation\"",
+            "DRUG_CONSUMABLE_IDEMPOTENCY_CONFLICT",
+            "DRUG_CONSUMABLE_VERSION_CONFLICT",
+            "DRUG_CONSUMABLE_RECEIPT_CAPACITY_EXCEEDED"
+          ]
+        },
+        {
+          "file": "src/http/routes/shared.js",
+          "anchors": [
+            "\"/api/drug-consumable-supervision/:id/remediation\"",
+            "withDrugConsumableWriteLock",
+            "if (!executed.replayed) writeDatabase(data)"
+          ]
+        }
+      ],
+      "testEvidence": [
+        {
+          "file": "test/t09-release-write-api-behavior.test.js",
+          "anchors": [
+            "T09 drug write commands bind actor-scoped keys, replay with zero writes, reject conflicts, and persist audit atomically",
+            "T09 drug commands preserve institution and insurance separation of duties",
+            "T09 routes authenticate before body/state access and map persistence failure without fallback writes",
+            "T09 aggregate locks re-read inside the lock and collapse concurrent exact replays to one write"
+          ]
+        }
+      ],
+      "productionReady": false,
+      "externalEvidenceRequired": true
+    },
+    {
+      "contractId": "shared.drug-consumable-insurance-sync-command.v1",
+      "key": "POST /api/drug-consumable-supervision/:id/insurance-sync",
+      "method": "POST",
+      "path": "/api/drug-consumable-supervision/:id/insurance-sync",
+      "owner": "T09",
+      "domain": "shared",
+      "purpose": "confirm-scoped-drug-consumable-insurance-synchronization",
+      "customAuthenticationEvidence": false,
+      "authentication": {
+        "required": true,
+        "mechanism": "bearer-or-cookie-session",
+        "principalType": "platform-user",
+        "credentialSource": [
+          "header:authorization",
+          "cookie:session"
+        ],
+        "replayCsrf": {
+          "replayProtection": "actor-scoped-hashed-key-plus-bounded-aggregate-command-receipt",
+          "csrf": "platform-session-transport-policy"
+        }
+      },
+      "authorization": {
+        "model": "platform-rbac-plus-insurance-responsibility-or-commission-organization-and-resident-scope",
+        "roles": [
+          "commission",
+          "insurance"
+        ],
+        "dataScope": "resident"
+      },
+      "coverage": {
+        "level": "endpoint",
+        "selector": "entire-route",
+        "actions": [
+          "insurance-sync"
+        ],
+        "unverifiedRemainder": false
+      },
+      "idempotency": {
+        "key": "header:Idempotency-Key or body.commandId/body.idempotencyKey with canonical payload fallback for legacy callers",
+        "payloadBinding": [
+          "recordId",
+          "actor.id",
+          "actor.role",
+          "actor.orgCode",
+          "actor.orgType",
+          "expectedVersion",
+          "insuranceStatus",
+          "settlementBatch",
+          "status",
+          "nextAction",
+          "note"
+        ],
+        "exactReplay": "returns the persisted public projection with idempotentReplay=true and performs zero business, receipt, audit, message, task, outbox, or fallback writes",
+        "conflictingReuse": "DRUG_CONSUMABLE_IDEMPOTENCY_CONFLICT",
+        "persistenceScope": "drugConsumableSupervisions commandReceipts plus record auditTrail and securityEvents in one state commit",
+        "distributedExactlyOnceClaimed": false
+      },
+      "concurrency": {
+        "cas": {
+          "required": true,
+          "field": "expectedVersion (explicit CAS; omitted only for legacy compatibility and bound to the lock-time current version)",
+          "conflictCodes": [
+            "DRUG_CONSUMABLE_VERSION_CONFLICT"
+          ]
+        }
+      },
+      "errors": [
+        {
+          "code": "DRUG_CONSUMABLE_ROLE_DENIED",
+          "status": 403
+        },
+        {
+          "code": "DRUG_CONSUMABLE_RESIDENT_SCOPE_DENIED",
+          "status": 403
+        },
+        {
+          "code": "DRUG_CONSUMABLE_IDEMPOTENCY_CONFLICT",
+          "status": 409
+        },
+        {
+          "code": "DRUG_CONSUMABLE_VERSION_CONFLICT",
+          "status": 409
+        },
+        {
+          "code": "DRUG_CONSUMABLE_RECEIPT_CAPACITY_EXCEEDED",
+          "status": 409
+        },
+        {
+          "code": "DRUG_CONSUMABLE_STORAGE_FAILED",
+          "status": 500
+        },
+        {
+          "code": "DRUG_CONSUMABLE_DUTY_SEPARATION_REQUIRED",
+          "status": 403
+        },
+        {
+          "code": "DRUG_CONSUMABLE_INSURANCE_SCOPE_DENIED",
+          "status": 403
+        },
+        {
+          "code": "DRUG_CONSUMABLE_COMMISSION_SCOPE_DENIED",
+          "status": 403
+        }
+      ],
+      "audit": {
+        "accepted": "commits the allowlisted record mutation, bounded hashed receipt, record auditTrail entry, and chained securityEvents entry in one persistence call",
+        "replay": "returns after current authorization and receipt validation without appending audit or calling the persistence port",
+        "rejected": "returns a stable scoped validation, authorization, conflict, or redacted storage error without fallback or second persistence"
+      },
+      "implementationEvidence": [
+        {
+          "file": "src/http/shared/drug-consumable-command.js",
+          "anchors": [
+            "\"insurance-sync\": \"drug-consumable-insurance-sync\"",
+            "DRUG_CONSUMABLE_IDEMPOTENCY_CONFLICT",
+            "DRUG_CONSUMABLE_VERSION_CONFLICT",
+            "DRUG_CONSUMABLE_RECEIPT_CAPACITY_EXCEEDED"
+          ]
+        },
+        {
+          "file": "src/http/routes/shared.js",
+          "anchors": [
+            "\"/api/drug-consumable-supervision/:id/insurance-sync\"",
+            "withDrugConsumableWriteLock",
+            "if (!executed.replayed) writeDatabase(data)"
+          ]
+        }
+      ],
+      "testEvidence": [
+        {
+          "file": "test/t09-release-write-api-behavior.test.js",
+          "anchors": [
+            "T09 drug write commands bind actor-scoped keys, replay with zero writes, reject conflicts, and persist audit atomically",
+            "T09 drug commands preserve institution and insurance separation of duties",
+            "T09 routes authenticate before body/state access and map persistence failure without fallback writes",
+            "T09 aggregate locks re-read inside the lock and collapse concurrent exact replays to one write"
+          ]
+        }
+      ],
+      "productionReady": false,
+      "externalEvidenceRequired": true
+    },
+    {
+      "contractId": "research.dataset-approval-command.v1",
+      "key": "POST /api/research/datasets/:id/approval",
+      "method": "POST",
+      "path": "/api/research/datasets/:id/approval",
+      "owner": "T09",
+      "domain": "research",
+      "purpose": "independently-approve-governed-research-dataset",
+      "customAuthenticationEvidence": false,
+      "authentication": {
+        "required": true,
+        "mechanism": "bearer-or-cookie-session",
+        "principalType": "platform-user",
+        "credentialSource": [
+          "header:authorization",
+          "cookie:session"
+        ],
+        "replayCsrf": {
+          "replayProtection": "actor-scoped-hashed-key-plus-bounded-aggregate-command-receipt",
+          "csrf": "platform-session-transport-policy"
+        }
+      },
+      "authorization": {
+        "model": "commission-organization-plus-dataset-scope-requester-separation-ethics-and-minimum-necessary-controls",
+        "roles": [
+          "commission"
+        ],
+        "dataScope": "research-dataset"
+      },
+      "coverage": {
+        "level": "endpoint",
+        "selector": "entire-route",
+        "actions": [
+          "approval"
+        ],
+        "unverifiedRemainder": false
+      },
+      "idempotency": {
+        "key": "header:Idempotency-Key or body.commandId/body.idempotencyKey with canonical payload fallback for legacy callers",
+        "payloadBinding": [
+          "datasetId",
+          "actor.id",
+          "actor.role",
+          "actor.orgCode",
+          "actor.orgType",
+          "expectedVersion",
+          "decision",
+          "status",
+          "governance",
+          "ethicsApproval",
+          "deidentificationStatus",
+          "publishStatus",
+          "environment",
+          "note"
+        ],
+        "exactReplay": "returns the persisted public projection with idempotentReplay=true and performs zero business, receipt, audit, message, task, outbox, or fallback writes",
+        "conflictingReuse": "RESEARCH_COMMAND_IDEMPOTENCY_CONFLICT",
+        "persistenceScope": "researchDatasets commandReceipts plus usageAudit and dataAccessLogs in one state commit",
+        "distributedExactlyOnceClaimed": false
+      },
+      "concurrency": {
+        "cas": {
+          "required": true,
+          "field": "expectedVersion (explicit CAS; omitted only for legacy compatibility and bound to the lock-time current version)",
+          "conflictCodes": [
+            "RESEARCH_COMMAND_VERSION_CONFLICT"
+          ]
+        }
+      },
+      "errors": [
+        {
+          "code": "RESEARCH_DATASET_SCOPE_DENIED",
+          "status": 403
+        },
+        {
+          "code": "RESEARCH_COMMAND_IDEMPOTENCY_CONFLICT",
+          "status": 409
+        },
+        {
+          "code": "RESEARCH_COMMAND_VERSION_CONFLICT",
+          "status": 409
+        },
+        {
+          "code": "RESEARCH_COMMAND_RECEIPT_CAPACITY_EXCEEDED",
+          "status": 409
+        },
+        {
+          "code": "RESEARCH_COMMAND_STORAGE_FAILED",
+          "status": 500
+        },
+        {
+          "code": "RESEARCH_APPROVAL_SEPARATION_REQUIRED",
+          "status": 403
+        },
+        {
+          "code": "RESEARCH_APPROVAL_EVIDENCE_REQUIRED",
+          "status": 409
+        },
+        {
+          "code": "RESEARCH_APPROVAL_MINIMIZATION_REQUIRED",
+          "status": 409
+        }
+      ],
+      "audit": {
+        "accepted": "commits the allowlisted dataset mutation, bounded hashed receipt, usageAudit, and dataAccessLogs in one persistence call",
+        "replay": "returns after current authorization and receipt validation without appending audit or calling the persistence port",
+        "rejected": "returns a stable scoped validation, authorization, conflict, or redacted storage error without fallback or second persistence"
+      },
+      "implementationEvidence": [
+        {
+          "file": "src/http/research/dataset-write-command.js",
+          "anchors": [
+            "if (endpoint === \"approval\")",
+            "RESEARCH_COMMAND_IDEMPOTENCY_CONFLICT",
+            "RESEARCH_COMMAND_VERSION_CONFLICT",
+            "RESEARCH_COMMAND_RECEIPT_CAPACITY_EXCEEDED"
+          ]
+        },
+        {
+          "file": "src/http/routes/research.js",
+          "anchors": [
+            "\"/api/research/datasets/:id/approval\"",
+            "withResearchDatasetWriteLock",
+            "if (!executed.replayed) writeDatabase(executed.state)"
+          ]
+        }
+      ],
+      "testEvidence": [
+        {
+          "file": "test/t09-release-write-api-behavior.test.js",
+          "anchors": [
+            "T09 research write commands bind actor-scoped keys, replay with zero writes, reject conflicts, and enforce CAS",
+            "T09 research commands enforce ethics, minimum-necessary, independent approval, and institution evidence boundaries",
+            "T09 routes authenticate before body/state access and map persistence failure without fallback writes",
+            "T09 aggregate locks re-read inside the lock and collapse concurrent exact replays to one write"
+          ]
+        }
+      ],
+      "productionReady": false,
+      "externalEvidenceRequired": true
+    },
+    {
+      "contractId": "research.dataset-evidence-command.v1",
+      "key": "POST /api/research/datasets/:id/evidence",
+      "method": "POST",
+      "path": "/api/research/datasets/:id/evidence",
+      "owner": "T09",
+      "domain": "research",
+      "purpose": "submit-scoped-research-governance-evidence",
+      "customAuthenticationEvidence": false,
+      "authentication": {
+        "required": true,
+        "mechanism": "bearer-or-cookie-session",
+        "principalType": "platform-user",
+        "credentialSource": [
+          "header:authorization",
+          "cookie:session"
+        ],
+        "replayCsrf": {
+          "replayProtection": "actor-scoped-hashed-key-plus-bounded-aggregate-command-receipt",
+          "csrf": "platform-session-transport-policy"
+        }
+      },
+      "authorization": {
+        "model": "platform-rbac-plus-research-dataset-owner-or-commission-scope-with-institution-submission-boundary",
+        "roles": [
+          "commission",
+          "institution"
+        ],
+        "dataScope": "research-dataset"
+      },
+      "coverage": {
+        "level": "endpoint",
+        "selector": "entire-route",
+        "actions": [
+          "evidence"
+        ],
+        "unverifiedRemainder": false
+      },
+      "idempotency": {
+        "key": "header:Idempotency-Key or body.commandId/body.idempotencyKey with canonical payload fallback for legacy callers",
+        "payloadBinding": [
+          "datasetId",
+          "actor.id",
+          "actor.role",
+          "actor.orgCode",
+          "actor.orgType",
+          "expectedVersion",
+          "id",
+          "type",
+          "title",
+          "referenceNo",
+          "issuedBy",
+          "issuedAt",
+          "expiresAt",
+          "fileName",
+          "fileHash",
+          "status",
+          "note"
+        ],
+        "exactReplay": "returns the persisted public projection with idempotentReplay=true and performs zero business, receipt, audit, message, task, outbox, or fallback writes",
+        "conflictingReuse": "RESEARCH_COMMAND_IDEMPOTENCY_CONFLICT",
+        "persistenceScope": "researchDatasets commandReceipts plus usageAudit and dataAccessLogs in one state commit",
+        "distributedExactlyOnceClaimed": false
+      },
+      "concurrency": {
+        "cas": {
+          "required": true,
+          "field": "expectedVersion (explicit CAS; omitted only for legacy compatibility and bound to the lock-time current version)",
+          "conflictCodes": [
+            "RESEARCH_COMMAND_VERSION_CONFLICT"
+          ]
+        }
+      },
+      "errors": [
+        {
+          "code": "RESEARCH_DATASET_SCOPE_DENIED",
+          "status": 403
+        },
+        {
+          "code": "RESEARCH_COMMAND_IDEMPOTENCY_CONFLICT",
+          "status": 409
+        },
+        {
+          "code": "RESEARCH_COMMAND_VERSION_CONFLICT",
+          "status": 409
+        },
+        {
+          "code": "RESEARCH_COMMAND_RECEIPT_CAPACITY_EXCEEDED",
+          "status": 409
+        },
+        {
+          "code": "RESEARCH_COMMAND_STORAGE_FAILED",
+          "status": 500
+        }
+      ],
+      "audit": {
+        "accepted": "commits the allowlisted dataset mutation, bounded hashed receipt, usageAudit, and dataAccessLogs in one persistence call",
+        "replay": "returns after current authorization and receipt validation without appending audit or calling the persistence port",
+        "rejected": "returns a stable scoped validation, authorization, conflict, or redacted storage error without fallback or second persistence"
+      },
+      "implementationEvidence": [
+        {
+          "file": "src/http/research/dataset-write-command.js",
+          "anchors": [
+            "endpoint === \"evidence\"",
+            "RESEARCH_COMMAND_IDEMPOTENCY_CONFLICT",
+            "RESEARCH_COMMAND_VERSION_CONFLICT",
+            "RESEARCH_COMMAND_RECEIPT_CAPACITY_EXCEEDED"
+          ]
+        },
+        {
+          "file": "src/http/routes/research.js",
+          "anchors": [
+            "\"/api/research/datasets/:id/evidence\"",
+            "withResearchDatasetWriteLock",
+            "if (!executed.replayed) writeDatabase(executed.state)"
+          ]
+        }
+      ],
+      "testEvidence": [
+        {
+          "file": "test/t09-release-write-api-behavior.test.js",
+          "anchors": [
+            "T09 research write commands bind actor-scoped keys, replay with zero writes, reject conflicts, and enforce CAS",
+            "T09 research commands enforce ethics, minimum-necessary, independent approval, and institution evidence boundaries",
+            "T09 routes authenticate before body/state access and map persistence failure without fallback writes",
+            "T09 aggregate locks re-read inside the lock and collapse concurrent exact replays to one write"
+          ]
+        }
+      ],
+      "productionReady": false,
+      "externalEvidenceRequired": true
+    },
+    {
+      "contractId": "research.dataset-compliant-export-request-command.v1",
+      "key": "POST /api/research/datasets/:id/compliant-exports",
+      "method": "POST",
+      "path": "/api/research/datasets/:id/compliant-exports",
+      "owner": "T09",
+      "domain": "research",
+      "purpose": "request-minimum-necessary-research-export-for-independent-review",
+      "customAuthenticationEvidence": false,
+      "authentication": {
+        "required": true,
+        "mechanism": "bearer-or-cookie-session",
+        "principalType": "platform-user",
+        "credentialSource": [
+          "header:authorization",
+          "cookie:session"
+        ],
+        "replayCsrf": {
+          "replayProtection": "actor-scoped-hashed-key-plus-bounded-aggregate-command-receipt",
+          "csrf": "platform-session-transport-policy"
+        }
+      },
+      "authorization": {
+        "model": "platform-rbac-plus-released-research-dataset-scope-and-direct-identifier-denial",
+        "roles": [
+          "commission",
+          "institution"
+        ],
+        "dataScope": "research-dataset"
+      },
+      "coverage": {
+        "level": "endpoint",
+        "selector": "entire-route",
+        "actions": [
+          "compliant-export"
+        ],
+        "unverifiedRemainder": false
+      },
+      "idempotency": {
+        "key": "header:Idempotency-Key or body.commandId/body.idempotencyKey with canonical payload fallback for legacy callers",
+        "payloadBinding": [
+          "datasetId",
+          "actor.id",
+          "actor.role",
+          "actor.orgCode",
+          "actor.orgType",
+          "expectedVersion",
+          "id",
+          "purpose",
+          "destination",
+          "requestedFields",
+          "exportFormat",
+          "retentionDays",
+          "evidenceRef"
+        ],
+        "exactReplay": "returns the persisted public projection with idempotentReplay=true and performs zero business, receipt, audit, message, task, outbox, or fallback writes",
+        "conflictingReuse": "RESEARCH_COMMAND_IDEMPOTENCY_CONFLICT",
+        "persistenceScope": "researchDatasets commandReceipts plus one pending-blocked compliantDataExports request, usageAudit, and dataAccessLogs in one state commit",
+        "distributedExactlyOnceClaimed": false
+      },
+      "concurrency": {
+        "cas": {
+          "required": true,
+          "field": "expectedVersion (explicit CAS; omitted only for legacy compatibility and bound to the lock-time current version)",
+          "conflictCodes": [
+            "RESEARCH_COMMAND_VERSION_CONFLICT"
+          ]
+        }
+      },
+      "errors": [
+        {
+          "code": "RESEARCH_DATASET_SCOPE_DENIED",
+          "status": 403
+        },
+        {
+          "code": "RESEARCH_COMMAND_IDEMPOTENCY_CONFLICT",
+          "status": 409
+        },
+        {
+          "code": "RESEARCH_COMMAND_VERSION_CONFLICT",
+          "status": 409
+        },
+        {
+          "code": "RESEARCH_COMMAND_RECEIPT_CAPACITY_EXCEEDED",
+          "status": 409
+        },
+        {
+          "code": "RESEARCH_COMMAND_STORAGE_FAILED",
+          "status": 500
+        },
+        {
+          "code": "RESEARCH_DATASET_NOT_RELEASED",
+          "status": 403
+        },
+        {
+          "code": "RESEARCH_EXPORT_DIRECT_IDENTIFIER_FORBIDDEN",
+          "status": 403
+        },
+        {
+          "code": "RESEARCH_EXPORT_ID_CONFLICT",
+          "status": 409
+        }
+      ],
+      "audit": {
+        "accepted": "commits one pending-blocked export request, the dataset hashed receipt, usageAudit, and dataAccessLogs in one persistence call; it does not release data",
+        "replay": "returns after current authorization and receipt validation without appending audit or calling the persistence port",
+        "rejected": "returns a stable scoped validation, authorization, conflict, or redacted storage error without fallback or second persistence"
+      },
+      "implementationEvidence": [
+        {
+          "file": "src/http/research/dataset-write-command.js",
+          "anchors": [
+            "endpoint === \"compliant-export\"",
+            "RESEARCH_COMMAND_IDEMPOTENCY_CONFLICT",
+            "RESEARCH_COMMAND_VERSION_CONFLICT",
+            "RESEARCH_COMMAND_RECEIPT_CAPACITY_EXCEEDED"
+          ]
+        },
+        {
+          "file": "src/http/routes/research.js",
+          "anchors": [
+            "\"/api/research/datasets/:id/compliant-exports\"",
+            "withResearchDatasetWriteLock",
+            "if (!executed.replayed) writeDatabase(executed.state)"
+          ]
+        }
+      ],
+      "testEvidence": [
+        {
+          "file": "test/t09-release-write-api-behavior.test.js",
+          "anchors": [
+            "T09 research write commands bind actor-scoped keys, replay with zero writes, reject conflicts, and enforce CAS",
+            "T09 research commands enforce ethics, minimum-necessary, independent approval, and institution evidence boundaries",
+            "T09 routes authenticate before body/state access and map persistence failure without fallback writes",
+            "T09 aggregate locks re-read inside the lock and collapse concurrent exact replays to one write"
+          ]
+        }
+      ],
+      "productionReady": false,
+      "externalEvidenceRequired": true
+    },
+    {
+      "contractId": "research.dataset-outcome-command.v1",
+      "key": "POST /api/research/datasets/:id/outcomes",
+      "method": "POST",
+      "path": "/api/research/datasets/:id/outcomes",
+      "owner": "T09",
+      "domain": "research",
+      "purpose": "return-minimized-research-outcome-to-governed-dataset",
+      "customAuthenticationEvidence": false,
+      "authentication": {
+        "required": true,
+        "mechanism": "bearer-or-cookie-session",
+        "principalType": "platform-user",
+        "credentialSource": [
+          "header:authorization",
+          "cookie:session"
+        ],
+        "replayCsrf": {
+          "replayProtection": "actor-scoped-hashed-key-plus-bounded-aggregate-command-receipt",
+          "csrf": "platform-session-transport-policy"
+        }
+      },
+      "authorization": {
+        "model": "platform-rbac-plus-released-research-dataset-scope",
+        "roles": [
+          "commission",
+          "institution"
+        ],
+        "dataScope": "research-dataset"
+      },
+      "coverage": {
+        "level": "endpoint",
+        "selector": "entire-route",
+        "actions": [
+          "outcomes"
+        ],
+        "unverifiedRemainder": false
+      },
+      "idempotency": {
+        "key": "header:Idempotency-Key or body.commandId/body.idempotencyKey with canonical payload fallback for legacy callers",
+        "payloadBinding": [
+          "datasetId",
+          "actor.id",
+          "actor.role",
+          "actor.orgCode",
+          "actor.orgType",
+          "expectedVersion",
+          "title",
+          "summary",
+          "registryImpact",
+          "returnedTo"
+        ],
+        "exactReplay": "returns the persisted public projection with idempotentReplay=true and performs zero business, receipt, audit, message, task, outbox, or fallback writes",
+        "conflictingReuse": "RESEARCH_COMMAND_IDEMPOTENCY_CONFLICT",
+        "persistenceScope": "researchDatasets commandReceipts plus usageAudit and dataAccessLogs in one state commit",
+        "distributedExactlyOnceClaimed": false
+      },
+      "concurrency": {
+        "cas": {
+          "required": true,
+          "field": "expectedVersion (explicit CAS; omitted only for legacy compatibility and bound to the lock-time current version)",
+          "conflictCodes": [
+            "RESEARCH_COMMAND_VERSION_CONFLICT"
+          ]
+        }
+      },
+      "errors": [
+        {
+          "code": "RESEARCH_DATASET_SCOPE_DENIED",
+          "status": 403
+        },
+        {
+          "code": "RESEARCH_COMMAND_IDEMPOTENCY_CONFLICT",
+          "status": 409
+        },
+        {
+          "code": "RESEARCH_COMMAND_VERSION_CONFLICT",
+          "status": 409
+        },
+        {
+          "code": "RESEARCH_COMMAND_RECEIPT_CAPACITY_EXCEEDED",
+          "status": 409
+        },
+        {
+          "code": "RESEARCH_COMMAND_STORAGE_FAILED",
+          "status": 500
+        },
+        {
+          "code": "RESEARCH_DATASET_NOT_RELEASED",
+          "status": 403
+        }
+      ],
+      "audit": {
+        "accepted": "commits the allowlisted dataset mutation, bounded hashed receipt, usageAudit, and dataAccessLogs in one persistence call",
+        "replay": "returns after current authorization and receipt validation without appending audit or calling the persistence port",
+        "rejected": "returns a stable scoped validation, authorization, conflict, or redacted storage error without fallback or second persistence"
+      },
+      "implementationEvidence": [
+        {
+          "file": "src/http/research/dataset-write-command.js",
+          "anchors": [
+            "endpoint === \"outcomes\"",
+            "RESEARCH_COMMAND_IDEMPOTENCY_CONFLICT",
+            "RESEARCH_COMMAND_VERSION_CONFLICT",
+            "RESEARCH_COMMAND_RECEIPT_CAPACITY_EXCEEDED"
+          ]
+        },
+        {
+          "file": "src/http/routes/research.js",
+          "anchors": [
+            "\"/api/research/datasets/:id/outcomes\"",
+            "withResearchDatasetWriteLock",
+            "if (!executed.replayed) writeDatabase(executed.state)"
+          ]
+        }
+      ],
+      "testEvidence": [
+        {
+          "file": "test/t09-release-write-api-behavior.test.js",
+          "anchors": [
+            "T09 research write commands bind actor-scoped keys, replay with zero writes, reject conflicts, and enforce CAS",
+            "T09 research commands enforce ethics, minimum-necessary, independent approval, and institution evidence boundaries",
+            "T09 routes authenticate before body/state access and map persistence failure without fallback writes",
+            "T09 aggregate locks re-read inside the lock and collapse concurrent exact replays to one write"
+          ]
+        }
+      ],
+      "productionReady": false,
+      "externalEvidenceRequired": true
+    },
+    {
+      "contractId": "research.dataset-sandbox-access-command.v1",
+      "key": "POST /api/research/datasets/:id/sandbox-access",
+      "method": "POST",
+      "path": "/api/research/datasets/:id/sandbox-access",
+      "owner": "T09",
+      "domain": "research",
+      "purpose": "record-governed-read-only-research-sandbox-access",
+      "customAuthenticationEvidence": false,
+      "authentication": {
+        "required": true,
+        "mechanism": "bearer-or-cookie-session",
+        "principalType": "platform-user",
+        "credentialSource": [
+          "header:authorization",
+          "cookie:session"
+        ],
+        "replayCsrf": {
+          "replayProtection": "actor-scoped-hashed-key-plus-bounded-aggregate-command-receipt",
+          "csrf": "platform-session-transport-policy"
+        }
+      },
+      "authorization": {
+        "model": "platform-rbac-plus-released-research-dataset-scope-and-purpose-control",
+        "roles": [
+          "commission",
+          "institution"
+        ],
+        "dataScope": "research-dataset"
+      },
+      "coverage": {
+        "level": "endpoint",
+        "selector": "entire-route",
+        "actions": [
+          "sandbox-access"
+        ],
+        "unverifiedRemainder": false
+      },
+      "idempotency": {
+        "key": "header:Idempotency-Key or body.commandId/body.idempotencyKey with canonical payload fallback for legacy callers",
+        "payloadBinding": [
+          "datasetId",
+          "actor.id",
+          "actor.role",
+          "actor.orgCode",
+          "actor.orgType",
+          "expectedVersion",
+          "purpose"
+        ],
+        "exactReplay": "returns the persisted public projection with idempotentReplay=true and performs zero business, receipt, audit, message, task, outbox, or fallback writes",
+        "conflictingReuse": "RESEARCH_COMMAND_IDEMPOTENCY_CONFLICT",
+        "persistenceScope": "researchDatasets commandReceipts plus usageAudit and dataAccessLogs in one state commit",
+        "distributedExactlyOnceClaimed": false
+      },
+      "concurrency": {
+        "cas": {
+          "required": true,
+          "field": "expectedVersion (explicit CAS; omitted only for legacy compatibility and bound to the lock-time current version)",
+          "conflictCodes": [
+            "RESEARCH_COMMAND_VERSION_CONFLICT"
+          ]
+        }
+      },
+      "errors": [
+        {
+          "code": "RESEARCH_DATASET_SCOPE_DENIED",
+          "status": 403
+        },
+        {
+          "code": "RESEARCH_COMMAND_IDEMPOTENCY_CONFLICT",
+          "status": 409
+        },
+        {
+          "code": "RESEARCH_COMMAND_VERSION_CONFLICT",
+          "status": 409
+        },
+        {
+          "code": "RESEARCH_COMMAND_RECEIPT_CAPACITY_EXCEEDED",
+          "status": 409
+        },
+        {
+          "code": "RESEARCH_COMMAND_STORAGE_FAILED",
+          "status": 500
+        },
+        {
+          "code": "RESEARCH_DATASET_NOT_RELEASED",
+          "status": 403
+        },
+        {
+          "code": "RESEARCH_PURPOSE_REQUIRED",
+          "status": 400
+        },
+        {
+          "code": "RESEARCH_PURPOSE_TOO_LONG",
+          "status": 400
+        }
+      ],
+      "audit": {
+        "accepted": "commits the allowlisted dataset mutation, bounded hashed receipt, usageAudit, and dataAccessLogs in one persistence call",
+        "replay": "returns after current authorization and receipt validation without appending audit or calling the persistence port",
+        "rejected": "returns a stable scoped validation, authorization, conflict, or redacted storage error without fallback or second persistence"
+      },
+      "implementationEvidence": [
+        {
+          "file": "src/http/research/dataset-write-command.js",
+          "anchors": [
+            "endpoint === \"sandbox-access\"",
+            "RESEARCH_COMMAND_IDEMPOTENCY_CONFLICT",
+            "RESEARCH_COMMAND_VERSION_CONFLICT",
+            "RESEARCH_COMMAND_RECEIPT_CAPACITY_EXCEEDED"
+          ]
+        },
+        {
+          "file": "src/http/routes/research.js",
+          "anchors": [
+            "\"/api/research/datasets/:id/sandbox-access\"",
+            "withResearchDatasetWriteLock",
+            "if (!executed.replayed) writeDatabase(executed.state)"
+          ]
+        }
+      ],
+      "testEvidence": [
+        {
+          "file": "test/t09-release-write-api-behavior.test.js",
+          "anchors": [
+            "T09 research write commands bind actor-scoped keys, replay with zero writes, reject conflicts, and enforce CAS",
+            "T09 research commands enforce ethics, minimum-necessary, independent approval, and institution evidence boundaries",
+            "T09 routes authenticate before body/state access and map persistence failure without fallback writes",
+            "T09 aggregate locks re-read inside the lock and collapse concurrent exact replays to one write"
+          ]
+        }
+      ],
+      "productionReady": false,
+      "externalEvidenceRequired": true
     }
   ]
 }

@@ -8,7 +8,7 @@
 | `src/http/research/dataset-write-command.js` | T09 | 五个科研数据集写入口的伦理、数据最小化、独立审批、幂等 receipt、版本 CAS、数据访问审计与导出申请 | 合规导出的独立审批/发布 action 状态机；外部伦理系统；真实导出 worker/outbox |
 | `src/http/routes/shared.js`、`src/http/routes/research.js` | T09 | 身份先行、锁内重读、单次持久化和稳定 HTTP 错误/回放投影 | 事实源选择、跨域组合、机器发布目录 |
 
-内部 `commandReceipts` 不属于公共响应；GET/写响应通过投影移除。T07 标准 use-case 未修改，避免把两个不同聚合的状态机合并。
+内部 `commandReceipts` 不属于公共响应；GET/写响应通过投影移除。receipt 保存首次公共响应快照，只用于后续精确回放，原始幂等键不入库。T07 标准 use-case 未修改，避免把两个不同聚合的状态机合并。
 
 > 实施分支 AS-IS 快照：基于 `main@a15d10d`。模块是可分配责任和验证的架构单元，不等同于每一个 JavaScript 文件。
 
@@ -47,7 +47,7 @@
 | 前端共享 | `auth.js`、`shared.js`、`platform-api-client.js`、`platform-shell.js` | 身份上下文、API 调用、壳和设计系统；服务端 token 不进入 localStorage，Cookie 上下文优先，陈旧凭据启动即清理 |
 | 静态发布与浏览器安全 | `src/http/static-asset-policy.js`、`src/http/static-content-runtime.js`、`src/http/browser-security-policy.js`、`src/http/browser-security-inventory.js`、`browser-safe-url.js`、`page-auth-bootstrap.js`、`scripts/static-publication.js` | 44 个入口、145 个显式发布资产、Pages 制品和服务端读取共用默认拒绝契约；血液主工作台、急救生命链、医生工作台、血液上线看板、陪诊工作台、产品运行驾驶舱、产品区域运行驾驶舱、质量安全工作台、区域切换工作台、血液召回面板、血液创新指挥中心及体检风险卡子块已改为可信 DOM/text 渲染，Safe URL port 按 internal/official/object-storage/tel/blob 能力在 mutation 前检查协议、凭据和 exact-Origin。Inventory v2 现锁定 824 个 DOM HTML、6 个动态 URL 和 45 个动态样式风险；体检页面其余 25 个 HTML sink 和 2 个 OHIF URL occurrence 仍复核。严格 CSP 仍是 Report-Only，生产 NO-GO |
 | 演示脱敏 | `src/platform/data/public-demo-snapshot.js` | 服务端合成、Pages 构建和 storage-admin 共用纯函数，凭据字段删除、个人姓名/身份/联系字段稳定掩码 |
-| API 生产目录 | `routeSourceFiles` + `api-authentication-evidence` + `api-idempotency-evidence` → `api-authorization-matrix-v3` → `production-api-catalog-v3` | 13 项认证证据保持未分类为 0。13 份幂等行为合同覆盖 11 个完整 endpoint 与 2 个转诊 action-slice；T03 highlight signal intake 复用既有 public-health route/service 和 bounded `publicHealthSignals`，增加 canonical 来源机构范围、actor 组织命名空间 key hash、按 key 单进程命令锁、锁内重读、稳定错误和 signal+audit 单次提交。322 个写接口仍缺 endpoint 级行为证明；退款 runtime-role variant 与通用 action remainder 使 324 项保持复核，全部生产 NO-GO。`reviewedProofRequired` 为零；有界 ledger、进程锁与 SQLite CAS 不是多实例生产证明 |
+| API 生产目录 | `routeSourceFiles` + `api-authentication-evidence` + `api-idempotency-evidence` → `api-authorization-matrix-v3` → `production-api-catalog-v3` | 13 项认证证据保持未分类为 0。21 份幂等行为合同覆盖 19 个完整 endpoint 与 2 个转诊 action-slice；新增八份 T09 合同绑定药械/科研直接负测。314 个写接口仍缺 endpoint 级行为证明，通用 action remainder 使 316 项保持复核，全部生产 NO-GO。`reviewedProofRequired` 为零；有界 receipt、进程锁与 SQLite CAS 不是多实例生产证明 |
 | 内部边界覆盖治理 | `config/internal-boundary-coverage.json` → `scripts/internal-boundary-coverage.js` | 复用现有 c8/直接行为测试，以 10 个不重叠源码组锁定 identity、audit、object storage、API governance、worker observability、区域共享命令、转诊 owner command、科研合规导出、浏览器响应头与 Safe URL 真实基线；每组绑定至少一条实际执行的负向合同，报告仅写临时目录 |
 | Playwright E2E 基础设施 | `playwright-browser-policy.v1`、`playwright-pwa-browser-policy.v1`、`playwright-port-policy`、三套 runner/config | 在线根 39 项（含急救生命链、医生工作台、血液上线看板、陪诊工作台、产品运行驾驶舱、产品区域运行驾驶舱、质量安全工作台、区域切换工作台、血液召回面板、血液创新指挥中心、体检风险卡恶意响应回归与 Go/No-Go 四方审批角色命名空间回归）与居民 13 项继续阻止 Service Worker；独立 PWA 3 项只在专项 context 允许 Worker，三套共 55 项唯一并集，统一 Chromium、动态端口和临时数据，并验证缓存/注册清理 |
 | 生产证据信任 provider | `src/platform/governance/production-evidence-trust-provider.js` → `scripts/production-preflight.js` | T00 通用 signed-envelope/anchor 验证端口与 production decision 适配；CLI 可部署装配，双角色 Ed25519、pin、撤销、时窗和发布上下文失败关闭；不拥有生产授权 |

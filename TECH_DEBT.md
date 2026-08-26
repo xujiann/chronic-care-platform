@@ -4,12 +4,12 @@
 
 | ID | 现状 | 剩余风险/下一步 |
 |---|---|---|
-| API-IDEM-T09-001 | 八个首发写入口已有直接行为测试：身份先行、角色/机构/资源范围、actor-scoped key、零写回放、异载荷 409、CAS、同聚合锁、单次业务+审计持久化和失败无 fallback | 由 T00 把八份合同加入机器证据注册并重跑发布范围验证；不得宣称跨实例 exactly-once |
-| DATA-T09-001 | 遗留聚合以内嵌有界 receipt 和 `domainVersion` 兼容，未改 schema | 生产 PostgreSQL 表、事务仓储、历史回填/回滚及真实多实例竞态尚未实现；需要正式 migration/ADR 后才能推进 |
+| API-IDEM-T09-001 | 八个首发写入口已有直接行为测试和 T00 机器合同：身份先行、角色/机构/资源范围、actor-scoped key、聚合变化后仍返回首次响应快照的零写回放、异载荷 409、CAS、同聚合锁、单次业务+审计持久化和失败无 fallback | 真实多实例与生产数据库证据未闭合；不得宣称跨实例 exactly-once |
+| DATA-T09-001 | 遗留聚合以内嵌最多 100 条、含首次公共响应快照的 receipt 和 `domainVersion` 兼容，未改 schema | 响应快照会增加聚合体积；生产 PostgreSQL 应拆分 command receipt 表并建立容量/保留策略、事务仓储、历史回填/回滚及真实多实例竞态证据，需要正式 migration/ADR 后才能推进 |
 | RESEARCH-T09-001 | 伦理/数据使用证据、最小化、禁止再识别和独立审批已失败关闭；导出申请保持 pending/blocked | 伦理系统、DLP/导出 worker、审批人与发布人现场责任、长期 WORM/SIEM 证据仍属外部/现场 NO-GO |
 | DRUG-T09-001 | 机构整改、医保同步职责已分离；T07 标准 use-case 未被混用 | 医保/HIS 真实回执、机构主数据绑定、PG 多实例与长期审计仍未闭合；兼容命令不可取代 T07 标准状态机 |
 
-机器登记完成后，`production-release-scope` 中对应 `apiReviewRequired` 应减少 8 项（由 17 变为 9）；该数字只有 T00 集成分支实际运行结果才是权威，本 T09 分支不预写受保护配置或宣称门禁已经下降。
+T00 机器登记完成后，`production-release-scope` 中对应 `apiReviewRequired` 已减少 8 项（由 17 变为 9）；范围仍为 `FROZEN-NO-GO`。
 
 > 实施分支 AS-IS 快照：基于 `main@4fcdd61`。严重级别表示建议治理优先级；已关闭项以专项测试及 PR/main CI 为回归依据。
 
@@ -43,7 +43,7 @@
 | ARC-006 | 同名模块 | 根目录与 `src/` 有 6 组同名 | 文档明确前端/服务端/迁移角色，不做全仓改名 |
 | ARC-008 | operations 跨域写入 | OPS-02 为保持兼容，将 T06 的既有直写整体移入 T02；其中 `resourceDispatchRequests`、`taskMessages` 的机器 Owner 仍是 T05 care-coordination | 后续仅在独立 ADR/切片中改为 T05 owner port 或版本化事件；在完成行为矩阵前不得直接改写副作用 |
 | API-001 | 错误契约 | 多种 JSON 错误格式 | 新 API 使用版本化标准错误接口 |
-| API-002 | 接口目录复核 | v3 仍为 593 项、13 项认证证据且未分类为 0。T03 highlight signal intake 已补身份/RBAC、canonical 来源机构 scope、actor 组织 key namespace、精确重放/冲突、同键并发、稳定脱敏错误、SQLite CAS 映射和 signal+audit 单次提交，使注册表达到 13 份合同、11 个 endpoint verified；独立 `GET /api/public-health/highlights` 与 `GET /api/public-health/system` 的嵌入式 highlights 现共同具备 district 读取范围、混合 alert 失败关闭、command/AI/evidence 隐藏及全角色内部摘要脱敏保护，T00 高风险机器目录与两项派生契约测试已同步独立 GET 的精确范围。`GET /api/state` 已通过 T02 专用投影移除 `authUsers.password/passwordHash`，并保护鉴权先于读取、投影顺序及快照不变性。`reviewedProofRequired` 为零。322 个写接口仍缺 endpoint 级证明，324 项保持 review-required | 继续逐 owner 补证。system 其余字段仍保留遗留响应，不能因内嵌 highlights 已投影就宣称整个 endpoint 完成资源范围治理；`GET /api/state` 仍返回大量 commission 聚合集合，后续必须按调用方迁移逐步建立最小权限 allowlist，不能因认证口令已移除而关闭该债务。该 signal ledger 只有 200 条且进程锁不等于跨实例 exactly-once；`publicHealthSignals` data owner、PG 多实例、长期审计/归档和现场证据仍未决，相关 endpoint 保持 NO-GO |
+| API-002 | 接口目录复核 | v3 仍为 593 项、13 项认证证据且未分类为 0。T00 已登记 21 份幂等合同、19 个 endpoint verified；新增八份 T09 合同覆盖药械/科研职责范围、首次响应快照回放、CAS 和原子审计。`reviewedProofRequired` 为零。314 个写接口仍缺 endpoint 级证明，316 项保持 review-required | 继续逐 owner 补证；`GET /api/state` 最小权限、PG 多实例、长期审计/归档和现场证据仍未决。进程锁不等于跨实例 exactly-once，相关 endpoint 保持 NO-GO |
 | JOB-001 | Worker 一致性 | 12 个既有 worker profile、9 个部署入口已建立 `platform-worker-observability.v1` 脱敏兼容投影；领域 state/retry/lease/checkpoint/receipt 仍各自权威，仓库不据此推导生产授权 | 后续接入真实指标/日志采集器与告警路由前，必须另行确认 owner、留存、访问控制和现场启用证据；不得把兼容投影演变为统一领域状态机 |
 | TEST-006 | 静态基线与测试性能 | `test/api.test.js` 的全文件 `no-unreachable` 已关闭，原 3 个 care 显式 skip 已由 T05 owner/route 独立特征测试逐块重验并恢复执行；陪诊引用挂号单的存在性/scope 缺口与 handoff `reject/return` 投影已最小修复。typecheck 为 13 个唯一文件；两个前端文件的 16 个重复翻译键已有逐键 shadow/final 值和真实调用保护，去重保持首次插入顺序及最终生效值，lint 文件级例外已归零；API 热点仍作为独立 integration 批次输出耗时。五个可逆夹具切片已分别提取临时 seed/env/server、单个 HIS hospital mock、单个 SIEM alert mock、单个 financial gateway mock 和单个 object-storage gateway mock 生命周期；storage 的签名响应、四类 operation、动态 URL 与 mutable scan 状态通过领域 helper 和最小 setter 保真。43 个子测试顺序摘要继续锁定 suite 成员、断言、超时、单进程语义、CI 预算与 required checks 不降低 | API 巨型测试仍集中约 8,200 行业务断言和其余共享状态。后续只按一个共享服务生命周期继续小步拆分，不得按耗时并行化共享状态或把 helper 变成生产接口。耗时先观察多次 CI 分布，不凭单机样本设门槛；不得恢复文件级 lint 豁免；外部护理/陪诊/HIS/SIEM/financial/storage 投递与现场证据继续由生产 readiness 跟踪，不以本测试关闭 |
 
@@ -162,5 +162,5 @@
 ## 2026-08-26 首批生产范围治理
 
 - `DEPLOY-003` 已关闭：首批八应用不再只靠文档描述，范围数量、摘要和部署包绑定可机器校验。
-- 仓库审查：32 个 scoped API 中 17 个仍需要 repository behavior review；首发 19 个 legacy 数据引用已关闭 owner/governance review，范围 `collectionReviewRequired=0`。它们与 T05 `referrals` exact source binding、T00 `operationsReadiness` derived read model 共 21 个引用仍不具备生产写资格，且全部 38 个引用禁止生产晋级。
+- 仓库审查：32 个 scoped API 中 9 个仍需要 repository behavior review；首发 19 个 legacy 数据引用已关闭 owner/governance review，范围 `collectionReviewRequired=0`。它们与 T05 `referrals` exact source binding、T00 `operationsReadiness` derived read model 共 21 个引用仍不具备生产写资格，且全部 38 个引用禁止生产晋级。
 - 仍外置：14 个外部依赖/14 个切换行动的真实签名证据、7 个 worker 的现场激活、PostgreSQL 主存储选择以及完整 smoke/回滚/验收。任何一项不得以冻结指纹替代，当前生产状态固定 NO-GO。
