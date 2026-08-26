@@ -401,3 +401,7 @@ sink 仍在 Inventory 中失败关闭；仓库测试不证明真实体检设备�
 ## 36. 9+5 开发组织（无 HTTP 变化）
 
 组织合同不新增或改变任何 HTTP method/path、路由顺序、认证、角色、scope、错误、幂等或审计语义。九个一级域继续以 `process-workstreams` 的路由 Owner 为权威，五个临床子域继续以 `clinical-subdomains` 的 API 前缀归属为权威；组织门禁不建立第三份 API 清单。
+
+## 37. 首批生产范围（无 HTTP 变化）
+
+冻结范围引用生产 API 目录中的 32 项：八应用声明的 28 项以及 `GET /api/live`、`GET /api/health`、`GET /api/metrics`、`GET /api/auth/context`。校验要求 method/path 均已存在且全部保持 `productionReady=false`；当前 17 项仍为 repository review-required。该增量没有注册、修改或删除任何 HTTP 路由，也不改变认证、授权、幂等或响应协议。

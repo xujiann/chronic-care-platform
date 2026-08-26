@@ -6,6 +6,24 @@ const test = require("node:test");
 
 const ROOT = path.resolve(__dirname, "..");
 
+test("frozen first-production scope is machine-verifiable and remains NO-GO", () => {
+  const report = require("../scripts/production-release-scope").run();
+  assert.equal(report.ok, true);
+  assert.equal(report.scopeFingerprint, "sha256:ec33706d5806e5bcf3c210a289ca124e188ff236dafc60ac2f4f1d538f5acca3");
+  assert.equal(report.productionReady, false);
+  assert.equal(report.externalEvidenceRequired, true);
+  assert.deepEqual(report.summary, {
+    applications: 8,
+    pages: 9,
+    apis: 32,
+    collections: 38,
+    workers: 7,
+    externalDependencies: 14,
+    applicationEvidence: 16,
+    cutoverActions: 14
+  });
+});
+
 test("isolated runtime serves liveness, health and public login while denying source data", async (t) => {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "health-platform-smoke-"));
   fs.copyFileSync(path.join(ROOT, "data", "db.json"), path.join(dataDir, "db.json"));

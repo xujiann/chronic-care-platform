@@ -316,3 +316,13 @@ strict preflight。candidate 用部署 anchor 摘要检查漂移，只聚合五�
 ## 9+5 开发组织模块
 
 `config/development-organization.json` 将 T01–T09 组合为九个一级开发域，并将五个临床子域作为 T06 的唯一嵌套组；T00 是独立的集成治理单元。`development-organization-governance` 只读取现有 process、clinical 和 service-extraction 权威并校验闭集、一致性与统一部署政策，不拥有路由、数据集合或业务状态。该模块分类为 B（KEEP + IMPROVE）：边界小且有负向测试，后续只随 Owner 决策同步演进。
+
+## 2026-08-26 T00 生产范围治理模块
+
+| 模块 | 类型 | 输入 | 输出 | 边界 |
+|---|---|---|---|---|
+| `config/production-release-scope.json` | 冻结选择器 | 既有应用、平台入口、worker 与外部依赖 ID | 数量/摘要/总指纹 | 不复制业务实现，不授权生产 |
+| `src/platform/governance/production-release-scope.js` | 只读治理服务 | 应用、API、数据、worker、联调、切换行动权威 | `production-release-scope-report.v1` | 不写数据库、报告或发布制品 |
+| `scripts/production-release-scope.js` | CLI 适配器 | 同上 | `FROZEN-NO-GO` 校验结果 | 失败仅表示合同漂移，不生成外部证据 |
+
+该模块由部署包 builder/verifier、standard smoke 与 strict preflight 消费；它不被 HTTP router 或业务服务调用。

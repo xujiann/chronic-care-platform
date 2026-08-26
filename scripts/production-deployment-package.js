@@ -3,6 +3,10 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { createHash } = require("node:crypto");
 const { spawnSync } = require("node:child_process");
+const {
+  buildProductionReleaseScopeReport,
+  loadDefaultAuthorities: loadProductionReleaseScopeAuthorities
+} = require("../src/platform/governance/production-release-scope");
 
 const ROOT = path.resolve(__dirname, "..");
 const DEFAULT_OUTPUT = path.join(ROOT, "release", "production-deployment-package.json");
@@ -39,6 +43,9 @@ const PRODUCTION_EVIDENCE_TRUST_RUNTIME_FILES = [
 const WORKER_OBSERVABILITY_RUNTIME_FILES = [
   "config/worker-observability-contract.json",
   "src/platform/operations/worker-observability-contract.js"
+];
+const PRODUCTION_RELEASE_SCOPE_RUNTIME_FILES = [
+  "config/production-release-scope.json"
 ];
 const POSTGRES_TRANSITION_RUNTIME_FILES = [
   "postgres-runtime-sync.js",
@@ -205,6 +212,7 @@ const REQUIRED_RUNTIME_FILES = [
   ...CHRONIC_FOLLOWUP_DISPATCH_RUNTIME_FILES,
   ...PRODUCTION_EVIDENCE_TRUST_RUNTIME_FILES,
   ...WORKER_OBSERVABILITY_RUNTIME_FILES,
+  ...PRODUCTION_RELEASE_SCOPE_RUNTIME_FILES,
   ...PREPRODUCTION_CONTROL_RUNTIME_FILES
 ];
 const ADDITIONAL_RUNTIME_FILES = [
@@ -215,6 +223,7 @@ const ADDITIONAL_RUNTIME_FILES = [
   ...CHRONIC_FOLLOWUP_DISPATCH_RUNTIME_FILES,
   ...PRODUCTION_EVIDENCE_TRUST_RUNTIME_FILES,
   ...WORKER_OBSERVABILITY_RUNTIME_FILES,
+  ...PRODUCTION_RELEASE_SCOPE_RUNTIME_FILES,
   ...PREPRODUCTION_CONTROL_RUNTIME_FILES
 ];
 const RUNTIME_DIRECTORIES = ["src/http", "src/platform/regional", "src/platform/storage", "regions"];
@@ -456,6 +465,9 @@ function buildProductionDeploymentPackage(options = {}) {
   const files = runtimeFiles.map((relativePath) => fileEvidence(root, relativePath));
   const digest = artifactDigest(files);
   const releaseId = String(options.releaseId || `${String(source.commit || "working-tree").slice(0, 12)}-${digest.slice(0, 12)}`);
+  const productionReleaseScope = buildProductionReleaseScopeReport(
+    options.productionReleaseScopeAuthorities || loadProductionReleaseScopeAuthorities(root)
+  );
   const processContract = {
     supervisor: "systemd-or-container-orchestrator",
     entrypoint: "node server.js",
@@ -480,6 +492,16 @@ function buildProductionDeploymentPackage(options = {}) {
         "PRODUCTION_EVIDENCE_TRUST_ENVELOPE_FILE",
         "PRODUCTION_CUTOVER_ACTION_EVIDENCE_DIR"
       ],
+      externalEvidenceRequired: true,
+      productionReady: false
+    },
+    productionReleaseScope: {
+      contract: "production-release-scope.v1",
+      scopeId: productionReleaseScope.scopeId,
+      scopeFingerprint: productionReleaseScope.scopeFingerprint,
+      verificationBoundary: "build-time-source-derived",
+      runtimeVerificationAvailable: false,
+      summary: productionReleaseScope.summary,
       externalEvidenceRequired: true,
       productionReady: false
     },
@@ -609,6 +631,7 @@ function buildProductionDeploymentPackage(options = {}) {
     check("deploymentPackage:digest", /^[a-f0-9]{64}$/.test(digest) && files.every((item) => /^[a-f0-9]{64}$/.test(item.sha256)), `sha256:${digest}`),
     check("deploymentPackage:secretBoundary", secretContract.valuesPersisted === false && secretContract.variables.length >= 10 && secretContract.variables.every((item) => item.name && item.persistedInArtifact === false && !("value" in item)), `${secretContract.variables.length} secret references; values persisted false`),
     check("deploymentPackage:processContract", processContract.healthChecks.length === 4 && processContract.healthChecks.some((item) => item.route === "/api/live" && item.purpose === "process-liveness" && item.authentication === "none") && processContract.healthChecks.some((item) => item.route === "/api/health" && item.purpose === "dependency-readiness" && item.authentication === "none") && processContract.restartPolicy === "on-failure" && processContract.gracefulShutdownSeconds >= 30 && processContract.productionPreflight.productionReady === false && processContract.backgroundJobs.some((item) => item.id === "continuous-audit-delivery" && item.productionReady === false) && processContract.backgroundJobs.some((item) => item.id === "chronic-followup-durable-dispatch" && item.productionReady === false) && processContract.backgroundJobs.some((item) => item.id === "postgres-shadow-sync" && item.productionReady === false) && processContract.backgroundJobs.some((item) => item.id === "postgres-shadow-reconciliation" && item.productionReady === false) && processContract.preproductionControls.length === 5 && processContract.preproductionControls.every((item) => item.readOnly === true && item.externalEvidenceRequired === true && item.cutoverExecutionAuthorized === false && item.executionAuthorized === false && item.runtimeCutoverEnabled === false && item.productionPrimary === false && item.productionReady === false), `${processContract.supervisor} / ${processContract.healthChecks.length} health checks / ${processContract.backgroundJobs.length} background jobs / ${processContract.preproductionControls.length} pre-production controls`),
+    check("deploymentPackage:releaseScope", productionReleaseScope.ok === true && productionReleaseScope.productionReady === false && productionReleaseScope.externalEvidenceRequired === true && PRODUCTION_RELEASE_SCOPE_RUNTIME_FILES.every((name) => files.some((item) => item.path === name)) && processContract.productionReleaseScope.scopeFingerprint === productionReleaseScope.scopeFingerprint, `${productionReleaseScope.scopeId} / ${productionReleaseScope.scopeFingerprint} / FROZEN-NO-GO`),
     check("deploymentPackage:databaseTransition", POSTGRES_TRANSITION_RUNTIME_FILES.every((name) => files.some((item) => item.path === name)) && templateHasVariables(root, "deploy/platform-production-adapters.env.template", POSTGRES_TRANSITION_CONFIGURATION_VARIABLES) && postgresDeploymentTemplatesValid(root) && processContract.databaseTransition.productionReady === false && processContract.databaseTransition.productionPrimary === false && processContract.databaseTransition.runtimeCutoverEnabled === false && processContract.databaseTransition.activationAuthorized === false && !JSON.stringify(processContract).includes("DATABASE_URL") && secretContract.variables.some((item) => item.name === "DATABASE_URL" && !Object.hasOwn(item, "value")), "PostgreSQL transition commands, workers, hardened templates and secret boundary remain fail closed"),
     check("deploymentPackage:preproductionControls", PREPRODUCTION_CONTROL_RUNTIME_FILES.every((name) => files.some((item) => item.path === name)) && templateHasVariables(root, "deploy/platform-production-adapters.env.template", PREPRODUCTION_CONTROL_CONFIGURATION_VARIABLES) && processContract.preproductionControls.length === 5, "five read-only pre-production control entrypoints and their runtime/configuration closure are mandatory"),
     check("deploymentPackage:rollbackContract", rollbackContract.requirePreviousArtifactDigest && rollbackContract.requireStorageBackup && rollbackContract.rollbackCommand.includes("rollback:snapshot"), "previous digest, storage backup and post-rollback health are mandatory"),
@@ -651,6 +674,15 @@ function buildProductionDeploymentPackage(options = {}) {
 
 function verifyProductionDeploymentPackage(manifest, options = {}) {
   const root = options.root || ROOT;
+  let productionReleaseScopeContract = {};
+  try {
+    productionReleaseScopeContract = JSON.parse(fs.readFileSync(
+      path.join(root, "config", "production-release-scope.json"),
+      "utf8"
+    ));
+  } catch {
+    productionReleaseScopeContract = {};
+  }
   const expectedFiles = Array.isArray(manifest?.artifact?.files) ? manifest.artifact.files : [];
   const currentFiles = [];
   const missing = [];
@@ -699,6 +731,20 @@ function verifyProductionDeploymentPackage(manifest, options = {}) {
     && item.productionPrimary === false
     && item.runtimeCutoverEnabled === false);
   const preproductionControls = manifest?.processContract?.preproductionControls || [];
+  const packagedReleaseScope = manifest?.processContract?.productionReleaseScope;
+  const frozenSummary = Object.fromEntries(Object.entries(productionReleaseScopeContract.frozenInventory || {})
+    .map(([key, value]) => [key, value.count]));
+  const releaseScopeValid = PRODUCTION_RELEASE_SCOPE_RUNTIME_FILES.every((required) => expectedFiles.some((item) => item.path === required))
+    && packagedReleaseScope?.contract === "production-release-scope.v1"
+    && productionReleaseScopeContract.productionReady === false
+    && productionReleaseScopeContract.externalEvidenceRequired === true
+    && packagedReleaseScope?.scopeId === productionReleaseScopeContract.scopeId
+    && packagedReleaseScope?.scopeFingerprint === productionReleaseScopeContract.scopeFingerprint
+    && JSON.stringify(packagedReleaseScope?.summary) === JSON.stringify(frozenSummary)
+    && packagedReleaseScope?.verificationBoundary === "build-time-source-derived"
+    && packagedReleaseScope?.runtimeVerificationAvailable === false
+    && packagedReleaseScope?.externalEvidenceRequired === true
+    && packagedReleaseScope?.productionReady === false;
   const preproductionControlsValid = preproductionControls.length === PREPRODUCTION_CONTROL_DEFINITIONS.length
     && PREPRODUCTION_CONTROL_DEFINITIONS.every((expected) => {
       const actual = preproductionControls.find((item) => item.id === expected.id);
@@ -724,6 +770,7 @@ function verifyProductionDeploymentPackage(manifest, options = {}) {
     check("deploymentVerify:auditWorker", AUDIT_DELIVERY_RUNTIME_FILES.every((required) => expectedFiles.some((item) => item.path === required)) && manifest?.processContract?.backgroundJobs?.some((item) => item.id === "continuous-audit-delivery" && item.productionReady === false && item.preflight === "npm run audit:delivery:preflight" && item.configurationTemplate === "deploy/platform-production-adapters.env.template" && item.configurationVariables?.includes("AUDIT_DELIVERY_SOURCE_CONTRACT") && item.configurationVariables?.includes("PLATFORM_PILOT_CUTOVER_ALERT_JOURNAL_FILE")) && manifest?.secretContract?.variables?.some((item) => item.name === "SIEM_AUDIT_SIGNING_SECRET" && !("value" in item)), "continuous audit dependency closure, process, configuration and secret references are mandatory"),
     check("deploymentVerify:chronicFollowupWorker", CHRONIC_FOLLOWUP_DISPATCH_RUNTIME_FILES.every((required) => expectedFiles.some((item) => item.path === required)) && manifest?.processContract?.backgroundJobs?.some((item) => item.id === "chronic-followup-durable-dispatch" && item.productionReady === false && item.preflight === "npm run chronic:followup-dispatch-preflight" && item.sourceContract === "citizen-chronic.followup-dispatch-outbox.v1" && ["DATA_DIR", "CITIZEN_CHRONIC_FOLLOWUP_DISPATCH_SQLITE_FILE", "CITIZEN_CHRONIC_FOLLOWUP_PUBLISHER_HMAC_SECRET", "CITIZEN_CHRONIC_FOLLOWUP_ACTIVATION_REGISTRY_FILE", "CITIZEN_CHRONIC_FOLLOWUP_ACTIVATION_PUBLIC_KEY_FILE", "CITIZEN_CHRONIC_FOLLOWUP_ACTIVATION_PUBLIC_KEY_SHA256"].every((name) => item.configurationVariables?.includes(name))) && manifest?.secretContract?.variables?.some((item) => item.name === "CITIZEN_CHRONIC_FOLLOWUP_PUBLISHER_HMAC_SECRET" && !("value" in item)), "chronic followup durable worker, canonical SQLite source, activation trust and secret references are mandatory"),
     check("deploymentVerify:productionEvidenceTrust", PRODUCTION_EVIDENCE_TRUST_RUNTIME_FILES.every((required) => expectedFiles.some((item) => item.path === required)) && manifest?.processContract?.productionPreflight?.entrypoint === "node scripts/production-preflight.js --strict" && manifest?.processContract?.productionPreflight?.trustContract === "platform-governance.production-evidence-trust-decision.v1" && manifest?.processContract?.productionPreflight?.productionReady === false && ["PRODUCTION_EVIDENCE_TRUST_ANCHORS_FILE", "PRODUCTION_EVIDENCE_TRUST_ANCHORS_SHA256", "PRODUCTION_EVIDENCE_TRUST_ENVELOPE_FILE", "PRODUCTION_CUTOVER_ACTION_EVIDENCE_DIR"].every((name) => manifest?.processContract?.productionPreflight?.configurationVariables?.includes(name)), "strict preflight includes the pinned Ed25519 production and cutover-action evidence providers and remains NO-GO by default"),
+    check("deploymentVerify:releaseScope", releaseScopeValid, packagedReleaseScope?.scopeFingerprint || "missing"),
     check("deploymentVerify:postgresTransition", postgresFilesPresent && postgresVariablesPresent && templateHasVariables(root, "deploy/platform-production-adapters.env.template", POSTGRES_TRANSITION_CONFIGURATION_VARIABLES) && postgresDeploymentTemplatesValid(root) && transitionFlagsClosed && postgresDatabaseUrlSecretOnly && postgresTransition?.commands?.readiness === "npm run postgres:transition-readiness" && postgresTransition?.commands?.migrationPackage === "npm run postgres:migration-package" && postgresTransition?.commands?.migrationVerify === "npm run postgres:migration-verify" && postgresTransition?.commands?.primaryReadRehearsal === "npm run postgres:primary-read-rehearsal" && postgresTransition?.commands?.adapterVerify === "npm run postgres:adapter-verify" && postgresTransition?.commands?.storageBackup === "npm run storage:backup" && postgresTransition?.commands?.storageInspect === "npm run storage:inspect" && postgresTransition?.commands?.storageAssess === "npm run storage:assess -- <backup-dir>" && postgresTransition?.commands?.shadowSync === "npm run postgres:sync-worker" && postgresTransition?.commands?.shadowReconciliation === "npm run postgres:shadow-reconcile" && postgresSyncJobValid && postgresReconciliationJobValid, "PostgreSQL transition entrypoints, variables, hardened templates, secret reference and fixed NO-GO flags are mandatory"),
     check("deploymentVerify:preproductionControls", PREPRODUCTION_CONTROL_RUNTIME_FILES.every((required) => expectedFiles.some((item) => item.path === required)) && templateHasVariables(root, "deploy/platform-production-adapters.env.template", PREPRODUCTION_CONTROL_CONFIGURATION_VARIABLES) && preproductionControlsValid, "five read-only pre-production controls require complete runtime files, configuration references and fixed non-authorization flags"),
     check("deploymentVerify:rollback", manifest?.rollbackContract?.requirePreviousArtifactDigest === true && manifest?.rollbackContract?.requireStorageBackup === true, "rollback prerequisites declared")

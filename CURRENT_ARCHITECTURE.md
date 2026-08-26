@@ -295,3 +295,7 @@ reconciliation 观察。所有入口要求调用方提供发布号和包指纹�
 ## 2026-08-25 9+5 开发组织
 
 当前开发组织由 T00 集成治理单元、T01–T09 九个一级开发域和 T06 下五个临床子域组成。T00 不计入一级开发域；五个临床子域也不提升为一级域。机器合同只组合既有 process 与 clinical Owner 权威，不复制路由或数据 Owner。各域可以独立 PLAN、工作树和领域测试，但仓库、`main`、Node.js 运行时、CI 和模块化单体部署保持统一，独立部署继续未授权。
+
+## 2026-08-26 首批生产范围冻结
+
+T00 新增只读 `production-release-scope.v1`，从现有八应用清单、静态发布清单、生产 API 目录、数据集合治理、worker 观测合同、外部联调活动及切换行动定义派生并冻结范围。当前指纹覆盖 8 个应用、9 个页面、32 个 API、38 个数据引用、7 个 worker、14 个外部依赖、16 个应用证据名和 14 个 definitions-only 切换动作。完整校验只在 CI/build-time 读取仓库权威；部署包仅保存已验证的冻结 config 与同一指纹并声明 runtime verifier 不可用，standard smoke 与 strict preflight 失败关闭校验绑定。`referrals` 以 T05 exact owner JSON 合同、`operationsReadiness` 以 T00 导出只读模型校验，不计入无 owner 缺口。此增量不新增路由、Schema、业务 API、数据或 worker 激活；17 个 API 和 19 个数据引用仍需仓库复核，`productionReady=false`。

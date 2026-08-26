@@ -1,0 +1,87 @@
+{
+  "schemaVersion": "production-release-scope.v1",
+  "scopeId": "priority-eight-applications-v1",
+  "status": "frozen",
+  "owner": "T00",
+  "applicationSource": "health-dashboard-applications.js",
+  "applicationIds": [
+    "regional-data-sharing",
+    "referral-teleconsultation",
+    "quality-safety",
+    "operations-dispatch",
+    "drug-consumable-supervision",
+    "chronic-followup",
+    "research-sandbox",
+    "health-dashboard"
+  ],
+  "platformEntrypoints": {
+    "pages": ["login.html"],
+    "apis": [
+      "GET /api/live",
+      "GET /api/health",
+      "GET /api/metrics",
+      "GET /api/auth/context"
+    ]
+  },
+  "workerProfileIds": [
+    "continuous-audit-delivery",
+    "chronic-followup-dispatch",
+    "referral-delivery",
+    "care-service-outbox",
+    "postgres-shadow-sync",
+    "postgres-shadow-reconciliation",
+    "cutover-alert-delivery"
+  ],
+  "collectionSourceBindings": {
+    "referrals": {
+      "kind": "owned-contract",
+      "source": "config/domain-data-ownership.json",
+      "jsonPath": ["collections", "referrals"],
+      "owner": "care-coordination",
+      "ownerProcess": "T05"
+    },
+    "operationsReadiness": {
+      "kind": "derived-read-model",
+      "source": "scripts/operations-readiness.js",
+      "export": "buildOperationsReadinessReport",
+      "ownerProcess": "T00"
+    }
+  },
+  "externalDependencies": [
+    { "id": "his-referral-v1", "source": "external-joint-test-campaign" },
+    { "id": "emr-clinical-summary-v1", "source": "external-joint-test-campaign" },
+    { "id": "lis-result-v1", "source": "external-joint-test-campaign" },
+    { "id": "pacs-imaging-v1", "source": "external-joint-test-campaign" },
+    { "id": "oidc-federation-v1", "source": "external-joint-test-campaign" },
+    { "id": "sms-notification-v1", "source": "external-joint-test-campaign" },
+    { "id": "insurance-settlement-v1", "source": "external-joint-test-campaign" },
+    { "id": "payment-refund-v1", "source": "external-joint-test-campaign" },
+    { "id": "digital-certificate-v1", "source": "external-joint-test-campaign" },
+    { "id": "public-health-direct-report-v1", "source": "external-joint-test-campaign" },
+    { "id": "siem-security-event-v1", "source": "external-joint-test-campaign" },
+    { "id": "duty-alert-ticket-v1", "source": "external-joint-test-campaign" },
+    { "id": "postgres-primary-storage", "source": "scripts/postgres-primary-transition-readiness.js" },
+    { "id": "object-storage-gateway-v1", "source": "secure-object-storage.js" }
+  ],
+  "commands": {
+    "verify": "npm run production:release-scope:verify",
+    "apiCatalog": "npm run api:production-catalog",
+    "deploymentPackage": "npm run deployment:package",
+    "smoke": "npm run test:smoke",
+    "goNoGo": "npm run production:preflight:strict"
+  },
+  "frozenInventory": {
+    "applications": { "count": 8, "sha256": "sha256:4eaf06db695661f8e64b50b97c5ff9a8734d58f1b028bc4861b7feadbc8eea87" },
+    "pages": { "count": 9, "sha256": "sha256:23cdec128c9d8f9dc30f17b02a451823aa7246ebb97692989ec177e3071772ca" },
+    "apis": { "count": 32, "sha256": "sha256:ad600704f6fb929cdf8d1ad3b7f33dd0fdcfb258e99a510c98965f2a513b7f03" },
+    "collections": { "count": 38, "sha256": "sha256:beef2bc08ed9803df8b983768bc9e2aeb89f374a362c1bc406562dad91047b03" },
+    "workers": { "count": 7, "sha256": "sha256:bc5187f75b7980fbf284a6f7404c81f7e20cb4f4cffbae8da681588875508752" },
+    "externalDependencies": { "count": 14, "sha256": "sha256:64dd68a2e7b2df084ebae6c0d624629d75a196102a401e319e9965ac29e5fb26" },
+    "applicationEvidence": { "count": 16, "sha256": "sha256:c4e2da6fd752d59c6b02279f8bacdb2056fae32a479b567b72c29d40ebd59bd7" },
+    "cutoverActions": { "count": 14, "sha256": "sha256:93567622cef1890da05a07f94ea505701090f0473d72322d8cc8f1e762512895" }
+  },
+  "scopeFingerprint": "sha256:ec33706d5806e5bcf3c210a289ca124e188ff236dafc60ac2f4f1d538f5acca3",
+  "externalEvidenceRequired": true,
+  "productionReady": false,
+  "boundary": "This contract freezes repository release scope only. It cannot create external evidence, authorize cutover, activate workers, select a production database or make the platform production-ready."
+}

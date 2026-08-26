@@ -1,5 +1,6 @@
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
+const os = require("node:os");
 const path = require("node:path");
 const test = require("node:test");
 
@@ -55,6 +56,9 @@ test("production deployment package hashes runtime files without persisting secr
     PREPRODUCTION_CONTROL_RUNTIME_FILES.forEach((runtimeFile) =>
       assert.equal(manifest.artifact.files.some((item) => item.path === runtimeFile), true, runtimeFile));
     assert.equal(manifest.artifact.files.some((item) => item.path === "config/regions.json"), true);
+    assert.equal(manifest.artifact.files.some((item) => item.path === "config/production-release-scope.json"), true);
+    assert.equal(manifest.artifact.files.some((item) => item.path === "scripts/production-release-scope.js"), false);
+    assert.equal(manifest.artifact.files.some((item) => item.path === "src/platform/governance/production-release-scope.js"), false);
     assert.equal(manifest.artifact.files.some((item) => item.path === "src/platform/regional/regional-runtime.js"), true);
     [
       "scripts/audit-delivery-worker.js",
@@ -145,6 +149,25 @@ test("production deployment package hashes runtime files without persisting secr
     assert.equal(manifest.processContract.productionPreflight.entrypoint, "node scripts/production-preflight.js --strict");
     assert.equal(manifest.processContract.productionPreflight.trustContract, "platform-governance.production-evidence-trust-decision.v1");
     assert.equal(manifest.processContract.productionPreflight.productionReady, false);
+    assert.deepEqual(manifest.processContract.productionReleaseScope, {
+      contract: "production-release-scope.v1",
+      scopeId: "priority-eight-applications-v1",
+      scopeFingerprint: "sha256:ec33706d5806e5bcf3c210a289ca124e188ff236dafc60ac2f4f1d538f5acca3",
+      verificationBoundary: "build-time-source-derived",
+      runtimeVerificationAvailable: false,
+      summary: {
+        applications: 8,
+        pages: 9,
+        apis: 32,
+        collections: 38,
+        workers: 7,
+        externalDependencies: 14,
+        applicationEvidence: 16,
+        cutoverActions: 14
+      },
+      externalEvidenceRequired: true,
+      productionReady: false
+    });
     assert.deepEqual(manifest.processContract.productionPreflight.configurationVariables, [
       "PRODUCTION_EVIDENCE_TRUST_ANCHORS_FILE",
       "PRODUCTION_EVIDENCE_TRUST_ANCHORS_SHA256",
@@ -204,6 +227,33 @@ test("deployment package verification detects file digest tampering", () => {
   const trustProviderFailed = verifyProductionDeploymentPackage(missingTrustProvider);
   assert.equal(trustProviderFailed.ok, false);
   assert.equal(trustProviderFailed.checks.some((item) => item.id === "deploymentVerify:productionEvidenceTrust" && !item.passed), true);
+
+  const forgedReleaseScope = structuredClone(manifest);
+  forgedReleaseScope.processContract.productionReleaseScope.scopeFingerprint = "sha256:forged";
+  forgedReleaseScope.processContract.productionReleaseScope.productionReady = true;
+  const forgedReleaseScopeFailed = verifyProductionDeploymentPackage(forgedReleaseScope);
+  assert.equal(forgedReleaseScopeFailed.ok, false);
+  assert.equal(forgedReleaseScopeFailed.checks.some((item) => item.id === "deploymentVerify:releaseScope" && !item.passed), true);
+
+  const missingReleaseScopeContract = structuredClone(manifest);
+  missingReleaseScopeContract.artifact.files = missingReleaseScopeContract.artifact.files.filter((item) =>
+    item.path !== "config/production-release-scope.json");
+  const missingReleaseScopeContractFailed = verifyProductionDeploymentPackage(missingReleaseScopeContract);
+  assert.equal(missingReleaseScopeContractFailed.ok, false);
+  assert.equal(missingReleaseScopeContractFailed.checks.some((item) =>
+    item.id === "deploymentVerify:releaseScope" && !item.passed), true);
+
+  const missingReleaseScopeRoot = fs.mkdtempSync(path.join(os.tmpdir(), "deployment-scope-missing-"));
+  try {
+    const missingReleaseScopeFileFailed = verifyProductionDeploymentPackage(manifest, {
+      root: missingReleaseScopeRoot
+    });
+    assert.equal(missingReleaseScopeFileFailed.ok, false);
+    assert.equal(missingReleaseScopeFileFailed.checks.some((item) =>
+      item.id === "deploymentVerify:releaseScope" && !item.passed), true);
+  } finally {
+    fs.rmSync(missingReleaseScopeRoot, { recursive: true, force: true });
+  }
 
   const missingPreproductionRuntime = structuredClone(manifest);
   missingPreproductionRuntime.artifact.files = missingPreproductionRuntime.artifact.files.filter((item) =>
