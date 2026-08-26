@@ -1,5 +1,24 @@
 # DEPENDENCY MAP — 主线依赖地图
 
+## 2026-08-26 T09 写命令依赖
+
+```text
+shared route
+  -> shared-drug-consumable-command.v1
+     -> canAccessResident / prependAuditTrailEntry（注入端口）
+     -> drugConsumableSupervisions + securityEvents（同一状态提交）
+
+research route
+  -> research-dataset-write-command.v1
+     -> sandbox-read-model（scope / purpose）
+     -> compliant-export-workflow（pending/blocked 申请）
+     -> normalize/require/audit（组合根注入的既有端口）
+     -> researchDatasets + compliantDataExports + dataAccessLogs（同一状态提交）
+```
+
+两个命令模块都不依赖 `server.js`，也不相互依赖。T09 未修改或反向依赖 T07 药械标准
+`supervision-use-case`，未引入外部 SDK、数据库驱动、消息系统或 outbox。聚合锁为进程内兼容保护，生产多实例仍依赖未来的 PostgreSQL atomic repository/CAS。
+
 > 实施分支 AS-IS 快照：基于 `main@a15d10d`。依赖包括代码、数据、外部系统、后台任务、构建和部署关系。
 
 ## 1. 代码依赖方向

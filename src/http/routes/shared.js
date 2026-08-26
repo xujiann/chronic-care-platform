@@ -2,7 +2,19 @@
 
 const { createResidentAuthorizationDecisionAdapter } = require("../../platform/governance/resident-authorization-decision-adapter");
 const { COMMAND_ID: REGIONAL_SHARING_ACCESS_COMMAND_ID, createRegionalSharingAccessCommand, projectRegionalSharingAccessResponse, projectRegionalSharingReadResponse, sha256: regionalSharingSha256, withRegionalSharingPackageWriteLock } = require("../../platform/governance/regional-sharing-access-command");
+const {
+  DrugConsumableCommandError,
+  executeDrugConsumableCommand,
+  projectDrugConsumableRecord,
+  withDrugConsumableWriteLock
+} = require("../shared/drug-consumable-command");
 const { protectSharedRouteSegments } = require("../shared/route-policy");
+
+const DRUG_CONSUMABLE_ROUTE_ACTIONS = Object.freeze({
+  review: Object.freeze({ command: "review", audit: "drug-consumable-review" }),
+  remediation: Object.freeze({ command: "remediation", audit: "drug-consumable-remediation" }),
+  insuranceSync: Object.freeze({ command: "insurance-sync", audit: "drug-consumable-insurance-sync" })
+});
 
 function createRouteSegments(runtime, options = {}) {
   const { BloodClinicalProduction, EmergencyModuleGate, SERVICE_ORDER_SOURCE_COLLECTIONS, T10SpecialtyModuleGovernance, appendDataAccessLog, appendSecurityEvent, applyPilotInterfaceReviewAction, authorizationState, buildAuthorizationLifecycle, buildConsortiumPerformanceReport, buildDataGovernanceOverview, buildDataQualityIssues, buildDataQualityScorecard, buildDrugConsumableSupervision, buildDrugTraceabilityEvidenceSubmission, buildMasterDataDirectory, buildMobileExperience, buildMultiPracticeRegistry, buildObservabilityAlertCenter, buildPilotAcceptanceCenter, buildPriorityApplicationTemplates, buildServiceAcceptanceSummary, buildServiceOrderSummary, buildSpecialtyCutoverPack, buildT10PlatformBlockedReadiness, calculateCreditEvaluations, canAccessResident, canAccessServiceOrder, canReadT10InstitutionModules, collectJson, dispatchAlert, normalizeServiceOrders, normalizeState, prependAuditTrailEntry, randomUUID, readDatabase, redactSensitiveResponse, regionalSharingReadModel, requireApiRole, resealAuditTrail, scopeStateForUser, sealAuditTrail, seedAccessibilityChecklist, seedMobileExperienceSettings, sendJson, sendT10SpecialtyModuleError, trustedT10Institution, updateDrugConsumableSupervision, upsertAlertDeliveryIncident, validateAlert, writeDatabase } = runtime;
@@ -24,6 +36,43 @@ function createRouteSegments(runtime, options = {}) {
     productionCutoverAuthorized: options.regionalProductionGate?.productionCutoverAuthorized,
     storageEngine: options.regionalProductionGate?.storageEngine
   });
+  const runDrugConsumableCommand = async ({ req, res, user, recordId, action, idempotencyKey }) => {
+    try {
+      const payload = await collectJson(req);
+      const result = await withDrugConsumableWriteLock(recordId, async () => {
+        const data = structuredClone(readDatabase());
+        const executed = executeDrugConsumableCommand({
+          state: data,
+          recordId,
+          action,
+          input: payload,
+          user,
+          headerKey: idempotencyKey,
+          canAccessResident,
+          prependAuditTrailEntry,
+          randomUUID
+        });
+        if (!executed.replayed) writeDatabase(data);
+        return executed;
+      });
+      sendJson(res, 200, { ...result.response, idempotentReplay: result.replayed });
+    } catch (error) {
+      if (error instanceof DrugConsumableCommandError) {
+        const errorName = error.status === 404 ? "Not Found" : error.status === 403 ? "Forbidden" : error.status === 409 ? "Conflict" : "Bad Request";
+        sendJson(res, error.status, { error: errorName, code: error.code, message: error.message });
+        return;
+      }
+      if (error instanceof SyntaxError) {
+        sendJson(res, 400, { error: "Bad Request", code: "DRUG_CONSUMABLE_BODY_INVALID", message: "Drug-consumable command body is invalid" });
+        return;
+      }
+      if (error?.code === "SQLITE_OPTIMISTIC_CONFLICT") {
+        sendJson(res, 409, { error: "Conflict", code: "DRUG_CONSUMABLE_VERSION_CONFLICT", message: "Drug-consumable record version changed; retry with a fresh snapshot" });
+        return;
+      }
+      sendJson(res, 500, { error: "Internal Server Error", code: "DRUG_CONSUMABLE_STORAGE_FAILED", message: "Drug-consumable command could not be persisted" });
+    }
+  };
   const segments = [
     {
       id: "shared-01",
@@ -429,7 +478,9 @@ function createRouteSegments(runtime, options = {}) {
     if (req.method === "GET" && url.pathname === "/api/drug-consumable-supervision") {
         const user = requireApiRole(req, res, ["commission", "insurance", "institution"], "/api/drug-consumable-supervision");
         if (!user) return true;
-        sendJson(res, 200, redactSensitiveResponse(buildDrugConsumableSupervision(scopeStateForUser(readDatabase(), user)), user));
+        const data = scopeStateForUser(readDatabase(), user);
+        data.drugConsumableSupervisions = (Array.isArray(data.drugConsumableSupervisions) ? data.drugConsumableSupervisions : []).map(projectDrugConsumableRecord);
+        sendJson(res, 200, redactSensitiveResponse(buildDrugConsumableSupervision(data), user));
         return true;
       }
 
@@ -437,14 +488,8 @@ function createRouteSegments(runtime, options = {}) {
         const user = requireApiRole(req, res, ["commission", "insurance"], "/api/drug-consumable-supervision/:id/review");
         if (!user) return true;
         const id = decodeURIComponent(url.pathname.replace("/api/drug-consumable-supervision/", "").replace("/review", ""));
-        const payload = await collectJson(req);
-        const result = updateDrugConsumableSupervision(readDatabase(), id, {
-          reviewStatus: String(payload.reviewStatus || payload.status || "reviewed"),
-          insuranceStatus: String(payload.insuranceStatus || "coordinating"),
-          status: String(payload.status || "in-review"),
-          nextAction: String(payload.nextAction || payload.note || "Continue insurance and institution coordination.")
-        }, user, "drug-consumable-review");
-        sendJson(res, result.status, result.body);
+        const idempotencyKey = req.headers?.["idempotency-key"];
+        await runDrugConsumableCommand({ req, res, user, recordId: id, action: DRUG_CONSUMABLE_ROUTE_ACTIONS.review.command, idempotencyKey });
         return true;
       }
 
@@ -452,14 +497,8 @@ function createRouteSegments(runtime, options = {}) {
         const user = requireApiRole(req, res, ["commission", "institution"], "/api/drug-consumable-supervision/:id/remediation");
         if (!user) return true;
         const id = decodeURIComponent(url.pathname.replace("/api/drug-consumable-supervision/", "").replace("/remediation", ""));
-        const payload = await collectJson(req);
-        const result = updateDrugConsumableSupervision(readDatabase(), id, {
-          remediationStatus: String(payload.remediationStatus || payload.status || "submitted"),
-          status: String(payload.status || "remediation-submitted"),
-          evidence: String(payload.evidence || ""),
-          nextAction: String(payload.nextAction || payload.note || "Regulator reviews remediation evidence.")
-        }, user, "drug-consumable-remediation");
-        sendJson(res, result.status, result.body);
+        const idempotencyKey = req.headers?.["idempotency-key"];
+        await runDrugConsumableCommand({ req, res, user, recordId: id, action: DRUG_CONSUMABLE_ROUTE_ACTIONS.remediation.command, idempotencyKey });
         return true;
       }
 
@@ -467,14 +506,8 @@ function createRouteSegments(runtime, options = {}) {
         const user = requireApiRole(req, res, ["commission", "insurance"], "/api/drug-consumable-supervision/:id/insurance-sync");
         if (!user) return true;
         const id = decodeURIComponent(url.pathname.replace("/api/drug-consumable-supervision/", "").replace("/insurance-sync", ""));
-        const payload = await collectJson(req);
-        const result = updateDrugConsumableSupervision(readDatabase(), id, {
-          insuranceStatus: String(payload.insuranceStatus || "synced"),
-          settlementBatch: String(payload.settlementBatch || "demo-batch"),
-          status: String(payload.status || "insurance-synced"),
-          nextAction: String(payload.nextAction || payload.note || "Archive settlement coordination evidence.")
-        }, user, "drug-consumable-insurance-sync");
-        sendJson(res, result.status, result.body);
+        const idempotencyKey = req.headers?.["idempotency-key"];
+        await runDrugConsumableCommand({ req, res, user, recordId: id, action: DRUG_CONSUMABLE_ROUTE_ACTIONS.insuranceSync.command, idempotencyKey });
         return true;
       }
 

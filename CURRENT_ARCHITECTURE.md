@@ -1,5 +1,13 @@
 # CURRENT ARCHITECTURE — 主线现状地图
 
+## 2026-08-26 T09 写接口行为增量
+
+- 药械监管的 `review`、`remediation`、`insurance-sync` 三个兼容写入口，以及科研数据集的 `approval`、`evidence`、`sandbox-access`、`compliant-exports`、`outcomes` 五个入口，已收敛到两个 T09 command/service 边界。
+- 两个边界均在身份/角色/机构与资源范围校验后处理 actor-scoped `Idempotency-Key`，同键同载荷回放不写入，同键异载荷返回稳定 409；`expectedVersion` 显式请求执行聚合 CAS，旧调用未传版本时保留兼容模式。
+- 路由按聚合串行并在锁内重读；业务状态、内部 receipt 与既有审计集合只调用一次持久化端口。持久层失败不会回退或二次写。该进程锁不构成跨实例 exactly-once。
+- 科研审批要求伦理与数据使用证据、最小必要和禁止再识别，并拒绝申请人自批；机构提交的证据固定为 `submitted`，合规导出仍需后续独立审批/发布。药械监管继续区分机构整改与医保同步职责。
+- 仓库没有为这八个入口虚构外部 outbox；真实 PostgreSQL、多实例、外部系统和现场证据仍未闭合，全部保持 `productionReady=false`、生产 `NO-GO`。机器证据注册由 T00 在集成边界统一完成。
+
 > 实施分支 AS-IS 快照：历史采样基于 `main@a15d10dc67a7fd89540d3073ece34b5d8c7b942e`；
 > 当前对账基线为 `origin/main@fbe815dcb17ddb5a87874e6c6db16aaf8a4d5d70` 加
 > `process/t00-postgres-transition-ops-20260824`
