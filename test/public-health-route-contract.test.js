@@ -12,6 +12,7 @@ const routeSource = fs.readFileSync(
 
 test("public health highlight contracts have exactly one reachable implementation", () => {
   const exactRoutes = [
+    ["GET", "/api/public-health/system"],
     ["GET", "/api/public-health/highlights"],
     ["POST", "/api/public-health/highlights/signals"]
   ];

@@ -265,28 +265,61 @@ function createRouteSegment(runtime) {
     if (req.method === "GET" && url.pathname === "/api/public-health/system") {
         const user = requireApiRole(req, res, ["commission"], "/api/public-health/system");
         if (!user) return true;
-        const data = readDatabase();
-        const system = buildPublicHealthSystem({ data });
-        const highlights = buildPublicHealthHighlights({ data });
-        appendSecurityEvent({
-          actor: user.name,
-          role: user.role,
-          action: "public-health-system",
-          target: "/api/public-health/system",
-          result: "allowed",
-          detail: "Public health standard matrix, institution scopes, events, and exchange tasks read."
-        });
-        sendJson(res, 200, {
-          ...system,
-          highlights,
-          summary: {
-            ...system.summary,
-            highlightCapabilities: highlights.summary.capabilities,
-            highlightActiveAlerts: highlights.summary.activeAlerts,
-            highlightOpenTasks: highlights.summary.openTasks,
-            highlightEvidenceScore: highlights.summary.evidenceScore
+        if (!publicHealthHighlightReadScopeDecision(user)) {
+          try {
+            appendSecurityEvent({
+              actor: user.name,
+              role: user.role,
+              action: "public-health-system",
+              target: "/api/public-health/system",
+              result: "denied",
+              detail: "PUBLIC_HEALTH_SYSTEM_SCOPE_FORBIDDEN"
+            });
+          } catch {
+            sendJson(res, 500, {
+              error: "Service Unavailable",
+              code: "PUBLIC_HEALTH_SYSTEM_AUDIT_FAILED",
+              message: "public health system access audit failed"
+            });
+            return true;
           }
-        });
+          sendJson(res, 403, {
+            error: "Forbidden",
+            code: "PUBLIC_HEALTH_SYSTEM_SCOPE_FORBIDDEN",
+            message: "public health system is outside the current organization scope"
+          });
+          return true;
+        }
+        try {
+          const data = readDatabase();
+          const system = buildPublicHealthSystem({ data });
+          const highlights = buildPublicHealthHighlightsProjection({ data, user, buildPublicHealthHighlights });
+          appendSecurityEvent({
+            actor: user.name,
+            role: user.role,
+            action: "public-health-system",
+            target: "/api/public-health/system",
+            result: "allowed",
+            detail: "Public health standard matrix, institution scopes, events, and exchange tasks read."
+          });
+          sendJson(res, 200, {
+            ...system,
+            highlights,
+            summary: {
+              ...system.summary,
+              highlightCapabilities: highlights.summary.capabilities,
+              highlightActiveAlerts: highlights.summary.activeAlerts,
+              highlightOpenTasks: highlights.summary.openTasks,
+              highlightEvidenceScore: highlights.summary.evidenceScore
+            }
+          });
+        } catch {
+          sendJson(res, 500, {
+            error: "Service Unavailable",
+            code: "PUBLIC_HEALTH_SYSTEM_READ_FAILED",
+            message: "public health system read failed"
+          });
+        }
         return true;
       }
 
