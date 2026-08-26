@@ -5,7 +5,7 @@
     "POST /api/regional-data-sharing/access-reviews": { "owner": "T02", "roles": ["commission", "institution"], "dataScope": "institution", "purpose": "execute-regional-sharing-access-review" },
     "GET /api/audit/verify": { "owner": "T01", "roles": ["commission"], "dataScope": "platform", "purpose": "verify-audit-integrity" },
     "GET /api/audit/export": { "owner": "T01", "roles": ["commission"], "dataScope": "platform", "purpose": "export-minimized-audit-evidence" },
-    "GET /api/public-health/highlights": { "owner": "T03", "roles": ["commission"], "dataScope": "platform", "purpose": "read-public-health-command-overview" },
+    "GET /api/public-health/highlights": { "owner": "T03", "roles": ["commission"], "dataScope": "city and health-admin platform; district own organization or explicit public-health hospital allowlist", "purpose": "read-public-health-command-overview" },
     "POST /api/public-health/highlights/signals": { "owner": "T03", "roles": ["commission"], "dataScope": "institution", "purpose": "ingest-public-health-signal" },
     "POST /api/public-health/highlights/alerts/:id/actions": { "owner": "T03", "roles": ["commission"], "dataScope": "platform", "purpose": "dispatch-public-health-alert" },
     "POST /api/public-health/highlights/command-tasks/:id/actions": { "owner": "T03", "roles": ["commission"], "dataScope": "institution", "purpose": "operate-public-health-command-task" },

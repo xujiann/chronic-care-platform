@@ -38,6 +38,21 @@ test("modular API authorization matrix covers owners roles scopes purposes and h
   assert.equal(regionalAccess.owner, "T02");
   assert.equal(regionalAccess.highRisk, true);
   assert.deepEqual(regionalAccess.roles, ["commission", "institution"]);
+  const publicHealthHighlightRoutes = matrix.routes.filter((route) => route.key === "GET /api/public-health/highlights");
+  assert.equal(publicHealthHighlightRoutes.length, 1);
+  const [publicHealthHighlights] = publicHealthHighlightRoutes;
+  assert.equal(publicHealthHighlights.owner, "T03");
+  assert.equal(publicHealthHighlights.domain, "public-health");
+  assert.equal(publicHealthHighlights.identity.required, true);
+  assert.equal(publicHealthHighlights.identity.mode, "required");
+  assert.equal(publicHealthHighlights.identity.mechanism, "bearer-or-cookie-session");
+  assert.equal(publicHealthHighlights.highRisk, true);
+  assert.deepEqual(publicHealthHighlights.roles, ["commission"]);
+  assert.equal(
+    publicHealthHighlights.dataScope,
+    "city and health-admin platform; district own organization or explicit public-health hospital allowlist"
+  );
+  assert.equal(publicHealthHighlights.purpose, "read-public-health-command-overview");
 });
 
 test("custom external authentication remains fail closed when its model or principal drifts", () => {
