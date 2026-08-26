@@ -47,7 +47,7 @@
     "regional:pilot:test": "node --test test/regional-pilot-program.test.js",
     "routes:check": "node scripts/check-http-modules.js",
     "routes:test": "node --test test/http-route-modularization.test.js test/http-runtime-contexts.test.js test/cross-domain-foundation-contract.test.js",
-    "operations-command:behavior-test": "node --test test/operations-command-handoff.test.js",
+    "operations-command:behavior-test": "node --test test/operations-command-handoff.test.js test/operations-quality-api-behavior.test.js",
     "api:authorization-matrix": "node scripts/api-authorization-matrix.js --check",
     "api:authentication-evidence": "node scripts/api-authentication-evidence.js --check && node --test test/api-authentication-evidence.test.js",
     "api:production-catalog": "node scripts/production-api-catalog.js --check",
