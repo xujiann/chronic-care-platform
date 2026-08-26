@@ -1,5 +1,19 @@
 "use strict";
 
+const {
+  appendApiCommandReceipt,
+  apiCommandHttpError,
+  assertApiCommandExpectedVersion,
+  commandBehaviorError,
+  createApiCommandIdentity,
+  findApiCommandReceipt,
+  projectApiCommandRecord,
+  requireGovernanceOrganization,
+  withApiCommandResourceLock
+} = require("../../api-command-behavior");
+
+const OPERATIONS_COMMAND_ERROR_PREFIX = "OPERATIONS_COMMAND";
+
 function createRouteSegment(runtime) {
   const { appendOperationsIntegrationAudit, applyDispatchStatusUpdate, assertSignedOperationsPayload, buildHospitalOperationsDashboard, buildOperationsInterfaceMappingEvidence, buildOperationsMobileDuty, buildOperationsSiteJointPatrol, buildPerformanceMonitoringEvidence, collectJson, createOperationsMobileDutyReminder, integrationPayloadAllowedForInstitution, normalizeDispatchAction, normalizeHandoverSignoff, normalizeOperationSnapshot, normalizeReconciliationBatchItem, randomUUID, readDatabase, requireApiRole, sendJson, writeDatabase } = runtime;
   return {
@@ -588,30 +602,70 @@ function createRouteSegment(runtime) {
       if (req.method === "POST" && url.pathname === "/api/operations/dispatch") {
         const user = requireApiRole(req, res, ["commission"], "/api/operations/dispatch");
         if (!user) return true;
-        const payload = await collectJson(req);
-        const data = readDatabase();
-        const request = normalizeDispatchAction(payload, user);
-        const existingIndex = (data.resourceDispatchRequests || []).findIndex((item) => item.id === request.id);
-        if (existingIndex >= 0) {
-          data.resourceDispatchRequests[existingIndex] = { ...data.resourceDispatchRequests[existingIndex], ...request };
-        } else {
-          data.resourceDispatchRequests = [request, ...(data.resourceDispatchRequests || [])].slice(0, 100);
+        try {
+          requireGovernanceOrganization(user, OPERATIONS_COMMAND_ERROR_PREFIX);
+          const payload = await collectJson(req);
+          const command = createApiCommandIdentity({
+            req,
+            user,
+            payload,
+            route: "/api/operations/dispatch",
+            resourceId: payload.id || "new-dispatch",
+            errorPrefix: OPERATIONS_COMMAND_ERROR_PREFIX
+          });
+          const result = await withApiCommandResourceLock(
+            `operations-dispatch:${String(payload.id || command.commandKeyHash)}`,
+            () => {
+              const data = readDatabase();
+              const current = Array.isArray(data.resourceDispatchRequests) ? data.resourceDispatchRequests : [];
+              const replay = findApiCommandReceipt(current, command);
+              if (replay) return { status: replay.statusCode, response: structuredClone(replay.response) };
+              let request;
+              try {
+                request = normalizeDispatchAction(payload, user);
+              } catch (error) {
+                throw commandBehaviorError(
+                  `${OPERATIONS_COMMAND_ERROR_PREFIX}_INVALID`,
+                  String(error?.message || "invalid dispatch payload"),
+                  400
+                );
+              }
+              const existingIndex = current.findIndex((item) => item.id === request.id);
+              const existing = existingIndex >= 0 ? current[existingIndex] : null;
+              const version = assertApiCommandExpectedVersion(existing, command) + 1;
+              const response = projectApiCommandRecord({ ...request, version });
+              const stored = appendApiCommandReceipt(
+                { ...(existing || {}), ...request, version },
+                command,
+                response,
+                existingIndex >= 0 ? 200 : 201,
+                request.updatedAt || new Date().toISOString()
+              );
+              if (existingIndex >= 0) current[existingIndex] = stored;
+              else current.unshift(stored);
+              data.resourceDispatchRequests = current.slice(0, 100);
+              data.securityEvents = [
+                {
+                  id: randomUUID(),
+                  at: new Date().toLocaleString("zh-CN", { hour12: false }),
+                  actor: user.name,
+                  role: user.role,
+                  action: "operations-dispatch",
+                  target: request.id,
+                  result: "allowed",
+                  detail: `${request.resourceType}:${request.quantity}:${request.status}`
+                },
+                ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+              ].slice(0, 120);
+              writeDatabase(data);
+              return { status: existingIndex >= 0 ? 200 : 201, response };
+            }
+          );
+          sendJson(res, result.status, result.response);
+        } catch (error) {
+          const response = apiCommandHttpError(error, OPERATIONS_COMMAND_ERROR_PREFIX);
+          sendJson(res, response.status, response.body);
         }
-        data.securityEvents = [
-          {
-            id: randomUUID(),
-            at: new Date().toLocaleString("zh-CN", { hour12: false }),
-            actor: user.name,
-            role: user.role,
-            action: "operations-dispatch",
-            target: request.id,
-            result: "allowed",
-            detail: `${request.resourceType}:${request.quantity}:${request.status}`
-          },
-          ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
-        ].slice(0, 120);
-        writeDatabase(data);
-        sendJson(res, existingIndex >= 0 ? 200 : 201, request);
         return true;
       }
 
@@ -651,44 +705,67 @@ function createRouteSegment(runtime) {
         const user = requireApiRole(req, res, ["commission"], "/api/operations/reconciliation/:id/review");
         if (!user) return true;
         const id = decodeURIComponent(reconciliationReviewMatch[1]);
-        const payload = await collectJson(req);
-        const data = readDatabase();
-        const index = (data.statisticsReconciliationReviews || []).findIndex((item) => item.id === id);
-        if (index < 0) {
-          sendJson(res, 404, { error: "Not Found", message: "reconciliation review not found" });
-          return true;
+        try {
+          requireGovernanceOrganization(user, OPERATIONS_COMMAND_ERROR_PREFIX);
+          const payload = await collectJson(req);
+          const command = createApiCommandIdentity({
+            req,
+            user,
+            payload,
+            route: "/api/operations/reconciliation/:id/review",
+            resourceId: id,
+            errorPrefix: OPERATIONS_COMMAND_ERROR_PREFIX
+          });
+          const result = await withApiCommandResourceLock(`operations-reconciliation:${id}`, () => {
+            const data = readDatabase();
+            const rows = Array.isArray(data.statisticsReconciliationReviews) ? data.statisticsReconciliationReviews : [];
+            const index = rows.findIndex((item) => item.id === id);
+            if (index < 0) return { status: 404, response: { error: "Not Found", message: "reconciliation review not found" } };
+            const replay = findApiCommandReceipt([rows[index]], command);
+            if (replay) return { status: replay.statusCode, response: structuredClone(replay.response) };
+            const version = assertApiCommandExpectedVersion(rows[index], command) + 1;
+            const now = new Date().toISOString();
+            const updated = {
+              ...rows[index],
+              version,
+              status: String(payload.status || "approved").trim(),
+              reviewedBy: user.username || user.role,
+              reviewedAt: now,
+              reviewNote: String(payload.reviewNote || payload.note || rows[index].reviewNote || "").trim(),
+              auditTrail: [
+                ...(Array.isArray(rows[index].auditTrail) ? rows[index].auditTrail : []),
+                {
+                  at: now,
+                  actor: user.username || user.role,
+                  action: "review-status-change",
+                  note: String(payload.reviewNote || payload.note || payload.status || "reviewed").trim()
+                }
+              ]
+            };
+            const response = projectApiCommandRecord(updated);
+            rows[index] = appendApiCommandReceipt(updated, command, response, 200, now);
+            data.statisticsReconciliationReviews = rows;
+            data.securityEvents = [
+              {
+                id: randomUUID(),
+                at: new Date().toLocaleString("zh-CN", { hour12: false }),
+                actor: user.name,
+                role: user.role,
+                action: "statistics-reconciliation-review",
+                target: id,
+                result: "allowed",
+                detail: updated.status
+              },
+              ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+            ].slice(0, 120);
+            writeDatabase(data);
+            return { status: 200, response };
+          });
+          sendJson(res, result.status, result.response);
+        } catch (error) {
+          const response = apiCommandHttpError(error, OPERATIONS_COMMAND_ERROR_PREFIX);
+          sendJson(res, response.status, response.body);
         }
-        data.statisticsReconciliationReviews[index] = {
-          ...data.statisticsReconciliationReviews[index],
-          status: String(payload.status || "approved").trim(),
-          reviewedBy: user.username || user.role,
-          reviewedAt: new Date().toISOString(),
-          reviewNote: String(payload.reviewNote || payload.note || data.statisticsReconciliationReviews[index].reviewNote || "").trim(),
-          auditTrail: [
-            ...(Array.isArray(data.statisticsReconciliationReviews[index].auditTrail) ? data.statisticsReconciliationReviews[index].auditTrail : []),
-            {
-              at: new Date().toISOString(),
-              actor: user.username || user.role,
-              action: "review-status-change",
-              note: String(payload.reviewNote || payload.note || payload.status || "reviewed").trim()
-            }
-          ]
-        };
-        data.securityEvents = [
-          {
-            id: randomUUID(),
-            at: new Date().toLocaleString("zh-CN", { hour12: false }),
-            actor: user.name,
-            role: user.role,
-            action: "statistics-reconciliation-review",
-            target: id,
-            result: "allowed",
-            detail: data.statisticsReconciliationReviews[index].status
-          },
-          ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
-        ].slice(0, 120);
-        writeDatabase(data);
-        sendJson(res, 200, data.statisticsReconciliationReviews[index]);
         return true;
       }
         return false;

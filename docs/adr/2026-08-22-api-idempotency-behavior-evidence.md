@@ -99,3 +99,13 @@ callback 持久化守卫要求由 HMAC 验签器生成且绑定目标 gateway ev
 命令 key 按 `Idempotency-Key` header、body `idempotencyKey`、body `id`、canonical payload digest 依次选择，并在 actor role/orgType/orgCode 命名空间后只保存 SHA-256；请求载荷绑定独立 digest。相同 key 在当前进程串行并在锁内重读，首次创建返回 201/`idempotent=false`，精确重放返回 200/`true` 且不再次写入，同键异载荷和 ID 占用返回稳定 409。新 signal 继续进入既有 200 条 `publicHealthSignals` 上限，并与链式 `securityEvents` 在一次 `writeDatabase` 中提交；SQLite collection-version 冲突映射为脱敏 409，普通失败为脱敏 500且不触发 fallback audit write。
 
 该扩展不新增集合、DDL、migration、dependency、outbox、worker、PG adapter 或第二套状态机。200 条 bounded ledger 会在容量滚动后失去旧命令证明，进程尾只覆盖当前 Node 实例，SQLite CAS 也不构成跨实例 exactly-once。`publicHealthSignals` data owner、PostgreSQL 多实例、长期审计/归档、真实来源系统与现场验收仍未关闭；合同继续 `productionReady=false`、`externalEvidenceRequired=true`、`distributedExactlyOnceClaimed=false`，593 项全部 `NO-GO`。
+
+## 2026-08-26 首发 operations / quality-safety 五接口扩展
+
+在本 ADR 已接受的逐 endpoint 机制内，注册表由 13 份合同扩展为 18 份：新增 T02 的资源调度创建/更新、统计对账复核，以及 T06 的质量问题派单、整改反馈、整改复核五个完整 endpoint。五条路由均保持 session/RBAC 先行；commission 仅允许 city/health-admin 组织，整改反馈还按 owner role 与机构代码、机构名称或既有医院运行目录别名重新核验资源范围，精确重放前不跳过授权。
+
+新合同优先使用 `Idempotency-Key`，兼容 body key；未携带显式 key 的遗留调用按包含资源 ID 的 canonical payload digest 派生稳定键，因此同一旧 payload 可安全重放，而同一资源的不同旧 payload 仍保持原更新语义。显式 key 必须提供非负 `expectedVersion`，遗留调用则在锁内读取当前版本。命令键只按 actor 组织范围保存 SHA-256，原始 key 不落库；每个资源最多保留 50 条内部 `api-command-receipt.v1`，包含请求摘要、原始成功状态和公开响应快照。相同 key/载荷在资源锁内重读后精确返回该快照且零写，同键异载荷稳定 409，版本不匹配及 SQLite collection CAS 冲突稳定 409。
+
+首次成功把业务记录、内部回执及既有 `securityEvents` 审计通过一次 `writeDatabase` 提交；质量派单/复核同时更新既有 `qualitySafetyEvents`，仍在同一全状态事务边界内。审计组装或持久化失败不执行补写，也没有真实下游消息语义，因此不新增或虚构 outbox。内部回执作为既有 JSON collection record 的兼容元数据惰性写入，不新增集合、SQLite/PostgreSQL 表、DDL 或 migration；公开响应通过投影移除内部回执，原有响应字段保持兼容并加法暴露 `version`。
+
+进程资源锁只覆盖当前 Node 实例，50 条回执有界且 JSON 兼容路径不具备多实例原子性；SQLite collection CAS 也不等于跨实例 exactly-once。真实 PostgreSQL 主存储、机构目录主数据、外部系统与现场回执仍未验证。五项及 593 个目录条目继续 `productionReady=false`、`externalEvidenceRequired=true`、`distributedExactlyOnceClaimed=false` / `NO-GO`；首发范围 API review 缺口仅从 17 降为 12，不能据此放行生产。
