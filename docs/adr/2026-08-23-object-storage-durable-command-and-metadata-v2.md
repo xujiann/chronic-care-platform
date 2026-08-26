@@ -1,12 +1,13 @@
 # ADR：对象存储采用结构化元数据与耐久异步命令轨道 v2
 
-- 状态：Proposed
+- 状态：Accepted
 - 日期：2026-08-23
+- 接受日期：2026-08-26
 - 决策 Owner：T00（架构/数据库/发布治理）
-- 建议 Data Owner：T08 integration（仅建议，仍需人类确认）
-- 建议 Technical Owner：T00（共享存储、worker、readiness 与部署合同）
+- Data Owner：T08 integration（已确认）
+- Technical Owner：T00（共享存储、worker、readiness 与部署合同，已确认）
 - 影响范围：安全附件元数据、对象存储命令、公开附件 API、SQLite v17 候选、worker、对账与生产门禁
-- 非目标：本 ADR 不实施 migration、runtime、API、外部网关、生产切换或 `domain-data-ownership` 变更
+- 非目标：本 ADR 不声明外部网关、KMS/WORM、恶意文件扫描、备份恢复或现场验收已经完成，也不授权生产切换
 
 ## Problem
 
@@ -56,7 +57,7 @@ outbox、租约 fencing、有界重试、死信/人工 replay、回执摘要、�
 方案 1 为低但不关闭生产缺口；方案 2 为中且收益有限；方案 3 为中高，需要独立 v17 migration、全量
 回填和核对、v1/v2 客户端兼容期、worker/systemd/readiness、容量和恢复演练；方案 4 为极高。
 
-若方案 3 被 Accepted，建议按以下不可跨越阶段实施：
+方案 3 已被接受，按以下不可跨越阶段实施：
 
 1. 人类确认 `secureAttachments` 的 data owner 和 v1/v2 兼容策略；更新机器 owner 合同；
 2. 追加单主题 SQLite v17，并同步 PostgreSQL 候选 DDL。候选表为 `secure_attachment_records`、
@@ -94,16 +95,16 @@ outbox、租约 fencing、有界重试、死信/人工 replay、回执摘要、�
 
 ## Recommendation
 
-建议选择方案 3，但保持 `Proposed`，当前不授权实现。建议由 T08 integration 作为附件元数据与命令业务
-语义的 data owner，由 T00 作为共享结构化存储、worker、分页基础设施、对账和 readiness/deployment 的
-technical owner；这两个角色必须通过版本化端口连接，T00 不取得业务数据所有权。
+选择方案 3。由 T08 integration 作为附件元数据与命令业务语义的 data owner，由 T00 作为共享结构化
+存储、worker、分页基础设施、对账和 readiness/deployment 的 technical owner；这两个角色通过版本化
+端口连接，T00 不取得业务数据所有权。
 
-建议兼容路径为并行发布 v2 异步 API，v1 在有界窗口内保持现有形状且生产默认不扩容；是否保留同步
-v1、何时弃用及各调用方迁移顺序仍需人类批准。机器决策/行动台账
-`config/object-storage-architecture-decision.json` 是本提案的唯一治理投影：在 ADR 未 Accepted、data owner
-或兼容策略未确认时，v17、runtime/API 实施及 production promotion 标志必须全部为 `false`，所有实现
-行动保持 `blocked-until-accepted`。`npm run object-storage:architecture-governance:verify` 在 CI 中失败关闭。
+兼容路径为并行发布 v2 异步 API，v1 在有界窗口内保持现有形状且生产默认不扩容；调用方必须显式迁移
+到 `202 + commandId + statusUrl` 合同。机器决策/行动台账
+`config/object-storage-architecture-decision.json` 是本决策的唯一治理投影。v17、runtime/API 实施已获授权，
+production promotion 仍保持 `false`。`npm run object-storage:architecture-governance:verify` 在 CI 中失败关闭。
 
-Acceptance 之后也不得一次性实施全部阶段；每个 migration/runtime/API/部署切片需要独立计划、测试、
-回滚和 review。真实端点、凭据、桶/KMS/WORM/扫描、provider 签名能力、容量、备份恢复与现场验收始终
-属于外部边界，仓库不得伪造生产 GO。
+仓库内已实现 v17 结构化迁移/回填/遗留写冻结、事务命令、v2 异步 API、围栏 worker、有界退避与死信、
+人工 replay、keyset 分页、持久差异 case/action、部署和 readiness 合同。真实端点、凭据、桶/KMS/WORM/
+扫描、provider 签名状态能力、容量、备份恢复与现场验收始终属于外部边界，仓库不得伪造生产 GO；这些
+证据完成前状态保持 `Accepted / NO-GO`。

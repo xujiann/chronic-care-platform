@@ -88,11 +88,11 @@ function buildGovernanceReport(input) {
     "runtimeImplementationAuthorized",
     "apiImplementationAuthorized"
   ].every((flag) => authorization[flag] === true);
-  const proposedActionStatesValid = actions.every((item) => {
-    if (item?.id?.startsWith("human-") || item?.id === "accept-architecture-decision") {
-      return item.status === "blocked-human-decision";
+  const acceptedActionStatesValid = actions.every((item) => {
+    if (["persistent-provider-reconciliation", "readiness-deployment-and-operations"].includes(item?.id)) {
+      return /^repository-complete-.*-blocked$/.test(String(item?.status || ""));
     }
-    return item?.status === "blocked-until-accepted";
+    return item?.status === "completed";
   });
   const sectionChecks = REQUIRED_ADR_SECTIONS.map((section) => (
     new RegExp(`^## ${section.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "m").test(String(adrSource || ""))
@@ -106,13 +106,13 @@ function buildGovernanceReport(input) {
     check("objectStorageDecision:adrSections", sectionChecks.every(Boolean), `${sectionChecks.filter(Boolean).length}/${REQUIRED_ADR_SECTIONS.length} required sections`),
     check("objectStorageDecision:knownStatus", proposalMode || acceptedMode, decision.status || "missing status"),
     check("objectStorageDecision:defaultNoGo", decision.defaultDecision === "NO-GO", decision.defaultDecision || "missing default decision"),
-    check("objectStorageDecision:recommendationOnlyOwner", decision.recommendedOwnership?.dataOwner?.process === "T08"
+    check("objectStorageDecision:confirmedOwner", decision.recommendedOwnership?.dataOwner?.process === "T08"
       && decision.recommendedOwnership?.dataOwner?.domain === "integration"
-      && decision.recommendedOwnership?.dataOwner?.status === "recommendation-only"
+      && decision.recommendedOwnership?.dataOwner?.status === "confirmed"
       && decision.recommendedOwnership?.technicalOwner?.process === "T00"
-      && decision.recommendedOwnership?.technicalOwner?.status === "recommendation-only", "T08 data owner and T00 technical owner must remain recommendations until accepted"),
-    check("objectStorageDecision:recommendationOnlyCompatibility", decision.recommendedCompatibility?.strategy === "parallel-versioned-v2-async-api"
-      && decision.recommendedCompatibility?.status === "recommendation-only", "v1/v2 compatibility remains recommendation-only"),
+      && decision.recommendedOwnership?.technicalOwner?.status === "confirmed", "T08 data owner and T00 technical owner must remain confirmed"),
+    check("objectStorageDecision:approvedCompatibility", decision.recommendedCompatibility?.strategy === "parallel-versioned-v2-async-api"
+      && decision.recommendedCompatibility?.status === "approved", "parallel versioned v2 async compatibility must remain approved"),
     check("objectStorageDecision:humanDecisionCoverage", exactIds(humanDecisions, REQUIRED_HUMAN_DECISION_IDS), `${humanDecisions.length}/${REQUIRED_HUMAN_DECISION_IDS.length} human decisions tracked`),
     check("objectStorageDecision:actionCoverage", exactIds(actions, REQUIRED_ACTION_IDS), `${actions.length}/${REQUIRED_ACTION_IDS.length} actions tracked`),
     check("objectStorageDecision:actionShape", actions.every((item) => typeof item?.owner === "string"
@@ -122,14 +122,17 @@ function buildGovernanceReport(input) {
       && Array.isArray(item?.dependsOn)), "each action requires owner, dependencies and deliverable"),
     check("objectStorageDecision:actionDependencies", actions.every((item) => item.dependsOn?.every((dependency) => REQUIRED_ACTION_IDS.includes(dependency) && dependency !== item.id)), "all action dependencies must reference another registered action"),
     check("objectStorageDecision:authorizationShape", AUTHORIZATION_FLAGS.every((flag) => typeof authorization[flag] === "boolean"), "all authorization flags must be explicit booleans"),
-    check("objectStorageDecision:v17Reservation", decision.reservedSqliteMigrationVersion === 17 && sqliteHead === 16, `reserved=${decision.reservedSqliteMigrationVersion}; currentHead=${sqliteHead}`),
-    check("objectStorageDecision:ownerNotInferred", !ownership?.collections?.secureAttachments, "secureAttachments must remain unowned until human confirmation"),
-    check("objectStorageDecision:existingReadinessNoGo", !proposalMode || /productionReady:\s*false/.test(String(readinessSource || "")), "existing object storage readiness must remain explicitly NO-GO while the ADR is Proposed"),
-    check("objectStorageDecision:proposalActionsBlocked", !proposalMode || proposedActionStatesValid, proposalMode ? "all proposal actions must remain blocked" : "not in proposal mode"),
-    check("objectStorageDecision:proposalAuthorizationClosed", !proposalMode || AUTHORIZATION_FLAGS.every((flag) => authorization[flag] === false), enabledAuthorizations.length ? enabledAuthorizations.join(", ") : "all implementation and promotion flags are explicitly false"),
+    check("objectStorageDecision:v17Applied", decision.reservedSqliteMigrationVersion === 17 && sqliteHead === 17, `reserved=${decision.reservedSqliteMigrationVersion}; currentHead=${sqliteHead}`),
+    check("objectStorageDecision:confirmedDataOwnership", ownership?.collections?.secureAttachments?.owner === "integration"
+      && ownership?.collections?.secureAttachments?.classification === "restricted"
+      && ownership?.collections?.secureAttachments?.writeContract === "object-storage-durable-command-and-metadata.v2"
+      && ownership?.collections?.secureAttachments?.productionWriteAllowed === false, "secureAttachments ownership and production write gate must match the Accepted decision"),
+    check("objectStorageDecision:readinessNoGo", /status:\s*"durable-v2-repository-ready-external-evidence-pending",\s*\r?\n\s*productionReady:\s*false/.test(String(readinessSource || "")), "object storage readiness must remain explicitly NO-GO without external evidence"),
+    check("objectStorageDecision:acceptedActions", !acceptedMode || acceptedActionStatesValid, acceptedMode ? "repository actions complete; external evidence actions remain blocked" : "not in accepted mode"),
+    check("objectStorageDecision:acceptedAuthorization", !acceptedMode || (implementationFlagsEnabled && authorization.productionPromotionAllowed === false), enabledAuthorizations.join(", ")),
     check("objectStorageDecision:acceptanceRequiresHumans", !acceptedMode || unresolved.length === 0, unresolved.length ? unresolved.map((item) => item.id).join(", ") : "human decisions resolved"),
     check("objectStorageDecision:promotionRequiresImplementation", authorization.productionPromotionAllowed !== true
-      || (acceptedMode && unresolved.length === 0 && implementationFlagsEnabled), "production promotion requires Accepted status, resolved human decisions and all implementation authorizations")
+      || (acceptedMode && unresolved.length === 0 && implementationFlagsEnabled && actions.every((item) => item.status === "completed")), "production promotion requires Accepted status, resolved human decisions, implementation authorizations and all external-evidence actions complete")
   ];
 
   const structurallyValid = checks.every((item) => item.passed);

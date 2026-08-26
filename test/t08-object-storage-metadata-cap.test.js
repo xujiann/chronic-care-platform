@@ -29,7 +29,7 @@ function uploadPayload() {
   };
 }
 
-function createHarness(attachmentCount) {
+function createHarness(attachmentCount, options = {}) {
   let state = {
     residents: [],
     secureAttachments: Array.from({ length: attachmentCount }, (_, index) => attachment(index)),
@@ -63,6 +63,7 @@ function createHarness(attachmentCount) {
       };
     },
     randomUUID: () => "new-attachment",
+    objectStorageLegacyWritesAllowed: () => options.legacyWritesAllowed !== false,
     readDatabase: () => structuredClone(state),
     requireApiRole: () => ({ role: "commission", username: "health", name: "Platform Operator" }),
     sendJson: (_res, status, body) => {
@@ -89,6 +90,14 @@ function createHarness(attachmentCount) {
     metrics: () => ({ gatewayCalls, writes })
   };
 }
+
+test("SQLite v17 freezes v1 upload before the provider call", async () => {
+  const harness = createHarness(0, { legacyWritesAllowed: false });
+  const response = await harness.upload();
+  assert.equal(response.responseStatus, 410);
+  assert.equal(response.responseBody.code, "OBJECT_STORAGE_V1_WRITE_FROZEN");
+  assert.deepEqual(harness.metrics(), { gatewayCalls: 0, writes: 0 });
+});
 
 test("the 500th attachment is retained without deleting existing immutable metadata", async () => {
   const harness = createHarness(499);

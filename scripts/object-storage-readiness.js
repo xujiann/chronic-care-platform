@@ -25,23 +25,37 @@ function buildObjectStorageReadiness(options = {}) {
   const releaseSource = options.releaseSource ?? read("scripts/release-report.js");
   const deploySource = options.deploySource ?? read("scripts/deploy-check.js");
   const manifestSource = options.manifestSource ?? read("scripts/release-artifact-manifest.js");
+  const durableSource = options.durableSource ?? read("src/platform/storage/object-storage-durable.js");
+  const workerSource = options.workerSource ?? read("src/platform/operations/object-storage-command-worker.js");
+  const migrationSource = options.migrationSource ?? read("src/platform/storage/sqlite-migrations.js");
+  const deploymentSource = options.deploymentSource ?? read("scripts/production-deployment-package.js");
   const controls = [
-    { id: "metadata", markers: ["validateAttachmentMetadata", "checksumSha256", "classification", "retentionPolicy"] },
-    { id: "upload-intent", markers: ["createObjectUploadIntent", "upload-intents", "buildObjectKey"] },
-    { id: "integrity-scan", markers: ["finalizeObjectUpload", "checksum verification failed", "malware scan did not pass"] },
-    { id: "download-intent", markers: ["createObjectDownloadIntent", "downloadTtlSeconds", "download-intents"] },
-    { id: "lifecycle", markers: ["applyObjectLifecycle", "legal-hold", "release-hold", "immutable"] },
-    { id: "gateway-security", markers: ["HMAC-SHA256", "X-Signature", "OBJECT_STORAGE_SIGNING_SECRET", "must use HTTPS in production"] },
-    { id: "gateway-response-trust", markers: ["signGatewayResponse", "verifyGatewayResponse", "parseRfc3339Instant", "OBJECT_STORAGE_RECEIPT_SIGNING_SECRET", "object-storage-response-v1"] },
-    { id: "signed-url-boundary", markers: ["OBJECT_STORAGE_UPLOAD_URL_ALLOWED_ORIGINS", "OBJECT_STORAGE_DOWNLOAD_URL_ALLOWED_ORIGINS", "validateSignedIntentUrl", "OBJECT_STORAGE_INTENT_EXPIRY_INVALID"] },
-    { id: "explicit-receipts", markers: ["scanReceiptId", "receiptId", "OBJECT_STORAGE_COMPLETION_RECEIPT_INVALID", "OBJECT_STORAGE_LIFECYCLE_RECEIPT_INVALID", "OBJECT_STORAGE_OBJECT_VERSION_REQUIRED", "OBJECT_STORAGE_MALWARE_SCAN_NOT_CLEAN"] }
-  ].map((item) => ({ ...item, passed: item.markers.every((marker) => adapterSource.includes(marker)) }));
+    { id: "metadata", source: adapterSource, markers: ["validateAttachmentMetadata", "checksumSha256", "classification", "retentionPolicy"] },
+    { id: "upload-intent", source: adapterSource, markers: ["createObjectUploadIntent", "upload-intents", "buildObjectKey"] },
+    { id: "integrity-scan", source: adapterSource, markers: ["finalizeObjectUpload", "checksum verification failed", "malware scan did not pass"] },
+    { id: "download-intent", source: adapterSource, markers: ["createObjectDownloadIntent", "downloadTtlSeconds", "download-intents"] },
+    { id: "lifecycle", source: adapterSource, markers: ["applyObjectLifecycle", "legal-hold", "release-hold", "immutable"] },
+    { id: "gateway-security", source: adapterSource, markers: ["HMAC-SHA256", "X-Signature", "OBJECT_STORAGE_SIGNING_SECRET", "must use HTTPS in production"] },
+    { id: "gateway-response-trust", source: adapterSource, markers: ["signGatewayResponse", "verifyGatewayResponse", "parseRfc3339Instant", "OBJECT_STORAGE_RECEIPT_SIGNING_SECRET", "object-storage-response-v1"] },
+    { id: "signed-url-boundary", source: adapterSource, markers: ["OBJECT_STORAGE_UPLOAD_URL_ALLOWED_ORIGINS", "OBJECT_STORAGE_DOWNLOAD_URL_ALLOWED_ORIGINS", "validateSignedIntentUrl", "OBJECT_STORAGE_INTENT_EXPIRY_INVALID"] },
+    { id: "explicit-receipts", source: adapterSource, markers: ["scanReceiptId", "receiptId", "OBJECT_STORAGE_COMPLETION_RECEIPT_INVALID", "OBJECT_STORAGE_LIFECYCLE_RECEIPT_INVALID", "OBJECT_STORAGE_OBJECT_VERSION_REQUIRED", "OBJECT_STORAGE_MALWARE_SCAN_NOT_CLEAN"] },
+    { id: "durable-command-track", source: durableSource, markers: ["object-storage-durable-command-and-metadata.v2", "object_storage_commands", "object_storage_command_receipts", "object_storage_reconciliation_cases"] },
+    { id: "legacy-backfill-freeze", source: durableSource, markers: ["backfillObjectStorageFromLegacyCollection", "object-storage-v17-backfill", "legacy secureAttachments writes are frozen"] },
+    { id: "fenced-worker-dlq", source: `${workerSource}\n${durableSource}`, markers: ["object-storage-command-worker.v2", "claimBatch", "markFailed", "dead-letter"] },
+    { id: "keyset-pagination", source: durableSource, markers: ["highWaterMark", "cursorSecret", "OBJECT_STORAGE_CURSOR_SCOPE_MISMATCH"] },
+    { id: "sqlite-v17", source: migrationSource, markers: ["version: 17", "add durable object storage metadata and command track"] },
+    { id: "deployment-no-go", source: deploymentSource, markers: ["object-storage-durable-command-v2", "externalEvidenceRequired", "productionReady: false"] }
+  ].map(({ source, ...item }) => ({ ...item, passed: item.markers.every((marker) => source.includes(marker)) }));
   const apiRoutes = [
     "/api/attachments/storage",
     "/api/attachments/upload-intents",
     "/api/attachments/:id/complete",
     "/api/attachments/:id/download-intent",
     "/api/attachments/:id/actions"
+    , "/api/attachments/v2"
+    , "/api/attachments/v2/upload-intents"
+    , "/api/attachments/v2/commands/:id"
+    , "/api/attachments/v2/commands/:id/replay"
   ].map((route) => ({ route, passed: serverSource.includes(route.replace(":id", "${id}")) || serverSource.includes(route) || serverSource.includes(route.replace(":id", "([^/]+)")) }));
   apiRoutes[2].passed = serverSource.includes("attachmentCompleteMatch") && serverSource.includes("finalizeObjectUpload");
   apiRoutes[3].passed = serverSource.includes("attachmentDownloadMatch") && serverSource.includes("createObjectDownloadIntent");
@@ -59,6 +73,7 @@ function buildObjectStorageReadiness(options = {}) {
     "OBJECT_STORAGE_TIMEOUT_MS",
     "OBJECT_STORAGE_MAX_BYTES",
     "OBJECT_STORAGE_DOWNLOAD_TTL_SECONDS"
+    , "OBJECT_STORAGE_CURSOR_SIGNING_SECRET"
   ];
   const attachmentRecords = Array.isArray(data.secureAttachments) ? data.secureAttachments : [];
   const checks = [
@@ -72,7 +87,7 @@ function buildObjectStorageReadiness(options = {}) {
   return {
     ok: checks.every((item) => item.passed),
     generatedAt: new Date().toISOString(),
-    status: "adapter-foundation-ready-site-acceptance-pending",
+    status: "durable-v2-repository-ready-external-evidence-pending",
     productionReady: false,
     summary: {
       controls: controls.length,
@@ -80,7 +95,7 @@ function buildObjectStorageReadiness(options = {}) {
       apiGroups: apiRoutes.length,
       apiGroupsReady: apiRoutes.filter((item) => item.passed).length,
       attachmentRecords: attachmentRecords.length,
-      productionBlockers: 8
+      productionBlockers: 10
     },
     controls,
     apiRoutes,
@@ -94,6 +109,8 @@ function buildObjectStorageReadiness(options = {}) {
       "backup restore and lifecycle task rehearsal",
       "capacity, concurrency and signed URL security tests",
       "privacy assessment and site acceptance signoff"
+      , "signed provider status, abort and capability receipts"
+      , "durable worker backlog, dead-letter and reconciliation alert acceptance"
     ],
     checks
   };

@@ -13,7 +13,7 @@ test("modular API authorization matrix covers owners roles scopes purposes and h
   assert.deepEqual(validateMatrix(matrix), []);
   assert.equal(matrix.generatedFrom, "src/http/routes/**/*.js");
   assert.equal(matrix.schemaVersion, "api-authorization-matrix-v3");
-  assert.equal(matrix.summary.declarations, 601);
+  assert.equal(matrix.summary.declarations, 606);
   assert.equal(matrix.summary.customAuthenticationEvidence, 13);
   assert.equal(matrix.summary.protected >= 550, true);
   assert.equal(matrix.summary.highRisk, 10);

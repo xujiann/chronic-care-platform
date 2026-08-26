@@ -32,7 +32,7 @@ test("production database readiness validates migration and rehearsal evidence",
   assert.equal(report.checks.some((item) => item.id === "production-db:runtimeBlock" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "production-db:sqliteSchema" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "production-db:sqliteMigrationRegistry" && item.passed), true);
-  assert.equal(report.sqliteMigrationRegistry.head, 16);
+  assert.equal(report.sqliteMigrationRegistry.head, 17);
   assert.match(report.sqliteMigrationRegistry.registryFingerprint, /^[a-f0-9]{64}$/);
   assert.equal(report.checks.some((item) => item.id === "production-db:sqliteRuntimeProfile" && item.passed), true);
   assert.equal(Object.values(report.sqliteRuntimeProfile).every(Boolean), true);
