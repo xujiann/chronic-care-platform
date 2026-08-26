@@ -32,6 +32,9 @@ const {
 
 const ROOT = path.resolve(__dirname, "..");
 const NOW = "2026-08-25T12:00:00.000Z";
+const CANDIDATE_EVALUATION_NOW = new Date().toISOString();
+const CANDIDATE_ISSUED_AT = new Date(Date.parse(CANDIDATE_EVALUATION_NOW) - 60 * 60 * 1000).toISOString();
+const CANDIDATE_EXPIRES_AT = new Date(Date.parse(CANDIDATE_EVALUATION_NOW) + 24 * 60 * 60 * 1000).toISOString();
 let candidateTrustEnv = {};
 
 function fixtureDirectory(t) {
@@ -150,8 +153,8 @@ function signCandidateReports(reports, options = {}) {
   const sharedPair = options.reusePublicKey === true
     ? generateKeyPairSync("ed25519")
     : null;
-  const issuedAt = options.issuedAt || "2026-08-24T12:00:00.000Z";
-  const expiresAt = options.expiresAt || "2026-08-26T12:00:00.000Z";
+  const issuedAt = options.issuedAt || CANDIDATE_ISSUED_AT;
+  const expiresAt = options.expiresAt || CANDIDATE_EXPIRES_AT;
   Object.entries(CANDIDATE_SCOPES).forEach(([name, scope], index) => {
     const pair = sharedPair || generateKeyPairSync("ed25519");
     const keyId = `candidate-report-key-${index + 1}`;
@@ -241,7 +244,7 @@ function writeSignedCandidateInputs(directory, reports, options = {}) {
 
 function candidateRuntime() {
   return {
-    now: NOW,
+    now: CANDIDATE_EVALUATION_NOW,
     env: candidateTrustEnv
   };
 }
