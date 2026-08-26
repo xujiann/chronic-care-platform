@@ -2799,7 +2799,10 @@ test("API authentication, scoping and governance regression suite", async (t) =>
       assert.equal(accountLogin.body.user.role, role);
       const scopedState = await api(baseUrl, "/api/state", authorized(accountLogin.body.token));
       assert.equal(scopedState.response.status, 200);
-      if (role !== "commission") {
+      if (role === "commission") {
+        assert.equal(scopedState.body.authUsers.every((item) => item.password === undefined), true, `${username} 不应读取认证明文口令`);
+        assert.equal(scopedState.body.authUsers.every((item) => item.passwordHash === undefined), true, `${username} 不应读取认证口令摘要`);
+      } else {
         assert.equal(scopedState.body.applicationCatalog, undefined, `${username} 不应读取平台建设目录`);
         assert.equal(scopedState.body.securityAcceptanceLedger, undefined, `${username} 不应读取安全验收台账`);
         assert.equal(scopedState.body.platformCapabilityReviews, undefined, `${username} should not read platform capability review ledger`);

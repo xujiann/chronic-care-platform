@@ -177,6 +177,9 @@ UUID 和时钟端口；鉴权先行、一次读取、专用 review 投影、角�
 T00 同时在 T02 `state-data` 兼容边界关闭通用写旁路：四个已登记的区域 owner 集合在 `PUT /api/state` 中只能省略或与当前服务端值深相等，集合级 legacy writer 一律拒绝。命令回执不能由 commission 删除、改写、重排或伪造追加，共享包版本和 `lastAccessReviewId` 也不能绕过命令改写。
 
 演示数据重置仍保留旧 path/角色以支持非生产验收，但 production 请求在读取 seed 或写库前返回 `DEMO_RESET_DISABLED_IN_PRODUCTION`；因此 reset 不是生产回执删除入口。
+
+`GET /api/state` 仍是 T02 的遗留聚合读取兼容边界。commission 响应在既有角色范围投影之后，现通过 `authUsers` 专用读取投影删除 `password` 与 `passwordHash`，保留账号标识、角色、机构、状态及外部身份主体等管理字段；投影创建新账号对象，不修改底层状态快照。其他业务集合、居民数据范围和非 commission 的既有脱敏语义未改变，因此本切片只关闭认证口令直接泄露，不宣称整个 commission 全状态读取已完成最小权限治理。
+
 ## 8. T05 转诊单一命令轨道
 
 本实施分支保留 `/api/referrals/:id/actions`、`/api/workflow-actions` 和 `/api/tasks/:id/actions` 三条公开路径及原成功响应形状，但 `collection=referrals` 的写入统一委托 `src/care-coordination/referral-command-service.js`。权限先于 inbox 重放和 CAS；机构按 from/to/org、区县主体按 region、居民按本人或家庭授权校验。聚合、command inbox 和 outbox 继续由既有 UoW 原子提交，未新增 schema、部署进程或转诊核心概念。
