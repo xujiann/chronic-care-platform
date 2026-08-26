@@ -2,7 +2,7 @@
 
 ## 2026-08-26 T09 应用记录
 
-药械监管三个兼容写入口和科研数据集五个写入口按本 ADR 的既有推荐实施：actor-scoped key hash、payload digest、精确回放零写、异载荷稳定 409、聚合版本 CAS、同聚合进程锁内重读，以及业务/receipt/现有审计单次持久化。该实施没有新增外部 outbox，也不声称进程锁提供跨实例 exactly-once。八份机器证据合同由 T00 在受保护注册表集成；所有合同保持 `productionReady=false` 和 `externalEvidenceRequired=true`。
+药械监管三个兼容写入口和科研数据集五个写入口按本 ADR 的既有推荐实施：actor-scoped key hash、payload digest、首次公共响应快照的精确零写回放、异载荷稳定 409、聚合版本 CAS、同聚合进程锁内重读，以及业务/receipt/现有审计单次持久化。该实施没有新增外部 outbox，也不声称进程锁提供跨实例 exactly-once。八份机器证据合同已由 T00 集成到受保护注册表；所有合同保持 `productionReady=false` 和 `externalEvidenceRequired=true`。
 
 - 状态：Accepted
 - 日期：2026-08-22

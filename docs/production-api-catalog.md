@@ -24,7 +24,7 @@
 
 两个仓库内部歧义已按证据闭合：`GET /api/t10-specialty/cutover-pack` 绑定真实 shared handler、commission 角色以及匿名 401/机构角色 403 的直接行为测试；目录解析器禁止跨越已结束的 handler 配对 method/path，`POST /api/public-health/domain-events/health` 虚假 key 已删除，同时保留真实 `GET .../health` 与 `POST .../dispatch`。修正没有创建新 API 或改变运行时策略。
 
-`production-api-catalog-v3` 另行统计幂等行为证据：333 个写接口中，103 个观察到幂等相关标记、230 个未观察到。`api-idempotency-evidence-v1` 现登记 13 份直接行为合同，其中 11 个完整 endpoint 为 `behavior-verified`，另有 `workflow-actions[collection=referrals]` 与 `tasks[referrals:*]` 2 个 action-slice；322 个写接口仍为 `behavior-proof-required`，总计 324 项 `review-required`。最新 T03 highlight signal 合同直接证明身份/RBAC 先于 body/state、city/health-admin 旧 payload 兼容、district canonical 来源机构 allowlist、actor 组织命名空间 key hash、同 key 命令串行和锁内重读、精确重放/冲突、bounded signal ledger、signal+audit 单次提交、稳定错误与真实 SQLite API 持久化；独立 highlight GET 和 `GET /api/public-health/system` 的嵌入式 highlights 都是 safe method，不新增幂等合同，直接路由与真实 SQLite API 测试已保护内部摘要脱敏、district allowlist、混合 alert 失败关闭和外层 highlights 摘要重算。T00 高风险授权注册表现在以 `city and health-admin platform; district own organization or explicit public-health hospital allowlist` 描述独立 highlight GET 范围，授权矩阵与派生生产目录测试同时锁定该值；system 其余字段仍保留遗留响应。`GET /api/state` 已先由 T02 投影移除 `authUsers.password/passwordHash`，但 commission 其余全状态读取范围仍未最小化，不能据此关闭该接口的 `NO-GO` 债务。两个 action-slice 仍只进入 `verifiedActionContracts`，通用 endpoint 继续阻断。所有合同都明确不证明多实例 exactly-once。
+`production-api-catalog-v3` 另行统计幂等行为证据：333 个写接口中，111 个观察到幂等相关标记、222 个未观察到。`api-idempotency-evidence-v1` 现登记 21 份直接行为合同，其中 19 个完整 endpoint 为 `behavior-verified`，另有 `workflow-actions[collection=referrals]` 与 `tasks[referrals:*]` 2 个 action-slice；314 个写接口仍为 `behavior-proof-required`，总计 316 项 `review-required`。新增八份 T09 合同覆盖药械监管和科研数据集首发写入口，直接证明职责/资源范围、首次公共响应快照回放、CAS、一次业务/审计提交及稳定错误；T07 标准药械状态机保持独立。两个 action-slice 仍只进入 `verifiedActionContracts`，通用 endpoint 继续阻断。所有合同都明确不证明多实例 exactly-once，593 项继续全部 `NO-GO`。
 
 区域共享目录 owner 由 Accepted ADR 和现有数据 owner 合同明确为 T02，不再沿 `shared.js` 文件名推断成 T09。科研导出创建接口只证明重复导出 ID 冲突，没有同键精确重放，未登记为幂等行为合同。
 
@@ -40,6 +40,6 @@
 
 1. 先消除 8 个 `runtime-policy` 路由的静态不确定性，但不得改变公共 method/path。
 2. 保持 T10 精确路径 401/403 和相邻 handler method/path 解析回归测试，防止已闭合歧义回流。
-3. 由 T01–T09 owner 分批为 322 个未验证写接口提供 endpoint 行为合同与负向测试；230 个“未观察到标记”只是优先排查子集，只读接口不要求幂等键。
+3. 由 T01–T09 owner 分批为 314 个未验证写接口提供 endpoint 行为合同与负向测试；222 个“未观察到标记”只是优先排查子集，只读接口不要求幂等键。
 4. 将已验证的幂等、CAS、错误与审计合同接入领域专项测试，不以字符串标记替代行为测试。
 5. 持续扩展 role × permission × resident/institution/region 的运行时允许和拒绝矩阵。

@@ -34,8 +34,8 @@ function formalGroupingReviewFixture() {
 
 test("idempotency evidence registry validates only directly proven endpoint and action-slice contracts", () => {
   assert.deepEqual(validateEvidenceRegistry(), []);
-  assert.equal(DEFAULT_REGISTRY.contracts.length, 13);
-  assert.equal(endpointEvidenceContracts().length, 11);
+  assert.equal(DEFAULT_REGISTRY.contracts.length, 21);
+  assert.equal(endpointEvidenceContracts().length, 19);
   assert.equal(actionSliceEvidenceContracts().length, 2);
   assert.equal(proofRequiredReviews().length, 0);
   assert.equal(DEFAULT_REGISTRY.contracts[0].key, "POST /api/auth/sms-delivery-callback");
@@ -58,7 +58,15 @@ test("idempotency evidence registry validates only directly proven endpoint and 
     "POST /api/security/controls/:id/actions",
     "POST /api/quality-operations-governance/items/:id/actions",
     "POST /api/disease-payment/formal-grouping/jobs",
-    "POST /api/public-health/highlights/signals"
+    "POST /api/public-health/highlights/signals",
+    "POST /api/drug-consumable-supervision/:id/review",
+    "POST /api/drug-consumable-supervision/:id/remediation",
+    "POST /api/drug-consumable-supervision/:id/insurance-sync",
+    "POST /api/research/datasets/:id/approval",
+    "POST /api/research/datasets/:id/evidence",
+    "POST /api/research/datasets/:id/compliant-exports",
+    "POST /api/research/datasets/:id/outcomes",
+    "POST /api/research/datasets/:id/sandbox-access"
   ]);
 });
 
@@ -77,10 +85,10 @@ test("formal grouping create replaces the final reviewed T07 proof gap with endp
 
 test("catalog promotes only whole endpoints and retains generic action routes as review-required", () => {
   const catalog = buildProductionApiCatalog();
-  assert.equal(catalog.summary.writeIdempotencyBehaviorVerified, 11);
+  assert.equal(catalog.summary.writeIdempotencyBehaviorVerified, 19);
   assert.equal(catalog.summary.writeIdempotencyActionSlicesVerified, 2);
-  assert.equal(catalog.summary.writeIdempotencyBehaviorProofRequired, 325);
-  assert.equal(catalog.summary.reviewRequired, 327);
+  assert.equal(catalog.summary.writeIdempotencyBehaviorProofRequired, 317);
+  assert.equal(catalog.summary.reviewRequired, 319);
 
   for (const key of [
     "POST /api/auth/sms-delivery-callback",
@@ -93,7 +101,15 @@ test("catalog promotes only whole endpoints and retains generic action routes as
     "POST /api/security/controls/:id/actions",
     "POST /api/quality-operations-governance/items/:id/actions",
     "POST /api/disease-payment/formal-grouping/jobs",
-    "POST /api/public-health/highlights/signals"
+    "POST /api/public-health/highlights/signals",
+    "POST /api/drug-consumable-supervision/:id/review",
+    "POST /api/drug-consumable-supervision/:id/remediation",
+    "POST /api/drug-consumable-supervision/:id/insurance-sync",
+    "POST /api/research/datasets/:id/approval",
+    "POST /api/research/datasets/:id/compliant-exports",
+    "POST /api/research/datasets/:id/evidence",
+    "POST /api/research/datasets/:id/outcomes",
+    "POST /api/research/datasets/:id/sandbox-access"
   ]) {
     const entry = catalog.entries.find((candidate) => candidate.key === key);
     assert.equal(entry.idempotency.behaviorEvidence.status, "behavior-verified", key);
@@ -113,7 +129,7 @@ test("catalog promotes only whole endpoints and retains generic action routes as
   assert.equal(regional.owner, "T02");
   assert.equal(regional.highRisk, true);
   const researchCreate = catalog.entries.find((entry) => entry.key === "POST /api/research/datasets/:id/compliant-exports");
-  assert.equal(researchCreate.idempotency.behaviorEvidence.status, "behavior-proof-required");
+  assert.equal(researchCreate.idempotency.behaviorEvidence.status, "behavior-verified");
   assert.deepEqual(researchCreate.idempotency.behaviorEvidence.verifiedActionContracts, []);
   const refund = catalog.entries.find((entry) => entry.key === "POST /api/online-payments/refunds");
   assert.equal(refund.production.repositoryReview, "review-required");

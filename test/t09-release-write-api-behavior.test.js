@@ -155,6 +155,27 @@ test("T09 research write commands bind actor-scoped keys, replay with zero write
   }
 });
 
+test("T09 research replay returns the original response after a later command advances the aggregate", () => {
+  const state = { researchDatasets: [readyDataset()], compliantDataExports: [], dataAccessLogs: [] };
+  const user = researchUser("evidence");
+  const firstPayload = researchPayload("evidence");
+  const first = executeResearch(state, "evidence", firstPayload, user, "research-original-response");
+  executeResearch(
+    state,
+    "evidence",
+    { ...firstPayload, expectedVersion: 1, referenceNo: "EXP-002", title: "Later evidence" },
+    user,
+    "research-later-command"
+  );
+  const beforeReplay = structuredClone(state);
+  const replay = executeResearch(state, "evidence", firstPayload, user, "research-original-response");
+  assert.equal(replay.replayed, true);
+  assert.deepEqual(replay.response, first.response);
+  assert.equal(replay.response.domainVersion, 1);
+  assert.equal(state.researchDatasets[0].domainVersion, 2);
+  assert.deepEqual(state, beforeReplay);
+});
+
 test("T09 research commands enforce ethics, minimum-necessary, independent approval, and institution evidence boundaries", () => {
   const noEvidence = readyDataset({ evidenceDocuments: [] });
   assert.throws(
@@ -243,6 +264,26 @@ test("T09 drug write commands bind actor-scoped keys, replay with zero writes, r
       action
     );
   }
+});
+
+test("T09 drug replay returns the original response after a later command advances the aggregate", () => {
+  const state = drugState();
+  const firstPayload = drugPayload("review");
+  const first = executeDrug(state, "review", firstPayload, drugUser("review"), "drug-original-response");
+  executeDrug(
+    state,
+    "remediation",
+    { ...drugPayload("remediation"), expectedVersion: 1 },
+    drugUser("remediation"),
+    "drug-later-command"
+  );
+  const beforeReplay = structuredClone(state);
+  const replay = executeDrug(state, "review", firstPayload, drugUser("review"), "drug-original-response");
+  assert.equal(replay.replayed, true);
+  assert.deepEqual(replay.response, first.response);
+  assert.equal(replay.response.domainVersion, 1);
+  assert.equal(state.drugConsumableSupervisions[0].domainVersion, 2);
+  assert.deepEqual(state, beforeReplay);
 });
 
 test("T09 drug commands preserve institution and insurance separation of duties", () => {
