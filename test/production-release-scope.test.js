@@ -29,7 +29,8 @@ test("production release scope freezes the priority-eight inventory while remain
     cutoverActions: 14
   });
   assert.equal(report.repositoryReview.apiReviewRequired.length, 17);
-  assert.equal(report.repositoryReview.collectionReviewRequired.length, 19);
+  assert.equal(report.repositoryReview.collectionReviewRequired.length, 0);
+  assert.equal(report.repositoryReview.collectionProductionWriteBlocked.length, 21);
   assert.equal(report.inventories.apis.items.every((key) => /^(GET|POST|PUT|PATCH|DELETE) \/api\//.test(key)), true);
   assert.equal(report.blockers.some((item) => item.includes("production NO-GO")), true);
 });
@@ -66,6 +67,15 @@ test("production release scope fails closed on authority drift or forged readine
   const forgedReadModelReport = buildProductionReleaseScopeReport({ ...authorities, scope: forgedReadModel });
   assert.equal(forgedReadModelReport.ok, false);
   assert.equal(forgedReadModelReport.checks.some((item) => item.id === "scope:collection-source-bindings" && !item.passed), true);
+
+  const reopenedOwnerReview = structuredClone(authorities.collectionGovernance);
+  const scopedOwnerReview = reopenedOwnerReview.collections.find((item) => item.name === "chronicAcceptanceLedger");
+  scopedOwnerReview.governanceStatus = "review-required";
+  const reopenedOwnerReviewReport = buildProductionReleaseScopeReport({
+    ...authorities,
+    collectionGovernance: reopenedOwnerReview
+  });
+  assert.deepEqual(reopenedOwnerReviewReport.repositoryReview.collectionReviewRequired, ["chronicAcceptanceLedger"]);
 });
 
 test("production release scope validates deployment package fingerprint binding", () => {

@@ -8,8 +8,11 @@ const {
   buildCollectionGovernanceInventory,
   coreConceptMatches,
   dispositionIndex,
-  normalizeSourceEntries
+  normalizeSourceEntries,
+  ownerReviewDigest,
+  validateManifest
 } = require("../src/platform/data/collection-governance");
+const { assertProductionWriteAccess } = require("../src/platform/data/domain-repository");
 const {
   readRuntimeSourceEntries,
   renderMarkdown,
@@ -49,11 +52,14 @@ test("collection inventory separates authoritative owner truth from source owner
   assert.equal(report.ok, true);
   assert.deepEqual(report.summary, {
     collections: 4,
+    ownerAssigned: 1,
     authoritative: 1,
+    ownerReviewedLegacy: 0,
     governedSystem: 1,
     reviewRequired: 1,
     legacyQuarantined: 1,
     blockedLegacy: 2,
+    unassignedLegacy: 2,
     classified: 4,
     sourceReferenced: 1,
     seedOnly: 3
@@ -183,18 +189,82 @@ test("repository inventory covers every current state collection and never autho
   const report = run({ now: "2026-08-22T00:00:00.000Z" });
   assert.equal(report.ok, true);
   assert.equal(report.summary.collections, 252);
-  assert.equal(Object.keys(manifest.collections).length, 87);
+  assert.equal(Object.keys(manifest.collections).length, 106);
+  assert.equal(report.summary.ownerAssigned, 79);
   assert.equal(report.summary.authoritative, 60);
+  assert.equal(report.summary.ownerReviewedLegacy, 19);
   assert.equal(report.summary.governedSystem, 3);
-  assert.equal(report.summary.reviewRequired, 188);
+  assert.equal(report.summary.reviewRequired, 169);
   assert.equal(report.summary.legacyQuarantined, 1);
+  assert.equal(report.summary.unassignedLegacy, 170);
+  assert.equal(report.summary.blockedLegacy, 189);
   assert.equal(report.summary.classified, 252);
   assert.equal(report.summary.sourceReferenced, 251);
   assert.equal(report.summary.seedOnly, 1);
   assert.equal(report.productionReady, false);
   assert.equal(report.productionPromotionAllowed, false);
   assert.equal(report.collections.every((item) => item.productionPromotionAllowed === false), true);
+  assert.equal(report.collections.filter((item) => item.governanceStatus === "owner-reviewed-legacy").every((item) => (
+    item.owner
+    && item.productionWriteAllowed === false
+    && item.promotionRequired === true
+  )), true);
   assert.equal(report.collections.find((item) => item.name === "dalianHealthStatistics2025").governanceStatus, "legacy-quarantined");
+});
+
+test("first-release owner review is a frozen 19-collection decision without production promotion", () => {
+  const batch = manifest.ownerReviewBatches.find((item) => item.id === "first-release-scope-20260826");
+  assert.ok(batch);
+  assert.equal(batch.collections.length, 19);
+  assert.equal(ownerReviewDigest(manifest, batch.collections), batch.decisionDigest);
+  assert.deepEqual(batch.collections, [...batch.collections].sort());
+
+  const report = run({ now: "2026-08-26T00:00:00.000Z" });
+  for (const collection of batch.collections) {
+    const policy = manifest.collections[collection];
+    const item = report.collections.find((candidate) => candidate.name === collection);
+    assert.equal(policy.ownerReview.contract, "first-release-legacy-owner-review.v1", collection);
+    assert.equal(policy.writePolicy.contract, "legacy-owner-review-write-policy.v1", collection);
+    assert.equal(item.governanceStatus, "owner-reviewed-legacy", collection);
+    assert.equal(item.productionWriteAllowed, false, collection);
+    assert.equal(item.productionPromotionAllowed, false, collection);
+    for (const evidence of policy.ownerReview.sourceEvidence) {
+      const source = require("node:fs").readFileSync(path.join(ROOT, evidence.path), "utf8");
+      assert.match(source, new RegExp(`\\b${collection}\\b`), `${collection}:${evidence.path}`);
+    }
+  }
+});
+
+test("owner-reviewed legacy collections reject missing or permissive write policies", () => {
+  const missingPolicy = structuredClone(manifest);
+  delete missingPolicy.collections.researchDatasets.writePolicy;
+  assert.throws(
+    () => validateManifest(missingPolicy),
+    /explicit fail-closed write policy: researchDatasets/
+  );
+
+  const promoted = structuredClone(manifest);
+  promoted.collections.researchDatasets.writePolicy.productionWriteAllowed = true;
+  assert.throws(
+    () => validateManifest(promoted),
+    /explicit fail-closed write policy: researchDatasets/
+  );
+
+  assert.throws(
+    () => assertProductionWriteAccess("research", "researchDatasets"),
+    (error) => error.code === "PRODUCTION_WRITE_CONTRACT_REQUIRED"
+  );
+  assert.equal(assertProductionWriteAccess("citizen-chronic", "followups").owner, "citizen-chronic");
+});
+
+test("owner review digest rejects an incorrect owner or reader allowlist", () => {
+  const wrongOwner = structuredClone(manifest);
+  wrongOwner.collections.platformRoadmap.owner = "research";
+  assert.throws(() => validateManifest(wrongOwner), /owner review decision digest mismatch/);
+
+  const wrongReader = structuredClone(manifest);
+  wrongReader.collections.platformRoadmap.readers.push("research");
+  assert.throws(() => validateManifest(wrongReader), /owner review decision digest mismatch/);
 });
 
 test("collection inventory rejects a permissive legacy write policy", () => {

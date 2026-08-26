@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "1.1.0",
+  "schemaVersion": "1.2.0",
   "storagePolicy": {
     "development": {
       "authoritative": "json-or-sqlite",
@@ -30,7 +30,395 @@
       "migration-and-rollback-evidence"
     ]
   },
+  "ownerReviewBatches": [
+    {
+      "id": "first-release-scope-20260826",
+      "contract": "first-release-legacy-owner-review.v1",
+      "collections": [
+        "chronicAcceptanceLedger",
+        "compliantDataExports",
+        "countyAcceptanceLedger",
+        "countyCollaborationOrders",
+        "dataQualityIssues",
+        "diseaseRegistryModels",
+        "healthDashboardSnapshots",
+        "healthStatistics",
+        "healthStatisticsIngestion",
+        "hospitalInteroperabilityFunctions",
+        "institutionCreditEvaluations",
+        "institutionSupervisions",
+        "medicalResources",
+        "platformEvidence",
+        "platformInterfaces",
+        "platformRoadmap",
+        "productionDeploymentPlan",
+        "researchDatasets",
+        "securityAcceptanceLedger"
+      ],
+      "decisionDigest": "aab36e12341d4bc1af76ca2d8c77368860988041caeec70ba1c59da5312cdb60"
+    }
+  ],
   "collections": {
+    "chronicAcceptanceLedger": {
+      "owner": "citizen-chronic",
+      "classification": "internal",
+      "readers": ["care-coordination", "platform-governance"],
+      "writePolicy": {
+        "contract": "legacy-owner-review-write-policy.v1",
+        "productionWriteAllowed": false,
+        "productionPromotionAllowed": false,
+        "migrationRequired": true
+      },
+      "ownerReview": {
+        "contract": "first-release-legacy-owner-review.v1",
+        "basis": "chronic acceptance projection is assembled with T04 screening, plan and followup facts; current writes remain legacy state compatibility only",
+        "sourceEvidence": [
+          { "path": "server.js", "access": "compatibility-write" }
+        ]
+      }
+    },
+    "compliantDataExports": {
+      "owner": "research",
+      "classification": "restricted",
+      "readers": ["platform-governance"],
+      "writePolicy": {
+        "contract": "legacy-owner-review-write-policy.v1",
+        "productionWriteAllowed": false,
+        "productionPromotionAllowed": false,
+        "migrationRequired": true
+      },
+      "ownerReview": {
+        "contract": "first-release-legacy-owner-review.v1",
+        "basis": "T09 research export workflow is the only dedicated command owner and platform governance consumes readiness projections",
+        "sourceEvidence": [
+          { "path": "src/http/routes/research.js", "access": "read-write" },
+          { "path": "scripts/research-sandbox-readiness.js", "access": "read" }
+        ]
+      }
+    },
+    "countyAcceptanceLedger": {
+      "owner": "care-coordination",
+      "classification": "internal",
+      "readers": ["clinical-specialties", "platform-governance"],
+      "writePolicy": {
+        "contract": "legacy-owner-review-write-policy.v1",
+        "productionWriteAllowed": false,
+        "productionPromotionAllowed": false,
+        "migrationRequired": true
+      },
+      "ownerReview": {
+        "contract": "first-release-legacy-owner-review.v1",
+        "basis": "the ledger measures the T05 county collaboration and referral service loop and is only normalized through the legacy state boundary",
+        "sourceEvidence": [
+          { "path": "server.js", "access": "compatibility-write" },
+          { "path": "scripts/health-dashboard-summary.js", "access": "read" }
+        ]
+      }
+    },
+    "countyCollaborationOrders": {
+      "owner": "care-coordination",
+      "classification": "restricted",
+      "readers": ["citizen-chronic", "clinical-specialties", "platform-governance"],
+      "writePolicy": {
+        "contract": "legacy-owner-review-write-policy.v1",
+        "productionWriteAllowed": false,
+        "productionPromotionAllowed": false,
+        "migrationRequired": true
+      },
+      "ownerReview": {
+        "contract": "first-release-legacy-owner-review.v1",
+        "basis": "T05 owns the county order command; T06 updates are an observed cross-domain compatibility write that must migrate to the owner port",
+        "sourceEvidence": [
+          { "path": "src/http/routes/care-coordination.js", "access": "read-write" },
+          { "path": "src/http/routes/clinical-specialties/clinical-blood.js", "access": "read-write" }
+        ]
+      }
+    },
+    "dataQualityIssues": {
+      "owner": "platform-governance",
+      "classification": "internal",
+      "readers": ["clinical-specialties", "integration", "public-health"],
+      "writePolicy": {
+        "contract": "legacy-owner-review-write-policy.v1",
+        "productionWriteAllowed": false,
+        "productionPromotionAllowed": false,
+        "migrationRequired": true
+      },
+      "ownerReview": {
+        "contract": "first-release-legacy-owner-review.v1",
+        "basis": "the commission data-governance command writes a cross-domain quality issue projection; shared is only the compatibility adapter and cannot own it",
+        "sourceEvidence": [
+          { "path": "src/http/routes/shared.js", "access": "read-write" },
+          { "path": "scripts/data-governance-readiness.js", "access": "read" }
+        ]
+      }
+    },
+    "diseaseRegistryModels": {
+      "owner": "research",
+      "classification": "internal",
+      "readers": ["citizen-chronic", "platform-governance", "public-health"],
+      "writePolicy": {
+        "contract": "legacy-owner-review-write-policy.v1",
+        "productionWriteAllowed": false,
+        "productionPromotionAllowed": false,
+        "migrationRequired": true
+      },
+      "ownerReview": {
+        "contract": "first-release-legacy-owner-review.v1",
+        "basis": "T09 research routes are the dedicated model review writer; chronic and public-health consume the reviewed model projection",
+        "sourceEvidence": [
+          { "path": "src/http/routes/research.js", "access": "read-write" },
+          { "path": "scripts/chronic-launch-core.js", "access": "read" }
+        ]
+      }
+    },
+    "healthDashboardSnapshots": {
+      "owner": "platform-governance",
+      "classification": "internal",
+      "readers": ["public-health"],
+      "writePolicy": {
+        "contract": "legacy-owner-review-write-policy.v1",
+        "productionWriteAllowed": false,
+        "productionPromotionAllowed": false,
+        "migrationRequired": true
+      },
+      "ownerReview": {
+        "contract": "first-release-legacy-owner-review.v1",
+        "basis": "the snapshot is a platform dashboard read model normalized by the composition boundary and consumed by public-health readiness",
+        "sourceEvidence": [
+          { "path": "server.js", "access": "compatibility-write" },
+          { "path": "scripts/public-health-readiness.js", "access": "read" }
+        ]
+      }
+    },
+    "healthStatistics": {
+      "owner": "public-health",
+      "classification": "internal",
+      "readers": ["integration", "platform-governance"],
+      "writePolicy": {
+        "contract": "legacy-owner-review-write-policy.v1",
+        "productionWriteAllowed": false,
+        "productionPromotionAllowed": false,
+        "migrationRequired": true
+      },
+      "ownerReview": {
+        "contract": "first-release-legacy-owner-review.v1",
+        "basis": "the statistics subject and quality rules belong to the public-health/statistics producer while T02 dashboards consume aggregate measurements",
+        "sourceEvidence": [
+          { "path": "server.js", "access": "compatibility-write" },
+          { "path": "src/platform/governance/health-dashboard-indicator-contract.js", "access": "read" }
+        ]
+      }
+    },
+    "healthStatisticsIngestion": {
+      "owner": "public-health",
+      "classification": "internal",
+      "readers": ["integration", "platform-governance"],
+      "writePolicy": {
+        "contract": "legacy-owner-review-write-policy.v1",
+        "productionWriteAllowed": false,
+        "productionPromotionAllowed": false,
+        "migrationRequired": true
+      },
+      "ownerReview": {
+        "contract": "first-release-legacy-owner-review.v1",
+        "basis": "the existing runtime HTTP adapter creates statistics ingestion jobs for the public-health/statistics business owner",
+        "sourceEvidence": [
+          { "path": "src/http/routes/runtime.js", "access": "read-write" },
+          { "path": "scripts/hospital-operations-readiness.js", "access": "read" }
+        ]
+      }
+    },
+    "hospitalInteroperabilityFunctions": {
+      "owner": "integration",
+      "classification": "internal",
+      "readers": ["clinical-specialties", "platform-governance"],
+      "writePolicy": {
+        "contract": "legacy-owner-review-write-policy.v1",
+        "productionWriteAllowed": false,
+        "productionPromotionAllowed": false,
+        "migrationRequired": true
+      },
+      "ownerReview": {
+        "contract": "first-release-legacy-owner-review.v1",
+        "basis": "the collection describes HIS/EMR/LIS/PACS interoperability management functions and shared only exposes a commission read adapter",
+        "sourceEvidence": [
+          { "path": "src/http/routes/shared.js", "access": "read" },
+          { "path": "scripts/hospital-interoperability-functions.js", "access": "read" }
+        ]
+      }
+    },
+    "institutionCreditEvaluations": {
+      "owner": "platform-governance",
+      "classification": "internal",
+      "readers": ["clinical-specialties", "insurance-payment", "public-health"],
+      "writePolicy": {
+        "contract": "legacy-owner-review-write-policy.v1",
+        "productionWriteAllowed": false,
+        "productionPromotionAllowed": false,
+        "migrationRequired": true
+      },
+      "ownerReview": {
+        "contract": "first-release-legacy-owner-review.v1",
+        "basis": "commission governance owns credit publication and appeal state; shared is the compatibility route and quality/insurance consume the result",
+        "sourceEvidence": [
+          { "path": "src/http/routes/shared.js", "access": "read-write" },
+          { "path": "scripts/quality-safety-report.js", "access": "read" }
+        ]
+      }
+    },
+    "institutionSupervisions": {
+      "owner": "insurance-payment",
+      "classification": "restricted",
+      "readers": ["care-coordination", "platform-governance"],
+      "writePolicy": {
+        "contract": "legacy-owner-review-write-policy.v1",
+        "productionWriteAllowed": false,
+        "productionPromotionAllowed": false,
+        "migrationRequired": true
+      },
+      "ownerReview": {
+        "contract": "first-release-legacy-owner-review.v1",
+        "basis": "the current collection is the institution and high-value consumable supervision source used by the insurance-payment application",
+        "sourceEvidence": [
+          { "path": "server.js", "access": "compatibility-write" },
+          { "path": "scripts/drug-consumable-readiness.js", "access": "read" }
+        ]
+      }
+    },
+    "medicalResources": {
+      "owner": "platform-governance",
+      "classification": "internal",
+      "readers": ["care-coordination", "clinical-specialties", "public-health"],
+      "writePolicy": {
+        "contract": "legacy-owner-review-write-policy.v1",
+        "productionWriteAllowed": false,
+        "productionPromotionAllowed": false,
+        "migrationRequired": true
+      },
+      "ownerReview": {
+        "contract": "first-release-legacy-owner-review.v1",
+        "basis": "the regional institution resource catalog is a platform fact; care coordination reads it to resolve referral organization and regional scope",
+        "sourceEvidence": [
+          { "path": "src/care-coordination/referral-command-service.js", "access": "read" },
+          { "path": "server.js", "access": "compatibility-write" }
+        ]
+      }
+    },
+    "platformEvidence": {
+      "owner": "platform-governance",
+      "classification": "internal",
+      "readers": ["integration"],
+      "writePolicy": {
+        "contract": "legacy-owner-review-write-policy.v1",
+        "productionWriteAllowed": false,
+        "productionPromotionAllowed": false,
+        "migrationRequired": true
+      },
+      "ownerReview": {
+        "contract": "first-release-legacy-owner-review.v1",
+        "basis": "the collection is the platform project acceptance evidence index and is normalized only through the legacy platform-state boundary",
+        "sourceEvidence": [
+          { "path": "server.js", "access": "compatibility-write" },
+          { "path": "scripts/evaluation-evidence.js", "access": "read" }
+        ]
+      }
+    },
+    "platformInterfaces": {
+      "owner": "integration",
+      "classification": "internal",
+      "readers": ["platform-governance", "public-health"],
+      "writePolicy": {
+        "contract": "legacy-owner-review-write-policy.v1",
+        "productionWriteAllowed": false,
+        "productionPromotionAllowed": false,
+        "migrationRequired": true
+      },
+      "ownerReview": {
+        "contract": "first-release-legacy-owner-review.v1",
+        "basis": "the collection records external interface implementation tracks; platform governance consumes it as a delivery/readiness projection",
+        "sourceEvidence": [
+          { "path": "server.js", "access": "compatibility-write" },
+          { "path": "scripts/integration-readiness.js", "access": "read" }
+        ]
+      }
+    },
+    "platformRoadmap": {
+      "owner": "platform-governance",
+      "classification": "internal",
+      "readers": [],
+      "writePolicy": {
+        "contract": "legacy-owner-review-write-policy.v1",
+        "productionWriteAllowed": false,
+        "productionPromotionAllowed": false,
+        "migrationRequired": true
+      },
+      "ownerReview": {
+        "contract": "first-release-legacy-owner-review.v1",
+        "basis": "the platform construction roadmap is composed and normalized by the platform governance boundary",
+        "sourceEvidence": [
+          { "path": "server.js", "access": "compatibility-write" },
+          { "path": "scripts/release-report.js", "access": "read" }
+        ]
+      }
+    },
+    "productionDeploymentPlan": {
+      "owner": "platform-governance",
+      "classification": "restricted",
+      "readers": ["identity-security", "integration"],
+      "writePolicy": {
+        "contract": "legacy-owner-review-write-policy.v1",
+        "productionWriteAllowed": false,
+        "productionPromotionAllowed": false,
+        "migrationRequired": true
+      },
+      "ownerReview": {
+        "contract": "first-release-legacy-owner-review.v1",
+        "basis": "the collection is a platform deployment/readiness plan; security and integration consume its controlled requirements but do not own deployment state",
+        "sourceEvidence": [
+          { "path": "server.js", "access": "compatibility-write" },
+          { "path": "scripts/production-db-readiness.js", "access": "read" }
+        ]
+      }
+    },
+    "researchDatasets": {
+      "owner": "research",
+      "classification": "de-identified",
+      "readers": ["platform-governance"],
+      "writePolicy": {
+        "contract": "legacy-owner-review-write-policy.v1",
+        "productionWriteAllowed": false,
+        "productionPromotionAllowed": false,
+        "migrationRequired": true
+      },
+      "ownerReview": {
+        "contract": "first-release-legacy-owner-review.v1",
+        "basis": "T09 research routes exclusively own dataset application, approval, evidence, sandbox, export and outcome commands",
+        "sourceEvidence": [
+          { "path": "src/http/routes/research.js", "access": "read-write" },
+          { "path": "src/http/research/sandbox-read-model.js", "access": "read" }
+        ]
+      }
+    },
+    "securityAcceptanceLedger": {
+      "owner": "identity-security",
+      "classification": "restricted",
+      "readers": ["platform-governance", "research"],
+      "writePolicy": {
+        "contract": "legacy-owner-review-write-policy.v1",
+        "productionWriteAllowed": false,
+        "productionPromotionAllowed": false,
+        "migrationRequired": true
+      },
+      "ownerReview": {
+        "contract": "first-release-legacy-owner-review.v1",
+        "basis": "the identity-security repository is the dedicated security control evidence command writer; governance and research readiness consume the ledger",
+        "sourceEvidence": [
+          { "path": "src/identity-security/session-security-audit.js", "access": "read-write" },
+          { "path": "scripts/research-sandbox-readiness.js", "access": "read" }
+        ]
+      }
+    },
     "accounts": {
       "owner": "identity-security",
       "classification": "restricted",

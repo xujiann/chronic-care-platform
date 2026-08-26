@@ -74,7 +74,7 @@
 
 | 模块 | 标签 | 依据 |
 |---|---|---|
-| domain data ownership registry | A/B | 83 个集合有 owner，仍需扩大覆盖 |
+| domain data ownership registry | A/B | 当前快照 60 个既有可写 owner 合同、19 个 owner-reviewed legacy；后者关闭责任审查但固定生产不可写，另有 170 个 legacy owner 未决/隔离 |
 | JSON 静态快照（演示用途） | B | 本地演示有效，但必须合成/脱敏/隔离 |
 | JSON 静态快照（生产事实源用途） | D | 与生产 PostgreSQL 目标冲突，安全风险高 |
 | SQLite migration 注册表/runner | B | 已独立、连续、事务化；v1–v14 指纹冻结，v15+ 内容 checksum，专项回归齐备 |

@@ -58,6 +58,8 @@
 - schema 变化只能通过顺序 migration；历史 migration 默认不可变。
 - migration 内容必须可指纹验证，schema head、公开版本和部署门禁必须一致。
 - 生产集合必须先进入 `domain-data-ownership`，明确 owner、reader、分类、写契约、迁移和回滚。
+- legacy 集合可先关闭 owner review，但必须通过显式 fail-closed write policy 与生产写合同分层；禁止
+  因 owner 登记、源码引用或发布范围校验通过自动把 JSON/SQLite writer 晋升为生产可写。
 - 核心概念遵守 `CORE_DATA_DEFINITIONS.md`，禁止创建平行 Resident/Institution/Practitioner/Record 等模型。
 - 生产目标 PostgreSQL、fallback write=false；请求路径不得双写。
 

@@ -356,3 +356,9 @@ CLI 不依赖 `server.js`、HTTP、数据库 client、worker runtime、rollback 
 ## 首批生产范围依赖方向
 
 依赖方向固定为 `existing authorities → CI/build-time production-release-scope verifier → deployment package frozen config/fingerprint → standard smoke / strict preflight`。现有权威包括八应用清单、static publication、production API catalog、collection governance/显式源码绑定、worker observability、external joint-test campaign 与 cutover action definitions。完整 verifier 不进入部署运行时闭包，artifact 明确 `runtimeVerificationAvailable=false`；业务模块、HTTP router、数据库和 worker 不得反向依赖该治理投影，范围校验通过也不得反向写入生产状态或外部证据。
+
+首发 legacy owner 审查的依赖方向为 `实际读写调用点与模块边界 → domain-data-ownership 唯一 owner/
+readers/classification + fail-closed write policy → collection-governance 状态/decision digest →
+production-release-scope repository review`。源码 process owner 仅是证据，不能反向决定数据 owner；
+发布范围校验也不能反向授权 legacy JSON/SQLite writer。19 个 owner-reviewed legacy 关闭
+`collectionReviewRequired`，仍要求版本化写合同、migration、回填/恢复、PostgreSQL 与现场证据。

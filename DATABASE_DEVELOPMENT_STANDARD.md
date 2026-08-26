@@ -52,7 +52,9 @@
 ①–④已完成主线重验；⑤已由 Accepted ADR 和独立 migration 注册表实施，⑥由 v1–v14 冻结指纹、`CORE_DATA_DEFINITIONS.md` 与 owner 规则共同约束。⑦–⑧继续按新 migration 标准和逐批数据核对实施，不得回写历史版本。
 
 DATA-003 已为 252/252 个当前 state collection 建立机器状态与源码使用证据；这只关闭未分类缺口。
-188 个 review-required 与 1 个 quarantine 仍须按 owner 批次确认、归档或迁移，不能因 CI 通过晋升。
+首发 19 个 legacy 集合已通过实际读写边界完成 owner 审查，但显式 write policy 仍禁止生产写入；
+169 个 review-required 与 1 个 quarantine 仍须按 owner 批次确认、归档或迁移。任何集合都不能因
+owner 登记或 CI 通过自动晋升。
 
 ### 当前兼容约束
 

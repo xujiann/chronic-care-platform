@@ -24,7 +24,8 @@ function runCli(argv = process.argv.slice(2)) {
         summary: report.summary,
         repositoryReview: {
           apiReviewRequired: report.repositoryReview.apiReviewRequired.length,
-          collectionReviewRequired: report.repositoryReview.collectionReviewRequired.length
+          collectionReviewRequired: report.repositoryReview.collectionReviewRequired.length,
+          collectionProductionWriteBlocked: report.repositoryReview.collectionProductionWriteBlocked.length
         },
         failedChecks: report.checks.filter((item) => !item.passed),
         blockers: report.blockers,

@@ -87,12 +87,15 @@ erDiagram
 
 静态页面不再直接读取该文件。Node 静态服务按源文件 mtime/size 合成 `data/public-demo.json`；Pages 在仓库外临时目录生成同名制品，Service Worker v61 只缓存同源成功响应中的该脱敏结果，不缓存源快照的 404 拒绝响应。
 
-`config/domain-data-ownership.json` 当前登记 87 个 owner 合同，其中 60 个集合存在于当前 252
-集合快照；27 个合同集合当前不在快照。另有 `dataAccessLogs`、`platformProcessAudit`、
-`securityEvents` 3 个既有系统集合。剩余 189 个无 owner 集合全部进入显式治理状态：188 个在
-599 个受跟踪 JS/HTML 运行时源中观察到精确标识符引用，标为 `review-required`；
+`config/domain-data-ownership.json` 当前登记 106 个 owner 合同，其中 60 个集合沿用既有版本化写
+合同，19 个首发 legacy 集合仅完成唯一业务 owner、reader、classification 与实际源码证据审查，
+27 个合同集合当前不在快照。另有 `dataAccessLogs`、`platformProcessAudit`、`securityEvents` 3 个
+既有系统集合。剩余 170 个无 owner 集合全部进入显式治理状态：169 个在 599 个受跟踪 JS/HTML
+运行时源中观察到精确标识符引用，标为 `review-required`；
 `dalianHealthStatistics2025` 未观察到运行时源码引用，标为 `legacy-quarantined`。静态引用不能证明
-生产实际读写，process owner 也不能推断数据 owner；189 个集合均禁止生产写入和晋升。
+生产实际读写，process owner 也不能推断数据 owner。19 个 owner-reviewed legacy 通过显式
+`legacy-owner-review-write-policy.v1` 固定 `productionWriteAllowed=false`、`migrationRequired=true`；
+它们与其余 170 个 legacy 集合共 189 个均禁止生产写入和晋升。
 
 根目录 `browser-security-policy.json` 是公开的静态发布/响应头治理合同，不是业务集合、数据库
 Schema、生产事实或安全评估证据。Inventory v2 风险基线只保存公开资产路径、风险类型、优先级、
@@ -156,8 +159,9 @@ legal-hold）不会再为新记录让位；这只关闭静默数据丢失，不�
 - `DATA-001`、`DATA-002` 已关闭：公开 head 已统一为 v15，历史 v1–v14 源码由冻结内容指纹保护，v15+ ledger 使用内容 checksum。
 - `DATA-003` 已关闭“未分类”缺口：252/252 集合具有唯一机器状态，未知 owner 不被伪造，新增/删除、
   重复登记、源码使用漂移和生产晋升由 CI 失败关闭。
-- `DATA-008`：188 个 `review-required` 和 1 个 `legacy-quarantined` 集合仍没有可证明的数据 owner；
-  后续只能按 owner 批次确认、归档或通过版本化合同/migration 晋升。
+- `DATA-008`：首发范围 19 个集合已根据实际读写调用点关闭 owner review；169 个 `review-required`
+  和 1 个 `legacy-quarantined` 集合仍没有可证明的数据 owner。owner 审查不等于可写晋升：19 个
+  owner-reviewed legacy 仍须独立版本化写合同、migration、回滚与现场证据才能改变生产状态。
 - `DATA-004`：JSON 快照同时承担页面数据、种子和报告输入，多角色耦合。
 - `DATA-005`：大量 `payload` JSON 关系没有数据库约束，只能靠应用验证。
 - `DATA-006`：已由显式发布清单、合成脱敏快照、旧缓存版本撤销和敏感路径负向测试缓解；仓库历史与源快照的数据分类仍需单独治理。
@@ -381,3 +385,8 @@ environment、joint-test、monitoring、rehearsal 与 candidate 文件均为仓�
 ## 27. 首批生产范围不是业务数据模型
 
 `production-release-scope.v1` 只保存权威对象 ID、显式来源绑定、数量和 SHA-256 摘要。它不新增 JSON 集合、SQLite/PostgreSQL 表、字段、DDL、migration、outbox 或状态事实；14 个切换项仍是 definitions-only，外部证据不得回写为仓库内完成状态。范围合同固定 `externalEvidenceRequired=true`、`productionReady=false`。
+
+首发范围的 19 个 legacy 引用已通过 `first-release-legacy-owner-review.v1` 冻结 owner/readers/
+classification、显式 fail-closed write policy 和实际源码证据。它们关闭的是 owner 决策缺口，不是生产
+写入或 schema 缺口；`referrals` 与 `operationsReadiness` 另以显式来源绑定治理，因此范围报告为
+`collectionReviewRequired=0`，但 21 个引用仍无生产写资格，所有 38 个引用均禁止生产晋级。

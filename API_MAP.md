@@ -405,3 +405,7 @@ sink 仍在 Inventory 中失败关闭；仓库测试不证明真实体检设备�
 ## 37. 首批生产范围（无 HTTP 变化）
 
 冻结范围引用生产 API 目录中的 32 项：八应用声明的 28 项以及 `GET /api/live`、`GET /api/health`、`GET /api/metrics`、`GET /api/auth/context`。校验要求 method/path 均已存在且全部保持 `productionReady=false`；当前 17 项仍为 repository review-required。该增量没有注册、修改或删除任何 HTTP 路由，也不改变认证、授权、幂等或响应协议。
+首发范围 19 个 legacy 集合现以实际读写调用点登记唯一业务 owner、最小 readers 和分类，状态为
+`owner-reviewed-legacy`。这只关闭 repository owner review，不新增或改变任何 HTTP method/path、请求、
+响应、鉴权、审计或副作用；显式 `legacy-owner-review-write-policy.v1` 仍拒绝生产写入和晋升，旧
+JSON/SQLite/state API 不能据 owner 登记自动成为生产写接口。

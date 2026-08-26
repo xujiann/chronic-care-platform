@@ -120,9 +120,11 @@ flowchart TB
     仅以 Report-Only 下发，因为动态 CSSOM/全角色运行时回归、真实托管响应头、独立扫描和现场验收
     均未证明，`productionReady` 保持 `false`。
 13. DATA-003 首个仓库内治理切片复用现有 `collection-governance`，不新建第二份 owner 清单。
-    当前快照 252 个集合已全部获得机器状态：60 个命中 87 个数据 owner 合同，3 个为既有系统
-    集合，188 个源码精确引用但 owner 未明确的集合标为 `review-required`，1 个仅存在种子的集合
-    标为 `legacy-quarantined`。静态扫描覆盖 599 个受跟踪 JS/HTML 运行时源；process owner 只作为
+    当前快照 252 个集合已全部获得机器状态：60 个命中既有可写 owner 合同，19 个首发 legacy
+    引用完成唯一业务 owner/reader/classification 审查但仍禁止生产写入，3 个为既有系统集合，169 个
+    源码精确引用但 owner 未明确的集合标为 `review-required`，1 个仅存在种子的集合标为
+    `legacy-quarantined`。owner 清单共 106 个合同，27 个当前不在快照。静态扫描覆盖 599 个受跟踪
+    JS/HTML 运行时源；process owner 只作为
     review 证据且固定禁止推断数据 owner。新增/删除、重复状态、引用漂移、非 owner 域和生产晋升
     都在 CI 失败关闭；本切片没有修改 JSON/SQLite、schema、API 或运行时，仍为 `NO-GO`。
 14. SEC-004 治理清单已升级为 `browser-security-risk-inventory.v2`，当前扫描 145 个显式发布资产。
@@ -298,4 +300,4 @@ reconciliation 观察。所有入口要求调用方提供发布号和包指纹�
 
 ## 2026-08-26 首批生产范围冻结
 
-T00 新增只读 `production-release-scope.v1`，从现有八应用清单、静态发布清单、生产 API 目录、数据集合治理、worker 观测合同、外部联调活动及切换行动定义派生并冻结范围。当前指纹覆盖 8 个应用、9 个页面、32 个 API、38 个数据引用、7 个 worker、14 个外部依赖、16 个应用证据名和 14 个 definitions-only 切换动作。完整校验只在 CI/build-time 读取仓库权威；部署包仅保存已验证的冻结 config 与同一指纹并声明 runtime verifier 不可用，standard smoke 与 strict preflight 失败关闭校验绑定。`referrals` 以 T05 exact owner JSON 合同、`operationsReadiness` 以 T00 导出只读模型校验，不计入无 owner 缺口。此增量不新增路由、Schema、业务 API、数据或 worker 激活；17 个 API 和 19 个数据引用仍需仓库复核，`productionReady=false`。
+T00 新增只读 `production-release-scope.v1`，从现有八应用清单、静态发布清单、生产 API 目录、数据集合治理、worker 观测合同、外部联调活动及切换行动定义派生并冻结范围。当前指纹覆盖 8 个应用、9 个页面、32 个 API、38 个数据引用、7 个 worker、14 个外部依赖、16 个应用证据名和 14 个 definitions-only 切换动作。完整校验只在 CI/build-time 读取仓库权威；部署包仅保存已验证的冻结 config 与同一指纹并声明 runtime verifier 不可用，standard smoke 与 strict preflight 失败关闭校验绑定。`referrals` 以 T05 exact owner JSON 合同、`operationsReadiness` 以 T00 导出只读模型校验，不伪装为顶层 collection。19 个首发 legacy 引用的 owner/governance review 已关闭，范围内 `collectionReviewRequired=0`；其中 19 个 legacy 集合连同上述 2 个显式来源绑定共 21 个引用仍不具备生产写合同。此增量不新增路由、Schema、业务 API、数据或 worker 激活；17 个 API 仍需仓库复核，所有集合生产晋级保持 NO-GO，`productionReady=false`。
