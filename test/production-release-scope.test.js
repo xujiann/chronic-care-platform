@@ -28,7 +28,7 @@ test("production release scope freezes the priority-eight inventory while remain
     applicationEvidence: 16,
     cutoverActions: 14
   });
-  assert.equal(report.repositoryReview.apiReviewRequired.length, 17);
+  assert.equal(report.repositoryReview.apiReviewRequired.length, 13);
   assert.equal(report.repositoryReview.collectionReviewRequired.length, 0);
   assert.equal(report.repositoryReview.collectionProductionWriteBlocked.length, 21);
   assert.equal(report.inventories.apis.items.every((key) => /^(GET|POST|PUT|PATCH|DELETE) \/api\//.test(key)), true);

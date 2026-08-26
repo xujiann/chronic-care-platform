@@ -1275,6 +1275,202 @@
       ],
       "productionReady": false,
       "externalEvidenceRequired": true
+    },
+    {
+      "contractId": "citizen-chronic.management-plan-patch-command.v1",
+      "key": "PATCH /api/chronic-management-plans/:id",
+      "method": "PATCH",
+      "path": "/api/chronic-management-plans/:id",
+      "owner": "T04",
+      "domain": "citizen-chronic",
+      "purpose": "update-scoped-chronic-management-plan",
+      "customAuthenticationEvidence": false,
+      "authentication": {
+        "required": true,
+        "mechanism": "bearer-or-cookie-session",
+        "principalType": "platform-user",
+        "credentialSource": ["header:authorization", "cookie:session"],
+        "replayCsrf": { "replayProtection": "actor-scoped-idempotency-key-hash-plus-resource-lock", "csrf": "platform-session-transport-policy" }
+      },
+      "authorization": {
+        "model": "platform-rbac-plus-resident-and-institution-business-row-scope",
+        "roles": ["institution", "commission"],
+        "dataScope": "resident"
+      },
+      "coverage": { "level": "endpoint", "selector": "entire-route", "actions": ["patch-management-plan"], "unverifiedRemainder": false },
+      "idempotency": {
+        "key": "header:Idempotency-Key-or-body-key-or-target-plus-expectedVersion/payload-digest",
+        "payloadBinding": ["actorScope", "planId", "expectedVersion", "safePatch"],
+        "exactReplay": "returns the persisted response snapshot with status 200 and no second state or audit write",
+        "conflictingReuse": "CHRONIC_MANAGEMENT_PLAN_IDEMPOTENCY_CONFLICT",
+        "persistenceScope": "bounded aggregate-embedded receipt plus plan and chained security audit in one platform state write",
+        "distributedExactlyOnceClaimed": false
+      },
+      "concurrency": { "cas": { "required": true, "field": "per-plan process lock plus chronicManagementPlans collection version", "conflictCodes": ["CHRONIC_MANAGEMENT_PLAN_VERSION_CONFLICT"] } },
+      "errors": [
+        { "code": "CHRONIC_MANAGEMENT_PLAN_IDEMPOTENCY_CONFLICT", "status": 409 },
+        { "code": "CHRONIC_MANAGEMENT_PLAN_VERSION_CONFLICT", "status": 409 },
+        { "code": "CHRONIC_MANAGEMENT_PLAN_PERSISTENCE_FAILED", "status": 500 }
+      ],
+      "audit": {
+        "accepted": "commits the scoped plan patch, bounded receipt and chained security event in one platform state write",
+        "replay": "returns the original response snapshot without another receipt, audit or state write",
+        "rejected": "identity and row scope are reevaluated before replay; conflicts do not write; failed SQLite transactions roll back business, receipt and audit without fallback writes"
+      },
+      "implementationEvidence": [
+        { "file": "src/http/routes/citizen-chronic.js", "anchors": ["CHRONIC_MANAGEMENT_PLAN_IDEMPOTENCY_CONFLICT", "withStateCommandLock(`chronic-management-plan:${id}`", "CHRONIC_MANAGEMENT_PLAN_PERSISTENCE_FAILED"] },
+        { "file": "server.js", "anchors": ["_writeCommandReceipts", "prepareCas(data, [collection, \"securityEvents\"]", "writeDatabase(data)"] }
+      ],
+      "testEvidence": [{ "file": "test/frozen-launch-write-api-contract.test.js", "anchors": ["CHRONIC_MANAGEMENT_PLAN_IDEMPOTENCY_CONFLICT", "CHRONIC_MANAGEMENT_PLAN_VERSION_CONFLICT", "CHRONIC_MANAGEMENT_PLAN_PERSISTENCE_FAILED"] }],
+      "productionReady": false,
+      "externalEvidenceRequired": true
+    },
+    {
+      "contractId": "citizen-chronic.followup-feedback-command.v1",
+      "key": "POST /api/chronic/followup-feedback",
+      "method": "POST",
+      "path": "/api/chronic/followup-feedback",
+      "owner": "T04",
+      "domain": "citizen-chronic",
+      "purpose": "submit-scoped-chronic-followup-feedback",
+      "customAuthenticationEvidence": false,
+      "authentication": {
+        "required": true,
+        "mechanism": "bearer-or-cookie-session",
+        "principalType": "platform-user",
+        "credentialSource": ["header:authorization", "cookie:session"],
+        "replayCsrf": { "replayProtection": "actor-scoped-idempotency-key-hash-plus-command-lock", "csrf": "platform-session-transport-policy" }
+      },
+      "authorization": {
+        "model": "platform-rbac-plus-current-resident-and-family/institution-scope",
+        "roles": ["citizen", "institution", "commission"],
+        "dataScope": "resident"
+      },
+      "coverage": { "level": "endpoint", "selector": "entire-route", "actions": ["submit-followup-feedback"], "unverifiedRemainder": false },
+      "idempotency": {
+        "key": "header:Idempotency-Key-or-body-key-or-record-id/canonical-payload-digest",
+        "payloadBinding": ["actorScope", "residentId", "followupId", "expectedVersion", "feedback"],
+        "exactReplay": "returns the persisted feedback and message receipt with status 200 and no duplicate record, followup update, task message or audit",
+        "conflictingReuse": "CHRONIC_FEEDBACK_IDEMPOTENCY_CONFLICT",
+        "persistenceScope": "personalRecords feedback receipt plus existing followup/taskMessage and audit projections in one platform state write",
+        "distributedExactlyOnceClaimed": false
+      },
+      "concurrency": { "cas": { "required": true, "field": "per-command process lock plus touched collection versions", "conflictCodes": ["CHRONIC_FEEDBACK_VERSION_CONFLICT"] } },
+      "errors": [
+        { "code": "CHRONIC_FEEDBACK_IDEMPOTENCY_CONFLICT", "status": 409 },
+        { "code": "CHRONIC_FEEDBACK_VERSION_CONFLICT", "status": 409 },
+        { "code": "CHRONIC_FEEDBACK_PERSISTENCE_FAILED", "status": 500 }
+      ],
+      "audit": {
+        "accepted": "commits feedback, existing followup/message projections, receipt, data-access and security audit in one platform state write",
+        "replay": "returns the original feedback response without another state or audit write",
+        "rejected": "identity and resident scope precede replay; conflicts do not write; forced SQLite failure rolls back every projection and has no fallback audit write"
+      },
+      "implementationEvidence": [
+        { "file": "src/http/routes/citizen-chronic.js", "anchors": ["POST /api/chronic/followup-feedback", "withStateCommandLock(`chronic-feedback:${command.commandKeyHash}`", "CHRONIC_FEEDBACK_PERSISTENCE_FAILED"] },
+        { "file": "server.js", "anchors": ["CHRONIC_FEEDBACK_IDEMPOTENCY_CONFLICT", "_writeCommandReceipt", "writeDatabase(normalizeState(data))"] }
+      ],
+      "testEvidence": [{ "file": "test/frozen-launch-write-api-contract.test.js", "anchors": ["CHRONIC_FEEDBACK_IDEMPOTENCY_CONFLICT", "CHRONIC_FEEDBACK_PERSISTENCE_FAILED", "feedbackScopeDenied.response.status, 403"] }],
+      "productionReady": false,
+      "externalEvidenceRequired": true
+    },
+    {
+      "contractId": "care-coordination.referral-teleconsultation-create-command.v1",
+      "key": "POST /api/referral-teleconsultations",
+      "method": "POST",
+      "path": "/api/referral-teleconsultations",
+      "owner": "T05",
+      "domain": "care-coordination",
+      "purpose": "create-authorized-referral-teleconsultation",
+      "customAuthenticationEvidence": false,
+      "authentication": {
+        "required": true,
+        "mechanism": "bearer-or-cookie-session",
+        "principalType": "platform-user",
+        "credentialSource": ["header:authorization", "cookie:session"],
+        "replayCsrf": { "replayProtection": "actor-scoped-idempotency-key-hash-plus-command-lock", "csrf": "platform-session-transport-policy" }
+      },
+      "authorization": {
+        "model": "platform-rbac-plus-current-resident-authorization-and-source-institution/region-scope",
+        "roles": ["institution", "county", "commission"],
+        "dataScope": "institution"
+      },
+      "coverage": { "level": "endpoint", "selector": "entire-route", "actions": ["create-teleconsultation"], "unverifiedRemainder": false },
+      "idempotency": {
+        "key": "header:Idempotency-Key-or-body-key-or-client-id/canonical-payload-digest",
+        "payloadBinding": ["actorScope", "residentId", "authorizationId", "sourceInstitution", "targetInstitution", "expectedVersion", "consultationPayload"],
+        "exactReplay": "reevaluates authorization and returns the persisted creation response with status 200 and no duplicate state or audit",
+        "conflictingReuse": "REFERRAL_TELECONSULTATION_CREATE_IDEMPOTENCY_CONFLICT",
+        "persistenceScope": "bounded aggregate receipt plus consultation and audit projections in one platform state write",
+        "distributedExactlyOnceClaimed": false
+      },
+      "concurrency": { "cas": { "required": true, "field": "per-command process lock plus referralTeleconsultations collection version", "conflictCodes": ["REFERRAL_TELECONSULTATION_VERSION_CONFLICT"] } },
+      "errors": [
+        { "code": "REFERRAL_TELECONSULTATION_CREATE_IDEMPOTENCY_CONFLICT", "status": 409 },
+        { "code": "REFERRAL_TELECONSULTATION_VERSION_CONFLICT", "status": 409 },
+        { "code": "REFERRAL_TELECONSULTATION_PERSISTENCE_FAILED", "status": 500 }
+      ],
+      "audit": {
+        "accepted": "commits the consultation, bounded receipt, data-access and chained security audit in one platform state write",
+        "replay": "returns the original creation response without another consultation, receipt or audit",
+        "rejected": "identity, authorization and source-organization scope precede replay; conflicts do not write; storage failure rolls back atomically without fallback audit"
+      },
+      "implementationEvidence": [
+        { "file": "src/http/routes/care-coordination.js", "anchors": ["REFERRAL_TELECONSULTATION_CREATE_IDEMPOTENCY_CONFLICT", "institutionSourceAllowed", "REFERRAL_TELECONSULTATION_PERSISTENCE_FAILED"] },
+        { "file": "src/platform/storage/state-command-consistency.js", "anchors": ["function withStateCommandLock", "function prepareCollectionCas", "function buildStateCommand"] }
+      ],
+      "testEvidence": [{ "file": "test/frozen-launch-write-api-contract.test.js", "anchors": ["REFERRAL_TELECONSULTATION_CREATE_IDEMPOTENCY_CONFLICT", "createScopeDenied.response.status, 403", "REFERRAL_TELECONSULTATION_PERSISTENCE_FAILED"] }],
+      "productionReady": false,
+      "externalEvidenceRequired": true
+    },
+    {
+      "contractId": "care-coordination.referral-teleconsultation-action-command.v1",
+      "key": "POST /api/referral-teleconsultations/:id/actions",
+      "method": "POST",
+      "path": "/api/referral-teleconsultations/:id/actions",
+      "owner": "T05",
+      "domain": "care-coordination",
+      "purpose": "update-scoped-referral-teleconsultation",
+      "customAuthenticationEvidence": false,
+      "authentication": {
+        "required": true,
+        "mechanism": "bearer-or-cookie-session",
+        "principalType": "platform-user",
+        "credentialSource": ["header:authorization", "cookie:session"],
+        "replayCsrf": { "replayProtection": "actor-scoped-idempotency-key-hash-plus-aggregate-lock", "csrf": "platform-session-transport-policy" }
+      },
+      "authorization": {
+        "model": "platform-rbac-plus-resident-source/target-institution-or-region-scope",
+        "roles": ["institution", "county", "commission"],
+        "dataScope": "institution"
+      },
+      "coverage": { "level": "endpoint", "selector": "entire-route", "actions": ["update-teleconsultation"], "unverifiedRemainder": false },
+      "idempotency": {
+        "key": "header:Idempotency-Key-or-body-key-or-target-plus-expectedVersion/payload-digest",
+        "payloadBinding": ["actorScope", "teleconsultationId", "expectedVersion", "action", "updates"],
+        "exactReplay": "reevaluates current scope and returns the persisted action response with status 200 and no duplicate state or audit",
+        "conflictingReuse": "REFERRAL_TELECONSULTATION_ACTION_IDEMPOTENCY_CONFLICT",
+        "persistenceScope": "bounded aggregate receipt plus teleconsultation and audit projections in one platform state write",
+        "distributedExactlyOnceClaimed": false
+      },
+      "concurrency": { "cas": { "required": true, "field": "per-teleconsultation process lock plus referralTeleconsultations collection version", "conflictCodes": ["REFERRAL_TELECONSULTATION_VERSION_CONFLICT"] } },
+      "errors": [
+        { "code": "REFERRAL_TELECONSULTATION_ACTION_IDEMPOTENCY_CONFLICT", "status": 409 },
+        { "code": "REFERRAL_TELECONSULTATION_VERSION_CONFLICT", "status": 409 },
+        { "code": "REFERRAL_TELECONSULTATION_ACTION_PERSISTENCE_FAILED", "status": 500 }
+      ],
+      "audit": {
+        "accepted": "commits the aggregate update, bounded receipt, data-access and chained security audit in one platform state write",
+        "replay": "returns the original action response without another aggregate, receipt or audit write",
+        "rejected": "identity and current resident/institution scope precede replay; CAS/conflicts do not write; storage failure rolls back atomically without fallback audit"
+      },
+      "implementationEvidence": [
+        { "file": "src/http/routes/care-coordination.js", "anchors": ["REFERRAL_TELECONSULTATION_ACTION_IDEMPOTENCY_CONFLICT", "withStateCommandLock(`referral-teleconsultation:${id}`", "REFERRAL_TELECONSULTATION_ACTION_PERSISTENCE_FAILED"] },
+        { "file": "src/platform/storage/state-command-consistency.js", "anchors": ["function withStateCommandLock", "function assertExpectedVersion", "function prepareCollectionCas"] }
+      ],
+      "testEvidence": [{ "file": "test/frozen-launch-write-api-contract.test.js", "anchors": ["REFERRAL_TELECONSULTATION_ACTION_IDEMPOTENCY_CONFLICT", "concurrent.map((item) => item.response.status).sort(), [200, 409]", "REFERRAL_TELECONSULTATION_ACTION_PERSISTENCE_FAILED"] }],
+      "productionReady": false,
+      "externalEvidenceRequired": true
     }
   ]
 }

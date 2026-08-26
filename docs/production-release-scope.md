@@ -38,7 +38,7 @@ The selected applications are regional data sharing, referral and teleconsultati
 
 ## Current blockers
 
-Repository verification currently identifies 17 scoped APIs needing behavior review and 19 scoped data references needing owner/governance review. `referrals` is validated as an exact `domain-data-ownership` owned contract for T05, while `operationsReadiness` is validated as a T00-owned exported derived read model; both remain fingerprinted data references but are not unowned top-level collections. All scoped APIs remain catalogued as production NO-GO. Worker activation, external joint-test results, signed cutover evidence, PostgreSQL primary selection and site acceptance remain external or release-specific work.
+Repository verification currently identifies 13 scoped APIs needing behavior review and no scoped data reference needing owner/governance review. The first four repository behavior gaps are closed by direct T04/T05 endpoint contracts, while all scoped APIs remain catalogued as production NO-GO. The 19 reviewed legacy collections, the exact T05 `referrals` owner binding and the T00 `operationsReadiness` derived read model remain production-write blocked until their explicit migration/promotion standards are met, so the scope reports 21 blocked data references without inventing repository readiness. Worker activation, external joint-test results, signed cutover evidence, PostgreSQL primary selection and site acceptance remain external or release-specific work.
 
 No generated report, external evidence, completion status or production authorization is created by this verifier.
 

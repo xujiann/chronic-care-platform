@@ -34,8 +34,8 @@ function formalGroupingReviewFixture() {
 
 test("idempotency evidence registry validates only directly proven endpoint and action-slice contracts", () => {
   assert.deepEqual(validateEvidenceRegistry(), []);
-  assert.equal(DEFAULT_REGISTRY.contracts.length, 13);
-  assert.equal(endpointEvidenceContracts().length, 11);
+  assert.equal(DEFAULT_REGISTRY.contracts.length, 17);
+  assert.equal(endpointEvidenceContracts().length, 15);
   assert.equal(actionSliceEvidenceContracts().length, 2);
   assert.equal(proofRequiredReviews().length, 0);
   assert.equal(DEFAULT_REGISTRY.contracts[0].key, "POST /api/auth/sms-delivery-callback");
@@ -58,7 +58,11 @@ test("idempotency evidence registry validates only directly proven endpoint and 
     "POST /api/security/controls/:id/actions",
     "POST /api/quality-operations-governance/items/:id/actions",
     "POST /api/disease-payment/formal-grouping/jobs",
-    "POST /api/public-health/highlights/signals"
+    "POST /api/public-health/highlights/signals",
+    "PATCH /api/chronic-management-plans/:id",
+    "POST /api/chronic/followup-feedback",
+    "POST /api/referral-teleconsultations",
+    "POST /api/referral-teleconsultations/:id/actions"
   ]);
 });
 
@@ -77,10 +81,10 @@ test("formal grouping create replaces the final reviewed T07 proof gap with endp
 
 test("catalog promotes only whole endpoints and retains generic action routes as review-required", () => {
   const catalog = buildProductionApiCatalog();
-  assert.equal(catalog.summary.writeIdempotencyBehaviorVerified, 11);
+  assert.equal(catalog.summary.writeIdempotencyBehaviorVerified, 15);
   assert.equal(catalog.summary.writeIdempotencyActionSlicesVerified, 2);
-  assert.equal(catalog.summary.writeIdempotencyBehaviorProofRequired, 322);
-  assert.equal(catalog.summary.reviewRequired, 324);
+  assert.equal(catalog.summary.writeIdempotencyBehaviorProofRequired, 318);
+  assert.equal(catalog.summary.reviewRequired, 320);
 
   for (const key of [
     "POST /api/auth/sms-delivery-callback",
@@ -93,7 +97,11 @@ test("catalog promotes only whole endpoints and retains generic action routes as
     "POST /api/security/controls/:id/actions",
     "POST /api/quality-operations-governance/items/:id/actions",
     "POST /api/disease-payment/formal-grouping/jobs",
-    "POST /api/public-health/highlights/signals"
+    "POST /api/public-health/highlights/signals",
+    "PATCH /api/chronic-management-plans/:id",
+    "POST /api/chronic/followup-feedback",
+    "POST /api/referral-teleconsultations",
+    "POST /api/referral-teleconsultations/:id/actions"
   ]) {
     const entry = catalog.entries.find((candidate) => candidate.key === key);
     assert.equal(entry.idempotency.behaviorEvidence.status, "behavior-verified", key);
