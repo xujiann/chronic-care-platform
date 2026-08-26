@@ -70,3 +70,7 @@
   并规划 v17 结构化模型、版本化异步 API、回填冻结、无损分页、worker、reconcile 和 readiness。
 - data owner 与 v1/v2 兼容策略仍需人类确认；机器台账和 CI 在 ADR 未 Accepted 时禁止任何 v17、runtime/
   API implementation 或 production promotion。当前 schema/API/runtime 仍保持 AS-IS 与 `NO-GO`。
+
+## 首批生产范围合同
+
+Accepted ADR `2026-08-26-production-release-scope-freeze.md` 确立 `production-release-scope.v1`：从既有权威派生八个优先应用的入口、API、数据引用、worker、外部依赖和证据清单，以摘要冻结并绑定 deployment package、standard smoke 与 strict preflight。它是 T00 发布治理投影，不进入运行时业务依赖，不能生成外部证据或把 `productionReady` 改为 `true`。

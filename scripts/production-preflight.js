@@ -221,6 +221,7 @@ async function buildProductionPreflight(options = {}) {
     && registryVerification.checks?.some((item) => item.id === "registry:deployment-package-binding" && item.passed);
   const softwareChecks = [
     check("preflight:package", manifest.ok === true && packageVerification.ok, `${packageVerification.checks.filter((item) => item.passed).length}/${packageVerification.checks.length} package checks`),
+    check("preflight:release-scope", packageVerification.checks?.some((item) => item.id === "deploymentVerify:releaseScope" && item.passed) && manifest.processContract?.productionReleaseScope?.productionReady === false, manifest.processContract?.productionReleaseScope?.scopeFingerprint || "release scope missing"),
     check("preflight:clean-source", /^[a-f0-9]{40}(?:[a-f0-9]{24})?$/.test(String(manifest.source?.commit || "").toLowerCase()) && manifest.source?.dirty === false, `${manifest.source?.commit || "missing"} / dirty=${manifest.source?.dirty}`),
     check("preflight:registry-chain", registryVerification.ok, `${registryVerification.entries} registered releases`),
     check("preflight:unique-baseline", registryVerification.checks?.some((item) => item.id === "registry:unique-baseline" && item.passed), registry.integrationBaseline ? `${registry.integrationBaseline.tag}@${registry.integrationBaseline.commit}` : "baseline missing"),
@@ -274,6 +275,13 @@ async function buildProductionPreflight(options = {}) {
       externalChecks: externalChecks.length
     },
     packageVerification,
+    productionReleaseScope: {
+      contract: manifest.processContract?.productionReleaseScope?.contract || "missing",
+      scopeId: manifest.processContract?.productionReleaseScope?.scopeId || "",
+      scopeFingerprint: manifest.processContract?.productionReleaseScope?.scopeFingerprint || "",
+      externalEvidenceRequired: manifest.processContract?.productionReleaseScope?.externalEvidenceRequired === true,
+      productionReady: false
+    },
     registryVerification,
     productionConfig: {
       passed: productionConfig.passed,

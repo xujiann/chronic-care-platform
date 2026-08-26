@@ -352,3 +352,7 @@ CLI 不依赖 `server.js`、HTTP、数据库 client、worker runtime、rollback 
 ## 9+5 开发组织依赖方向
 
 治理依赖固定为 `process-workstreams + clinical-subdomains + service-extraction-scorecard → development-organization-governance → architecture/governance CI`。组合合同不被运行时、路由或 repository 反向依赖，不读取业务数据库，也不改变 T01–T09 或 T06 子域的实现依赖。开发协作方向为 `领域工作树 → main/T00 集成 → 共享门禁 → 模块化单体部署`。
+
+## 首批生产范围依赖方向
+
+依赖方向固定为 `existing authorities → CI/build-time production-release-scope verifier → deployment package frozen config/fingerprint → standard smoke / strict preflight`。现有权威包括八应用清单、static publication、production API catalog、collection governance/显式源码绑定、worker observability、external joint-test campaign 与 cutover action definitions。完整 verifier 不进入部署运行时闭包，artifact 明确 `runtimeVerificationAvailable=false`；业务模块、HTTP router、数据库和 worker 不得反向依赖该治理投影，范围校验通过也不得反向写入生产状态或外部证据。

@@ -377,3 +377,7 @@ environment、joint-test、monitoring、rehearsal 与 candidate 文件均为仓�
 ## 26. 9+5 开发组织不是数据模型
 
 开发组织合同只保存进程 ID、父子关系和开发政策，不新增 collection、表、字段、DDL、migration、数据分类或事实源。process Owner、临床子域 Owner 和数据 Owner 继续分别由现有权威清单管理；T01–T09 或 T06 子域身份不能自动推断生产数据 Owner。
+
+## 27. 首批生产范围不是业务数据模型
+
+`production-release-scope.v1` 只保存权威对象 ID、显式来源绑定、数量和 SHA-256 摘要。它不新增 JSON 集合、SQLite/PostgreSQL 表、字段、DDL、migration、outbox 或状态事实；14 个切换项仍是 definitions-only，外部证据不得回写为仓库内完成状态。范围合同固定 `externalEvidenceRequired=true`、`productionReady=false`。
