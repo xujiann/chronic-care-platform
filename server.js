@@ -967,7 +967,7 @@ const WORKFLOW_ROLE_COLLECTIONS = {
   county: new Set(["referralTeleconsultations", "escortServiceOrders", "countyCollaborationOrders", "countyAiDiagnosisCases", "countyMutualRecognitionRecords", "diagnosticReports", "emergencySignals"]),
   citizen: new Set(["followups", "referrals", "medicationPickups", "digitalCredentials", "chronicScreeningTasks", "chronicEducationPushes", "escortServiceOrders", "internetNursingOrders"])
 };
-const WORKFLOW_PROTECTED_FIELDS = new Set(["id", "residentId", "maternalResidentId", "personIndex", "credentialNo", "certificateNo", "documentNo", "motherDocumentNo", "fatherDocumentNo", "createdAt", "createdBy", "createdByName", "lastUpdated", "updatedAt", "updatedBy", "updatedByName"]);
+const WORKFLOW_PROTECTED_FIELDS = new Set(["id", "residentId", "maternalResidentId", "personIndex", "credentialNo", "certificateNo", "documentNo", "motherDocumentNo", "fatherDocumentNo", "createdAt", "createdBy", "createdByName", "lastUpdated", "updatedAt", "updatedBy", "updatedByName", "_writeCommandReceipts"]);
 const PERSONAL_RECORD_PROTECTED_FIELDS = new Set(["id", "residentId", "personIndex", "createdAt", "createdBy", "createdByName", "updatedAt", "updatedBy", "updatedByName", "expectedVersion"]);
 const RESIDENT_PROTECTED_FIELDS = new Set(["id", "idCard", "phone", "personIndex", "identityIndex"]);
 const MULTI_PRACTICE_PROTECTED_FIELDS = new Set(["id", "doctorId", "doctorName", "category", "title", "specialty", "primaryInstitutionId", "primaryInstitution", "targetInstitutionId", "targetInstitution", "compliance", "lastUpdated", "updatedBy", "updatedByName", "expectedVersion"]);
@@ -19011,11 +19011,30 @@ function residentExperiencePoints(payload) {
   return Math.min(points, 30);
 }
 
-function upsertChronicFeedback(data, user, payload) {
+function upsertChronicFeedback(data, user, payload, options = {}) {
   const feedback = normalizeChronicFeedback(payload, user);
   if (!canAccessResident(user, feedback.residentId, data)) {
     appendSecurityEvent({ actor: user.name, role: user.role, action: "submit chronic feedback", target: feedback.residentId, result: "denied", detail: "resident scope denied" });
     return { status: 403, body: { error: "Forbidden", message: "resident scope denied" } };
+  }
+  const command = options.command;
+  if (command) {
+    const existing = (Array.isArray(data.personalRecords) ? data.personalRecords : [])
+      .find((record) => record?.meta?._writeCommandReceipt?.commandKeyHash === command.commandKeyHash);
+    if (existing) {
+      const receipt = existing.meta._writeCommandReceipt;
+      if (receipt.requestDigest !== command.requestDigest) {
+        return { status: 409, body: { error: "Conflict", code: "CHRONIC_FEEDBACK_IDEMPOTENCY_CONFLICT", message: "idempotency key was already used for another feedback payload" } };
+      }
+      return { status: 200, body: structuredClone(receipt.response), replayed: true };
+    }
+    options.prepareCollectionCas(
+      data,
+      ["personalRecords", "followups", "taskMessages", "securityEvents", "dataAccessLogs"],
+      "personalRecords",
+      payload.expectedVersion,
+      "CHRONIC_FEEDBACK_VERSION_CONFLICT"
+    );
   }
   const residentMap = new Map((data.residents || []).map((resident) => [resident.id, resident]));
   feedback.personIndex = personIndexForResident(residentMap, feedback.residentId);
@@ -19039,6 +19058,15 @@ function upsertChronicFeedback(data, user, payload) {
     body: feedback.result || feedback.name,
     user
   });
+  const response = { ...feedback, meta: { ...feedback.meta }, messageId: message.id };
+  if (command) {
+    feedback.meta._writeCommandReceipt = {
+      commandKeyHash: command.commandKeyHash,
+      requestDigest: command.requestDigest,
+      response: structuredClone(response),
+      recordedAt: feedback.createdAt
+    };
+  }
   data.securityEvents = [
     {
       id: randomUUID(),
@@ -19053,8 +19081,13 @@ function upsertChronicFeedback(data, user, payload) {
     ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
   ].slice(0, 120);
   appendDataAccessLog(data, user, feedback.residentId, "chronic follow-up feedback", feedback.result || feedback.name);
-  writeDatabase(normalizeState(data));
-  return { status: 201, body: { ...feedback, messageId: message.id } };
+  try {
+    writeDatabase(normalizeState(data));
+  } catch (error) {
+    error.stateCommandPersistenceFailure = true;
+    throw error;
+  }
+  return { status: 201, body: response, replayed: false };
 }
 
 function upsertResidentExperienceCheckin(data, user, payload) {
@@ -21119,13 +21152,24 @@ function patchCollectionItem({ data, collection, id, patch, user, action, protec
   return { status: 200, body: rows[index] };
 }
 
-function patchBusinessCollectionItem({ data, collection, id, patch, user, action }) {
+function patchBusinessCollectionItem({ data, collection, id, patch, user, action, command, prepareCas, versionConflictCode, idempotencyConflictCode }) {
   const rows = Array.isArray(data[collection]) ? data[collection] : [];
   const index = rows.findIndex((item) => item.id === id);
   if (index < 0) return { status: 404, body: { error: "Not Found", message: "未找到业务记录" } };
   if (!canAccessBusinessRow(user, rows[index], data)) {
     appendSecurityEvent({ actor: user.name, role: user.role, action, target: `${collection}/${id}`, result: "拒绝", detail: "超出居民授权范围" });
     return { status: 403, body: { error: "Forbidden", message: "无权更新该居民业务记录" } };
+  }
+  if (command) {
+    const receipt = (Array.isArray(rows[index]._writeCommandReceipts) ? rows[index]._writeCommandReceipts : [])
+      .find((item) => item.commandKeyHash === command.commandKeyHash);
+    if (receipt) {
+      if (receipt.requestDigest !== command.requestDigest) {
+        return { status: 409, body: { error: "Conflict", code: idempotencyConflictCode, collection, message: "idempotency key was already used for another update" } };
+      }
+      return { status: 200, body: structuredClone(receipt.response), replayed: true };
+    }
+    prepareCas(data, [collection, "securityEvents"], collection, patch.expectedVersion, versionConflictCode);
   }
   rows[index] = {
     ...rows[index],
@@ -21135,7 +21179,7 @@ function patchBusinessCollectionItem({ data, collection, id, patch, user, action
     lastUpdated: new Date().toISOString()
   };
   data[collection] = rows;
-  if (Object.hasOwn(patch, "expectedVersion")) {
+  if (!command && Object.hasOwn(patch, "expectedVersion")) {
     data.storageMeta = {
       ...(data.storageMeta || {}),
       collectionVersions: { [collection]: Number(patch.expectedVersion) }
@@ -21151,8 +21195,28 @@ function patchBusinessCollectionItem({ data, collection, id, patch, user, action
     result: "允许",
     detail: `业务级更新 ${collection}`
   });
-  writeDatabase(data);
-  return { status: 200, body: rows[index] };
+  if (command) {
+    const response = structuredClone(rows[index]);
+    delete response._writeCommandReceipts;
+    rows[index]._writeCommandReceipts = [
+      {
+        commandKeyHash: command.commandKeyHash,
+        requestDigest: command.requestDigest,
+        response,
+        recordedAt: rows[index].lastUpdated
+      },
+      ...(Array.isArray(rows[index]._writeCommandReceipts) ? rows[index]._writeCommandReceipts : [])
+    ].slice(0, 20);
+  }
+  try {
+    writeDatabase(data);
+  } catch (error) {
+    error.stateCommandPersistenceFailure = true;
+    throw error;
+  }
+  const body = structuredClone(rows[index]);
+  delete body._writeCommandReceipts;
+  return { status: 200, body, replayed: false };
 }
 
 function findWorkflowCollection(data, collection) {

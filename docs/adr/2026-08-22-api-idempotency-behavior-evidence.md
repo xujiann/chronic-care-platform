@@ -103,3 +103,23 @@ callback 持久化守卫要求由 HMAC 验签器生成且绑定目标 gateway ev
 命令 key 按 `Idempotency-Key` header、body `idempotencyKey`、body `id`、canonical payload digest 依次选择，并在 actor role/orgType/orgCode 命名空间后只保存 SHA-256；请求载荷绑定独立 digest。相同 key 在当前进程串行并在锁内重读，首次创建返回 201/`idempotent=false`，精确重放返回 200/`true` 且不再次写入，同键异载荷和 ID 占用返回稳定 409。新 signal 继续进入既有 200 条 `publicHealthSignals` 上限，并与链式 `securityEvents` 在一次 `writeDatabase` 中提交；SQLite collection-version 冲突映射为脱敏 409，普通失败为脱敏 500且不触发 fallback audit write。
 
 该扩展不新增集合、DDL、migration、dependency、outbox、worker、PG adapter 或第二套状态机。200 条 bounded ledger 会在容量滚动后失去旧命令证明，进程尾只覆盖当前 Node 实例，SQLite CAS 也不构成跨实例 exactly-once。`publicHealthSignals` data owner、PostgreSQL 多实例、长期审计/归档、真实来源系统与现场验收仍未关闭；合同继续 `productionReady=false`、`externalEvidenceRequired=true`、`distributedExactlyOnceClaimed=false`，593 项全部 `NO-GO`。
+
+## 2026-08-26 T04/T05 冻结首发四条写 API 扩展
+
+注册表新增第 14–17 份合同，只登记 `PATCH /api/chronic-management-plans/:id`、
+`POST /api/chronic/followup-feedback`、`POST /api/referral-teleconsultations` 与
+`POST /api/referral-teleconsultations/:id/actions`。四条 route 都保持 session/RBAC 先行，并在 receipt
+replay 前重验居民、家庭、来源/目标机构或地区范围；远程会诊创建另禁止 institution 伪造来源机构。
+
+新共享端口只提供 actor scope key hash、canonical request digest、同资源当前进程命令尾和
+`storageMeta.collectionVersions` CAS，不读取领域集合或拥有状态机。显式 header/body key 优先；旧调用继续
+以 target/record ID、expectedVersion 或 canonical payload digest 形成兼容自然键。T04/T05 各自把有界 receipt
+内嵌在既有 owner aggregate/record，普通端点删除内部 receipt 后保持旧成功响应。精确 replay 返回原响应快照、
+HTTP 200 且零写；同键异载荷与陈旧版本返回稳定 409。同一次 `writeDatabase` 提交业务、既有 task message、
+data-access 与 security audit；SQLite 临时失败 trigger 的负向测试证明业务、receipt 和审计共同回滚，且 route
+不做 fallback audit write。
+
+该扩展不新增 collection、DDL、migration、dependency、外部调用、worker、PG adapter 或 outbox；四条命令
+没有新的真实外部投递语义，因此不为目录虚构 outbox。receipt 有界、进程尾只覆盖当前 Node 实例，SQLite CAS
+也不构成 distributed exactly-once。真实 PostgreSQL 多实例、外部会诊/通知回执、Origin/TLS、现场联调和验收
+仍未关闭；17 份合同全部继续 `productionReady=false`、`externalEvidenceRequired=true`，593 项仍为 `NO-GO`。

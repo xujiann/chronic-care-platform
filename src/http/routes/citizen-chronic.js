@@ -7,6 +7,14 @@ const {
 const {
   inspectFollowupEventPublisherReadiness
 } = require("../../citizen-chronic/followup-event-publisher");
+const {
+  StateCommandError,
+  buildStateCommand,
+  isStorageConflict,
+  prepareCollectionCas,
+  sha256,
+  withStateCommandLock
+} = require("../../platform/storage/state-command-consistency");
 
 const FOLLOWUP_ORGANIZATION_FIELDS = Object.freeze([
   "orgCode",
@@ -31,6 +39,29 @@ function followupAggregateIdsForUser(data, user, canAccessResident, rowMatchesOr
       return !explicitlyOrganizationScoped || rowMatchesOrganizationScope(data, user, followup);
     })
     .map((followup) => String(followup.id)));
+}
+
+function chronicCommandPayload(payload = {}) {
+  const canonical = { ...payload };
+  delete canonical.idempotencyKey;
+  delete canonical.commandId;
+  return canonical;
+}
+
+function chronicCommandError(res, sendJson, error, codes) {
+  if (error instanceof StateCommandError) {
+    sendJson(res, error.statusCode, { error: error.statusCode === 409 ? "Conflict" : "Bad Request", code: error.code, ...(codes.collection ? { collection: codes.collection } : {}), message: error.message });
+    return;
+  }
+  if (isStorageConflict(error)) {
+    sendJson(res, 409, { error: "Conflict", code: codes.version, ...(codes.collection ? { collection: codes.collection } : {}), message: "state version conflict" });
+    return;
+  }
+  if (error?.stateCommandPersistenceFailure) {
+    sendJson(res, 500, { error: "Internal Server Error", code: codes.storage, message: "state command persistence failed" });
+    return;
+  }
+  sendJson(res, 400, { error: "Bad Request", message: error?.message || "invalid state command" });
 }
 
 function createRouteSegments(runtime, options = {}) {
@@ -276,14 +307,21 @@ function createRouteSegments(runtime, options = {}) {
       if (req.method === "POST" && url.pathname === "/api/chronic/followup-feedback") {
         const user = requireApiRole(req, res, ["citizen", "institution", "commission"], "/api/chronic/followup-feedback");
         if (!user) return true;
-        let result;
+        const payload = await collectJson(req);
         try {
-          result = upsertChronicFeedback(readDatabase(), user, await collectJson(req));
+          const canonical = chronicCommandPayload(payload);
+          const naturalKey = `feedback:${String(payload.id || "").trim() || sha256(canonical)}`;
+          const command = buildStateCommand({ req, payload, user, endpoint: "POST /api/chronic/followup-feedback", naturalKey, canonicalPayload: canonical });
+          const result = await withStateCommandLock(`chronic-feedback:${command.commandKeyHash}`, () =>
+            upsertChronicFeedback(readDatabase(), user, payload, { command, prepareCollectionCas }));
+          sendJson(res, result.status, redactSensitiveResponse(result.body, user));
         } catch (error) {
-          sendJson(res, 400, { error: "Bad Request", message: error.message });
-          return true;
+          chronicCommandError(res, sendJson, error, {
+            version: "CHRONIC_FEEDBACK_VERSION_CONFLICT",
+            storage: "CHRONIC_FEEDBACK_PERSISTENCE_FAILED",
+            collection: "personalRecords"
+          });
         }
-        sendJson(res, result.status, redactSensitiveResponse(result.body, user));
         return true;
       }
 
@@ -492,15 +530,35 @@ function createRouteSegments(runtime, options = {}) {
     if (req.method === "PATCH" && url.pathname.startsWith("/api/chronic-management-plans/")) {
         const user = requireApiRole(req, res, ["institution", "commission"], "/api/chronic-management-plans/:id");
         if (!user) return true;
-        const result = patchBusinessCollectionItem({
-          data: readDatabase(),
-          collection: "chronicManagementPlans",
-          id: decodeURIComponent(url.pathname.replace("/api/chronic-management-plans/", "")),
-          patch: await collectJson(req),
-          user,
-          action: "更新慢病管理计划"
-        });
-        sendJson(res, result.status, result.body);
+        const id = decodeURIComponent(url.pathname.replace("/api/chronic-management-plans/", ""));
+        const payload = await collectJson(req);
+        try {
+          const canonical = chronicCommandPayload(payload);
+          const naturalKey = `plan:${id}:v${Object.hasOwn(payload, "expectedVersion") ? payload.expectedVersion : sha256(canonical)}`;
+          const command = buildStateCommand({ req, payload, user, endpoint: "PATCH /api/chronic-management-plans/:id", naturalKey, canonicalPayload: { id, ...canonical } });
+          const patch = { ...payload };
+          delete patch.idempotencyKey;
+          delete patch.commandId;
+          const result = await withStateCommandLock(`chronic-management-plan:${id}`, () => patchBusinessCollectionItem({
+            data: readDatabase(),
+            collection: "chronicManagementPlans",
+            id,
+            patch,
+            user,
+            action: "更新慢病管理计划",
+            command,
+            prepareCas: prepareCollectionCas,
+            versionConflictCode: "CHRONIC_MANAGEMENT_PLAN_VERSION_CONFLICT",
+            idempotencyConflictCode: "CHRONIC_MANAGEMENT_PLAN_IDEMPOTENCY_CONFLICT"
+          }));
+          sendJson(res, result.status, result.body);
+        } catch (error) {
+          chronicCommandError(res, sendJson, error, {
+            version: "CHRONIC_MANAGEMENT_PLAN_VERSION_CONFLICT",
+            storage: "CHRONIC_MANAGEMENT_PLAN_PERSISTENCE_FAILED",
+            collection: "chronicManagementPlans"
+          });
+        }
         return true;
       }
 
