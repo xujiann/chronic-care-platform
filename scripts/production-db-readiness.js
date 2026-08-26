@@ -313,15 +313,6 @@ function buildProductionDbReadinessReport(options = {}) {
   const postgresPrimaryStorageConfig = buildPostgresPrimaryStorageConfig(options.env || process.env);
   const postgresPrimaryStorage = safeConfigStatus(postgresPrimaryStorageConfig);
   const postgresTransitionAssessment = buildTransitionAssessment({ requestedMode: "primary-read" }, postgresPrimaryStorageConfig);
-  const migrationEvidence = {
-    currentAdapter: "sqlite-wal-json-snapshot",
-    targetAdapter: "postgresql",
-    runtimePostgresEnabled: !/PostgreSQL is tracked in productionDeploymentPlan but the runtime adapter is not enabled yet/.test(serverSource),
-    runtimePostgresBlocked: /PostgreSQL is tracked in productionDeploymentPlan but the runtime adapter is not enabled yet/.test(serverSource),
-    requiredConfig: productionTrack?.requiredConfig || [],
-    evidence: productionTrack?.evidence || [],
-    nextAction: productionTrack?.nextAction || ""
-  };
   const rehearsalEvidence = {
     backupDocumented: hasText(deployment, /storage:backup/) && hasText(deployment, /manifest\.json|SHA-256/),
     restoreDocumented: hasText(deployment, /rehearse/) && hasText(deployment, /restore/),
@@ -358,10 +349,29 @@ function buildProductionDbReadinessReport(options = {}) {
     hardenedService: ["Type=oneshot", "Environment=POSTGRES_SYNC_MODE=outbox", "NoNewPrivileges=true", "ProtectSystem=strict"].every((marker) => runtimeSyncService.includes(marker)) && ["OnUnitActiveSec=15s", "Persistent=true"].every((marker) => runtimeSyncTimer.includes(marker)),
     documentedBoundary: ["事务型 outbox", "不得上传 Git", "STORAGE_ENGINE=postgres", "productionPrimary"].every((marker) => runtimeSyncDocument.includes(marker) || serverSource.includes(marker))
   };
+  const runtimePostgresEnabled = postgresPrimaryStorage.productionPrimary === true
+    && postgresPrimaryStorage.runtimeCutoverEnabled === true;
+  const migrationEvidence = {
+    currentAdapter: "sqlite-wal-json-snapshot",
+    targetAdapter: "postgresql",
+    runtimeAdapterImplemented: postgresRuntimeSync.productionAdapter === true,
+    runtimeMode: postgresPrimaryStorage.mode,
+    runtimePostgresEnabled,
+    runtimePostgresBlocked: !runtimePostgresEnabled,
+    productionPrimary: postgresPrimaryStorage.productionPrimary === true,
+    runtimeCutoverEnabled: postgresPrimaryStorage.runtimeCutoverEnabled === true,
+    requiredConfig: productionTrack?.requiredConfig || [],
+    evidence: productionTrack?.evidence || [],
+    declaredStatus: productionTrack?.status || "missing",
+    declaredNextAction: productionTrack?.nextAction || "",
+    nextAction: postgresRuntimeSync.productionAdapter
+      ? "Keep the adapter disabled; complete controlled migration, reconciliation, recovery, capacity/failover and independent approval evidence before any production-primary activation."
+      : "Implement and verify the PostgreSQL adapter behind the existing storage contract before a controlled rehearsal."
+  };
   const checks = [
     { id: "production-db:track", passed: Boolean(productionTrack?.owner && productionTrack?.nextAction), detail: productionTrack?.status || "missing production deployment track" },
     { id: "production-db:requiredConfig", passed: ["DATABASE_URL", "STORAGE_ENGINE=postgres"].every((item) => migrationEvidence.requiredConfig.includes(item)), detail: migrationEvidence.requiredConfig.join(",") || "missing" },
-    { id: "production-db:runtimeBlock", passed: migrationEvidence.runtimePostgresBlocked, detail: migrationEvidence.runtimePostgresBlocked ? "postgres runtime intentionally blocked until adapter is implemented" : "postgres runtime appears enabled" },
+    { id: "production-db:runtimeBlock", passed: migrationEvidence.runtimePostgresBlocked && !migrationEvidence.productionPrimary && !migrationEvidence.runtimeCutoverEnabled, detail: migrationEvidence.runtimePostgresBlocked ? `adapterImplemented=${migrationEvidence.runtimeAdapterImplemented}; mode=${migrationEvidence.runtimeMode}; productionPrimary=false; runtimeCutoverEnabled=false` : "postgres runtime reports production-primary activation" },
     { id: "production-db:jsonSnapshot", passed: Boolean(json.present && Number(json.collections || 0) >= 40 && Number(json.totalRecords || 0) > 0), detail: `${json.collections || 0} collections / ${json.totalRecords || 0} records` },
     { id: "production-db:sqliteSchema", passed: !sqlite.present || Boolean(sqlite.available && Number(sqlite.schemaVersion || 0) >= 7 && Number(sqlite.tableCount || 0) >= 10), detail: sqlite.present ? `schema v${sqlite.schemaVersion || 0}, ${sqlite.tableCount || 0} tables` : "sqlite file not present in this checkout" },
     { id: "production-db:sqliteRuntimeProfile", passed: Object.values(sqliteRuntimeProfile).every(Boolean), detail: Object.entries(sqliteRuntimeProfile).map(([key, value]) => `${key}:${value ? "yes" : "no"}`).join(";") },
@@ -449,7 +459,9 @@ function renderMarkdown(report) {
     `- Result: ${report.ok ? "PASS" : "FAIL"}`,
     `- Current adapter: ${report.migrationEvidence.currentAdapter}`,
     `- Target adapter: ${report.migrationEvidence.targetAdapter}`,
-    `- PostgreSQL runtime enabled: ${report.migrationEvidence.runtimePostgresEnabled ? "yes" : "no"}`,
+    `- PostgreSQL adapter implemented: ${report.migrationEvidence.runtimeAdapterImplemented ? "yes" : "no"}`,
+    `- PostgreSQL runtime mode: ${report.migrationEvidence.runtimeMode || "disabled"}`,
+    `- PostgreSQL production primary enabled: ${report.migrationEvidence.runtimePostgresEnabled ? "yes" : "no"}`,
     `- Migration batches: ${report.cutoverCenter?.summary?.migrationBatches || 0}`,
     `- Cutover rehearsal runs: ${report.cutoverCenter?.summary?.cutoverRuns || 0}`,
     "",
