@@ -78,12 +78,12 @@ TypeScript 与 Node 类型仅用于开发门禁；lockfile audit 已修复 c8 �
 - 动态浏览器凭据方向为 `HttpOnly Cookie → /api/auth/context → 脱敏身份投影`；`auth.js` 在
   任何普通 API 调用前清除旧 localStorage token，Cookie 与 Authorization 并存时服务端也选择
   Cookie。bearer-only 兼容 token 仅存在页面内存，不跨重载恢复。
-- Inventory v2 在显式发布图精确锁定 820 处 `innerHTML=` 与 4 处 `insertAdjacentHTML`（合计 824，
-  覆盖 33 个资产）；血液主工作台 25 处、急救生命链和医生工作台 controller 各 6 处、血液上线看板 8 处、陪诊工作台 7 处 `innerHTML` 加 1 处 `insertAdjacentHTML`、产品运行驾驶舱、产品区域运行驾驶舱与质量安全工作台各 1 处、区域切换工作台及血液召回面板各 2 处、血液创新指挥中心 10 处以及体检风险卡 2 处 `innerHTML` 已迁到 DOM/text 节点；体检页面仍保留 25 处失败关闭，最高仍为 citizen 94、
+- Inventory v2 在显式发布图精确锁定 795 处 `innerHTML=` 与 4 处 `insertAdjacentHTML`（合计 799，
+  覆盖 32 个资产）；血液主工作台 25 处、急救生命链和医生工作台 controller 各 6 处、血液上线看板 8 处、陪诊工作台 7 处 `innerHTML` 加 1 处 `insertAdjacentHTML`、产品运行驾驶舱、产品区域运行驾驶舱与质量安全工作台各 1 处、区域切换工作台及血液召回面板各 2 处、血液创新指挥中心 10 处以及体检工作台全部 27 处 `innerHTML` 已迁到 DOM/text 节点；体检资产已无 Inventory P0/P1，最高仍为 citizen 94、
   app 90、public-health 78、platform 72。
 - 同一清单现锁定 6 个动态 URL sink（公共 Safe URL port 内 2 个 DOM URL attribute 和 2 个导航调用、
-  2 个 OHIF 导航）以及 45 个动态样式 sink（30 个模板 style 属性、
-  12 个 CSSOM 属性、2 个 `setProperty`、1 个 runtime style element）。浏览器 URL 依赖方向为
+  2 个 OHIF 导航）以及 42 个动态样式 sink（29 个模板 style 属性、
+  10 个 CSSOM 属性、2 个 `setProperty`、1 个 runtime style element）。浏览器 URL 依赖方向为
   `页面 action → 无 URL 模板/固定 DOM anchor → browser-safe-url-policy.v1 → capability/protocol/userinfo/exact-Origin decision → DOM/navigation`；
   28 个真实模板 URL 已迁移，1 个普通属性赋值误报已校正；
   居民短时凭据复用同一端口，服务端对象存储信任合同保持不变。仅 2 个 OHIF 导航仍因真实 exact-Origin 未证明而需复核，

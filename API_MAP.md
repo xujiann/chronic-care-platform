@@ -78,8 +78,8 @@ HTTP request
 - 静态未知/敏感路径统一 404；`GET/HEAD /data/public-demo.json` 返回合成脱敏数据，`/data/db.json`、源码、配置和仓库元数据不可发布。
 - HTML、静态资源、JSON/API、下载与错误响应由集中端口下发 `nosniff`、frame、referrer、
   permissions 与 CSP。显式发布图的内联脚本/样式静态风险已归零，但兼容 CSP 仍含 `unsafe-inline`，
-  严格目标只为 Report-Only；血液主工作台、急救生命链、医生工作台、血液上线看板、陪诊工作台、产品运行驾驶舱、产品区域运行驾驶舱、质量安全工作台、区域切换工作台、血液召回面板、血液创新指挥中心及体检居民解释/报告质检卡 API 字段已使用 DOM/text 节点，Inventory v2 已把
-  824 个 DOM HTML、6 个动态 URL 和 45 个动态样式
+  严格目标只为 Report-Only；血液主工作台、急救生命链、医生工作台、血液上线看板、陪诊工作台、产品运行驾驶舱、产品区域运行驾驶舱、质量安全工作台、区域切换工作台、血液召回面板、血液创新指挥中心及体检工作台 API 字段已使用 DOM/text 节点，Inventory v2 已把
+  799 个 DOM HTML、6 个动态 URL 和 42 个动态样式
   sink 作为资产级治理事实锁定。`browser-safe-url-policy.v1` 将可证明的内部导航、对象存储、`tel:120`
   和 blob 下载迁入统一协议/无凭据/exact-Origin 检查；29 个原模板 occurrence 已由 28 个真实 DOM
   绑定迁移和 1 个扫描误报校正闭合，仅 2 个 OHIF 导航保持 `review-required`。该变化不改变任何
@@ -369,12 +369,13 @@ DOM/text/class/dataset/`replaceChildren`，表头、空态和委托按钮动作�
 死信与孪生字段通过显式 DOM、`textContent` 与 dataset 写入，死信重试和创新能力执行仍调用原接口。
 仓库测试不证明真实血液系统、设备、跨模块消费方、外部回执、托管响应头、渗透或现场验收完成。
 
-## 32. 体检风险卡可信渲染（无 HTTP 变化）
+## 32. 体检工作台可信渲染闭环（无 HTTP 变化）
 
-本切片只改变 `physical-examination.js` 对既有居民解释与报告质检响应中两个高风险卡片区域的浏览器表达；
-method/path、鉴权、请求/响应 schema、错误、写动作、幂等与审计语义均保持原状。翻译结论、质检说明和
-问题文本通过显式 DOM、`textContent` 与闭集状态 class 写入，未知状态不能成为 class。其余 25 个 HTML
-sink 仍在 Inventory 中失败关闭；仓库测试不证明真实体检设备、外部回执、托管头、渗透或现场验收完成。
+本切片把 `physical-examination.js` 原剩余 25 个 HTML sink 全部迁为显式 DOM、`textContent`、固定 class、
+dataset 与受控 attribute，连同前一切片共关闭该资产 27 个 HTML sink；3 个动态样式 sink 迁为固定高度 class
+和可见状态 class。method/path、鉴权、请求/响应 schema、错误、写动作、幂等与审计语义均保持原状。
+同一恶意 API 响应已覆盖汇总、趋势、计划、质检、联调、专项分流、标准、报告列表和详情等原风险区域；
+仓库测试不证明真实体检设备、外部回执、托管头、严格 CSP 强制、渗透或现场验收完成。
 
 ## 33. 金融 callback/finalize 写入约束（HTTP 兼容）
 

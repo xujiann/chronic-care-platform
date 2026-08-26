@@ -101,6 +101,7 @@
 .finding-table th, .finding-table td { padding: 9px; border-bottom: 1px solid var(--line); text-align: left; }
 .finding-table tr.abnormal td { color: #9a4500; background: #fff9ec; }
 .toast { position: fixed; right: 22px; bottom: 22px; display: none; padding: 12px 16px; border-radius: 9px; color: #fff; background: #142d29; z-index: 20; }
+.toast.visible { display: block; }
 .highlight-command-panel { background: linear-gradient(135deg, #f4fbf8, #fff); }
 .highlight-summary-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 10px; }
 .highlight-summary-grid article { display: grid; gap: 4px; min-width: 0; padding: 13px; border: 1px solid #cfe7df; border-radius: 12px; background: #fff; }
@@ -115,6 +116,13 @@
 .mini-bars { display: flex; align-items: end; gap: 5px; min-height: 70px; padding: 6px 2px; }
 .mini-bars span { flex: 1; max-width: 24px; min-width: 7px; border-radius: 5px 5px 2px 2px; background: #85c8b8; }
 .mini-bars span.warn { background: #f1a65a; }
+.mini-bars span.height-0 { height: 24px; }
+.mini-bars span.height-1 { height: 31px; }
+.mini-bars span.height-2 { height: 38px; }
+.mini-bars span.height-3 { height: 45px; }
+.mini-bars span.height-4 { height: 52px; }
+.mini-bars span.height-5 { height: 59px; }
+.mini-bars span.height-6 { height: 66px; }
 .tag-row { display: flex; flex-wrap: wrap; gap: 6px; }
 .tag-row span { padding: 4px 7px; border-radius: 999px; color: var(--exam-dark); background: var(--exam-soft); font-size: 12px; }
 .translation-card.abnormal, .translation-card.high-risk { border-left: 5px solid #dc7b31; }

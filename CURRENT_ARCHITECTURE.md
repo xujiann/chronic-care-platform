@@ -130,9 +130,9 @@ flowchart TB
 14. SEC-004 治理清单已升级为 `browser-security-risk-inventory.v2`，当前扫描 145 个显式发布资产。
     `browser-safe-url-policy.v1` 复用居民短时凭据/对象存储的 HTTPS、无凭据和 exact-Origin 语义，
     为 internal navigation、official source、object storage、`tel` 与 blob download 建立唯一公共端口。
-    血液主工作台、急救生命链、医生工作台、血液上线看板、陪诊工作台、产品运行驾驶舱、产品区域运行驾驶舱、质量安全工作台、区域切换工作台、血液召回面板、血液创新指挥中心及体检风险卡子块的可信 DOM/text 切片与 Safe URL 内部闭环后，机器基线锁定
-    824 个 DOM HTML sink（33 个资产）、6 个动态 URL sink（2 个资产）和 45 个动态样式/CSSOM/runtime style element
-    （14 个资产）；29 个原模板 occurrence 中 28 个真实 URL 已改为无 URL 模板加 DOM 绑定，另 1 个
+    血液主工作台、急救生命链、医生工作台、血液上线看板、陪诊工作台、产品运行驾驶舱、产品区域运行驾驶舱、质量安全工作台、区域切换工作台、血液召回面板、血液创新指挥中心及体检工作台的可信 DOM/text 切片与 Safe URL 内部闭环后，机器基线锁定
+    799 个 DOM HTML sink（32 个资产）、6 个动态 URL sink（2 个资产）和 42 个动态样式/CSSOM/runtime style element
+    （13 个资产）；体检工作台自身已无 Inventory v2 P0/P1 finding。29 个原模板 occurrence 中 28 个真实 URL 已改为无 URL 模板加 DOM 绑定，另 1 个
     `item.action` 普通赋值已从扫描误报中排除。当前 4 项是公共端口内受控 mutation/navigation，只有
     2 个缺真实 OHIF exact-Origin allowlist 的导航继续 `review-required`。每个资产/类型同时绑定
     occurrence 数量和规范化源行聚合 SHA-256。相同数量的片段替换、数量增加和新类型/资产都会失败关闭；
