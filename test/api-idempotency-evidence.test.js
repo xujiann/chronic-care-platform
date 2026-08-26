@@ -34,8 +34,8 @@ function formalGroupingReviewFixture() {
 
 test("idempotency evidence registry validates only directly proven endpoint and action-slice contracts", () => {
   assert.deepEqual(validateEvidenceRegistry(), []);
-  assert.equal(DEFAULT_REGISTRY.contracts.length, 25);
-  assert.equal(endpointEvidenceContracts().length, 23);
+  assert.equal(DEFAULT_REGISTRY.contracts.length, 30);
+  assert.equal(endpointEvidenceContracts().length, 28);
   assert.equal(actionSliceEvidenceContracts().length, 2);
   assert.equal(proofRequiredReviews().length, 0);
   assert.equal(DEFAULT_REGISTRY.contracts[0].key, "POST /api/auth/sms-delivery-callback");
@@ -58,6 +58,11 @@ test("idempotency evidence registry validates only directly proven endpoint and 
     "POST /api/security/controls/:id/actions",
     "POST /api/quality-operations-governance/items/:id/actions",
     "POST /api/disease-payment/formal-grouping/jobs",
+    "POST /api/operations/dispatch",
+    "POST /api/operations/reconciliation/:id/review",
+    "POST /api/quality-safety/issues/:id/dispatch",
+    "POST /api/quality-safety/rectifications/:id/feedback",
+    "POST /api/quality-safety/rectifications/:id/review",
     "POST /api/public-health/highlights/signals",
     "POST /api/drug-consumable-supervision/:id/review",
     "POST /api/drug-consumable-supervision/:id/remediation",
@@ -89,10 +94,10 @@ test("formal grouping create replaces the final reviewed T07 proof gap with endp
 
 test("catalog promotes only whole endpoints and retains generic action routes as review-required", () => {
   const catalog = buildProductionApiCatalog();
-  assert.equal(catalog.summary.writeIdempotencyBehaviorVerified, 23);
+  assert.equal(catalog.summary.writeIdempotencyBehaviorVerified, 28);
   assert.equal(catalog.summary.writeIdempotencyActionSlicesVerified, 2);
-  assert.equal(catalog.summary.writeIdempotencyBehaviorProofRequired, 313);
-  assert.equal(catalog.summary.reviewRequired, 315);
+  assert.equal(catalog.summary.writeIdempotencyBehaviorProofRequired, 308);
+  assert.equal(catalog.summary.reviewRequired, 310);
 
   for (const key of [
     "POST /api/auth/sms-delivery-callback",
@@ -105,6 +110,11 @@ test("catalog promotes only whole endpoints and retains generic action routes as
     "POST /api/security/controls/:id/actions",
     "POST /api/quality-operations-governance/items/:id/actions",
     "POST /api/disease-payment/formal-grouping/jobs",
+    "POST /api/operations/dispatch",
+    "POST /api/operations/reconciliation/:id/review",
+    "POST /api/quality-safety/issues/:id/dispatch",
+    "POST /api/quality-safety/rectifications/:id/feedback",
+    "POST /api/quality-safety/rectifications/:id/review",
     "POST /api/public-health/highlights/signals",
     "POST /api/drug-consumable-supervision/:id/review",
     "POST /api/drug-consumable-supervision/:id/remediation",

@@ -258,11 +258,11 @@ source/sink contract、目标摘要、cursor/source hash 与 receipt 摘要；ch
 
 ## 13. 生产 API 目录数据边界
 
-`production-api-catalog-v3` 是从路由源码、授权矩阵与两个小型证据注册表即时派生的治理元数据，不新增 JSON 集合、SQLite/PostgreSQL 表、字段、DDL、migration、outbox 或生产事实源。`config/api-authentication-evidence.json` 只登记可由控制流和负向测试证明的 custom auth 入口；SMS 认证继续从既有 `config/api-idempotency-evidence.json` 派生，避免第二份手工真相。两者均只保存源码/测试引用和分类字符串，不复制 593 项路由清单，也不保存真实 credential、provider payload 或外部回执。
+`production-api-catalog-v3` 是从路由源码、授权矩阵与两个小型证据注册表即时派生的治理元数据，不新增 JSON 集合、SQLite/PostgreSQL 表、字段、DDL、migration、outbox 或生产事实源。`config/api-authentication-evidence.json` 只登记可由控制流和负向测试证明的 custom auth 入口；SMS 认证继续从既有 `config/api-idempotency-evidence.json` 派生，避免第二份手工真相。两者均只保存源码/测试引用和分类字符串，不复制 598 项路由清单，也不保存真实 credential、provider payload 或外部回执。
 
 目录中的源码 marker 既不是认证证明，也不是幂等执行证据；只有 owner、控制流锚点和可执行负向测试一致时才产生认证 evidence contract。认证分类只描述 AS-IS 的 required/optional/none、凭据来源、replay/CSRF 和 scope，不代表目标政策充分或生产安全。幂等 `behavior-verified` 仍只证明当前仓库行为，不证明跨实例 exactly-once 或生产耐久性；所有生产状态继续 `NO-GO`。
 
-API-002 的 existing-proof 扩展现使注册表达到 21 份合同，其中 19 个为完整 endpoint、2 个为 action-slice。新增八份 T09 合同使用既有 `researchDatasets`、`compliantDataExports`、`drugConsumableSupervisions` 与审计集合；有界 receipt 保存散列命令身份和首次公共响应快照，使聚合后续变化后仍可零写返回原响应。T07 标准药械状态机和 T03 highlight signal 合同保持既有边界。没有新增集合、表、DDL、migration、outbox 或事实源，也不宣称跨实例 exactly-once；生产 PostgreSQL 状态未改变。
+API-002 的 existing-proof 扩展现使注册表达到 30 份合同，其中 28 个为完整 endpoint、2 个为 action-slice。T09 使用既有 `researchDatasets`、`compliantDataExports`、`drugConsumableSupervisions` 与审计集合；T04/T05 复用慢病计划、反馈和会诊聚合；T02/T06 复用 operations 与 quality-safety 记录及既有审计投影。有界 receipt 保存散列命令身份和首次公共响应或精确结果快照，使聚合后续变化后仍可零写返回原响应。T07 标准药械状态机和 T03 highlight signal 合同保持既有边界。没有为这些证据新增集合、表、DDL、migration、outbox 或事实源，也不宣称跨实例 exactly-once；生产 PostgreSQL 状态未改变。
 
 T07 第二批审计的 3 条 `reviewedProofRequired` 已全部由直接 endpoint 行为合同替换；formal grouping create 最后关闭资源范围、并发/CAS、稳定错误和原子审计证据缺口。机器验证仍禁止拒绝记录和正式合同同 key 并存，当前 `reviewedProofRequired` 为 0。
 
