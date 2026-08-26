@@ -116,7 +116,7 @@ HTTP request
 
 - `API-001`：机器目录已覆盖当前 601 条授权声明、371 个字面条件路由和两者并集的 593 个唯一接口，并强制 method/path/owner/auth/roles-or-scope/idempotency/生产状态完整；不再手工复制路由清单。
 - `API-002`：区域共享、直接转诊、科研导出 action、T07 退款申请/financial dispatch/financial reconciliation/formal grouping create、T01 security-control action、T02 quality-governance item action与 T03 highlight signal intake 共 11 个 endpoint 已形成行为证据；两条通用转诊入口仅登记 referrals action-slice。8 个运行时策略、322 个尚无 endpoint 级幂等行为证据合同的写接口和 role × permission × resource 运行时矩阵仍需逐 owner 扩展。T08 普通 integration event/dispatch 和 T07 退款 action regex 也未晋升。
-- T03 signal intake 的 POST 成功响应和独立 `GET /api/public-health/highlights` 已复用同一公开投影：所有角色均不接收 `commandKeyHash`、`requestDigest`；district 只返回自身/服务端医院 allowlist 内的 signal，alert 只有在全部关联 signal 同范围时才返回，混合范围和空关联均失败关闭；city/health-admin 保留合法全平台业务视图。GET 保持 safe method，不新增幂等合同；T00 高风险机器目录当前仍以通用 `platform` 表述范围，需在独立治理切片中同步精确角色变体。`GET /api/public-health/system` 的嵌入式 highlights 与 commission `GET /api/state` 仍未完成同等读取投影，是明确 `NO-GO` 债务。
+- T03 signal intake 的 POST 成功响应和独立 `GET /api/public-health/highlights` 已复用同一公开投影：所有角色均不接收 `commandKeyHash`、`requestDigest`；district 只返回自身/服务端医院 allowlist 内的 signal，alert 只有在全部关联 signal 同范围时才返回，混合范围和空关联均失败关闭；city/health-admin 保留合法全平台业务视图。GET 保持 safe method，不新增幂等合同；T00 高风险机器目录现以 `city and health-admin platform; district own organization or explicit public-health hospital allowlist` 锁定该读取范围，并由授权矩阵与生产目录契约测试保护。`GET /api/public-health/system` 的嵌入式 highlights 与 commission `GET /api/state` 仍未完成同等读取投影，是明确 `NO-GO` 债务。
 - API 治理脚本继续拒绝伪造认证合同、跨 handler method/path 误配、action-slice 冒充 endpoint、缺幂等行为证明和生产误 promotion；覆盖率门禁不关闭上述 324 项 `review-required`，也不构成生产放行证据。
 - `API-003`：错误响应契约不统一，调用方需要理解多个格式。
 - `API-004`：`shared` 有 12 个路由段，容易成为跨域逻辑聚集点。

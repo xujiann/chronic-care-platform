@@ -79,6 +79,32 @@ test("production API catalog reuses the authorization inventory and stays fail c
   assert.equal(catalog.summary.productionNoGo, catalog.summary.entries);
   assert.equal(catalog.entries.every((entry) => entry.method && entry.path && entry.owner && entry.authentication && entry.authorization && entry.idempotency), true);
   assert.equal(catalog.entries.every((entry) => entry.production.status === "NO-GO" && entry.production.productionReady === false), true);
+  const publicHealthHighlightEntries = catalog.entries.filter((entry) => entry.key === "GET /api/public-health/highlights");
+  assert.equal(publicHealthHighlightEntries.length, 1);
+  const [publicHealthHighlights] = publicHealthHighlightEntries;
+  assert.equal(publicHealthHighlights.owner, "T03");
+  assert.equal(publicHealthHighlights.domain, "public-health");
+  assert.equal(publicHealthHighlights.purpose, "read-public-health-command-overview");
+  assert.equal(publicHealthHighlights.highRisk, true);
+  assert.equal(publicHealthHighlights.authentication.required, true);
+  assert.equal(publicHealthHighlights.authentication.mode, "required");
+  assert.deepEqual(publicHealthHighlights.authentication.mechanisms, ["bearer-or-cookie-session"]);
+  assert.deepEqual(publicHealthHighlights.authorization.roles, ["commission"]);
+  assert.deepEqual(publicHealthHighlights.authorization.dataScopes, [
+    "city and health-admin platform; district own organization or explicit public-health hospital allowlist"
+  ]);
+  assert.equal(publicHealthHighlights.authorization.variants.length, 1);
+  assert.equal(
+    publicHealthHighlights.authorization.variants[0].dataScope,
+    "city and health-admin platform; district own organization or explicit public-health hospital allowlist"
+  );
+  assert.equal(publicHealthHighlights.authorization.rolesOrScope, "roles-and-resource-scope");
+  assert.equal(publicHealthHighlights.routeResolution, "literal");
+  assert.equal(publicHealthHighlights.sourceCoverage, "authorization-matrix-and-route-inventory");
+  assert.equal(publicHealthHighlights.idempotency.required, false);
+  assert.equal(publicHealthHighlights.idempotency.status, "not-required-safe-method");
+  assert.equal(publicHealthHighlights.production.status, "NO-GO");
+  assert.equal(publicHealthHighlights.production.productionReady, false);
 });
 
 test("custom authentication evidence classifies every proven control flow without inventing a route", () => {
