@@ -1,5 +1,11 @@
 # CURRENT ARCHITECTURE — 主线现状地图
 
+## 2026-08-27 生产 Go/No-Go 页面可信渲染增量
+
+- `production-go-no-go-ui.js` 的 4 个 `innerHTML` 与 2 个 `insertAdjacentHTML` 已迁为显式 DOM、`textContent`、闭集 class 和 dataset；指标、前置检查、四方审批及指挥决策的结构与交互保持兼容。
+- 恶意 API 字段 E2E 直接覆盖状态、指标、检查、审批、证据引用、决策和边界文本，证明载荷保持惰性文本且不执行事件处理器。
+- Inventory v2 当前锁定 793 个 DOM HTML sink、6 个动态 URL sink 与 42 个动态样式风险；严格 CSP、真实托管响应头、独立安全评估和现场验收仍未完成，生产状态保持 `NO-GO`。
+
 ## 2026-08-26 T09 写接口行为增量
 
 - 药械监管的 `review`、`remediation`、`insurance-sync` 三个兼容写入口，以及科研数据集的 `approval`、`evidence`、`sandbox-access`、`compliant-exports`、`outcomes` 五个入口，已收敛到两个 T09 command/service 边界。
@@ -93,12 +99,12 @@ flowchart TB
 5. SQLite v1–v14 已冻结内容指纹，v15 追加 append-only 连续审计 source，v16 追加慢病随访 durable outbox，v17 追加对象存储耐久元数据/命令轨道；`STORAGE_SCHEMA_VERSION`、部署检查和测试统一从注册表 head v17 派生。历史 ledger 的 v1–v14 checksum 保持兼容，v15 起写入内容 SHA-256。
 6. TEST-001 已建立统一的 `build`、`lint`、`typecheck`、`test:unit`、`test:integration`、`test:smoke` 入口；build 复用静态发布 allowlist 并默认输出到仓库外，unit/integration 完整分区根测试，smoke 独立启动临时 JSON 运行时。治理 CI 执行 `data:collection-governance:verify`，以源码、owner 和隔离清单漂移失败关闭；原 `server.js` c8 门禁保持 85/85/55，内部边界现以 10 个职责独立组锁定真实覆盖基线和直接负向矩阵：原 identity、audit、object storage、API governance 四组，加上 worker observability、区域共享命令、转诊 owner command、科研合规导出、浏览器响应头策略和 Safe URL 端口六组。所有报告只存在临时目录。TEST-006 已恢复全文件 `no-unreachable`；`internet-nursing.js` 与 `quality-safety.js` 的 16 个重复翻译键已按显式 shadow map 去重，保留原首次插入顺序和最终生效值，lint 不再有文件级规则例外。typecheck 去重后由 9 个唯一文件扩大到 13 个治理/安全边界文件。集成套件成员、顺序、断言和超时不变，但本机三次采样约 294–371 秒的 API 热点现在独立进程执行，并向 CI 日志输出无阈值的批次/套件耗时。
    TEST-006 care revalidation 已把这 3 段显式 skip 全部恢复为可执行断言，并新增陪诊 owner route、护理闭环、护士生命周期 3 个可独立运行的真实 HTTP 特征测试。测试只使用临时 JSON 副本和进程内 owner 证据签发能力；陪诊 handoff 现统一解释 `reject/return`，引用挂号单在补字段前先校验存在性与当前用户 scope。护理通知继续以 planned message + pending outbox 表达，仓库测试不伪造外部送达或现场证据。API 巨型测试的第一个可逆夹具切片已将临时 JSON seed、环境变量和同一 server 生命周期移入 `test/helpers/api-regression-runtime.js`；第二至第五个切片分别只将单个 HIS hospital adapter mock、单个 SIEM alert delivery mock、单个 financial gateway mock 与单个 object-storage gateway mock 的创建、动态回环监听、测试环境和关闭移入各自测试 helper。对象存储 helper 只额外暴露测试正文按原顺序驱动的 `setScanStatus` 控制口。43 个有序子测试、请求/响应与签名断言、告警失败/恢复顺序、金融 callback/reconciliation/retry、对象存储 clean/恶意 provider 文本与 quarantine 断言、超时、单进程执行和 integration 成员均保持不变，并由顺序摘要门禁锁定；synthetic HIS/SIEM/financial/storage 响应均不是外部回执或上线证据。
-   TEST-005 将浏览器 E2E 精确分为根 39 项与居民 13 项：两套配置统一使用 Playwright Chromium、
+   TEST-005 将浏览器 E2E 精确分为根 40 项与居民 13 项：两套配置统一使用 Playwright Chromium、
    `serviceWorkers=block` 和动态回环端口；居民套件复用独占 runner、独立临时数据目录并在结束后释放服务。
-   在线 52 项并集/唯一性、浏览器策略和 runner 生命周期由专项测试锁定。PWA 专项另以 3 项独占套件允许
+   在线 53 项并集/唯一性、浏览器策略和 runner 生命周期由专项测试锁定。PWA 专项另以 3 项独占套件允许
    Service Worker，验证居民登录后的 v61 安装、v60 清理、同源成功响应缓存边界、离线导航回退及最终
    unregister/Cache Storage 清理。SEC-004 另增加急救生命链、医生工作台、血液上线看板、陪诊工作台、产品运行驾驶舱、产品区域运行驾驶舱、质量安全工作台、区域切换工作台、血液召回面板、血液创新指挥中心及体检风险卡各 1 项恶意 API 载荷回归；Go/No-Go 回归锁定四方业务责任属性不再被登录角色过滤器误删。
-   当前根 39 + 居民 13 + PWA 3 = 55 项；标准在线 context 仍保持阻止 Service Worker。
+   当前根 40 + 居民 13 + PWA 3 = 56 项；标准在线 context 仍保持阻止 Service Worker。
 7. 审计验证已收敛到 `src/identity-security/audit-chain.js` 的 v2 严格端口；内容、链接、结构和重复 ID 任一异常均失败，验证 API/合规报告不再读取时重封。全量状态写入中的审计数组由服务端管理。
 8. 机器 API 授权矩阵现从路由扫描和小型认证证据合同派生 606 条声明；`production-api-catalog-v3` 与 373 个字面条件路由取并集，形成 598 个唯一接口条目（589 个字面路由、9 个运行时策略）。认证证据共 13 项且无未分类。幂等证据注册表现有 30 份直接行为合同：28 个完整 endpoint 与 2 个转诊 action-slice。T09、T04/T05、T02/T06 共关闭冻结首发范围 17 个写入口，原响应/结果快照回放、职责/资源范围、CAS、单次状态/审计提交与错误负测均由机器锚点校验；T07 标准药械状态机保持原边界。336 个写接口中 28 个 endpoint 为 `behavior-verified`，308 个仍为 `behavior-proof-required`；两个通用 action endpoint 使当前 310 项需复核，598 项全部 `NO-GO`。进程锁和 SQLite collection-version CAS 均不被解释为跨实例 exactly-once，`reviewedProofRequired` 保持为零。
 9. P1 生产适配器增量保持现有 owner：T01 的 `production-adapters.js` 承担 JWKS/JWT 与 SMS 协议；OTP、发送/登录限流和失败锁定由共享 `auth-security-state-store` 承载，单主机 SQLite 复用 `state_collections`、生产多实例使用组合根长期 PostgreSQL pool；T00 的 PostgreSQL 组合保持 shadow/rehearsal 且 `productionPrimary=false`，受控迁移评估继续失败关闭。连续审计已使用 v15 同事务 append-only source、最小投影和 checkpoint v3，worker/preflight/systemd 已进入部署制品；未签名 receipt、外部单调 anchor、真实 WORM/KMS 与现场证据使 `productionReady=false` 继续失败关闭。
@@ -139,7 +145,7 @@ flowchart TB
     `browser-safe-url-policy.v1` 复用居民短时凭据/对象存储的 HTTPS、无凭据和 exact-Origin 语义，
     为 internal navigation、official source、object storage、`tel` 与 blob download 建立唯一公共端口。
     血液主工作台、急救生命链、医生工作台、血液上线看板、陪诊工作台、产品运行驾驶舱、产品区域运行驾驶舱、质量安全工作台、区域切换工作台、血液召回面板、血液创新指挥中心及体检工作台的可信 DOM/text 切片与 Safe URL 内部闭环后，机器基线锁定
-    799 个 DOM HTML sink（32 个资产）、6 个动态 URL sink（2 个资产）和 42 个动态样式/CSSOM/runtime style element
+    793 个 DOM HTML sink（31 个资产）、6 个动态 URL sink（2 个资产）和 42 个动态样式/CSSOM/runtime style element
     （13 个资产）；体检工作台自身已无 Inventory v2 P0/P1 finding。29 个原模板 occurrence 中 28 个真实 URL 已改为无 URL 模板加 DOM 绑定，另 1 个
     `item.action` 普通赋值已从扫描误报中排除。当前 4 项是公共端口内受控 mutation/navigation，只有
     2 个缺真实 OHIF exact-Origin allowlist 的导航继续 `review-required`。每个资产/类型同时绑定

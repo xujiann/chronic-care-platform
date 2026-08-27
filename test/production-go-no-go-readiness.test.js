@@ -7,9 +7,11 @@ const { buildProductionGoNoGoReadiness, renderMarkdown } = require("../scripts/p
 
 test("go/no-go approval responsibility uses a namespace distinct from auth roles", () => {
   const source = fs.readFileSync(path.join(__dirname, "..", "production-go-no-go-ui.js"), "utf8");
-  assert.match(source, /data-approval-role="\$\{escapeHtml\(item\.role\)\}"/);
+  assert.match(source, /button\.dataset\.approvalRole = String\(item\.role \?\? ""\)/);
+  assert.match(source, /button\.dataset\.goNoGoApproval/);
   assert.match(source, /approval\.dataset\.approvalRole/);
-  assert.doesNotMatch(source, /data-role="\$\{escapeHtml\(item\.role\)\}"/);
+  assert.doesNotMatch(source, /\.dataset\.role\s*=/);
+  assert.doesNotMatch(source, /innerHTML|insertAdjacentHTML/);
 });
 
 test("global go/no-go readiness validates software controls while preserving runtime blockers", () => {

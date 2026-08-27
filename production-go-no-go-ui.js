@@ -10,14 +10,18 @@
   };
   let center = null;
 
-  function escapeHtml(value) {
-    return String(value ?? "").replace(/[&<>'"]/g, (character) => ({
-      "&": "&amp;",
-      "<": "&lt;",
-      ">": "&gt;",
-      "'": "&#39;",
-      '"': "&quot;"
-    })[character]);
+  function appendTextElement(parent, tagName, text, className = "") {
+    const element = document.createElement(tagName);
+    if (className) element.className = className;
+    element.textContent = String(text ?? "");
+    parent.appendChild(element);
+    return element;
+  }
+
+  function appendHeaderRow(table, headings) {
+    const head = table.createTHead();
+    const row = head.insertRow();
+    headings.forEach((heading) => appendTextElement(row, "th", heading));
   }
 
   function render() {
@@ -39,23 +43,76 @@
         ["全局审批", `${center.summary.approvalsRecorded}/${center.summary.approvals}`, `${center.summary.uniqueSigners}名独立签署人`],
         ["指挥决策", center.decision?.decision || "未记录", center.gate?.formalDecisionEligible ? "可提交GO决策" : "不可提交GO决策"]
       ];
-      metrics.innerHTML = rows.map(([label, value, detail]) => `<article class="metric-card"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong><small>${escapeHtml(detail)}</small></article>`).join("");
-      metrics.insertAdjacentHTML("beforeend", `<span class="sr-only" data-go-no-go-drift>${escapeHtml(center.summary.staleApprovals || 0)} stale approvals</span>`);
+      metrics.replaceChildren();
+      rows.forEach(([label, value, detail]) => {
+        const card = document.createElement("article");
+        card.className = "metric-card";
+        appendTextElement(card, "span", label);
+        appendTextElement(card, "strong", value);
+        appendTextElement(card, "small", detail);
+        metrics.appendChild(card);
+      });
+      const drift = appendTextElement(metrics, "span", `${center.summary.staleApprovals || 0} stale approvals`, "sr-only");
+      drift.dataset.goNoGoDrift = "";
     }
     if (checks) {
-      checks.innerHTML = `<table><thead><tr><th>全局前置条件</th><th>结果</th><th>证据摘要</th></tr></thead><tbody>${(center.checks || []).map((item) => `<tr><td>${escapeHtml(item.id)}</td><td><span class="badge ${item.passed ? "ok" : "danger"}">${item.passed ? "通过" : "阻断"}</span></td><td>${escapeHtml(item.detail)}</td></tr>`).join("")}</tbody></table>`;
+      const table = document.createElement("table");
+      appendHeaderRow(table, ["全局前置条件", "结果", "证据摘要"]);
+      const body = table.createTBody();
+      (center.checks || []).forEach((item) => {
+        const row = body.insertRow();
+        appendTextElement(row, "td", item.id);
+        const resultCell = row.insertCell();
+        appendTextElement(resultCell, "span", item.passed ? "通过" : "阻断", `badge ${item.passed ? "ok" : "danger"}`);
+        appendTextElement(row, "td", item.detail);
+      });
+      checks.replaceChildren(table);
     }
     if (approvals) {
-      approvals.innerHTML = `<table><thead><tr><th>责任角色</th><th>状态</th><th>签署人</th><th>证据引用</th><th>操作</th></tr></thead><tbody>${(center.approvals || []).map((item) => {
+      const table = document.createElement("table");
+      appendHeaderRow(table, ["责任角色", "状态", "签署人", "证据引用", "操作"]);
+      const body = table.createTBody();
+      (center.approvals || []).forEach((item) => {
         const approved = item.status === "approved";
         const current = approved && item.evidenceFingerprint === center.evidenceFingerprint;
         const disabled = !approved && !center.summary.prerequisiteReady;
-        return `<tr data-go-no-go-drift="${approved && !current ? "stale" : "current"}" data-go-no-go-approval-drift="${approved && !current ? "revoke-required" : "none"}"><td>${escapeHtml(ROLE_LABELS[item.role] || item.role)}</td><td>${escapeHtml(approved && !current ? "证据已变化，审批失效" : item.status)}</td><td>${escapeHtml(item.approvedBy || "-")}</td><td>${escapeHtml(item.evidenceRef || "-")}</td><td><button type="button" class="inline-action" data-go-no-go-approval="${approved ? "revoke" : "approve"}" data-approval-role="${escapeHtml(item.role)}" data-id="${escapeHtml(item.id)}" ${disabled ? "disabled" : ""}>${approved ? "撤销" : "审批"}</button></td></tr>`;
-      }).join("")}</tbody></table>`;
-      approvals.insertAdjacentHTML("beforeend", `<p class="implementation-boundary" data-go-no-go-approval-drift>${escapeHtml(center.summary.staleApprovals || 0)} stale approval(s) against the current evidence fingerprint.</p>`);
+        const row = body.insertRow();
+        row.dataset.goNoGoDrift = approved && !current ? "stale" : "current";
+        row.dataset.goNoGoApprovalDrift = approved && !current ? "revoke-required" : "none";
+        appendTextElement(row, "td", ROLE_LABELS[item.role] || item.role);
+        appendTextElement(row, "td", approved && !current ? "证据已变化，审批失效" : item.status);
+        appendTextElement(row, "td", item.approvedBy || "-");
+        appendTextElement(row, "td", item.evidenceRef || "-");
+        const actionCell = row.insertCell();
+        const button = appendTextElement(actionCell, "button", approved ? "撤销" : "审批", "inline-action");
+        button.type = "button";
+        button.dataset.goNoGoApproval = approved ? "revoke" : "approve";
+        button.dataset.approvalRole = String(item.role ?? "");
+        button.dataset.id = String(item.id ?? "");
+        button.disabled = disabled;
+      });
+      const drift = document.createElement("p");
+      drift.className = "implementation-boundary";
+      drift.textContent = `${center.summary.staleApprovals || 0} stale approval(s) against the current evidence fingerprint.`;
+      drift.dataset.goNoGoApprovalDrift = "";
+      approvals.replaceChildren(table, drift);
     }
     if (decision) {
-      decision.innerHTML = `<div class="action-row"><button type="button" class="inline-action primary" data-go-no-go-decision="GO" ${center.gate?.formalDecisionEligible ? "" : "disabled"}>记录GO</button><button type="button" class="inline-action" data-go-no-go-decision="NO-GO">记录NO-GO</button></div><p>${center.decision ? `${escapeHtml(center.decision.decision)} · ${escapeHtml(center.decision.changeTicket)} · ${escapeHtml(center.decision.decidedBy)}` : "尚未形成全局指挥决策。"}</p>`;
+      const actions = document.createElement("div");
+      actions.className = "action-row";
+      const goButton = appendTextElement(actions, "button", "记录GO", "inline-action primary");
+      goButton.type = "button";
+      goButton.dataset.goNoGoDecision = "GO";
+      goButton.disabled = !center.gate?.formalDecisionEligible;
+      const noGoButton = appendTextElement(actions, "button", "记录NO-GO", "inline-action");
+      noGoButton.type = "button";
+      noGoButton.dataset.goNoGoDecision = "NO-GO";
+      const decisionText = center.decision
+        ? `${center.decision.decision} · ${center.decision.changeTicket} · ${center.decision.decidedBy}`
+        : "尚未形成全局指挥决策。";
+      const detail = document.createElement("p");
+      detail.textContent = decisionText;
+      decision.replaceChildren(actions, detail);
     }
     if (boundary) boundary.textContent = center.boundary || "";
   }

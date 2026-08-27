@@ -53,12 +53,12 @@
 - 首发范围 19 个 legacy 集合可按实际读写调用点确认唯一 owner/readers/classification，但必须使用
   fail-closed write policy 与既有可写合同分离；owner review 完成不等于生产可写、已迁移或可晋级。
 - 关键内部边界现按 10 个职责独立组测量覆盖率：identity、audit、object storage、API governance、worker observability、区域共享、转诊、科研导出、浏览器响应头与 Safe URL；原 server.js 门禁保持不变，基线只能持平或提高，临时覆盖报告不构成浏览器页面或生产证据。
-- 在线 Playwright 继续在 39 + 13 项 context 中阻止 Service Worker；PWA 只在独立 3 项 context 中允许，
+- 在线 Playwright 继续在 40 + 13 项 context 中阻止 Service Worker；PWA 只在独立 3 项 context 中允许，
   使用同一 Chromium/动态端口策略并逐项注销 registration、删除 Cache Storage。v61 只缓存同源成功响应，
   仓库测试不替代真实 HTTPS、设备策略或现场安装验收。
 - 急救生命链、医生工作台、血液上线看板、陪诊工作台、产品运行驾驶舱、产品区域运行驾驶舱、质量安全工作台、区域切换工作台、血液召回面板与血液创新指挥中心十个单页 controller 分别将 6、6、8、8、1、1、1、2、2、10 个 API 驱动 HTML sink 迁为显式
   DOM/text/class/dataset；体检页面已将全部 27 个 HTML sink 迁为显式 DOM/text/class/dataset，
-  并把轨迹高度与 toast 显隐改为固定 CSS class。Inventory v2 的 HTML occurrence 由 871 降至 799、
+  并把轨迹高度与 toast 显隐改为固定 CSS class；生产 Go/No-Go 页面另关闭 6 个 HTML sink。Inventory v2 的 HTML occurrence 由 871 降至 793、
   动态样式由 45 降至 42；体检工作台恶意响应浏览器测试
   不替代真实托管头、渗透或现场验收。
 - strict production preflight 通过 T00 受控文件 provider 装配既有 external trust verifier；只接受独立
