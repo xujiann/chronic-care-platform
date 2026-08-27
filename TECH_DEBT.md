@@ -1,5 +1,10 @@
 # TECH DEBT — 主线技术债与风险台账
 
+## 2026-08-27 生产 Go/No-Go 页面可信渲染
+
+- `production-go-no-go-ui.js` 的 6 个 P0 HTML sink 已关闭，Inventory v2 的 DOM HTML 数从 799 降至 793，P0 finding 从 805 降至 799。
+- 页面仍依赖兼容 CSP；真实托管响应头、严格 CSP 强制、独立扫描/渗透与现场浏览器验收继续属于 SEC-004 的生产阻断项。
+
 ## 2026-08-26 T09 写接口闭环后的剩余债务
 
 | ID | 现状 | 剩余风险/下一步 |
@@ -28,7 +33,7 @@ T00 机器登记完成后，`production-release-scope` 中 17 个仓库内 API �
 | CHR-001 | 慢病随访事件投递 | 仓库内闭环已建立：SQLite v16 同事务 enqueue、专用 outbox、lease owner/token hash/version/expiry fencing、有界退避、死信、digest-only replay、独立 worker/CLI/systemd 合同与 Ed25519 activation provider；HTTP 请求路径不再同步外发 | 继续 NO-GO：真实 endpoint/凭据、外部签名 activation decision、可信签名回执、供应方幂等核对、PostgreSQL 多节点主存储、监控告警、服务启用和现场验收仍外置；只能承诺至少一次，不得宣称 exactly-once |
 | OBJ-001 | 对象存储生产闭环 | OBJ-ADR-002 已 Accepted；T08/T00 owner 固定，SQLite v17 完成结构化元数据/命令/回执/对账、无损回填与 legacy 写冻结；v2 202/status/replay、围栏 worker、退避/DLQ、scope-bound keyset 分页、部署/readiness 合同已建立 | 真实 provider status/abort capability、可信回执、KMS/WORM/扫描、容量/告警、备份恢复、PostgreSQL 多节点主存储和现场验收仍外置，production promotion=false；v1 调用方仍需按有界窗口迁移 |
 | OPS-001 | 连续审计耐久信任 | 仓库内来源缺口已关闭：v15 同事务 append-only source、最小投影、cursor 批次、target/source 绑定和 checkpoint v3 已有专项测试；已淘汰历史不可恢复，checkpoint/head 仍在同一本地信任域，SIEM receipt 未独立验签，filesystem 仅是 WORM rehearsal | 继续 NO-GO：需真实签名耐久 receipt、外部单调 anchor、WORM/KMS/保留与恢复能力、Data Owner 投影审批、专用账号及现场验收 |
-| SEC-004 | XSS / CSP 面 | 37 个可执行内联脚本、8 个样式块和 13 个静态样式属性已外移；血液主工作台 25 个、急救生命链 6 个、医生工作台 6 个、血液上线看板 8 个、陪诊工作台 8 个、血液创新指挥中心 10 个、体检工作台全部 27 个、产品运行驾驶舱、产品区域运行驾驶舱与质量安全工作台各 1 个、区域切换工作台和血液召回面板各 2 个 HTML sink 已迁为 DOM/text/class/dataset，并分别补恶意 API 载荷 E2E；体检工作台 3 个动态样式 sink 也已迁为固定 class。Inventory v2 对 145 个发布资产锁定 799 个 DOM HTML、6 个动态 URL 和 42 个动态样式风险。Safe URL port 拒绝 javascript/data/userinfo/协议相对/未批准 Origin；兼容 CSP 仍含 `unsafe-inline`，严格策略仅 Report-Only | 2 个 OHIF 导航须在真实 exact-Origin 到位后复核；全清单仍有 799 个 HTML 与 42 个动态样式 sink。真实 OHIF/对象存储 Origin、托管头、严格 CSP 强制试点、独立扫描和渗透验收前继续 NO-GO |
+| SEC-004 | XSS / CSP 面 | 既有高风险页面按小切片迁为 DOM/text/class/dataset；生产 Go/No-Go 页面新增关闭 4 个 `innerHTML` 与 2 个 `insertAdjacentHTML`，恶意状态、指标、检查、审批、证据引用和决策字段由 Chromium E2E 保护。Inventory v2 对 145 个发布资产锁定 793 个 DOM HTML、6 个动态 URL 和 42 个动态样式风险。Safe URL port 拒绝 javascript/data/userinfo/协议相对/未批准 Origin；兼容 CSP 仍含 `unsafe-inline`，严格策略仅 Report-Only | 2 个 OHIF 导航须在真实 exact-Origin 到位后复核；全清单仍有 793 个 HTML 与 42 个动态样式 sink。真实 OHIF/对象存储 Origin、托管头、严格 CSP 强制试点、独立扫描和渗透验收前继续 NO-GO |
 | SEC-005 | 混合会话 | 服务端 token 已禁止写入 localStorage，Cookie/Authorization 并存时 Cookie 优先，旧凭据自动清理；生产 bearer/hybrid 需显式兼容门禁并保持 NO-GO，静态演示仅保存无凭据身份状态 | bearer-only 仍有页面内存凭据、刷新即失效和额外运维状态；XSS/CSP 风险及真实 Cookie/CSRF 现场验证尚未关闭 |
 | DATA-008 | 集合 owner 决策 | 252/252 已有机器状态；首发范围 19 个 legacy 集合已按实际读写调用点确认唯一业务 owner/readers/classification 并冻结摘要，169 个 `review-required` 与 1 个 `legacy-quarantined` 仍无可证明数据 owner | 继续按领域 owner 分批确认、归档或迁移；已确认的 19 个仍无版本化生产写合同/migration/现场证据，固定 `productionWriteAllowed=false`，不得把 owner 审查解释为晋升 |
 | TEST-002 | 覆盖率 | 原 `server.js` c8 门禁之外，内部边界已从 4 组扩展为 10 组；新增 worker observability、区域共享命令、转诊 owner command、科研合规导出、浏览器响应头和 Safe URL，并把 API governance 基线提高到最新主线实测 99.18/100/82.9 | 其余 `src/` 与页面控制器仍不在覆盖率结论中；Safe URL 的 Node 端口覆盖不等于页面/真实 Origin 覆盖，浏览器业务仍须 Playwright；按风险继续扩展且不得降低任何已合并阈值 |
@@ -76,7 +81,7 @@ T00 机器登记完成后，`production-release-scope` 中 17 个仓库内 API �
 | SEC-010 | 2026-08-23 | strict production preflight 不再只能靠测试注入 externalTrustVerifier；可部署 provider 使用 pinned anchor bundle、Ed25519 双角色签名、撤销/时窗和 release/source/artifact/evidence/registry 精确绑定，默认仍 NO-GO | generic signed-envelope 负向矩阵、CLI 自动装配、synthetic fixture 不提升全局生产状态、deployment package/env/CI 合同与脱敏错误 |
 | DEPLOY-002 | 2026-08-23 | 切换行动定义升级为 definitions-only v2；14/14 effective status 仅由共享 Ed25519 provider 验证的当前 release/artifact 绑定决定派生，并接入 strict preflight 与 protected manual workflow；手改 `verified` 固定失败 | 缺 provider/记录、错签/撤销、异 release/digest、过期/未来时间、角色重合、重复 signer、缺转换历史/命令回执、symlink/超限、错误脱敏与 digest-only receipt 负向测试 |
 | TEST-007 | 2026-08-23 | 复用既有 T02 handoff harness，对 operations-command 32/32 路径建立数据驱动运行时矩阵；覆盖 19 条只读、13 条写入、三条签名集成入口及 institution 范围 | 闭集唯一性、role/deny-before-read、payload/400/403/404、响应/副作用、审计—写入顺序、审计和写入失败语义；governance-api 显式专项门禁 |
-| TEST-005 | 2026-08-23 | 本地/CI 统一 Playwright Chromium；在线根 39 项与居民 13 项继续阻止 Service Worker；PWA 3 项使用独立允许策略、动态端口和临时数据；Go/No-Go 四方业务责任属性不再复用登录角色 `data-role` | 55 项唯一并集/漂移测试、居民同文件 13/13、PWA 重复 9/9、完整标准 E2E；不得把仓库浏览器测试解释为真实 HTTPS、托管安全头或现场验收 |
+| TEST-005 | 2026-08-27 | 本地/CI 统一 Playwright Chromium；在线根 40 项与居民 13 项继续阻止 Service Worker；PWA 3 项使用独立允许策略、动态端口和临时数据；Go/No-Go 同时覆盖四方业务责任属性与恶意响应可信渲染 | 56 项唯一并集/漂移测试、居民同文件 13/13、PWA 重复 9/9、完整标准 E2E；不得把仓库浏览器测试解释为真实 HTTPS、托管安全头或现场验收 |
 | TEST-008 | 2026-08-23 | 专用 PWA/Service Worker E2E 验证居民登录后安装、v60→v61 激活清理、受控 update、离线 mobile/citizen 回退、API/源快照 404 缓存边界与逐项注销/清缓存 | 真实 HTTPS 终止、OS 安装提示/策略、浏览器设备矩阵、外部 Origin、现场缓存升级与独立安全验收继续外置；仓库测试不产生生产 GO |
 | GOV-001 | 2026-08-23 | `main`/`origin/main` 成为唯一当前集成与默认开发基线；固定 governance tag 仅作可复现证据，旧日期化 workflow 原文冻结 | process plan/verify 默认值、manifest/AGENTS/iteration program 漂移和 CI 目标分支负向测试 |
 | DOC-001 | 2026-08-24 | 当前 267 份 Markdown 以路径和 ADR 台账唯一分类为 198 current、68 snapshot、1 superseded；不删除历史证据 | 闭集路径/分类摘要、规则重叠、ADR status 和 snapshot 内容聚合摘要失败关闭 |

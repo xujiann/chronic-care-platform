@@ -1,5 +1,9 @@
 # API MAP — 主线接口地图
 
+## 2026-08-27 生产 Go/No-Go 页面（无 API 变化）
+
+`GET /api/production-go-no-go/center` 及审批、撤销、决策写接口的 method/path、鉴权、请求、响应、错误和审计语义均未改变。客户端仅将六个字符串 HTML sink 替换为 DOM/text/class/dataset 渲染，并由恶意响应 E2E 锁定。
+
 ## 2026-08-26 T09 八个写入口行为
 
 | 接口 | 角色/职责 | 成功副作用 |
@@ -94,7 +98,7 @@ HTTP request
 - HTML、静态资源、JSON/API、下载与错误响应由集中端口下发 `nosniff`、frame、referrer、
   permissions 与 CSP。显式发布图的内联脚本/样式静态风险已归零，但兼容 CSP 仍含 `unsafe-inline`，
   严格目标只为 Report-Only；血液主工作台、急救生命链、医生工作台、血液上线看板、陪诊工作台、产品运行驾驶舱、产品区域运行驾驶舱、质量安全工作台、区域切换工作台、血液召回面板、血液创新指挥中心及体检工作台 API 字段已使用 DOM/text 节点，Inventory v2 已把
-  799 个 DOM HTML、6 个动态 URL 和 42 个动态样式
+  793 个 DOM HTML、6 个动态 URL 和 42 个动态样式
   sink 作为资产级治理事实锁定。`browser-safe-url-policy.v1` 将可证明的内部导航、对象存储、`tel:120`
   和 blob 下载迁入统一协议/无凭据/exact-Origin 检查；29 个原模板 occurrence 已由 28 个真实 DOM
   绑定迁移和 1 个扫描误报校正闭合，仅 2 个 OHIF 导航保持 `review-required`。该变化不改变任何
@@ -296,7 +300,7 @@ profile、profile 替换、额外字段和生产授权扩张均失败关闭。�
 ## 20. Playwright E2E 隔离（无 HTTP 变化）
 
 TEST-005 只改变测试进程、浏览器与临时端口装配，不新增或改变任何 HTTP method/path、鉴权、角色、
-scope、错误、幂等或审计语义。根 39 项与居民 13 项继续调用现有接口；动态回环端口和临时数据只用于
+scope、错误、幂等或审计语义。根 40 项与居民 13 项继续调用现有接口；动态回环端口和临时数据只用于
 自动化验证，不能登记为公开 API、生产 endpoint 或现场证据。
 
 PWA 专项增加 3 项独立浏览器行为测试，但不新增测试控制 HTTP API：仍由现有 `/api/health` 探活并使用
