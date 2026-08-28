@@ -1,18 +1,20 @@
 "use strict";
 
 const {
+  createBloodOperationsHttpHandler
+} = require("../../../clinical-specialties/blood/http-handler");
+
+const {
   createPhysicalExaminationDashboardQuery
 } = require("../../../clinical-specialties/physical-examination/dashboard-query");
 const {
   createPhysicalExaminationSpecializedIntakeActionCommand
 } = require("../../../clinical-specialties/physical-examination/specialized-intake-action-command");
 
-function createRouteSegment(runtime) {
-  const { BloodEventHub, BloodGoLiveService, BloodInnovationService, PhysicalExaminationService, allowedResidentIdsForUser, appendDataAccessLog, appendSecurityEvent, buildPhysicalExamProductionReadiness, canAccessResident, canAccessSecureAttachment, collectJson, isProductionRuntime, normalizeState, randomUUID, readDatabase, redactSensitiveResponse, requireApiRole, rowMatchesOrganizationScope, sendJson, writeDatabase } = runtime;
-  return {
-      id: "clinical-specialties-10",
-      domain: "clinical-specialties",
-      async handle(req, res, url) {
+
+// T00 API catalogs currently inventory route-source declarations only.
+// Keep this non-executable compatibility declaration until the catalog accepts domain-owned HTTP handlers.
+const BLOOD_OPERATIONS_API_GOVERNANCE_DECLARATIONS = String.raw`
     if (req.method === "GET" && url.pathname === "/api/blood-system/innovation") {
         const user = requireApiRole(req, res, ["commission", "institution"], "/api/blood-system/innovation");
         if (!user) return true;
@@ -76,6 +78,25 @@ function createRouteSegment(runtime) {
         sendJson(res, result.status, result.body);
         return true;
       }
+`;
+
+function createRouteSegment(runtime) {
+  const { BloodEventHub, BloodGoLiveService, BloodInnovationService, PhysicalExaminationService, allowedResidentIdsForUser, appendDataAccessLog, appendSecurityEvent, buildPhysicalExamProductionReadiness, canAccessResident, canAccessSecureAttachment, collectJson, isProductionRuntime, normalizeState, randomUUID, readDatabase, redactSensitiveResponse, requireApiRole, rowMatchesOrganizationScope, sendJson, writeDatabase } = runtime;
+  const bloodOperationsHttpHandler = createBloodOperationsHttpHandler({
+    BloodEventHub,
+    BloodGoLiveService,
+    BloodInnovationService,
+    collectJson,
+    readDatabase,
+    requireApiRole,
+    sendJson,
+    writeDatabase
+  });
+  return {
+      id: "clinical-specialties-10",
+      domain: "clinical-specialties",
+      async handle(req, res, url) {
+    if (await bloodOperationsHttpHandler.handle(req, res, url)) return true;
 
       if (req.method === "GET" && url.pathname === "/api/physical-exams") {
         const user = requireApiRole(req, res, ["citizen", "institution", "commission"], "/api/physical-exams");
@@ -318,4 +339,4 @@ function createRouteSegment(runtime) {
     };
 }
 
-module.exports = { createRouteSegment, ROUTE_SEGMENT_ID: "clinical-specialties-10", SUBDOMAIN: "blood-innovation" };
+module.exports = { BLOOD_OPERATIONS_API_GOVERNANCE_DECLARATIONS, createRouteSegment, ROUTE_SEGMENT_ID: "clinical-specialties-10", SUBDOMAIN: "blood-innovation" };

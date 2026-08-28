@@ -129,7 +129,7 @@ scripts/platform-cutover-alert-worker.js
 | 子域 | Owner | API 字面路径 | 边界状态 |
 |---|---|---:|---|
 | emergency | T06/emergency | 37 | 急救/信号前缀已唯一归属；dashboard 查询已进入目标源码根 |
-| blood | T06/blood | 28 | dashboard 查询已进入目标源码根；其余仍与 imaging、physical-examination 混合 |
+| blood | T06/blood | 28 | `/api/blood-system` handler 与九个服务端实现已进入目标源码根；旧混合路由只保留兼容编排，根入口只保留导出 shim |
 | imaging | T06/imaging | 17 | dashboard、公开响应净化及 share/QC 两个写用例已进入目标源码根 |
 | physical-examination | T06/physical-examination | 7 | dashboard 查询与专项分流 action command 已进入目标源码根；其余写命令仍与 blood-innovation 混合 |
 | quality-safety | T06/quality-safety | 14 | 写模型限定为质量自有数据 |
@@ -355,3 +355,15 @@ strict preflight。candidate 用部署 anchor 摘要检查漂移，只聚合五�
 首发 19 个 legacy 集合的 owner 审查通过冻结 decision digest 与实际读写源码证据闭合，发布范围的
 `collectionReviewRequired` 因此为 0；这不改变它们的 `productionWriteAllowed=false`，也不改变所有
 集合的 `productionPromotionAllowed=false`。
+
+## 2026-08-28 血液子域模块边界
+
+| 模块 | Owner | 职责 | 兼容边界 |
+|---|---|---|---|
+| `src/clinical-specialties/blood/index.js` | T06/blood | 冻结的开发入口，统一导出 boundary、contracts、HTTP factory 与 services | 不作为独立进程或生产部署入口 |
+| `src/clinical-specialties/blood/http-handler.js` | T06/blood | 全部 `/api/blood-system` HTTP 处理 | 由两个既有 route segment 在原顺序委托 |
+| `src/clinical-specialties/blood/{service,transaction-service,integration-gateway,business-service,innovation-service,event-hub,go-live-service}.js` | T06/blood | 血液业务、事务、集成、创新、事件和上线控制唯一实现 | 根目录同名入口仅 re-export |
+| `boundary.js` / `state-repository.js` | T06/blood | 冻结 API/集合/端口/契约；限制遗留状态写边界 | 仍提交完整遗留快照，不宣称数据库自治 |
+| `cross-domain-contracts.js` | T06/blood | 三个 v1 投影字段和兼容投影 | 既有 consumer 字段保留并只做加法扩展 |
+
+模块当前分类为 B/C 过渡：源码和 HTTP 实现已可独立开发、测试；共享组合根、静态页面发布、生产数据 Owner、数据库与部署仍由平台统一治理。

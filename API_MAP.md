@@ -432,3 +432,9 @@ dataset 与受控 attribute，连同前一切片共关闭该资产 27 个 HTML s
 `owner-reviewed-legacy`。这只关闭 repository owner review，不新增或改变任何 HTTP method/path、请求、
 响应、鉴权、审计或副作用；显式 `legacy-owner-review-write-policy.v1` 仍拒绝生产写入和晋升，旧
 JSON/SQLite/state API 不能据 owner 登记自动成为生产写接口。
+
+## 38. 血液 HTTP 实现归域（协议不变）
+
+全部既有 `/api/blood-system` method/path 已从两个混合 route segment 的业务分支迁入 `src/clinical-specialties/blood/http-handler.js`。`clinical-specialties-06` 与 `clinical-specialties-10` 仍在原 manifest 插槽按原顺序调用血液 handler 后再处理影像或体检，因此未新增、删除或重排公开 API；认证角色、body 读取时机、幂等键、状态码、响应和持久化条件保持原行为。
+
+跨域投影在兼容字段基础上新增 `projectionId`、`status`、`sourceSubdomain` 和 `subjectRef`，使 `blood-emergency-coordination.v1`、`blood-quality-signal.v1`、`clinical-quality-observation.v1` 的必需字段可机器验证。该变化为加法兼容，不授权 consumer 反向写血液数据。

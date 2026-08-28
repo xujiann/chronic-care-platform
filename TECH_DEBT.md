@@ -34,7 +34,7 @@ T00 机器登记完成后，`production-release-scope` 中 17 个仓库内 API �
 | ARC-001 | 超大组合根 | `server.js` 约 28.7k 行 | 变更冲突、初始化耦合、难隔离测试 |
 | ARC-003 | 宽接口 | public-health runtime context 160 个依赖 | 组合根和路由同步变化，难形成领域端口 |
 | ARC-004 | 前端超大模块 | 数智医院 app 10.5k、citizen 6k、公卫 4.4k | 全局状态、渲染和流程耦合 |
-| ARC-007 | 临床子域隔离 | 急救、血液、影像、体检首个查询端口已建立；影像 share/QC 与体检专项分流 action 三个写用例已有目标命令端口、单元测试及顺序/失败特征保护。两个混合路由仍承载其余写命令；血液 GET 有内存规范化，影像和体检 GET 有审计持久化；33 个 operations 字面路径已全部移交 T02 | 继续按特征测试逐用例迁移；专项分流仍使用宽快照/同步写入，未新增幂等、CAS 或事务边界；QC 仍缺幂等、CAS、机构范围且外调先于本地写入；`clinical-blood` 仍混合 blood/imaging，`blood-innovation` 仍混合 blood/physical-examination；禁止已迁用例和 operations 回流，不把兼容切片误写为生产闭环 |
+| ARC-007 | 临床子域隔离 | 血液 API/服务端唯一实现、集合白名单端口和 v1 跨域投影已归入目标源码根；两个旧 route segment 对血液只做兼容编排。影像/体检遗留实现仍分别留在旧 segment，33 个 operations 字面路径已移交 T02 | 继续拆分影像/体检 route segment 并由 T00 收窄运行时 subcontext；血液仍使用共享快照、中央组合根和统一部署，dashboard 保留原始对象身份兼容读取；不得据此宣称数据库自治或独立服务 |
 | CHR-001 | 慢病随访事件投递 | 仓库内闭环已建立：SQLite v16 同事务 enqueue、专用 outbox、lease owner/token hash/version/expiry fencing、有界退避、死信、digest-only replay、独立 worker/CLI/systemd 合同与 Ed25519 activation provider；HTTP 请求路径不再同步外发 | 继续 NO-GO：真实 endpoint/凭据、外部签名 activation decision、可信签名回执、供应方幂等核对、PostgreSQL 多节点主存储、监控告警、服务启用和现场验收仍外置；只能承诺至少一次，不得宣称 exactly-once |
 | OBJ-001 | 对象存储生产闭环 | OBJ-ADR-002 已 Accepted；T08/T00 owner 固定，SQLite v17 完成结构化元数据/命令/回执/对账、无损回填与 legacy 写冻结；v2 202/status/replay、围栏 worker、退避/DLQ、scope-bound keyset 分页、部署/readiness 合同已建立 | 真实 provider status/abort capability、可信回执、KMS/WORM/扫描、容量/告警、备份恢复、PostgreSQL 多节点主存储和现场验收仍外置，production promotion=false；v1 调用方仍需按有界窗口迁移 |
 | OPS-001 | 连续审计耐久信任 | 仓库内来源缺口已关闭：v15 同事务 append-only source、最小投影、cursor 批次、target/source 绑定和 checkpoint v3 已有专项测试；已淘汰历史不可恢复，checkpoint/head 仍在同一本地信任域，SIEM receipt 未独立验签，filesystem 仅是 WORM rehearsal | 继续 NO-GO：需真实签名耐久 receipt、外部单调 anchor、WORM/KMS/保留与恢复能力、Data Owner 投影审批、专用账号及现场验收 |
@@ -174,3 +174,10 @@ T00 机器登记完成后，`production-release-scope` 中 17 个仓库内 API �
 - `DEPLOY-003` 已关闭：首批八应用不再只靠文档描述，范围数量、摘要和部署包绑定可机器校验。
 - 仓库审查：32 个 scoped API 的 repository behavior review 已全部关闭，范围 `apiReviewRequired=0`；首发 19 个 legacy 数据引用也已关闭 owner/governance review，范围 `collectionReviewRequired=0`。它们与 T05 `referrals` exact source binding、T00 `operationsReadiness` derived read model 共 21 个引用仍不具备生产写资格，且全部 38 个引用禁止生产晋级。
 - 仍外置：14 个外部依赖/14 个切换行动的真实签名证据、7 个 worker 的现场激活、PostgreSQL 主存储选择以及完整 smoke/回滚/验收。任何一项不得以冻结指纹替代，当前生产状态固定 NO-GO。
+
+## 2026-08-28 血液子域剩余债务
+
+- 已关闭：根目录九份重复服务实现、两个混合路由内的血液业务分支、未冻结的跨域投影必需字段、写命令可无声明访问任意顶层集合。
+- 仍保留：`blood-domain.js` 与 `blood-standard-registry.js` 是浏览器直接加载的根静态适配器；静态资产构建体系建立前不能改成 CommonJS shim。
+- T00 待办：中央 `clinical-subdomains` 的 mixed/partial 状态、运行时 subcontext 拆分、独立 CI 映射与部署打包；这些 protected path 不在 T06 分支越权修改。
+- 数据待办：34 个实际集合尚未获得中央生产 Owner、schema/migration、事务/outbox、回填/回滚和 PostgreSQL 验证，独立部署评分仍不满足。当前结论仍是“可独立开发和测试，不能独立上线”。

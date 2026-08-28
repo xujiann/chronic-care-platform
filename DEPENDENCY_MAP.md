@@ -405,3 +405,9 @@ readers/classification + fail-closed write policy → collection-governance 状�
 production-release-scope repository review`。源码 process owner 仅是证据，不能反向决定数据 owner；
 发布范围校验也不能反向授权 legacy JSON/SQLite writer。19 个 owner-reviewed legacy 关闭
 `collectionReviewRequired`，仍要求版本化写合同、migration、回填/恢复、PostgreSQL 与现场证据。
+
+## 血液子域独立依赖方向（2026-08-28）
+
+当前方向为 `共享组合根 capabilities → 原两个 route segment 兼容编排 → blood/http-handler → blood use cases/services → blood state repository → legacy writeDatabase`。血液 handler 不包含影像、体检、急救或质量安全 API；根目录九个 Node 模块只单向 re-export 子域实现，子域实现不依赖 `server.js`。
+
+跨域读取方向为 `blood event-hub → blood/cross-domain-contracts.v1 → emergency / quality-safety read model`，投影具备三个登记契约的必需字段。仍存在三项平台耦合：组合根向两个遗留 route subcontext 注入宽 capability 集、状态 repository 最终提交共享快照、`innovation-service` 使用 T00 区域上下文。以上均是显式平台端口或兼容层，不得反向演变为子域间实现导入。

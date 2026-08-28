@@ -4,6 +4,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 const ROOT = path.resolve(__dirname, "..");
+const BLOOD_SOURCE_ROOT = "src/clinical-specialties/blood";
 
 function readText(relativePath) {
   return fs.readFileSync(path.join(ROOT, relativePath), "utf8");
@@ -13,12 +14,16 @@ function readJson(relativePath) {
   return JSON.parse(readText(relativePath));
 }
 
+function readBloodSource(name) {
+  return readText(`${BLOOD_SOURCE_ROOT}/${name}.js`);
+}
+
 function buildBloodSystemReadinessReport(options = {}) {
   const html = options.html ?? readText("blood.html");
   const js = options.js ?? readText("blood.js");
-  const server = options.server ?? readRuntimeSource(ROOT);
-  const transaction = options.transaction ?? readText("blood-transaction-service.js");
-  const service = options.service ?? readText("blood-service.js");
+  const server = options.server ?? `${readRuntimeSource(ROOT)}\n${readBloodSource("http-handler")}`;
+  const transaction = options.transaction ?? readBloodSource("transaction-service");
+  const service = options.service ?? readBloodSource("service");
   const dashboardQuery = options.dashboardQuery ?? readText("src/clinical-specialties/blood/dashboard-query.js");
   const emergencyDashboardQuery = options.emergencyDashboardQuery ?? readText("src/clinical-specialties/emergency/dashboard-query.js");
   const qualitySafetyDashboardQuery = options.qualitySafetyDashboardQuery ?? readText("src/clinical-specialties/quality-safety/dashboard-query.js");
@@ -30,8 +35,11 @@ function buildBloodSystemReadinessReport(options = {}) {
   const artifactManifest = options.artifactManifest ?? readText("scripts/release-artifact-manifest.js");
   const deployCheck = options.deployCheck ?? readText("scripts/deploy-check.js");
   const goLive = options.goLive ?? require(path.join(ROOT, "blood-go-live-service.js")).center({});
+  const boundary = options.boundary ?? require(path.join(ROOT, BLOOD_SOURCE_ROOT, "boundary.js")).BLOOD_DOMAIN_BOUNDARY;
   const checks = [
     ["双角色工作台", /data-role="center"/.test(html) && /data-role="hospital"/.test(html)],
+    ["血液子域唯一源码边界", boundary.sourceRoot === BLOOD_SOURCE_ROOT && boundary.apiPrefixes.length === 1 && boundary.apiPrefixes[0] === "/api/blood-system"],
+    ["血液子域独立部署保持关闭", boundary.deployment.current === "shared-node-runtime" && boundary.deployment.independentDeploymentAuthorized === false],
     ["血站六大业务域", ["献血者服务", "血液采集", "成分制备", "血液检测", "储存发放运输", "质量管理"].every((item) => js.includes(item))],
     ["临床用血闭环", ["用血申请", "交叉配血", "床旁输注", "输血后评价"].every((item) => html.includes(item) || js.includes(item))],
     ["唯一标识与双向追溯", html.includes("一袋血双向追溯") && js.includes("CN2102")],
@@ -42,7 +50,7 @@ function buildBloodSystemReadinessReport(options = {}) {
     ["区域应急与风险预警", domain.standards.some((item) => item.id === "PLAN-EMG") && domain.standards.some((item) => item.id === "PLAN-RISK")],
     ["BIS-BTIS交换契约", domain.buildExchangeMessage("delivery_receipt", {}).standard.includes("WS/T 866")],
     ["服务端持久化接口", server.includes('url.pathname === "/api/blood-system"') && server.includes("BloodService.transitionBloodUnit")],
-    ["角色数据范围", readText("blood-service.js").includes("canSeeRequest")],
+    ["角色数据范围", service.includes("canSeeRequest")],
     ["献血者屏蔽与回告", server.includes("donorSafetyCases") && js.includes("notificationStatus")],
     ["标本拒收门禁", server.includes("BloodService.assessSpecimen") && js.includes("标本拒收")],
     ["报告收回与召回", server.includes("BloodService.createRecall") && js.includes("报告收回联动")],
@@ -62,29 +70,29 @@ function buildBloodSystemReadinessReport(options = {}) {
     ["血液角色和权限种子", server.includes("BLOOD-DL") && server.includes("u-blood-quality") && server.includes("u-blood-tech-1") && server.includes("bloodPermissions")],
     ["默认测试与覆盖率门禁", pkg.scripts?.pretest?.includes("test/blood-transaction-service.test.js") && pkg.scripts?.["pretest:coverage"]?.includes("blood-system:test")],
     ["CI发布链覆盖", ci.includes("npm run blood-system:readiness") && releaseReport.includes("blood-system:readiness") && artifactManifest.includes("blood-system:readiness") && deployCheck.includes("blood-system:readiness")]
-    ,["Versioned blood master data", server.includes("BloodMasterData.snapshot") && readText("blood-master-data.js").includes("recallDispositions")],
+    ,["Versioned blood master data", server.includes("BloodMasterData.snapshot") && readBloodSource("master-data").includes("recallDispositions")],
     ["Recall acknowledgement and closure", server.includes("acknowledgeRecall") && server.includes("closeRecall")],
     ["Reaction investigation closure", server.includes("investigateReaction")],
     ["Emergency allocation execution", server.includes("actEmergencyAllocation")],
     ["Recall acknowledgement idempotency and exchange", service.includes("acknowledgementSummary") && service.includes("bloodIdempotencyRecords") && server.includes("idempotencyKey") && domain.buildExchangeMessage("recall_acknowledgement", {}).type === "recall_acknowledgement"],
     ["Recall institution confirmation UI", html.includes("blood-recall.js") && readText("blood-recall.js").includes("data-recall-action")]
-    ,["Blood integration contract registry", server.includes("BloodIntegrationGateway.dashboard") && readText("blood-integration-gateway.js").includes("IOT-TEMPERATURE")],
-    ["Integration idempotency and dead letter", server.includes("BloodIntegrationGateway.retry") && server.includes("bloodIntegrationDeadLetters") && readText("blood-integration-gateway.js").includes("idempotentReplay")],
-    ["Hospital and regional exchange mapping", readText("blood-integration-gateway.js").includes("WS/T 866+WS/T 867-2025") && readText("blood-integration-gateway.js").includes("REGIONAL-REPORT")]
+    ,["Blood integration contract registry", server.includes("BloodIntegrationGateway.dashboard") && readBloodSource("integration-gateway").includes("IOT-TEMPERATURE")],
+    ["Integration idempotency and dead letter", server.includes("BloodIntegrationGateway.retry") && server.includes("bloodIntegrationDeadLetters") && readBloodSource("integration-gateway").includes("idempotentReplay")],
+    ["Hospital and regional exchange mapping", readBloodSource("integration-gateway").includes("WS/T 866+WS/T 867-2025") && readBloodSource("integration-gateway").includes("REGIONAL-REPORT")]
     ,["Integration operations workbench", html.includes('id="integration"') && js.includes("renderIntegration")],
     ["Integration test and retry actions", js.includes("IOT-TEMPERATURE/receive") && js.includes("dead-letters/")]
-    ,["All BIS and BTIS business domains", server.includes("BloodBusinessService.dashboard") && readText("blood-business-service.js").includes("autologous-treatment")],
+    ,["All BIS and BTIS business domains", server.includes("BloodBusinessService.dashboard") && readBloodSource("business-service").includes("autologous-treatment")],
     ["Business records and governed actions", server.includes("BloodBusinessService.create") && server.includes("BloodBusinessService.action")]
-    ,["All business state transitions are ordered", readText("blood-business-service.js").includes("rule.transitions?.[from]") && Object.values(require(path.join(ROOT, "blood-business-service.js")).resourceRules).every((rule)=>rule.statuses.every((status)=>Array.isArray(rule.transitions[status])))]
+    ,["All business state transitions are ordered", readBloodSource("business-service").includes("rule.transitions?.[from]") && Object.values(require(path.join(ROOT, "blood-business-service.js")).resourceRules).every((rule)=>rule.statuses.every((status)=>Array.isArray(rule.transitions[status])))]
     ,["Role-scoped business operations UI", readText("blood-business.html").includes("血液业务中心") && readText("blood-business.js").includes("business/resources")],
     ["All business page entry", html.includes("blood-business.html")],
-    ["Thirteen innovation capabilities", readText("blood-innovation-service.js").includes('"pda-bedside"') && require(path.join(ROOT, "blood-innovation-service.js")).capabilities.length === 13],
-    ["Digital twin and regional inventory", readText("blood-innovation-service.js").includes("function twin") && readText("blood-innovation-service.js").includes("function inventoryNodes")],
-    ["Forecast recruitment and rational-use engine", readText("blood-innovation-service.js").includes("function forecast") && readText("blood-innovation-service.js").includes("function rationalUse")],
-    ["PDA and automated compliance actions", server.includes("BloodInnovationService.execute") && readText("blood-innovation-service.js").includes('capabilityId === "pda-bedside"') && readText("blood-innovation-service.js").includes('capabilityId === "compliance-check"')],
+    ["Thirteen innovation capabilities", readBloodSource("innovation-service").includes('"pda-bedside"') && require(path.join(ROOT, "blood-innovation-service.js")).capabilities.length === 13],
+    ["Digital twin and regional inventory", readBloodSource("innovation-service").includes("function twin") && readBloodSource("innovation-service").includes("function inventoryNodes")],
+    ["Forecast recruitment and rational-use engine", readBloodSource("innovation-service").includes("function forecast") && readBloodSource("innovation-service").includes("function rationalUse")],
+    ["PDA and automated compliance actions", server.includes("BloodInnovationService.execute") && readBloodSource("innovation-service").includes('capabilityId === "pda-bedside"') && readBloodSource("innovation-service").includes('capabilityId === "compliance-check"')],
     ["Innovation command center UI", html.includes("blood-innovation.html") && readText("blood-innovation.html").includes("13项亮点能力") && readText("blood-innovation.js").includes("/api/blood-system/innovation")],
-    ["Cross-module blood event contracts", require(path.join(ROOT, "blood-event-hub.js")).contracts.length === 6 && readText("blood-event-hub.js").includes('"quality-safety"') && readText("blood-event-hub.js").includes('"health-dashboard"')],
-    ["Event idempotency dead letter and retry", readText("blood-event-hub.js").includes("stableId") && readText("blood-event-hub.js").includes('status: options.failConsumer === consumer ? "dead_letter"') && server.includes("BloodEventHub.retry")],
+    ["Cross-module blood event contracts", require(path.join(ROOT, "blood-event-hub.js")).contracts.length === 6 && readBloodSource("event-hub").includes('"quality-safety"') && readBloodSource("event-hub").includes('"health-dashboard"')],
+    ["Event idempotency dead letter and retry", readBloodSource("event-hub").includes("stableId") && readBloodSource("event-hub").includes('status: options.failConsumer === consumer ? "dead_letter"') && server.includes("BloodEventHub.retry")],
     ["Cross-module event operations UI", readText("blood-innovation.html").includes("跨模块事件枢纽") && readText("blood-innovation.js").includes("publish-events") && server.includes('url.pathname === "/api/blood-system/events/publish"')],
     ["Four consumer dashboards receive blood projections", ["emergency.html", "quality-safety.html", "operations.html", "health-dashboard.html"].every((file) => readText(file).includes("blood-coordination")) && ["emergency.js", "quality-safety.js", "operations.js", "health-dashboard.js"].every((file) => readText(file).includes("renderBloodCoordination"))],
     ["Consumer APIs expose scoped blood coordination", server.includes("dashboard.bloodCoordination")
@@ -95,12 +103,12 @@ function buildBloodSystemReadinessReport(options = {}) {
     ["Blood production cutover center", server.includes("BloodGoLiveService.center") && readText("blood-go-live.html").includes("临床用血独立模块上线控制中心") && readText("blood-go-live.js").includes("/api/blood-system/go-live")],
     ["WS/T 866 dataset registry", require(path.join(ROOT, "blood-standard-registry.js")).coverage().completeSubsetCoverage && readText("blood-go-live.html").includes("gl-standard-registry")],
     ["Clinical six-gate production view", readText("blood-go-live.js").includes("receiptsValid") && readText("blood-go-live.js").includes("rollbackPassed") && readText("blood-go-live.html").includes("gl-clinical-gates")],
-    ["Crossmatch operation review release separation", readText("blood-clinical-production.js").includes("crossmatch-operation-review") && readText("blood-clinical-production.js").includes("independent report releaser")],
-    ["Component-specific cold-chain profiles", readText("blood-clinical-production.js").includes("coldChainProfiles") && readText("blood-clinical-production.js").includes("agitationRequired") && readText("blood-clinical-production.js").includes("frozenRequired")],
-    ["Pretransfusion historical compatibility gate", readText("blood-clinical-production.js").includes("assessPretransfusionCompatibility") && readText("blood-clinical-production.js").includes("historical blood type mismatch")],
-    ["Standalone semantic dependency scan", readText("blood-clinical-production.js").includes("optionalIntegrations") && readText("blood-clinical-production.js").includes("requiredDependencies")],
-    ["Formal go-live boundary preserved", readText("blood-go-live-service.js").includes("blocked-until-site-evidence-signed") && readText("blood-go-live-service.js").includes("ready-for-production") && readText("blood-go-live-service.js").includes("independent verification") && readText("blood-go-live-service.js").includes("previousDigest") && readText("blood-go-live-service.js").includes("\"GENESIS\"")],
-    ["Interfaces drills migrations and dual approvals", ["bloodGoLiveEndpoints","bloodGoLiveDrills","bloodMigrationBatches","bloodCutoverApprovals"].every((token)=>readText("blood-go-live-service.js").includes(token)) && server.includes("BloodGoLiveService.signApproval")]
+    ["Crossmatch operation review release separation", readBloodSource("clinical-production").includes("crossmatch-operation-review") && readBloodSource("clinical-production").includes("independent report releaser")],
+    ["Component-specific cold-chain profiles", readBloodSource("clinical-production").includes("coldChainProfiles") && readBloodSource("clinical-production").includes("agitationRequired") && readBloodSource("clinical-production").includes("frozenRequired")],
+    ["Pretransfusion historical compatibility gate", readBloodSource("clinical-production").includes("assessPretransfusionCompatibility") && readBloodSource("clinical-production").includes("historical blood type mismatch")],
+    ["Standalone semantic dependency scan", readBloodSource("clinical-production").includes("optionalIntegrations") && readBloodSource("clinical-production").includes("requiredDependencies")],
+    ["Formal go-live boundary preserved", readBloodSource("go-live-service").includes("blocked-until-site-evidence-signed") && readBloodSource("go-live-service").includes("ready-for-production") && readBloodSource("go-live-service").includes("independent verification") && readBloodSource("go-live-service").includes("previousDigest") && readBloodSource("go-live-service").includes("\"GENESIS\"")],
+    ["Interfaces drills migrations and dual approvals", ["bloodGoLiveEndpoints","bloodGoLiveDrills","bloodMigrationBatches","bloodCutoverApprovals"].every((token)=>readBloodSource("go-live-service").includes(token)) && server.includes("BloodGoLiveService.signApproval")]
   ];
   const normalizedChecks = checks.map((item) => ({ name: item?.[0] || "Unnamed check", ok: Boolean(item?.[1]) }));
   return {

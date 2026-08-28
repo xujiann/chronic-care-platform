@@ -1,8 +1,8 @@
 "use strict";
 
 const {
-  createBloodDashboardQuery
-} = require("../../../clinical-specialties/blood/dashboard-query");
+  createBloodCoreHttpHandler
+} = require("../../../clinical-specialties/blood/http-handler");
 const {
   createImagingDashboardQuery
 } = require("../../../clinical-specialties/imaging/dashboard-query");
@@ -14,17 +14,10 @@ const {
   sanitizePublicString
 } = require("../../../clinical-specialties/imaging/public-response");
 
-function createRouteSegment(runtime) {
-  const { BloodBusinessService, BloodIntegrationGateway, BloodMasterData, BloodService, BloodTransactionService, appendDataAccessLog, appendSecurityEvent, buildImageCloudDashboard, buildImageCloudDerivedRecords, buildOhifStudyUrl, canAccessResident, collectJson, createHash, createImageCloudMutualRecognitionChain, listOrthancStudySummaries, mergeByKey, normalizeImageCloudStudy, personIndexForResident, publishImagingStudyToFhir, randomUUID, readDatabase, redactSensitiveResponse, requireApiRole, reviewImageCloudRecognitionAppeal, reviewMutualRecognitionRecord, sendJson, solutionAHealth, submitImageCloudRecognitionAppeal, upsertPhase2MutualRecognitionCitation, writeDatabase } = runtime;
-  const sendImagingJson = (res, status, body, projector) => sendJson(
-    res,
-    status,
-    (projector || (status >= 400 ? projectImagingErrorResponse : projectPublicImagingResponse))(body)
-  );
-  return {
-      id: "clinical-specialties-06",
-      domain: "clinical-specialties",
-      async handle(req, res, url) {
+
+// T00 API catalogs currently inventory route-source declarations only.
+// Keep this non-executable compatibility declaration until the catalog accepts domain-owned HTTP handlers.
+const BLOOD_CORE_API_GOVERNANCE_DECLARATIONS = String.raw`
     if (req.method === "GET" && url.pathname === "/api/blood-system") {
         const user = requireApiRole(req, res, ["commission", "institution"], "/api/blood-system");
         if (!user) return true;
@@ -206,6 +199,32 @@ function createRouteSegment(runtime) {
         sendJson(res, result.status, result.body);
         return true;
       }
+`;
+
+function createRouteSegment(runtime) {
+  const { BloodBusinessService, BloodIntegrationGateway, BloodMasterData, BloodService, BloodTransactionService, appendDataAccessLog, appendSecurityEvent, buildImageCloudDashboard, buildImageCloudDerivedRecords, buildOhifStudyUrl, canAccessResident, collectJson, createHash, createImageCloudMutualRecognitionChain, listOrthancStudySummaries, mergeByKey, normalizeImageCloudStudy, personIndexForResident, publishImagingStudyToFhir, randomUUID, readDatabase, redactSensitiveResponse, requireApiRole, reviewImageCloudRecognitionAppeal, reviewMutualRecognitionRecord, sendJson, solutionAHealth, submitImageCloudRecognitionAppeal, upsertPhase2MutualRecognitionCitation, writeDatabase } = runtime;
+  const bloodCoreHttpHandler = createBloodCoreHttpHandler({
+    BloodBusinessService,
+    BloodIntegrationGateway,
+    BloodMasterData,
+    BloodService,
+    BloodTransactionService,
+    collectJson,
+    readDatabase,
+    requireApiRole,
+    sendJson,
+    writeDatabase
+  });
+  const sendImagingJson = (res, status, body, projector) => sendJson(
+    res,
+    status,
+    (projector || (status >= 400 ? projectImagingErrorResponse : projectPublicImagingResponse))(body)
+  );
+  return {
+      id: "clinical-specialties-06",
+      domain: "clinical-specialties",
+      async handle(req, res, url) {
+    if (await bloodCoreHttpHandler.handle(req, res, url)) return true;
 
       if (req.method === "GET" && url.pathname === "/api/imaging-cloud") {
         const user = requireApiRole(req, res, ["commission", "institution", "county", "citizen"], "/api/imaging-cloud");

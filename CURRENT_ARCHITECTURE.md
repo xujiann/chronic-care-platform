@@ -320,3 +320,9 @@ reconciliation 观察。所有入口要求调用方提供发布号和包指纹�
 ## 2026-08-26 首批生产范围冻结
 
 T00 新增只读 `production-release-scope.v1`，从现有八应用清单、静态发布清单、生产 API 目录、数据集合治理、worker 观测合同、外部联调活动及切换行动定义派生并冻结范围。当前指纹覆盖 8 个应用、9 个页面、32 个 API、38 个数据引用、7 个 worker、14 个外部依赖、16 个应用证据名和 14 个 definitions-only 切换动作。完整校验只在 CI/build-time 读取仓库权威；部署包仅保存已验证的冻结 config 与同一指纹并声明 runtime verifier 不可用，standard smoke 与 strict preflight 失败关闭校验绑定。19 个首发 legacy 引用的 owner/governance review 已关闭，范围内 `collectionReviewRequired=0`；19 个 legacy 集合连同 `referrals` 精确 owner 绑定和 `operationsReadiness` 派生只读模型共 21 个引用仍不具备生产写合同。T09、T04/T05、T02/T06 的 17 份首发行为合同使范围内 `apiReviewRequired=0`；所有 API、集合生产晋级与 worker 激活仍保持 NO-GO，`productionReady=false`。
+
+## 2026-08-28 血液子域最大化独立切片
+
+血液服务端唯一实现已归入 `src/clinical-specialties/blood/`；根目录九个既有 CommonJS 入口仅保留向后兼容导出，浏览器直接加载的 `blood-domain.js` 与 `blood-standard-registry.js` 继续作为公开静态适配器。`clinical-blood`、`blood-innovation` 两个遗留路由段仍占用原全局插槽，但已不再实现 `/api/blood-system`，只向血液子域 HTTP handler 委托，因此 URL、角色、状态码、写入和路由顺序不变。
+
+血液边界 v1 冻结 API 前缀、34 个实际自有集合、1 个外部只读集合、共享平台端口和三个版本化跨域契约。写路径通过 legacy state repository 的顶层集合白名单进入原统一持久化函数；dashboard 为保持既有端口对象身份仍使用只读兼容入口。运行时仍是共享 Node 模块化单体，中央数据 Owner、migration、独立 CI 与独立部署均未被本切片授权。

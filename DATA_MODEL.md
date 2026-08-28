@@ -411,3 +411,9 @@ environment、joint-test、monitoring、rehearsal 与 candidate 文件均为仓�
 classification、显式 fail-closed write policy 和实际源码证据。它们关闭的是 owner 决策缺口，不是生产
 写入或 schema 缺口；`referrals` 与 `operationsReadiness` 另以显式来源绑定治理，因此范围报告为
 `collectionReviewRequired=0`，但 21 个引用仍无生产写资格，所有 38 个引用均禁止生产晋级。
+
+## 28. 血液子域不可变数据边界 v1
+
+`src/clinical-specialties/blood/boundary.js` 将现有 22 个核心候选集合和 12 个创新/上线控制实际集合冻结为 `clinical-blood.v1` 的 34 个自有集合，并把 `securityEvents` 明确为外部只读集合。该定义用于阻止新 HTTP 写路径触碰未声明顶层集合；它不是中央生产 Owner 登记，也不改变 `legacy-non-authoritative`、`productionWriteAllowed=false` 或 `productionPromotionAllowed=false`。
+
+`state-repository.js` 是统一 JSON 状态上的过渡端口：读取时为写命令提供集合白名单代理，提交时解包并调用原 `writeDatabase`，从而保持旧快照格式和未触碰集合。它没有建立独立事务、CAS、outbox、DDL 或物理数据库。中央 `domain-data-ownership`、版本化 migration、回填/回滚和 PostgreSQL 自治必须由后续 T00 数据任务批准；本切片未编辑 `data/db.json`、SQLite 或任何生成产物。
