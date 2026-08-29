@@ -6,6 +6,7 @@
   "deploymentBoundary": "shared-node-runtime",
   "independentDeploymentAuthorized": false,
   "routeSourceRoot": "src/http/routes/clinical-specialties",
+  "routeImplementationSources": [],
   "subdomains": [
     {
       "id": "emergency",

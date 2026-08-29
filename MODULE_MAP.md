@@ -1,5 +1,13 @@
 # MODULE MAP — 主线模块地图
 
+## 2026-08-29 路由实现源治理模块
+
+| 模块 | Owner | 标签 | 当前边界 |
+|---|---|---|---|
+| `src/http/runtime-source.js` | T00 | B KEEP + IMPROVE | 合并既有 route directory source 与显式登记的子域实现源，提供共享 domain/owner metadata；不递归扫描领域源码根 |
+| `config/clinical-subdomains.json#routeImplementationSources` | T06 事实 / T00 集成 | B KEEP + IMPROVE | 只登记 `{subdomain, source, mountedBy[]}`；facade 必须静态 require handler，目标根、路由前缀、domain 和 process owner 从现有字段派生；当前为空 |
+| API authorization matrix / production catalog / readiness consumers | T00 | B KEEP + IMPROVE | 共用 `runtime-source` inventory，禁止另建 handler 字符串副本或第二套路由清单 |
+
 ## 2026-08-27 生产 Go/No-Go 前端边界
 
 | 模块 | Owner | 标签 | 当前边界 |

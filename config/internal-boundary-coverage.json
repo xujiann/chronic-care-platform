@@ -42,14 +42,16 @@
       "includes": [
         "scripts/api-authentication-evidence.js",
         "scripts/api-authorization-matrix.js",
-        "scripts/production-api-catalog.js"
+        "scripts/production-api-catalog.js",
+        "src/http/runtime-source.js"
       ],
       "tests": [
         "test/api-authentication-evidence.test.js",
         "test/api-authorization-matrix.test.js",
-        "test/production-api-catalog.test.js"
+        "test/production-api-catalog.test.js",
+        "test/route-implementation-source-governance.test.js"
       ],
-      "baseline": { "lines": 99.18, "functions": 100, "branches": 82.9 }
+      "baseline": { "lines": 99.3, "functions": 100, "branches": 84.46 }
     },
     {
       "id": "worker-observability",
@@ -143,6 +145,12 @@
       "group": "api-governance",
       "test": "test/production-api-catalog.test.js",
       "title": "catalog validation rejects production promotion"
+    },
+    {
+      "id": "registered-route-source-boundary",
+      "group": "api-governance",
+      "test": "test/route-implementation-source-governance.test.js",
+      "title": "registered implementations reject comment-only and string-only mount evidence"
     },
     {
       "id": "worker-observability-fail-closed",

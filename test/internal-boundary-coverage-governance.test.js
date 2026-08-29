@@ -17,7 +17,7 @@ const EXPECTED_BASELINES = Object.freeze({
   "runtime-identity-policy": Object.freeze({ lines: 96.83, functions: 100, branches: 64.84 }),
   "audit-chain-source": Object.freeze({ lines: 93.19, functions: 100, branches: 74.49 }),
   "object-storage-trust": Object.freeze({ lines: 97.63, functions: 100, branches: 69.27 }),
-  "api-governance": Object.freeze({ lines: 99.18, functions: 100, branches: 82.9 }),
+  "api-governance": Object.freeze({ lines: 99.3, functions: 100, branches: 84.46 }),
   "worker-observability": Object.freeze({ lines: 94.85, functions: 100, branches: 86.39 }),
   "regional-sharing-command": Object.freeze({ lines: 91.84, functions: 96.29, branches: 81.52 }),
   "referral-owner-command": Object.freeze({ lines: 63.26, functions: 82.97, branches: 74.22 }),

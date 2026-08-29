@@ -94,6 +94,7 @@ test("all current clinical API literals have one subdomain or explicit handoff o
   const report = validateClinicalSubdomainRegistry(ROOT);
   assert.deepEqual(report.issues, []);
   assert.equal(report.ok, true);
+  assert.equal(report.routeImplementationSourceCount, 0);
   assert.equal(report.routeLiteralCount > 70, true);
   EXPECTED_SUBDOMAINS.forEach((id) => assert.equal(report.routeCounts[id] > 0, true, id));
   assert.equal(report.routeCounts["legacy-platform-operations"], 0);
@@ -145,6 +146,10 @@ test("governance gate rejects overlapping source, route and contract boundaries"
   registry.subdomains[0].implementedUseCases[0].source = "src/http/routes/clinical-specialties/emergency-care.js";
   registry.subdomains[0].implementedUseCases[0].contracts = ["unknown-contract.v1"];
   delete registry.subdomains[0].implementedUseCases[0].sideEffects;
+  registry.routeImplementationSources = [{
+    subdomain: "blood",
+    source: "src/http/routes/clinical-specialties/clinical-blood.js"
+  }];
 
   const report = validateClinicalSubdomainRegistry(ROOT, registry);
   const issues = report.issues.join("\n");
@@ -156,4 +161,5 @@ test("governance gate rejects overlapping source, route and contract boundaries"
   assert.match(issues, /source is outside emergency/);
   assert.match(issues, /references unknown contract unknown-contract\.v1/);
   assert.match(issues, /must declare side effects explicitly/);
+  assert.match(issues, /route implementation source is outside blood targetSourceRoot/);
 });

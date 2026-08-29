@@ -1,5 +1,9 @@
 # API MAP — 主线接口地图
 
+## 2026-08-29 API 源码发现边界（无 HTTP 变化）
+
+本切片不新增、删除或修改任何 HTTP method/path、鉴权、角色、scope、请求/响应、错误、幂等或审计语义。授权矩阵和生产目录只消费经临床注册表显式登记、符合唯一子域 `routePrefixes` 且具有 `mountedBy` route facade 直接静态 require 证据的领域 handler，并保留 `subdomain` 与中央 domain/process owner 归属；这只是中央发现门槛，真实 HTTP 可达性由后续领域 integration test 验证。readiness 也通过 `readRuntimeSource` 消费同一 inventory。当前登记为空，606 条授权声明、373 个字面路由和 598 个目录接口保持不变。
+
 ## 2026-08-27 生产 Go/No-Go 页面（无 API 变化）
 
 `GET /api/production-go-no-go/center` 及审批、撤销、决策写接口的 method/path、鉴权、请求、响应、错误和审计语义均未改变。客户端仅将六个字符串 HTML sink 替换为 DOM/text/class/dataset 渲染，并由恶意响应 E2E 锁定。
