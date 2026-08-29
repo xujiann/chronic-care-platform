@@ -1,5 +1,10 @@
 # TECH DEBT — 主线技术债与风险台账
 
+## 2026-08-29 API 源码扫描假绿风险
+
+- T00 已建立显式 route implementation source 机制，授权矩阵、字面目录、syntax/readiness 统一消费同一 inventory；登记路径越界/别名/缺失/类型不符、owner/domain 漂移、子域 API 前缀漂移或 facade 静态挂载缺失均失败关闭。
+- 当前主线登记为空，只关闭通用机制缺口。血液真实 handler 尚未由 T06 登记，facade ghost 也未在本切片删除；在 T06 rebase 完成这两项前，不得宣称 blood 扫描漂移风险已经关闭。
+
 ## 2026-08-27 生产 Go/No-Go 页面可信渲染
 
 - `production-go-no-go-ui.js` 的 6 个 P0 HTML sink 已关闭，Inventory v2 的 DOM HTML 数从 799 降至 793，P0 finding 从 805 降至 799。

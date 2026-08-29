@@ -3,7 +3,12 @@
 
 const fs = require("node:fs");
 const path = require("node:path");
-const { routeSourceFiles } = require("../src/http/runtime-source");
+const {
+  DOMAIN_OWNERS,
+  routeSourceDomain,
+  routeSourceRecords,
+  validateRegisteredRouteSource
+} = require("../src/http/runtime-source");
 const {
   AUTHENTICATION_REGISTRY,
   authenticationEvidenceByKey,
@@ -20,23 +25,6 @@ const PUBLIC_ROUTES = Object.freeze([
   { method: "POST", path: "/api/auth/phone-code", owner: "T01", purpose: "request-phone-verification" },
   { method: "POST", path: "/api/auth/phone-login", owner: "T01", purpose: "establish-phone-session" }
 ]);
-
-const DOMAIN_OWNERS = Object.freeze({
-  runtime: "T01",
-  "identity-security": "T01",
-  "authorization-context": "T01",
-  "platform-governance": "T02",
-  "state-data": "T02",
-  "public-health": "T03",
-  "citizen-chronic": "T04",
-  "care-coordination": "T05",
-  "clinical-specialties": "T06",
-  "insurance-payment": "T07",
-  integration: "T08",
-  research: "T09",
-  shared: "T09",
-  regional: "T00"
-});
 
 function findCallEnd(source, openIndex) {
   let depth = 0;
@@ -121,16 +109,15 @@ function inferPurpose(method, routePath) {
   return "write-business-data";
 }
 
-function domainForFile(file) {
-  const relative = path.relative(path.join(ROOT, "src", "http", "routes"), file).replaceAll("\\", "/");
-  const name = relative.split("/")[0].replace(/\.js$/, "");
-  return name;
+function domainForFile(file, root = ROOT) {
+  return routeSourceDomain(file, root);
 }
 
 function readRouteSources(root = ROOT) {
-  return routeSourceFiles(root).map((file) => ({
-    file,
-    source: fs.readFileSync(file, "utf8")
+  return routeSourceRecords(root).map((record) => ({
+    ...record,
+    relative: path.relative(root, record.file).replaceAll("\\", "/"),
+    source: fs.readFileSync(record.file, "utf8")
   }));
 }
 
@@ -141,7 +128,7 @@ function customRouteSource(contract, sourceFiles) {
     if (pathIndex < 0) continue;
     const context = entry.source.slice(Math.max(0, pathIndex - 320), pathIndex + contract.path.length + 80);
     if (!new RegExp(`req\\.method\\s*(?:===|!==)\\s*["']${contract.method}["']`).test(context)) continue;
-    matches.push(`${path.relative(ROOT, entry.file).replaceAll("\\", "/")}:${entry.source.slice(0, pathIndex).split("\n").length}`);
+    matches.push(`${entry.relative || path.relative(ROOT, entry.file).replaceAll("\\", "/")}:${entry.source.slice(0, pathIndex).split("\n").length}`);
   }
   if (matches.length !== 1) throw new Error(`custom authentication route must resolve exactly once: ${contract.key} (${matches.length})`);
   return matches[0];
@@ -161,9 +148,10 @@ function buildMatrix(sourceFiles = readRouteSources()) {
 
   for (const entry of sourceFiles) {
     const source = entry.source;
-    const relative = path.relative(ROOT, entry.file).replaceAll("\\", "/");
-    const domain = domainForFile(entry.file);
-    const owner = DOMAIN_OWNERS[domain] || "T00-review-required";
+    if (entry.sourceKind === "registered-implementation") validateRegisteredRouteSource(entry, source);
+    const relative = entry.relative || path.relative(ROOT, entry.file).replaceAll("\\", "/");
+    const domain = entry.domain || domainForFile(entry.file);
+    const owner = entry.owner || DOMAIN_OWNERS[domain] || "T00-review-required";
     const needle = "requireApiRole(";
     let cursor = 0;
     while ((cursor = source.indexOf(needle, cursor)) >= 0) {
@@ -191,7 +179,8 @@ function buildMatrix(sourceFiles = readRouteSources()) {
         dataScope: override?.dataScope || inferScope(before + after, routePath),
         purpose: override?.purpose || inferPurpose(method, routePath),
         highRisk: Boolean(override),
-        source: `${relative}:${line}`
+        source: `${relative}:${line}`,
+        ...(entry.subdomain ? { subdomain: entry.subdomain } : {})
       });
     }
   }
@@ -218,7 +207,9 @@ function buildMatrix(sourceFiles = readRouteSources()) {
 
   return {
     schemaVersion: "api-authorization-matrix-v3",
-    generatedFrom: "src/http/routes/**/*.js",
+    generatedFrom: sourceFiles.some((entry) => entry.sourceKind === "registered-implementation")
+      ? "src/http/routes/**/*.js + config/clinical-subdomains.json#routeImplementationSources"
+      : "src/http/routes/**/*.js",
     explicitCustomAuthenticationFrom: AUTHENTICATION_REGISTRY.schemaVersion,
     generatedAt: new Date().toISOString(),
     summary: {
@@ -273,4 +264,4 @@ function runCli(argv = process.argv.slice(2)) {
 
 if (require.main === module) runCli();
 
-module.exports = { DOMAIN_OWNERS, buildMatrix, readRouteSources, validateMatrix };
+module.exports = { DOMAIN_OWNERS, buildMatrix, domainForFile, readRouteSources, validateMatrix };

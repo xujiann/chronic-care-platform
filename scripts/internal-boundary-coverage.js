@@ -28,6 +28,7 @@ const REQUIRED_NEGATIVE_CASES = new Set([
   "method-path-drift",
   "idempotency-missing",
   "production-promotion",
+  "registered-route-source-boundary",
   "worker-observability-fail-closed",
   "regional-authorization-recheck",
   "referral-authorization-before-replay",

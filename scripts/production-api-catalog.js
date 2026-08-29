@@ -2,7 +2,8 @@
 "use strict";
 
 const path = require("node:path");
-const { DOMAIN_OWNERS, buildMatrix, readRouteSources, validateMatrix } = require("./api-authorization-matrix");
+const { DOMAIN_OWNERS, buildMatrix, domainForFile, readRouteSources, validateMatrix } = require("./api-authorization-matrix");
+const { validateRegisteredRouteSource } = require("../src/http/runtime-source");
 const { AUTHENTICATION_REGISTRY, authenticationEvidenceByKey, authenticationEvidenceContracts, validateAuthenticationEvidence } = require("./api-authentication-evidence");
 const {
   DEFAULT_REGISTRY,
@@ -35,12 +36,12 @@ const LITERAL_ROUTE_PATTERNS = Object.freeze([
   })
 ]);
 
-function relativeSource(file) {
-  return path.relative(ROOT, file).replaceAll("\\", "/");
+function relativeSource(entry) {
+  return entry.relative || path.relative(ROOT, entry.file).replaceAll("\\", "/");
 }
 
 function sourceIndex(sourceFiles) {
-  return new Map(sourceFiles.map((entry) => [relativeSource(entry.file), String(entry.source || "").split(/\r?\n/)]));
+  return new Map(sourceFiles.map((entry) => [relativeSource(entry), String(entry.source || "").split(/\r?\n/)]));
 }
 
 function parseSourceReference(reference) {
@@ -48,18 +49,19 @@ function parseSourceReference(reference) {
   return match ? { file: match[1], line: Number(match[2]) } : null;
 }
 
-function domainForSource(reference) {
+function domainForSource(reference, sourceFiles) {
   const parsed = parseSourceReference(reference);
   const relative = parsed?.file || String(reference || "");
-  const withinRoutes = relative.replace(/^.*src\/http\/routes\//, "");
-  return withinRoutes.split("/")[0].replace(/\.js$/, "");
+  const source = sourceFiles.find((entry) => relativeSource(entry) === relative);
+  return source?.domain || domainForFile(source?.file || path.resolve(ROOT, relative));
 }
 
 function buildLiteralRouteInventory(sourceFiles = readRouteSources()) {
   const inventory = new Map();
   for (const entry of sourceFiles) {
     const source = String(entry.source || "");
-    const relative = relativeSource(entry.file);
+    if (entry.sourceKind === "registered-implementation") validateRegisteredRouteSource(entry, source);
+    const relative = relativeSource(entry);
     for (const pattern of LITERAL_ROUTE_PATTERNS) {
       pattern.expression.lastIndex = 0;
       for (const match of source.matchAll(pattern.expression)) {
@@ -132,6 +134,7 @@ function buildCatalogEntry(declarations, indexedSources, contracts) {
   const first = declarations[0];
   const owners = [...new Set(declarations.map((route) => route.owner))].sort();
   const domains = [...new Set(declarations.map((route) => route.domain))].sort();
+  const subdomains = [...new Set(declarations.map((route) => route.subdomain).filter(Boolean))].sort();
   const purposes = [...new Set(declarations.map((route) => route.purpose))].sort();
   const roles = [...new Set(declarations.flatMap((route) => route.roles))].sort();
   const dataScopes = [...new Set(declarations.map((route) => route.dataScope))].sort();
@@ -146,6 +149,7 @@ function buildCatalogEntry(declarations, indexedSources, contracts) {
   const internalBlockers = [];
   if (owners.length !== 1) internalBlockers.push("multiple-route-owners");
   if (domains.length !== 1) internalBlockers.push("multiple-route-domains");
+  if (subdomains.length > 1) internalBlockers.push("multiple-route-subdomains");
   if (purposes.length !== 1) internalBlockers.push("multiple-route-purposes");
   if (identityRequiredValues.length !== 1) internalBlockers.push("conflicting-authentication-policy");
   if (authenticationModes.length !== 1) internalBlockers.push("conflicting-authentication-mode");
@@ -172,6 +176,7 @@ function buildCatalogEntry(declarations, indexedSources, contracts) {
     routeResolution,
     owner: owners.length === 1 ? owners[0] : "MULTIPLE",
     domain: domains.length === 1 ? domains[0] : "multiple",
+    ...(subdomains.length ? { subdomain: subdomains.length === 1 ? subdomains[0] : "multiple" } : {}),
     purpose: purposes.length === 1 ? purposes[0] : "multiple",
     authentication: {
       required: identityRequiredValues.length === 1 ? identityRequiredValues[0] : null,
@@ -202,10 +207,12 @@ function buildCatalogEntry(declarations, indexedSources, contracts) {
   };
 }
 
-function buildInventoryOnlyEntry(route, indexedSources, contracts) {
+function buildInventoryOnlyEntry(route, indexedSources, contracts, sourceFiles) {
   const declarations = route.sources.map((source) => ({ source }));
-  const domain = domainForSource(route.sources[0]);
-  const owner = DOMAIN_OWNERS[domain] || "T00-review-required";
+  const reference = parseSourceReference(route.sources[0]);
+  const source = sourceFiles.find((entry) => relativeSource(entry) === reference?.file);
+  const domain = domainForSource(route.sources[0], sourceFiles);
+  const owner = source?.owner || DOMAIN_OWNERS[domain] || "T00-review-required";
   const idempotency = idempotencyFor(route.method, declarations, indexedSources, contracts.get(route.key));
   const blockers = [
     "missing-authorization-matrix-declaration",
@@ -222,6 +229,7 @@ function buildInventoryOnlyEntry(route, indexedSources, contracts) {
     routeResolution: "literal",
     owner,
     domain,
+    ...(source?.subdomain ? { subdomain: source.subdomain } : {}),
     purpose: "runtime-policy-review-required",
     authentication: {
       required: null,
@@ -264,7 +272,7 @@ function buildProductionApiCatalog(matrix = buildMatrix(), sourceFiles = readRou
       catalogEntry.routeInventorySources = route.sources;
       catalogEntry.sourceCoverage = "authorization-matrix-and-route-inventory";
     } else {
-      entriesByKey.set(route.key, buildInventoryOnlyEntry(route, indexedSources, contracts));
+      entriesByKey.set(route.key, buildInventoryOnlyEntry(route, indexedSources, contracts, sourceFiles));
     }
   }
   const entries = [...entriesByKey.values()].sort((left, right) => left.key.localeCompare(right.key));

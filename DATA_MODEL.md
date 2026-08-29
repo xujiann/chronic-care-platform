@@ -1,5 +1,9 @@
 # DATA MODEL — 主线数据地图
 
+## 2026-08-29 路由实现源登记不是业务数据
+
+`routeImplementationSources` 是源码治理元数据，只保存子域 ID、仓库相对 JavaScript 路径与静态挂载它的 route facade 路径清单。它不新增或修改业务集合、SQLite/PostgreSQL 表、字段、DDL、migration、审计事实或生产证据；domain、process owner、目标源码根与允许的 API 前缀继续来自既有临床注册表。当前数组为空，数据库及 252 个集合状态完全不变。
+
 ## 2026-08-27 生产 Go/No-Go 页面数据边界
 
 本切片只改变浏览器对既有 `/api/production-go-no-go/center` 响应的 DOM 投影，不新增或修改集合、SQLite/PostgreSQL 表、migration、审计记录或生产证据。恶意载荷 E2E 使用临时测试响应，不构成业务事实、审批或现场证据。

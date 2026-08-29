@@ -1,5 +1,11 @@
 # CURRENT ARCHITECTURE — 主线现状地图
 
+## 2026-08-29 路由实现源中央治理
+
+- `src/http/runtime-source.js` 继续递归发现 `src/http/routes/**/*.js`，并可从 `config/clinical-subdomains.json#routeImplementationSources` 加载显式登记的子域 HTTP 实现源；不扫描整个目标源码目录。
+- 登记项只声明 `subdomain`、仓库相对 `source` 与非空 `mountedBy` facade 清单。domain、T00–T09 process owner、`targetSourceRoot` 和 `routePrefixes` 从同一临床注册表派生；owner/domain 不符合中央映射、API 字面量或授权声明越过唯一子域前缀、facade 未静态 require handler、路径越界/别名/缺失/类型不符时均失败关闭，重复登记只产生一个源码记录。`mountedBy` 是最小静态挂载证明，不替代 T06 的真实 HTTP integration test，也不单独宣称完整运行时可达。
+- 当前登记数组为空，因此主线授权声明 606、字面路由 373、生产目录 598 的基线及所有 readiness 输入保持不变。血液 handler 的登记与 facade ghost 删除由后续 T06 rebase 切片完成。
+
 ## 2026-08-27 生产 Go/No-Go 页面可信渲染增量
 
 - `production-go-no-go-ui.js` 的 4 个 `innerHTML` 与 2 个 `insertAdjacentHTML` 已迁为显式 DOM、`textContent`、闭集 class 和 dataset；指标、前置检查、四方审批及指挥决策的结构与交互保持兼容。

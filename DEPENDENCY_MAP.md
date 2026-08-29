@@ -1,5 +1,18 @@
 # DEPENDENCY MAP — 主线依赖地图
 
+## 2026-08-29 路由实现源依赖方向
+
+```text
+clinical-subdomains registry
+  -> runtime-source strict resolver
+     -> routeSourceFiles / readRuntimeSource / route source metadata
+        -> syntax/readiness consumers
+        -> API authorization matrix
+           -> production API catalog
+```
+
+注册表只引用显式 handler 及直接静态 require 它的 route facade，不让 T00 扫描整个 `src/clinical-specialties/**`，也不让领域实现反向依赖治理脚本。domain、process owner、目标源码根与唯一允许的路由前缀均从同一登记事实派生；缺少这项最小静态挂载证据的 handler 不进入 runtime source、matrix、catalog 或 readiness，但完整运行时可达性仍须由所属领域 integration test 证明。当前空数组不增加运行时文件、第三方包、CI job 或部署单元。
+
 ## 2026-08-27 生产 Go/No-Go 浏览器依赖
 
 ```text

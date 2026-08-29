@@ -3,6 +3,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const { ROUTE_SUBDOMAINS } = require("../http/route-subdomains");
+const { routeImplementationSourceRecords } = require("../http/runtime-source");
 
 const EXPECTED_SUBDOMAINS = Object.freeze([
   "emergency",
@@ -43,6 +44,12 @@ function loadClinicalSubdomainRegistry(root = path.resolve(__dirname, "..", ".."
 
 function validateClinicalSubdomainRegistry(root, registry = loadClinicalSubdomainRegistry(root)) {
   const issues = [];
+  let routeImplementationSourceCount = 0;
+  try {
+    routeImplementationSourceCount = routeImplementationSourceRecords(root, registry).length;
+  } catch (error) {
+    issues.push(error.message);
+  }
   const subdomains = Array.isArray(registry.subdomains) ? registry.subdomains : [];
   const ids = subdomains.map((item) => item.id);
   const idSet = new Set(ids);
@@ -226,7 +233,8 @@ function validateClinicalSubdomainRegistry(root, registry = loadClinicalSubdomai
     routeLiteralCount: routeInventory.length,
     registeredCollectionCount: subdomains.reduce((sum, item) => sum + (item.registeredCollections || []).length, 0),
     candidateCollectionCount: subdomains.reduce((sum, item) => sum + (item.candidateCollections || []).length, 0),
-    contractCount: (registry.crossSubdomainContracts || []).length
+    contractCount: (registry.crossSubdomainContracts || []).length,
+    routeImplementationSourceCount
   });
 }
 
