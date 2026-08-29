@@ -84,6 +84,9 @@ test("blood state repository blocks undeclared reads, foreign writes and collect
   assert.throws(() => { state.residents = []; }, /write outside boundary: residents/);
   assert.throws(() => { state.securityEvents.push({ id: "injected" }); }, TypeError);
   assert.throws(() => { state.securityEvents[0].detail.result = "tampered"; }, TypeError);
+  const securityDescriptor = Object.getOwnPropertyDescriptor(state, "securityEvents");
+  assert.notStrictEqual(securityDescriptor.value, source.securityEvents);
+  assert.throws(() => { securityDescriptor.value.push({ id: "descriptor-injected" }); }, TypeError);
   assert.throws(
     () => Object.defineProperty(state, "securityEvents", { value: [] }),
     /property definition is forbidden/
@@ -99,6 +102,25 @@ test("blood state repository blocks undeclared reads, foreign writes and collect
   assert.deepEqual(persisted.securityEvents, [{ id: "security-1", detail: { result: "allowed" } }]);
   assert.deepEqual(persisted.residents, [{ id: "r-1" }]);
   assert.throws(() => repository.commit(source), /only commit a state returned by read/);
+});
+
+test("blood state repository view preserves proxy invariants for restricted source objects", () => {
+  for (const source of [
+    Object.preventExtensions({ bloodUnits: [], securityEvents: [], residents: [] }),
+    Object.defineProperty({ bloodUnits: [], securityEvents: [] }, "residents", {
+      configurable: false,
+      enumerable: true,
+      value: []
+    })
+  ]) {
+    const repository = createLegacyBloodStateRepository({
+      readDatabase: () => source,
+      writeDatabase: () => {}
+    });
+    const state = repository.read();
+    assert.deepEqual(Object.keys(state).sort(), ["bloodUnits", "securityEvents"]);
+    assert.equal("residents" in state, false);
+  }
 });
 
 test("blood write routes persist through the scoped repository without changing the legacy snapshot shape", async () => {
