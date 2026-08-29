@@ -64,7 +64,11 @@ test("legacy root modules are compatibility exports of the canonical blood sourc
 });
 
 test("blood state repository blocks undeclared reads, foreign writes and collection deletion", () => {
-  const source = { bloodUnits: [], securityEvents: [], residents: [{ id: "r-1" }] };
+  const source = {
+    bloodUnits: [],
+    securityEvents: [{ id: "security-1", detail: { result: "allowed" } }],
+    residents: [{ id: "r-1" }]
+  };
   let persisted;
   const repository = createLegacyBloodStateRepository({
     readDatabase: () => source,
@@ -72,13 +76,27 @@ test("blood state repository blocks undeclared reads, foreign writes and collect
   });
   const state = repository.read();
   assert.strictEqual(state.bloodUnits, source.bloodUnits);
-  assert.strictEqual(state.securityEvents, source.securityEvents);
+  assert.notStrictEqual(state.securityEvents, source.securityEvents);
+  assert.deepEqual(state.securityEvents, source.securityEvents);
+  assert.equal(Object.isFrozen(state.securityEvents), true);
+  assert.equal(Object.isFrozen(state.securityEvents[0].detail), true);
   assert.throws(() => state.residents, /read outside boundary: residents/);
   assert.throws(() => { state.residents = []; }, /write outside boundary: residents/);
+  assert.throws(() => { state.securityEvents.push({ id: "injected" }); }, TypeError);
+  assert.throws(() => { state.securityEvents[0].detail.result = "tampered"; }, TypeError);
+  assert.throws(
+    () => Object.defineProperty(state, "securityEvents", { value: [] }),
+    /property definition is forbidden/
+  );
+  assert.throws(() => Object.setPrototypeOf(state, null), /prototype mutation is forbidden/);
+  assert.throws(() => Object.preventExtensions(state), /preventing extensions is forbidden/);
   assert.throws(() => { delete state.bloodUnits; }, /collection deletion is forbidden/);
+  assert.deepEqual(Object.keys(state).sort(), ["bloodUnits", "securityEvents"]);
+  assert.equal("residents" in state, false);
   state.bloodUnits = [{ id: "bu-1" }];
   repository.commit(state);
   assert.strictEqual(persisted, source);
+  assert.deepEqual(persisted.securityEvents, [{ id: "security-1", detail: { result: "allowed" } }]);
   assert.deepEqual(persisted.residents, [{ id: "r-1" }]);
   assert.throws(() => repository.commit(source), /only commit a state returned by read/);
 });
