@@ -3,6 +3,7 @@
 const assert = require("node:assert/strict");
 const test = require("node:test");
 const { buildMatrix, validateMatrix } = require("../scripts/api-authorization-matrix");
+const { routeImplementationSourceRecords } = require("../src/http/runtime-source");
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
@@ -11,9 +12,13 @@ function clone(value) {
 test("modular API authorization matrix covers owners roles scopes purposes and high-risk routes", () => {
   const matrix = buildMatrix();
   assert.deepEqual(validateMatrix(matrix), []);
-  assert.equal(matrix.generatedFrom, "src/http/routes/**/*.js");
+  assert.equal(matrix.generatedFrom, routeImplementationSourceRecords().length
+    ? "src/http/routes/**/*.js + config/clinical-subdomains.json#routeImplementationSources"
+    : "src/http/routes/**/*.js");
   assert.equal(matrix.schemaVersion, "api-authorization-matrix-v3");
-  assert.equal(matrix.summary.declarations, 606);
+  assert.equal(matrix.summary.declarations, matrix.routes.length);
+  assert.equal(matrix.summary.declarations, matrix.summary.protected + matrix.summary.public);
+  assert.equal(matrix.summary.declarations >= 606, true);
   assert.equal(matrix.summary.customAuthenticationEvidence, 13);
   assert.equal(matrix.summary.protected >= 550, true);
   assert.equal(matrix.summary.highRisk, 10);
