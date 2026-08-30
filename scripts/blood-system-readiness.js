@@ -21,7 +21,7 @@ function readBloodSource(name) {
 function buildBloodSystemReadinessReport(options = {}) {
   const html = options.html ?? readText("blood.html");
   const js = options.js ?? readText("blood.js");
-  const server = options.server ?? `${readRuntimeSource(ROOT)}\n${readBloodSource("http-handler")}`;
+  const server = options.server ?? readRuntimeSource(ROOT);
   const transaction = options.transaction ?? readBloodSource("transaction-service");
   const service = options.service ?? readBloodSource("service");
   const dashboardQuery = options.dashboardQuery ?? readText("src/clinical-specialties/blood/dashboard-query.js");

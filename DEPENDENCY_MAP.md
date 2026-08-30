@@ -1,6 +1,6 @@
 # DEPENDENCY MAP — 主线依赖地图
 
-## 2026-08-29 路由实现源依赖方向
+## 2026-08-30 血液路由实现源依赖方向
 
 ```text
 clinical-subdomains registry
@@ -11,7 +11,7 @@ clinical-subdomains registry
            -> production API catalog
 ```
 
-注册表只引用显式 handler 及直接静态 require 它的 route facade，不让 T00 扫描整个 `src/clinical-specialties/**`，也不让领域实现反向依赖治理脚本。domain、process owner、目标源码根与唯一允许的路由前缀均从同一登记事实派生；缺少这项最小静态挂载证据的 handler 不进入 runtime source、matrix、catalog 或 readiness，但完整运行时可达性仍须由所属领域 integration test 证明。当前空数组不增加运行时文件、第三方包、CI job 或部署单元。
+注册表当前只引用 blood canonical handler 及直接静态 require 它的两个 route facade，不让 T00 扫描整个 `src/clinical-specialties/**`，也不让领域实现反向依赖治理脚本。domain、process owner、目标源码根与唯一允许的路由前缀均从同一登记事实派生；缺少这项最小静态挂载证据的 handler 不进入 runtime source、matrix、catalog 或 readiness，完整运行时可达性继续由 T06 integration test 证明。本切片不增加第三方包、进程、数据库、CI job 或部署单元。
 
 ## 2026-08-27 生产 Go/No-Go 浏览器依赖
 

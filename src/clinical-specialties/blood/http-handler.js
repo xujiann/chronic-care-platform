@@ -154,8 +154,13 @@ function createBloodCoreHttpHandler(runtime) {
         const emergencyActionMatch = url.pathname.match(/^\/api\/blood-system\/emergency-allocations\/([^/]+)\/actions$/);
         const bloodWorkflowMatch = recallAcknowledgeMatch || recallCloseMatch || reactionInvestigateMatch || emergencyActionMatch;
         if (req.method === "POST" && bloodWorkflowMatch) {
-          const roles = recallAcknowledgeMatch ? ["institution"] : reactionInvestigateMatch ? ["commission", "institution"] : emergencyActionMatch ? ["commission", "institution"] : ["commission"];
-          const user = requireApiRole(req, res, roles, url.pathname);
+          const user = recallAcknowledgeMatch
+            ? requireApiRole(req, res, ["institution"], "/api/blood-system/recalls/:id/acknowledge")
+            : recallCloseMatch
+              ? requireApiRole(req, res, ["commission"], "/api/blood-system/recalls/:id/close")
+              : reactionInvestigateMatch
+                ? requireApiRole(req, res, ["commission", "institution"], "/api/blood-system/transfusion-reactions/:id/investigate")
+                : requireApiRole(req, res, ["commission", "institution"], "/api/blood-system/emergency-allocations/:id/actions");
           if (!user) return true;
           const data = readDatabase();
           const payload = await collectJson(req);
@@ -171,23 +176,36 @@ function createBloodCoreHttpHandler(runtime) {
         }
 
         const bloodTransactionRoutes = {
-          "/api/blood-system/test-reports/sign": { roles: ["commission"], action: BloodTransactionService.signTestReport },
-          "/api/blood-system/release-reviews": { roles: ["commission"], action: BloodTransactionService.reviewRelease },
-          "/api/blood-system/shipments": { roles: ["commission"], action: BloodTransactionService.createShipment },
-          "/api/blood-system/shipments/receive": { roles: ["institution"], action: BloodTransactionService.receiveShipment },
-          "/api/blood-system/safety-incidents/cold-chain/review": { roles: ["commission"], action: BloodTransactionService.reviewColdChainIncident },
-          "/api/blood-system/compatibility-tests": { roles: ["institution"], action: BloodTransactionService.recordCompatibility },
-          "/api/blood-system/transfusions/start": { roles: ["institution"], action: BloodTransactionService.startTransfusion },
-          "/api/blood-system/transfusions/complete": { roles: ["institution"], action: BloodTransactionService.completeTransfusion }
+          "/api/blood-system/test-reports/sign": BloodTransactionService.signTestReport,
+          "/api/blood-system/release-reviews": BloodTransactionService.reviewRelease,
+          "/api/blood-system/shipments": BloodTransactionService.createShipment,
+          "/api/blood-system/shipments/receive": BloodTransactionService.receiveShipment,
+          "/api/blood-system/safety-incidents/cold-chain/review": BloodTransactionService.reviewColdChainIncident,
+          "/api/blood-system/compatibility-tests": BloodTransactionService.recordCompatibility,
+          "/api/blood-system/transfusions/start": BloodTransactionService.startTransfusion,
+          "/api/blood-system/transfusions/complete": BloodTransactionService.completeTransfusion
         };
         if (req.method === "POST" && bloodTransactionRoutes[url.pathname]) {
-          const route = bloodTransactionRoutes[url.pathname];
-          const user = requireApiRole(req, res, route.roles, url.pathname);
+          const user = url.pathname === "/api/blood-system/test-reports/sign"
+            ? requireApiRole(req, res, ["commission"], "/api/blood-system/test-reports/sign")
+            : url.pathname === "/api/blood-system/release-reviews"
+              ? requireApiRole(req, res, ["commission"], "/api/blood-system/release-reviews")
+              : url.pathname === "/api/blood-system/shipments"
+                ? requireApiRole(req, res, ["commission"], "/api/blood-system/shipments")
+                : url.pathname === "/api/blood-system/shipments/receive"
+                  ? requireApiRole(req, res, ["institution"], "/api/blood-system/shipments/receive")
+                  : url.pathname === "/api/blood-system/safety-incidents/cold-chain/review"
+                    ? requireApiRole(req, res, ["commission"], "/api/blood-system/safety-incidents/cold-chain/review")
+                    : url.pathname === "/api/blood-system/compatibility-tests"
+                      ? requireApiRole(req, res, ["institution"], "/api/blood-system/compatibility-tests")
+                      : url.pathname === "/api/blood-system/transfusions/start"
+                        ? requireApiRole(req, res, ["institution"], "/api/blood-system/transfusions/start")
+                        : requireApiRole(req, res, ["institution"], "/api/blood-system/transfusions/complete");
           if (!user) return true;
           const data = readDatabase();
           const payload = await collectJson(req);
           const idempotencyKey = String(req.headers["idempotency-key"] || payload.idempotencyKey || "").trim();
-          const result = route.action(data, user, payload, idempotencyKey);
+          const result = bloodTransactionRoutes[url.pathname](data, user, payload, idempotencyKey);
           writeDatabase(data);
           sendJson(res, result.status, result.body);
           return true;

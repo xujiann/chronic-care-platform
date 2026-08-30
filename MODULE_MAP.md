@@ -1,11 +1,12 @@
 # MODULE MAP — 主线模块地图
 
-## 2026-08-29 路由实现源治理模块
+## 2026-08-30 血液路由实现源治理模块
 
 | 模块 | Owner | 标签 | 当前边界 |
 |---|---|---|---|
 | `src/http/runtime-source.js` | T00 | B KEEP + IMPROVE | 合并既有 route directory source 与显式登记的子域实现源，提供共享 domain/owner metadata；不递归扫描领域源码根 |
-| `config/clinical-subdomains.json#routeImplementationSources` | T06 事实 / T00 集成 | B KEEP + IMPROVE | 只登记 `{subdomain, source, mountedBy[]}`；facade 必须静态 require handler，目标根、路由前缀、domain 和 process owner 从现有字段派生；当前为空 |
+| `config/clinical-subdomains.json#routeImplementationSources` | T06 事实 / T00 集成 | B KEEP + IMPROVE | 只登记 `{subdomain, source, mountedBy[]}`；当前唯一记录指向 blood canonical handler 及两个静态挂载 facade，目标根、路由前缀、domain 和 process owner 从现有字段派生 |
+| `src/clinical-specialties/blood/http-handler.js` | T06 | B KEEP + IMPROVE | `/api/blood-system` 唯一可执行 handler 与治理声明源；动态动作使用稳定的参数化鉴权审计目标，不拥有独立进程、数据库或部署单元 |
 | API authorization matrix / production catalog / readiness consumers | T00 | B KEEP + IMPROVE | 共用 `runtime-source` inventory，禁止另建 handler 字符串副本或第二套路由清单 |
 
 ## 2026-08-27 生产 Go/No-Go 前端边界
@@ -42,7 +43,7 @@
 | T08 | integration | 3 | 13 | 外部网关、签名回调和交换 |
 | T09 | research / shared | 14 | 30 | 科研沙箱、组合查询和确实跨域的体验 |
 
-历史字面扫描识别 368 个精确 method/path 下限；当前扫描识别 373 个字面条件路由和 606 条授权声明（含 13 条机器认证证据声明），机器生产目录取并集后形成 598 个唯一接口，其中 589 个为字面 method/path、9 个保留运行时策略阻断。扫描器不再跨越已结束的相邻 handler 配对 method/path；目录复用现有授权矩阵和 route source inventory，不新增平行路由注册表，`npm run routes:check` 继续负责模块语法与装配边界。
+历史字面扫描识别 368 个精确 method/path 下限；当前扫描识别 374 个字面条件路由和 616 条授权声明（含 13 条机器认证证据声明），机器生产目录取并集后形成 609 个唯一接口，其中 601 个为字面 method/path、8 个保留运行时策略阻断。扫描器不再跨越已结束的相邻 handler 配对 method/path；目录复用现有授权矩阵和 route source inventory，不新增平行路由注册表，`npm run routes:check` 继续负责模块语法与装配边界。
 
 ## 2. 主要服务模块
 

@@ -1,8 +1,8 @@
 # DATA MODEL — 主线数据地图
 
-## 2026-08-29 路由实现源登记不是业务数据
+## 2026-08-30 血液路由实现源登记不是业务数据
 
-`routeImplementationSources` 是源码治理元数据，只保存子域 ID、仓库相对 JavaScript 路径与静态挂载它的 route facade 路径清单。它不新增或修改业务集合、SQLite/PostgreSQL 表、字段、DDL、migration、审计事实或生产证据；domain、process owner、目标源码根与允许的 API 前缀继续来自既有临床注册表。当前数组为空，数据库及 252 个集合状态完全不变。
+`routeImplementationSources` 是源码治理元数据，只保存子域 ID、仓库相对 JavaScript 路径与静态挂载它的 route facade 路径清单。当前仅登记 blood canonical handler 和两个挂载 facade；它不新增或修改业务集合、SQLite/PostgreSQL 表、字段、DDL、migration、审计事实或生产证据，数据库及 252 个集合状态完全不变。domain、process owner、目标源码根与允许的 API 前缀继续来自既有临床注册表。
 
 ## 2026-08-27 生产 Go/No-Go 页面数据边界
 
@@ -266,7 +266,7 @@ source/sink contract、目标摘要、cursor/source hash 与 receipt 摘要；ch
 
 ## 13. 生产 API 目录数据边界
 
-`production-api-catalog-v3` 是从路由源码、授权矩阵与两个小型证据注册表即时派生的治理元数据，不新增 JSON 集合、SQLite/PostgreSQL 表、字段、DDL、migration、outbox 或生产事实源。`config/api-authentication-evidence.json` 只登记可由控制流和负向测试证明的 custom auth 入口；SMS 认证继续从既有 `config/api-idempotency-evidence.json` 派生，避免第二份手工真相。两者均只保存源码/测试引用和分类字符串，不复制 598 项路由清单，也不保存真实 credential、provider payload 或外部回执。
+`production-api-catalog-v3` 是从路由源码、授权矩阵与两个小型证据注册表即时派生的治理元数据，不新增 JSON 集合、SQLite/PostgreSQL 表、字段、DDL、migration、outbox 或生产事实源。`config/api-authentication-evidence.json` 只登记可由控制流和负向测试证明的 custom auth 入口；SMS 认证继续从既有 `config/api-idempotency-evidence.json` 派生，避免第二份手工真相。两者均只保存源码/测试引用和分类字符串，不复制 609 项路由清单，也不保存真实 credential、provider payload 或外部回执。
 
 目录中的源码 marker 既不是认证证明，也不是幂等执行证据；只有 owner、控制流锚点和可执行负向测试一致时才产生认证 evidence contract。认证分类只描述 AS-IS 的 required/optional/none、凭据来源、replay/CSRF 和 scope，不代表目标政策充分或生产安全。幂等 `behavior-verified` 仍只证明当前仓库行为，不证明跨实例 exactly-once 或生产耐久性；所有生产状态继续 `NO-GO`。
 

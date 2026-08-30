@@ -5,6 +5,9 @@ const fs = require("node:fs");
 const path = require("node:path");
 const test = require("node:test");
 
+const { buildMatrix } = require("../scripts/api-authorization-matrix");
+const { buildProductionApiCatalog } = require("../scripts/production-api-catalog");
+
 const {
   BLOOD_DOMAIN_BOUNDARY,
   CORE_COLLECTIONS,
@@ -179,6 +182,40 @@ test("blood write routes persist through the scoped repository without changing 
   assert.deepEqual(persisted.residents, [{ id: "r-1" }]);
 });
 
+test("dynamic blood actions expose stable authorization audit targets", async () => {
+  const authorizations = [];
+  const handler = createBloodCoreHttpHandler({
+    BloodBusinessService: {},
+    BloodIntegrationGateway: {},
+    BloodMasterData: {},
+    BloodService: {},
+    BloodTransactionService: { receiveShipment: () => ({ status: 500, body: {} }) },
+    collectJson: async () => ({}),
+    readDatabase: () => ({}),
+    requireApiRole: (_req, _res, roles, target) => {
+      authorizations.push({ roles, target });
+      return null;
+    },
+    sendJson: () => {},
+    writeDatabase: () => {}
+  });
+
+  for (const pathname of [
+    "/api/blood-system/recalls/recall-1/acknowledge",
+    "/api/blood-system/shipments/receive"
+  ]) {
+    assert.equal(await handler.handle(
+      { method: "POST", headers: {} },
+      {},
+      new URL(`http://localhost${pathname}`)
+    ), true);
+  }
+  assert.deepEqual(authorizations, [
+    { roles: ["institution"], target: "/api/blood-system/recalls/:id/acknowledge" },
+    { roles: ["institution"], target: "/api/blood-system/shipments/receive" }
+  ]);
+});
+
 test("versioned cross-domain projections satisfy every frozen required-field contract", () => {
   const event = {
     id: "evt-1",
@@ -195,17 +232,52 @@ test("versioned cross-domain projections satisfy every frozen required-field con
   });
 });
 
-test("legacy route facades retain only catalog declarations and delegate blood implementation", () => {
+test("legacy route facades delegate blood implementation without governance declaration copies", () => {
   const facades = ["clinical-blood.js", "blood-innovation.js"].map((file) =>
     fs.readFileSync(path.join(ROOT, "src", "http", "routes", "clinical-specialties", file), "utf8")
   );
-  assert.match(facades[0], /BLOOD_CORE_API_GOVERNANCE_DECLARATIONS/);
+  assert.doesNotMatch(facades[0], /BLOOD_CORE_API_GOVERNANCE_DECLARATIONS|String\.raw/);
   assert.match(facades[0], /bloodCoreHttpHandler\.handle/);
   assert.doesNotMatch(facades[0].slice(facades[0].indexOf("function createRouteSegment")), /BloodService\.createRequest/);
-  assert.match(facades[1], /BLOOD_OPERATIONS_API_GOVERNANCE_DECLARATIONS/);
+  assert.doesNotMatch(facades[1], /BLOOD_OPERATIONS_API_GOVERNANCE_DECLARATIONS|String\.raw/);
   assert.match(facades[1], /bloodOperationsHttpHandler\.handle/);
   assert.doesNotMatch(facades[1].slice(facades[1].indexOf("function createRouteSegment")), /BloodEventHub\.publish/);
   const handler = fs.readFileSync(path.join(ROOT, "src", "clinical-specialties", "blood", "http-handler.js"), "utf8");
   assert.match(handler, /\/api\/blood-system/);
   assert.doesNotMatch(handler, /\/api\/(?:imaging-cloud|physical-exams|emergency|quality-safety)/);
+});
+
+test("blood API governance is derived only from the registered canonical handler", () => {
+  const handlerSource = "src/clinical-specialties/blood/http-handler.js";
+  const registry = require("../config/clinical-subdomains.json");
+  assert.deepEqual(registry.routeImplementationSources, [{
+    subdomain: "blood",
+    source: handlerSource,
+    mountedBy: [
+      "src/http/routes/clinical-specialties/blood-innovation.js",
+      "src/http/routes/clinical-specialties/clinical-blood.js"
+    ]
+  }]);
+
+  const matrix = buildMatrix();
+  const bloodRoutes = matrix.routes.filter((route) => route.path.startsWith("/api/blood-system"));
+  assert.equal(bloodRoutes.length > 0, true);
+  bloodRoutes.forEach((route) => {
+    assert.equal(route.owner, "T06", route.key);
+    assert.equal(route.domain, "clinical-specialties", route.key);
+    assert.equal(route.subdomain, "blood", route.key);
+    assert.match(route.source, new RegExp(`^${handlerSource.replaceAll("/", "\\/")}:\\d+$`), route.key);
+  });
+
+  const catalog = buildProductionApiCatalog(matrix);
+  const bloodEntries = catalog.entries.filter((entry) => entry.path.startsWith("/api/blood-system"));
+  assert.equal(bloodEntries.length > 0, true);
+  bloodEntries.forEach((entry) => {
+    assert.equal(entry.owner, "T06", entry.key);
+    assert.equal(entry.domain, "clinical-specialties", entry.key);
+    assert.equal(entry.subdomain, "blood", entry.key);
+    [...entry.sources, ...entry.routeInventorySources].forEach((source) => {
+      assert.match(source, new RegExp(`^${handlerSource.replaceAll("/", "\\/")}:\\d+$`), entry.key);
+    });
+  });
 });

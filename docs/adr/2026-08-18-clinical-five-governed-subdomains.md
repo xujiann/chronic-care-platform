@@ -46,7 +46,8 @@
 
 本增补不改变本 ADR 的方案 2、模块化单体或统一部署决策，只细化中央源码 inventory 的实现规则：领域目录外的 HTTP handler 必须由 `routeImplementationSources` 显式登记；登记不得复制 owner/domain/target root/route prefixes，必须从既有子域事实派生，声明非空 `mountedBy` route facade，并由 T00 消费方统一失败关闭。
 
-- T00 路由实现源前置切片：中央 `runtime-source` 已支持 `routeImplementationSources` 显式登记，并将同一 source inventory 提供给 readiness、授权矩阵和生产目录。登记保存子域、源码路径和静态挂载 facade；target root/route prefixes/domain/process owner 由本 ADR 的既有注册表派生。canonical owner 映射、路径/realpath、每个 API 字面量和授权声明的唯一前缀、facade 对 handler 的静态 require 均失败关闭，临时 fixture 防止领域 handler 漂移被 facade 字符串副本掩盖。当前登记为空，血液 opt-in 与 ghost 删除留给后续 T06 rebase。
+- T00 路由实现源前置切片：中央 `runtime-source` 已支持 `routeImplementationSources` 显式登记，并将同一 source inventory 提供给 readiness、授权矩阵和生产目录。登记保存子域、源码路径和静态挂载 facade；target root/route prefixes/domain/process owner 由本 ADR 的既有注册表派生。canonical owner 映射、路径/realpath、每个 API 字面量和授权声明的唯一前缀、facade 对 handler 的静态 require 均失败关闭，临时 fixture 防止领域 handler 漂移被 facade 字符串副本掩盖。
+- 2026-08-30 T06 接入：blood canonical handler 已登记，两个遗留 facade 的不可执行 `String.raw` governance ghost 已删除。动态 workflow/transaction 动作按稳定参数化路由模板声明鉴权审计 target，保持既有角色判定；32 条血液授权记录只从可执行 handler 派生并由 owner/domain/subdomain/source 测试锁定。该接入不改变模块化单体、统一身份、共享数据库或统一部署决策。
 
 - 第一切片：五子域注册表、136 个 API 字面路径归属、9 个中央登记集合映射、66 个候选集合盘点和 3 个跨子域契约已建立。
 - 第二切片：`GET /api/emergency/dashboard` 已通过 `emergency-dashboard-query.v1` 迁入急救目标源码根，保持原鉴权、脱敏、状态码和只读语义。
