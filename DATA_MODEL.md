@@ -419,3 +419,7 @@ classification、显式 fail-closed write policy 和实际源码证据。它们�
 `state-repository.js` 是统一 JSON 状态上的过渡端口：读取时为写命令提供集合白名单代理，提交时解包并调用原 `writeDatabase`，从而保持旧快照格式和未触碰集合。它没有建立独立事务、CAS、outbox、DDL 或物理数据库。中央 `domain-data-ownership`、版本化 migration、回填/回滚和 PostgreSQL 自治必须由后续 T00 数据任务批准；本切片未编辑 `data/db.json`、SQLite 或任何生成产物。
 
 中央临床注册表现将同一 34 项集合完整列为血液 `candidateCollections`，顺序与 `CORE_COLLECTIONS + OPERATIONS_COLLECTIONS` 冻结定义一致；`registeredCollections=[]`。候选登记只关闭清单漂移，不创建表、DDL、migration、生产写合同或数据 Owner，也不把共享 JSON/SQLite 状态拆成血液数据库。
+
+## 医保支付产品线数据边界（2026-08-30）
+
+产品线身份不创建或迁移任何数据结构。T07 继续通过 `config/domain-data-ownership.json` 消费既有医保支付 Owner/reader/write-policy 事实，核心 Resident、Institution、Practitioner、Record 等定义保持 closed-world；JSON/SQLite 兼容状态、PostgreSQL 目标、migration、事务/outbox 和生产写资格均未改变。独立数据库和数据自治仍须新的数据 ADR、版本化 migration、回填/核对/回滚及生产证据。

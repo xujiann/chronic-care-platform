@@ -328,3 +328,7 @@ T00 新增只读 `production-release-scope.v1`，从现有八应用清单、静�
 血液边界 v1 冻结 API 前缀、34 个实际自有集合、1 个外部只读集合、共享平台端口和三个版本化跨域契约。写路径通过 legacy state repository 的顶层集合白名单进入原统一持久化函数；dashboard 为保持既有端口对象身份仍使用只读兼容入口。运行时仍是共享 Node 模块化单体，中央数据 Owner、migration、独立 CI 与独立部署均未被本切片授权。
 
 T00 收尾已将 34 个冻结集合完整同步为临床注册表的 `candidateCollections`，`registeredCollections` 继续为空，因而没有生产 Owner 晋升。`blood-system:test` 现包含边界测试并在治理 CI 中显式执行。T10 对临床用血的展示已改为 `shared-platform-node-runtime`、逻辑模块选择和逻辑禁用回滚；`independentDeploymentAuthorized=false`、`productionReady=false` 与 `NO-GO` 为固定平台边界。
+
+## T07 医保支付独立开发产品线（2026-08-30）
+
+`config/development-organization.json` 已将 `insurance-payment` 确立为 T07 拥有的独立开发产品线。独立性只覆盖产品 Roadmap、Backlog、process 工作树和领域测试；既有按病种付费、金融网关、退款、凭证、验收和证据能力不迁移、不复制，也不改变公共 API。当前仍是单仓、T00/main 集成、共享 Node.js、模块化单体统一部署，`independentDeploymentAuthorized=false`、`productionReady=false`。

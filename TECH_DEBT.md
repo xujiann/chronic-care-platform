@@ -183,3 +183,9 @@ T00 机器登记完成后，`production-release-scope` 中 17 个仓库内 API �
 - T00 已关闭：34 个冻结集合与 `candidateCollections` 的清单漂移、`blood-system:test` 缺少边界测试、治理 CI 缺少显式血液测试映射，以及 T10 对临床用血 `standalone`/独立回滚的错误表述。
 - T00 仍待办：中央 `clinical-subdomains` 的 mixed/partial 路由状态、运行时 subcontext 进一步收窄和生产部署评估。当前共享 Node 运行时、统一部署包、逻辑模块禁用、独立部署未授权和 `NO-GO` 已成为显式门禁，不得建立血液独立容器或数据库规避该门禁。
 - 数据待办：34 个实际集合尚未获得中央生产 Owner、schema/migration、事务/outbox、回填/回滚和 PostgreSQL 验证，独立部署评分仍不满足。当前结论仍是“可独立开发和测试，不能独立上线”。
+
+## T07 医保支付产品线剩余债务（2026-08-30）
+
+- 已关闭：T07 只有一级域身份、没有机器可校验产品线身份的问题；Owner、独立 Roadmap/Backlog/工作树/测试和 T00/main 集成边界现已失败关闭。
+- 仍保留：外部医保/支付/证照 provider、真实凭据与网络、生产多实例 exactly-once、独立数据存储、长期审计、灾备和现场验收均未闭合。
+- 产品线不是服务提取许可：当前不得拆独立仓库、数据库、容器或部署流水线；如需物理拆分，必须新增评分、SLO、数据自治、迁移/回滚和 Accepted ADR。

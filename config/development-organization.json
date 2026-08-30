@@ -24,6 +24,30 @@
     "T08",
     "T09"
   ],
+  "productLines": [
+    {
+      "id": "insurance-payment",
+      "name": "医保支付",
+      "processId": "T07",
+      "status": "established",
+      "developmentMode": "independent-product-line",
+      "scopeAuthority": "config/process-workstreams.json#processes.T07",
+      "autonomy": {
+        "roadmap": "independent-product-roadmap",
+        "backlog": "independent-product-backlog",
+        "worktree": "independent-process-worktree",
+        "tests": "domain-tests-plus-shared-gates",
+        "release": "main-through-t00"
+      },
+      "topology": {
+        "repositoryBoundary": "single-repository",
+        "runtimeBoundary": "shared-node-runtime",
+        "deploymentBoundary": "modular-monolith",
+        "independentDeploymentAuthorized": false,
+        "productionReady": false
+      }
+    }
+  ],
   "nestedDevelopmentGroups": [
     {
       "id": "clinical-five",

@@ -370,3 +370,7 @@ strict preflight。candidate 用部署 anchor 摘要检查漂移，只聚合五�
 模块当前分类为 B/C 过渡：源码和 HTTP 实现已可独立开发、测试；共享组合根、静态页面发布、生产数据 Owner、数据库与部署仍由平台统一治理。
 
 T10 的 `clinical-blood` 条目只表示机构级逻辑选择与受控演练，不再表示独立进程或独立回滚单元。其 `deploymentUnit` 是 `shared-platform-node-runtime`，`independentDeploymentAuthorized=false`；关闭该模块使用 `logical-module-disable`，不能把模块清单解释为独立服务清单。
+
+## T07 医保支付产品线模块边界（2026-08-30）
+
+T07 `insurance-payment` 继续是 B 类 KEEP + IMPROVE 领域，并新增“独立开发产品线”组织标签。产品线复用既有按病种付费、医保结算、在线退款、金融网关、凭证回调、运营模型、验收和证据模块，不创建第二套 service、utility、API 或数据 Owner。独立 Roadmap、Backlog、工作树和测试不改变模块依赖；跨域接线、组合根、CI 和发布仍归 T00。
