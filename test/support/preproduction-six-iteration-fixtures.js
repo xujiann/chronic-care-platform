@@ -131,7 +131,18 @@ function createRehearsalSession() {
   };
 }
 
-function createExternalJointTestFixture() {
+function createExternalJointTestFixture(options = {}) {
+  const evaluationTime = options.now ? Date.parse(options.now) : null;
+  if (options.now && !Number.isFinite(evaluationTime)) throw new Error("invalid joint-test fixture time");
+  const executedAt = options.now
+    ? new Date(evaluationTime - 2 * 60 * 60 * 1000).toISOString()
+    : "2026-08-24T10:00:00.000Z";
+  const attestedAt = options.now
+    ? new Date(evaluationTime - 60 * 60 * 1000).toISOString()
+    : "2026-08-24T10:30:00.000Z";
+  const expiresAt = options.now
+    ? new Date(evaluationTime + 24 * 60 * 60 * 1000).toISOString()
+    : "2026-08-30T10:00:00.000Z";
   const campaign = normalizeCampaign(campaignRegistry);
   const platform = generateKeyPairSync("ed25519");
   const external = generateKeyPairSync("ed25519");
@@ -173,8 +184,8 @@ function createExternalJointTestFixture() {
       interfaceId: item.id,
       scenarioId: scenario.id,
       runId: `joint-test-run-${String(sequence).padStart(3, "0")}`,
-      executedAt: "2026-08-24T10:00:00.000Z",
-      expiresAt: "2026-08-30T10:00:00.000Z",
+      executedAt,
+      expiresAt,
       result: "passed",
       traceRef: `evidence://external-joint-test/${item.id}/${scenario.id}/trace`,
       receiptRef: `artifact://external-joint-test/${item.id}/${scenario.id}/receipt`,
@@ -194,7 +205,7 @@ function createExternalJointTestFixture() {
         keyId: "platform-joint-test-key-v1",
         account: "platform-joint-test-owner",
         algorithm: "Ed25519",
-        issuedAt: "2026-08-24T10:30:00.000Z",
+        issuedAt: attestedAt,
         nonce: `platform-nonce-${String(sequence).padStart(5, "0")}`,
         subjectDigest,
         signature: sign(null, Buffer.from(stableStringify(subject)), platform.privateKey)
@@ -206,7 +217,7 @@ function createExternalJointTestFixture() {
         keyId: "external-joint-test-key-v1",
         account: "external-joint-test-owner",
         algorithm: "Ed25519",
-        issuedAt: "2026-08-24T10:30:00.000Z",
+        issuedAt: attestedAt,
         nonce: `external-nonce-${String(sequence).padStart(5, "0")}`,
         subjectDigest,
         signature: sign(null, Buffer.from(stableStringify(subject)), external.privateKey)
