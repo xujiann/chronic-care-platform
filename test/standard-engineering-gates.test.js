@@ -158,7 +158,7 @@ test("the API hotspot keeps extracted lifecycles and the exact subtest order", (
   assert.match(storageMockHelper, /OBJECT_STORAGE_RECEIPT_SIGNING_SECRET = RECEIPT_SECRET/);
   assert.match(storageMockHelper, /server\.closeAllConnections\?\.\(\)/);
   assert.equal(subtestNames.length, 43);
-  assert.equal(orderDigest, "dab18cc7fb2ae790cae552d5646c30f9ba35e8139ac47c629466001dfe6b6cea");
+  assert.equal(orderDigest, "67d6d0c4ffaad052e1b1a0380b961168d192be087752aa72828998b561c84c27");
 });
 
 test("standard suite metrics are emitted for success without a time threshold", () => {

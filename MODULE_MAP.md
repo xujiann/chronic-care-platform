@@ -368,3 +368,5 @@ strict preflight。candidate 用部署 anchor 摘要检查漂移，只聚合五�
 | `cross-domain-contracts.js` | T06/blood | 三个 v1 投影字段和兼容投影 | 既有 consumer 字段保留并只做加法扩展 |
 
 模块当前分类为 B/C 过渡：源码和 HTTP 实现已可独立开发、测试；共享组合根、静态页面发布、生产数据 Owner、数据库与部署仍由平台统一治理。
+
+T10 的 `clinical-blood` 条目只表示机构级逻辑选择与受控演练，不再表示独立进程或独立回滚单元。其 `deploymentUnit` 是 `shared-platform-node-runtime`，`independentDeploymentAuthorized=false`；关闭该模块使用 `logical-module-disable`，不能把模块清单解释为独立服务清单。

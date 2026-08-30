@@ -113,6 +113,7 @@ function buildInstitutionModuleView(state = {}, institutionIdValue, options = {}
       name: item.name,
       selected: item.selected,
       independentlySelectable: item.independentlySelectable,
+      independentDeploymentAuthorized: item.independentDeploymentAuthorized,
       deploymentUnit: item.deploymentUnit,
       requiredPeerModules: [...item.requiredPeerModules],
       controlState: item.selected ? "configured-for-controlled-rehearsal" : "not-configured"

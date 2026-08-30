@@ -1096,7 +1096,7 @@ function buildDeployCheckReport(options = {}) {
     { name: "manifest:emergencyReadiness", ok: manifestSource.includes("emergency-readiness-report.md") && manifestSource.includes("emergency:readiness") && manifestSource.includes("/api/emergency/production-center") && manifestSource.includes("emergency-evidence-package-api") && manifestSource.includes("emergency-evidence-export-api") && manifestSource.includes("/api/emergency/events/:id/evidence-package/export?format=json") && manifestSource.includes("emergency-sos-aed-api") && manifestSource.includes("/api/emergency/sos /api/emergency/aed-map") && manifestSource.includes("emergency-life-chain") && manifestSource.includes("/api/emergency/life-chain/device-sos /api/emergency/life-chain/command-center /api/emergency/life-chain/quality"), detail: "prehospital emergency readiness, evidence exports, SOS/AED and golden four-minute life-chain artifacts are indexed" },
     { name: "manifest:t10SpecialtyCutover", ok: manifestSource.includes("t10-specialty-cutover-pack.md") && manifestSource.includes("t10:specialty-cutover") && manifestSource.includes("/api/t10-specialty/cutover-pack") && serverSource.includes("/api/t10-specialty/cutover-pack") && fs.readFileSync(path.join(ROOT, "workbench.html"), "utf8").includes("t10-specialty-cutover.html") && fs.readFileSync(path.join(ROOT, "t10-specialty-cutover.js"), "utf8").includes("/api/t10-specialty/cutover-pack") && fs.readFileSync(path.join(ROOT, "scripts", "release-report.js"), "utf8").includes("specialtyCutover:moduleCatalog"), detail: "T10 specialty module catalog, cutover API, portal entry and release artifact are indexed" },
     {
-      name: "api:t10IndependentProductionGates",
+      name: "api:t10SpecialtyProductionGates",
       ok: [
         "/api/t10-specialty/modules/clinical-blood/readiness",
         "/api/t10-specialty/modules/emergency-life-chain/readiness",
@@ -1109,7 +1109,9 @@ function buildDeployCheckReport(options = {}) {
         "imagingProductionApprovalMatch",
         "blocked-until-trusted-site-evidence-and-platform-launch-approval"
       ].every((marker) => serverSource.includes(marker))
-        && bloodClinicalProductionSource.includes("blocked-until-site-evidence-signed")
+        && bloodClinicalProductionSource.includes("src/clinical-specialties/blood/clinical-production")
+        && fs.readFileSync(path.join(ROOT, "src", "clinical-specialties", "blood", "clinical-production.js"), "utf8").includes('deploymentMode: "shared-platform-node-runtime"')
+        && fs.readFileSync(path.join(ROOT, "src", "clinical-specialties", "blood", "clinical-production.js"), "utf8").includes("independentDeploymentAuthorized: false")
         && emergencyModuleGateSource.includes("independent-emergency-module")
         && imagingCloudProductionSource.includes("SITE_RECEIPT_CONTRACTS")
         && imagingCloudProductionSource.includes("ROUTE_CONTRACTS")
@@ -1120,7 +1122,7 @@ function buildDeployCheckReport(options = {}) {
       detail: "clinical blood, emergency, imaging and physical-examination module evidence remain subordinate to the T00 platform launch gate"
     },
     {
-      name: "package:t10IndependentProductionGates",
+      name: "package:t10SpecialtyProductionGates",
       ok: [
         "t10:clinical-blood:readiness",
         "t10:clinical-blood:smoke",
@@ -1129,17 +1131,17 @@ function buildDeployCheckReport(options = {}) {
         "t10:physical-examination:readiness",
         "t10:physical-examination:test"
       ].every((name) => Boolean(pkg.scripts?.[name])),
-      detail: "T10 independent module check, smoke and readiness commands are registered"
+      detail: "T10 specialty module check, smoke and readiness commands are registered; clinical blood stays on the shared runtime"
     },
     {
-      name: "manifest:t10IndependentProductionGates",
+      name: "manifest:t10SpecialtyProductionGates",
       ok: [
         "t10-clinical-blood-independent-gate",
         "t10-emergency-independent-gate",
         "t10-imaging-production-gate",
         "t10-physical-examination-independent-gate"
       ].every((marker) => manifestSource.includes(marker)),
-      detail: "T10 clinical blood, emergency, imaging and physical-examination production gates are indexed"
+      detail: "T10 clinical blood shared-runtime gate and the other specialty production gates are indexed"
     },
     {
       name: "api:t10SpecialtyModuleGovernance",

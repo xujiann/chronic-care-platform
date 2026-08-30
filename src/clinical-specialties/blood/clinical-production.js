@@ -14,7 +14,8 @@ const coldChainProfiles = Object.freeze({
 
 const manifest = Object.freeze({
   moduleId: MODULE_ID,
-  deploymentMode: "standalone",
+  deploymentMode: "shared-platform-node-runtime",
+  independentDeploymentAuthorized: false,
   requiredDependencies: ["identity", "mpi", "his", "lis", "pda", "iot", "audit"],
   forbiddenDependencies: FORBIDDEN_DEPENDENCIES
 });
@@ -200,16 +201,23 @@ function evaluateProductionReadiness(state = {}) {
   const smokePassed = data.smokeRuns.some((item) => item.result === "passed" && item.moduleId === MODULE_ID && item.evidenceRef);
   const rollbackPassed = data.rollbackRuns.some((item) => item.result === "passed" && item.restoreVerified === true && item.evidenceRef);
   const gates = { receiptsValid, mastersValid, coldChainValid, scenariosValid, smokePassed, rollbackPassed };
-  const ready = Object.values(gates).every(Boolean);
+  const localEvidenceReady = Object.values(gates).every(Boolean);
   return {
     moduleId: MODULE_ID,
-    standalone: true,
-    functionalState: "software-release-ready",
-    formalGoLiveState: ready ? "ready-for-production" : "blocked-until-site-evidence-signed",
-    productionReady: ready,
+    standalone: false,
+    deploymentMode: manifest.deploymentMode,
+    independentDeploymentAuthorized: false,
+    functionalState: localEvidenceReady ? "local-rehearsal-ready" : "local-evidence-incomplete",
+    formalGoLiveState: "NO-GO",
+    productionReady: false,
+    localEvidenceReady,
     gates,
     evidenceDigest: digest({ moduleId: MODULE_ID, gates }),
-    blockers: Object.entries(gates).filter(([, passed]) => !passed).map(([name]) => name)
+    blockers: [
+      ...Object.entries(gates).filter(([, passed]) => !passed).map(([name]) => name),
+      "shared-platform-production-gate",
+      "independent-deployment-not-authorized"
+    ]
   };
 }
 

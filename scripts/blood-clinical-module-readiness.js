@@ -22,10 +22,11 @@ const report = {
   moduleId: MODULE_ID,
   generatedAt: new Date().toISOString(),
   manifest,
-  independentDeployment: isolation.every((item) => item.valid),
+  independentDeployment: false,
+  dependencyIsolationVerified: isolation.every((item) => item.valid),
   isolation,
   readiness,
-  decision: readiness.productionReady && isolation.every((item) => item.valid) ? "GO" : "NO-GO"
+  decision: "NO-GO"
 };
 
 process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);

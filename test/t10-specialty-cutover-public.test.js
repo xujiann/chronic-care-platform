@@ -104,6 +104,9 @@ test("T10 public projection keeps all real production gates closed with rehearsa
   assert.equal(pack.moduleCatalog.enabledModuleIds.length, 4);
   assert.equal(pack.moduleCatalog.peerModuleDependencyCount, 0);
   assert.ok(pack.moduleCatalog.modules.every((item) => item.independentlySelectable && item.requiredPeerModules.length === 0));
+  const blood = pack.moduleCatalog.modules.find((item) => item.id === "clinical-blood");
+  assert.equal(blood.independentDeploymentAuthorized, false);
+  assert.equal(blood.deploymentUnit, "shared-platform-node-runtime");
   assert.ok(pack.tracks.every((track) => track.productionReady === false && track.blockers.length > 0));
   assert.deepEqual(pack.stages, [
     "code-readiness",

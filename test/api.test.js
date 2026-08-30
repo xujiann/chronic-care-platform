@@ -3760,7 +3760,7 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(state.body.t10SpecialtyModuleAudit.every((item) => item.productionReady === false), true);
   });
 
-  await t.test("keeps independent T10 production evidence subordinate to the platform launch gate", async () => {
+  await t.test("keeps shared-runtime blood and independent T10 evidence subordinate to the platform launch gate", async () => {
     const institutionLogin = await login(baseUrl, "hospital");
     const anonymous = await api(baseUrl, "/api/t10-specialty/modules/clinical-blood/readiness");
     assert.equal(anonymous.response.status, 401);
@@ -3778,8 +3778,11 @@ test("API authentication, scoping and governance regression suite", async (t) =>
       authorized(commissionToken)
     );
     assert.equal(clinicalBlood.response.status, 200);
+    assert.equal(clinicalBlood.body.standalone, false);
+    assert.equal(clinicalBlood.body.deploymentMode, "shared-platform-node-runtime");
+    assert.equal(clinicalBlood.body.independentDeploymentAuthorized, false);
     assert.equal(clinicalBlood.body.productionReady, false);
-    assert.equal(clinicalBlood.body.blockers.length, 6);
+    assert.equal(clinicalBlood.body.blockers.length, 8);
     assert.equal(clinicalBlood.body.formalGoLiveState, "blocked-until-trusted-site-evidence-and-platform-launch-approval");
 
     const emergencyModule = await api(

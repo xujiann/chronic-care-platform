@@ -7,6 +7,8 @@ const bagId = "A123456789012-RBCS-01";
 
 test("clinical-blood manifest has no emergency, imaging or exam dependency", () => {
   assert.equal(clinical.manifest.moduleId, "clinical-blood");
+  assert.equal(clinical.manifest.deploymentMode, "shared-platform-node-runtime");
+  assert.equal(clinical.manifest.independentDeploymentAuthorized, false);
   assert.deepEqual(clinical.manifest.requiredDependencies, ["identity", "mpi", "his", "lis", "pda", "iot", "audit"]);
   assert.equal(clinical.validateDependencyIsolation('require("./emergency-service")').valid, false);
   assert.equal(clinical.validateDependencyIsolation('require("./blood-service")').valid, true);
@@ -70,11 +72,12 @@ test("single-operator crossmatch with independent review/release, bedside four-c
 test("formal go-live remains No-Go without all site evidence", () => {
   const result = clinical.evaluateProductionReadiness({});
   assert.equal(result.productionReady, false);
-  assert.equal(result.formalGoLiveState, "blocked-until-site-evidence-signed");
-  assert.equal(result.blockers.length, 6);
+  assert.equal(result.localEvidenceReady, false);
+  assert.equal(result.formalGoLiveState, "NO-GO");
+  assert.equal(result.blockers.length, 8);
 });
 
-test("all six production gates can reach ready-for-production", () => {
+test("all six local gates can reach rehearsal readiness without production promotion", () => {
   const receipt = { evidenceRef: "site://1", evidenceDigest: sha, organizationCode: "ORG", signedBy: "owner", signedAt: "2026-07-24", verifiedBy: "reviewer", verifiedAt: "2026-07-24", correlationId: "c", idempotencyKey: "i" };
   const master = (system) => ({ organizationCode: "ORG", system, code: "RBCS", name: "RBC", version: "1", effectiveAt: "2026-07-24" });
   const base = { patientId: "P1", bagId, evidenceRef: "site://scenario" };
@@ -90,5 +93,14 @@ test("all six production gates can reach ready-for-production", () => {
     smokeRuns: [{ moduleId: "clinical-blood", result: "passed", evidenceRef: "site://smoke" }],
     rollbackRuns: [{ result: "passed", restoreVerified: true, evidenceRef: "site://rollback" }]
   };
-  assert.equal(clinical.evaluateProductionReadiness(state).productionReady, true);
+  const readiness = clinical.evaluateProductionReadiness(state);
+  assert.equal(readiness.localEvidenceReady, true);
+  assert.equal(readiness.standalone, false);
+  assert.equal(readiness.independentDeploymentAuthorized, false);
+  assert.equal(readiness.formalGoLiveState, "NO-GO");
+  assert.equal(readiness.productionReady, false);
+  assert.deepEqual(readiness.blockers, [
+    "shared-platform-production-gate",
+    "independent-deployment-not-authorized"
+  ]);
 });

@@ -156,6 +156,8 @@ jobs:
         run: npm run api:idempotency-evidence
       - name: Run blood system readiness gate
         run: npm run blood-system:readiness
+      - name: Run blood domain and boundary tests
+        run: npm run blood-system:test
       - name: Run emergency collaboration API gate
         run: npm run emergency:test
       - name: Run physical examination innovation and API gate
