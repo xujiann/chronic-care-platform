@@ -1,8 +1,8 @@
 # API MAP — 主线接口地图
 
-## 2026-08-29 API 源码发现边界（无 HTTP 变化）
+## 2026-08-30 血液 API 源码发现边界
 
-本切片不新增、删除或修改任何 HTTP method/path、鉴权、角色、scope、请求/响应、错误、幂等或审计语义。授权矩阵和生产目录只消费经临床注册表显式登记、符合唯一子域 `routePrefixes` 且具有 `mountedBy` route facade 直接静态 require 证据的领域 handler，并保留 `subdomain` 与中央 domain/process owner 归属；这只是中央发现门槛，真实 HTTP 可达性由后续领域 integration test 验证。readiness 也通过 `readRuntimeSource` 消费同一 inventory。当前登记为空，606 条授权声明、373 个字面路由和 598 个目录接口保持不变。
+本切片不新增或删除 HTTP method/path，不改变角色、scope、请求/响应、错误或幂等规则。血液动态动作的拒绝审计 target 从含实例 ID 的运行时路径规范为稳定的参数化路由模板；访问判定保持原角色规则。授权矩阵和生产目录只消费经临床注册表显式登记、符合唯一子域 `routePrefixes` 且具有 `mountedBy` facade 静态 require 证据的领域 handler，并保留 `subdomain` 与中央 domain/process owner 归属。readiness 也通过 `readRuntimeSource` 消费同一 inventory。当前 32 条 `/api/blood-system` 授权记录只来自 canonical handler；全平台为 616 条授权声明、374 个字面条件路由和 609 个目录接口。
 
 ## 2026-08-27 生产 Go/No-Go 页面（无 API 变化）
 
@@ -23,7 +23,7 @@
 
 八个入口均支持 header `Idempotency-Key`，并保留既有 body command id 的必要兼容；key 按 actor、角色、机构、资源和动作散列命名空间。精确回放返回首次提交的公共响应快照并标记 `idempotentReplay: true`，且零写；异载荷复用返回 409。显式 `expectedVersion` 执行 CAS；未传版本沿用当前聚合版本兼容旧客户端。路由仅在锁内重读后调用一次 `writeDatabase`，存储失败返回脱敏 500/409，不做 JSON/SQLite fallback。所有入口继续 `productionReady=false`。
 
-> 实施分支 AS-IS 快照：历史静态分析识别的 368 条精确路由是下限；当前扫描识别 373 个字面条件路由和 606 条授权声明，派生目录取并集后形成 598 个唯一接口（589 个字面路由、9 个运行时策略）。其中 13 条声明来自机器认证证据合同，不新增路由；相邻 handler 不再被跨块拼接成虚假 method/path。动态 ID、请求体 action 和外部回调变体仍需以运行时路由测试为准。
+> 实施分支 AS-IS 快照：历史静态分析识别的 368 条精确路由是下限；当前扫描识别 374 个字面条件路由和 616 条授权声明，派生目录取并集后形成 609 个唯一接口（601 个字面路由、8 个运行时策略）。其中 13 条声明来自机器认证证据合同，不新增路由；相邻 handler 不再被跨块拼接成虚假 method/path。动态 ID、请求体 action 和外部回调变体仍需以运行时路由测试为准。
 
 ## 1. 请求链
 
@@ -118,7 +118,7 @@ HTTP request
 - `GET /api/state` 保持 method/path、允许角色、状态码和顶层集合兼容。鉴权与既有角色范围投影完成后，`authUsers` 专用投影删除 `password`、`passwordHash`，保留账号、角色、机构、状态和 `externalSubject` 等管理字段；读取不修改权威快照。该增量只关闭认证口令泄露，commission 其余全状态最小权限债务仍为 `NO-GO`。
 - `npm run api:authorization-matrix` 从模块化路由源码生成/校验 owner、身份、角色、范围、用途和九条高风险接口唯一性。
 - `npm run api:authentication-evidence` 校验 13 项认证合同的 owner、mechanism、credential source、required/optional/none、replay/CSRF、scope、实现锚点和可执行负向测试。其中 SMS callback 从现有幂等合同派生；原 13 个未分类 key 中 12 个真实入口已分类，T10 cutover pack 绑定 commission 直接拒绝证据，1 个公卫词法误配已从 inventory 删除，未分类认证为 0。
-- `npm run api:production-catalog` 合并上述授权矩阵与同一 route source inventory 的字面条件；当前 598 项全部 `NO-GO`。336 个写接口中 28 个完整 endpoint 有直接幂等行为合同，308 个仍缺 endpoint 级行为证明；2 个转诊 action-slice 不晋升通用 endpoint，退款 runtime-role variant 仍复核，因此总 `review-required` 为 310。
+- `npm run api:production-catalog` 合并上述授权矩阵与同一 route source inventory 的字面条件；当前 609 项全部 `NO-GO`。347 个写接口中 28 个完整 endpoint 有直接幂等行为合同，319 个仍缺 endpoint 级行为证明；2 个转诊 action-slice 不晋升通用 endpoint，退款 runtime-role variant 仍复核，因此总 `review-required` 为 321。
 - `npm run api:idempotency-evidence` 校验 30 份证据合同。新增八份 T09、四份 T04/T05 和五份 T02/T06 合同绑定首发药耗/科研、慢病/会诊、运行调度/质量安全入口及其身份、职责/资源范围、原响应或精确结果回放、CAS、单次持久化与稳定错误负测；T07 标准药械 use-case 保持原边界。T03 highlight signal intake 继续保留既有范围、幂等与原子审计合同。所有合同保持 `productionReady=false`，进程锁与 SQLite CAS 不等于跨实例 exactly-once。
 - 身份/SMS HTTP 路径保持不变；组合根已为短信发送生成随机 request ID，适配器现在拒绝缺失幂等 ID，OIDC refresh 返回的 ID token 必须通过 JWKS/claims 验证后才暴露脱敏 claims。
 - `POST /api/attachments/upload-intents` 在完成身份和居民范围校验后检查服务端元数据容量；已有
@@ -138,8 +138,8 @@ HTTP request
 
 ## 7. API 风险与缺失测试
 
-- `API-001`：机器目录已覆盖当前 606 条授权声明、373 个字面条件路由和两者并集的 598 个唯一接口，并强制 method/path/owner/auth/roles-or-scope/idempotency/生产状态完整；不再手工复制路由清单。
-- `API-002`：现有 28 个完整 endpoint 已形成行为证据；首发冻结范围新增的 T09 八项、T04/T05 四项和 T02/T06 五项共 17 个缺口全部关闭，两条通用转诊入口仍只登记 referrals action-slice。9 个运行时策略、308 个尚无 endpoint 级幂等行为证据合同的非首发写接口和 role × permission × resource 运行时矩阵仍需逐 owner 扩展。T08 普通 integration event/dispatch 和 T07 退款 action regex 也未晋升。
+- `API-001`：机器目录已覆盖当前 616 条授权声明、374 个字面条件路由和两者并集的 609 个唯一接口，并强制 method/path/owner/auth/roles-or-scope/idempotency/生产状态完整；不再手工复制路由清单。
+- `API-002`：现有 28 个完整 endpoint 已形成行为证据；首发冻结范围新增的 T09 八项、T04/T05 四项和 T02/T06 五项共 17 个缺口全部关闭，两条通用转诊入口仍只登记 referrals action-slice。8 个运行时策略、319 个尚无 endpoint 级幂等行为证据合同的非首发写接口和 role × permission × resource 运行时矩阵仍需逐 owner 扩展。T08 普通 integration event/dispatch 和 T07 退款 action regex 也未晋升。
 - T03 signal intake 的 POST 成功响应、独立 `GET /api/public-health/highlights` 和 `GET /api/public-health/system` 的嵌入式 highlights 已复用同一公开投影：所有角色均不接收 `commandKeyHash`、`requestDigest`；district 只返回自身/服务端医院 allowlist 内的 signal，alert 只有在全部关联 signal 同范围时才返回，混合范围和空关联均失败关闭，并隐藏 command、AI 与 evidence 明细；city/health-admin 保留合法全平台业务视图。两个 GET 保持 safe method，不新增幂等合同；system 在业务读取前拒绝未知组织类型或空组织代码，并只用投影后的 highlights 重算四项外层摘要，其他 system 字段保持遗留响应，本切片不据此宣称整个 system 已完成资源范围治理。T00 高风险机器目录继续以 `city and health-admin platform; district own organization or explicit public-health hospital allowlist` 锁定独立 highlights GET 范围，并由授权矩阵与生产目录契约测试保护。commission `GET /api/state` 已先移除 `authUsers` 的认证口令字段，但其余全状态最小权限投影仍是明确 `NO-GO` 债务。
 - API 治理脚本继续拒绝伪造认证合同、跨 handler method/path 误配、action-slice 冒充 endpoint、缺幂等行为证明和生产误 promotion；覆盖率门禁不关闭上述 310 项 `review-required`，也不构成生产放行证据。
 - `API-003`：错误响应契约不统一，调用方需要理解多个格式。
@@ -432,3 +432,9 @@ dataset 与受控 attribute，连同前一切片共关闭该资产 27 个 HTML s
 `owner-reviewed-legacy`。这只关闭 repository owner review，不新增或改变任何 HTTP method/path、请求、
 响应、鉴权、审计或副作用；显式 `legacy-owner-review-write-policy.v1` 仍拒绝生产写入和晋升，旧
 JSON/SQLite/state API 不能据 owner 登记自动成为生产写接口。
+
+## 38. 血液 HTTP 实现归域（协议不变）
+
+全部既有 `/api/blood-system` method/path 已从两个混合 route segment 的业务分支迁入 `src/clinical-specialties/blood/http-handler.js`。`clinical-specialties-06` 与 `clinical-specialties-10` 仍在原 manifest 插槽按原顺序调用血液 handler 后再处理影像或体检，因此未新增、删除或重排公开 API；认证角色、body 读取时机、幂等键、状态码、响应和持久化条件保持原行为。
+
+跨域投影在兼容字段基础上新增 `projectionId`、`status`、`sourceSubdomain` 和 `subjectRef`，使 `blood-emergency-coordination.v1`、`blood-quality-signal.v1`、`clinical-quality-observation.v1` 的必需字段可机器验证。该变化为加法兼容，不授权 consumer 反向写血液数据。

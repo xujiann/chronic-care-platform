@@ -6,7 +6,16 @@
   "deploymentBoundary": "shared-node-runtime",
   "independentDeploymentAuthorized": false,
   "routeSourceRoot": "src/http/routes/clinical-specialties",
-  "routeImplementationSources": [],
+  "routeImplementationSources": [
+    {
+      "subdomain": "blood",
+      "source": "src/clinical-specialties/blood/http-handler.js",
+      "mountedBy": [
+        "src/http/routes/clinical-specialties/blood-innovation.js",
+        "src/http/routes/clinical-specialties/clinical-blood.js"
+      ]
+    }
+  ],
   "subdomains": [
     {
       "id": "emergency",

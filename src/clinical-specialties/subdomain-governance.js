@@ -143,6 +143,25 @@ function validateClinicalSubdomainRegistry(root, registry = loadClinicalSubdomai
       routeInventory.push({ apiPath, owner: matches[0].id, routeFile });
     });
   });
+  subdomains.forEach((subdomain) => {
+    const sourceRoot = path.join(root, subdomain.targetSourceRoot || "");
+    listJavaScriptFiles(sourceRoot)
+      .filter((file) => /(?:^|[\\/])http-handler\.js$/.test(file))
+      .forEach((file) => {
+        extractApiPaths(fs.readFileSync(file, "utf8")).forEach((apiPath) => {
+          const matches = prefixOwners.filter((entry) => matchesPrefix(apiPath, entry.prefix));
+          if (matches.length !== 1 || matches[0].id !== subdomain.id) {
+            issues.push(`${apiPath} in ${path.relative(root, file)} is outside ${subdomain.id} route ownership`);
+            return;
+          }
+          routeInventory.push({
+            apiPath,
+            owner: subdomain.id,
+            routeFile: path.relative(root, file).replace(/\\/g, "/")
+          });
+        });
+      });
+  });
   implementedUseCases.forEach((useCase) => {
     const apiPath = String(useCase.route || "").split(" ")[1];
     if (!routeInventory.some((route) => route.owner === useCase.owner && route.apiPath === apiPath)) {

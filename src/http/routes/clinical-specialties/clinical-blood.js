@@ -1,8 +1,8 @@
 "use strict";
 
 const {
-  createBloodDashboardQuery
-} = require("../../../clinical-specialties/blood/dashboard-query");
+  createBloodCoreHttpHandler
+} = require("../../../clinical-specialties/blood/http-handler");
 const {
   createImagingDashboardQuery
 } = require("../../../clinical-specialties/imaging/dashboard-query");
@@ -14,8 +14,22 @@ const {
   sanitizePublicString
 } = require("../../../clinical-specialties/imaging/public-response");
 
+
+
 function createRouteSegment(runtime) {
   const { BloodBusinessService, BloodIntegrationGateway, BloodMasterData, BloodService, BloodTransactionService, appendDataAccessLog, appendSecurityEvent, buildImageCloudDashboard, buildImageCloudDerivedRecords, buildOhifStudyUrl, canAccessResident, collectJson, createHash, createImageCloudMutualRecognitionChain, listOrthancStudySummaries, mergeByKey, normalizeImageCloudStudy, personIndexForResident, publishImagingStudyToFhir, randomUUID, readDatabase, redactSensitiveResponse, requireApiRole, reviewImageCloudRecognitionAppeal, reviewMutualRecognitionRecord, sendJson, solutionAHealth, submitImageCloudRecognitionAppeal, upsertPhase2MutualRecognitionCitation, writeDatabase } = runtime;
+  const bloodCoreHttpHandler = createBloodCoreHttpHandler({
+    BloodBusinessService,
+    BloodIntegrationGateway,
+    BloodMasterData,
+    BloodService,
+    BloodTransactionService,
+    collectJson,
+    readDatabase,
+    requireApiRole,
+    sendJson,
+    writeDatabase
+  });
   const sendImagingJson = (res, status, body, projector) => sendJson(
     res,
     status,
@@ -25,187 +39,7 @@ function createRouteSegment(runtime) {
       id: "clinical-specialties-06",
       domain: "clinical-specialties",
       async handle(req, res, url) {
-    if (req.method === "GET" && url.pathname === "/api/blood-system") {
-        const user = requireApiRole(req, res, ["commission", "institution"], "/api/blood-system");
-        if (!user) return true;
-        const bloodDashboardQuery = createBloodDashboardQuery({
-          buildBloodDashboard: BloodService.buildDashboard,
-          normalizeTransactionState: BloodTransactionService.normalizeTransactionState
-        });
-        const data = readDatabase();
-        sendJson(res, 200, bloodDashboardQuery.execute({ data, user }));
-        return true;
-      }
-
-      if (req.method === "GET" && url.pathname === "/api/blood-system/master-data") {
-        const user = requireApiRole(req, res, ["commission", "institution"], "/api/blood-system/master-data");
-        if (!user) return true;
-        sendJson(res, 200, BloodMasterData.snapshot());
-        return true;
-      }
-
-      if (req.method === "GET" && url.pathname === "/api/blood-system/integration") {
-        const user = requireApiRole(req, res, ["commission", "institution"], "/api/blood-system/integration");
-        if (!user) return true;
-        sendJson(res, 200, BloodIntegrationGateway.dashboard(readDatabase()));
-        return true;
-      }
-
-      if (req.method === "GET" && url.pathname === "/api/blood-system/business") {
-        const user = requireApiRole(req, res, ["commission", "institution"], "/api/blood-system/business");
-        if (!user) return true;
-        sendJson(res, 200, BloodBusinessService.dashboard(readDatabase(), user));
-        return true;
-      }
-
-      const bloodBusinessCreateMatch = url.pathname.match(/^\/api\/blood-system\/business\/resources\/([^/]+)$/);
-      const bloodBusinessActionMatch = url.pathname.match(/^\/api\/blood-system\/business\/records\/([^/]+)\/actions$/);
-      if (req.method === "POST" && (bloodBusinessCreateMatch || bloodBusinessActionMatch)) {
-        const user = requireApiRole(req, res, ["commission", "institution"], "/api/blood-system/business/actions");
-        if (!user) return true;
-        const data = readDatabase();
-        const payload = await collectJson(req);
-        const result = bloodBusinessCreateMatch
-          ? BloodBusinessService.create(data, user, decodeURIComponent(bloodBusinessCreateMatch[1]), payload)
-          : BloodBusinessService.action(data, user, decodeURIComponent(bloodBusinessActionMatch[1]), payload);
-        if (result.status < 500) writeDatabase(data);
-        sendJson(res, result.status, result.body);
-        return true;
-      }
-
-      const bloodIntegrationReceiveMatch = url.pathname.match(/^\/api\/blood-system\/integration\/contracts\/([^/]+)\/receive$/);
-      const bloodIntegrationEnqueueMatch = url.pathname.match(/^\/api\/blood-system\/integration\/contracts\/([^/]+)\/enqueue$/);
-      const bloodIntegrationRetryMatch = url.pathname.match(/^\/api\/blood-system\/integration\/dead-letters\/([^/]+)\/retry$/);
-      if (req.method === "POST" && (bloodIntegrationReceiveMatch || bloodIntegrationEnqueueMatch || bloodIntegrationRetryMatch)) {
-        const user = requireApiRole(req, res, ["commission", "institution"], "/api/blood-system/integration/actions");
-        if (!user) return true;
-        const data = readDatabase();
-        const payload = await collectJson(req);
-        const result = bloodIntegrationReceiveMatch
-          ? BloodIntegrationGateway.receive(data, user, decodeURIComponent(bloodIntegrationReceiveMatch[1]), payload)
-          : bloodIntegrationEnqueueMatch
-            ? BloodIntegrationGateway.enqueue(data, user, decodeURIComponent(bloodIntegrationEnqueueMatch[1]), payload)
-            : BloodIntegrationGateway.retry(data, user, decodeURIComponent(bloodIntegrationRetryMatch[1]));
-        writeDatabase(data);
-        sendJson(res, result.status, result.body);
-        return true;
-      }
-
-      if (req.method === "POST" && url.pathname === "/api/blood-system/transfusion-requests") {
-        const user = requireApiRole(req, res, ["institution"], "/api/blood-system/transfusion-requests");
-        if (!user) return true;
-        const data = readDatabase();
-        const result = BloodService.createRequest(data, user, await collectJson(req));
-        if (result.status < 400) writeDatabase(data);
-        sendJson(res, result.status, result.body);
-        return true;
-      }
-
-      if (req.method === "POST" && url.pathname === "/api/blood-system/specimens/assess") {
-        const user = requireApiRole(req, res, ["institution"], "/api/blood-system/specimens/assess");
-        if (!user) return true;
-        const data = readDatabase();
-        const result = BloodService.assessSpecimen(data, user, await collectJson(req));
-        writeDatabase(data);
-        sendJson(res, result.status, result.body);
-        return true;
-      }
-
-      if (req.method === "POST" && url.pathname === "/api/blood-system/recalls") {
-        const user = requireApiRole(req, res, ["commission"], "/api/blood-system/recalls");
-        if (!user) return true;
-        const data = readDatabase();
-        const result = BloodService.createRecall(data, user, await collectJson(req));
-        if (result.status < 400) writeDatabase(data);
-        sendJson(res, result.status, result.body);
-        return true;
-      }
-
-      if (req.method === "POST" && url.pathname === "/api/blood-system/transfusion-reactions") {
-        const user = requireApiRole(req, res, ["institution"], "/api/blood-system/transfusion-reactions");
-        if (!user) return true;
-        const data = readDatabase();
-        const result = BloodService.reportReaction(data, user, await collectJson(req));
-        if (result.status < 400) writeDatabase(data);
-        sendJson(res, result.status, result.body);
-        return true;
-      }
-
-      if (req.method === "POST" && url.pathname === "/api/blood-system/emergency-allocations") {
-        const user = requireApiRole(req, res, ["commission", "institution"], "/api/blood-system/emergency-allocations");
-        if (!user) return true;
-        const data = readDatabase();
-        const result = BloodService.createEmergencyAllocation(data, user, await collectJson(req));
-        if (result.status < 400) writeDatabase(data);
-        sendJson(res, result.status, result.body);
-        return true;
-      }
-
-      const recallAcknowledgeMatch = url.pathname.match(/^\/api\/blood-system\/recalls\/([^/]+)\/acknowledge$/);
-      const recallCloseMatch = url.pathname.match(/^\/api\/blood-system\/recalls\/([^/]+)\/close$/);
-      const reactionInvestigateMatch = url.pathname.match(/^\/api\/blood-system\/transfusion-reactions\/([^/]+)\/investigate$/);
-      const emergencyActionMatch = url.pathname.match(/^\/api\/blood-system\/emergency-allocations\/([^/]+)\/actions$/);
-      const bloodWorkflowMatch = recallAcknowledgeMatch || recallCloseMatch || reactionInvestigateMatch || emergencyActionMatch;
-      if (req.method === "POST" && bloodWorkflowMatch) {
-        const roles = recallAcknowledgeMatch ? ["institution"] : reactionInvestigateMatch ? ["commission", "institution"] : emergencyActionMatch ? ["commission", "institution"] : ["commission"];
-        const user = requireApiRole(req, res, roles, url.pathname);
-        if (!user) return true;
-        const data = readDatabase();
-        const payload = await collectJson(req);
-        const id = decodeURIComponent(bloodWorkflowMatch[1]);
-        const idempotencyKey = String(req.headers["idempotency-key"] || payload.idempotencyKey || "").trim();
-        const result = recallAcknowledgeMatch ? BloodService.acknowledgeRecall(data, user, id, payload, idempotencyKey)
-          : recallCloseMatch ? BloodService.closeRecall(data, user, id, payload, idempotencyKey)
-            : reactionInvestigateMatch ? BloodService.investigateReaction(data, user, id, payload)
-              : BloodService.actEmergencyAllocation(data, user, id, payload);
-        if (result.status < 500) writeDatabase(data);
-        sendJson(res, result.status, result.body);
-        return true;
-      }
-
-      const bloodTransactionRoutes = {
-        "/api/blood-system/test-reports/sign": { roles: ["commission"], action: BloodTransactionService.signTestReport },
-        "/api/blood-system/release-reviews": { roles: ["commission"], action: BloodTransactionService.reviewRelease },
-        "/api/blood-system/shipments": { roles: ["commission"], action: BloodTransactionService.createShipment },
-        "/api/blood-system/shipments/receive": { roles: ["institution"], action: BloodTransactionService.receiveShipment },
-        "/api/blood-system/safety-incidents/cold-chain/review": { roles: ["commission"], action: BloodTransactionService.reviewColdChainIncident },
-        "/api/blood-system/compatibility-tests": { roles: ["institution"], action: BloodTransactionService.recordCompatibility },
-        "/api/blood-system/transfusions/start": { roles: ["institution"], action: BloodTransactionService.startTransfusion },
-        "/api/blood-system/transfusions/complete": { roles: ["institution"], action: BloodTransactionService.completeTransfusion }
-      };
-      if (req.method === "POST" && bloodTransactionRoutes[url.pathname]) {
-        const route = bloodTransactionRoutes[url.pathname];
-        const user = requireApiRole(req, res, route.roles, url.pathname);
-        if (!user) return true;
-        const data = readDatabase();
-        const payload = await collectJson(req);
-        const idempotencyKey = String(req.headers["idempotency-key"] || payload.idempotencyKey || "").trim();
-        const result = route.action(data, user, payload, idempotencyKey);
-        writeDatabase(data);
-        sendJson(res, result.status, result.body);
-        return true;
-      }
-
-      const bloodTransitionMatch = url.pathname.match(/^\/api\/blood-system\/blood-units\/([^/]+)\/transition$/);
-      if (req.method === "POST" && bloodTransitionMatch) {
-        const user = requireApiRole(req, res, ["commission", "institution"], "/api/blood-system/blood-units/:id/transition");
-        if (!user) return true;
-        const data = readDatabase();
-        const payload = await collectJson(req);
-        const result = BloodService.transitionBloodUnit(data, user, decodeURIComponent(bloodTransitionMatch[1]), String(payload.to || ""), payload.context || {});
-        writeDatabase(data);
-        sendJson(res, result.status, result.body);
-        return true;
-      }
-
-      const bloodTraceMatch = url.pathname.match(/^\/api\/blood-system\/trace\/([^/]+)$/);
-      if (req.method === "GET" && bloodTraceMatch) {
-        const user = requireApiRole(req, res, ["commission", "institution"], "/api/blood-system/trace/:code");
-        if (!user) return true;
-        const result = BloodService.trace(readDatabase(), user, decodeURIComponent(bloodTraceMatch[1]));
-        sendJson(res, result.status, result.body);
-        return true;
-      }
+    if (await bloodCoreHttpHandler.handle(req, res, url)) return true;
 
       if (req.method === "GET" && url.pathname === "/api/imaging-cloud") {
         const user = requireApiRole(req, res, ["commission", "institution", "county", "citizen"], "/api/imaging-cloud");

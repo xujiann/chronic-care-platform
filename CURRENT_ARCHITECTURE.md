@@ -1,10 +1,10 @@
 # CURRENT ARCHITECTURE — 主线现状地图
 
-## 2026-08-29 路由实现源中央治理
+## 2026-08-30 血液路由实现源接入中央治理
 
 - `src/http/runtime-source.js` 继续递归发现 `src/http/routes/**/*.js`，并可从 `config/clinical-subdomains.json#routeImplementationSources` 加载显式登记的子域 HTTP 实现源；不扫描整个目标源码目录。
 - 登记项只声明 `subdomain`、仓库相对 `source` 与非空 `mountedBy` facade 清单。domain、T00–T09 process owner、`targetSourceRoot` 和 `routePrefixes` 从同一临床注册表派生；owner/domain 不符合中央映射、API 字面量或授权声明越过唯一子域前缀、facade 未静态 require handler、路径越界/别名/缺失/类型不符时均失败关闭，重复登记只产生一个源码记录。`mountedBy` 是最小静态挂载证明，不替代 T06 的真实 HTTP integration test，也不单独宣称完整运行时可达。
-- 当前登记数组为空，因此主线授权声明 606、字面路由 373、生产目录 598 的基线及所有 readiness 输入保持不变。血液 handler 的登记与 facade ghost 删除由后续 T06 rebase 切片完成。
+- 血液子域现将唯一可执行实现 `src/clinical-specialties/blood/http-handler.js` 登记为实现源，两个遗留 route facade 只保留静态 require 与委托，不再保存 `String.raw` 治理副本。readiness、授权矩阵与生产目录均由同一 canonical handler 派生；当前授权声明 616、字面条件路由 374、生产目录 609，32 条 `/api/blood-system` 授权记录全部归属 T06 / `clinical-specialties` / `blood`。这不改变模块化单体、共享 Node 运行时或统一部署状态。
 
 ## 2026-08-27 生产 Go/No-Go 页面可信渲染增量
 
@@ -112,7 +112,7 @@ flowchart TB
    unregister/Cache Storage 清理。SEC-004 另增加急救生命链、医生工作台、血液上线看板、陪诊工作台、产品运行驾驶舱、产品区域运行驾驶舱、质量安全工作台、区域切换工作台、血液召回面板、血液创新指挥中心及体检风险卡各 1 项恶意 API 载荷回归；Go/No-Go 回归锁定四方业务责任属性不再被登录角色过滤器误删。
    当前根 40 + 居民 13 + PWA 3 = 56 项；标准在线 context 仍保持阻止 Service Worker。
 7. 审计验证已收敛到 `src/identity-security/audit-chain.js` 的 v2 严格端口；内容、链接、结构和重复 ID 任一异常均失败，验证 API/合规报告不再读取时重封。全量状态写入中的审计数组由服务端管理。
-8. 机器 API 授权矩阵现从路由扫描和小型认证证据合同派生 606 条声明；`production-api-catalog-v3` 与 373 个字面条件路由取并集，形成 598 个唯一接口条目（589 个字面路由、9 个运行时策略）。认证证据共 13 项且无未分类。幂等证据注册表现有 30 份直接行为合同：28 个完整 endpoint 与 2 个转诊 action-slice。T09、T04/T05、T02/T06 共关闭冻结首发范围 17 个写入口，原响应/结果快照回放、职责/资源范围、CAS、单次状态/审计提交与错误负测均由机器锚点校验；T07 标准药械状态机保持原边界。336 个写接口中 28 个 endpoint 为 `behavior-verified`，308 个仍为 `behavior-proof-required`；两个通用 action endpoint 使当前 310 项需复核，598 项全部 `NO-GO`。进程锁和 SQLite collection-version CAS 均不被解释为跨实例 exactly-once，`reviewedProofRequired` 保持为零。
+8. 机器 API 授权矩阵现从路由扫描和小型认证证据合同派生 616 条声明；`production-api-catalog-v3` 与 374 个字面条件路由取并集，形成 609 个唯一接口条目（601 个字面路由、8 个运行时策略）。认证证据共 13 项且无未分类。幂等证据注册表现有 30 份直接行为合同：28 个完整 endpoint 与 2 个转诊 action-slice。T09、T04/T05、T02/T06 共关闭冻结首发范围 17 个写入口，原响应/结果快照回放、职责/资源范围、CAS、单次状态/审计提交与错误负测均由机器锚点校验；T07 标准药械状态机保持原边界。347 个写接口中 28 个 endpoint 为 `behavior-verified`，319 个仍为 `behavior-proof-required`；两个通用 action endpoint 使当前 321 项需复核，609 项全部 `NO-GO`。进程锁和 SQLite collection-version CAS 均不被解释为跨实例 exactly-once，`reviewedProofRequired` 保持为零。
 9. P1 生产适配器增量保持现有 owner：T01 的 `production-adapters.js` 承担 JWKS/JWT 与 SMS 协议；OTP、发送/登录限流和失败锁定由共享 `auth-security-state-store` 承载，单主机 SQLite 复用 `state_collections`、生产多实例使用组合根长期 PostgreSQL pool；T00 的 PostgreSQL 组合保持 shadow/rehearsal 且 `productionPrimary=false`，受控迁移评估继续失败关闭。连续审计已使用 v15 同事务 append-only source、最小投影和 checkpoint v3，worker/preflight/systemd 已进入部署制品；未签名 receipt、外部单调 anchor、真实 WORM/KMS 与现场证据使 `productionReady=false` 继续失败关闭。
    浏览器服务端登录不再把 token/bearer 写入 `localStorage`；Cookie 上下文在服务端和浏览器
    水合链路均优先，旧脚本可读 token 会在上下文请求前清除。生产 bearer/hybrid 只有显式
@@ -320,3 +320,9 @@ reconciliation 观察。所有入口要求调用方提供发布号和包指纹�
 ## 2026-08-26 首批生产范围冻结
 
 T00 新增只读 `production-release-scope.v1`，从现有八应用清单、静态发布清单、生产 API 目录、数据集合治理、worker 观测合同、外部联调活动及切换行动定义派生并冻结范围。当前指纹覆盖 8 个应用、9 个页面、32 个 API、38 个数据引用、7 个 worker、14 个外部依赖、16 个应用证据名和 14 个 definitions-only 切换动作。完整校验只在 CI/build-time 读取仓库权威；部署包仅保存已验证的冻结 config 与同一指纹并声明 runtime verifier 不可用，standard smoke 与 strict preflight 失败关闭校验绑定。19 个首发 legacy 引用的 owner/governance review 已关闭，范围内 `collectionReviewRequired=0`；19 个 legacy 集合连同 `referrals` 精确 owner 绑定和 `operationsReadiness` 派生只读模型共 21 个引用仍不具备生产写合同。T09、T04/T05、T02/T06 的 17 份首发行为合同使范围内 `apiReviewRequired=0`；所有 API、集合生产晋级与 worker 激活仍保持 NO-GO，`productionReady=false`。
+
+## 2026-08-28 血液子域最大化独立切片
+
+血液服务端唯一实现已归入 `src/clinical-specialties/blood/`；根目录九个既有 CommonJS 入口仅保留向后兼容导出，浏览器直接加载的 `blood-domain.js` 与 `blood-standard-registry.js` 继续作为公开静态适配器。`clinical-blood`、`blood-innovation` 两个遗留路由段仍占用原全局插槽，但已不再实现 `/api/blood-system`，只向血液子域 HTTP handler 委托，因此 URL、角色、状态码、写入和路由顺序不变。
+
+血液边界 v1 冻结 API 前缀、34 个实际自有集合、1 个外部只读集合、共享平台端口和三个版本化跨域契约。写路径通过 legacy state repository 的顶层集合白名单进入原统一持久化函数；dashboard 为保持既有端口对象身份仍使用只读兼容入口。运行时仍是共享 Node 模块化单体，中央数据 Owner、migration、独立 CI 与独立部署均未被本切片授权。
