@@ -4,6 +4,8 @@
 
 本切片不新增或删除 HTTP method/path，不改变角色、scope、请求/响应、错误或幂等规则。血液动态动作的拒绝审计 target 从含实例 ID 的运行时路径规范为稳定的参数化路由模板；访问判定保持原角色规则。授权矩阵和生产目录只消费经临床注册表显式登记、符合唯一子域 `routePrefixes` 且具有 `mountedBy` facade 静态 require 证据的领域 handler，并保留 `subdomain` 与中央 domain/process owner 归属。readiness 也通过 `readRuntimeSource` 消费同一 inventory。当前 32 条 `/api/blood-system` 授权记录只来自 canonical handler；全平台为 616 条授权声明、374 个字面条件路由和 609 个目录接口。
 
+中央收尾没有新增 API；治理 CI 在 readiness 之后显式运行 `blood-system:test`，其测试集合包含 canonical handler、状态边界和注册来源验证。T10 投影继续允许机构选择临床用血模块，但新增共享运行时与独立部署未授权字段。原始模块 readiness 固定 `productionReady=false`、`formalGoLiveState=NO-GO`；对外 API 再叠加平台级 `blocked-until-trusted-site-evidence-and-platform-launch-approval`，同样不构成上线授权。
+
 ## 2026-08-27 生产 Go/No-Go 页面（无 API 变化）
 
 `GET /api/production-go-no-go/center` 及审批、撤销、决策写接口的 method/path、鉴权、请求、响应、错误和审计语义均未改变。客户端仅将六个字符串 HTML sink 替换为 DOM/text/class/dataset 渲染，并由恶意响应 E2E 锁定。

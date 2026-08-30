@@ -65,3 +65,4 @@
   handler 或关闭 ARC-008。
 - 尚未实施：除血液外四个临床子域的路由全面归域、完整运行时上下文拆分、中央数据 Owner 晋升、独立 CI、数据库拆分和独立部署；operations 大 handler 的后续用例端口拆分也不属于本次原子移交。
 - 第九切片：全部 `/api/blood-system` HTTP 分支和九个服务端实现已进入血液目标源码根；根 CommonJS 文件降为兼容 re-export，两个原 route segment 只维持原插槽委托。`clinical-blood.v1` 冻结 34 个实际集合、平台端口和三个跨域契约，写命令通过集合白名单 legacy repository；跨域投影以加法字段满足 v1 必需字段。未修改中央 route order、runtime source、数据 Owner、migration、CI 或部署授权；血液达到“可独立开发与测试”，仍不具备独立生产服务资格。
+- 第十切片：T00 将上述 34 项完整同步为中央 `candidateCollections`，继续保持 `registeredCollections=[]`；将边界测试纳入 `blood-system:test` 并在治理 CI 显式执行。T10 的临床用血条目改为共享平台 Node 运行时、机构级逻辑选择与逻辑禁用回滚，`independentDeploymentAuthorized=false`，本地证据只能达到 `local-rehearsal-ready`，正式状态固定 `NO-GO`。本切片没有创建独立服务、容器、数据库、migration 或生产 Owner。

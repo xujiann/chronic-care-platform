@@ -180,5 +180,6 @@ T00 机器登记完成后，`production-release-scope` 中 17 个仓库内 API �
 
 - 已关闭：根目录九份重复服务实现、两个混合路由内的血液业务分支、未冻结的跨域投影必需字段、写命令可无声明访问任意顶层集合。
 - 仍保留：`blood-domain.js` 与 `blood-standard-registry.js` 是浏览器直接加载的根静态适配器；静态资产构建体系建立前不能改成 CommonJS shim。
-- T00 待办：中央 `clinical-subdomains` 的 mixed/partial 状态、运行时 subcontext 拆分、独立 CI 映射与部署打包；这些 protected path 不在 T06 分支越权修改。
+- T00 已关闭：34 个冻结集合与 `candidateCollections` 的清单漂移、`blood-system:test` 缺少边界测试、治理 CI 缺少显式血液测试映射，以及 T10 对临床用血 `standalone`/独立回滚的错误表述。
+- T00 仍待办：中央 `clinical-subdomains` 的 mixed/partial 路由状态、运行时 subcontext 进一步收窄和生产部署评估。当前共享 Node 运行时、统一部署包、逻辑模块禁用、独立部署未授权和 `NO-GO` 已成为显式门禁，不得建立血液独立容器或数据库规避该门禁。
 - 数据待办：34 个实际集合尚未获得中央生产 Owner、schema/migration、事务/outbox、回填/回滚和 PostgreSQL 验证，独立部署评分仍不满足。当前结论仍是“可独立开发和测试，不能独立上线”。

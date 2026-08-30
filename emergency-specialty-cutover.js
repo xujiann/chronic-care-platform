@@ -88,7 +88,8 @@ const SPECIALTY_MODULE_BOUNDARIES = {
     requiredPeerModules: []
   },
   "clinical-blood": {
-    deploymentUnit: "t10-clinical-blood",
+    deploymentUnit: "shared-platform-node-runtime",
+    independentDeploymentAuthorized: false,
     dataBoundary: "blood order, bag identity, compatibility, cold-chain, issue, transfusion and recall evidence",
     externalSystems: ["BIS or BTIS", "hospital transfusion service", "cold-chain IoT gateway"],
     sharedPlatformCapabilities: ["institution-directory", "identity-and-role-scope", "signed-interface", "audit-evidence"],
@@ -192,6 +193,7 @@ function buildModuleCatalog(allTracks, enabledTracks) {
       name: track.name,
       deploymentUnit: boundary.deploymentUnit,
       independentlySelectable: true,
+      independentDeploymentAuthorized: boundary.independentDeploymentAuthorized !== false,
       selected: enabledIds.has(track.id),
       page: track.page,
       api: track.api,
@@ -203,9 +205,12 @@ function buildModuleCatalog(allTracks, enabledTracks) {
     };
   });
   const enabled = modules.filter((item) => item.selected);
+  const singleModuleMode = enabled.length === 1
+    ? (enabled[0].independentDeploymentAuthorized ? "standalone-module" : "shared-runtime-module-selection")
+    : "composable-module-suite";
   return {
     contractVersion: "1.0.0",
-    selectionMode: enabled.length === 1 ? "standalone-module" : "composable-module-suite",
+    selectionMode: singleModuleMode,
     enabledModuleIds: enabled.map((item) => item.id),
     disabledModuleIds: modules.filter((item) => !item.selected).map((item) => item.id),
     peerModuleDependencyCount: enabled.reduce((sum, item) => sum + item.requiredPeerModules.length, 0),
@@ -226,7 +231,9 @@ function buildInstitutionDeploymentManifest(moduleCatalog, options = {}) {
     dataBoundary: item.dataBoundary,
     externalSystems: item.externalSystems,
     sharedPlatformCapabilities: item.sharedPlatformCapabilities,
-    rollbackUnit: item.deploymentUnit,
+    independentDeploymentAuthorized: item.independentDeploymentAuthorized,
+    rollbackMode: item.independentDeploymentAuthorized ? "deployment-unit" : "logical-module-disable",
+    rollbackUnit: item.independentDeploymentAuthorized ? item.deploymentUnit : item.id,
     productionTrafficState: "blocked-until-site-evidence-signed"
   }));
   return {
@@ -243,7 +250,7 @@ function buildInstitutionDeploymentManifest(moduleCatalog, options = {}) {
     enabledModules,
     validationRules: [
       "only selected specialty pages and APIs may be exposed for the institution",
-      "each enabled module must use its own data namespace and rollback unit",
+      "each enabled module must use its own data namespace and an authorized rollback control; shared runtime modules use logical disable rather than process rollback",
       "disabled specialty modules must remain unreachable and receive no production traffic",
       "shared platform capabilities do not activate a peer specialty module",
       "site evidence and formal Go/No-Go approval remain mandatory after module activation"
@@ -305,8 +312,10 @@ function validateInstitutionDeploymentManifest(manifest, moduleCatalog) {
       passed: manifest.rollbackUnits?.length === expectedEnabledIds.length
         && unique(manifest.rollbackUnits)
         && manifestModules.length === expectedEnabledIds.length
-        && manifestModules.every((item) => item.rollbackUnit === item.deploymentUnit),
-      detail: `${new Set(manifest.rollbackUnits || []).size}/${expectedEnabledIds.length} independent rollback units`
+        && manifestModules.every((item) => item.independentDeploymentAuthorized
+          ? item.rollbackMode === "deployment-unit" && item.rollbackUnit === item.deploymentUnit
+          : item.rollbackMode === "logical-module-disable" && item.rollbackUnit === item.id),
+      detail: `${new Set(manifest.rollbackUnits || []).size}/${expectedEnabledIds.length} authorized rollback controls`
     },
     {
       id: "peer-module-independence",

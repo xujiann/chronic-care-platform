@@ -34,6 +34,9 @@ test("institution module view defaults to independent rehearsal-only modules and
   assert.deepEqual(view.enabledModuleIds, MODULE_IDS);
   assert.equal(view.modules.length, 4);
   assert.equal(view.modules.every((item) => item.independentlySelectable && item.requiredPeerModules.length === 0), true);
+  const blood = view.modules.find((item) => item.id === "clinical-blood");
+  assert.equal(blood.independentDeploymentAuthorized, false);
+  assert.equal(blood.deploymentUnit, "shared-platform-node-runtime");
   assert.equal(view.modules.every((item) => item.controlState === "configured-for-controlled-rehearsal"), true);
   assert.equal(view.formalGoLiveState, "blocked-until-site-evidence-signed");
   assert.equal(view.siteNoGoEnforced, true);

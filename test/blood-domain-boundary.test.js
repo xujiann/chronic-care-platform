@@ -33,7 +33,12 @@ test("blood boundary is immutable, unique and not independently deployable yet",
   assert.equal(new Set(OWNED_COLLECTIONS).size, OWNED_COLLECTIONS.length);
   assert.equal(OWNED_COLLECTIONS.length, CORE_COLLECTIONS.length + OPERATIONS_COLLECTIONS.length);
   assert.deepEqual(BLOOD_DOMAIN_BOUNDARY.apiPrefixes, ["/api/blood-system"]);
+  assert.equal(BLOOD_DOMAIN_BOUNDARY.deployment.current, "shared-node-runtime");
   assert.equal(BLOOD_DOMAIN_BOUNDARY.deployment.independentDeploymentAuthorized, false);
+  const registry = require("../config/clinical-subdomains.json");
+  const blood = registry.subdomains.find((item) => item.id === "blood");
+  assert.deepEqual(blood.registeredCollections, []);
+  assert.deepEqual(blood.candidateCollections, OWNED_COLLECTIONS);
 });
 
 test("blood subdomain exposes one frozen canonical development entry point", () => {

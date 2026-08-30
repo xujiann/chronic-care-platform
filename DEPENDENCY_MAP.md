@@ -411,3 +411,5 @@ production-release-scope repository review`。源码 process owner 仅是证据�
 当前方向为 `共享组合根 capabilities → 原两个 route segment 兼容编排 → blood/http-handler → blood use cases/services → blood state repository → legacy writeDatabase`。血液 handler 不包含影像、体检、急救或质量安全 API；根目录九个 Node 模块只单向 re-export 子域实现，子域实现不依赖 `server.js`。
 
 跨域读取方向为 `blood event-hub → blood/cross-domain-contracts.v1 → emergency / quality-safety read model`，投影具备三个登记契约的必需字段。仍存在三项平台耦合：组合根向两个遗留 route subcontext 注入宽 capability 集、状态 repository 最终提交共享快照、`innovation-service` 使用 T00 区域上下文。以上均是显式平台端口或兼容层，不得反向演变为子域间实现导入。
+
+T10 依赖方向现明确为 `机构模块选择 → shared-platform-node-runtime → 既有平台组合根 → blood canonical handler`。`clinical-blood` 可独立选择、开发和演练，但 `independentDeploymentAuthorized=false`；回滚边界是逻辑模块禁用，不是停止独立进程、切换独立容器或回滚独立数据库。

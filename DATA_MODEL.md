@@ -417,3 +417,5 @@ classification、显式 fail-closed write policy 和实际源码证据。它们�
 `src/clinical-specialties/blood/boundary.js` 将现有 22 个核心候选集合和 12 个创新/上线控制实际集合冻结为 `clinical-blood.v1` 的 34 个自有集合，并把 `securityEvents` 明确为外部只读集合。该定义用于阻止新 HTTP 写路径触碰未声明顶层集合；它不是中央生产 Owner 登记，也不改变 `legacy-non-authoritative`、`productionWriteAllowed=false` 或 `productionPromotionAllowed=false`。
 
 `state-repository.js` 是统一 JSON 状态上的过渡端口：读取时为写命令提供集合白名单代理，提交时解包并调用原 `writeDatabase`，从而保持旧快照格式和未触碰集合。它没有建立独立事务、CAS、outbox、DDL 或物理数据库。中央 `domain-data-ownership`、版本化 migration、回填/回滚和 PostgreSQL 自治必须由后续 T00 数据任务批准；本切片未编辑 `data/db.json`、SQLite 或任何生成产物。
+
+中央临床注册表现将同一 34 项集合完整列为血液 `candidateCollections`，顺序与 `CORE_COLLECTIONS + OPERATIONS_COLLECTIONS` 冻结定义一致；`registeredCollections=[]`。候选登记只关闭清单漂移，不创建表、DDL、migration、生产写合同或数据 Owner，也不把共享 JSON/SQLite 状态拆成血液数据库。

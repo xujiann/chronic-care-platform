@@ -326,3 +326,5 @@ T00 新增只读 `production-release-scope.v1`，从现有八应用清单、静�
 血液服务端唯一实现已归入 `src/clinical-specialties/blood/`；根目录九个既有 CommonJS 入口仅保留向后兼容导出，浏览器直接加载的 `blood-domain.js` 与 `blood-standard-registry.js` 继续作为公开静态适配器。`clinical-blood`、`blood-innovation` 两个遗留路由段仍占用原全局插槽，但已不再实现 `/api/blood-system`，只向血液子域 HTTP handler 委托，因此 URL、角色、状态码、写入和路由顺序不变。
 
 血液边界 v1 冻结 API 前缀、34 个实际自有集合、1 个外部只读集合、共享平台端口和三个版本化跨域契约。写路径通过 legacy state repository 的顶层集合白名单进入原统一持久化函数；dashboard 为保持既有端口对象身份仍使用只读兼容入口。运行时仍是共享 Node 模块化单体，中央数据 Owner、migration、独立 CI 与独立部署均未被本切片授权。
+
+T00 收尾已将 34 个冻结集合完整同步为临床注册表的 `candidateCollections`，`registeredCollections` 继续为空，因而没有生产 Owner 晋升。`blood-system:test` 现包含边界测试并在治理 CI 中显式执行。T10 对临床用血的展示已改为 `shared-platform-node-runtime`、逻辑模块选择和逻辑禁用回滚；`independentDeploymentAuthorized=false`、`productionReady=false` 与 `NO-GO` 为固定平台边界。

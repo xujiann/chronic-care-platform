@@ -172,10 +172,12 @@ test("institution selection can package one specialty without installing peer sp
   assert.equal(pack.summary.tracks, 1);
   assert.equal(pack.tracks[0].id, "clinical-blood");
   assert.equal(pack.firstIncrement.trackId, "clinical-blood");
-  assert.equal(pack.moduleCatalog.selectionMode, "standalone-module");
+  assert.equal(pack.moduleCatalog.selectionMode, "shared-runtime-module-selection");
   assert.deepEqual(pack.moduleCatalog.enabledModuleIds, ["clinical-blood"]);
   assert.deepEqual(pack.moduleCatalog.disabledModuleIds, ["emergency-life-chain"]);
   assert.deepEqual(pack.moduleCatalog.modules.find((item) => item.id === "clinical-blood").requiredPeerModules, []);
+  assert.equal(pack.moduleCatalog.modules.find((item) => item.id === "clinical-blood").deploymentUnit, "shared-platform-node-runtime");
+  assert.equal(pack.moduleCatalog.modules.find((item) => item.id === "clinical-blood").independentDeploymentAuthorized, false);
   assert.equal(pack.acceptanceScenarioSuite.scenarios[0].name, "Normal end-to-end clinical blood workflow");
   assert.match(pack.acceptanceScenarioSuite.scenarios[0].passCriteria, /bag/);
   assert.ok(pack.runtimeSmokePlan.trackRoutes.every((item) => item.trackId === "clinical-blood"));
@@ -207,7 +209,10 @@ test("institution deployment manifest exposes only selected module routes and da
   assert.deepEqual(manifest.routeAllowlist, ["blood.html"]);
   assert.deepEqual(manifest.apiAllowlist, ["/api/blood-system/go-live"]);
   assert.deepEqual(manifest.dataNamespaces, ["t10.clinical_blood"]);
-  assert.deepEqual(manifest.rollbackUnits, ["t10-clinical-blood"]);
+  assert.deepEqual(manifest.rollbackUnits, ["clinical-blood"]);
+  assert.equal(manifest.enabledModules[0].deploymentUnit, "shared-platform-node-runtime");
+  assert.equal(manifest.enabledModules[0].independentDeploymentAuthorized, false);
+  assert.equal(manifest.enabledModules[0].rollbackMode, "logical-module-disable");
   assert.equal(manifest.enabledModules[0].externalSystems.includes("BIS or BTIS"), true);
   assert.ok(manifest.validationRules.some((item) => /disabled specialty modules/.test(item)));
 });

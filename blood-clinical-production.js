@@ -1,5 +1,4 @@
 "use strict";
 
-// T00 deploy-check compatibility marker; canonical implementation remains the only authority:
-// blocked-until-site-evidence-signed
+// Compatibility export only; the canonical shared-runtime implementation remains the authority.
 module.exports = require("./src/clinical-specialties/blood/clinical-production");
