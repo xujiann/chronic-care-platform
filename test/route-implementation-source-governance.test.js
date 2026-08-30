@@ -82,11 +82,19 @@ function writeRegistry(root, registry) {
 test("main registry preserves the current route source inventory", () => {
   const registry = JSON.parse(fs.readFileSync(path.join(ROOT, "config", "clinical-subdomains.json"), "utf8"));
   const registeredSources = routeImplementationSourceRecords(ROOT);
-  assert.deepEqual(registry.routeImplementationSources, registeredSources);
+  assert.deepEqual(
+    registry.routeImplementationSources,
+    registeredSources.map((entry) => ({
+      subdomain: entry.subdomain,
+      source: path.relative(ROOT, entry.file).split(path.sep).join("/"),
+      mountedBy: entry.mountedBy
+    }))
+  );
+  const registeredFiles = new Set(registeredSources.map((entry) => entry.file));
   assert.equal(
     routeSourceFiles(ROOT).every((file) =>
       file.includes(`${path.sep}src${path.sep}http${path.sep}routes${path.sep}`) ||
-      registeredSources.some((entry) => path.join(ROOT, entry.source) === file)
+      registeredFiles.has(file)
     ),
     true
   );

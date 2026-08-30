@@ -394,7 +394,8 @@ test("every control requires caller-supplied immutable release bindings", (t) =>
 
 test("joint-test evaluates 96 signed receipts including timeout retry and reconciliation", (t) => {
   const directory = fixtureDirectory(t);
-  const fixture = createExternalJointTestFixture();
+  const evaluationNow = new Date().toISOString();
+  const fixture = createExternalJointTestFixture({ now: evaluationNow });
   const options = {
     campaign: writeJson(directory, "campaign.json", fixture.campaign),
     "trust-registry": writeJson(directory, "trust.json", fixture.trustRegistry),
@@ -403,7 +404,7 @@ test("joint-test evaluates 96 signed receipts including timeout retry and reconc
     "package-fingerprint": PACKAGE,
     "require-ready": true
   };
-  const ready = run({ command: "joint-test", options }, { now: NOW });
+  const ready = run({ command: "joint-test", options }, { now: evaluationNow });
   assert.equal(ready.exitCode, 0);
   assert.equal(ready.report.summary.required, 96);
   assert.equal(ready.report.summary.verified, 96);
@@ -415,7 +416,7 @@ test("joint-test evaluates 96 signed receipts including timeout retry and reconc
 
   fixture.evidenceBundle.receipts.pop();
   options.evidence = writeJson(directory, "evidence-blocked.json", fixture.evidenceBundle);
-  const blocked = run({ command: "joint-test", options }, { now: NOW });
+  const blocked = run({ command: "joint-test", options }, { now: evaluationNow });
   assert.equal(blocked.exitCode, 2);
   assert.equal(blocked.report.externalEvidenceVerified, false);
   assert.equal(spawnControl("joint-test", options).status, 2);
