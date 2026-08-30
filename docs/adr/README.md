@@ -27,6 +27,7 @@
 | [核心数据 closed-world 定义](./2026-08-18-core-data-closed-world.md) | Accepted | 核心概念不可随意平行创建 |
 | [临床专科五个可治理子域](./2026-08-18-clinical-five-governed-subdomains.md) | Accepted | 急救、血液、影像、体检、质量安全的开发边界 |
 | [9 个一级开发域加 5 个临床子域的开发组织](./2026-08-25-nine-plus-five-development-organization.md) | Accepted | T00 集成治理、T01–T09 一级域、T06 五个嵌套子域和统一集成边界 |
+| [医保支付独立开发产品线](./2026-08-30-insurance-payment-independent-product-line.md) | Accepted | T07 独立产品规划、工作树和测试；保持单仓、共享运行时、T00 集成与生产 NO-GO |
 | [静态内容安全边界](./2026-08-18-static-content-security-boundary.md) | Accepted | 已合入 `main@6c18221`；发布 allowlist、数据和缓存隔离 |
 | [浏览器安全响应头与 CSP 分批强制](./2026-08-22-browser-security-headers-and-csp-migration.md) | Accepted | 集中响应头端口、兼容 CSP、严格 Report-Only 目标、资产风险基线与生产 NO-GO |
 | [浏览器动态 URL 统一进入 Safe URL Port](./2026-08-23-browser-safe-url-policy.md) | Accepted | internal/official/object-storage/tel/blob 能力、稳定错误、exact-Origin 与分批 URL sink 迁移 |

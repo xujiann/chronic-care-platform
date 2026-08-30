@@ -6,6 +6,10 @@
 
 中央收尾没有新增 API；治理 CI 在 readiness 之后显式运行 `blood-system:test`，其测试集合包含 canonical handler、状态边界和注册来源验证。T10 投影继续允许机构选择临床用血模块，但新增共享运行时与独立部署未授权字段。原始模块 readiness 固定 `productionReady=false`、`formalGoLiveState=NO-GO`；对外 API 再叠加平台级 `blocked-until-trusted-site-evidence-and-platform-launch-approval`，同样不构成上线授权。
 
+## T07 医保支付产品线 API 边界（2026-08-30）
+
+本决策没有新增、删除或改动 HTTP method/path、鉴权、角色、scope、错误、幂等、审计或生产目录条目。医保支付产品线继续以 `src/http/routes/insurance-payment.js` 和现有 T07 API/认证/幂等证据为事实源；金融外部连接仍通过明确登记的网关与 T08 边界。产品线标签不得用于推断新 API Owner、扩大资源范围或把目录中的 `NO-GO` 条目提升为生产可用。
+
 ## 2026-08-27 生产 Go/No-Go 页面（无 API 变化）
 
 `GET /api/production-go-no-go/center` 及审批、撤销、决策写接口的 method/path、鉴权、请求、响应、错误和审计语义均未改变。客户端仅将六个字符串 HTML sink 替换为 DOM/text/class/dataset 渲染，并由恶意响应 E2E 锁定。

@@ -17,7 +17,7 @@ T00 集成治理（不计入九个一级开发域）
   │    ├─ imaging 影像
   │    ├─ physical-examination 体检
   │    └─ quality-safety 质量安全
-  ├─ T07 医保支付
+  ├─ T07 医保支付（独立开发产品线）
   ├─ T08 外部集成
   └─ T09 科研与共享
 ```
@@ -39,6 +39,12 @@ T00 集成治理（不计入九个一级开发域）
 | T09 | 科研与共享 | 科研沙箱和确实跨域的兼容查询 | `shared` 不得成为业务数据 Owner 或新逻辑收容区 |
 
 名称、路由 Owner 和保护路径唯一以 `config/process-workstreams.json` 为准；本文件不复制 API 清单。
+
+### T07 医保支付产品线
+
+`insurance-payment` 是当前唯一显式确立的独立开发产品线，由 T07 负责产品 Roadmap、Backlog、process 工作树和领域测试。其业务范围继续由 T07 process Owner、现有 API/数据 Owner、按病种付费、金融网关、在线退款、凭证和验收实现共同定义，本组织合同不复制功能、路由或集合清单。
+
+产品线发布仍通过 T00 合入 `main`，运行于共享 Node.js 和模块化单体；`independentDeploymentAuthorized=false`、`productionReady=false`。产品线身份不授权独立仓库、数据库、服务、容器或生产部署。
 
 ## 3. 临床五子域责任
 
@@ -84,10 +90,10 @@ T00 集成治理（不计入九个一级开发域）
 
 ## 6. 机器门禁
 
-`config/development-organization.json` 只保存 9+5 组合关系和开发政策，引用而不替代现有 Owner 权威。运行：
+`config/development-organization.json` 只保存 9+5 组合关系、产品线身份和开发政策，引用而不替代现有 Owner 权威。运行：
 
 ```powershell
 npm.cmd run development-organization:verify
 ```
 
-门禁拒绝：把 T00 计入一级域、漏掉 T01–T09、改变五子域闭集、漂移 T06 Owner 命名空间、拆多仓、授权独立部署或与现有 Owner 清单不一致。
+门禁拒绝：把 T00 计入一级域、漏掉 T01–T09、改变五子域闭集、漂移 T06 Owner 命名空间、漂移医保支付产品线的 T07 归属或自主开发合同、拆多仓、授权独立部署/生产就绪，或与现有 Owner 清单不一致。

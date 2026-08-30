@@ -9,6 +9,7 @@ const EXPECTED_PRIMARY_DOMAIN_IDS = Object.freeze([
 const EXPECTED_CLINICAL_SUBDOMAIN_IDS = Object.freeze([
   "emergency", "blood", "imaging", "physical-examination", "quality-safety"
 ]);
+const EXPECTED_PRODUCT_LINE_IDS = Object.freeze(["insurance-payment"]);
 const AUTHORITY_PATHS = Object.freeze({
   processOwnership: "config/process-workstreams.json",
   clinicalSubdomains: "config/clinical-subdomains.json",
@@ -57,6 +58,32 @@ function validateDevelopmentOrganization(root, overrides = {}) {
     issues.push("T00 must remain the non-primary integration governance unit");
   }
 
+  const productLines = Array.isArray(organization.productLines) ? organization.productLines : [];
+  const productLineIds = productLines.map((item) => item.id);
+  if (!sameValues(productLineIds, EXPECTED_PRODUCT_LINE_IDS)) {
+    issues.push("development product lines must contain exactly insurance-payment");
+  }
+  const insurancePayment = productLines[0] || {};
+  const insuranceProcess = processes.processes?.T07 || {};
+  if (insurancePayment.name !== "医保支付"
+    || insurancePayment.processId !== "T07"
+    || insurancePayment.status !== "established"
+    || insurancePayment.developmentMode !== "independent-product-line"
+    || insurancePayment.scopeAuthority !== "config/process-workstreams.json#processes.T07"
+    || insuranceProcess.name !== insurancePayment.name
+    || insuranceProcess.slug !== insurancePayment.id) {
+    issues.push("insurance-payment product line must remain bound to the authoritative T07 process");
+  }
+  if (!sameValues(insurancePayment.autonomy, {
+    roadmap: "independent-product-roadmap",
+    backlog: "independent-product-backlog",
+    worktree: "independent-process-worktree",
+    tests: "domain-tests-plus-shared-gates",
+    release: "main-through-t00"
+  })) {
+    issues.push("insurance-payment product-line autonomy must preserve roadmap, backlog, worktree, tests and T00 integration");
+  }
+
   const groups = Array.isArray(organization.nestedDevelopmentGroups)
     ? organization.nestedDevelopmentGroups
     : [];
@@ -96,6 +123,15 @@ function validateDevelopmentOrganization(root, overrides = {}) {
     || clinical.independentDeploymentAuthorized !== false) {
     issues.push("development autonomy must not imply repository, runtime or deployment separation");
   }
+  if (!sameValues(insurancePayment.topology, {
+    repositoryBoundary: policy.repositoryBoundary,
+    runtimeBoundary: policy.runtimeBoundary,
+    deploymentBoundary: policy.deploymentBoundary,
+    independentDeploymentAuthorized: false,
+    productionReady: false
+  })) {
+    issues.push("insurance-payment product line must preserve the shared repository, runtime, deployment and NO-GO topology");
+  }
   if (policy.planningBoundary !== "independent-domain-plan"
     || policy.worktreeBoundary !== "independent-process-worktree"
     || policy.sourceOwnership !== "delegated-by-authority"
@@ -116,6 +152,8 @@ function validateDevelopmentOrganization(root, overrides = {}) {
     schemaVersion: organization.schemaVersion,
     model: organization.model,
     primaryDevelopmentDomainCount: organization.primaryDevelopmentDomainIds?.length || 0,
+    productLineCount: productLines.length,
+    productLineIds: Object.freeze(productLineIds),
     clinicalSubdomainCount: clinicalGroup.memberIds?.length || 0,
     governedDevelopmentUnitCount: (organization.primaryDevelopmentDomainIds?.length || 0)
       + (clinicalGroup.memberIds?.length || 0),
@@ -132,5 +170,6 @@ module.exports = {
   AUTHORITY_PATHS,
   EXPECTED_CLINICAL_SUBDOMAIN_IDS,
   EXPECTED_PRIMARY_DOMAIN_IDS,
+  EXPECTED_PRODUCT_LINE_IDS,
   validateDevelopmentOrganization
 };
