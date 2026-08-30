@@ -94,7 +94,17 @@ test("all current clinical API literals have one subdomain or explicit handoff o
   const report = validateClinicalSubdomainRegistry(ROOT);
   assert.deepEqual(report.issues, []);
   assert.equal(report.ok, true);
-  assert.equal(report.routeImplementationSourceCount, 0);
+  assert.equal(report.routeImplementationSourceCount, registry.routeImplementationSources.length);
+  assert.deepEqual(registry.routeImplementationSources, [
+    {
+      subdomain: "blood",
+      source: "src/clinical-specialties/blood/http-handler.js",
+      mountedBy: [
+        "src/http/routes/clinical-specialties/blood-innovation.js",
+        "src/http/routes/clinical-specialties/clinical-blood.js"
+      ]
+    }
+  ]);
   assert.equal(report.routeLiteralCount > 70, true);
   EXPECTED_SUBDOMAINS.forEach((id) => assert.equal(report.routeCounts[id] > 0, true, id));
   assert.equal(report.routeCounts["legacy-platform-operations"], 0);
