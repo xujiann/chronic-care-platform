@@ -4,7 +4,7 @@ const emergencySignalWrite = require("../t06-emergency-signal-write");
 const emergencySignalDelivery = require("../t06-emergency-signal-delivery");
 
 function createRouteSegment(runtime) {
-  const { collectJson, prependAuditTrailEntry, readDatabase, requireApiRole, sendJson, writeDatabase } = runtime;
+  const { appendSecurityEvent, collectJson, prependAuditTrailEntry, readDatabase, requireApiRole, rowMatchesOrganizationScope, sendJson, writeDatabase } = runtime;
   return {
     id: "clinical-specialties-09",
     domain: "clinical-specialties",
@@ -93,24 +93,71 @@ function createRouteSegment(runtime) {
       if (req.method === "PATCH" && url.pathname.startsWith("/api/emergency-signals/")) {
         const user = requireApiRole(req, res, ["institution", "county", "commission"], "/api/emergency-signals/:id");
         if (!user) return true;
+        const id = decodeURIComponent(url.pathname.replace("/api/emergency-signals/", ""));
+        const access = emergencySignalWrite.inspectEmergencySignalAccess({
+          id,
+          user,
+          readDatabase,
+          rowMatchesOrganizationScope
+        });
+        if (!access.allowed) {
+          if (access.statusCode === 404) {
+            res.setHeader("X-Idempotent-Replay", "false");
+            sendJson(res, 404, {
+              error: "Not Found",
+              message: "未找到业务记录",
+              idempotentReplay: false
+            });
+            return true;
+          }
+          if (access.statusCode === 403) {
+            appendSecurityEvent({
+              actor: user.name || user.username || user.role,
+              role: user.role,
+              action: "更新公卫预警",
+              target: id,
+              result: "拒绝",
+              detail: "resource scope denied"
+            });
+          }
+          sendJson(res, access.statusCode, {
+            error: "Forbidden",
+            code: access.code,
+            message: "无权更新该急救信号"
+          });
+          return true;
+        }
         let result;
         try {
           result = await emergencySignalWrite.updateEmergencySignal({
-            id: decodeURIComponent(url.pathname.replace("/api/emergency-signals/", "")),
+            id,
             payload: await collectJson(req),
             user,
             correlationId: req.correlationId || req.headers["x-correlation-id"],
             causationId: req.headers["idempotency-key"],
             readDatabase,
             writeDatabase,
-            prependAuditTrailEntry
+            prependAuditTrailEntry,
+            rowMatchesOrganizationScope
           });
         } catch (error) {
           if (!(error instanceof emergencySignalWrite.EmergencySignalCommandError)) throw error;
+          if (error.statusCode === 403) {
+            appendSecurityEvent({
+              actor: user.name || user.username || user.role,
+              role: user.role,
+              action: "更新公卫预警",
+              target: id,
+              result: "拒绝",
+              detail: "resource scope denied after command lock"
+            });
+          }
           sendJson(res, error.statusCode, {
-            error: error.statusCode === 409 ? "Conflict" : "Internal Server Error",
+            error: error.statusCode === 403 ? "Forbidden"
+              : error.statusCode === 409 ? "Conflict"
+                : "Internal Server Error",
             code: error.code,
-            message: error.message
+            message: error.statusCode === 403 ? "无权更新该急救信号" : error.message
           });
           return true;
         }

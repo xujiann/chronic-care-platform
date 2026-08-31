@@ -19,14 +19,50 @@ function runtimeState() {
     emergencySignals: [{
       id: "signal-1",
       residentId: "resident-1",
+      sourceInstitutionCode: "MR3",
+      sourceInstitution: "青泥洼桥社区卫生服务中心",
+      targetInstitution: "regional-sharing-center",
+      region: "中山区",
       level: "high",
       status: "pending_acknowledgement",
       action: "notify physician"
     }],
+    authOrganizations: [
+      { orgCode: "ORG-DIST-ZS", name: "中山区健康城市平台", orgType: "district", parentCode: "ORG-CITY-DL", dataScope: "本区市县" },
+      { orgCode: "ORG-CONSORTIUM-ZS", name: "中山区县域医共体", orgType: "county_consortium", parentCode: "ORG-DIST-ZS", dataScope: "医共体成员机构" },
+      { orgCode: "MR3", name: "青泥洼桥社区卫生服务中心", parentCode: "ORG-DIST-ZS", dataScope: "本机构" },
+      { orgCode: "MR1", name: "大连市中心医院", parentCode: "ORG-HEALTH-DL", dataScope: "本机构" },
+      { orgCode: "ORG-HEALTH-DL", name: "大连市卫生健康委", parentCode: "ORG-CITY-DL", dataScope: "全市医疗卫生" }
+    ],
+    authUsers: [
+      { username: "county-duty", role: "county", orgCode: "ORG-CONSORTIUM-ZS" },
+      { username: "community", role: "institution", orgCode: "MR3" }
+    ],
     emergencyAuditEvents: [],
     securityEvents: [],
     storageMeta: { collectionVersions: { emergencySignals: 7 } }
   };
+}
+
+const COUNTY_USER = Object.freeze({
+  username: "county-duty",
+  name: "County Duty",
+  role: "county",
+  orgCode: "ORG-CONSORTIUM-ZS",
+  orgName: "中山区县域医共体",
+  dataScope: "医共体成员机构"
+});
+
+function rowMatchesOrganizationScope(_state, user, signal) {
+  return [
+    signal.orgCode,
+    signal.institutionCode,
+    signal.sourceInstitutionCode,
+    signal.sourceOrgCode,
+    signal.targetInstitutionCode,
+    signal.targetOrgCode
+  ].includes(user.orgCode)
+    || [signal.sourceInstitution, signal.targetInstitution].includes(user.orgName);
 }
 
 test("emergency signal update commits owned aggregate and versioned event in one unit of work", async () => {
@@ -43,11 +79,7 @@ test("emergency signal update commits owned aggregate and versioned event in one
       status: "acknowledged",
       action: "physician notified"
     },
-    user: {
-      username: "county-duty",
-      name: "County Duty",
-      role: "county"
-    },
+    user: COUNTY_USER,
     correlationId: "correlation-emergency-001",
     causationId: "command-emergency-001",
     readDatabase: () => structuredClone(state),
@@ -120,7 +152,7 @@ test("emergency signal outbox retains existing delivery evidence without a count
   await updateEmergencySignal({
     id: "signal-1",
     payload: { expectedVersion: 7, status: "acknowledged" },
-    user: { username: "county-duty", name: "County Duty", role: "county" },
+    user: COUNTY_USER,
     correlationId: "correlation-retention",
     causationId: "command-retention",
     readDatabase: () => structuredClone(state),
@@ -145,11 +177,7 @@ test("emergency signal command replays once and rejects idempotency payload drif
       status: "acknowledged",
       action: "physician notified"
     },
-    user: {
-      username: "county-duty",
-      name: "County Duty",
-      role: "county"
-    },
+    user: COUNTY_USER,
     correlationId: "correlation-emergency-replay-001",
     causationId: "command-emergency-replay-001",
     readDatabase: () => structuredClone(state),
@@ -197,7 +225,7 @@ test("concurrent emergency signal retries commit one aggregate version and one o
   const options = {
     id: "signal-1",
     payload: { expectedVersion: 7, status: "acknowledged" },
-    user: { username: "county-duty", name: "County Duty", role: "county" },
+    user: COUNTY_USER,
     correlationId: "correlation-emergency-concurrent",
     causationId: "command-emergency-concurrent",
     readDatabase: () => structuredClone(state),
@@ -225,7 +253,7 @@ test("emergency signal repository does not write or emit an event for missing ag
   const result = await updateEmergencySignal({
     id: "missing",
     payload: { status: "acknowledged" },
-    user: { name: "County Duty", role: "county" },
+    user: COUNTY_USER,
     readDatabase: () => structuredClone(state),
     prependAuditTrailEntry: (rows, entry) => [entry, ...rows],
     writeDatabase: () => { writes += 1; }
@@ -242,6 +270,8 @@ test("emergency signal patch protects aggregate identity and repository fields",
     aggregateVersion: 99,
     expectedVersion: 4,
     updatedBy: "tampered",
+    sourceInstitutionCode: "MR1",
+    region: "市级",
     status: "dispatched",
     metadata: { channel: "county-command" }
   }), {
@@ -256,10 +286,12 @@ test("emergency signal route exposes ownership and versioned event headers", asy
   let responseBody = null;
   const headers = {};
   const segment = emergencySignalRoute.createRouteSegment({
+    appendSecurityEvent: () => {},
     collectJson: async () => ({ status: "dispatched" }),
     prependAuditTrailEntry: (rows, entry) => [entry, ...rows],
     readDatabase: () => structuredClone(state),
-    requireApiRole: () => ({ username: "hospital-duty", name: "Hospital Duty", role: "institution" }),
+    requireApiRole: () => ({ username: "hospital-duty", name: "Hospital Duty", role: "institution", orgCode: "MR3" }),
+    rowMatchesOrganizationScope,
     sendJson: (_res, status, body) => {
       responseStatus = status;
       responseBody = body;
@@ -307,10 +339,12 @@ test("emergency signal route exposes ownership and versioned event headers", asy
   assert.equal(state[OUTBOX_COLLECTION].length, 1);
 
   const driftSegment = emergencySignalRoute.createRouteSegment({
+    appendSecurityEvent: () => {},
     collectJson: async () => ({ status: "acknowledged" }),
     prependAuditTrailEntry: (rows, entry) => [entry, ...rows],
     readDatabase: () => structuredClone(state),
-    requireApiRole: () => ({ username: "hospital-duty", name: "Hospital Duty", role: "institution" }),
+    requireApiRole: () => ({ username: "hospital-duty", name: "Hospital Duty", role: "institution", orgCode: "MR3" }),
+    rowMatchesOrganizationScope,
     sendJson: (_res, status, body) => {
       responseStatus = status;
       responseBody = body;
@@ -328,5 +362,215 @@ test("emergency signal route exposes ownership and versioned event headers", asy
   );
   assert.equal(responseStatus, 409);
   assert.equal(responseBody.code, "EMERGENCY_SIGNAL_IDEMPOTENCY_CONFLICT");
+  assert.equal(state[OUTBOX_COLLECTION].length, 1);
+});
+
+test("institution emergency signal scope is checked before body parsing and denial is audited", async () => {
+  const state = runtimeState();
+  let bodyReads = 0;
+  let writes = 0;
+  const audits = [];
+  let responseStatus = null;
+  let responseBody = null;
+  const segment = emergencySignalRoute.createRouteSegment({
+    appendSecurityEvent: (event) => audits.push(event),
+    collectJson: async () => {
+      bodyReads += 1;
+      return { status: "dispatched" };
+    },
+    prependAuditTrailEntry: (rows, entry) => [entry, ...rows],
+    readDatabase: () => structuredClone(state),
+    requireApiRole: () => ({
+      username: "other-hospital",
+      name: "Other Hospital",
+      role: "institution",
+      orgCode: "MR1",
+      orgName: "大连市中心医院"
+    }),
+    rowMatchesOrganizationScope,
+    sendJson: (_res, status, body) => {
+      responseStatus = status;
+      responseBody = body;
+    },
+    writeDatabase: () => { writes += 1; }
+  });
+
+  const handled = await segment.handle(
+    { method: "PATCH", headers: { "idempotency-key": "denied-command" } },
+    { setHeader() {} },
+    new URL("http://local/api/emergency-signals/signal-1")
+  );
+
+  assert.equal(handled, true);
+  assert.equal(responseStatus, 403);
+  assert.equal(responseBody.code, "EMERGENCY_SIGNAL_SCOPE_DENIED");
+  assert.equal(bodyReads, 0);
+  assert.equal(writes, 0);
+  assert.equal(audits.length, 1);
+  assert.equal(audits[0].result, "拒绝");
+  assert.equal(audits[0].target, "signal-1");
+});
+
+test("emergency signal route preserves the legacy missing response before body parsing", async () => {
+  const state = runtimeState();
+  let bodyReads = 0;
+  let audits = 0;
+  let responseStatus = null;
+  let responseBody = null;
+  const headers = {};
+  const segment = emergencySignalRoute.createRouteSegment({
+    appendSecurityEvent: () => { audits += 1; },
+    collectJson: async () => {
+      bodyReads += 1;
+      return {};
+    },
+    prependAuditTrailEntry: (rows, entry) => [entry, ...rows],
+    readDatabase: () => structuredClone(state),
+    requireApiRole: () => ({ username: "health", name: "Health", role: "commission" }),
+    rowMatchesOrganizationScope,
+    sendJson: (_res, status, body) => {
+      responseStatus = status;
+      responseBody = body;
+    },
+    writeDatabase: () => assert.fail("missing signal must not write")
+  });
+
+  await segment.handle(
+    { method: "PATCH", headers: {} },
+    { setHeader: (name, value) => { headers[String(name).toLowerCase()] = String(value); } },
+    new URL("http://local/api/emergency-signals/missing")
+  );
+
+  assert.equal(responseStatus, 404);
+  assert.deepEqual(responseBody, {
+    error: "Not Found",
+    message: "未找到业务记录",
+    idempotentReplay: false
+  });
+  assert.equal(headers["x-idempotent-replay"], "false");
+  assert.equal(bodyReads, 0);
+  assert.equal(audits, 0);
+});
+
+test("county emergency signal scope allows its district and rejects an external institution", async () => {
+  let allowedState = runtimeState();
+  let allowedWrites = 0;
+  const allowed = await updateEmergencySignal({
+    id: "signal-1",
+    payload: { status: "acknowledged" },
+    user: COUNTY_USER,
+    readDatabase: () => structuredClone(allowedState),
+    prependAuditTrailEntry: (rows, entry) => [entry, ...rows],
+    writeDatabase(data) {
+      allowedWrites += 1;
+      allowedState = structuredClone(data);
+    }
+  });
+  assert.equal(allowed.status, 200);
+  assert.equal(allowedWrites, 1);
+
+  const deniedState = runtimeState();
+  deniedState.authOrganizations.push({
+    orgCode: "MR30",
+    name: "External Prefix Clinic",
+    parentCode: "ORG-DIST-OTHER",
+    dataScope: "external district"
+  });
+  deniedState.emergencySignals[0] = {
+    ...deniedState.emergencySignals[0],
+    sourceInstitutionCode: "MR30",
+    sourceInstitution: "External Prefix Clinic",
+    region: "市级"
+  };
+  await assert.rejects(
+    updateEmergencySignal({
+      id: "signal-1",
+      payload: { status: "acknowledged" },
+      user: COUNTY_USER,
+      readDatabase: () => structuredClone(deniedState),
+      prependAuditTrailEntry: (rows, entry) => [entry, ...rows],
+      writeDatabase: () => assert.fail("county scope denial must not write")
+    }),
+    (error) => error.code === "EMERGENCY_SIGNAL_SCOPE_DENIED" && error.statusCode === 403
+  );
+
+  const directDistrictState = runtimeState();
+  directDistrictState.authOrganizations.push(
+    { orgCode: "ORG-DIST-OTHER", name: "外区健康城市平台", orgType: "district", parentCode: "ORG-CITY-DL", dataScope: "外区" },
+    { orgCode: "MR30", name: "外区医院", orgType: "medical_institution", parentCode: "ORG-DIST-OTHER", dataScope: "本机构" }
+  );
+  directDistrictState.emergencySignals[0] = {
+    ...directDistrictState.emergencySignals[0],
+    sourceInstitutionCode: "MR30",
+    sourceInstitution: "外区医院"
+  };
+  await assert.rejects(
+    updateEmergencySignal({
+      id: "signal-1",
+      payload: { status: "acknowledged" },
+      user: { ...COUNTY_USER, orgCode: "ORG-DIST-ZS", orgName: "中山区健康城市平台" },
+      readDatabase: () => structuredClone(directDistrictState),
+      prependAuditTrailEntry: (rows, entry) => [entry, ...rows],
+      writeDatabase: () => assert.fail("a direct district account must not inherit city-wide sibling scope")
+    }),
+    (error) => error.code === "EMERGENCY_SIGNAL_SCOPE_DENIED" && error.statusCode === 403
+  );
+
+  let creatorState = runtimeState();
+  creatorState.emergencySignals[0] = {
+    ...creatorState.emergencySignals[0],
+    sourceInstitutionCode: undefined,
+    sourceInstitution: "Unregistered County Hospital",
+    targetInstitution: "Unregistered Regional Center",
+    region: "regional-sharing-center",
+    createdBy: "county-duty"
+  };
+  const creatorOwned = await updateEmergencySignal({
+    id: "signal-1",
+    payload: { status: "acknowledged" },
+    user: COUNTY_USER,
+    readDatabase: () => structuredClone(creatorState),
+    prependAuditTrailEntry: (rows, entry) => [entry, ...rows],
+    writeDatabase(data) { creatorState = structuredClone(data); }
+  });
+  assert.equal(creatorOwned.status, 200);
+});
+
+test("commission can update a signal and idempotent replay rechecks current institution scope", async () => {
+  let commissionState = runtimeState();
+  const commission = await updateEmergencySignal({
+    id: "signal-1",
+    payload: { status: "reviewed" },
+    user: { username: "health", name: "Health Commission", role: "commission", orgCode: "ORG-HEALTH-DL" },
+    readDatabase: () => structuredClone(commissionState),
+    prependAuditTrailEntry: (rows, entry) => [entry, ...rows],
+    writeDatabase(data) { commissionState = structuredClone(data); }
+  });
+  assert.equal(commission.status, 200);
+
+  let state = runtimeState();
+  let writes = 0;
+  const options = {
+    id: "signal-1",
+    payload: { status: "acknowledged" },
+    user: { username: "community", name: "Community", role: "institution", orgCode: "MR3" },
+    causationId: "scope-replay-command",
+    readDatabase: () => structuredClone(state),
+    prependAuditTrailEntry: (rows, entry) => [entry, ...rows],
+    rowMatchesOrganizationScope,
+    writeDatabase(data) {
+      writes += 1;
+      state = structuredClone(data);
+    }
+  };
+  await updateEmergencySignal(options);
+  state.emergencySignals[0].sourceInstitutionCode = "MR1";
+  state.emergencySignals[0].sourceInstitution = "大连市中心医院";
+  await assert.rejects(
+    updateEmergencySignal(options),
+    (error) => error.code === "EMERGENCY_SIGNAL_SCOPE_DENIED" && error.statusCode === 403
+  );
+  assert.equal(writes, 1);
+  assert.equal(state[INBOX_COLLECTION].length, 1);
   assert.equal(state[OUTBOX_COLLECTION].length, 1);
 });

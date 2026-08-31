@@ -1,5 +1,9 @@
 # DATA MODEL — 主线数据地图
 
+## 2026-08-31 急救信号资源归属不变量
+
+本切片不新增或回填 `emergencySignals` 字段，不修改 JSON/SQLite/PostgreSQL schema。资源范围只消费既有信号上的 `orgCode`/`institutionCode`、来源/目标机构代码或名称、`regionCode`/`region`/`district`、受保护 `createdBy`，以及既有 `authOrganizations`/`authUsers` 组织事实。机构、来源、目标、地区、创建者组织和 `ownerRole` 现与居民/聚合身份字段一起禁止通过 PATCH 修改，防止调用方改变授权归属。未登记来源医院只有在受保护创建者能解析到当前 institution/county 时才允许；可解析到辖区外组织或完全无归属时失败关闭。commission 的既有范围不变。生产数据回填与组织主数据核对仍属于首发迁移计划和现场工作，本切片不得创造推断值。
+
 ## 2026-08-31 数据模型事实验证边界
 
 文档事实验证器在一次性内存 SQLite 中按正式 migration 顺序重建 schema，并从 `sqlite_schema` 统计非内部表；当前权威结果为 head v17、38 张表。它不打开、复制或写入运行时 SQLite 和 `data/db.json`，也不创建新 migration、DDL 或生产数据库声明。DATA_MODEL 中的当前 head、表数和升级路径若回退到历史值，治理门禁失败关闭。

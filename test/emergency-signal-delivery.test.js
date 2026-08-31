@@ -17,9 +17,14 @@ async function seededState() {
       residentId: "resident-1",
       location: "private-location",
       clinicalDetail: "private-clinical-detail",
+      region: "中山区",
       level: "high",
       status: "pending"
     }],
+    authOrganizations: [
+      { orgCode: "ORG-DIST-ZS", name: "中山区健康城市平台", orgType: "district", parentCode: "ORG-CITY-DL", dataScope: "本区市县" },
+      { orgCode: "ORG-CONSORTIUM-ZS", name: "中山区县域医共体", orgType: "county_consortium", parentCode: "ORG-DIST-ZS", dataScope: "医共体成员机构" }
+    ],
     emergencyAuditEvents: [],
     emergencySignalCommandInbox: [],
     securityEvents: [],
@@ -28,7 +33,14 @@ async function seededState() {
   const accepted = await updateEmergencySignal({
     id: "signal-1",
     payload: { expectedVersion: 1, status: "acknowledged" },
-    user: { username: "county-duty", name: "County Duty", role: "county" },
+    user: {
+      username: "county-duty",
+      name: "County Duty",
+      role: "county",
+      orgCode: "ORG-CONSORTIUM-ZS",
+      orgName: "中山区县域医共体",
+      dataScope: "医共体成员机构"
+    },
     correlationId: "emergency-delivery-correlation",
     causationId: "emergency-delivery-command",
     readDatabase: () => structuredClone(state),

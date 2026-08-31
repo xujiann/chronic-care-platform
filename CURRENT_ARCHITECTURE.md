@@ -1,5 +1,9 @@
 # CURRENT ARCHITECTURE — 主线现状地图
 
+## 2026-08-31 T06 急救信号更新资源范围
+
+`PATCH /api/emergency-signals/:id` 保持原 method/path、三类角色、成功响应、领域事件、outbox、CAS 和幂等协议。路由现在于请求体解析前读取目标并执行资源预检，命令在同聚合进程锁内、receipt replay 前再次读取并授权：机构仅能更新自身作为来源、目标或受保护创建者组织的信号，医共体仅能更新所属区县、成员机构或本组织创建的信号，commission 保持既有全局范围。机构范围复用组合根既有 `rowMatchesOrganizationScope`，区县范围只读取现有 `authOrganizations`/`authUsers` 组织事实及信号已有组织/地区/创建者字段；可解析到辖区外组织时拒绝，完全模糊归属失败关闭。拒绝使用既有安全审计端口单独记录，不与业务写混称原子事务。该 T06 切片不新增路由、集合、DDL、依赖或部署单元；T00 机器证据登记完成前，全平台 API 计数与该 endpoint 的 `review-required` 状态不变。
+
 ## 2026-08-31 当前架构事实机器对账
 
 - `scripts/documentation-fact-drift.js` 现以生产 API 目录、首批生产范围、SQLite migration、仓库 Markdown/PDF 闭集和 Accepted ADR 注册表为机器权威，对 ROADMAP、ARCHITECTURE、六张架构地图和 ADR 索引共 9 份当前文档失败关闭。
