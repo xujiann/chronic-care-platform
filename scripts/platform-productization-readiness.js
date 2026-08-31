@@ -17,6 +17,8 @@ function renderMarkdown(report) {
     `- Iterations: ${report.summary.iterations}`,
     `- P0 collections promoted: ${report.summary.promotedP0}`,
     `- Collections repository plan-ready: ${report.summary.repositoryPlanReady}`,
+    `- First-release persistent migration plans: ${report.summary.firstReleaseMigrationPlans}`,
+    `- First-release derived read models: ${report.summary.firstReleaseDerivedReadModels}`,
     `- Work-item projections: ${report.summary.projectedWorkItems}`,
     `- Institution adapters: ${report.summary.institutionAdapters}`,
     "",

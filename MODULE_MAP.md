@@ -1,5 +1,13 @@
 # MODULE MAP — 主线模块地图
 
+## 2026-08-31 首发数据迁移治理模块
+
+| 模块 | Owner | 标签 | 当前边界 |
+|---|---|---|---|
+| `config/first-release-data-migration-portfolio.json` | T00 + 各数据 Owner | B KEEP + IMPROVE | 选择既有 Owner/release 权威；20 个持久化计划、1 个派生读模型；不保存业务载荷或生产证据 |
+| `src/platform/data/first-release-migration-portfolio.js` | T00 | B KEEP + IMPROVE | 校验闭集、唯一波次、Owner/分类、PG 目标与失败关闭状态；不执行 migration |
+| `src/platform/governance/production-release-scope.js` | T00 | B KEEP + IMPROVE | 新增 repository-plan-missing 投影；继续把 21 个生产写受阻引用和外部证据保持 NO-GO |
+
 ## 2026-08-30 血液路由实现源治理模块
 
 | 模块 | Owner | 标签 | 当前边界 |

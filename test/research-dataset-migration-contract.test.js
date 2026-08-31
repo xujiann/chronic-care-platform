@@ -36,7 +36,7 @@ test("researchDatasets has one versioned, fail-closed first-release migration pl
   });
 
   const run = createMigrationRun({ runId: "research-datasets-rehearsal", waveId: readiness.waveId });
-  assert.deepEqual(run.collections, ["researchDatasets"]);
+  assert.deepEqual(run.collections, ["compliantDataExports", "diseaseRegistryModels", "researchDatasets"]);
   assert.equal(run.state, STATES.PLANNED);
   assert.equal(run.productionReady, false);
   assert.equal(run.productionPrimary, false);

@@ -4,7 +4,8 @@ const programDefault = require("../../../config/data-governance-control-plane.js
 const migrationProgram = require("../../../config/data-migration-program.json");
 const promotionProgram = require("../../../config/p0-data-promotions.json");
 const { buildDataMigrationControlCenter } = require("./migration-control-center");
-const { promotionPhaseCounts } = require("./promotion-contract");
+const { buildFirstReleaseMigrationPortfolioReadiness } = require("./first-release-migration-portfolio");
+const { promotionPhaseCounts, validatePromotionProgram } = require("./promotion-contract");
 const { STATES: EXECUTION_STATES, assessMigrationExecutionState } = require("./migration-execution-runtime");
 const {
   SHA256,
@@ -281,7 +282,9 @@ function buildDataGovernanceControlPlane(input = {}, options = {}) {
   const changeIds = impacts.map((item) => item.changeId);
   if (new Set(changeIds).size !== changeIds.length) throw governanceError("DATA_GOVERNANCE_CHANGE_DUPLICATED", "data governance change identifiers must be unique");
   const promotions = options.promotions || promotionProgram;
+  validatePromotionProgram(promotions);
   const promotionPhases = promotionPhaseCounts(promotions);
+  const firstReleaseMigration = buildFirstReleaseMigrationPortfolioReadiness({ promotions });
   const migration = buildDataMigrationControlCenter(migrationRuns, { now: options.now, promotions });
   const execution = assessMigrationExecutionState(executionState, { now: options.now });
   const candidateRuns = migrationRuns.filter((run) => run.state === "local-candidate");
@@ -302,6 +305,7 @@ function buildDataGovernanceControlPlane(input = {}, options = {}) {
   const checks = Object.freeze([
     { id: "dataGovernanceControl:program", passed: true, detail: `${program.iterations.length} iterations / ${program.qualityRules.length} quality rules` },
     { id: "dataGovernanceControl:promotionPhases", passed: promotionPhases.promotedP0 + promotionPhases.repositoryPlanReady === promotionPhases.registeredContracts, detail: `${promotionPhases.promotedP0} promoted / ${promotionPhases.repositoryPlanReady} repository plan-ready` },
+    { id: "dataGovernanceControl:firstReleaseMigrationPortfolio", passed: firstReleaseMigration.ok && firstReleaseMigration.repositoryCriticalGaps === 0, detail: `${firstReleaseMigration.summary.repositoryPlanReady} persistent plans / ${firstReleaseMigration.summary.derivedReadModels} derived read model` },
     { id: "dataGovernanceControl:migrationExecution", passed: migration.ok && execution.ok, detail: `${migration.summary.runs} runs / ${execution.summary.batches} batches` },
     { id: "dataGovernanceControl:recoverableCheckpoint", passed: checkpointsValid, detail: `${(executionState.batches || []).filter((batch) => batch.checkpoint).length} persisted checkpoints` },
     { id: "dataGovernanceControl:exactReconciliation", passed: bindingsValid && openReconciliation.length === 0, detail: `${candidateBatches.length} candidate bindings / ${openReconciliation.length} open exceptions` },
@@ -326,6 +330,8 @@ function buildDataGovernanceControlPlane(input = {}, options = {}) {
       iterations: program.iterations.length,
       promotedP0: promotionPhases.promotedP0,
       repositoryPlanReady: promotionPhases.repositoryPlanReady,
+      firstReleaseMigrationPlans: firstReleaseMigration.summary.repositoryPlanReady,
+      firstReleaseDerivedReadModels: firstReleaseMigration.summary.derivedReadModels,
       migrationRuns: migration.summary.runs,
       executionBatches: execution.summary.batches,
       checkpoints: (executionState.batches || []).filter((batch) => batch.checkpoint).length,
@@ -337,6 +343,7 @@ function buildDataGovernanceControlPlane(input = {}, options = {}) {
       projectedWorkItems: workItems.length
     }),
     migration,
+    firstReleaseMigration,
     execution,
     qualityRules: Object.freeze(program.qualityRules.map((item) => Object.freeze({ ...item }))),
     reconciliationExceptions: Object.freeze(reconciliationExceptions),

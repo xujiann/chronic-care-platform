@@ -1,6 +1,19 @@
 # DATA MODEL — 主线数据地图
 
-## 2026-08-31 `researchDatasets` 首发迁移计划切片
+## 2026-08-31 首发迁移计划闭集
+
+Accepted ADR 将首发 21 个生产写受阻引用分为 20 个持久化迁移计划与 1 个非持久派生读模型。
+19 个 `owner-reviewed-legacy` 集合和既有 T05 Owner 绑定的 `referrals` 分别进入唯一 migration wave；
+`operationsReadiness` 固定为 `derived-read-model`，无 wave、无 promotion，不得据名称创建生产表。
+所有持久化计划复用 PostgreSQL `health_platform.primary_collection_state` 和既有 outbox-shadow 控制面，
+不新增 DDL、不请求路径双写、不执行 migration run。
+
+`p0-data-promotions` 现分别统计 12 个既有 `promoted`、19 个 `repository-plan-ready`，注册合同共 31；
+首发 portfolio 另含 `referrals`，因此持久化计划总数为 20，派生读模型为 1，仓库计划缺口为 0。
+这些数字不能替代生产资格：21 个引用仍全部 `productionWriteAllowed=false`/生产 NO-GO，真实全量演练、
+签名核对、独立回滚、PG 多实例、容量/故障切换与现场审批继续外置。
+
+## `researchDatasets` 详细迁移合同
 
 `researchDatasets` 继续由 T09 research 拥有，分类保持 `de-identified`，首发 owner review 与
 `legacy-owner-review-write-policy.v1` 不变。新增 `research.dataset-aggregate.v1` 只冻结仓库侧逻辑写合同：
@@ -15,9 +28,8 @@ head、不新增表或 DDL。`wave-first-release-research` 允许后续建立 me
 未激活 worker、未选择 PostgreSQL primary，`productionWriteAllowed=false`、`productionReady=false`；首发
 生产写阻断引用仍为 21，不得把 `repositoryPlanReady` 解释为数据已迁移或生产晋升。
 
-`p0-data-promotions` 现以显式 phase 区分 12 个既有 `promoted` 合同与 1 个
-`repository-plan-ready` 合同；`researchDatasets` 只属于后者。产品化报告、HTTP 投影和数据治理控制面
-必须分别输出 `promotedP0=12` 与 `repositoryPlanReady=1`，禁止用注册合同总数 13 覆盖晋级语义。
+`researchDatasets` 仍属于 19 个 `repository-plan-ready` 合同之一；其详细 endpoint 行为合同不会使同 wave
+中的 `compliantDataExports`、`diseaseRegistryModels` 自动获得生产写资格。
 
 ## 2026-08-30 血液路由实现源登记不是业务数据
 

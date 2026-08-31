@@ -29,6 +29,12 @@ test("current documentation facts are derived from machine authorities", () => {
     implementationAuthorized: state.objectStorageReport.implementationAuthorized,
     productionReady: state.objectStorageReport.productionReady
   });
+  assert.deepEqual(report.summary.firstReleaseMigration, {
+    persistentReferences: 20,
+    derivedReadModels: 1,
+    repositoryCriticalGaps: 0,
+    productionReady: false
+  });
 });
 
 test("API catalog count drift fails closed in every governed progress statement", () => {
@@ -153,4 +159,25 @@ test("repository implementation facts cannot be used to claim object storage pro
   const report = governance.buildReport(state);
   assert.equal(report.ok, false);
   assert.equal(failed(report, "authority:objectStorageDecision"), true);
+});
+
+test("first-release migration plan counts and production boundary cannot drift in the roadmap", () => {
+  const state = cloneRepositoryState();
+  state.documents.roadmap = state.documents.roadmap
+    .replace("20 个唯一持久化计划", "19 个唯一持久化计划")
+    .replace("21 个引用仍无生产写资格", "21 个引用已有生产写资格");
+  const report = governance.buildReport(state);
+  assert.equal(report.ok, false);
+  assert.equal(failed(report, "roadmap:firstReleaseMigrationPortfolio"), true);
+});
+
+test("ADR index cannot regress the accepted object-storage decision to Proposed", () => {
+  const state = cloneRepositoryState();
+  state.documents.adrIndex = state.documents.adrIndex.replace(
+    /\| \[对象存储采用结构化元数据与耐久异步命令轨道 v2\][^\n]+/,
+    (line) => line.replace("Accepted", "Proposed")
+  );
+  const report = governance.buildReport(state);
+  assert.equal(report.ok, false);
+  assert.equal(failed(report, "adrIndex:objectStorageAcceptedNoGo"), true);
 });

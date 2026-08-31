@@ -126,6 +126,8 @@ jobs:
         run: npm run development-organization:verify
       - name: Verify governed architecture documentation facts
         run: npm run documentation-facts:verify
+      - name: Verify first-release data migration portfolio
+        run: npm run first-release:migration-portfolio:verify
       - name: Test five independently governed clinical subdomains
         run: npm run clinical-subdomains:test
       - name: Test modular-monolith architecture contracts

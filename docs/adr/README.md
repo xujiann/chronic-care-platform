@@ -38,6 +38,7 @@
 | [生产 API 目录从现有授权清单派生并默认拒绝](./2026-08-22-production-api-catalog.md) | Accepted | method/path/owner/auth/scope/idempotency/生产状态机器目录与 CI 门禁 |
 | [JSON/SQLite State Collection 的 Owner 与隔离治理](./2026-08-22-state-collection-ownership-and-quarantine.md) | Accepted | 252/252 集合状态、源码使用证据、owner/共享边界、隔离和生产晋升失败关闭 |
 | [首发范围遗留集合采用 Owner 归属与生产写策略分离](./2026-08-26-first-release-legacy-owner-review.md) | Accepted | 19 个首发集合的实际调用证据、唯一 Owner/reader、显式生产写失败关闭与冻结决策摘要 |
+| [首发数据引用采用迁移计划闭集与派生读模型分离](./2026-08-31-first-release-data-migration-portfolio.md) | Accepted | 20 个持久化迁移计划、1 个非持久派生读模型、唯一波次与生产 NO-GO |
 | [API 幂等行为证据必须显式登记且默认拒绝](./2026-08-22-api-idempotency-behavior-evidence.md) | Accepted | source marker 与行为证明分层、SMS callback pilot、custom external auth 与生产 NO-GO |
 | [Custom API 认证必须绑定控制流与可执行负向测试证据](./2026-08-23-api-custom-authentication-evidence.md) | Accepted | 认证机制、credential source、required/optional/none、replay/CSRF、scope、负向测试与生产 NO-GO |
 | [PostgreSQL shadow 合同强化](./2026-08-21-postgresql-shadow-contract-hardening.md) | Accepted | schema 隔离、健康探针、batch/digest/version/tombstone 冲突 |
@@ -46,7 +47,7 @@
 | [连续审计投递与耐久 checkpoint](./2026-08-21-continuous-audit-delivery.md) | Accepted | SIEM/WORM rehearsal、checkpoint v2、部署信任合同 A；append-only source/可信 receipt/外部 anchor 前生产 NO-GO |
 | [连续审计采用 append-only source v2](./2026-08-22-append-only-audit-source-v2.md) | Accepted | SQLite v15 事务内审计来源、稳定 cursor、最小投影与 checkpoint v3；外部信任仍 NO-GO |
 | [对象存储网关采用版本化响应信任合同 v1](./2026-08-22-object-storage-gateway-trust-v1.md) | Accepted | 独立响应验签、请求/对象绑定、签名 URL Origin/TTL 与严格回执 |
-| [对象存储采用结构化元数据与耐久异步命令轨道 v2](./2026-08-23-object-storage-durable-command-and-metadata-v2.md) | Proposed | T08 data owner/T00 technical owner 建议、SQLite v17 候选、异步 API、worker、分页、对账与默认 NO-GO；不授权实施 |
+| [对象存储采用结构化元数据与耐久异步命令轨道 v2](./2026-08-23-object-storage-durable-command-and-metadata-v2.md) | Accepted | T08 data owner/T00 technical owner、SQLite v17、异步 API、worker、分页和对账已完成仓库实现；生产仍 NO-GO |
 | [Worker 统一脱敏观测合同 v1](./2026-08-23-worker-observability-contract-v1.md) | Accepted | 12 个现有 worker profile 的兼容投影、部署入口漂移门禁与固定生产非授权；不统一业务状态机 |
 | [生产切换行动状态由外部可信证据派生](./2026-08-23-production-cutover-action-derived-status-v2.md) | Accepted | definitions-only 台账、release/artifact 绑定、有效期、转换历史、职责分离与 strict preflight |
 | [首批生产范围以机器合同冻结](./2026-08-26-production-release-scope-freeze.md) | Accepted | 8 个优先应用及其入口、API、数据引用、worker、外部依赖和证据指纹；部署包/smoke/preflight 绑定并固定 NO-GO |

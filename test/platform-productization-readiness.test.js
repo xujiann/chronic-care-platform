@@ -20,13 +20,16 @@ test("productization readiness completes local gates and keeps production fail c
   assert.equal(report.summary.iterations, 6);
   assert.equal(report.summary.promotedP0, phases.promotedP0);
   assert.equal(report.summary.repositoryPlanReady, phases.repositoryPlanReady);
+  assert.equal(report.summary.firstReleaseMigrationPlans, 20);
+  assert.equal(report.summary.firstReleaseDerivedReadModels, 1);
   assert.equal(report.containsPatientData, false);
   assert.equal(report.containsCredentials, false);
   assert.equal(report.checks.every((item) => item.passed), true);
   assert.equal(report.checks.find((item) => item.id === "productization:regionalAssembly").detail, "template");
   assert.match(renderMarkdown(report), /Production readiness: NO-GO/);
   assert.match(renderMarkdown(report), /P0 collections promoted: 12/);
-  assert.match(renderMarkdown(report), /Collections repository plan-ready: 1/);
+  assert.match(renderMarkdown(report), /Collections repository plan-ready: 19/);
+  assert.match(renderMarkdown(report), /First-release persistent migration plans: 20/);
 });
 
 test("productization readiness rejects incomplete iteration programs", () => {

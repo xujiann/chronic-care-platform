@@ -19,6 +19,10 @@ function uniqueSorted(values) {
   return [...new Set((values || []).map((value) => String(value || "").trim()).filter(Boolean))].sort();
 }
 
+function sameMembers(left, right) {
+  return JSON.stringify(uniqueSorted(left)) === JSON.stringify(uniqueSorted(right));
+}
+
 function inventory(values) {
   const items = uniqueSorted(values);
   return Object.freeze({ count: items.length, sha256: sha256(items), items });
@@ -47,6 +51,10 @@ function loadDefaultAuthorities(root = ROOT) {
     workerRegistry: loadJson(path.join(root, "config", "worker-observability-contract.json")),
     externalCampaign: loadJson(path.join(root, "config", "external-joint-test-campaign.json")),
     cutoverActions: loadJson(path.join(root, "config", "production-cutover-actions.json")),
+    firstReleaseMigrationPortfolio: loadJson(path.join(root, "config", "first-release-data-migration-portfolio.json")),
+    migrationProgram: loadJson(path.join(root, "config", "data-migration-program.json")),
+    promotionProgram: loadJson(path.join(root, "config", "p0-data-promotions.json")),
+    researchMigrationContract: loadJson(path.join(root, "config", "research-dataset-migration-contract.json")),
     packageJson: loadJson(path.join(root, "package.json")),
     root
   });
@@ -167,6 +175,41 @@ function buildProductionReleaseScopeReport(options = {}) {
       ? governed.productionWriteAllowed !== true
       : true;
   });
+  const migrationPortfolio = options.firstReleaseMigrationPortfolio || {};
+  let migrationPortfolioValid = false;
+  try {
+    const { validateFirstReleaseMigrationPortfolio } = require("../data/first-release-migration-portfolio");
+    validateFirstReleaseMigrationPortfolio(migrationPortfolio, {
+      root,
+      ownership: options.domainOwnership,
+      promotions: options.promotionProgram,
+      migrationProgram: options.migrationProgram,
+      releaseScope: scope,
+      researchContract: options.researchMigrationContract
+    });
+    migrationPortfolioValid = true;
+  } catch {
+    migrationPortfolioValid = false;
+  }
+  const migrationEntryByCollection = new Map((migrationPortfolio.entries || []).map((item) => [item.collection, item]));
+  const collectionRepositoryPlanMissing = collectionProductionWriteBlocked.filter((name) => {
+    const entry = migrationEntryByCollection.get(name);
+    return entry?.sourceKind === "derived-read-model"
+      ? !(entry.repositoryPlanReady === false && entry.waveId === null)
+      : entry?.repositoryPlanReady !== true;
+  });
+  const migrationPortfolioClosed = migrationPortfolioValid
+    && migrationPortfolio.schemaVersion === "first-release-data-migration-portfolio.v1"
+    && migrationPortfolio.scopeId === scope.scopeId
+    && migrationPortfolio.productionReady === false
+    && migrationPortfolio.writePolicy?.productionWriteAllowed === false
+    && migrationPortfolio.writePolicy?.productionPromotionAllowed === false
+    && sameMembers(migrationPortfolio.entries?.map((item) => item.collection), collectionProductionWriteBlocked);
+  checks.push(check(
+    "scope:first-release-migration-portfolio",
+    migrationPortfolioClosed && collectionRepositoryPlanMissing.length === 0,
+    `${collectionProductionWriteBlocked.length - collectionRepositoryPlanMissing.length}/${collectionProductionWriteBlocked.length} blocked references have a repository plan or non-persistent classification`
+  ));
   const deploymentScope = options.deploymentPackage?.processContract?.productionReleaseScope;
   const deploymentBound = !options.deploymentPackage || (
     deploymentScope?.contract === scope.schemaVersion
@@ -191,13 +234,16 @@ function buildProductionReleaseScopeReport(options = {}) {
     repositoryReview: Object.freeze({
       apiReviewRequired: Object.freeze(apiReviewRequired),
       collectionReviewRequired: Object.freeze(collectionReviewRequired),
-      collectionProductionWriteBlocked: Object.freeze(collectionProductionWriteBlocked)
+      collectionProductionWriteBlocked: Object.freeze(collectionProductionWriteBlocked),
+      collectionRepositoryPlanMissing: Object.freeze(collectionRepositoryPlanMissing),
+      collectionDerivedReadModels: Object.freeze(collectionProductionWriteBlocked.filter((name) => migrationEntryByCollection.get(name)?.sourceKind === "derived-read-model"))
     }),
     checks: Object.freeze(checks),
     blockers: Object.freeze([
       ...(apiReviewRequired.length ? [`${apiReviewRequired.length} scoped APIs require repository behavior review`] : []),
       ...(collectionReviewRequired.length ? [`${collectionReviewRequired.length} scoped collections require data-owner review`] : []),
-      ...(collectionProductionWriteBlocked.length ? [`${collectionProductionWriteBlocked.length} scoped collection references remain blocked from production writes pending versioned contracts, migrations and external evidence`] : []),
+      ...(collectionRepositoryPlanMissing.length ? [`${collectionRepositoryPlanMissing.length} scoped collection references still lack repository migration planning`] : []),
+      ...(collectionProductionWriteBlocked.length ? [`${collectionProductionWriteBlocked.length} scoped data references remain production NO-GO; repository planning is complete and external rehearsal, PostgreSQL and site evidence are still required`] : []),
       "all scoped APIs remain production NO-GO",
       "all scoped collections remain production-promotion NO-GO",
       "all scoped workers require explicit external activation and site evidence",

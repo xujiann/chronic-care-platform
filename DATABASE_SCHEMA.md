@@ -75,14 +75,17 @@ legacy collection 更新/删除。附件事实和命令 source 字段不可变�
 完整 lease fencing、有界退避、dead-letter 与审计 replay。真实 PostgreSQL DDL、生产回填/恢复和外部
 provider/KMS/WORM/扫描证据仍未完成，因此 production promotion 保持 false。
 
-## 7. `researchDatasets` 逻辑写合同与迁移波次（无 Schema 变化）
+## 7. 首发迁移计划闭集（无 Schema 变化）
 
-`research.dataset-aggregate.v1` 将既有 `researchDatasets` 聚合登记为 12 个既有 promoted 合同之外的
-1 个 `repository-plan-ready` 合同，并通过 `wave-first-release-research` 单独进入 outbox-shadow 迁移计划。源数据继续位于
+首发 portfolio 将 20 个持久化引用分配到唯一 outbox-shadow wave，`operationsReadiness` 明确为非持久
+派生读模型。19 个 owner-reviewed legacy 登记为 `repository-plan-ready`；既有 12 个 promoted 合同保持不变，
+注册合同共 31。`referrals` 复用既有 T05 Owner source binding，不伪装成 P0 promoted。
+
+`research.dataset-aggregate.v1` 继续提供 `researchDatasets` 的详细逻辑写合同；源数据继续位于
 `state_collections[researchDatasets]`，SQLite v7 的 `research_dataset_records` 保持只读兼容投影；目标复用
 已存在的 PostgreSQL `health_platform.primary_collection_state`，以 `collection_name=researchDatasets`
 定位，不新增 SQLite/PostgreSQL DDL，schema head 仍为 v17。
 
-本登记只达到 repository-plan-ready：没有创建 migration run、没有执行回填、没有激活 worker，也没有
+整个 portfolio 只达到 repository-plan-ready/non-persistent 分类：没有创建 migration run、没有执行回填、没有激活 worker，也没有
 授权生产主库或生产写入。后续必须提供精确 count/digest、outbox checkpoint、零 mismatch/duplicate、
 独立回滚演练、PG 多实例 CAS 与现场审批；首发生产写阻断计数保持 21。

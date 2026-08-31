@@ -1,5 +1,11 @@
 # CURRENT ARCHITECTURE — 主线现状地图
 
+## 2026-08-31 首发数据迁移计划闭集
+
+- `config/first-release-data-migration-portfolio.json` 现在唯一分类首发 21 个生产写受阻引用：20 个持久化引用进入唯一迁移波次，`operationsReadiness` 是无 wave、无 promotion 的派生读模型。
+- 19 个 Owner-reviewed legacy 为 `repository-plan-ready`，既有 promoted 保持 12；`referrals` 继续使用 T05 Owner source binding。因此注册 phase 为 12/19/31，首发计划为 20+1，仓库计划缺口为 0。
+- 该闭集不执行数据迁移、不增加 DDL、不激活 worker、不选择 PostgreSQL primary。21 个引用仍禁止生产写入，真实演练、核对、回滚、多实例、容量/故障切换及现场审批继续 `NO-GO`。
+
 ## 2026-08-30 血液路由实现源接入中央治理
 
 - `src/http/runtime-source.js` 继续递归发现 `src/http/routes/**/*.js`，并可从 `config/clinical-subdomains.json#routeImplementationSources` 加载显式登记的子域 HTTP 实现源；不扫描整个目标源码目录。
