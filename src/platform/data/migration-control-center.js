@@ -2,6 +2,7 @@
 
 const defaultProgram = require("../../../config/data-migration-program.json");
 const promotionProgram = require("../../../config/p0-data-promotions.json");
+const { validatePromotionProgram } = require("./promotion-contract");
 const {
   SHA256,
   assertMetadataOnly,
@@ -58,6 +59,7 @@ function requireCount(value, field) {
 }
 
 function validateDataMigrationProgram(program = defaultProgram, promotions = promotionProgram) {
+  validatePromotionProgram(promotions);
   if (program?.schemaVersion !== "data-migration-program-v1") throw new TypeError("data migration program schema is invalid");
   if (program.mode !== "outbox-shadow-then-cutover" || program.requestPathDualWrite !== false) {
     throw new TypeError("data migration program must use outbox shadow migration without request-path dual writes");

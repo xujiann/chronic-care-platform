@@ -16,6 +16,7 @@ function renderMarkdown(report) {
     `- Production readiness: ${report.productionReady ? "GO" : "NO-GO"}`,
     `- Iterations: ${report.summary.iterations}`,
     `- P0 collections promoted: ${report.summary.promotedP0}`,
+    `- Collections repository plan-ready: ${report.summary.repositoryPlanReady}`,
     `- Work-item projections: ${report.summary.projectedWorkItems}`,
     `- Institution adapters: ${report.summary.institutionAdapters}`,
     "",

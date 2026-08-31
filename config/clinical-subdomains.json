@@ -5,6 +5,14 @@
   "architecture": "modular-monolith",
   "deploymentBoundary": "shared-node-runtime",
   "independentDeploymentAuthorized": false,
+  "testGovernance": {
+    "schemaVersion": "1.0.0",
+    "runner": "scripts/clinical-subdomain-test-gate.js",
+    "allEntrypoint": "node scripts/clinical-subdomain-test-gate.js --all",
+    "ciScript": "clinical-subdomains:test",
+    "sharedGovernanceTests": ["test/clinical-subdomain-governance.test.js"],
+    "productionReady": false
+  },
   "routeSourceRoot": "src/http/routes/clinical-specialties",
   "routeImplementationSources": [
     {
@@ -24,6 +32,15 @@
       "targetSourceRoot": "src/clinical-specialties/emergency",
       "routePrefixes": ["/api/emergency", "/api/emergency-signals"],
       "roleEnvelope": ["commission", "institution", "citizen"],
+      "testGate": {
+        "entrypoint": "node scripts/clinical-subdomain-test-gate.js --subdomain emergency",
+        "status": "local-independent-test-ready",
+        "productionReady": false,
+        "testFiles": [
+          "test/emergency-dashboard-query.test.js",
+          "test/emergency-dashboard-route-characterization.test.js"
+        ]
+      },
       "registeredCollections": ["emergencySignals", "emergencySignalCommandInbox"],
       "candidateCollections": [
         "emergencyAuditEvents",
@@ -65,6 +82,16 @@
       "targetSourceRoot": "src/clinical-specialties/blood",
       "routePrefixes": ["/api/blood-system"],
       "roleEnvelope": ["commission", "institution"],
+      "testGate": {
+        "entrypoint": "node scripts/clinical-subdomain-test-gate.js --subdomain blood",
+        "status": "local-independent-test-ready",
+        "productionReady": false,
+        "testFiles": [
+          "test/blood-dashboard-query.test.js",
+          "test/blood-dashboard-route-characterization.test.js",
+          "test/blood-domain-boundary.test.js"
+        ]
+      },
       "registeredCollections": [],
       "candidateCollections": [
         "bloodAuditEvents",
@@ -121,6 +148,16 @@
       "targetSourceRoot": "src/clinical-specialties/imaging",
       "routePrefixes": ["/api/imaging-cloud", "/api/mutual-recognition"],
       "roleEnvelope": ["commission", "institution", "county", "citizen"],
+      "testGate": {
+        "entrypoint": "node scripts/clinical-subdomain-test-gate.js --subdomain imaging",
+        "status": "local-independent-test-ready",
+        "productionReady": false,
+        "testFiles": [
+          "test/imaging-dashboard-query.test.js",
+          "test/imaging-dashboard-route-characterization.test.js",
+          "test/imaging-study-quality-control-command.test.js"
+        ]
+      },
       "registeredCollections": ["diagnosticReports", "countyMutualRecognitionRecords", "phase2MutualRecognitionCitations"],
       "candidateCollections": [
         "imageCloudQualityReviews",
@@ -177,6 +214,17 @@
       "targetSourceRoot": "src/clinical-specialties/physical-examination",
       "routePrefixes": ["/api/physical-exams"],
       "roleEnvelope": ["commission", "institution", "citizen"],
+      "testGate": {
+        "entrypoint": "node scripts/clinical-subdomain-test-gate.js --subdomain physical-examination",
+        "status": "local-independent-test-ready",
+        "productionReady": false,
+        "testFiles": [
+          "test/physical-examination-dashboard-query.test.js",
+          "test/physical-examination-dashboard-route-characterization.test.js",
+          "test/physical-examination-specialized-intake-action-command.test.js",
+          "test/physical-examination-specialized-intake-route-characterization.test.js"
+        ]
+      },
       "registeredCollections": [],
       "candidateCollections": [
         "physicalExamAbnormalCases",
@@ -236,6 +284,12 @@
       "targetSourceRoot": "src/clinical-specialties/quality-safety",
       "routePrefixes": ["/api/quality-safety"],
       "roleEnvelope": ["commission", "institution"],
+      "testGate": {
+        "entrypoint": "node scripts/clinical-subdomain-test-gate.js --subdomain quality-safety",
+        "status": "local-independent-test-ready",
+        "productionReady": false,
+        "testFiles": ["test/quality-safety-dashboard-query.test.js"]
+      },
       "writeBoundary": "quality-owned-only",
       "registeredCollections": [
         "qualityRectificationOrders",
@@ -252,7 +306,17 @@
         "qualitySafetyEvents",
         "qualitySafetySiteSignoffs"
       ],
-      "externalReadCollections": []
+      "externalReadCollections": [],
+      "implementedUseCases": [
+        {
+          "id": "quality-safety-dashboard-query.v1",
+          "source": "src/clinical-specialties/quality-safety/dashboard-query.js",
+          "route": "GET /api/quality-safety/dashboard",
+          "ports": ["buildQualitySafetyDashboard", "readBloodCoordination"],
+          "contracts": ["blood-quality-signal.v1"],
+          "sideEffects": []
+        }
+      ]
     }
   ],
   "routeSubcontextAssignments": {
@@ -329,7 +393,7 @@
     { "id": "data-subdomain-ownership", "status": "partial" },
     { "id": "versioned-cross-subdomain-contracts", "status": "partial" },
     { "id": "source-directory-isolation", "status": "partial" },
-    { "id": "independent-domain-tests", "status": "partial" },
-    { "id": "independent-ci-gates", "status": "not-met" }
+    { "id": "independent-domain-tests", "status": "met" },
+    { "id": "independent-ci-gates", "status": "met" }
   ]
 }

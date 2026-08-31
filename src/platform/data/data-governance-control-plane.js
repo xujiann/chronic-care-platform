@@ -2,7 +2,9 @@
 
 const programDefault = require("../../../config/data-governance-control-plane.json");
 const migrationProgram = require("../../../config/data-migration-program.json");
+const promotionProgram = require("../../../config/p0-data-promotions.json");
 const { buildDataMigrationControlCenter } = require("./migration-control-center");
+const { promotionPhaseCounts } = require("./promotion-contract");
 const { STATES: EXECUTION_STATES, assessMigrationExecutionState } = require("./migration-execution-runtime");
 const {
   SHA256,
@@ -278,7 +280,9 @@ function buildDataGovernanceControlPlane(input = {}, options = {}) {
   if (new Set(issueKeys).size !== issueKeys.length) throw governanceError("DATA_GOVERNANCE_ISSUE_DUPLICATED", "data governance issue identifiers must be unique within each issue type");
   const changeIds = impacts.map((item) => item.changeId);
   if (new Set(changeIds).size !== changeIds.length) throw governanceError("DATA_GOVERNANCE_CHANGE_DUPLICATED", "data governance change identifiers must be unique");
-  const migration = buildDataMigrationControlCenter(migrationRuns, { now: options.now });
+  const promotions = options.promotions || promotionProgram;
+  const promotionPhases = promotionPhaseCounts(promotions);
+  const migration = buildDataMigrationControlCenter(migrationRuns, { now: options.now, promotions });
   const execution = assessMigrationExecutionState(executionState, { now: options.now });
   const candidateRuns = migrationRuns.filter((run) => run.state === "local-candidate");
   const candidateBatches = (executionState.batches || []).filter((batch) => batch.state === EXECUTION_STATES.LOCAL_CANDIDATE);
@@ -297,6 +301,7 @@ function buildDataGovernanceControlPlane(input = {}, options = {}) {
     && item.payloadsExposed === false && item.credentialsExposed === false && item.sourceRefDigest.startsWith("sha256:"));
   const checks = Object.freeze([
     { id: "dataGovernanceControl:program", passed: true, detail: `${program.iterations.length} iterations / ${program.qualityRules.length} quality rules` },
+    { id: "dataGovernanceControl:promotionPhases", passed: promotionPhases.promotedP0 + promotionPhases.repositoryPlanReady === promotionPhases.registeredContracts, detail: `${promotionPhases.promotedP0} promoted / ${promotionPhases.repositoryPlanReady} repository plan-ready` },
     { id: "dataGovernanceControl:migrationExecution", passed: migration.ok && execution.ok, detail: `${migration.summary.runs} runs / ${execution.summary.batches} batches` },
     { id: "dataGovernanceControl:recoverableCheckpoint", passed: checkpointsValid, detail: `${(executionState.batches || []).filter((batch) => batch.checkpoint).length} persisted checkpoints` },
     { id: "dataGovernanceControl:exactReconciliation", passed: bindingsValid && openReconciliation.length === 0, detail: `${candidateBatches.length} candidate bindings / ${openReconciliation.length} open exceptions` },
@@ -319,6 +324,8 @@ function buildDataGovernanceControlPlane(input = {}, options = {}) {
     decision: "NO-GO",
     summary: Object.freeze({
       iterations: program.iterations.length,
+      promotedP0: promotionPhases.promotedP0,
+      repositoryPlanReady: promotionPhases.repositoryPlanReady,
       migrationRuns: migration.summary.runs,
       executionBatches: execution.summary.batches,
       checkpoints: (executionState.batches || []).filter((batch) => batch.checkpoint).length,

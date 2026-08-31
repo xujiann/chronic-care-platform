@@ -124,6 +124,10 @@ jobs:
         run: npm run repository:governance:verify
       - name: Verify nine plus five development organization
         run: npm run development-organization:verify
+      - name: Verify governed architecture documentation facts
+        run: npm run documentation-facts:verify
+      - name: Test five independently governed clinical subdomains
+        run: npm run clinical-subdomains:test
       - name: Test modular-monolith architecture contracts
         run: npm run architecture:test
       - name: Protect all operations command runtime behaviors

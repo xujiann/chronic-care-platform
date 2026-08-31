@@ -2,6 +2,8 @@
 
 const assert = require("node:assert/strict");
 const test = require("node:test");
+const promotionProgram = require("../config/p0-data-promotions.json");
+const { promotionPhaseCounts } = require("../src/platform/data/promotion-contract");
 const runtime = require("../src/platform/productization/runtime");
 const { createRouteSegment } = require("../src/http/routes/platform-governance/productization-center");
 
@@ -24,12 +26,15 @@ function harness(options = {}) {
 
 test("productization center is commission-only and production fail closed", async () => {
   const fixture = harness();
+  const phases = promotionPhaseCounts(promotionProgram);
   const handled = await fixture.segment.handle({ method: "GET" }, {}, new URL("https://example.gov.cn/api/platform/productization/center"));
   assert.equal(handled, true);
   assert.equal(fixture.responses[0].status, 200);
   assert.equal(fixture.responses[0].body.productionReady, false);
-  assert.equal(fixture.responses[0].body.dataPromotion.summary.promotedP0, 12);
+  assert.equal(fixture.responses[0].body.dataPromotion.summary.promotedP0, phases.promotedP0);
+  assert.equal(fixture.responses[0].body.dataPromotion.summary.repositoryPlanReady, phases.repositoryPlanReady);
   assert.equal(fixture.audits[0].action, "platform-productization-center-read");
+  assert.match(fixture.audits[0].detail, /12 promoted P0; 1 repository plan-ready/);
 });
 
 test("product operations cockpit is commission-only, read-only and minimized", async () => {

@@ -363,7 +363,8 @@ external verifier，所以依赖缺失时稳定失败关闭。未来外部 CAB/p
 共同层不依赖 `server.js`、HTTP、数据库、provider 或领域实现，也不被 repository 反向调用。12 个 profile
 保持不同 state/retry/lease/checkpoint/receipt 语义，只投影为共同 outcome/count/error-code/digest；因此
 不存在新的跨域写边或第二套任务协议。部署包显式携带模块和清单，CI 从 systemd `ExecStart` 发现 9 个
-入口并拒绝未登记或未接入适配器的 worker。对象存储 v2 的 Proposed worker 继续 blocked。
+入口并拒绝未登记或未接入适配器的 worker。对象存储 v2 worker 已按 Accepted `OBJ-ADR-002` 完成仓库接入，
+但真实 provider capability、运行激活和现场证据未闭合，生产 readiness 继续失败关闭。
 
 ## 仓库文档与 PDF 治理依赖方向
 

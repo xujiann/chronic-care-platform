@@ -1,5 +1,11 @@
 # TECH DEBT — 主线技术债与风险台账
 
+## 2026-08-31 `researchDatasets` 迁移计划后的剩余债务
+
+| ID | 已关闭的仓库缺口 | 仍阻断生产的事项 |
+|---|---|---|
+| DATA-T09-002 | `researchDatasets` 已登记 `research.dataset-aggregate.v1`、独立 `wave-first-release-research`、既有 PostgreSQL collection-state 目标、精确核对/回滚门禁，并机器绑定 5 条 endpoint 行为合同；显式 phase 只计 `repositoryPlanReady=1`，既有 `promotedP0` 保持 12 | 尚无脱敏全量 rehearsal、签名核对、独立回滚演练、PG 多实例命令/CAS 证明和现场变更审批；Owner-reviewed legacy 写策略保持失败关闭，首发生产写阻断数仍为 21，禁止把注册合同总数 13 描述为 promoted |
+
 ## 2026-08-30 血液 API 源码扫描假绿风险收口
 
 - T00 已建立显式 route implementation source 机制，授权矩阵、字面目录、syntax/readiness 统一消费同一 inventory；登记路径越界/别名/缺失/类型不符、owner/domain 漂移、子域 API 前缀漂移或 facade 静态挂载缺失均失败关闭。

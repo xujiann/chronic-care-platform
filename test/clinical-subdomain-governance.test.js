@@ -45,6 +45,10 @@ test("clinical specialty governance defines exactly five bounded subdomains", ()
       "physical-examination-specialized-intake-action-command.v1"
     ]
   );
+  assert.deepEqual(
+    registry.subdomains[4].implementedUseCases.map((useCase) => useCase.id),
+    ["quality-safety-dashboard-query.v1"]
+  );
 });
 
 test("physical examination specialized intake command remains in its target source root", () => {
