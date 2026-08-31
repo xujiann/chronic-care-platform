@@ -32,10 +32,10 @@ test("Markdown snapshot digests are invariant across checkout line endings", () 
 test("every governed Markdown path is classified once and the closed inventory is current", () => {
   const report = buildRepositoryGovernanceReport();
   assert.equal(report.ok, true);
-  assert.equal(report.markdown.total, 272);
+  assert.equal(report.markdown.total, config.markdown.expected.total);
   assert.deepEqual(
     Object.fromEntries(Object.entries(report.markdown.byClassification).map(([key, value]) => [key, value.count])),
-    { current: 203, snapshot: 68, superseded: 1 }
+    Object.fromEntries(Object.entries(config.markdown.expected.byClassification).map(([key, value]) => [key, value.count]))
   );
   assert.equal(report.markdown.entries.length, new Set(report.markdown.entries.map((item) => item.path)).size);
   assert.equal(report.markdown.entries.every((item) => ["current", "snapshot", "superseded"].includes(item.classification)), true);
@@ -49,6 +49,10 @@ test("every governed Markdown path is classified once and the closed inventory i
   );
   assert.equal(
     report.markdown.entries.find((item) => item.path === "docs/adr/2026-08-30-insurance-payment-independent-product-line.md").classification,
+    "current"
+  );
+  assert.equal(
+    report.markdown.entries.find((item) => item.path === "docs/architecture/PLATFORM_FUNCTION_MAP.md").classification,
     "current"
   );
 });
