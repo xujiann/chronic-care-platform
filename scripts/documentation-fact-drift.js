@@ -3,17 +3,30 @@
 
 const fs = require("node:fs");
 const path = require("node:path");
+const { DatabaseSync } = require("node:sqlite");
 const { buildProductionApiCatalog, validateProductionApiCatalog } = require("./production-api-catalog");
 const objectStorageGovernance = require("./object-storage-architecture-governance");
 const { buildRepositoryGovernanceReport } = require("./repository-governance");
 const { buildFirstReleaseMigrationPortfolioReadiness } = require("../src/platform/data/first-release-migration-portfolio");
+const {
+  applySqliteMigrations,
+  SQLITE_SCHEMA_HEAD
+} = require("../src/platform/storage/sqlite-migrations");
+const {
+  buildProductionReleaseScopeReport,
+  loadDefaultAuthorities
+} = require("../src/platform/governance/production-release-scope");
 
 const ROOT = path.resolve(__dirname, "..");
 const DOCUMENT_PATHS = Object.freeze({
   roadmap: "ROADMAP.md",
   architecture: "ARCHITECTURE.md",
+  currentArchitecture: "CURRENT_ARCHITECTURE.md",
   moduleMap: "MODULE_MAP.md",
+  dataModel: "DATA_MODEL.md",
+  apiMap: "API_MAP.md",
   dependencyMap: "DEPENDENCY_MAP.md",
+  techDebt: "TECH_DEBT.md",
   adrIndex: "docs/adr/README.md"
 });
 
@@ -47,6 +60,19 @@ function hasAcceptedWithoutProposed(source) {
   return statuses.length === 1 && statuses[0] === "Accepted";
 }
 
+function buildSqliteSchemaFacts() {
+  const database = new DatabaseSync(":memory:");
+  try {
+    applySqliteMigrations(database);
+    const tables = database.prepare(
+      "SELECT name FROM sqlite_schema WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name"
+    ).all().map((row) => row.name);
+    return Object.freeze({ head: SQLITE_SCHEMA_HEAD, tables: Object.freeze(tables), tableCount: tables.length });
+  } finally {
+    database.close();
+  }
+}
+
 function readRepositoryState(options = {}) {
   const documents = options.documents || Object.fromEntries(Object.entries(DOCUMENT_PATHS)
     .map(([id, relative]) => [id, fs.readFileSync(path.join(ROOT, relative), "utf8")]));
@@ -56,16 +82,45 @@ function readRepositoryState(options = {}) {
   const objectStorageReport = options.objectStorageReport || objectStorageGovernance.verifyRepository();
   const repositoryGovernanceReport = options.repositoryGovernanceReport || buildRepositoryGovernanceReport();
   const firstReleaseMigrationReport = options.firstReleaseMigrationReport || buildFirstReleaseMigrationPortfolioReadiness();
-  return { documents, catalogSummary, catalogErrors, objectStorageReport, repositoryGovernanceReport, firstReleaseMigrationReport };
+  const sqliteSchemaFacts = options.sqliteSchemaFacts || buildSqliteSchemaFacts();
+  const productionReleaseScopeReport = options.productionReleaseScopeReport
+    || buildProductionReleaseScopeReport(loadDefaultAuthorities());
+  return {
+    documents,
+    catalogSummary,
+    catalogErrors,
+    objectStorageReport,
+    repositoryGovernanceReport,
+    firstReleaseMigrationReport,
+    sqliteSchemaFacts,
+    productionReleaseScopeReport
+  };
 }
 
 function buildReport(input) {
-  const { documents = {}, catalogSummary = {}, catalogErrors = ["catalog validation not supplied"], objectStorageReport = {}, repositoryGovernanceReport = {}, firstReleaseMigrationReport = {} } = input || {};
+  const {
+    documents = {},
+    catalogSummary = {},
+    catalogErrors = ["catalog validation not supplied"],
+    objectStorageReport = {},
+    repositoryGovernanceReport = {},
+    firstReleaseMigrationReport = {},
+    sqliteSchemaFacts = {},
+    productionReleaseScopeReport = {}
+  } = input || {};
   const entries = catalogSummary.entries;
   const writeRoutes = catalogSummary.writeRoutes;
   const behaviorProofRequired = catalogSummary.writeIdempotencyBehaviorProofRequired;
   const reviewRequired = catalogSummary.reviewRequired;
   const markdownTotal = repositoryGovernanceReport.markdown?.total;
+  const markdownCurrent = repositoryGovernanceReport.markdown?.byClassification?.current?.count;
+  const markdownSnapshot = repositoryGovernanceReport.markdown?.byClassification?.snapshot?.count;
+  const markdownSuperseded = repositoryGovernanceReport.markdown?.byClassification?.superseded?.count;
+  const sqliteHead = sqliteSchemaFacts.head;
+  const sqliteTableCount = sqliteSchemaFacts.tableCount;
+  const scopedApiReviewRequired = productionReleaseScopeReport.repositoryReview?.apiReviewRequired?.length;
+  const scopedCollectionReviewRequired = productionReleaseScopeReport.repositoryReview?.collectionReviewRequired?.length;
+  const scopedRepositoryPlanMissing = productionReleaseScopeReport.repositoryReview?.collectionRepositoryPlanMissing?.length;
   const roadmapApi = uniqueLineContaining(documents.roadmap, "| 7C | 生产 API 机器目录 |");
   const roadmapRepository = uniqueLineContaining(documents.roadmap, "| 15 | 当前工作流、Markdown 与跟踪 PDF 闭集治理 |");
   const roadmapObjectStorage = uniqueLineContaining(documents.roadmap, "| 12 | 对象存储结构化元数据与耐久命令轨道 |");
@@ -75,9 +130,16 @@ function buildReport(input) {
   const moduleObjectStoragePort = uniqueLineContaining(documents.moduleMap, "| 安全对象存储端口 |");
   const moduleObjectStorage = uniqueSection(documents.moduleMap, "## 17. 对象存储耐久 v2 模块", "## 18. Production evidence trust provider");
   const moduleObjectStorageDecision = uniqueLineContaining(moduleObjectStorage.text, "| `config/object-storage-architecture-decision.json` |");
+  const moduleRepositoryGovernance = uniqueLineContaining(documents.moduleMap, "| `test/repository-governance.test.js` |");
   const architectureObjectStorage = uniqueSection(documents.architecture, "## 已接受的对象存储 v2 方向", "## 首批生产范围合同");
+  const currentArchitectureRepository = uniqueSection(documents.currentArchitecture, "## 2026-08-23 仓库文档与跟踪 PDF 治理", "## 2026-08-23 金融写入证据边界");
+  const dataModelSchema = uniqueSection(documents.dataModel, "## 2. SQLite Schema", "### 关系主链");
+  const dataModelMigrations = uniqueSection(documents.dataModel, "## 3. Migration 现状", "## 4. JSON 集合与实际使用");
+  const apiMapCurrentFacts = uniqueSection(documents.apiMap, "## 6. 错误、幂等与审计", "## 7. API 风险与缺失测试");
+  const apiMapReleaseScope = uniqueSection(documents.apiMap, "## 37. 首批生产范围（无 HTTP 变化）", "## 38. 血液 HTTP 实现归域（协议不变）");
   const dependencyObjectStorage = uniqueSection(documents.dependencyMap, "## 对象存储耐久 v2 依赖方向", "## Production evidence trust 依赖方向");
   const dependencyWorker = uniqueSection(documents.dependencyMap, "## Worker 共同观测依赖方向", "## 仓库文档与 PDF 治理依赖方向");
+  const techDebtRepositoryGovernance = uniqueLineContaining(documents.techDebt, "| DOC-001 |");
 
   const catalogFactsValid = [entries, writeRoutes, behaviorProofRequired, reviewRequired]
     .every(Number.isSafeInteger)
@@ -92,6 +154,18 @@ function buildReport(input) {
     && objectStorageReport.summary?.decisionStatus === "accepted"
     && objectStorageReport.implementationAuthorized === true
     && objectStorageReport.productionReady === false;
+  const sqliteFactsValid = Number.isSafeInteger(sqliteHead)
+    && sqliteHead === SQLITE_SCHEMA_HEAD
+    && Number.isSafeInteger(sqliteTableCount)
+    && sqliteTableCount > 0
+    && Array.isArray(sqliteSchemaFacts.tables)
+    && sqliteSchemaFacts.tables.length === sqliteTableCount;
+  const releaseScopeFactsValid = productionReleaseScopeReport.ok === true
+    && productionReleaseScopeReport.status === "FROZEN-NO-GO"
+    && productionReleaseScopeReport.productionReady === false
+    && scopedApiReviewRequired === 0
+    && scopedCollectionReviewRequired === 0
+    && scopedRepositoryPlanMissing === 0;
 
   const checks = [
     check("authority:apiCatalog", catalogFactsValid, catalogErrors.length
@@ -99,6 +173,8 @@ function buildReport(input) {
       : `${entries} entries; ${writeRoutes} writes; ${behaviorProofRequired} behavior proofs; ${reviewRequired} reviews`),
     check("authority:objectStorageDecision", objectStorageFactsValid, `${objectStorageReport.summary?.decisionStatus || "missing"}; implementation=${objectStorageReport.implementationAuthorized}; production=${objectStorageReport.productionReady}`),
     check("authority:repositoryGovernance", repositoryGovernanceReport.ok === true && Number.isSafeInteger(markdownTotal), `${markdownTotal} tracked Markdown files`),
+    check("authority:sqliteSchema", sqliteFactsValid, `SQLite head v${sqliteHead}; ${sqliteTableCount} tables`),
+    check("authority:firstReleaseScope", releaseScopeFactsValid, `${productionReleaseScopeReport.status || "missing"}; API reviews=${scopedApiReviewRequired}; collection reviews=${scopedCollectionReviewRequired}; plan gaps=${scopedRepositoryPlanMissing}`),
     check("roadmap:apiCatalogFacts", roadmapApi.count === 1
       && hasOneNumericFact(roadmapApi.text, /v3 当前 (\d+) 项/g, entries)
       && hasOneNumericFact(roadmapApi.text, /(\d+) 个写接口/g, writeRoutes)
@@ -146,6 +222,33 @@ function buildReport(input) {
       && hasAcceptedWithoutProposed(moduleObjectStorageDecision.text)
       && /记录 Accepted、v17\/runtime\/API 授权和 production promotion=false/.test(moduleObjectStorageDecision.text)
       && /外部 provider\/KMS\/WORM\/扫描和现场证据仍 NO-GO/.test(moduleObjectStoragePort.text), moduleObjectStorageDecision.text || `module map object storage section count=${moduleObjectStorage.count}; decision row count=${moduleObjectStorageDecision.count}`),
+    check("currentArchitecture:repositoryGovernanceFacts", currentArchitectureRepository.count === 1
+      && hasOneNumericFact(currentArchitectureRepository.text, /当前闭集为 (\d+) 份 Markdown/g, markdownTotal)
+      && hasOneNumericFact(currentArchitectureRepository.text, /(\d+) 份\s*`current`/g, markdownCurrent)
+      && hasOneNumericFact(currentArchitectureRepository.text, /(\d+) 份\s*`snapshot`/g, markdownSnapshot)
+      && hasOneNumericFact(currentArchitectureRepository.text, /(\d+) 份\s*`superseded`/g, markdownSuperseded), currentArchitectureRepository.text || `current architecture repository section count=${currentArchitectureRepository.count}`),
+    check("moduleMap:repositoryGovernanceFacts", moduleRepositoryGovernance.count === 1
+      && hasOneNumericFact(moduleRepositoryGovernance.text, /锁定当前 (\d+) 份 Markdown/g, markdownTotal), moduleRepositoryGovernance.text || `module map repository row count=${moduleRepositoryGovernance.count}`),
+    check("dataModel:sqliteSchemaFacts", dataModelSchema.count === 1
+      && hasOneNumericFact(dataModelSchema.text, /当前实际与公开 head 均为 v(\d+)/g, sqliteHead)
+      && hasOneNumericFact(dataModelSchema.text, /创建 (\d+) 张表/g, sqliteTableCount), dataModelSchema.text || `data model schema section count=${dataModelSchema.count}`),
+    check("dataModel:migrationFacts", dataModelMigrations.count === 1
+      && hasOneNumericFact(dataModelMigrations.text, /当前为 (\d+)/g, sqliteHead)
+      && hasOneNumericFact(dataModelMigrations.text, /空库 0→(\d+)/g, sqliteHead)
+      && hasOneNumericFact(dataModelMigrations.text, /v11→(\d+)/g, sqliteHead)
+      && hasOneNumericFact(dataModelMigrations.text, /v15→(\d+)/g, sqliteHead), dataModelMigrations.text || `data model migration section count=${dataModelMigrations.count}`),
+    check("apiMap:currentMachineFacts", apiMapCurrentFacts.count === 1
+      && hasOneNumericFact(apiMapCurrentFacts.text, /当前为 (\d+)/g, sqliteHead)
+      && hasOneNumericFact(apiMapCurrentFacts.text, /(\d+) 个仍缺 endpoint 级行为证明/g, behaviorProofRequired)
+      && hasOneNumericFact(apiMapCurrentFacts.text, /总 `review-required` 为 (\d+)/g, reviewRequired), apiMapCurrentFacts.text || `API map current facts section count=${apiMapCurrentFacts.count}`),
+    check("apiMap:firstReleaseScopeFacts", apiMapReleaseScope.count === 1
+      && hasOneNumericFact(apiMapReleaseScope.text, /当前 `apiReviewRequired=(\d+)`/g, scopedApiReviewRequired)
+      && /`FROZEN-NO-GO`/.test(apiMapReleaseScope.text), apiMapReleaseScope.text || `API map release scope section count=${apiMapReleaseScope.count}`),
+    check("techDebt:repositoryGovernanceFacts", techDebtRepositoryGovernance.count === 1
+      && hasOneNumericFact(techDebtRepositoryGovernance.text, /当前 (\d+) 份 Markdown/g, markdownTotal)
+      && hasOneNumericFact(techDebtRepositoryGovernance.text, /(\d+) current/g, markdownCurrent)
+      && hasOneNumericFact(techDebtRepositoryGovernance.text, /(\d+) snapshot/g, markdownSnapshot)
+      && hasOneNumericFact(techDebtRepositoryGovernance.text, /(\d+) superseded/g, markdownSuperseded), techDebtRepositoryGovernance.text || `tech debt DOC-001 row count=${techDebtRepositoryGovernance.count}`),
     check("dependencyMap:objectStorageAcceptedNoGo", dependencyObjectStorage.count === 1
       && hasAcceptedWithoutProposed(dependencyObjectStorage.text)
       && /T08 已确认为 data owner/.test(dependencyObjectStorage.text)
@@ -171,7 +274,21 @@ function buildReport(input) {
       },
       repositoryGovernance: {
         markdownTotal,
+        markdownCurrent,
+        markdownSnapshot,
+        markdownSuperseded,
         pdfArtifacts: repositoryGovernanceReport.pdf?.entries?.length
+      },
+      sqliteSchema: {
+        head: sqliteHead,
+        tables: sqliteTableCount
+      },
+      firstReleaseScope: {
+        status: productionReleaseScopeReport.status,
+        apiReviewRequired: scopedApiReviewRequired,
+        collectionReviewRequired: scopedCollectionReviewRequired,
+        repositoryPlanMissing: scopedRepositoryPlanMissing,
+        productionReady: productionReleaseScopeReport.productionReady === true
       },
       firstReleaseMigration: {
         persistentReferences: firstReleaseMigrationReport.summary?.persistentReferences,
@@ -201,6 +318,7 @@ if (require.main === module) {
 
 module.exports = {
   DOCUMENT_PATHS,
+  buildSqliteSchemaFacts,
   buildReport,
   readRepositoryState,
   verifyRepository

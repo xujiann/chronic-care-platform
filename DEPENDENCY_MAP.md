@@ -1,5 +1,18 @@
 # DEPENDENCY MAP — 主线依赖地图
 
+## 2026-08-31 当前文档事实依赖方向
+
+```text
+SQLite migration registry + production API catalog + frozen release scope + repository governance
+  -> documentation-fact-drift read-only verifier
+     -> ROADMAP / ARCHITECTURE / 六张当前地图 / ADR 台账
+        -> governance-api + architecture:test
+```
+
+验证器在内存 SQLite 中应用既有 migration 以派生 head 与表数，并从既有发布范围和仓库治理报告读取
+API 复核及 Markdown 分类；它不读取或修改 `data/db.json`、运行时 SQLite、业务 API、外部证据或生成产物。
+文档不能反向成为 schema、发布范围或生产状态权威。
+
 ## 2026-08-31 首发迁移计划依赖方向
 
 ```text

@@ -1,5 +1,13 @@
 # MODULE MAP — 主线模块地图
 
+## 2026-08-31 当前文档事实治理模块
+
+| 模块 | Owner | 标签 | 当前边界 |
+|---|---|---|---|
+| `scripts/documentation-fact-drift.js` | T00 | B KEEP + IMPROVE | 从既有 API、首发范围、migration、仓库文档和 ADR 权威派生事实，验证 9 份当前治理文档；不成为第二事实源 |
+| `test/documentation-fact-drift.test.js` | T00 | A KEEP | 锁定当前事实并用历史 schema、API 复核与 Markdown 分类值验证失败关闭；不读取或修改业务数据 |
+| `npm run documentation-facts:verify` | T00 | A KEEP | 由架构门禁和治理 CI 复用；失败只阻断合并，不执行运行时修复、migration 或产物生成 |
+
 ## 2026-08-31 首发数据迁移治理模块
 
 | 模块 | Owner | 标签 | 当前边界 |
@@ -318,7 +326,7 @@ owner、文件引用和 closed-world 核心概念匹配只是证据，不能自�
 |---|---|---|---|
 | `config/repository-governance.json` | T00 | 当前 workflow、Markdown 分类规则/闭集摘要、3 个 PDF 来源与 digest 的机器合同 | 不定义业务 owner，不包含 PDF 正文 |
 | `scripts/repository-governance.js` | T00 | 只读枚举 Git 路径，拒绝漏分/重叠/快照改写/旧 baseline/PDF 漂移 | 不生成或修改文档、PDF、报告和归档 |
-| `test/repository-governance.test.js` | T00 / TEST-001 | 锁定 267 份 Markdown、三类边界、当前 main 流程和 3 个 PDF 负向漂移 | 不证明 PDF 内容正确或生产可用 |
+| `test/repository-governance.test.js` | T00 / TEST-001 | 锁定当前 272 份 Markdown、三类边界、当前 main 流程和 3 个 PDF 负向漂移 | 不证明 PDF 内容正确或生产可用 |
 
 依赖方向为 `Git 跟踪路径 + ADR 状态 + 当前进程清单 + PDF bytes/source paths → repository governance
 verifier → governance-api/architecture:test`。snapshot 与 superseded 只提供历史证据，不得反向覆盖 current

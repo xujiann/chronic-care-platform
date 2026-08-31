@@ -1,5 +1,11 @@
 # TECH DEBT — 主线技术债与风险台账
 
+## 2026-08-31 当前文档事实漂移治理
+
+| ID | 已关闭的仓库缺口 | 剩余风险/边界 |
+|---|---|---|
+| DOC-002 | 六张当前架构地图已按 API 目录、首批生产范围、SQLite migration 和 Markdown/PDF 闭集重新对账；验证范围扩至 9 份当前文档，并用历史 schema/API/分类值负向测试锁定失败关闭 | 历史快照继续不可变；机器对账不能替代外部系统、真实数据库、多实例、容量、故障切换、安全评估和现场验收证据，平台生产状态仍为 `NO-GO` |
+
 ## 2026-08-31 首发迁移计划闭集后的剩余债务
 
 | ID | 已关闭的仓库缺口 | 仍阻断生产的事项 |
@@ -96,7 +102,7 @@ T00 机器登记完成后，`production-release-scope` 中 17 个仓库内 API �
 | TEST-005 | 2026-08-27 | 本地/CI 统一 Playwright Chromium；在线根 40 项与居民 13 项继续阻止 Service Worker；PWA 3 项使用独立允许策略、动态端口和临时数据；Go/No-Go 同时覆盖四方业务责任属性与恶意响应可信渲染 | 56 项唯一并集/漂移测试、居民同文件 13/13、PWA 重复 9/9、完整标准 E2E；不得把仓库浏览器测试解释为真实 HTTPS、托管安全头或现场验收 |
 | TEST-008 | 2026-08-23 | 专用 PWA/Service Worker E2E 验证居民登录后安装、v60→v61 激活清理、受控 update、离线 mobile/citizen 回退、API/源快照 404 缓存边界与逐项注销/清缓存 | 真实 HTTPS 终止、OS 安装提示/策略、浏览器设备矩阵、外部 Origin、现场缓存升级与独立安全验收继续外置；仓库测试不产生生产 GO |
 | GOV-001 | 2026-08-23 | `main`/`origin/main` 成为唯一当前集成与默认开发基线；固定 governance tag 仅作可复现证据，旧日期化 workflow 原文冻结 | process plan/verify 默认值、manifest/AGENTS/iteration program 漂移和 CI 目标分支负向测试 |
-| DOC-001 | 2026-08-24 | 当前 267 份 Markdown 以路径和 ADR 台账唯一分类为 198 current、68 snapshot、1 superseded；不删除历史证据 | 闭集路径/分类摘要、规则重叠、ADR status 和 snapshot 内容聚合摘要失败关闭 |
+| DOC-001 | 2026-08-24 | 关闭时为 267 份；当前 272 份 Markdown 以路径和 ADR 台账唯一分类为 203 current、68 snapshot、1 superseded；不删除历史证据 | 闭集路径/分类摘要、规则重叠、ADR status、当前事实和 snapshot 内容聚合摘要失败关闭 |
 | REPO-001 | 2026-08-23 | 3 个跟踪 PDF 均登记 SHA-256、大小、页数、引入提交、来源、保留理由和真实 generator 可用性；二进制本体未修改 | exact tracked inventory、digest/size/page/source 漂移负向测试；替换前必须补可复现生成源，禁止手工编辑 |
 
 ## 重复、死代码和命名结论

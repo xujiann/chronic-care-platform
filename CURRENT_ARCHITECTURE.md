@@ -1,5 +1,11 @@
 # CURRENT ARCHITECTURE — 主线现状地图
 
+## 2026-08-31 当前架构事实机器对账
+
+- `scripts/documentation-fact-drift.js` 现以生产 API 目录、首批生产范围、SQLite migration、仓库 Markdown/PDF 闭集和 Accepted ADR 注册表为机器权威，对 ROADMAP、ARCHITECTURE、六张架构地图和 ADR 索引共 9 份当前文档失败关闭。
+- 当前对账值为 SQLite head v17/38 张非内部表、生产 API 609 项/347 个写入口/319 个行为证明缺口/321 个总复核项、首批范围 `FROZEN-NO-GO` 且范围内 API/集合复核与仓库迁移计划缺口均为 0、Markdown 272 份（203 current、68 snapshot、1 superseded）。
+- 该验证仅在内存 SQLite 中重放既有 migration 并读取仓库权威；不写 `data/db.json`、运行时 SQLite、生产证据、生成报告或归档产物，不改变任何运行时行为。
+
 ## 2026-08-31 首发数据迁移计划闭集
 
 - `config/first-release-data-migration-portfolio.json` 现在唯一分类首发 21 个生产写受阻引用：20 个持久化引用进入唯一迁移波次，`operationsReadiness` 是无 wave、无 promotion 的派生读模型。
@@ -55,7 +61,7 @@ flowchart TB
 
 ## 2. 仓库结构
 
-本治理切片闭集盘点 1,585 个受跟踪及本分支待跟踪文件，其中 JavaScript 1,083、Markdown 267、JSON 107、HTML 44。主要目录：
+历史 AS-IS 采样曾盘点 1,585 个受跟踪及当时分支待跟踪文件，其中 JavaScript 1,083、Markdown 267、JSON 107、HTML 44；这些是采样快照，不是当前仓库计数权威。当前 Markdown 闭集由 `repository-governance-v1` 动态校验。主要目录：
 
 | 路径 | 作用 | 当前边界 |
 |---|---|---|
@@ -283,7 +289,7 @@ Worker、外部数字医院注册及仍为 Proposed 的对象存储 v2 worker �
 `baseline/governance-20260817-enhancement-v1` 仅保留为可复现证据 tag。历史日期化路由/治理文档不再被
 `AGENTS.md` 作为当前工作流入口引用，原文和摘要保持不变。
 
-`repository-governance-v1` 从 Git 路径派生 267 份 Markdown 的闭集清单：198 份 `current`、68 份
+`repository-governance-v1` 从 Git 路径派生；当前闭集为 272 份 Markdown：203 份 `current`、68 份
 `snapshot`、1 份 `superseded`，每个路径必须唯一命中规则；snapshot 内容聚合摘要失败关闭。
 `output/pdf` 的 3 个 PDF 未修改，分别绑定 SHA-256、大小、页数、引入提交、来源与保留理由。现有仓库
 没有任何一个 PDF 的可复现生成器；医院运行脚本只是 verifier，不能被描述为 generator。机器门禁只读，

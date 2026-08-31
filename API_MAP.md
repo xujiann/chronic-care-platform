@@ -1,5 +1,9 @@
 # API MAP — 主线接口地图
 
+## 2026-08-31 API 当前事实机器对账
+
+生产 API 目录当前为 609 项，其中 347 个写入口、319 个 endpoint 仍缺直接行为证明、总 `review-required` 为 321；首批生产范围的 `apiReviewRequired` 已为 0，但整体仍为 `FROZEN-NO-GO`。这些数字由既有目录与首批范围权威派生，本切片没有新增、删除或修改 HTTP method/path、鉴权、scope、请求/响应、幂等或审计协议。
+
 ## 2026-08-31 首发迁移计划不改变 API
 
 本切片没有新增、删除或修改 HTTP method/path、鉴权、scope、请求/响应或审计协议。首发 32 个 API 的
@@ -109,7 +113,7 @@ HTTP request
 ## 6. 错误、幂等与审计
 
 - router 未命中统一 404；存储冲突和 session store 不可用有专用错误转换。
-- 健康/存储元数据的既有 `schemaVersion` 字段形状保持不变，值由 SQLite 注册表 head 派生，当前为 16。
+- 健康/存储元数据的既有 `schemaVersion` 字段形状保持不变，值由 SQLite 注册表 head 派生，当前为 17。
 - 静态未知/敏感路径统一 404；`GET/HEAD /data/public-demo.json` 返回合成脱敏数据，`/data/db.json`、源码、配置和仓库元数据不可发布。
 - HTML、静态资源、JSON/API、下载与错误响应由集中端口下发 `nosniff`、frame、referrer、
   permissions 与 CSP。显式发布图的内联脚本/样式静态风险已归零，但兼容 CSP 仍含 `unsafe-inline`，
@@ -153,7 +157,7 @@ HTTP request
 - `API-001`：机器目录已覆盖当前 616 条授权声明、374 个字面条件路由和两者并集的 609 个唯一接口，并强制 method/path/owner/auth/roles-or-scope/idempotency/生产状态完整；不再手工复制路由清单。
 - `API-002`：现有 28 个完整 endpoint 已形成行为证据；首发冻结范围新增的 T09 八项、T04/T05 四项和 T02/T06 五项共 17 个缺口全部关闭，两条通用转诊入口仍只登记 referrals action-slice。8 个运行时策略、319 个尚无 endpoint 级幂等行为证据合同的非首发写接口和 role × permission × resource 运行时矩阵仍需逐 owner 扩展。T08 普通 integration event/dispatch 和 T07 退款 action regex 也未晋升。
 - T03 signal intake 的 POST 成功响应、独立 `GET /api/public-health/highlights` 和 `GET /api/public-health/system` 的嵌入式 highlights 已复用同一公开投影：所有角色均不接收 `commandKeyHash`、`requestDigest`；district 只返回自身/服务端医院 allowlist 内的 signal，alert 只有在全部关联 signal 同范围时才返回，混合范围和空关联均失败关闭，并隐藏 command、AI 与 evidence 明细；city/health-admin 保留合法全平台业务视图。两个 GET 保持 safe method，不新增幂等合同；system 在业务读取前拒绝未知组织类型或空组织代码，并只用投影后的 highlights 重算四项外层摘要，其他 system 字段保持遗留响应，本切片不据此宣称整个 system 已完成资源范围治理。T00 高风险机器目录继续以 `city and health-admin platform; district own organization or explicit public-health hospital allowlist` 锁定独立 highlights GET 范围，并由授权矩阵与生产目录契约测试保护。commission `GET /api/state` 已先移除 `authUsers` 的认证口令字段，但其余全状态最小权限投影仍是明确 `NO-GO` 债务。
-- API 治理脚本继续拒绝伪造认证合同、跨 handler method/path 误配、action-slice 冒充 endpoint、缺幂等行为证明和生产误 promotion；覆盖率门禁不关闭上述 310 项 `review-required`，也不构成生产放行证据。
+- API 治理脚本继续拒绝伪造认证合同、跨 handler method/path 误配、action-slice 冒充 endpoint、缺幂等行为证明和生产误 promotion；覆盖率门禁不关闭上述 321 项 `review-required`，也不构成生产放行证据。
 - `API-003`：错误响应契约不统一，调用方需要理解多个格式。
 - `API-004`：`shared` 有 12 个路由段，容易成为跨域逻辑聚集点。
 - `API-005`：已通过 Pages/Node 共用显式资源图和敏感路径拒绝矩阵缓解；后续新增页面资源必须同步更新清单并通过构建验证。
@@ -439,7 +443,7 @@ dataset 与受控 attribute，连同前一切片共关闭该资产 27 个 HTML s
 
 ## 37. 首批生产范围（无 HTTP 变化）
 
-冻结范围引用生产 API 目录中的 32 项：八应用声明的 28 项以及 `GET /api/live`、`GET /api/health`、`GET /api/metrics`、`GET /api/auth/context`。校验要求 method/path 均已存在且全部保持 `productionReady=false`；当前 17 项仍为 repository review-required。该增量没有注册、修改或删除任何 HTTP 路由，也不改变认证、授权、幂等或响应协议。
+冻结范围引用生产 API 目录中的 32 项：八应用声明的 28 项以及 `GET /api/live`、`GET /api/health`、`GET /api/metrics`、`GET /api/auth/context`。校验要求 method/path 均已存在且全部保持 `productionReady=false`；冻结建立时的 17 项 repository review 已由后续 Owner 行为合同关闭，当前 `apiReviewRequired=0`，范围状态仍为 `FROZEN-NO-GO`。该增量没有注册、修改或删除任何 HTTP 路由，也不改变认证、授权、幂等或响应协议。
 首发范围 19 个 legacy 集合现以实际读写调用点登记唯一业务 owner、最小 readers 和分类，状态为
 `owner-reviewed-legacy`。这只关闭 repository owner review，不新增或改变任何 HTTP method/path、请求、
 响应、鉴权、审计或副作用；显式 `legacy-owner-review-write-policy.v1` 仍拒绝生产写入和晋升，旧

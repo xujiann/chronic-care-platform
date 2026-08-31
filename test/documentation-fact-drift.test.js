@@ -18,6 +18,7 @@ test("current documentation facts are derived from machine authorities", () => {
   const state = cloneRepositoryState();
   const report = governance.buildReport(state);
   assert.equal(report.ok, true);
+  assert.equal(report.summary.documents, 9);
   assert.deepEqual(report.summary.apiCatalog, {
     entries: state.catalogSummary.entries,
     writeRoutes: state.catalogSummary.writeRoutes,
@@ -33,6 +34,17 @@ test("current documentation facts are derived from machine authorities", () => {
     persistentReferences: 20,
     derivedReadModels: 1,
     repositoryCriticalGaps: 0,
+    productionReady: false
+  });
+  assert.deepEqual(report.summary.sqliteSchema, {
+    head: state.sqliteSchemaFacts.head,
+    tables: state.sqliteSchemaFacts.tableCount
+  });
+  assert.deepEqual(report.summary.firstReleaseScope, {
+    status: "FROZEN-NO-GO",
+    apiReviewRequired: 0,
+    collectionReviewRequired: 0,
+    repositoryPlanMissing: 0,
     productionReady: false
   });
 });
@@ -84,6 +96,9 @@ test("repository Markdown and PDF totals are derived and cannot keep a historica
   const report = governance.buildReport(state);
   assert.deepEqual(report.summary.repositoryGovernance, {
     markdownTotal: state.repositoryGovernanceReport.markdown.total,
+    markdownCurrent: state.repositoryGovernanceReport.markdown.byClassification.current.count,
+    markdownSnapshot: state.repositoryGovernanceReport.markdown.byClassification.snapshot.count,
+    markdownSuperseded: state.repositoryGovernanceReport.markdown.byClassification.superseded.count,
     pdfArtifacts: state.repositoryGovernanceReport.pdf.entries.length
   });
 
@@ -94,6 +109,59 @@ test("repository Markdown and PDF totals are derived and cannot keep a historica
   const drifted = governance.buildReport(state);
   assert.equal(drifted.ok, false);
   assert.equal(failed(drifted, "roadmap:repositoryGovernanceFacts"), true);
+});
+
+test("SQLite head and table facts cannot drift in the current data model", () => {
+  const state = cloneRepositoryState();
+  const head = state.sqliteSchemaFacts.head;
+  const tableCount = state.sqliteSchemaFacts.tableCount;
+  state.documents.dataModel = state.documents.dataModel
+    .replace(`当前实际与公开 head 均为 v${head}`, `当前实际与公开 head 均为 v${head - 1}`)
+    .replace(`创建 ${tableCount} 张表`, `创建 ${tableCount - 1} 张表`);
+  const report = governance.buildReport(state);
+  assert.equal(report.ok, false);
+  assert.equal(failed(report, "dataModel:sqliteSchemaFacts"), true);
+});
+
+test("SQLite migration progress cannot retain the previous schema head", () => {
+  const state = cloneRepositoryState();
+  const head = state.sqliteSchemaFacts.head;
+  state.documents.dataModel = state.documents.dataModel
+    .replace(`当前为 ${head}`, `当前为 ${head - 1}`)
+    .replace(`空库 0→${head}`, `空库 0→${head - 1}`);
+  const report = governance.buildReport(state);
+  assert.equal(report.ok, false);
+  assert.equal(failed(report, "dataModel:migrationFacts"), true);
+});
+
+test("API map current review totals and first-release review state fail closed on drift", () => {
+  const state = cloneRepositoryState();
+  state.documents.apiMap = state.documents.apiMap
+    .replaceAll(`总 \`review-required\` 为 ${state.catalogSummary.reviewRequired}`, `总 \`review-required\` 为 ${state.catalogSummary.reviewRequired - 1}`)
+    .replaceAll("当前 `apiReviewRequired=0`", "当前 `apiReviewRequired=17`");
+  const report = governance.buildReport(state);
+  assert.equal(report.ok, false);
+  assert.equal(failed(report, "apiMap:currentMachineFacts"), true);
+  assert.equal(failed(report, "apiMap:firstReleaseScopeFacts"), true);
+});
+
+test("current Markdown classification facts fail closed in all governed maps", () => {
+  const markdownTotal = repositoryState.repositoryGovernanceReport.markdown.total;
+  for (const [documentId, checkId, prefix] of [
+    ["currentArchitecture", "currentArchitecture:repositoryGovernanceFacts", "当前闭集为"],
+    ["moduleMap", "moduleMap:repositoryGovernanceFacts", "锁定当前"],
+    ["techDebt", "techDebt:repositoryGovernanceFacts", "当前"]
+  ]) {
+    const state = cloneRepositoryState();
+    const currentText = `${prefix} ${markdownTotal} 份 Markdown`;
+    state.documents[documentId] = state.documents[documentId].replace(
+      currentText,
+      `${prefix} ${markdownTotal - 1} 份 Markdown`
+    );
+    const report = governance.buildReport(state);
+    assert.equal(report.ok, false, documentId);
+    assert.equal(failed(report, checkId), true, documentId);
+  }
 });
 
 test("duplicate governed rows and sections fail closed", () => {

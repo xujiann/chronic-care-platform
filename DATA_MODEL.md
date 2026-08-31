@@ -1,5 +1,9 @@
 # DATA MODEL — 主线数据地图
 
+## 2026-08-31 数据模型事实验证边界
+
+文档事实验证器在一次性内存 SQLite 中按正式 migration 顺序重建 schema，并从 `sqlite_schema` 统计非内部表；当前权威结果为 head v17、38 张表。它不打开、复制或写入运行时 SQLite 和 `data/db.json`，也不创建新 migration、DDL 或生产数据库声明。DATA_MODEL 中的当前 head、表数和升级路径若回退到历史值，治理门禁失败关闭。
+
 ## 2026-08-31 首发迁移计划闭集
 
 Accepted ADR 将首发 21 个生产写受阻引用分为 20 个持久化迁移计划与 1 个非持久派生读模型。
@@ -84,12 +88,14 @@ PWA 专项 3 项复用相同的仓库外临时数据和动态回环端口，只�
 
 ## 2. SQLite Schema
 
-主存储 migration 位于 `src/platform/storage/sqlite-migrations.js` 的版本化注册表，当前实际与公开 head 均为 v15。包括 `schema_migrations` 在内，主 SQLite 逻辑上创建 31 张表：
+主存储 migration 位于 `src/platform/storage/sqlite-migrations.js` 的版本化注册表，当前实际与公开 head 均为 v17。包括 `schema_migrations` 在内，主 SQLite 逻辑上创建 38 张表：
 
 | 组 | 表 |
 |---|---|
 | 集合与审计 | `state_collections`、`storage_events`、`schema_migrations` |
 | 连续审计来源 | `audit_delivery_source_events` |
+| 慢病随访耐久投递 | `chronic_followup_dispatch_outbox`、`chronic_followup_dispatch_replays` |
+| 对象存储耐久轨道 | `secure_attachment_records`、`object_storage_commands`、`object_storage_command_receipts`、`object_storage_reconciliation_cases`、`object_storage_reconciliation_actions` |
 | 身份主索引镜像 | `residents`、`accounts`、`account_members`、`person_indexes` |
 | 个人记录镜像 | `personal_records` |
 | 慢病与服务镜像 | `chronic_records`、`followup_records`、`insurance_claim_records`、`certificate_records`、`care_order_records`、`medication_pickup_records`、`county_workflow_records` |
@@ -126,8 +132,8 @@ erDiagram
 - 为兼容既有数据库，v1–v14 ledger checksum 继续使用历史 `version:name` 摘要；对应源码内容另由 14 个冻结 SHA-256 和注册表校验保护，禁止改写。
 - v15 及以后 ledger checksum 使用包含 version、name、owner、apply 实现和显式依赖的内容 SHA-256；新版本必须连续追加。
 - runner 在执行新迁移前校验已应用 ledger 是注册表的连续前缀，name/checksum 漂移会 fail-closed；单个迁移失败时 DDL 与 ledger 行一并回滚。
-- `STORAGE_SCHEMA_VERSION`、`storageMeta`、部署检查、生产 readiness 和发布报告统一从 `SQLITE_SCHEMA_HEAD` 派生，当前为 16。
-- 自动化测试覆盖空库 0→16、v11→16、v15→16 回填、重复执行、冻结指纹、ledger 漂移、未来 v17 内容 checksum 和失败回滚；schema fingerprint 用于比较升级结果与空库结果。
+- `STORAGE_SCHEMA_VERSION`、`storageMeta`、部署检查、生产 readiness 和发布报告统一从 `SQLITE_SCHEMA_HEAD` 派生，当前为 17。
+- 自动化测试覆盖空库 0→17、v11→17、v15→17、重复执行、冻结指纹、ledger 漂移、v15–v17 内容 checksum 和失败回滚；schema fingerprint 用于比较升级结果与空库结果。
 
 专项 SQLite 表仍有独立生命周期和台账，不得误计入主 schema head；生产 PostgreSQL 是否已迁移仍必须由现场证据证明。
 
@@ -210,7 +216,7 @@ legal-hold）不会再为新记录让位；这只关闭静默数据丢失，不�
 
 ## 7. 主要风险
 
-- `DATA-001`、`DATA-002` 已关闭：公开 head 已统一为 v15，历史 v1–v14 源码由冻结内容指纹保护，v15+ ledger 使用内容 checksum。
+- `DATA-001`、`DATA-002` 已关闭：公开 head 已统一为 v17，历史 v1–v14 源码由冻结内容指纹保护，v15+ ledger 使用内容 checksum。
 - `DATA-003` 已关闭“未分类”缺口：252/252 集合具有唯一机器状态，未知 owner 不被伪造，新增/删除、
   重复登记、源码使用漂移和生产晋升由 CI 失败关闭。
 - `DATA-008`：首发范围 19 个集合已根据实际读写调用点关闭 owner review；169 个 `review-required`
@@ -251,14 +257,14 @@ legal-hold）不会再为新记录让位；这只关闭静默数据丢失，不�
 | `regionalSharingSnapshots` | platform-governance | internal | 共享目录快照，不是授权事实 |
 | `regionalSharingAccessReviews` | platform-governance | restricted | `regional-sharing-access-receipt.v1` 只追加历史；禁止截断、删除或原地改写旧回执 |
 
-区域共享回执保存授权引用/版本、结构化用途、范围、共享包版本和稳定摘要；不保存原始幂等键或自由文本用途。展示集合 `dataAccessLogs/securityEvents` 仍受 120 条上限约束，v15 source 只保留它们今后的最小投影；区域共享的权威业务回执仍是未截断的 `regionalSharingAccessReviews`。区域切片本身未增 DDL；当前主 schema 因连续审计来源已进至 v15，其生产切换授权仍为 false。
+区域共享回执保存授权引用/版本、结构化用途、范围、共享包版本和稳定摘要；不保存原始幂等键或自由文本用途。展示集合 `dataAccessLogs/securityEvents` 仍受 120 条上限约束，v15 source 只保留它们今后的最小投影；区域共享的权威业务回执仍是未截断的 `regionalSharingAccessReviews`。区域切片本身未增 DDL；该切片实施时主 schema 因连续审计来源进至 v15，当前统一 head 已由后续 v16/v17 migration 推进至 v17，生产切换授权仍为 false。
 
 四个区域 owner 集合均为 legacy state writer 的 server-managed 字段：全量提交时只能省略或深相等，省略从现有状态恢复；集合级写入被拒绝。该规则同时保护 receipt 顺序/原值以及 package `version`、`lastAccessReviewId`，避免客户端绕过命令 CAS。演示 reset 仅允许非生产，生产固定失败关闭。
 
 `regional-sharing-read-model.v1` 只读取上述四个区域集合及既有 residents、诊断报告、个人记录、互认记录和
 接口契约投影；它不创建集合、表、字段、DDL、migration、审计事实或缓存。交接清单的 report ID 和生成时间
-只存在响应及既有安全审计投影中，不成为新的事实源；本次 builder 归位不改变 SQLite v16 head、JSON/SQLite/
-PostgreSQL 拓扑或任何 data owner。
+只存在响应及既有安全审计投影中，不成为新的事实源；该 builder 归位切片未改变当时的 SQLite v16 head，
+当前统一 head 已为 v17；JSON/SQLite/PostgreSQL 拓扑和任何 data owner 均未因该切片改变。
 ## 10. 健康驾驶舱指标测量
 
 `population-service-visits.v1` 是代码内版本化逻辑合同，不新增集合、表、DDL 或 migration。
