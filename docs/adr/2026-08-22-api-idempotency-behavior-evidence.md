@@ -137,3 +137,9 @@ T02/T06 复用新的轻量 `api-command-behavior` 端口，只提供 actor-scope
 在本 ADR 已接受的逐 endpoint 机制内，T06 先关闭 `PATCH /api/emergency-signals/:id` 的运行时资源范围缺口，不在本分支修改 T00 证据注册表。method/path、institution/county/commission 角色、成功响应、DomainRepository、outbox/inbox、CAS 和幂等键保持不变。route 在 body 前预检目标；命令在同聚合锁内、receipt replay 前重新读取并授权。institution 复用既有组织范围端口，county 使用现有 `authOrganizations` 直接父级和信号明确组织/地区，commission 保持既有全局范围；无法明确归属时失败关闭。组织、来源/目标机构、地区与 owner 字段纳入不可 patch 集合，防止调用方改变授权事实。
 
 拒绝返回稳定 403 `EMERGENCY_SIGNAL_SCOPE_DENIED` 并调用既有安全审计端口，404 不制造拒绝审计；成功命令仍把业务、receipt、outbox 和允许审计一次提交。直接测试覆盖本机构/跨机构、辖区内/外、commission、body-before-scope、拒绝审计和 scope 撤销后的 replay 拒绝。该切片不新增集合、DDL、migration、dependency、外部调用、worker 或生产授权；历史无归属记录需要后续受控迁移，T00 证据登记前目录统计保持不变。
+
+## 2026-08-31 T00 急救信号更新证据登记
+
+T06 运行时切片合并并通过 CI 后，T00 以 `clinical-specialties.emergency-signal-update-command.v1` 登记整个 `PATCH /api/emergency-signals/:id` endpoint。合同直接绑定 session/RBAC、institution/county/commission 当前资源范围、body 前拒绝、聚合锁内 receipt 前重验、受保护归属字段、原聚合与领域事件精确回放、同键异载荷 `EMERGENCY_SIGNAL_IDEMPOTENCY_CONFLICT`、并发相同命令只写一次，以及 aggregate/inbox/outbox/成功审计的一次本地状态提交。scope 拒绝审计继续被准确描述为独立安全写，不被宣称与业务状态原子提交。
+
+注册表现有 32 份合同：30 个完整 endpoint、2 个 action-slice；347 个写接口中 317 个仍为 `behavior-proof-required`，两个通用 action remainder 使总 `review-required` 为 319。登记未修改任何 HTTP、运行时代码、数据字段、DDL、migration、依赖、worker 或部署配置；`productionReady=false`、`externalEvidenceRequired=true`、`distributedExactlyOnceClaimed=false` 保持不变。历史无归属数据、真实 PostgreSQL 多实例串行、长期 receipt/审计留存、组织主数据核对和现场验收仍为生产阻断项。

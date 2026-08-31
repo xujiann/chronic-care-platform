@@ -2,7 +2,7 @@
 
 ## 2026-08-31 急救信号资源归属不变量
 
-本切片不新增或回填 `emergencySignals` 字段，不修改 JSON/SQLite/PostgreSQL schema。资源范围只消费既有信号上的 `orgCode`/`institutionCode`、来源/目标机构代码或名称、`regionCode`/`region`/`district`、受保护 `createdBy`，以及既有 `authOrganizations`/`authUsers` 组织事实。机构、来源、目标、地区、创建者组织和 `ownerRole` 现与居民/聚合身份字段一起禁止通过 PATCH 修改，防止调用方改变授权归属。未登记来源医院只有在受保护创建者能解析到当前 institution/county 时才允许；可解析到辖区外组织或完全无归属时失败关闭。commission 的既有范围不变。生产数据回填与组织主数据核对仍属于首发迁移计划和现场工作，本切片不得创造推断值。
+本切片不新增或回填 `emergencySignals` 字段，不修改 JSON/SQLite/PostgreSQL schema。资源范围只消费既有信号上的 `orgCode`/`institutionCode`、来源/目标机构代码或名称、`regionCode`/`region`/`district`、受保护 `createdBy`，以及既有 `authOrganizations`/`authUsers` 组织事实。机构、来源、目标、地区、创建者组织和 `ownerRole` 现与居民/聚合身份字段一起禁止通过 PATCH 修改，防止调用方改变授权归属。未登记来源医院只有在受保护创建者能解析到当前 institution/county 时才允许；可解析到辖区外组织或完全无归属时失败关闭。commission 的既有范围不变。T00 新增的 API 行为合同只保存源码/测试锚点和分类字符串，不是业务集合、审计事实或数据库记录。生产数据回填与组织主数据核对仍属于首发迁移计划和现场工作，本切片不得创造推断值。
 
 ## 2026-08-31 数据模型事实验证边界
 
@@ -311,7 +311,7 @@ source/sink contract、目标摘要、cursor/source hash 与 receipt 摘要；ch
 
 目录中的源码 marker 既不是认证证明，也不是幂等执行证据；只有 owner、控制流锚点和可执行负向测试一致时才产生认证 evidence contract。认证分类只描述 AS-IS 的 required/optional/none、凭据来源、replay/CSRF 和 scope，不代表目标政策充分或生产安全。幂等 `behavior-verified` 仍只证明当前仓库行为，不证明跨实例 exactly-once 或生产耐久性；所有生产状态继续 `NO-GO`。
 
-API-002 的 existing-proof 扩展现使注册表达到 30 份合同，其中 28 个为完整 endpoint、2 个为 action-slice。T09 使用既有 `researchDatasets`、`compliantDataExports`、`drugConsumableSupervisions` 与审计集合；T04/T05 复用慢病计划、反馈和会诊聚合；T02/T06 复用 operations 与 quality-safety 记录及既有审计投影。有界 receipt 保存散列命令身份和首次公共响应或精确结果快照，使聚合后续变化后仍可零写返回原响应。T07 标准药械状态机和 T03 highlight signal 合同保持既有边界。没有为这些证据新增集合、表、DDL、migration、outbox 或事实源，也不宣称跨实例 exactly-once；生产 PostgreSQL 状态未改变。
+API-002 的 existing-proof 扩展现使注册表达到 32 份合同，其中 30 个为完整 endpoint、2 个为 action-slice。T09 使用既有 `researchDatasets`、`compliantDataExports`、`drugConsumableSupervisions` 与审计集合；T04/T05 复用慢病计划、反馈和会诊聚合；T02/T06 复用 operations、quality-safety 与 emergency signal 聚合、收件箱、发件箱及既有审计投影。有界 receipt 保存散列命令身份和首次公共响应或精确结果快照，使聚合后续变化后仍可零写返回原响应。T07 标准药械状态机和 T03 highlight signal 合同保持既有边界。没有为这些证据新增集合、表、DDL、migration、outbox 或事实源，也不宣称跨实例 exactly-once；生产 PostgreSQL 状态未改变。
 
 T07 第二批审计的 3 条 `reviewedProofRequired` 已全部由直接 endpoint 行为合同替换；formal grouping create 最后关闭资源范围、并发/CAS、稳定错误和原子审计证据缺口。机器验证仍禁止拒绝记录和正式合同同 key 并存，当前 `reviewedProofRequired` 为 0。
 

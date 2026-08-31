@@ -8,6 +8,7 @@
 | `src/http/routes/t06-emergency-signal-write.js` | T06/emergency | B KEEP + IMPROVE | 聚合锁内在 receipt 前重验机构/区县资源范围，冻结组织与地区归属字段；继续复用 DomainRepository、既有 outbox/inbox 和 CAS |
 | `src/clinical-specialties/emergency/signal-update-scope.js` | T06/emergency | B KEEP + IMPROVE | 纯资源授权策略；解析机构、创建者组织与区县直接父级，不依赖 HTTP、数据库适配器或其他领域 |
 | `src/http/runtime-contexts/clinical-specialties.js#emergency-signals` | T06 | B KEEP + IMPROVE | 只新增既有 `appendSecurityEvent` 与 `rowMatchesOrganizationScope` 能力投影，不扩大全域运行时依赖集合 |
+| `config/api-idempotency-evidence.json#clinical-specialties.emergency-signal-update-command.v1` | T00 governance / T06 evidence owner | A KEEP | 只登记整个 PATCH endpoint 的直接实现与测试证据；固定生产 NO-GO，不进入运行时依赖 |
 
 ## 2026-08-31 当前文档事实治理模块
 
@@ -88,7 +89,7 @@
 | 前端共享 | `auth.js`、`shared.js`、`platform-api-client.js`、`platform-shell.js` | 身份上下文、API 调用、壳和设计系统；服务端 token 不进入 localStorage，Cookie 上下文优先，陈旧凭据启动即清理 |
 | 静态发布与浏览器安全 | `src/http/static-asset-policy.js`、`src/http/static-content-runtime.js`、`src/http/browser-security-policy.js`、`src/http/browser-security-inventory.js`、`browser-safe-url.js`、`page-auth-bootstrap.js`、`scripts/static-publication.js` | 44 个入口、145 个显式发布资产、Pages 制品和服务端读取共用默认拒绝契约；既有高风险页面及生产 Go/No-Go 页面已按切片迁为可信 DOM/text 渲染，Safe URL port 按 internal/official/object-storage/tel/blob 能力在 mutation 前检查协议、凭据和 exact-Origin。Inventory v2 现锁定 793 个 DOM HTML、6 个动态 URL 和 42 个动态样式风险；体检工作台与生产 Go/No-Go 页面自身 P0/P1 finding 已归零，2 个 OHIF URL occurrence 仍复核。严格 CSP 仍是 Report-Only，生产 NO-GO |
 | 演示脱敏 | `src/platform/data/public-demo-snapshot.js` | 服务端合成、Pages 构建和 storage-admin 共用纯函数，凭据字段删除、个人姓名/身份/联系字段稳定掩码 |
-| API 生产目录 | `routeSourceFiles` + `api-authentication-evidence` + `api-idempotency-evidence` → `api-authorization-matrix-v3` → `production-api-catalog-v3` | 当前目录 609 项，13 项认证证据保持未分类为 0。31 份幂等行为合同覆盖 29 个完整 endpoint 与 2 个转诊 action-slice；首发 17 个写入口之外，T06 急救信号死信重放已绑定完整 endpoint 直接证据。347 个写接口中 318 个仍缺 endpoint 级行为证明，通用 action remainder 使 320 项保持复核，全部生产 NO-GO。相邻急救信号更新未因同模块而自动晋升；`reviewedProofRequired` 为零，有界 receipt、进程锁与 SQLite CAS 不是多实例生产证明 |
+| API 生产目录 | `routeSourceFiles` + `api-authentication-evidence` + `api-idempotency-evidence` → `api-authorization-matrix-v3` → `production-api-catalog-v3` | 当前目录 609 项，13 项认证证据保持未分类为 0。32 份幂等行为合同覆盖 30 个完整 endpoint 与 2 个转诊 action-slice；T06 急救信号死信重放和更新均绑定独立完整 endpoint 直接证据。347 个写接口中 317 个仍缺 endpoint 级行为证明，通用 action remainder 使 319 项保持复核，全部生产 NO-GO。`reviewedProofRequired` 为零，有界 receipt、进程锁与 SQLite CAS 不是多实例生产证明 |
 | 内部边界覆盖治理 | `config/internal-boundary-coverage.json` → `scripts/internal-boundary-coverage.js` | 复用现有 c8/直接行为测试，以 10 个不重叠源码组锁定 identity、audit、object storage、API governance、worker observability、区域共享命令、转诊 owner command、科研合规导出、浏览器响应头与 Safe URL 真实基线；每组绑定至少一条实际执行的负向合同，报告仅写临时目录 |
 | Playwright E2E 基础设施 | `playwright-browser-policy.v1`、`playwright-pwa-browser-policy.v1`、`playwright-port-policy`、三套 runner/config | 在线根 40 项（含生产 Go/No-Go 恶意响应与四方审批角色回归）与居民 13 项继续阻止 Service Worker；独立 PWA 3 项只在专项 context 允许 Worker，三套共 56 项唯一并集，统一 Chromium、动态端口和临时数据，并验证缓存/注册清理 |
 | 生产证据信任 provider | `src/platform/governance/production-evidence-trust-provider.js` → `scripts/production-preflight.js` | T00 通用 signed-envelope/anchor 验证端口与 production decision 适配；CLI 可部署装配，双角色 Ed25519、pin、撤销、时窗和发布上下文失败关闭；不拥有生产授权 |

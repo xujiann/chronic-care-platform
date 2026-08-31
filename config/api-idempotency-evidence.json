@@ -3747,6 +3747,135 @@
       ],
       "productionReady": false,
       "externalEvidenceRequired": true
+    },
+    {
+      "contractId": "clinical-specialties.emergency-signal-update-command.v1",
+      "key": "PATCH /api/emergency-signals/:id",
+      "method": "PATCH",
+      "path": "/api/emergency-signals/:id",
+      "owner": "T06",
+      "domain": "clinical-specialties",
+      "purpose": "update-emergency-signal-with-resource-scope",
+      "customAuthenticationEvidence": false,
+      "authentication": {
+        "required": true,
+        "mechanism": "bearer-or-cookie-session",
+        "principalType": "platform-user",
+        "credentialSource": [
+          "header:authorization",
+          "cookie:session"
+        ],
+        "replayCsrf": {
+          "replayProtection": "idempotency-key-bound-command-receipt-plus-current-resource-scope-recheck",
+          "csrf": "platform-session-transport-policy"
+        }
+      },
+      "authorization": {
+        "model": "platform-rbac-plus-current-emergency-signal-resource-scope",
+        "roles": [
+          "institution",
+          "county",
+          "commission"
+        ],
+        "dataScope": "institution-own-or-county-jurisdiction-or-commission-platform"
+      },
+      "coverage": {
+        "level": "endpoint",
+        "selector": "entire-route",
+        "actions": [
+          "update-emergency-signal"
+        ],
+        "unverifiedRemainder": false
+      },
+      "idempotency": {
+        "key": "header:Idempotency-Key",
+        "payloadBinding": [
+          "signalId",
+          "expectedVersion",
+          "safePatch",
+          "actor"
+        ],
+        "exactReplay": "returns the persisted aggregate response and domain event with idempotentReplay true and performs no second state write",
+        "conflictingReuse": "EMERGENCY_SIGNAL_IDEMPOTENCY_CONFLICT",
+        "persistenceScope": "emergency signal aggregate, command inbox, domain-event delivery outbox and chained success audit in one local state write",
+        "distributedExactlyOnceClaimed": false
+      },
+      "concurrency": {
+        "cas": {
+          "required": false,
+          "field": "",
+          "conflictCodes": []
+        }
+      },
+      "errors": [
+        {
+          "code": "EMERGENCY_SIGNAL_SCOPE_DENIED",
+          "status": 403
+        },
+        {
+          "code": "EMERGENCY_SIGNAL_NOT_FOUND",
+          "status": 404
+        },
+        {
+          "code": "EMERGENCY_SIGNAL_IDEMPOTENCY_CONFLICT",
+          "status": 409
+        },
+        {
+          "code": "EMERGENCY_SIGNAL_REPLAY_INTEGRITY_FAILED",
+          "status": 500
+        }
+      ],
+      "audit": {
+        "accepted": "commits the aggregate, command receipt, delivery outbox and chained success audit in one local state write",
+        "replay": "rechecks current resource scope before returning the original aggregate and event without another state or audit write",
+        "rejected": "identity and current institution or county scope precede body collection and replay; scope denial emits a separate minimized security audit while missing records and idempotency conflicts do not mutate the business state"
+      },
+      "implementationEvidence": [
+        {
+          "file": "src/http/routes/clinical-specialties/emergency-signals.js",
+          "anchors": [
+            "url.pathname.startsWith(\"/api/emergency-signals/\")",
+            "inspectEmergencySignalAccess",
+            "resource scope denied after command lock"
+          ]
+        },
+        {
+          "file": "src/http/routes/t06-emergency-signal-write.js",
+          "anchors": [
+            "function updateEmergencySignal(input)",
+            "EMERGENCY_SIGNAL_IDEMPOTENCY_CONFLICT",
+            "authorizeEmergencySignalUpdate"
+          ]
+        },
+        {
+          "file": "src/clinical-specialties/emergency/signal-update-scope.js",
+          "anchors": [
+            "function authorizeEmergencySignalUpdate",
+            "EMERGENCY_SIGNAL_SCOPE_DENIED",
+            "user?.role === \"commission\""
+          ]
+        }
+      ],
+      "testEvidence": [
+        {
+          "file": "test/emergency-signal-repository.test.js",
+          "anchors": [
+            "emergency signal command replays once and rejects idempotency payload drift",
+            "concurrent emergency signal retries commit one aggregate version and one outbox event",
+            "emergency signal update commits owned aggregate and versioned event in one unit of work"
+          ]
+        },
+        {
+          "file": "test/emergency-signal-repository.test.js",
+          "anchors": [
+            "institution emergency signal scope is checked before body parsing and denial is audited",
+            "county emergency signal scope allows its district and rejects an external institution",
+            "idempotent replay rechecks current institution scope"
+          ]
+        }
+      ],
+      "productionReady": false,
+      "externalEvidenceRequired": true
     }
   ]
 }

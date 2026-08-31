@@ -11,7 +11,7 @@ session/RBAC
   -> scope denial -> existing appendSecurityEvent
 ```
 
-依赖方向保持从 T06 HTTP 适配器到 T06 命令模块及组合根注入的小型既有端口。命令模块不导入 `server.js`、T05 实现、数据库适配器或其他临床子域；区县判断仅使用调用时状态中的组织目录。拒绝审计是既有独立安全写，成功业务/receipt/outbox/audit 继续一次状态提交。未增加第三方依赖、反向依赖、外部调用、worker 或部署拓扑。
+依赖方向保持从 T06 HTTP 适配器到 T06 命令模块及组合根注入的小型既有端口。命令模块不导入 `server.js`、T05 实现、数据库适配器或其他临床子域；区县判断仅使用调用时状态中的组织目录。拒绝审计是既有独立安全写，成功业务/receipt/outbox/audit 继续一次状态提交。T00 行为证据只建立 `evidence registry → source/test anchors → production catalog` 的只读治理边，不被 T06 运行时反向依赖。未增加第三方依赖、反向业务依赖、外部调用、worker 或部署拓扑。
 
 ## 2026-08-31 当前文档事实依赖方向
 
