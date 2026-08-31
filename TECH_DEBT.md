@@ -1,5 +1,11 @@
 # TECH DEBT — 主线技术债与风险台账
 
+## 2026-08-31 T06 急救信号资源范围加固
+
+| ID | 已关闭的仓库缺口 | 剩余风险/边界 |
+|---|---|---|
+| API-SCOPE-T06-001 | `PATCH /api/emergency-signals/:id` 已在 body 前及 receipt replay 前执行机构/区县资源范围，冻结组织与地区归属字段，并以直接负向测试覆盖跨机构、跨辖区、撤销后 replay 和拒绝审计 | T00 尚未把该 endpoint 登记为 behavior-verified，因此目录复核数暂不变；历史无归属记录将失败关闭，需通过受控迁移回填而非运行时猜测；拒绝审计是既有独立写，进程锁/JSON/SQLite CAS 仍不是多实例 exactly-once，生产继续 NO-GO |
+
 ## 2026-08-31 当前文档事实漂移治理
 
 | ID | 已关闭的仓库缺口 | 剩余风险/边界 |

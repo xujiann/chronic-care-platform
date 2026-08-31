@@ -1,5 +1,9 @@
 # API MAP — 主线接口地图
 
+## 2026-08-31 T06 急救信号 PATCH 资源授权
+
+`PATCH /api/emergency-signals/:id` 未改变 method/path、允许角色、请求体、200/404/409 成功与错误兼容、幂等键、领域事件或响应头。新增稳定 403 `EMERGENCY_SIGNAL_SCOPE_DENIED`：institution 必须匹配信号来源或目标组织，county 必须匹配其区县/成员机构，commission 保持既有全局访问。预检在 body 解析前完成，命令锁内在 receipt replay 前重验，scope 归属字段不可由 patch 改写，拒绝写安全审计。T06 直接测试已覆盖本机构/跨机构、区县内/区县外、commission、body-before-scope、审计及 scope 撤销后的 replay 拒绝；在后续 T00 证据注册前，目录中的 318 个 endpoint 行为缺口和 320 个总复核项暂不减少，全部 API 仍为 `NO-GO`。
+
 ## 2026-08-31 API 当前事实机器对账
 
 生产 API 目录当前为 609 项，其中 347 个写入口、318 个 endpoint 仍缺直接行为证明、总 `review-required` 为 320；首批生产范围的 `apiReviewRequired` 已为 0，但整体仍为 `FROZEN-NO-GO`。这些数字由既有目录与首批范围权威派生，本切片没有新增、删除或修改 HTTP method/path、鉴权、scope、请求/响应、幂等或审计协议。

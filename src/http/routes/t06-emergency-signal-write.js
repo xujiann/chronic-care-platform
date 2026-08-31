@@ -3,6 +3,9 @@
 const { createHash } = require("node:crypto");
 const { DomainRepository } = require("../../platform/data/domain-repository");
 const { createDomainEvent } = require("../../platform/events/domain-event-runtime");
+const {
+  authorizeEmergencySignalUpdate
+} = require("../../clinical-specialties/emergency/signal-update-scope");
 const { createEmergencySignalDelivery } = require("./t06-emergency-signal-delivery");
 
 const DOMAIN = "clinical-specialties";
@@ -12,9 +15,12 @@ const INBOX_COLLECTION = "emergencySignalCommandInbox";
 const OUTBOX_COLLECTION = "emergencyAuditEvents";
 const aggregateWriteTails = new Map();
 const PROTECTED_FIELDS = new Set([
-  "aggregateVersion", "certificateNo", "createdAt", "createdBy", "createdByName",
+  "aggregateVersion", "certificateNo", "createdAt", "createdBy", "createdByName", "createdByOrgCode",
   "credentialNo", "documentNo", "fatherDocumentNo", "id", "lastUpdated",
   "maternalResidentId", "motherDocumentNo", "personIndex", "residentId",
+  "orgCode", "organizationId", "institutionCode", "sourceInstitutionCode",
+  "sourceOrgCode", "sourceInstitution", "targetInstitutionCode", "targetOrgCode",
+  "targetInstitution", "region", "regionCode", "district", "ownerRole",
   "updatedAt", "updatedBy", "updatedByName", "version"
 ]);
 
@@ -76,6 +82,16 @@ function aggregateVersionFor(current) {
     return current.aggregateVersion + 1;
   }
   return 1;
+}
+
+function inspectEmergencySignalAccess({ id, user, readDatabase, rowMatchesOrganizationScope }) {
+  const state = readDatabase();
+  const signal = (Array.isArray(state[COLLECTION]) ? state[COLLECTION] : [])
+    .find((item) => String(item.id) === String(id)) || null;
+  return {
+    ...authorizeEmergencySignalUpdate({ state, signal, user, rowMatchesOrganizationScope }),
+    signal
+  };
 }
 
 function withAggregateWriteLock(id, work) {
@@ -209,7 +225,8 @@ async function executeEmergencySignalUpdate({
   causationId,
   readDatabase,
   writeDatabase,
-  prependAuditTrailEntry
+  prependAuditTrailEntry,
+  rowMatchesOrganizationScope
 }) {
   const commandId = String(causationId || "").trim();
   const expectedVersion = Object.hasOwn(payload || {}, "expectedVersion")
@@ -222,6 +239,27 @@ async function executeEmergencySignalUpdate({
     patch,
     actor: String(user?.username || user?.id || user?.role || "")
   });
+  const access = inspectEmergencySignalAccess({
+    id,
+    user,
+    readDatabase,
+    rowMatchesOrganizationScope
+  });
+  if (access.statusCode === 404) {
+    return Object.freeze({
+      status: 404,
+      body: Object.freeze({ error: "Not Found", message: "未找到业务记录" }),
+      event: null,
+      replayed: false
+    });
+  }
+  if (!access.allowed) {
+    throw new EmergencySignalCommandError(
+      access.code,
+      "emergency signal resource scope denied",
+      access.statusCode
+    );
+  }
   if (commandId) {
     const state = readDatabase();
     const receipt = (Array.isArray(state[INBOX_COLLECTION]) ? state[INBOX_COLLECTION] : [])
@@ -275,6 +313,19 @@ async function executeEmergencySignalUpdate({
       replayed: false
     });
   }
+  const currentAccess = authorizeEmergencySignalUpdate({
+    state: readDatabase(),
+    signal: current,
+    user,
+    rowMatchesOrganizationScope
+  });
+  if (!currentAccess.allowed) {
+    throw new EmergencySignalCommandError(
+      currentAccess.code,
+      "emergency signal resource scope denied",
+      currentAccess.statusCode
+    );
+  }
   const aggregateVersion = aggregateVersionFor(current);
   const updatedAt = new Date().toISOString();
   const updated = {
@@ -320,9 +371,11 @@ module.exports = {
   INBOX_COLLECTION,
   OUTBOX_COLLECTION,
   EmergencySignalCommandError,
+  authorizeEmergencySignalUpdate,
   createRuntimeAdapter,
   digest,
   domainEventFromOutboxRow,
   safePatch,
+  inspectEmergencySignalAccess,
   updateEmergencySignal
 };

@@ -131,3 +131,9 @@ data-access 与 security audit；SQLite 临时失败 trigger 的负向测试证�
 T02/T06 复用新的轻量 `api-command-behavior` 端口，只提供 actor-scope key hash、canonical request digest、expectedVersion、同资源当前进程命令尾和有界 receipt；T04/T05 继续复用 `state-command-consistency`，T09 receipt 保存首次公共响应快照。所有入口都要求授权和资源范围在 receipt replay 前重新验证，同键异载荷、陈旧版本、并发冲突和持久化失败映射为稳定脱敏错误，业务与既有审计在一次状态写入中提交。测试同时证明后续命令推进聚合后，旧 key 仍返回首次响应且零写。
 
 对象存储 v2 新增路由后，当前目录为 598 项、336 个写接口、28 个完整 endpoint 已验证、308 个 `behavior-proof-required` 和 310 项总复核；这些余项不属于冻结首发 32 API 的仓库行为缺口。五项 operations/quality receipt 每资源最多 50 条，其他 aggregate receipt 也有界；进程锁、JSON 状态与 SQLite CAS 均不构成 PostgreSQL 多实例 exactly-once。21 个首发数据引用仍无生产写资格，真实数据库、外部系统、密钥/端点、worker 激活和现场验收未关闭，因此 598 项继续 `productionReady=false`、`externalEvidenceRequired=true`、`NO-GO`。
+
+## 2026-08-31 T06 急救信号更新资源范围前置切片
+
+在本 ADR 已接受的逐 endpoint 机制内，T06 先关闭 `PATCH /api/emergency-signals/:id` 的运行时资源范围缺口，不在本分支修改 T00 证据注册表。method/path、institution/county/commission 角色、成功响应、DomainRepository、outbox/inbox、CAS 和幂等键保持不变。route 在 body 前预检目标；命令在同聚合锁内、receipt replay 前重新读取并授权。institution 复用既有组织范围端口，county 使用现有 `authOrganizations` 直接父级和信号明确组织/地区，commission 保持既有全局范围；无法明确归属时失败关闭。组织、来源/目标机构、地区与 owner 字段纳入不可 patch 集合，防止调用方改变授权事实。
+
+拒绝返回稳定 403 `EMERGENCY_SIGNAL_SCOPE_DENIED` 并调用既有安全审计端口，404 不制造拒绝审计；成功命令仍把业务、receipt、outbox 和允许审计一次提交。直接测试覆盖本机构/跨机构、辖区内/外、commission、body-before-scope、拒绝审计和 scope 撤销后的 replay 拒绝。该切片不新增集合、DDL、migration、dependency、外部调用、worker 或生产授权；历史无归属记录需要后续受控迁移，T00 证据登记前目录统计保持不变。

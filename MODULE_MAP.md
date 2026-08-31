@@ -1,5 +1,14 @@
 # MODULE MAP — 主线模块地图
 
+## 2026-08-31 T06 急救信号更新模块
+
+| 模块 | Owner | 标签 | 当前边界 |
+|---|---|---|---|
+| `src/http/routes/clinical-specialties/emergency-signals.js` | T06/emergency | B KEEP + IMPROVE | PATCH 适配器在 body 前预检、映射 403/404、记录拒绝审计；公开 route 与成功协议不变 |
+| `src/http/routes/t06-emergency-signal-write.js` | T06/emergency | B KEEP + IMPROVE | 聚合锁内在 receipt 前重验机构/区县资源范围，冻结组织与地区归属字段；继续复用 DomainRepository、既有 outbox/inbox 和 CAS |
+| `src/clinical-specialties/emergency/signal-update-scope.js` | T06/emergency | B KEEP + IMPROVE | 纯资源授权策略；解析机构、创建者组织与区县直接父级，不依赖 HTTP、数据库适配器或其他领域 |
+| `src/http/runtime-contexts/clinical-specialties.js#emergency-signals` | T06 | B KEEP + IMPROVE | 只新增既有 `appendSecurityEvent` 与 `rowMatchesOrganizationScope` 能力投影，不扩大全域运行时依赖集合 |
+
 ## 2026-08-31 当前文档事实治理模块
 
 | 模块 | Owner | 标签 | 当前边界 |
