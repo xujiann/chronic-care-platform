@@ -3625,6 +3625,128 @@
       ],
       "productionReady": false,
       "externalEvidenceRequired": true
+    },
+    {
+      "contractId": "clinical-specialties.emergency-signal-delivery-replay-command.v1",
+      "key": "POST /api/emergency-signals/deliveries/:eventId/replay",
+      "method": "POST",
+      "path": "/api/emergency-signals/deliveries/:eventId/replay",
+      "owner": "T06",
+      "domain": "clinical-specialties",
+      "purpose": "replay-emergency-signal-dead-letter-delivery",
+      "customAuthenticationEvidence": false,
+      "authentication": {
+        "required": true,
+        "mechanism": "bearer-or-cookie-session",
+        "principalType": "platform-user",
+        "credentialSource": [
+          "header:authorization",
+          "cookie:session"
+        ],
+        "replayCsrf": {
+          "replayProtection": "body-idempotency-key-digest-plus-durable-replay-history",
+          "csrf": "platform-session-transport-policy"
+        }
+      },
+      "authorization": {
+        "model": "platform-rbac-plus-commission-only-dead-letter-state-gate",
+        "roles": [
+          "commission"
+        ],
+        "dataScope": "platform"
+      },
+      "coverage": {
+        "level": "endpoint",
+        "selector": "entire-route",
+        "actions": [
+          "replay-dead-letter-delivery"
+        ],
+        "unverifiedRemainder": false
+      },
+      "idempotency": {
+        "key": "body:idempotencyKey",
+        "payloadBinding": [
+          "eventId",
+          "idempotencyKey",
+          "reason"
+        ],
+        "exactReplay": "returns the persisted replay generation with duplicate=true and performs no second state or audit write",
+        "conflictingReuse": "EMERGENCY_SIGNAL_DELIVERY_REPLAY_CONFLICT",
+        "persistenceScope": "emergency signal delivery replay history and chained security audit in one local state write",
+        "distributedExactlyOnceClaimed": false
+      },
+      "concurrency": {
+        "cas": {
+          "required": false,
+          "field": "",
+          "conflictCodes": []
+        }
+      },
+      "errors": [
+        {
+          "code": "EMERGENCY_SIGNAL_DELIVERY_FIELD_INVALID",
+          "status": 400
+        },
+        {
+          "code": "EMERGENCY_SIGNAL_DELIVERY_REPLAY_FORBIDDEN",
+          "status": 403
+        },
+        {
+          "code": "EMERGENCY_SIGNAL_DELIVERY_NOT_FOUND",
+          "status": 404
+        },
+        {
+          "code": "EMERGENCY_SIGNAL_DELIVERY_REPLAY_CONFLICT",
+          "status": 409
+        },
+        {
+          "code": "EMERGENCY_SIGNAL_DELIVERY_REPLAY_STATE_INVALID",
+          "status": 409
+        }
+      ],
+      "audit": {
+        "accepted": "serializes the dead-letter transition and commits replay history, delivery state and one chained security audit in one local state write",
+        "replay": "returns the original pending generation without another delivery mutation, replay-history row, audit event or database write",
+        "rejected": "role, event integrity, payload and dead-letter state checks precede mutation; conflicts leave the cloned transaction uncommitted"
+      },
+      "implementationEvidence": [
+        {
+          "file": "src/http/routes/clinical-specialties/emergency-signals.js",
+          "anchors": [
+            "/api/emergency-signals/deliveries/:eventId/replay",
+            "transactEmergencySignalDelivery",
+            "if (!result.duplicate)"
+          ]
+        },
+        {
+          "file": "src/http/routes/t06-emergency-signal-delivery.js",
+          "anchors": [
+            "function replayEmergencySignalDelivery",
+            "EMERGENCY_SIGNAL_DELIVERY_REPLAY_CONFLICT",
+            "function transactEmergencySignalDelivery"
+          ]
+        }
+      ],
+      "testEvidence": [
+        {
+          "file": "test/emergency-signal-delivery.test.js",
+          "anchors": [
+            "retry exhausts into dead letter and commission replay is durable and idempotent",
+            "assert.deepEqual(duplicate, { duplicate: true, status: \"pending\", generation: 2 })",
+            "EMERGENCY_SIGNAL_DELIVERY_REPLAY_CONFLICT"
+          ]
+        },
+        {
+          "file": "test/emergency-signal-delivery.test.js",
+          "anchors": [
+            "operations route exposes minimal metadata and persists replay with its audit",
+            "assert.equal(writes, 1)",
+            "state.securityEvents[0].ownershipContract.unitOfWork"
+          ]
+        }
+      ],
+      "productionReady": false,
+      "externalEvidenceRequired": true
     }
   ]
 }

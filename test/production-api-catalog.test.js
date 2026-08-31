@@ -145,9 +145,9 @@ test("write APIs always expose an idempotency classification without claiming pr
   assert.equal(catalog.policy.sourceMarkersAreBehaviorProof, false);
   assert.equal(catalog.policy.writeIdempotencyEvidence, "explicit-behavior-contract-and-executable-test-evidence");
   assert.equal(catalog.entries.filter((entry) => entry.idempotency.status === "not-observed").every((entry) => entry.production.repositoryReview === "review-required"), true);
-  assert.equal(catalog.summary.writeIdempotencyBehaviorVerified, 28);
+  assert.equal(catalog.summary.writeIdempotencyBehaviorVerified, 29);
   assert.equal(catalog.summary.writeIdempotencyActionSlicesVerified, 2);
-  assert.equal(catalog.summary.writeIdempotencyBehaviorProofRequired, writes.length - 28);
+  assert.equal(catalog.summary.writeIdempotencyBehaviorProofRequired, writes.length - 29);
   assert.equal(writes.filter((entry) => entry.idempotency.behaviorEvidence.status === "behavior-proof-required").every((entry) => entry.production.blockers.includes("idempotency-behavior-proof-required")), true);
   const callback = catalog.entries.find((entry) => entry.key === "POST /api/auth/sms-delivery-callback");
   assert.equal(callback.idempotency.status, "source-marker-observed");
