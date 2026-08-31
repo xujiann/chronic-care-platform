@@ -33,8 +33,9 @@ test("productization center is commission-only and production fail closed", asyn
   assert.equal(fixture.responses[0].body.productionReady, false);
   assert.equal(fixture.responses[0].body.dataPromotion.summary.promotedP0, phases.promotedP0);
   assert.equal(fixture.responses[0].body.dataPromotion.summary.repositoryPlanReady, phases.repositoryPlanReady);
+  assert.equal(fixture.responses[0].body.dataPromotion.summary.firstReleaseMigrationPlans, 20);
   assert.equal(fixture.audits[0].action, "platform-productization-center-read");
-  assert.match(fixture.audits[0].detail, /12 promoted P0; 1 repository plan-ready/);
+  assert.match(fixture.audits[0].detail, /12 promoted P0; 19 owner-reviewed repository plan-ready; 20 persistent first-release plans/);
 });
 
 test("product operations cockpit is commission-only, read-only and minimized", async () => {

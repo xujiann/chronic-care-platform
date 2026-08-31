@@ -31,6 +31,9 @@ test("production release scope freezes the priority-eight inventory while remain
   assert.equal(report.repositoryReview.apiReviewRequired.length, 0);
   assert.equal(report.repositoryReview.collectionReviewRequired.length, 0);
   assert.equal(report.repositoryReview.collectionProductionWriteBlocked.length, 21);
+  assert.equal(report.repositoryReview.collectionRepositoryPlanMissing.length, 0);
+  assert.deepEqual(report.repositoryReview.collectionDerivedReadModels, ["operationsReadiness"]);
+  assert.equal(report.checks.find((item) => item.id === "scope:first-release-migration-portfolio").passed, true);
   assert.equal(report.inventories.apis.items.every((key) => /^(GET|POST|PUT|PATCH|DELETE) \/api\//.test(key)), true);
   assert.equal(report.blockers.some((item) => item.includes("production NO-GO")), true);
 });
@@ -76,6 +79,16 @@ test("production release scope fails closed on authority drift or forged readine
     collectionGovernance: reopenedOwnerReview
   });
   assert.deepEqual(reopenedOwnerReviewReport.repositoryReview.collectionReviewRequired, ["chronicAcceptanceLedger"]);
+
+  const incompletePortfolio = structuredClone(authorities.firstReleaseMigrationPortfolio);
+  incompletePortfolio.entries = incompletePortfolio.entries.filter((item) => item.collection !== "medicalResources");
+  const incompletePortfolioReport = buildProductionReleaseScopeReport({
+    ...authorities,
+    firstReleaseMigrationPortfolio: incompletePortfolio
+  });
+  assert.equal(incompletePortfolioReport.ok, false);
+  assert.deepEqual(incompletePortfolioReport.repositoryReview.collectionRepositoryPlanMissing, ["medicalResources"]);
+  assert.equal(incompletePortfolioReport.checks.some((item) => item.id === "scope:first-release-migration-portfolio" && !item.passed), true);
 });
 
 test("production release scope validates deployment package fingerprint binding", () => {

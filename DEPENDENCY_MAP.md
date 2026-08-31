@@ -1,5 +1,19 @@
 # DEPENDENCY MAP — 主线依赖地图
 
+## 2026-08-31 首发迁移计划依赖方向
+
+```text
+production release scope + domain data ownership
+  -> first-release migration portfolio
+     -> p0 promotion phases + data migration waves
+        -> migration/productization/data-governance readiness
+        -> production release scope repository-gap projection
+```
+
+portfolio 只向既有权威取数，不反向依赖 HTTP、组合根、业务服务或 `data/db.json`；执行控制面也不依赖
+portfolio 来授权生产。目标继续是既有 `health_platform.primary_collection_state`，因此没有新数据库驱动、
+进程、worker、外部 SDK 或部署单元。
+
 ## 2026-08-30 血液路由实现源依赖方向
 
 ```text

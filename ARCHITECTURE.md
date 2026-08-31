@@ -2,6 +2,13 @@
 
 > 更新：2026-08-31。AS-IS、决策和计划必须分开阅读。
 
+## 首发数据迁移计划闭集
+
+Accepted ADR `first-release-data-migration-portfolio.v1` 把首发 21 个生产写受阻引用闭集为 20 个持久化
+迁移计划和 1 个非持久派生读模型。迁移计划只复用既有 outbox-shadow/PG collection-state 控制面，
+不改运行时 API、SQLite/PostgreSQL schema、worker 激活或生产授权。发布范围现可机器证明仓库关键计划
+缺口为 0，同时继续报告 21 个生产 NO-GO 引用及全部外部/现场门禁。
+
 ## 每日阅读顺序
 
 1. `AGENTS.md` 与 `ENGINEERING_GOVERNANCE.md`。

@@ -6,13 +6,15 @@ const path = require("node:path");
 const { buildProductionApiCatalog, validateProductionApiCatalog } = require("./production-api-catalog");
 const objectStorageGovernance = require("./object-storage-architecture-governance");
 const { buildRepositoryGovernanceReport } = require("./repository-governance");
+const { buildFirstReleaseMigrationPortfolioReadiness } = require("../src/platform/data/first-release-migration-portfolio");
 
 const ROOT = path.resolve(__dirname, "..");
 const DOCUMENT_PATHS = Object.freeze({
   roadmap: "ROADMAP.md",
   architecture: "ARCHITECTURE.md",
   moduleMap: "MODULE_MAP.md",
-  dependencyMap: "DEPENDENCY_MAP.md"
+  dependencyMap: "DEPENDENCY_MAP.md",
+  adrIndex: "docs/adr/README.md"
 });
 
 function check(id, passed, detail) {
@@ -53,11 +55,12 @@ function readRepositoryState(options = {}) {
   const catalogErrors = options.catalogErrors || validateProductionApiCatalog(catalog);
   const objectStorageReport = options.objectStorageReport || objectStorageGovernance.verifyRepository();
   const repositoryGovernanceReport = options.repositoryGovernanceReport || buildRepositoryGovernanceReport();
-  return { documents, catalogSummary, catalogErrors, objectStorageReport, repositoryGovernanceReport };
+  const firstReleaseMigrationReport = options.firstReleaseMigrationReport || buildFirstReleaseMigrationPortfolioReadiness();
+  return { documents, catalogSummary, catalogErrors, objectStorageReport, repositoryGovernanceReport, firstReleaseMigrationReport };
 }
 
 function buildReport(input) {
-  const { documents = {}, catalogSummary = {}, catalogErrors = ["catalog validation not supplied"], objectStorageReport = {}, repositoryGovernanceReport = {} } = input || {};
+  const { documents = {}, catalogSummary = {}, catalogErrors = ["catalog validation not supplied"], objectStorageReport = {}, repositoryGovernanceReport = {}, firstReleaseMigrationReport = {} } = input || {};
   const entries = catalogSummary.entries;
   const writeRoutes = catalogSummary.writeRoutes;
   const behaviorProofRequired = catalogSummary.writeIdempotencyBehaviorProofRequired;
@@ -66,6 +69,8 @@ function buildReport(input) {
   const roadmapApi = uniqueLineContaining(documents.roadmap, "| 7C | 生产 API 机器目录 |");
   const roadmapRepository = uniqueLineContaining(documents.roadmap, "| 15 | 当前工作流、Markdown 与跟踪 PDF 闭集治理 |");
   const roadmapObjectStorage = uniqueLineContaining(documents.roadmap, "| 12 | 对象存储结构化元数据与耐久命令轨道 |");
+  const roadmapReleaseScope = uniqueLineContaining(documents.roadmap, "| 16 | 首批生产范围机器冻结 |");
+  const adrObjectStorage = uniqueLineContaining(documents.adrIndex, "[对象存储采用结构化元数据与耐久异步命令轨道 v2]");
   const moduleApi = uniqueLineContaining(documents.moduleMap, "| API 生产目录 |");
   const moduleObjectStoragePort = uniqueLineContaining(documents.moduleMap, "| 安全对象存储端口 |");
   const moduleObjectStorage = uniqueSection(documents.moduleMap, "## 17. 对象存储耐久 v2 模块", "## 18. Production evidence trust provider");
@@ -110,6 +115,17 @@ function buildReport(input) {
       && /仓库实现均已完成/.test(roadmapObjectStorage.text)
       && /production promotion=false/.test(roadmapObjectStorage.text)
       && /继续 NO-GO/.test(roadmapObjectStorage.text), roadmapObjectStorage.text || `roadmap object storage row count=${roadmapObjectStorage.count}`),
+    check("roadmap:firstReleaseMigrationPortfolio", firstReleaseMigrationReport.ok === true
+      && firstReleaseMigrationReport.repositoryCriticalGaps === 0
+      && roadmapReleaseScope.count === 1
+      && hasOneNumericFact(roadmapReleaseScope.text, /(\d+) 个唯一持久化计划/g, firstReleaseMigrationReport.summary?.persistentReferences)
+      && hasOneNumericFact(roadmapReleaseScope.text, /(\d+) 个派生读模型/g, firstReleaseMigrationReport.summary?.derivedReadModels)
+      && hasOneNumericFact(roadmapReleaseScope.text, /collectionRepositoryPlanMissing=(\d+)/g, firstReleaseMigrationReport.repositoryCriticalGaps)
+      && /21 个引用仍无生产写资格/.test(roadmapReleaseScope.text), roadmapReleaseScope.text || `roadmap release scope row count=${roadmapReleaseScope.count}`),
+    check("adrIndex:objectStorageAcceptedNoGo", adrObjectStorage.count === 1
+      && hasAcceptedWithoutProposed(adrObjectStorage.text)
+      && /仓库实现/.test(adrObjectStorage.text)
+      && /生产仍 NO-GO/.test(adrObjectStorage.text), adrObjectStorage.text || `ADR object storage row count=${adrObjectStorage.count}`),
     check("architecture:objectStorageAcceptedNoGo", architectureObjectStorage.count === 1
       && hasAcceptedWithoutProposed(architectureObjectStorage.text)
       && /OBJ-ADR-002` 已 Accepted/.test(architectureObjectStorage.text)
@@ -156,6 +172,12 @@ function buildReport(input) {
       repositoryGovernance: {
         markdownTotal,
         pdfArtifacts: repositoryGovernanceReport.pdf?.entries?.length
+      },
+      firstReleaseMigration: {
+        persistentReferences: firstReleaseMigrationReport.summary?.persistentReferences,
+        derivedReadModels: firstReleaseMigrationReport.summary?.derivedReadModels,
+        repositoryCriticalGaps: firstReleaseMigrationReport.repositoryCriticalGaps,
+        productionReady: firstReleaseMigrationReport.productionReady === true
       }
     },
     checks

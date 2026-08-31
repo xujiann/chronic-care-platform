@@ -62,7 +62,7 @@ function validateResearchDatasetMigrationContract(contract = defaultContract, op
 
   const wave = (migrationProgram.waves || []).find((item) => item.id === contract.migration?.waveId);
   if (!wave
-    || !sameMembers(wave.collections, [contract.collection])
+    || !wave.collections?.includes(contract.collection)
     || migrationProgram.mode !== contract.migration.mode
     || migrationProgram.requestPathDualWrite !== false
     || migrationProgram.productionCutoverAuthorized !== false) {

@@ -19,7 +19,7 @@ function createRouteSegment(runtime) {
           action: "platform-productization-center-read",
           target: url.pathname,
           result: "allowed",
-          detail: `${report.dataPromotion.summary.promotedP0} promoted P0; ${report.dataPromotion.summary.repositoryPlanReady} repository plan-ready; ${report.workItems.summary.open} open work items; production gate closed`
+          detail: `${report.dataPromotion.summary.promotedP0} promoted P0; ${report.dataPromotion.summary.repositoryPlanReady} owner-reviewed repository plan-ready; ${report.dataPromotion.summary.firstReleaseMigrationPlans} persistent first-release plans; ${report.workItems.summary.open} open work items; production gate closed`
         });
         sendJson(res, 200, report);
         return true;

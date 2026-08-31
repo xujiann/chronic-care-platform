@@ -123,7 +123,9 @@ test("empty control plane is structurally ready while the local and production g
   assert.equal(report.summary.iterations, 6);
   assert.equal(report.summary.lineageRecords, migrationProgram.waves.reduce((sum, wave) => sum + wave.collections.length, 0));
   assert.equal(report.summary.promotedP0, 12);
-  assert.equal(report.summary.repositoryPlanReady, 1);
+  assert.equal(report.summary.repositoryPlanReady, 19);
+  assert.equal(report.summary.firstReleaseMigrationPlans, 20);
+  assert.equal(report.summary.firstReleaseDerivedReadModels, 1);
   assert.equal(report.localGateReady, false);
   assert.equal(report.productionReady, false);
   assert.equal(report.productionPrimary, false);

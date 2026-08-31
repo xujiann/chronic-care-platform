@@ -47,7 +47,7 @@ function buildPlatformProductizationReadiness(options = {}) {
   const checks = Object.freeze([
     { id: "productization:sixIterations", passed: iterations.length === 6, detail: `${iterations.length}/6` },
     { id: "productization:requiredFiles", passed: files.every((item) => item.present), detail: `${files.filter((item) => item.present).length}/${files.length}` },
-    { id: "productization:p0DataPromotion", passed: center.dataPromotion.localGateReady, detail: `${center.dataPromotion.summary.promotedP0} promoted P0 / ${center.dataPromotion.summary.repositoryPlanReady} repository plan-ready` },
+    { id: "productization:p0DataPromotion", passed: center.dataPromotion.localGateReady, detail: `${center.dataPromotion.summary.promotedP0} promoted P0 / ${center.dataPromotion.summary.repositoryPlanReady} owner-reviewed plan-ready / ${center.dataPromotion.summary.firstReleaseMigrationPlans} persistent first-release plans` },
     { id: "productization:workItemProjection", passed: center.workItems.ok, detail: `${center.workItems.summary.total} metadata-only projections` },
     { id: "productization:syntheticIntegration", passed: center.institutionIntegration.ok, detail: `${center.institutionIntegration.summary.adapters} adapters` },
     { id: "productization:regionalAssembly", passed: assembly.ok, detail: assembly.region.code },
@@ -67,6 +67,8 @@ function buildPlatformProductizationReadiness(options = {}) {
       iterations: iterations.length,
       promotedP0: center.dataPromotion.summary.promotedP0,
       repositoryPlanReady: center.dataPromotion.summary.repositoryPlanReady,
+      firstReleaseMigrationPlans: center.dataPromotion.summary.firstReleaseMigrationPlans,
+      firstReleaseDerivedReadModels: center.dataPromotion.summary.firstReleaseDerivedReadModels,
       projectedWorkItems: center.workItems.summary.total,
       institutionAdapters: center.institutionIntegration.summary.adapters,
       regionalBundles: assembly.regionalBundles.length

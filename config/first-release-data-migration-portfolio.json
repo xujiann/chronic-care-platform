@@ -1,0 +1,64 @@
+{
+  "schemaVersion": "first-release-data-migration-portfolio.v1",
+  "scopeId": "priority-eight-applications-v1",
+  "ownerReviewContract": "first-release-legacy-owner-review.v1",
+  "integrationOwner": "T00",
+  "target": {
+    "engine": "postgresql",
+    "schemaSource": "deploy/postgres-primary-storage-schema.sql",
+    "table": "health_platform.primary_collection_state",
+    "physicalSchemaChange": false,
+    "newSqlMigrationRequired": false
+  },
+  "controls": {
+    "mode": "outbox-shadow-then-cutover",
+    "requestPathDualWrite": false,
+    "requireExactCounts": true,
+    "allowedMismatchCount": 0,
+    "allowedDuplicateCount": 0,
+    "requireMatchingDigest": true,
+    "requireOutboxCheckpoint": true,
+    "minimumIndependentApprovals": 2,
+    "requiredApprovalRoles": ["data-owner", "release-manager"],
+    "localExecutionAuthorized": false,
+    "productionCutoverAuthorized": false
+  },
+  "entries": [
+    { "collection": "chronicAcceptanceLedger", "owner": "citizen-chronic", "process": "T04", "classification": "internal", "contractId": "citizen.chronic-acceptance-ledger.v1", "sourceKind": "owner-reviewed-legacy", "waveId": "wave-first-release-citizen", "repositoryPlanReady": true },
+    { "collection": "compliantDataExports", "owner": "research", "process": "T09", "classification": "restricted", "contractId": "research.compliant-data-export.v1", "sourceKind": "owner-reviewed-legacy", "waveId": "wave-first-release-research", "repositoryPlanReady": true },
+    { "collection": "countyAcceptanceLedger", "owner": "care-coordination", "process": "T05", "classification": "internal", "contractId": "care.county-acceptance-ledger.v1", "sourceKind": "owner-reviewed-legacy", "waveId": "wave-first-release-care", "repositoryPlanReady": true },
+    { "collection": "countyCollaborationOrders", "owner": "care-coordination", "process": "T05", "classification": "restricted", "contractId": "care.county-collaboration-order.v1", "sourceKind": "owner-reviewed-legacy", "waveId": "wave-first-release-care", "repositoryPlanReady": true },
+    { "collection": "dataQualityIssues", "owner": "platform-governance", "process": "T02", "classification": "internal", "contractId": "platform.data-quality-issue.v1", "sourceKind": "owner-reviewed-legacy", "waveId": "wave-first-release-platform", "repositoryPlanReady": true },
+    { "collection": "diseaseRegistryModels", "owner": "research", "process": "T09", "classification": "internal", "contractId": "research.disease-registry-model.v1", "sourceKind": "owner-reviewed-legacy", "waveId": "wave-first-release-research", "repositoryPlanReady": true },
+    { "collection": "healthDashboardSnapshots", "owner": "platform-governance", "process": "T02", "classification": "internal", "contractId": "platform.health-dashboard-snapshot.v1", "sourceKind": "owner-reviewed-legacy", "waveId": "wave-first-release-platform", "repositoryPlanReady": true },
+    { "collection": "healthStatistics", "owner": "public-health", "process": "T03", "classification": "internal", "contractId": "public-health.health-statistics.v1", "sourceKind": "owner-reviewed-legacy", "waveId": "wave-first-release-public-health", "repositoryPlanReady": true },
+    { "collection": "healthStatisticsIngestion", "owner": "public-health", "process": "T03", "classification": "internal", "contractId": "public-health.health-statistics-ingestion.v1", "sourceKind": "owner-reviewed-legacy", "waveId": "wave-first-release-public-health", "repositoryPlanReady": true },
+    { "collection": "hospitalInteroperabilityFunctions", "owner": "integration", "process": "T08", "classification": "internal", "contractId": "integration.hospital-interoperability-function.v1", "sourceKind": "owner-reviewed-legacy", "waveId": "wave-first-release-integration", "repositoryPlanReady": true },
+    { "collection": "institutionCreditEvaluations", "owner": "platform-governance", "process": "T02", "classification": "internal", "contractId": "platform.institution-credit-evaluation.v1", "sourceKind": "owner-reviewed-legacy", "waveId": "wave-first-release-platform", "repositoryPlanReady": true },
+    { "collection": "institutionSupervisions", "owner": "insurance-payment", "process": "T07", "classification": "restricted", "contractId": "insurance.institution-supervision.v1", "sourceKind": "owner-reviewed-legacy", "waveId": "wave-first-release-insurance", "repositoryPlanReady": true },
+    { "collection": "medicalResources", "owner": "platform-governance", "process": "T02", "classification": "internal", "contractId": "platform.medical-resource.v1", "sourceKind": "owner-reviewed-legacy", "waveId": "wave-first-release-platform", "repositoryPlanReady": true },
+    { "collection": "platformEvidence", "owner": "platform-governance", "process": "T02", "classification": "internal", "contractId": "platform.evidence.v1", "sourceKind": "owner-reviewed-legacy", "waveId": "wave-first-release-platform", "repositoryPlanReady": true },
+    { "collection": "platformInterfaces", "owner": "integration", "process": "T08", "classification": "internal", "contractId": "integration.platform-interface.v1", "sourceKind": "owner-reviewed-legacy", "waveId": "wave-first-release-integration", "repositoryPlanReady": true },
+    { "collection": "platformRoadmap", "owner": "platform-governance", "process": "T02", "classification": "internal", "contractId": "platform.roadmap.v1", "sourceKind": "owner-reviewed-legacy", "waveId": "wave-first-release-platform", "repositoryPlanReady": true },
+    { "collection": "productionDeploymentPlan", "owner": "platform-governance", "process": "T02", "classification": "restricted", "contractId": "platform.production-deployment-plan.v1", "sourceKind": "owner-reviewed-legacy", "waveId": "wave-first-release-platform", "repositoryPlanReady": true },
+    { "collection": "referrals", "owner": "care-coordination", "process": "T05", "classification": "restricted", "contractId": "care.referral.v1", "sourceKind": "owned-source-binding", "waveId": "wave-first-release-care", "repositoryPlanReady": true },
+    { "collection": "researchDatasets", "owner": "research", "process": "T09", "classification": "de-identified", "contractId": "research.dataset-aggregate.v1", "sourceKind": "owner-reviewed-legacy", "waveId": "wave-first-release-research", "repositoryPlanReady": true },
+    { "collection": "securityAcceptanceLedger", "owner": "identity-security", "process": "T01", "classification": "restricted", "contractId": "identity.security-acceptance-ledger.v1", "sourceKind": "owner-reviewed-legacy", "waveId": "wave-first-release-security", "repositoryPlanReady": true },
+    { "collection": "operationsReadiness", "owner": "platform-governance", "process": "T00", "classification": "derived-metadata", "contractId": "platform.operations-readiness-read-model.v1", "sourceKind": "derived-read-model", "waveId": null, "repositoryPlanReady": false }
+  ],
+  "writePolicy": {
+    "productionWriteAllowed": false,
+    "productionPromotionAllowed": false,
+    "externalEvidenceRequired": true
+  },
+  "remainingGates": [
+    "masked-full-volume-rehearsal",
+    "signed-reconciliation-evidence",
+    "independent-rollback-rehearsal",
+    "postgresql-multi-instance-command-and-cas-verification",
+    "capacity-and-failover-assessment",
+    "site-change-approval"
+  ],
+  "productionReady": false,
+  "boundary": "The portfolio closes repository migration planning for every persistent first-release reference and classifies the derived operations view as non-persistent. It does not execute migration, enable production writes, activate workers, select PostgreSQL primary, or create external/site evidence."
+}

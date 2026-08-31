@@ -15,8 +15,11 @@ test("P0 data promotion and T02 regional ownership reduce legacy authority debt"
   assert.equal(report.summary.promotedP0, phases.promotedP0);
   assert.equal(report.summary.repositoryPlanReady, phases.repositoryPlanReady);
   assert.equal(report.summary.registeredContracts, phases.registeredContracts);
-  assert.deepEqual(phases, { promotedP0: 12, repositoryPlanReady: 1, registeredContracts: 13 });
-  assert.equal(report.checks.find((item) => item.id === "dataPromotion:phases").detail, "12 promoted / 1 repository plan-ready");
+  assert.deepEqual(phases, { promotedP0: 12, repositoryPlanReady: 19, registeredContracts: 31 });
+  assert.equal(report.checks.find((item) => item.id === "dataPromotion:phases").detail, "12 promoted / 19 repository plan-ready");
+  assert.equal(report.summary.firstReleaseMigrationPlans, 20);
+  assert.equal(report.summary.firstReleaseDerivedReadModels, 1);
+  assert.equal(report.checks.find((item) => item.id === "dataPromotion:firstReleaseMigrationPortfolio").passed, true);
   assert.equal(report.summary.authoritative, 61);
   assert.equal(report.summary.legacyBlocked, 188);
   for (const collection of [

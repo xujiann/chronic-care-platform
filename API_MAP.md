@@ -1,5 +1,11 @@
 # API MAP — 主线接口地图
 
+## 2026-08-31 首发迁移计划不改变 API
+
+本切片没有新增、删除或修改 HTTP method/path、鉴权、scope、请求/响应或审计协议。首发 32 个 API 的
+`apiReviewRequired` 继续为 0；迁移 portfolio 只在构建/CI/readiness 内选择既有数据与行为权威，不能作为
+新写入口、生产回执或外部联调证据。全平台其余 319 个写接口行为证明债务仍按 Owner 渐进治理。
+
 ## 2026-08-30 血液 API 源码发现边界
 
 本切片不新增或删除 HTTP method/path，不改变角色、scope、请求/响应、错误或幂等规则。血液动态动作的拒绝审计 target 从含实例 ID 的运行时路径规范为稳定的参数化路由模板；访问判定保持原角色规则。授权矩阵和生产目录只消费经临床注册表显式登记、符合唯一子域 `routePrefixes` 且具有 `mountedBy` facade 静态 require 证据的领域 handler，并保留 `subdomain` 与中央 domain/process owner 归属。readiness 也通过 `readRuntimeSource` 消费同一 inventory。当前 32 条 `/api/blood-system` 授权记录只来自 canonical handler；全平台为 616 条授权声明、374 个字面条件路由和 609 个目录接口。

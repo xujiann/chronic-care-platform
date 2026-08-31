@@ -2,6 +2,7 @@
 
 const defaultProgram = require("../../../config/data-migration-program.json");
 const promotionProgram = require("../../../config/p0-data-promotions.json");
+const firstReleasePortfolio = require("../../../config/first-release-data-migration-portfolio.json");
 const { validatePromotionProgram } = require("./promotion-contract");
 const {
   SHA256,
@@ -75,8 +76,15 @@ function validateDataMigrationProgram(program = defaultProgram, promotions = pro
     collections.push(...wave.collections);
   }
   if (new Set(collections).size !== collections.length) throw new TypeError("data migration collections must appear in exactly one wave");
-  const promoted = (promotions.collections || []).map((item) => item.collection).sort();
-  if (JSON.stringify([...collections].sort()) !== JSON.stringify(promoted)) throw new TypeError("data migration waves must cover every promoted P0 collection exactly once");
+  const expectedCollections = [...new Set([
+    ...(promotions.collections || []).map((item) => item.collection),
+    ...(firstReleasePortfolio.entries || [])
+      .filter((item) => item.sourceKind !== "derived-read-model")
+      .map((item) => item.collection)
+  ])].sort();
+  if (JSON.stringify([...collections].sort()) !== JSON.stringify(expectedCollections)) {
+    throw new TypeError("data migration waves must cover every promoted P0 collection and persistent first-release plan exactly once");
+  }
   const reconciliation = program.reconciliation || {};
   if (reconciliation.allowedMismatchCount !== 0 || reconciliation.allowedDuplicateCount !== 0 || reconciliation.requireMatchingDigest !== true) {
     throw new TypeError("data migration reconciliation must require exact counts and matching digests");

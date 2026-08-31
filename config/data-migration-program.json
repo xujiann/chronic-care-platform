@@ -19,7 +19,35 @@
     },
     {
       "id": "wave-first-release-research",
-      "collections": ["researchDatasets"]
+      "collections": ["compliantDataExports", "diseaseRegistryModels", "researchDatasets"]
+    },
+    {
+      "id": "wave-first-release-citizen",
+      "collections": ["chronicAcceptanceLedger"]
+    },
+    {
+      "id": "wave-first-release-care",
+      "collections": ["countyAcceptanceLedger", "countyCollaborationOrders", "referrals"]
+    },
+    {
+      "id": "wave-first-release-platform",
+      "collections": ["dataQualityIssues", "healthDashboardSnapshots", "institutionCreditEvaluations", "medicalResources", "platformEvidence", "platformRoadmap", "productionDeploymentPlan"]
+    },
+    {
+      "id": "wave-first-release-public-health",
+      "collections": ["healthStatistics", "healthStatisticsIngestion"]
+    },
+    {
+      "id": "wave-first-release-integration",
+      "collections": ["hospitalInteroperabilityFunctions", "platformInterfaces"]
+    },
+    {
+      "id": "wave-first-release-insurance",
+      "collections": ["institutionSupervisions"]
+    },
+    {
+      "id": "wave-first-release-security",
+      "collections": ["securityAcceptanceLedger"]
     }
   ],
   "reconciliation": {
