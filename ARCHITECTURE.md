@@ -27,6 +27,8 @@ Accepted ADR `first-release-data-migration-portfolio.v1` 把首发 21 个生产�
 | [DEPENDENCY_MAP.md](./DEPENDENCY_MAP.md) | 代码、浏览器、数据、worker 和外部依赖如何连接？ |
 | [TECH_DEBT.md](./TECH_DEBT.md) | 已确认风险、优先级和测试缺口是什么？ |
 
+辅助总览：[全平台功能图](./docs/architecture/PLATFORM_FUNCTION_MAP.md) 汇总访问主体、九个一级开发域、五个临床子域、共享平台、数据存储、外部系统和 T00 集成治理关系；机器事实仍以六张地图及其权威注册表为准。
+
 ## 标准
 
 | 文档 | 用途 |
