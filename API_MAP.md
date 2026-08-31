@@ -2,13 +2,13 @@
 
 ## 2026-08-31 API 当前事实机器对账
 
-生产 API 目录当前为 609 项，其中 347 个写入口、319 个 endpoint 仍缺直接行为证明、总 `review-required` 为 321；首批生产范围的 `apiReviewRequired` 已为 0，但整体仍为 `FROZEN-NO-GO`。这些数字由既有目录与首批范围权威派生，本切片没有新增、删除或修改 HTTP method/path、鉴权、scope、请求/响应、幂等或审计协议。
+生产 API 目录当前为 609 项，其中 347 个写入口、318 个 endpoint 仍缺直接行为证明、总 `review-required` 为 320；首批生产范围的 `apiReviewRequired` 已为 0，但整体仍为 `FROZEN-NO-GO`。这些数字由既有目录与首批范围权威派生，本切片没有新增、删除或修改 HTTP method/path、鉴权、scope、请求/响应、幂等或审计协议。
 
 ## 2026-08-31 首发迁移计划不改变 API
 
 本切片没有新增、删除或修改 HTTP method/path、鉴权、scope、请求/响应或审计协议。首发 32 个 API 的
 `apiReviewRequired` 继续为 0；迁移 portfolio 只在构建/CI/readiness 内选择既有数据与行为权威，不能作为
-新写入口、生产回执或外部联调证据。全平台其余 319 个写接口行为证明债务仍按 Owner 渐进治理。
+新写入口、生产回执或外部联调证据。全平台其余 318 个写接口行为证明债务仍按 Owner 渐进治理。
 
 ## 2026-08-30 血液 API 源码发现边界
 
@@ -134,8 +134,8 @@ HTTP request
 - `GET /api/state` 保持 method/path、允许角色、状态码和顶层集合兼容。鉴权与既有角色范围投影完成后，`authUsers` 专用投影删除 `password`、`passwordHash`，保留账号、角色、机构、状态和 `externalSubject` 等管理字段；读取不修改权威快照。该增量只关闭认证口令泄露，commission 其余全状态最小权限债务仍为 `NO-GO`。
 - `npm run api:authorization-matrix` 从模块化路由源码生成/校验 owner、身份、角色、范围、用途和九条高风险接口唯一性。
 - `npm run api:authentication-evidence` 校验 13 项认证合同的 owner、mechanism、credential source、required/optional/none、replay/CSRF、scope、实现锚点和可执行负向测试。其中 SMS callback 从现有幂等合同派生；原 13 个未分类 key 中 12 个真实入口已分类，T10 cutover pack 绑定 commission 直接拒绝证据，1 个公卫词法误配已从 inventory 删除，未分类认证为 0。
-- `npm run api:production-catalog` 合并上述授权矩阵与同一 route source inventory 的字面条件；当前 609 项全部 `NO-GO`。347 个写接口中 28 个完整 endpoint 有直接幂等行为合同，319 个仍缺 endpoint 级行为证明；2 个转诊 action-slice 不晋升通用 endpoint，退款 runtime-role variant 仍复核，因此总 `review-required` 为 321。
-- `npm run api:idempotency-evidence` 校验 30 份证据合同。新增八份 T09、四份 T04/T05 和五份 T02/T06 合同绑定首发药耗/科研、慢病/会诊、运行调度/质量安全入口及其身份、职责/资源范围、原响应或精确结果回放、CAS、单次持久化与稳定错误负测；T07 标准药械 use-case 保持原边界。T03 highlight signal intake 继续保留既有范围、幂等与原子审计合同。所有合同保持 `productionReady=false`，进程锁与 SQLite CAS 不等于跨实例 exactly-once。
+- `npm run api:production-catalog` 合并上述授权矩阵与同一 route source inventory 的字面条件；当前 609 项全部 `NO-GO`。347 个写接口中 29 个完整 endpoint 有直接幂等行为合同，318 个仍缺 endpoint 级行为证明；2 个转诊 action-slice 不晋升通用 endpoint，退款 runtime-role variant 仍复核，因此总 `review-required` 为 320。
+- `npm run api:idempotency-evidence` 校验 31 份证据合同。新增八份 T09、四份 T04/T05 和五份 T02/T06 合同绑定首发药耗/科研、慢病/会诊、运行调度/质量安全入口及其身份、职责/资源范围、原响应或精确结果回放、CAS、单次持久化与稳定错误负测；本批次另登记 T06 急救信号死信重放 endpoint 的 commission 范围、持久回放历史、冲突和原子审计证据。T07 标准药械 use-case 与 T03 highlight signal intake 保持原边界。所有合同保持 `productionReady=false`，进程锁与 SQLite CAS 不等于跨实例 exactly-once。
 - 身份/SMS HTTP 路径保持不变；组合根已为短信发送生成随机 request ID，适配器现在拒绝缺失幂等 ID，OIDC refresh 返回的 ID token 必须通过 JWKS/claims 验证后才暴露脱敏 claims。
 - `POST /api/attachments/upload-intents` 在完成身份和居民范围校验后检查服务端元数据容量；已有
   500 条或更多记录时返回 `507 SECURE_ATTACHMENT_METADATA_CAPACITY_EXCEEDED`，且不调用对象
@@ -155,9 +155,9 @@ HTTP request
 ## 7. API 风险与缺失测试
 
 - `API-001`：机器目录已覆盖当前 616 条授权声明、374 个字面条件路由和两者并集的 609 个唯一接口，并强制 method/path/owner/auth/roles-or-scope/idempotency/生产状态完整；不再手工复制路由清单。
-- `API-002`：现有 28 个完整 endpoint 已形成行为证据；首发冻结范围新增的 T09 八项、T04/T05 四项和 T02/T06 五项共 17 个缺口全部关闭，两条通用转诊入口仍只登记 referrals action-slice。8 个运行时策略、319 个尚无 endpoint 级幂等行为证据合同的非首发写接口和 role × permission × resource 运行时矩阵仍需逐 owner 扩展。T08 普通 integration event/dispatch 和 T07 退款 action regex 也未晋升。
+- `API-002`：现有 29 个完整 endpoint 已形成行为证据；首发冻结范围新增的 T09 八项、T04/T05 四项和 T02/T06 五项共 17 个缺口全部关闭，两条通用转诊入口仍只登记 referrals action-slice。T06 急救信号死信重放另外以 commission 角色、死信状态门禁、持久回放历史、冲突拒绝和原子审计形成 endpoint 合同；相邻 `PATCH /api/emergency-signals/:id` 仍缺机构资源范围证明。8 个运行时策略、318 个尚无 endpoint 级幂等行为证据合同的写接口和 role × permission × resource 运行时矩阵仍需逐 owner 扩展。T08 普通 integration event/dispatch 和 T07 退款 action regex 也未晋升。
 - T03 signal intake 的 POST 成功响应、独立 `GET /api/public-health/highlights` 和 `GET /api/public-health/system` 的嵌入式 highlights 已复用同一公开投影：所有角色均不接收 `commandKeyHash`、`requestDigest`；district 只返回自身/服务端医院 allowlist 内的 signal，alert 只有在全部关联 signal 同范围时才返回，混合范围和空关联均失败关闭，并隐藏 command、AI 与 evidence 明细；city/health-admin 保留合法全平台业务视图。两个 GET 保持 safe method，不新增幂等合同；system 在业务读取前拒绝未知组织类型或空组织代码，并只用投影后的 highlights 重算四项外层摘要，其他 system 字段保持遗留响应，本切片不据此宣称整个 system 已完成资源范围治理。T00 高风险机器目录继续以 `city and health-admin platform; district own organization or explicit public-health hospital allowlist` 锁定独立 highlights GET 范围，并由授权矩阵与生产目录契约测试保护。commission `GET /api/state` 已先移除 `authUsers` 的认证口令字段，但其余全状态最小权限投影仍是明确 `NO-GO` 债务。
-- API 治理脚本继续拒绝伪造认证合同、跨 handler method/path 误配、action-slice 冒充 endpoint、缺幂等行为证明和生产误 promotion；覆盖率门禁不关闭上述 321 项 `review-required`，也不构成生产放行证据。
+- API 治理脚本继续拒绝伪造认证合同、跨 handler method/path 误配、action-slice 冒充 endpoint、缺幂等行为证明和生产误 promotion；覆盖率门禁不关闭上述 320 项 `review-required`，也不构成生产放行证据。
 - `API-003`：错误响应契约不统一，调用方需要理解多个格式。
 - `API-004`：`shared` 有 12 个路由段，容易成为跨域逻辑聚集点。
 - `API-005`：已通过 Pages/Node 共用显式资源图和敏感路径拒绝矩阵缓解；后续新增页面资源必须同步更新清单并通过构建验证。

@@ -3,7 +3,7 @@
 ## 2026-08-31 当前架构事实机器对账
 
 - `scripts/documentation-fact-drift.js` 现以生产 API 目录、首批生产范围、SQLite migration、仓库 Markdown/PDF 闭集和 Accepted ADR 注册表为机器权威，对 ROADMAP、ARCHITECTURE、六张架构地图和 ADR 索引共 9 份当前文档失败关闭。
-- 当前对账值为 SQLite head v17/38 张非内部表、生产 API 609 项/347 个写入口/319 个行为证明缺口/321 个总复核项、首批范围 `FROZEN-NO-GO` 且范围内 API/集合复核与仓库迁移计划缺口均为 0、Markdown 273 份（204 current、68 snapshot、1 superseded）。
+- 当前对账值为 SQLite head v17/38 张非内部表、生产 API 609 项/347 个写入口/318 个行为证明缺口/320 个总复核项、首批范围 `FROZEN-NO-GO` 且范围内 API/集合复核与仓库迁移计划缺口均为 0、Markdown 273 份（204 current、68 snapshot、1 superseded）。
 - 该验证仅在内存 SQLite 中重放既有 migration 并读取仓库权威；不写 `data/db.json`、运行时 SQLite、生产证据、生成报告或归档产物，不改变任何运行时行为。
 
 ## 2026-08-31 首发数据迁移计划闭集
@@ -124,7 +124,7 @@ flowchart TB
    unregister/Cache Storage 清理。SEC-004 另增加急救生命链、医生工作台、血液上线看板、陪诊工作台、产品运行驾驶舱、产品区域运行驾驶舱、质量安全工作台、区域切换工作台、血液召回面板、血液创新指挥中心及体检风险卡各 1 项恶意 API 载荷回归；Go/No-Go 回归锁定四方业务责任属性不再被登录角色过滤器误删。
    当前根 40 + 居民 13 + PWA 3 = 56 项；标准在线 context 仍保持阻止 Service Worker。
 7. 审计验证已收敛到 `src/identity-security/audit-chain.js` 的 v2 严格端口；内容、链接、结构和重复 ID 任一异常均失败，验证 API/合规报告不再读取时重封。全量状态写入中的审计数组由服务端管理。
-8. 机器 API 授权矩阵现从路由扫描和小型认证证据合同派生 616 条声明；`production-api-catalog-v3` 与 374 个字面条件路由取并集，形成 609 个唯一接口条目（601 个字面路由、8 个运行时策略）。认证证据共 13 项且无未分类。幂等证据注册表现有 30 份直接行为合同：28 个完整 endpoint 与 2 个转诊 action-slice。T09、T04/T05、T02/T06 共关闭冻结首发范围 17 个写入口，原响应/结果快照回放、职责/资源范围、CAS、单次状态/审计提交与错误负测均由机器锚点校验；T07 标准药械状态机保持原边界。347 个写接口中 28 个 endpoint 为 `behavior-verified`，319 个仍为 `behavior-proof-required`；两个通用 action endpoint 使当前 321 项需复核，609 项全部 `NO-GO`。进程锁和 SQLite collection-version CAS 均不被解释为跨实例 exactly-once，`reviewedProofRequired` 保持为零。
+8. 机器 API 授权矩阵现从路由扫描和小型认证证据合同派生 616 条声明；`production-api-catalog-v3` 与 374 个字面条件路由取并集，形成 609 个唯一接口条目（601 个字面路由、8 个运行时策略）。认证证据共 13 项且无未分类。幂等证据注册表现有 31 份直接行为合同：29 个完整 endpoint 与 2 个转诊 action-slice。T09、T04/T05、T02/T06 共关闭冻结首发范围 17 个写入口；T06 急救信号死信重放另以 commission 角色、死信状态门禁、持久回放历史、冲突拒绝和原子审计形成完整 endpoint 证据。347 个写接口中 29 个 endpoint 为 `behavior-verified`，318 个仍为 `behavior-proof-required`；两个通用 action endpoint 使当前 320 项需复核，609 项全部 `NO-GO`。相邻急救信号更新仍缺机构资源范围证明；进程锁和 SQLite collection-version CAS 均不被解释为跨实例 exactly-once，`reviewedProofRequired` 保持为零。
 9. P1 生产适配器增量保持现有 owner：T01 的 `production-adapters.js` 承担 JWKS/JWT 与 SMS 协议；OTP、发送/登录限流和失败锁定由共享 `auth-security-state-store` 承载，单主机 SQLite 复用 `state_collections`、生产多实例使用组合根长期 PostgreSQL pool；T00 的 PostgreSQL 组合保持 shadow/rehearsal 且 `productionPrimary=false`，受控迁移评估继续失败关闭。连续审计已使用 v15 同事务 append-only source、最小投影和 checkpoint v3，worker/preflight/systemd 已进入部署制品；未签名 receipt、外部单调 anchor、真实 WORM/KMS 与现场证据使 `productionReady=false` 继续失败关闭。
    浏览器服务端登录不再把 token/bearer 写入 `localStorage`；Cookie 上下文在服务端和浏览器
    水合链路均优先，旧脚本可读 token 会在上下文请求前清除。生产 bearer/hybrid 只有显式

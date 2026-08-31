@@ -34,8 +34,8 @@ function formalGroupingReviewFixture() {
 
 test("idempotency evidence registry validates only directly proven endpoint and action-slice contracts", () => {
   assert.deepEqual(validateEvidenceRegistry(), []);
-  assert.equal(DEFAULT_REGISTRY.contracts.length, 30);
-  assert.equal(endpointEvidenceContracts().length, 28);
+  assert.equal(DEFAULT_REGISTRY.contracts.length, 31);
+  assert.equal(endpointEvidenceContracts().length, 29);
   assert.equal(actionSliceEvidenceContracts().length, 2);
   assert.equal(proofRequiredReviews().length, 0);
   assert.equal(DEFAULT_REGISTRY.contracts[0].key, "POST /api/auth/sms-delivery-callback");
@@ -75,7 +75,8 @@ test("idempotency evidence registry validates only directly proven endpoint and 
     "PATCH /api/chronic-management-plans/:id",
     "POST /api/chronic/followup-feedback",
     "POST /api/referral-teleconsultations",
-    "POST /api/referral-teleconsultations/:id/actions"
+    "POST /api/referral-teleconsultations/:id/actions",
+    "POST /api/emergency-signals/deliveries/:eventId/replay"
   ]);
 });
 
@@ -94,7 +95,7 @@ test("formal grouping create replaces the final reviewed T07 proof gap with endp
 
 test("catalog promotes only whole endpoints and retains generic action routes as review-required", () => {
   const catalog = buildProductionApiCatalog();
-  assert.equal(catalog.summary.writeIdempotencyBehaviorVerified, 28);
+  assert.equal(catalog.summary.writeIdempotencyBehaviorVerified, 29);
   assert.equal(catalog.summary.writeIdempotencyActionSlicesVerified, 2);
   assert.equal(catalog.summary.writeIdempotencyBehaviorProofRequired,
     catalog.summary.writeRoutes - catalog.summary.writeIdempotencyBehaviorVerified);
@@ -130,7 +131,8 @@ test("catalog promotes only whole endpoints and retains generic action routes as
     "PATCH /api/chronic-management-plans/:id",
     "POST /api/chronic/followup-feedback",
     "POST /api/referral-teleconsultations",
-    "POST /api/referral-teleconsultations/:id/actions"
+    "POST /api/referral-teleconsultations/:id/actions",
+    "POST /api/emergency-signals/deliveries/:eventId/replay"
   ]) {
     const entry = catalog.entries.find((candidate) => candidate.key === key);
     assert.equal(entry.idempotency.behaviorEvidence.status, "behavior-verified", key);
@@ -183,6 +185,11 @@ test("catalog promotes only whole endpoints and retains generic action routes as
   assert.deepEqual(publicHealthSignal.authorization.roles, ["commission"]);
   assert.equal(publicHealthSignal.production.repositoryReview, "catalogued");
   assert.equal(publicHealthSignal.production.status, "NO-GO");
+  const emergencyDeliveryReplay = catalog.entries.find((entry) => entry.key === "POST /api/emergency-signals/deliveries/:eventId/replay");
+  assert.equal(emergencyDeliveryReplay.idempotency.behaviorEvidence.contractId, "clinical-specialties.emergency-signal-delivery-replay-command.v1");
+  assert.deepEqual(emergencyDeliveryReplay.authorization.roles, ["commission"]);
+  assert.equal(emergencyDeliveryReplay.production.repositoryReview, "catalogued");
+  assert.equal(emergencyDeliveryReplay.production.status, "NO-GO");
   for (const runtimePolicy of catalog.entries.filter((entry) => entry.owner === "T07" && entry.routeResolution === "runtime-policy" && entry.idempotency.required)) {
     assert.equal(runtimePolicy.idempotency.behaviorEvidence.status, "behavior-proof-required", runtimePolicy.key);
     assert.deepEqual(runtimePolicy.idempotency.behaviorEvidence.verifiedActionContracts, [], runtimePolicy.key);
