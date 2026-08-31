@@ -1,5 +1,24 @@
 # DATA MODEL — 主线数据地图
 
+## 2026-08-31 `researchDatasets` 首发迁移计划切片
+
+`researchDatasets` 继续由 T09 research 拥有，分类保持 `de-identified`，首发 owner review 与
+`legacy-owner-review-write-policy.v1` 不变。新增 `research.dataset-aggregate.v1` 只冻结仓库侧逻辑写合同：
+`id` 是聚合标识、`domainVersion` 是 CAS 版本、`commandReceipts` 保存最多 100 条 actor-scoped 命令回执；
+五个科研数据集写 endpoint 的身份/资源范围、精确零写回放、异载荷冲突、CAS 和单次审计提交继续由
+既有 T09 行为合同证明。
+
+迁移源仍是 `state_collections[researchDatasets]`，SQLite 的 `research_dataset_records` 只作为既有兼容
+投影；目标复用已跟踪的 PostgreSQL `health_platform.primary_collection_state`，因此本切片不追加 SQLite
+head、不新增表或 DDL。`wave-first-release-research` 允许后续建立 metadata-only rehearsal run，必须经过
+精确 count/digest、零 mismatch/duplicate、outbox checkpoint、独立回滚角色和质量门禁。当前没有真实 run、
+未激活 worker、未选择 PostgreSQL primary，`productionWriteAllowed=false`、`productionReady=false`；首发
+生产写阻断引用仍为 21，不得把 `repositoryPlanReady` 解释为数据已迁移或生产晋升。
+
+`p0-data-promotions` 现以显式 phase 区分 12 个既有 `promoted` 合同与 1 个
+`repository-plan-ready` 合同；`researchDatasets` 只属于后者。产品化报告、HTTP 投影和数据治理控制面
+必须分别输出 `promotedP0=12` 与 `repositoryPlanReady=1`，禁止用注册合同总数 13 覆盖晋级语义。
+
 ## 2026-08-30 血液路由实现源登记不是业务数据
 
 `routeImplementationSources` 是源码治理元数据，只保存子域 ID、仓库相对 JavaScript 路径与静态挂载它的 route facade 路径清单。当前仅登记 blood canonical handler 和两个挂载 facade；它不新增或修改业务集合、SQLite/PostgreSQL 表、字段、DDL、migration、审计事实或生产证据，数据库及 252 个集合状态完全不变。domain、process owner、目标源码根与允许的 API 前缀继续来自既有临床注册表。

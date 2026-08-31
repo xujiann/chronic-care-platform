@@ -1,0 +1,78 @@
+{
+  "schemaVersion": "research-dataset-migration-contract-v1",
+  "contractId": "research.dataset-aggregate.v1",
+  "scopeId": "priority-eight-applications-v1",
+  "collection": "researchDatasets",
+  "owner": "research",
+  "process": "T09",
+  "integrationOwner": "T00",
+  "classification": "de-identified",
+  "source": {
+    "logicalStore": "state_collections",
+    "collectionName": "researchDatasets",
+    "sqliteProjection": "research_dataset_records",
+    "ownerReviewContract": "first-release-legacy-owner-review.v1"
+  },
+  "writeContract": {
+    "commandContract": "research-dataset-write-command.v1",
+    "aggregateIdField": "id",
+    "aggregateVersionField": "domainVersion",
+    "commandReceiptField": "commandReceipts",
+    "maximumCommandReceipts": 100,
+    "compareAndSwapRequired": true,
+    "actorScopedIdempotencyRequired": true,
+    "exactReplayMustBeZeroWrite": true,
+    "atomicAuditCollections": ["dataAccessLogs"],
+    "conditionalSideEffects": ["compliantDataExports"]
+  },
+  "endpointBehaviorEvidence": [
+    "POST /api/research/datasets/:id/approval",
+    "POST /api/research/datasets/:id/evidence",
+    "POST /api/research/datasets/:id/compliant-exports",
+    "POST /api/research/datasets/:id/outcomes",
+    "POST /api/research/datasets/:id/sandbox-access"
+  ],
+  "target": {
+    "engine": "postgresql",
+    "schemaSource": "deploy/postgres-primary-storage-schema.sql",
+    "table": "health_platform.primary_collection_state",
+    "selector": "collection_name=researchDatasets",
+    "physicalSchemaChange": false,
+    "newSqlMigrationRequired": false
+  },
+  "migration": {
+    "waveId": "wave-first-release-research",
+    "mode": "outbox-shadow-then-cutover",
+    "requestPathDualWrite": false,
+    "sourceSnapshotFields": ["sourceCount", "sourceVersion", "sourceDigest"],
+    "reconciliation": {
+      "requireExactCounts": true,
+      "allowedMismatchCount": 0,
+      "allowedDuplicateCount": 0,
+      "requireMatchingDigest": true,
+      "requireOutboxCheckpoint": true
+    },
+    "rollback": {
+      "strategy": "keep-current-json-or-sqlite-primary-and-replay-from-last-verified-checkpoint",
+      "minimumIndependentApprovals": 2,
+      "requiredApprovalRoles": ["data-owner", "release-manager"]
+    },
+    "repositoryPlanReady": true,
+    "localExecutionAuthorized": false,
+    "productionCutoverAuthorized": false
+  },
+  "writePolicy": {
+    "productionWriteAllowed": false,
+    "productionPromotionAllowed": false,
+    "externalEvidenceRequired": true
+  },
+  "remainingGates": [
+    "masked-full-volume-rehearsal",
+    "signed-reconciliation-evidence",
+    "independent-rollback-rehearsal",
+    "postgresql-multi-instance-command-and-cas-verification",
+    "site-change-approval"
+  ],
+  "productionReady": false,
+  "boundary": "This contract makes one first-release collection repository-plan-ready for controlled migration rehearsal only. It does not activate a worker, change the runtime write path, authorize PostgreSQL primary writes, or provide external/site evidence."
+}

@@ -16,6 +16,10 @@
     {
       "id": "wave-public-health-referral",
       "collections": ["publicHealthCommandTasks", "publicHealthExchangeTasks", "referralSystem", "referralTeleconsultations"]
+    },
+    {
+      "id": "wave-first-release-research",
+      "collections": ["researchDatasets"]
     }
   ],
   "reconciliation": {

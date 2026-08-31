@@ -1,6 +1,6 @@
 # 架构与治理入口
 
-> 更新：2026-08-19。AS-IS、决策和计划必须分开阅读。
+> 更新：2026-08-31。AS-IS、决策和计划必须分开阅读。
 
 ## 每日阅读顺序
 
@@ -68,12 +68,13 @@
   `readyForControlledRehearsal=true`，不接入 strict preflight、不启用 worker 或主库；部署合同中的
   `activationAuthorized`、`productionPrimary`、`runtimeCutoverEnabled` 和 `productionReady` 固定为 false。
 
-## Proposed 方向（不授权实施）
+## 已接受的对象存储 v2 方向
 
-- `OBJ-ADR-002` 建议 T08 作为对象存储附件元数据 data owner、T00 作为共享存储/worker technical owner，
-  并规划 v17 结构化模型、版本化异步 API、回填冻结、无损分页、worker、reconcile 和 readiness。
-- data owner 与 v1/v2 兼容策略仍需人类确认；机器台账和 CI 在 ADR 未 Accepted 时禁止任何 v17、runtime/
-  API implementation 或 production promotion。当前 schema/API/runtime 仍保持 AS-IS 与 `NO-GO`。
+- `OBJ-ADR-002` 已 Accepted：T08 是对象存储附件元数据 data owner，T00 是共享存储/worker technical owner；
+  v1/v2 采用并行版本化异步兼容策略。
+- SQLite v17 结构化模型、回填冻结、版本化异步 API、无损 keyset 分页、fenced worker、持久 reconcile 和
+  readiness 的仓库实现已完成。机器台账继续固定 `productionPromotionAllowed=false`；真实 provider capability、
+  KMS/WORM/扫描、监控、备份与现场验收未闭合，生产状态保持 `NO-GO`。
 
 ## 首批生产范围合同
 

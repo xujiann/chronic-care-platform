@@ -5,6 +5,8 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const test = require("node:test");
+const migrationProgram = require("../config/data-migration-program.json");
+const promotionProgram = require("../config/p0-data-promotions.json");
 
 const {
   analyzeImpact,
@@ -119,12 +121,23 @@ test("empty control plane is structurally ready while the local and production g
   const report = buildDataGovernanceControlPlane({}, { now: NOW });
   assert.equal(report.ok, true);
   assert.equal(report.summary.iterations, 6);
-  assert.equal(report.summary.lineageRecords, 12);
+  assert.equal(report.summary.lineageRecords, migrationProgram.waves.reduce((sum, wave) => sum + wave.collections.length, 0));
+  assert.equal(report.summary.promotedP0, 12);
+  assert.equal(report.summary.repositoryPlanReady, 1);
   assert.equal(report.localGateReady, false);
   assert.equal(report.productionReady, false);
   assert.equal(report.productionPrimary, false);
   assert.equal(report.activationAuthorized, false);
   assert.equal(report.decision, "NO-GO");
+});
+
+test("data governance control plane rejects forged promotion of a repository-plan-ready collection", () => {
+  const forged = structuredClone(promotionProgram);
+  forged.collections.find((item) => item.collection === "researchDatasets").phase = "promoted";
+  assert.throws(
+    () => buildDataGovernanceControlPlane({}, { now: NOW, promotions: forged }),
+    /owner-reviewed legacy collection cannot be reported as promoted: researchDatasets/
+  );
 });
 
 test("matching execution, checkpoint, reconciliation, rollback and quality evidence yields only a local candidate", () => {

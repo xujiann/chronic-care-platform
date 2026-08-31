@@ -56,6 +56,16 @@ DATA-003 已为 252/252 个当前 state collection 建立机器状态与源码�
 169 个 review-required 与 1 个 quarantine 仍须按 owner 批次确认、归档或迁移。任何集合都不能因
 owner 登记或 CI 通过自动晋升。
 
+2026-08-31 首个 owner-reviewed legacy 渐进迁移计划选择 `researchDatasets`：复用既有 T09 五条写接口
+行为证明、SQLite 投影和 PostgreSQL collection-state 表，登记版本化逻辑写合同及独立迁移 wave。该状态
+称为 `repositoryPlanReady`，不等于 local candidate、migration applied 或 production write ready；只有
+真实 rehearsal、精确核对、回滚、PG 多实例和现场证据闭合后才能另行评审晋升。当前首发 21 个生产写
+阻断引用不变。
+
+机器台账必须以 phase 分别统计 12 个既有 `promoted` 与 1 个 `repository-plan-ready`，注册合同合计 13
+不能作为 promoted 数。Owner-reviewed legacy 若被改写为 `promoted`、既有权威合同若被伪装成
+`repository-plan-ready`、缺失 phase 或未知 phase，均须在产品化和数据治理控制面失败关闭。
+
 ### 当前兼容约束
 
 - v1–v14 的 `schema_migrations.checksum` 保持既有 `version:name` 算法，禁止批量重算或更新现场 ledger。
