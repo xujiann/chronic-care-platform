@@ -10,6 +10,11 @@
     "POST /api/public-health/highlights/alerts/:id/actions": { "owner": "T03", "roles": ["commission"], "dataScope": "platform", "purpose": "dispatch-public-health-alert" },
     "POST /api/public-health/highlights/command-tasks/:id/actions": { "owner": "T03", "roles": ["commission"], "dataScope": "institution", "purpose": "operate-public-health-command-task" },
     "POST /api/public-health/highlights/ai-reviews/:id/actions": { "owner": "T03", "roles": ["commission"], "dataScope": "platform", "purpose": "human-review-public-health-ai-output" },
-    "POST /api/public-health/highlights/evidence/:id/actions": { "owner": "T03", "roles": ["commission"], "dataScope": "platform", "purpose": "verify-public-health-evidence" }
+    "POST /api/public-health/highlights/evidence/:id/actions": { "owner": "T03", "roles": ["commission"], "dataScope": "platform", "purpose": "verify-public-health-evidence" },
+    "GET /api/public-health/supervision/workbench": { "owner": "T03", "roles": ["commission", "institution"], "dataScope": "city and health-admin platform; district jurisdiction; medical institution own subject", "purpose": "read-health-supervision-workbench" },
+    "POST /api/public-health/supervision/subjects": { "owner": "T03", "roles": ["commission"], "dataScope": "city and health-admin platform; district jurisdiction", "purpose": "register-health-supervision-subject-reference" },
+    "POST /api/public-health/supervision/inspection-tasks": { "owner": "T03", "roles": ["commission"], "dataScope": "city and health-admin platform; district jurisdiction", "purpose": "create-health-supervision-inspection-task" },
+    "POST /api/public-health/supervision/inspection-tasks/:id/actions": { "owner": "T03", "roles": ["commission"], "dataScope": "city and health-admin platform; district jurisdiction", "purpose": "operate-health-supervision-inspection-task" },
+    "POST /api/public-health/supervision/findings/:id/actions": { "owner": "T03", "roles": ["commission", "institution"], "dataScope": "commission jurisdiction or medical institution own subject", "purpose": "submit-or-review-health-supervision-remediation" }
   }
 }

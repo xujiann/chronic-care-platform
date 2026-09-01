@@ -12,7 +12,7 @@
     Object.freeze({ id: "citizen-chronic", label: "居民与慢病", pages: Object.freeze(["index.html", "institution.html", "doctor.html", "citizen.html"]) }),
     Object.freeze({ id: "care-coordination", label: "医疗协同", pages: Object.freeze(["workbench.html", "internet-nursing.html", "escort.html", "county.html"]) }),
     Object.freeze({ id: "clinical-specialties", label: "临床专科", pages: Object.freeze(["imaging-cloud.html", "emergency.html", "physical-examination.html", "blood.html"]) }),
-    Object.freeze({ id: "public-health", label: "公共卫生", pages: Object.freeze(["public-health.html", "immunization.html"]) }),
+    Object.freeze({ id: "public-health", label: "公共卫生", pages: Object.freeze(["public-health.html", "public-health-supervision.html", "immunization.html"]) }),
     Object.freeze({ id: "insurance-payment", label: "医保支付", pages: Object.freeze(["insurance.html", "disease-payment.html"]) }),
     Object.freeze({ id: "platform-governance", label: "平台治理", pages: Object.freeze(["platform.html", "operations.html", "quality-safety.html"]) })
   ]);

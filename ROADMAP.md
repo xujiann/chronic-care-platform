@@ -2,6 +2,12 @@
 
 > 更新：2026-09-01。队列不是实施授权；只有 Accepted ADR/明确 owner 审批的范围可进入实现。
 
+## T03 卫生监督首个闭环增量（2026-09-01）
+
+- 已按 R009 源文档复核范围实现“主体最小目录引用—检查任务—接单/开始—不可变检查记录—问题—机构整改—监管复核—关闭”闭环，并提供独立管理页面。
+- 四类领域集合由 `public-health` 拥有；所有写命令强制显式幂等键、聚合版本、资源范围重验、单次持久化和链式安全审计。主体只引用身份组织目录代码，不复制机构名称、地址、联系人、证照、居民或患者数据。
+- 本增量不包含案件、GIS、视频、社会办医、ESB、附件上传或地方规则定版；通用清单保持 `draft-reference`，运行时和页面固定 `productionReady=false`，生产继续 `NO-GO`。
+
 ## 地区需求产品化接入增量（2026-09-01）
 
 - T00 已把松江二期 19 项原始建设需求归一化为独立的 `regional-requirement-catalog-v1` 只读机器合同，并通过既有 commission-only 产品化中心 GET 与管理页面提供白名单摘要；运行期统一待办、地区部署验收和能力包交付状态没有被混用。
@@ -34,9 +40,9 @@
 | 7 | 运行时上下文瘦身 | 候选 / P1 | 按领域子端口，逐块迁移，不重写 server |
 | 7A | 临床五个可治理子域 | 治理切片完成，急救/血液/影像/体检首个查询用例已迁移；影像 share/QC 与体检专项分流 action 三个写用例已接入目标命令端口并有单元、顺序/失败保护；operations dashboard 与 command 已由 T00 移交 T02，command 32/32 路径已完成 TEST-007 行为保护 / P1 | Accepted ADR；保持协议兼容，继续按五子域逐用例迁移并禁止已迁用例及 operations 回流 T06；专项分流幂等/CAS/事务、QC 幂等/CAS/机构范围及外调—本地写入核对需独立行为变更审批，当前保持 NO-GO；operations 后续拆分或 ARC-008 治理必须保持矩阵通过并另行审批 |
 | 7B | 健康驾驶舱版本化指标 | 首个 `population-service-visits.v1` 合同已建立 / P1 | 由 T03 确认来源版本与签名证据、由 T00 注入服务端 region scope；其余指标按 owner 逐项接入 |
-| 7C | 生产 API 机器目录 | v3 当前 609 项与 13 项认证合同。现有 32 份幂等行为合同：30 个完整 endpoint、2 个转诊 action-slice；T06 急救信号死信重放与更新 endpoint 均已分别绑定直接证据，`reviewedProofRequired` 为零。347 个写接口中 317 个仍缺 endpoint 级证明，通用 action remainder 使总复核为 319，全部 NO-GO / P1 | 继续按高风险与数据写入优先逐 owner 补证；急救更新合同只证明当前单实例/SQLite 兼容路径，不关闭真实 data owner、PG 多实例、长期留存/归档与现场证据，禁止把进程锁、SQLite CAS 或测试解释为 exactly-once/生产 GO |
+| 7C | 生产 API 机器目录 | v3 当前 614 项与 13 项认证合同。现有 36 份幂等行为合同：34 个完整 endpoint、2 个转诊 action-slice；新增 T03 卫生监督四个写入口与既有 T06 急救信号入口均绑定直接证据，`reviewedProofRequired` 为零。351 个写接口中 317 个仍缺 endpoint 级证明，通用 action remainder 使总复核为 319，全部 NO-GO / P1 | 继续按高风险与数据写入优先逐 owner 补证；现有合同只证明当前单实例/SQLite 兼容路径，不关闭真实 data owner、PG 多实例、长期留存/归档与现场证据，禁止把进程锁、SQLite CAS 或测试解释为 exactly-once/生产 GO |
 | 7D | 区域共享只读边界 | 两个 GET builder 已从组合根归位 `regional-sharing-read-model.v1`，shared runtime 以单一 capability 注入；行为/架构/API 特征测试锁定鉴权、范围、投影、排序、审计顺序与响应兼容 / P1 | 继续小步迁移 legacy normalize/seed/handoff evidence，最终源码 owner 移交需独立流程/ADR；`shared-05`、PostgreSQL atomic repository、数据回填、真实机构地区映射和现场验收仍未关闭 |
-| 8 | JSON/SQLite state collection 治理 | DATA-003 状态完整；首发 19 个 legacy 集合已按实际调用点关闭 owner review，当前 60 existing writable、19 owner-reviewed legacy、3 system、169 review-required、1 quarantined / P1 | 继续按 DATA-008 分 owner 确认、归档或 migration 晋升；19 个已审查集合固定生产不可写，process owner 证据不得自动变成 data owner |
+| 8 | JSON/SQLite state collection 治理 | DATA-003 状态完整；首发 19 个 legacy 集合已按实际调用点关闭 owner review，当前 61 existing writable、19 owner-reviewed legacy、3 system、168 review-required、1 quarantined / P1 | 继续按 DATA-008 分 owner 确认、归档或 migration 晋升；19 个已审查集合固定生产不可写，process owner 证据不得自动变成 data owner |
 | 9 | 前端可信渲染与 CSP | Accepted ADR；生产 Go/No-Go 页面新增关闭 6 个 P0 HTML sink，并以恶意响应 E2E 锁定指标、检查、审批和决策。Inventory v2 锁定 793 个 DOM HTML、6 个动态 URL、42 个动态样式风险且禁止增加/替换 / P1 | 按高风险资产继续治理 793 个 HTML 与 42 个动态样式 sink；真实 OHIF exact-Origin 到位后迁移剩余 2 个导航；完成全角色恶意输入、真实托管头与独立安全评估后才移除兼容 `unsafe-inline` 并强制严格 CSP |
 | 10 | CI/worker/部署依赖治理 | CI 风险域拆分和 Action 完整 SHA 固定已建立；12 个 worker profile 的 v1 脱敏兼容观测、9 个部署入口漂移门禁与部署包闭包已完成；在线根 40 + 居民 13 项继续隔离 Worker，PWA 3 项已验证 v61 安装/更新/离线/缓存边界/清理，标准 E2E 共 56 项；Go/No-Go 四方角色与恶意响应均有回归 / P2 | 不降低 required checks；持续按官方 tag 升级并核验 commit SHA；新增 worker 必须登记并复用 v1；真实 HTTPS、设备/浏览器策略、外部 Origin、现场缓存升级、采集器/告警和上线验收继续外置 |
 | 11 | 居民小程序制品凭证扫描消除哈希误报 | 已完成 / P2 | JSON 仅扫描语义字符串值并精确跳过两个字段中的合法 SHA-256；非 JSON 保留文本扫描；真实演示凭证与伪造摘要负向测试已建立 |

@@ -1,5 +1,13 @@
 # TECH DEBT — 主线技术债与风险台账
 
+## 2026-09-01 T03 卫生监督首增量后的剩余债务
+
+| ID | 已完成的仓库能力 | 剩余风险/下一步 |
+|---|---|---|
+| PH-SUP-001 | 主体—任务—检查—问题—整改复核状态机、角色/组织范围、幂等/CAS、链式审计和安全页面已建立 | JSON/SQLite 与进程锁不是多实例事务；正式 PostgreSQL 聚合/receipt 仓储、回填、容量、恢复和现场并发证据仍未完成 |
+| PH-SUP-002 | 通用草案清单完整覆盖一次检查并保持不可变记录 | 饮用水、公共场所、学校、职业卫生等正式表单、法规版本和地方规则须由业务/法务独立定版，当前模板不得用于执法结论 |
+| PH-SUP-003 | 仅保存不透明证据引用，不接收 URL、路径或原始附件 | 对象存储、扫描、WORM、签名回执、移动端定位/照片、现场安全测试和验收仍外置；案件、GIS、视频、社会办医及 ESB 未实施 |
+
 ## 2026-09-01 地区需求接入后的剩余债务
 
 | ID | 已完成的仓库能力 | 剩余风险/下一步 |
@@ -65,9 +73,9 @@ T00 机器登记完成后，`production-release-scope` 中 17 个仓库内 API �
 | CHR-001 | 慢病随访事件投递 | 仓库内闭环已建立：SQLite v16 同事务 enqueue、专用 outbox、lease owner/token hash/version/expiry fencing、有界退避、死信、digest-only replay、独立 worker/CLI/systemd 合同与 Ed25519 activation provider；HTTP 请求路径不再同步外发 | 继续 NO-GO：真实 endpoint/凭据、外部签名 activation decision、可信签名回执、供应方幂等核对、PostgreSQL 多节点主存储、监控告警、服务启用和现场验收仍外置；只能承诺至少一次，不得宣称 exactly-once |
 | OBJ-001 | 对象存储生产闭环 | OBJ-ADR-002 已 Accepted；T08/T00 owner 固定，SQLite v17 完成结构化元数据/命令/回执/对账、无损回填与 legacy 写冻结；v2 202/status/replay、围栏 worker、退避/DLQ、scope-bound keyset 分页、部署/readiness 合同已建立 | 真实 provider status/abort capability、可信回执、KMS/WORM/扫描、容量/告警、备份恢复、PostgreSQL 多节点主存储和现场验收仍外置，production promotion=false；v1 调用方仍需按有界窗口迁移 |
 | OPS-001 | 连续审计耐久信任 | 仓库内来源缺口已关闭：v15 同事务 append-only source、最小投影、cursor 批次、target/source 绑定和 checkpoint v3 已有专项测试；已淘汰历史不可恢复，checkpoint/head 仍在同一本地信任域，SIEM receipt 未独立验签，filesystem 仅是 WORM rehearsal | 继续 NO-GO：需真实签名耐久 receipt、外部单调 anchor、WORM/KMS/保留与恢复能力、Data Owner 投影审批、专用账号及现场验收 |
-| SEC-004 | XSS / CSP 面 | 既有高风险页面按小切片迁为 DOM/text/class/dataset；生产 Go/No-Go 页面新增关闭 4 个 `innerHTML` 与 2 个 `insertAdjacentHTML`，恶意状态、指标、检查、审批、证据引用和决策字段由 Chromium E2E 保护。Inventory v2 对 145 个发布资产锁定 793 个 DOM HTML、6 个动态 URL 和 42 个动态样式风险。Safe URL port 拒绝 javascript/data/userinfo/协议相对/未批准 Origin；兼容 CSP 仍含 `unsafe-inline`，严格策略仅 Report-Only | 2 个 OHIF 导航须在真实 exact-Origin 到位后复核；全清单仍有 793 个 HTML 与 42 个动态样式 sink。真实 OHIF/对象存储 Origin、托管头、严格 CSP 强制试点、独立扫描和渗透验收前继续 NO-GO |
+| SEC-004 | XSS / CSP 面 | 既有高风险页面按小切片迁为 DOM/text/class/dataset；生产 Go/No-Go 页面新增关闭 4 个 `innerHTML` 与 2 个 `insertAdjacentHTML`，新增卫生监督页同样只使用可信 DOM/text。Inventory v2 对 148 个发布资产锁定 793 个 DOM HTML、6 个动态 URL 和 42 个动态样式风险。Safe URL port 拒绝 javascript/data/userinfo/协议相对/未批准 Origin；兼容 CSP 仍含 `unsafe-inline`，严格策略仅 Report-Only | 2 个 OHIF 导航须在真实 exact-Origin 到位后复核；全清单仍有 793 个 HTML 与 42 个动态样式 sink。真实 OHIF/对象存储 Origin、托管头、严格 CSP 强制试点、独立扫描和渗透验收前继续 NO-GO |
 | SEC-005 | 混合会话 | 服务端 token 已禁止写入 localStorage，Cookie/Authorization 并存时 Cookie 优先，旧凭据自动清理；生产 bearer/hybrid 需显式兼容门禁并保持 NO-GO，静态演示仅保存无凭据身份状态 | bearer-only 仍有页面内存凭据、刷新即失效和额外运维状态；XSS/CSP 风险及真实 Cookie/CSRF 现场验证尚未关闭 |
-| DATA-008 | 集合 owner 决策 | 252/252 已有机器状态；首发范围 19 个 legacy 集合已按实际读写调用点确认唯一业务 owner/readers/classification 并冻结摘要，169 个 `review-required` 与 1 个 `legacy-quarantined` 仍无可证明数据 owner | 继续按领域 owner 分批确认、归档或迁移；已确认的 19 个仍无版本化生产写合同/migration/现场证据，固定 `productionWriteAllowed=false`，不得把 owner 审查解释为晋升 |
+| DATA-008 | 集合 owner 决策 | 252/252 已有机器状态；61 个命中既有可写 owner 合同，首发范围 19 个 legacy 集合已按实际读写调用点确认唯一业务 owner/readers/classification 并冻结摘要，168 个 `review-required` 与 1 个 `legacy-quarantined` 仍无可证明数据 owner | 继续按领域 owner 分批确认、归档或迁移；已确认的 19 个仍无版本化生产写合同/migration/现场证据，固定 `productionWriteAllowed=false`，不得把 owner 审查解释为晋升 |
 | TEST-002 | 覆盖率 | 原 `server.js` c8 门禁之外，内部边界已从 4 组扩展为 10 组；新增 worker observability、区域共享命令、转诊 owner command、科研合规导出、浏览器响应头和 Safe URL，并把 API governance 基线提高到最新主线实测 99.18/100/82.9 | 其余 `src/` 与页面控制器仍不在覆盖率结论中；Safe URL 的 Node 端口覆盖不等于页面/真实 Origin 覆盖，浏览器业务仍须 Playwright；按风险继续扩展且不得降低任何已合并阈值 |
 | TEST-003 | 安全负向测试 | 已建立源码、配置、环境模板、Git 元数据、文档和 `data/db.json` 拒绝矩阵 | 后续新增敏感类别必须扩展矩阵 |
 | GOV-002 | 生产授权权威 | runtime 已拒绝仅凭本地 JSON、DR 布尔、普通 evidenceRef 或 synthetic GO 放行，并要求 release/digest/fingerprint/有效期/anti-replay/verifier 的受信 receipt；ADR 仍为 Proposed | 唯一外部签发权威、信任根轮换、耐久 nonce ledger、provider 可用性/灾备和现场验收仍待人工接受；此前生产 false-positive 已关闭，但生产继续 NO-GO |
@@ -80,7 +88,7 @@ T00 机器登记完成后，`production-release-scope` 中 17 个仓库内 API �
 | ARC-006 | 同名模块 | 根目录与 `src/` 有 6 组同名 | 文档明确前端/服务端/迁移角色，不做全仓改名 |
 | ARC-008 | operations 跨域写入 | OPS-02 为保持兼容，将 T06 的既有直写整体移入 T02；其中 `resourceDispatchRequests`、`taskMessages` 的机器 Owner 仍是 T05 care-coordination | 后续仅在独立 ADR/切片中改为 T05 owner port 或版本化事件；在完成行为矩阵前不得直接改写副作用 |
 | API-001 | 错误契约 | 多种 JSON 错误格式 | 新 API 使用版本化标准错误接口 |
-| API-002 | 接口目录复核 | v3 当前 609 项、13 项认证证据且未分类为 0。T00 已登记 32 份幂等合同、30 个 endpoint verified；T09、T04/T05、T02/T06 共关闭冻结首发范围 17 个 API 行为缺口，T06 急救信号死信重放与更新另完成 endpoint 证据闭环。`reviewedProofRequired` 为零。317 个写接口仍缺 endpoint 级证明，319 项保持 review-required | 继续逐 owner 渐进补证。五项 operations/quality receipt 每资源最多 50 条；研究/药耗、慢病/会诊及急救更新 receipt 同样有界，进程锁只覆盖单实例，JSON 路径和 SQLite CAS 均不是跨实例 exactly-once。`resourceDispatchRequests` 仍有 T05 owner 的既有跨域写债；PG 多实例、长期审计/归档和真实外部/现场证据均未决，相关 endpoint 保持 NO-GO |
+| API-002 | 接口目录复核 | v3 当前 614 项、13 项认证证据且未分类为 0。T00 已登记 36 份幂等合同、34 个 endpoint verified；T03 卫生监督四个写入口完成 endpoint 证据闭环，既有首发范围复核仍为零。`reviewedProofRequired` 为零。317 个写接口仍缺 endpoint 级证明，319 项保持 review-required | 继续逐 owner 渐进补证。卫生监督及既有聚合 receipt 均有界，进程锁只覆盖单实例，JSON 路径和 SQLite CAS 均不是跨实例 exactly-once。`resourceDispatchRequests` 仍有 T05 owner 的既有跨域写债；PG 多实例、长期审计/归档和真实外部/现场证据均未决，相关 endpoint 保持 NO-GO |
 | JOB-001 | Worker 一致性 | 12 个既有 worker profile、9 个部署入口已建立 `platform-worker-observability.v1` 脱敏兼容投影；领域 state/retry/lease/checkpoint/receipt 仍各自权威，仓库不据此推导生产授权 | 后续接入真实指标/日志采集器与告警路由前，必须另行确认 owner、留存、访问控制和现场启用证据；不得把兼容投影演变为统一领域状态机 |
 | TEST-006 | 静态基线与测试性能 | `test/api.test.js` 的全文件 `no-unreachable` 已关闭，原 3 个 care 显式 skip 已由 T05 owner/route 独立特征测试逐块重验并恢复执行；陪诊引用挂号单的存在性/scope 缺口与 handoff `reject/return` 投影已最小修复。typecheck 为 13 个唯一文件；两个前端文件的 16 个重复翻译键已有逐键 shadow/final 值和真实调用保护，去重保持首次插入顺序及最终生效值，lint 文件级例外已归零；API 热点仍作为独立 integration 批次输出耗时。五个可逆夹具切片已分别提取临时 seed/env/server、单个 HIS hospital mock、单个 SIEM alert mock、单个 financial gateway mock 和单个 object-storage gateway mock 生命周期；storage 的签名响应、四类 operation、动态 URL 与 mutable scan 状态通过领域 helper 和最小 setter 保真。43 个子测试顺序摘要继续锁定 suite 成员、断言、超时、单进程语义、CI 预算与 required checks 不降低 | API 巨型测试仍集中约 8,200 行业务断言和其余共享状态。后续只按一个共享服务生命周期继续小步拆分，不得按耗时并行化共享状态或把 helper 变成生产接口。耗时先观察多次 CI 分布，不凭单机样本设门槛；不得恢复文件级 lint 豁免；外部护理/陪诊/HIS/SIEM/financial/storage 投递与现场证据继续由生产 readiness 跟踪，不以本测试关闭 |
 
@@ -88,7 +96,7 @@ T00 机器登记完成后，`production-release-scope` 中 17 个仓库内 API �
 
 | ID | 关闭日期 | 结果 | 回归保护 |
 |---|---|---|---|
-| SEC-001 | 2026-08-19 | Node 与 Pages 共用 44 入口显式资源图，未知、越界和敏感路径默认拒绝 | 静态清单构建、HTTP 负向矩阵、PR/main CI 与 Pages 构建 |
+| SEC-001 | 2026-08-19 | Node 与 Pages 共用 45 入口显式资源图，未知、越界和敏感路径默认拒绝 | 静态清单构建、HTTP 负向矩阵、PR/main CI 与 Pages 构建 |
 | SEC-002 | 2026-08-19 | 浏览器和 Service Worker 只消费生成的 `public-demo.json`；凭据删除、身份联系字段掩码；v61 激活清理 v60 并拒绝缓存源快照 404 | 共享脱敏纯函数、源快照拒绝、Pages 仓库外构建和 PWA 缓存边界 E2E；仓库历史分类残余风险继续由 `DATA_MODEL.md` 的 DATA-006 跟踪 |
 | CI-001 | 2026-08-19 | 综合 CI 拆为 governance-api、browser-e2e、release-readiness，并保留 fail-closed 聚合 test | workflow 契约测试锁定步骤归属、预算、always 聚合和三个上游结果 |
 | TEST-004 | 2026-08-19 | 居民小程序 JSON 制品改为递归扫描语义字符串值，仅跳过精确摘要字段中的合法 SHA-256；非 JSON 仍全文扫描 | 摘要命中放行，伪造摘要字段、`123456`、`888888`、`DEMO-MOBILE` 语义值和非 JSON 文本均拒绝 |

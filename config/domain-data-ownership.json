@@ -427,7 +427,7 @@
     "authOrganizations": {
       "owner": "identity-security",
       "classification": "internal",
-      "readers": ["platform-governance", "integration"]
+      "readers": ["platform-governance", "integration", "public-health"]
     },
     "authUsers": {
       "owner": "identity-security",
@@ -645,6 +645,26 @@
       "owner": "public-health",
       "classification": "restricted",
       "readers": ["platform-governance", "clinical-specialties"]
+    },
+    "publicHealthSupervisionSubjects": {
+      "owner": "public-health",
+      "classification": "restricted",
+      "readers": ["platform-governance"]
+    },
+    "publicHealthSupervisionInspectionTasks": {
+      "owner": "public-health",
+      "classification": "restricted",
+      "readers": ["platform-governance"]
+    },
+    "publicHealthSupervisionInspectionRecords": {
+      "owner": "public-health",
+      "classification": "restricted",
+      "readers": ["platform-governance"]
+    },
+    "publicHealthSupervisionFindings": {
+      "owner": "public-health",
+      "classification": "restricted",
+      "readers": ["platform-governance"]
     },
     "birthCertificates": {
       "owner": "public-health",

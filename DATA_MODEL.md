@@ -1,5 +1,11 @@
 # DATA MODEL — 主线数据地图
 
+## 2026-09-01 T03 卫生监督数据边界
+
+新增四个受限领域集合：`publicHealthSupervisionSubjects`、`publicHealthSupervisionInspectionTasks`、`publicHealthSupervisionInspectionRecords`、`publicHealthSupervisionFindings`，Owner 均为 `public-health`，仅向 `platform-governance` 开放治理读取。检查记录写入后不可修改；整改提交与复核轮次内嵌于问题，避免第二事实源。
+
+主体不复制组织目录名称、地址、联系方式或证照，只保存 `identity-organization:v1:<code>`、组织代码/层级和辖区代码。内部命令 receipt 有界且公共投影删除；证据只保存不透明引用。当前仍是 JSON/SQLite 兼容状态，无新 DDL/migration、PostgreSQL 原子仓储或生产写资格，全部集合固定 `productionPromotionAllowed=false`、生产 `NO-GO`。
+
 ## 2026-09-01 地区需求目录不是业务数据模型
 
 `regional-requirement-catalog-v1` 是仓库跟踪的产品化治理配置，不是居民、患者、机构、订单、支付、医疗文书或其他领域事实源。19 项记录当前均为 `normalized`，只保存受控来源元数据、产品化分类、Owner 候选和证据状态；只读投影不包含原始 PDF、业务载荷、凭据、Token 或生产连接信息。
@@ -157,15 +163,15 @@ erDiagram
 
 静态页面不再直接读取该文件。Node 静态服务按源文件 mtime/size 合成 `data/public-demo.json`；Pages 在仓库外临时目录生成同名制品，Service Worker v61 只缓存同源成功响应中的该脱敏结果，不缓存源快照的 404 拒绝响应。
 
-`config/domain-data-ownership.json` 当前登记 106 个 owner 合同，其中 60 个集合沿用既有版本化写
+`config/domain-data-ownership.json` 当前登记 111 个 owner 合同，其中 61 个集合沿用既有版本化写
 合同，19 个首发 legacy 集合仅完成唯一业务 owner、reader、classification 与实际源码证据审查，
-27 个合同集合当前不在快照。另有 `dataAccessLogs`、`platformProcessAudit`、`securityEvents` 3 个
-既有系统集合。剩余 170 个无 owner 集合全部进入显式治理状态：169 个在 599 个受跟踪 JS/HTML
+31 个合同集合当前不在快照。另有 `dataAccessLogs`、`platformProcessAudit`、`securityEvents` 3 个
+既有系统集合。剩余 169 个无 owner 集合全部进入显式治理状态：168 个在 599 个受跟踪 JS/HTML
 运行时源中观察到精确标识符引用，标为 `review-required`；
 `dalianHealthStatistics2025` 未观察到运行时源码引用，标为 `legacy-quarantined`。静态引用不能证明
 生产实际读写，process owner 也不能推断数据 owner。19 个 owner-reviewed legacy 通过显式
 `legacy-owner-review-write-policy.v1` 固定 `productionWriteAllowed=false`、`migrationRequired=true`；
-它们与其余 170 个 legacy 集合共 189 个均禁止生产写入和晋升。
+它们与其余 169 个 legacy 集合共 188 个均禁止生产写入和晋升。
 
 根目录 `browser-security-policy.json` 是公开的静态发布/响应头治理合同，不是业务集合、数据库
 Schema、生产事实或安全评估证据。Inventory v2 风险基线只保存公开资产路径、风险类型、优先级、
@@ -229,7 +235,7 @@ legal-hold）不会再为新记录让位；这只关闭静默数据丢失，不�
 - `DATA-001`、`DATA-002` 已关闭：公开 head 已统一为 v17，历史 v1–v14 源码由冻结内容指纹保护，v15+ ledger 使用内容 checksum。
 - `DATA-003` 已关闭“未分类”缺口：252/252 集合具有唯一机器状态，未知 owner 不被伪造，新增/删除、
   重复登记、源码使用漂移和生产晋升由 CI 失败关闭。
-- `DATA-008`：首发范围 19 个集合已根据实际读写调用点关闭 owner review；169 个 `review-required`
+- `DATA-008`：首发范围 19 个集合已根据实际读写调用点关闭 owner review；168 个 `review-required`
   和 1 个 `legacy-quarantined` 集合仍没有可证明的数据 owner。owner 审查不等于可写晋升：19 个
   owner-reviewed legacy 仍须独立版本化写合同、migration、回滚与现场证据才能改变生产状态。
 - `DATA-004`：JSON 快照同时承担页面数据、种子和报告输入，多角色耦合。
@@ -313,11 +319,11 @@ source/sink contract、目标摘要、cursor/source hash 与 receipt 摘要；ch
 
 ## 13. 生产 API 目录数据边界
 
-`production-api-catalog-v3` 是从路由源码、授权矩阵与两个小型证据注册表即时派生的治理元数据，不新增 JSON 集合、SQLite/PostgreSQL 表、字段、DDL、migration、outbox 或生产事实源。`config/api-authentication-evidence.json` 只登记可由控制流和负向测试证明的 custom auth 入口；SMS 认证继续从既有 `config/api-idempotency-evidence.json` 派生，避免第二份手工真相。两者均只保存源码/测试引用和分类字符串，不复制 609 项路由清单，也不保存真实 credential、provider payload 或外部回执。
+`production-api-catalog-v3` 是从路由源码、授权矩阵与两个小型证据注册表即时派生的治理元数据，不新增 JSON 集合、SQLite/PostgreSQL 表、字段、DDL、migration、outbox 或生产事实源。`config/api-authentication-evidence.json` 只登记可由控制流和负向测试证明的 custom auth 入口；SMS 认证继续从既有 `config/api-idempotency-evidence.json` 派生，避免第二份手工真相。两者均只保存源码/测试引用和分类字符串，不复制 614 项路由清单，也不保存真实 credential、provider payload 或外部回执。
 
 目录中的源码 marker 既不是认证证明，也不是幂等执行证据；只有 owner、控制流锚点和可执行负向测试一致时才产生认证 evidence contract。认证分类只描述 AS-IS 的 required/optional/none、凭据来源、replay/CSRF 和 scope，不代表目标政策充分或生产安全。幂等 `behavior-verified` 仍只证明当前仓库行为，不证明跨实例 exactly-once 或生产耐久性；所有生产状态继续 `NO-GO`。
 
-API-002 的 existing-proof 扩展现使注册表达到 32 份合同，其中 30 个为完整 endpoint、2 个为 action-slice。T09 使用既有 `researchDatasets`、`compliantDataExports`、`drugConsumableSupervisions` 与审计集合；T04/T05 复用慢病计划、反馈和会诊聚合；T02/T06 复用 operations、quality-safety 与 emergency signal 聚合、收件箱、发件箱及既有审计投影。有界 receipt 保存散列命令身份和首次公共响应或精确结果快照，使聚合后续变化后仍可零写返回原响应。T07 标准药械状态机和 T03 highlight signal 合同保持既有边界。没有为这些证据新增集合、表、DDL、migration、outbox 或事实源，也不宣称跨实例 exactly-once；生产 PostgreSQL 状态未改变。
+API-002 的 existing-proof 扩展现使注册表达到 36 份合同，其中 34 个为完整 endpoint、2 个为 action-slice。T09 使用既有 `researchDatasets`、`compliantDataExports`、`drugConsumableSupervisions` 与审计集合；T04/T05 复用慢病计划、反馈和会诊聚合；T02/T06 复用 operations、quality-safety 与 emergency signal 聚合、收件箱、发件箱及既有审计投影；T03 卫生监督四个写入口复用主体、任务、不可变检查记录、问题及审计集合。有界 receipt 保存散列命令身份和首次公共响应或精确结果快照，使聚合后续变化后仍可零写返回原响应。T07 标准药械状态机和 T03 highlight signal 合同保持既有边界。没有为证据注册本身新增表、DDL、migration、outbox 或事实源，也不宣称跨实例 exactly-once；生产 PostgreSQL 状态未改变。
 
 T07 第二批审计的 3 条 `reviewedProofRequired` 已全部由直接 endpoint 行为合同替换；formal grouping create 最后关闭资源范围、并发/CAS、稳定错误和原子审计证据缺口。机器验证仍禁止拒绝记录和正式合同同 key 并存，当前 `reviewedProofRequired` 为 0。
 

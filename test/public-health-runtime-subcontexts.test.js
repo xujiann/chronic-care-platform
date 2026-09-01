@@ -14,7 +14,8 @@ test("public-health subdomains declare distinct least-privilege contexts", () =>
     "surveillance-foundation",
     "public-health-operations",
     "vital-records",
-    "infectious-reporting"
+    "infectious-reporting",
+    "health-supervision"
   ]);
   assert.deepEqual(
     Object.fromEntries(Object.entries(SUBDOMAIN_DEPENDENCIES).map(([name, dependencies]) => [name, dependencies.length])),
@@ -22,10 +23,11 @@ test("public-health subdomains declare distinct least-privilege contexts", () =>
       "surveillance-foundation": 97,
       "public-health-operations": 59,
       "vital-records": 15,
-      "infectious-reporting": 19
+      "infectious-reporting": 19,
+      "health-supervision": 8
     }
   );
-  assert.equal(new Set(Object.values(SUBDOMAIN_DEPENDENCIES).map((dependencies) => dependencies.join(","))).size, 4);
+  assert.equal(new Set(Object.values(SUBDOMAIN_DEPENDENCIES).map((dependencies) => dependencies.join(","))).size, 5);
   assert.deepEqual([...new Set(Object.values(SUBDOMAIN_DEPENDENCIES).flat())].sort(), [...DEPENDENCIES].sort());
 });
 
@@ -36,7 +38,8 @@ test("public-health facade projects each subdomain and fails fast on missing cap
     "public-health-01",
     "public-health-02",
     "public-health-03",
-    "public-health-04"
+    "public-health-04",
+    "public-health-05"
   ]);
 
   const incomplete = { ...runtime };

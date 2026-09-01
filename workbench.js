@@ -26,6 +26,25 @@ const WORKBENCH_TRACEABILITY_OFFICIAL_ORIGINS = Object.freeze([
 ]);
 
 document.addEventListener("DOMContentLoaded", async () => {
+  const statePromise = loadPlatformState(fallbackState);
+  const operationsPromise = loadOperationalMetrics();
+  const readinessPromise = loadSystemReadiness();
+  const processAuditPromise = loadProcessAudit();
+  const serviceAcceptanceSummaryPromise = loadServiceAcceptanceSummary();
+  const acceptanceLedgersPromise = loadAcceptanceLedgers();
+  const siteReadinessPackPromise = loadSiteReadinessPack();
+  const siteTemplateReadmesPromise = loadSiteTemplateReadmes();
+  const siteLaunchEvidencePromise = loadSiteLaunchEvidence();
+  const releaseReportPromise = loadReleaseReport();
+  const productionCutoverPromise = loadProductionCutoverChecklist();
+  const releaseArtifactManifestPromise = loadReleaseArtifactManifest();
+  const unifiedTaskReportPromise = loadUnifiedTaskReport();
+  const drugConsumableSupervisionPromise = loadDrugConsumableSupervision();
+
+  // Readiness is the first operational signal on this page and must not wait for
+  // the heavier release-report and cutover aggregations to finish.
+  readinessPromise.then(renderSystemReadiness);
+
   const [
     state,
     operations,
@@ -42,20 +61,20 @@ document.addEventListener("DOMContentLoaded", async () => {
     unifiedTaskReport,
     drugConsumableSupervision
   ] = await Promise.all([
-    loadPlatformState(fallbackState),
-    loadOperationalMetrics(),
-    loadSystemReadiness(),
-    loadProcessAudit(),
-    loadServiceAcceptanceSummary(),
-    loadAcceptanceLedgers(),
-    loadSiteReadinessPack(),
-    loadSiteTemplateReadmes(),
-    loadSiteLaunchEvidence(),
-    loadReleaseReport(),
-    loadProductionCutoverChecklist(),
-    loadReleaseArtifactManifest(),
-    loadUnifiedTaskReport(),
-    loadDrugConsumableSupervision()
+    statePromise,
+    operationsPromise,
+    readinessPromise,
+    processAuditPromise,
+    serviceAcceptanceSummaryPromise,
+    acceptanceLedgersPromise,
+    siteReadinessPackPromise,
+    siteTemplateReadmesPromise,
+    siteLaunchEvidencePromise,
+    releaseReportPromise,
+    productionCutoverPromise,
+    releaseArtifactManifestPromise,
+    unifiedTaskReportPromise,
+    drugConsumableSupervisionPromise
   ]);
   const tasks = unifiedTaskReport?.tasks?.length ? normalizeApiTasks(unifiedTaskReport.tasks) : collectUnifiedTasks(state);
   const roadmap = state.platformRoadmap?.length ? state.platformRoadmap : defaultRoadmap();
@@ -63,7 +82,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   currentSiteTemplateReadmes = siteTemplateReadmes;
   renderMetrics(state, tasks, roadmap, operations);
   renderDrugConsumableSupervision(drugConsumableSupervision, state);
-  renderSystemReadiness(readiness);
   renderReleaseEvidenceGates(state, readiness, operations, processAudit, serviceAcceptanceSummary, siteReadinessPack, releaseReport, productionCutover, releaseArtifactManifest);
   renderAcceptanceLedgers(state, acceptanceLedgers, serviceAcceptanceSummary);
   renderSiteReadinessPack(siteReadinessPack, siteTemplateReadmes, siteLaunchEvidence);

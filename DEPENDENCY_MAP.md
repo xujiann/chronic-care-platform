@@ -1,5 +1,17 @@
 # DEPENDENCY MAP — 主线依赖地图
 
+## 2026-09-01 T03 卫生监督依赖方向
+
+```text
+安全工作台 → 5 个 public-health API
+  → health-supervision route（身份/manager/组织范围/幂等/CAS/审计）
+    → health-supervision contracts + pure service
+      → 四个 public-health Owner 集合
+      → authOrganizations 只读目录引用
+```
+
+领域服务不导入 `server.js`、HTTP、存储实现、其他领域聚合或外部 SDK。跨域只读仅通过身份组织目录代码；页面只消费安全投影。没有新增依赖包、worker、外部网络调用、数据库 migration 或独立部署单元。
+
 ## 2026-09-01 地区需求目录依赖方向
 
 ```text
@@ -170,7 +182,7 @@ TypeScript 与 Node 类型仅用于开发门禁；lockfile audit 已修复 c8 �
 
 ## 4. 浏览器依赖
 
-- 44 个 HTML 页面和根目录脚本通过全局加载顺序共享状态。
+- 45 个 HTML 页面和根目录脚本通过全局加载顺序共享状态。
 - `auth.js`、`shared.js`、`platform-api-client.js`、`platform-shell.js` 是主要共享边界。
 - 动态浏览器凭据方向为 `HttpOnly Cookie → /api/auth/context → 脱敏身份投影`；`auth.js` 在
   任何普通 API 调用前清除旧 localStorage token，Cookie 与 Authorization 并存时服务端也选择

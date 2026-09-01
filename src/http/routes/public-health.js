@@ -6,13 +6,15 @@ const segment01 = require("./public-health/surveillance-foundation");
 const segment02 = require("./public-health/public-health-operations");
 const segment03 = require("./public-health/vital-records");
 const segment04 = require("./public-health/infectious-reporting");
+const segment05 = require("./public-health/health-supervision");
 
 const DOMAIN = "public-health";
 const SUBDOMAIN_SEGMENTS = Object.freeze([
   ["surveillance-foundation", segment01],
   ["public-health-operations", segment02],
   ["vital-records", segment03],
-  ["infectious-reporting", segment04]
+  ["infectious-reporting", segment04],
+  ["health-supervision", segment05]
 ]);
 
 function createRouteSegments(runtime) {

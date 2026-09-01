@@ -1,5 +1,16 @@
 # MODULE MAP — 主线模块地图
 
+## 2026-09-01 T03 卫生监督模块
+
+| 模块 | Owner | 标签 | 当前边界 |
+|---|---|---|---|
+| `src/public-health/health-supervision/contracts.js` | T03 | B KEEP + IMPROVE | 闭合字段、枚举、模板和安全投影；拒绝 URL/路径/原始附件证据 |
+| `src/public-health/health-supervision/service.js` | T03 | B KEEP + IMPROVE | 纯状态机：主体、任务、不可变检查、问题整改与复核；不依赖 HTTP、存储或组合根 |
+| `src/http/routes/public-health/health-supervision.js` | T03 | B KEEP + IMPROVE | 5 个 API 的认证、组织范围、幂等、锁、CAS、审计和一次写入适配 |
+| `public-health-supervision.*` | T03 | B KEEP + IMPROVE | 独立 manager 工作台；安全 DOM 文本渲染，固定展示生产边界 |
+
+该模块复用身份组织目录和共享状态持久化端口，不复用 T07/T09 药械监管聚合，也不创建案件、GIS、视频、外部交换或附件模块。
+
 ## 2026-09-01 地区需求目录模块
 
 | 模块 | Owner | 标签 | 当前边界 |
@@ -73,7 +84,7 @@
 | T00 | regional / runtime composition | 2 | 3 | 组合根、区域运行时、全局顺序和协议；组合根本身不作为领域路由域 |
 | T01 | runtime / identity-security | 8 | 31 | 健康、指标、登录、会话、OIDC/SMS、授权和安全控制 |
 | T02 | platform-governance / state-data | 16 | 109 | 平台治理、证据、状态适配、迁移与发布控制；含已移交的医院运行 dashboard 与 command |
-| T03 | public-health | 4 | 49 | 监测、直报、出生死亡和公卫运营 |
+| T03 | public-health | 5 | 54 | 监测、直报、出生死亡、公卫运营和卫生监督闭环 |
 | T04 | citizen-chronic | 7 | 34 | 居民档案、家庭授权、慢病管理 |
 | T05 | care-coordination | 10 | 32 | 挂号、转诊、护理、陪诊和履约 |
 | T06 | clinical-specialties | 8 | 40 | 急救、用血、影像、体检和质量安全；operations 路由已全部移交 T02 |
@@ -81,7 +92,7 @@
 | T08 | integration | 3 | 13 | 外部网关、签名回调和交换 |
 | T09 | research / shared | 14 | 30 | 科研沙箱、组合查询和确实跨域的体验 |
 
-历史字面扫描识别 368 个精确 method/path 下限；当前扫描识别 374 个字面条件路由和 616 条授权声明（含 13 条机器认证证据声明），机器生产目录取并集后形成 609 个唯一接口，其中 601 个为字面 method/path、8 个保留运行时策略阻断。扫描器不再跨越已结束的相邻 handler 配对 method/path；目录复用现有授权矩阵和 route source inventory，不新增平行路由注册表，`npm run routes:check` 继续负责模块语法与装配边界。
+历史字面扫描识别 368 个精确 method/path 下限；当前扫描识别 377 个字面条件路由和 621 条授权声明（含 13 条机器认证证据声明），机器生产目录取并集后形成 614 个唯一接口，其中 606 个为字面 method/path、8 个保留运行时策略阻断。扫描器不再跨越已结束的相邻 handler 配对 method/path；目录复用现有授权矩阵和 route source inventory，不新增平行路由注册表，`npm run routes:check` 继续负责模块语法与装配边界。
 
 ## 2. 主要服务模块
 
@@ -99,9 +110,9 @@
 | 区域运行 | `src/platform/regional/`、`regions/` | 多地区清单、能力包、复制和发布注册 |
 | 领域实现 | `src/care-coordination/` 等与根目录服务 | 新旧实现并存，边界尚未完全迁移 |
 | 前端共享 | `auth.js`、`shared.js`、`platform-api-client.js`、`platform-shell.js` | 身份上下文、API 调用、壳和设计系统；服务端 token 不进入 localStorage，Cookie 上下文优先，陈旧凭据启动即清理 |
-| 静态发布与浏览器安全 | `src/http/static-asset-policy.js`、`src/http/static-content-runtime.js`、`src/http/browser-security-policy.js`、`src/http/browser-security-inventory.js`、`browser-safe-url.js`、`page-auth-bootstrap.js`、`scripts/static-publication.js` | 44 个入口、145 个显式发布资产、Pages 制品和服务端读取共用默认拒绝契约；既有高风险页面及生产 Go/No-Go 页面已按切片迁为可信 DOM/text 渲染，Safe URL port 按 internal/official/object-storage/tel/blob 能力在 mutation 前检查协议、凭据和 exact-Origin。Inventory v2 现锁定 793 个 DOM HTML、6 个动态 URL 和 42 个动态样式风险；体检工作台与生产 Go/No-Go 页面自身 P0/P1 finding 已归零，2 个 OHIF URL occurrence 仍复核。严格 CSP 仍是 Report-Only，生产 NO-GO |
+| 静态发布与浏览器安全 | `src/http/static-asset-policy.js`、`src/http/static-content-runtime.js`、`src/http/browser-security-policy.js`、`src/http/browser-security-inventory.js`、`browser-safe-url.js`、`page-auth-bootstrap.js`、`scripts/static-publication.js` | 45 个入口、148 个显式发布资产、Pages 制品和服务端读取共用默认拒绝契约；既有高风险页面、生产 Go/No-Go 页面及新增卫生监督页均按可信 DOM/text 渲染，Safe URL port 按 internal/official/object-storage/tel/blob 能力在 mutation 前检查协议、凭据和 exact-Origin。Inventory v2 现锁定 793 个 DOM HTML、6 个动态 URL 和 42 个动态样式风险；体检工作台、生产 Go/No-Go 页面与卫生监督页自身 P0/P1 finding 已归零，2 个 OHIF URL occurrence 仍复核。严格 CSP 仍是 Report-Only，生产 NO-GO |
 | 演示脱敏 | `src/platform/data/public-demo-snapshot.js` | 服务端合成、Pages 构建和 storage-admin 共用纯函数，凭据字段删除、个人姓名/身份/联系字段稳定掩码 |
-| API 生产目录 | `routeSourceFiles` + `api-authentication-evidence` + `api-idempotency-evidence` → `api-authorization-matrix-v3` → `production-api-catalog-v3` | 当前目录 609 项，13 项认证证据保持未分类为 0。32 份幂等行为合同覆盖 30 个完整 endpoint 与 2 个转诊 action-slice；T06 急救信号死信重放和更新均绑定独立完整 endpoint 直接证据。347 个写接口中 317 个仍缺 endpoint 级行为证明，通用 action remainder 使 319 项保持复核，全部生产 NO-GO。`reviewedProofRequired` 为零，有界 receipt、进程锁与 SQLite CAS 不是多实例生产证明 |
+| API 生产目录 | `routeSourceFiles` + `api-authentication-evidence` + `api-idempotency-evidence` → `api-authorization-matrix-v3` → `production-api-catalog-v3` | 当前目录 614 项，13 项认证证据保持未分类为 0。36 份幂等行为合同覆盖 34 个完整 endpoint 与 2 个转诊 action-slice；T03 卫生监督四个写入口和 T06 急救信号入口均绑定独立完整 endpoint 直接证据。351 个写接口中 317 个仍缺 endpoint 级行为证明，通用 action remainder 使 319 项保持复核，全部生产 NO-GO。`reviewedProofRequired` 为零，有界 receipt、进程锁与 SQLite CAS 不是多实例生产证明 |
 | 内部边界覆盖治理 | `config/internal-boundary-coverage.json` → `scripts/internal-boundary-coverage.js` | 复用现有 c8/直接行为测试，以 10 个不重叠源码组锁定 identity、audit、object storage、API governance、worker observability、区域共享命令、转诊 owner command、科研合规导出、浏览器响应头与 Safe URL 真实基线；每组绑定至少一条实际执行的负向合同，报告仅写临时目录 |
 | Playwright E2E 基础设施 | `playwright-browser-policy.v1`、`playwright-pwa-browser-policy.v1`、`playwright-port-policy`、三套 runner/config | 在线根 40 项（含生产 Go/No-Go 恶意响应与四方审批角色回归）与居民 13 项继续阻止 Service Worker；独立 PWA 3 项只在专项 context 允许 Worker，三套共 56 项唯一并集，统一 Chromium、动态端口和临时数据，并验证缓存/注册清理 |
 | 生产证据信任 provider | `src/platform/governance/production-evidence-trust-provider.js` → `scripts/production-preflight.js` | T00 通用 signed-envelope/anchor 验证端口与 production decision 适配；CLI 可部署装配，双角色 Ed25519、pin、撤销、时窗和发布上下文失败关闭；不拥有生产授权 |
@@ -136,10 +147,10 @@ scripts/platform-cutover-alert-worker.js
 
 - 根目录与 `src/` 存在同名模块：`blood-innovation`、`digital-hospital-governance`、`imaging-cloud`、`public-health`、`quality-safety`、`shared`。部分是前端/后端同名，部分是迁移期并存；命名本身不足以判定死代码。
 - `server.js` 内仍有大量种子、规范化、存储和领域函数，而相同领域也已在 `src/` 建立模块。
-- 数据 owner 清单现有 106 个合同，其中 60 个是快照内既有可写合同，19 个是首发范围内完成唯一
-  owner/reader/classification 审查但显式禁止生产写入的 legacy 合同，27 个当前不在 252 集合快照；
-  另有 3 个系统集合。其余 170 个不复制 owner：169 个精确源码引用登记为 `review-required`，1 个
-  种子专有集合登记为 `legacy-quarantined`。19 个 owner-reviewed legacy 与 170 个未分配 legacy
+- 数据 owner 清单现有 111 个合同，其中 61 个是快照内既有可写合同，19 个是首发范围内完成唯一
+  owner/reader/classification 审查但显式禁止生产写入的 legacy 合同，31 个当前不在 252 集合快照；
+  另有 3 个系统集合。其余 169 个不复制 owner：168 个精确源码引用登记为 `review-required`，1 个
+  种子专有集合登记为 `legacy-quarantined`。19 个 owner-reviewed legacy 与 169 个未分配 legacy
   均禁止生产写入和晋升。
 - 许多 readiness/report 脚本重复读取 `data/db.json` 并各自产生报告，证据生成接口尚未统一。
 - 静态发布与 storage-admin 原有脱敏逻辑已收敛到同一纯函数；其他报告脚本的重复读取仍未治理。
