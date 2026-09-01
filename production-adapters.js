@@ -14,6 +14,8 @@ const DEFAULT_OIDC_CLOCK_SKEW_SECONDS = 60;
 const DEFAULT_SMS_CALLBACK_MAX_SKEW_SECONDS = 300;
 const SMS_DELIVERY_STATUSES = new Set(["accepted", "queued", "sent", "delivered", "failed", "expired", "undeliverable", "rejected"]);
 const SMS_DELIVERY_TERMINAL_STATUSES = new Set(["delivered", "failed", "expired", "undeliverable", "rejected"]);
+const SMS_ACCEPTANCE_STATUSES = new Set(["accepted", "queued", "sent", "delivered"]);
+const SMS_REJECTION_STATUSES = new Set(["failed", "expired", "undeliverable", "rejected", "error", "denied"]);
 const SMS_DELIVERY_STATUS_RANK = new Map([
   ["accepted", 0],
   ["queued", 1],
@@ -150,6 +152,11 @@ function safeCallbackText(value, maxLength = 160) {
   return String(value || "").trim().replace(/[\r\n]/g, " ").slice(0, maxLength);
 }
 
+function normalizeSmsAcceptanceStatus(value) {
+  if (value === undefined || value === null || (typeof value === "string" && !value.trim())) return "accepted";
+  return String(value).trim().toLowerCase();
+}
+
 function normalizeSmsDeliveryStatus(value) {
   const normalized = safeCallbackText(value, 40).toLowerCase().replace(/[\s_]+/g, "-");
   const aliases = {
@@ -254,6 +261,10 @@ function recordSmsDeliveryAcceptance(data, input = {}) {
   if (!providerMessageId || !clientRequestId) {
     throw new SmsDeliveryCallbackError("SMS acceptance receipt requires provider and client message ids", "SMS_ACCEPTANCE_IDENTITY_REQUIRED");
   }
+  const acceptanceStatus = normalizeSmsAcceptanceStatus(input.status);
+  if (!SMS_ACCEPTANCE_STATUSES.has(acceptanceStatus)) {
+    throw new SmsDeliveryCallbackError("SMS acceptance receipt status is invalid", "SMS_ACCEPTANCE_STATUS_INVALID");
+  }
   const receipts = Array.isArray(data.smsDeliveryReceipts) ? data.smsDeliveryReceipts : [];
   const existing = receipts.find((item) => item.providerMessageId === providerMessageId);
   if (existing) {
@@ -269,7 +280,7 @@ function recordSmsDeliveryAcceptance(data, input = {}) {
     clientRequestId,
     purpose: safeCallbackText(input.purpose || "resident-phone-code", 80),
     maskedPhone: safeCallbackText(input.maskedPhone, 32),
-    status: SMS_DELIVERY_STATUSES.has(String(input.status || "").toLowerCase()) ? String(input.status).toLowerCase() : "accepted",
+    status: acceptanceStatus,
     acceptedAt,
     latestEventAt: acceptedAt,
     providerCode: safeCallbackText(input.providerCode, 80),
@@ -831,9 +842,12 @@ async function sendSmsVerificationCode(message, options = {}) {
   }, options);
   const providerMessageId = String(body.providerMessageId || body.messageId || body.requestId || "").trim();
   if (!providerMessageId) throw new ProductionAdapterError("SMS gateway response is missing provider message id", "SMS_PROVIDER_MESSAGE_ID_MISSING");
-  const providerStatus = String(body.status || "accepted").trim().toLowerCase();
-  if (body.success === false || ["rejected", "failed", "error", "denied"].includes(providerStatus)) {
+  const providerStatus = normalizeSmsAcceptanceStatus(body.status);
+  if (body.success === false || SMS_REJECTION_STATUSES.has(providerStatus)) {
     throw new ProductionAdapterError("SMS gateway rejected the request", "SMS_GATEWAY_REJECTED");
+  }
+  if (!SMS_ACCEPTANCE_STATUSES.has(providerStatus)) {
+    throw new ProductionAdapterError("SMS gateway receipt status is invalid", "SMS_GATEWAY_RECEIPT_STATUS_INVALID");
   }
   return {
     providerMessageId,

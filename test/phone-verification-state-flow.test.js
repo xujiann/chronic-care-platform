@@ -4,12 +4,21 @@ const assert = require("node:assert/strict");
 const test = require("node:test");
 
 const { issuePhoneVerificationCode } = require("../server");
+const { sendSmsVerificationCode } = require("../production-adapters");
 
 const OPTIONS = Object.freeze({
   env: { NODE_ENV: "production" },
   digestSecret: "phone-flow-test-digest-secret-at-least-32-characters",
   generateCode: () => "314159"
 });
+
+function jsonResponse(body, status = 200) {
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    text: async () => JSON.stringify(body)
+  };
+}
 
 test("provider rejection revokes only the issued OTP", async () => {
   const calls = [];
@@ -25,6 +34,45 @@ test("provider rejection revokes only the issued OTP", async () => {
   }), /provider rejected/);
   assert.deepEqual(calls, ["issue", "send", "revoke-otp"]);
   assert.equal(active, false);
+});
+
+test("invalid provider receipt statuses revoke the issued OTP", async () => {
+  const scenarios = [
+    { status: "processing", code: "SMS_GATEWAY_RECEIPT_STATUS_INVALID" },
+    { status: "undeliverable", code: "SMS_GATEWAY_REJECTED" }
+  ];
+
+  for (const scenario of scenarios) {
+    const calls = [];
+    let active = false;
+    const store = {
+      async issueVerificationCode() { calls.push("issue"); active = true; return { expiresAt: "2026-08-21T01:00:00.000Z" }; },
+      async revokeVerificationCode() { calls.push("revoke-otp"); active = false; return { revoked: true }; }
+    };
+    await assert.rejects(() => issuePhoneVerificationCode("13800000000", {
+      ...OPTIONS,
+      store,
+      async sendSms(message) {
+        calls.push("send");
+        return sendSmsVerificationCode(message, {
+          env: {
+            NODE_ENV: "production",
+            SMS_GATEWAY_URL: "https://sms.example.gov.cn/send",
+            SMS_GATEWAY_AUTH_MODE: "bearer",
+            SMS_GATEWAY_TOKEN: "provider-token",
+            SMS_TEMPLATE_ID: "resident-login-code"
+          },
+          fetchImpl: async () => jsonResponse({
+            providerMessageId: `provider-${scenario.status}`,
+            status: scenario.status
+          })
+        });
+      }
+    }), (error) => error.code === scenario.code);
+
+    assert.deepEqual(calls, ["issue", "send", "revoke-otp"]);
+    assert.equal(active, false);
+  }
 });
 
 test("shared-state issue failure invokes the SMS adapter zero times", async () => {
