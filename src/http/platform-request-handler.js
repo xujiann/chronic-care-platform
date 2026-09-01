@@ -8,6 +8,27 @@ function requiredFunction(options, name) {
   return options[name];
 }
 
+function publicRequestError(error) {
+  if (error instanceof URIError) {
+    return Object.freeze({
+      status: 400,
+      body: Object.freeze({
+        error: "Bad Request",
+        code: "REQUEST_URI_ENCODING_INVALID",
+        message: "request URI encoding is invalid"
+      })
+    });
+  }
+  return Object.freeze({
+    status: 500,
+    body: Object.freeze({
+      error: "Internal Server Error",
+      code: "INTERNAL_SERVER_ERROR",
+      message: "request processing failed"
+    })
+  });
+}
+
 function createPlatformRequestHandler(options = {}) {
   const observability = options.observability;
   if (!observability || typeof observability.run !== "function" || typeof observability.recordDependency !== "function") {
@@ -64,10 +85,20 @@ function createPlatformRequestHandler(options = {}) {
         }
         serveStatic(req, res);
       } catch (error) {
+        if (error instanceof URIError) {
+          const failure = publicRequestError(error);
+          sendJson(res, failure.status, failure.body);
+          return;
+        }
         handleError(req, res, error);
       }
     });
   };
 }
 
-module.exports = { createBrowserSecurityHeaders, createPlatformRequestHandler, createStaticContentRuntime };
+module.exports = {
+  createBrowserSecurityHeaders,
+  createPlatformRequestHandler,
+  createStaticContentRuntime,
+  publicRequestError
+};

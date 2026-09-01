@@ -3,7 +3,10 @@
 const assert = require("node:assert/strict");
 const test = require("node:test");
 const { createPlatformRuntimeComposition } = require("../src/http/platform-runtime-composition");
-const { createPlatformRequestHandler } = require("../src/http/platform-request-handler");
+const {
+  createPlatformRequestHandler,
+  publicRequestError
+} = require("../src/http/platform-request-handler");
 
 test("runtime composition builds providers contexts and one immutable router", () => {
   const calls = [];
@@ -52,4 +55,49 @@ test("request handler centralizes API session failure and static dispatch", asyn
   await failed({ url: "/api/health" }, response);
   assert.equal(responses[0].status, 503);
   assert.equal(responses[0].body.code, "SESSION_STORE_UNAVAILABLE");
+});
+
+test("request handler rejects malformed URI encoding as a stable client error", async () => {
+  const responses = [];
+  let delegatedError = null;
+  const handler = createPlatformRequestHandler({
+    observability: {
+      run: async (_req, _res, work) => work(),
+      recordDependency: () => {}
+    },
+    hydrateRequestSession: async () => {},
+    hydrateStaticRequestSession: async () => {},
+    isProtectedStaticRequest: () => false,
+    handleApi: async () => { decodeURIComponent("%"); },
+    serveStatic: () => {},
+    recordRequestMetrics: () => {},
+    sendJson: (_res, status, body) => responses.push({ status, body }),
+    handleError: (_req, _res, error) => { delegatedError = error; },
+    logger: { error: () => {} }
+  });
+
+  await handler({ url: "/api/emergency-signals/%" }, { on: () => {} });
+
+  assert.equal(delegatedError, null);
+  assert.deepEqual(responses, [{
+    status: 400,
+    body: {
+      error: "Bad Request",
+      code: "REQUEST_URI_ENCODING_INVALID",
+      message: "request URI encoding is invalid"
+    }
+  }]);
+});
+
+test("public request errors do not expose internal exception details", () => {
+  const internal = publicRequestError(new Error("database failed at C:\\private\\health.db with secret=demo"));
+  assert.deepEqual(internal, {
+    status: 500,
+    body: {
+      error: "Internal Server Error",
+      code: "INTERNAL_SERVER_ERROR",
+      message: "request processing failed"
+    }
+  });
+  assert.doesNotMatch(JSON.stringify(internal), /private|health\.db|secret|demo/);
 });
