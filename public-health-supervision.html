@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>卫生监督闭环工作台</title>
+    <link rel="stylesheet" href="./portal.css" />
+    <link rel="stylesheet" href="./public-health-supervision.css" />
+    <script src="./regional-context.js"></script>
+    <script src="./access-control-policy.js"></script>
+    <script src="./browser-safe-url.js"></script>
+    <script src="./auth.js"></script>
+    <script defer src="./platform-domain-modules.js"></script>
+    <script defer src="./platform-api-client.js"></script>
+    <script defer src="./platform-design-system.js"></script>
+    <script defer src="./platform-shell.js"></script>
+    <script src="./page-auth-bootstrap.js" data-roles="commission,institution" data-account-types="manager"></script>
+    <script defer src="./public-health-supervision.js"></script>
+  </head>
+  <body>
+    <main class="portal-shell supervision-shell">
+      <header class="portal-header">
+        <div>
+          <span>公共卫生 · 卫生监督</span>
+          <h1>卫生监督闭环工作台</h1>
+          <p>主体目录引用、检查任务、现场记录、问题整改与独立复核共用一条可审计状态链。</p>
+        </div>
+        <nav>
+          <a href="./public-health.html">公共卫生总览</a>
+          <a href="./workbench.html">运营工作台</a>
+          <a href="./index.html">卫健委端</a>
+        </nav>
+      </header>
+
+      <section class="supervision-boundary" aria-labelledby="supervision-boundary-title">
+        <h2 id="supervision-boundary-title">首增量边界</h2>
+        <p id="supervision-boundary">加载前按未就绪处理：不包含案件、GIS、视频、附件上传或外部交换，生产保持 NO-GO。</p>
+      </section>
+      <p id="supervision-status" class="supervision-status" role="status" aria-live="polite">正在加载工作台……</p>
+      <p id="supervision-error" class="login-error" role="alert"></p>
+      <section id="supervision-metrics" class="metric-grid" aria-label="卫生监督摘要"></section>
+
+      <section class="portal-grid supervision-forms" data-role="commission">
+        <article class="panel">
+          <div class="panel-title"><h2>登记监督主体</h2><span>仅保存身份组织目录代码</span></div>
+          <form id="supervision-subject-form" class="supervision-form">
+            <label>组织代码<input name="organizationCode" required maxlength="64" autocomplete="off" /></label>
+            <label>风险等级<select name="riskLevel"><option value="low">低</option><option value="medium" selected>中</option><option value="high">高</option><option value="critical">重大</option></select></label>
+            <button type="submit">登记主体</button>
+          </form>
+        </article>
+        <article class="panel">
+          <div class="panel-title"><h2>创建检查任务</h2><span>通用草案清单</span></div>
+          <form id="supervision-task-form" class="supervision-form">
+            <label>主体编号<input name="subjectId" required autocomplete="off" /></label>
+            <label>任务类型<select name="taskType"><option value="routine">日常检查</option><option value="risk-triggered">风险触发</option><option value="reinspection">复查</option></select></label>
+            <label>优先级<select name="priority"><option value="normal">普通</option><option value="high">高</option><option value="urgent">紧急</option><option value="low">低</option></select></label>
+            <label>截止时间<input name="dueAt" type="datetime-local" required /></label>
+            <button type="submit">创建任务</button>
+          </form>
+        </article>
+      </section>
+
+      <section class="portal-grid">
+        <article class="panel wide">
+          <div class="panel-title"><h2>检查任务</h2><span>接单、开始、检查与关闭</span></div>
+          <div id="supervision-tasks" class="supervision-list"></div>
+        </article>
+        <article class="panel">
+          <div class="panel-title"><h2>监督主体</h2><span>不显示目录名称</span></div>
+          <div id="supervision-subjects" class="supervision-list"></div>
+        </article>
+      </section>
+
+      <section class="portal-grid">
+        <article class="panel wide">
+          <div class="panel-title"><h2>问题与整改复核</h2><span>机构提交，监管复核</span></div>
+          <div id="supervision-findings" class="supervision-list"></div>
+        </article>
+        <article class="panel">
+          <div class="panel-title"><h2>通用动作</h2><span>按当前版本提交</span></div>
+          <form id="supervision-action-form" class="supervision-form">
+            <label>资源类型<select name="resourceType"><option value="task">检查任务</option><option value="finding">问题</option></select></label>
+            <label>资源编号<input name="resourceId" required autocomplete="off" /></label>
+            <label>动作<select name="action"><option value="accept">接单</option><option value="start">开始检查</option><option value="cancel">取消任务</option><option value="submit-remediation">提交整改</option><option value="review-remediation">复核整改</option></select></label>
+            <label>当前版本<input name="expectedVersion" type="number" min="1" required /></label>
+            <label>复核结论<select name="decision"><option value="approved">通过</option><option value="rejected">驳回</option></select></label>
+            <label>说明<input name="note" maxlength="1000" autocomplete="off" /></label>
+            <label>证据引用<input name="evidenceRef" maxlength="160" autocomplete="off" placeholder="evidence:..." /></label>
+            <button type="submit">提交动作</button>
+          </form>
+        </article>
+      </section>
+
+      <section class="panel" data-role="commission">
+        <div class="panel-title"><h2>记录现场检查</h2><span>每项任务只允许一条不可变记录</span></div>
+        <form id="supervision-inspection-form" class="supervision-form supervision-inspection-form">
+          <label>任务编号<input name="taskId" required autocomplete="off" /></label>
+          <label>当前版本<input name="expectedVersion" type="number" min="1" required /></label>
+          <label>检查时间<input name="inspectedAt" type="datetime-local" required /></label>
+          <label>检查结论<select name="result"><option value="compliant">合格</option><option value="noncompliant">不合格</option></select></label>
+          <label>主体资质<select name="subjectQualification"><option value="pass">通过</option><option value="fail">不通过</option><option value="not-applicable">不适用</option></select></label>
+          <label>现场条件<select name="siteCondition"><option value="pass">通过</option><option value="fail">不通过</option><option value="not-applicable">不适用</option></select></label>
+          <label>过程记录<select name="processRecord"><option value="pass">通过</option><option value="fail">不通过</option><option value="not-applicable">不适用</option></select></label>
+          <label>问题摘要<input name="findingSummary" maxlength="500" autocomplete="off" /></label>
+          <label>整改期限<input name="remediationDueAt" type="datetime-local" /></label>
+          <label>证据引用<input name="evidenceRef" required maxlength="160" autocomplete="off" value="evidence:inspection:manual" /></label>
+          <button type="submit">保存不可变检查记录</button>
+        </form>
+      </section>
+
+      <section class="panel">
+        <div class="panel-title"><h2>检查记录</h2><span>只读、不可变</span></div>
+        <div id="supervision-records" class="supervision-list"></div>
+      </section>
+    </main>
+  </body>
+</html>

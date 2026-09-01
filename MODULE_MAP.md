@@ -1,5 +1,16 @@
 # MODULE MAP — 主线模块地图
 
+## 2026-09-01 T03 卫生监督模块
+
+| 模块 | Owner | 标签 | 当前边界 |
+|---|---|---|---|
+| `src/public-health/health-supervision/contracts.js` | T03 | B KEEP + IMPROVE | 闭合字段、枚举、模板和安全投影；拒绝 URL/路径/原始附件证据 |
+| `src/public-health/health-supervision/service.js` | T03 | B KEEP + IMPROVE | 纯状态机：主体、任务、不可变检查、问题整改与复核；不依赖 HTTP、存储或组合根 |
+| `src/http/routes/public-health/health-supervision.js` | T03 | B KEEP + IMPROVE | 5 个 API 的认证、组织范围、幂等、锁、CAS、审计和一次写入适配 |
+| `public-health-supervision.*` | T03 | B KEEP + IMPROVE | 独立 manager 工作台；安全 DOM 文本渲染，固定展示生产边界 |
+
+该模块复用身份组织目录和共享状态持久化端口，不复用 T07/T09 药械监管聚合，也不创建案件、GIS、视频、外部交换或附件模块。
+
 ## 2026-09-01 地区需求目录模块
 
 | 模块 | Owner | 标签 | 当前边界 |

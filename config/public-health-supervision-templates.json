@@ -1,0 +1,31 @@
+{
+  "schemaVersion": "public-health-supervision-template-catalog.v1",
+  "productionReady": false,
+  "templates": [
+    {
+      "id": "general-health-supervision-baseline",
+      "version": 1,
+      "title": "通用卫生监督检查清单（草案）",
+      "status": "draft-reference",
+      "productionReady": false,
+      "boundary": "仅用于通用业务闭环验证，投产前必须完成适用法规、地方规则和现场表单的独立校验。",
+      "items": [
+        {
+          "code": "subject-qualification-status",
+          "label": "主体资质状态",
+          "required": true
+        },
+        {
+          "code": "site-condition-status",
+          "label": "现场条件状态",
+          "required": true
+        },
+        {
+          "code": "process-record-status",
+          "label": "过程记录状态",
+          "required": true
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+.supervision-shell { display: grid; gap: 16px; }
+.supervision-boundary { border: 1px solid #d7a72f; border-radius: 14px; padding: 14px 18px; background: #fff8df; color: #644b08; }
+.supervision-boundary h2 { margin: 0 0 6px; font-size: 1rem; }
+.supervision-boundary p, .supervision-status { margin: 0; }
+.supervision-forms .panel { min-width: 0; }
+.supervision-form { display: grid; gap: 10px; }
+.supervision-form label { display: grid; gap: 5px; font-size: .9rem; color: #334155; }
+.supervision-form input, .supervision-form select { width: 100%; box-sizing: border-box; border: 1px solid #cbd5e1; border-radius: 8px; padding: 9px; background: #fff; }
+.supervision-form button, .supervision-action { border: 0; border-radius: 8px; padding: 9px 12px; background: #0f766e; color: #fff; cursor: pointer; }
+.supervision-inspection-form { grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); align-items: end; }
+.supervision-list { display: grid; gap: 10px; }
+.supervision-row { border: 1px solid #dbe4ee; border-radius: 10px; padding: 12px; background: #fff; }
+.supervision-row header { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.supervision-row p { margin: 7px 0 0; color: #475569; }
+.supervision-badge { border-radius: 999px; padding: 3px 8px; background: #e2e8f0; color: #334155; font-size: .78rem; }
+.supervision-row-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.supervision-empty { color: #64748b; margin: 0; }
+@media (max-width: 720px) { .supervision-inspection-form { grid-template-columns: 1fr; } }

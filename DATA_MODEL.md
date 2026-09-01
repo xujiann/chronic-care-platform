@@ -1,5 +1,11 @@
 # DATA MODEL — 主线数据地图
 
+## 2026-09-01 T03 卫生监督数据边界
+
+新增四个受限领域集合：`publicHealthSupervisionSubjects`、`publicHealthSupervisionInspectionTasks`、`publicHealthSupervisionInspectionRecords`、`publicHealthSupervisionFindings`，Owner 均为 `public-health`，仅向 `platform-governance` 开放治理读取。检查记录写入后不可修改；整改提交与复核轮次内嵌于问题，避免第二事实源。
+
+主体不复制组织目录名称、地址、联系方式或证照，只保存 `identity-organization:v1:<code>`、组织代码/层级和辖区代码。内部命令 receipt 有界且公共投影删除；证据只保存不透明引用。当前仍是 JSON/SQLite 兼容状态，无新 DDL/migration、PostgreSQL 原子仓储或生产写资格，全部集合固定 `productionPromotionAllowed=false`、生产 `NO-GO`。
+
 ## 2026-09-01 地区需求目录不是业务数据模型
 
 `regional-requirement-catalog-v1` 是仓库跟踪的产品化治理配置，不是居民、患者、机构、订单、支付、医疗文书或其他领域事实源。19 项记录当前均为 `normalized`，只保存受控来源元数据、产品化分类、Owner 候选和证据状态；只读投影不包含原始 PDF、业务载荷、凭据、Token 或生产连接信息。

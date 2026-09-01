@@ -1,5 +1,11 @@
 # CURRENT ARCHITECTURE — 主线现状地图
 
+## 2026-09-01 T03 卫生监督业务闭环
+
+- `public-health-05 / health-supervision` 承载 1 个受范围约束的工作台查询和 4 个命令入口；路由只做认证、manager/组织范围、幂等/CAS、审计和持久化适配，纯状态转换位于 `src/public-health/health-supervision/`。
+- 领域模型由主体、任务、不可变检查记录和问题四类集合组成；整改轮次内嵌于问题，父任务在每次提交/复核后重算，只有全部问题 `verified` 才关闭。
+- 主体仅保存 `authOrganizations` 的代码化目录引用；API 和页面不返回目录名称或居民/患者字段。通用检查模板是未定版草案，案件、GIS、视频、外部交换和附件不在本增量，生产固定 `NO-GO`。
+
 ## 2026-09-01 地区需求产品化接入
 
 - `config/regional-requirement-catalog.json` 以 `regional-requirement-catalog-v1` 登记地区需求来源和 19 项归一化需求；`src/platform/productization/regional-requirement-catalog.js` 负责闭集校验、汇总及只读白名单投影，不读取原始 PDF，也不保存居民、患者、凭据或外部系统载荷。

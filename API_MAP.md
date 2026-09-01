@@ -1,5 +1,17 @@
 # API MAP — 主线接口地图
 
+## 2026-09-01 T03 卫生监督 API
+
+| Method / Path | 角色与范围 | 语义 |
+|---|---|---|
+| `GET /api/public-health/supervision/workbench` | commission/institution manager；市/卫健、区辖区或机构自身 | 最多各 50 条安全投影、草案模板与固定生产边界 |
+| `POST /api/public-health/supervision/subjects` | commission manager；区级仅目录子机构 | 创建最小主体引用 |
+| `POST /api/public-health/supervision/inspection-tasks` | commission manager；主体范围 | 创建 assigned 检查任务 |
+| `POST /api/public-health/supervision/inspection-tasks/:id/actions` | 任务指派监管组织 | 接单、开始、一次性记录检查或取消 |
+| `POST /api/public-health/supervision/findings/:id/actions` | 机构仅自身整改；指派监管组织复核 | 提交整改、通过或驳回重开 |
+
+四个 POST 强制 `Idempotency-Key` 和 `expectedVersion`，锁内重读并重验 scope；同键同载荷返回首次公共响应且零写，同键异载荷 409。成功命令在一次本地状态写中提交业务状态、receipt 和链式审计；进程锁/SQLite CAS 不构成跨实例 exactly-once。
+
 ## 2026-09-01 地区需求只读投影（HTTP 兼容）
 
 既有 commission-only `GET /api/platform/productization/center` 保持 method/path、鉴权、角色、错误、审计动作和 `platform-productization-center-v1` 顶层 schemaVersion，响应以向后兼容方式增加 `regionalRequirements` 白名单只读投影。该字段只表达来源摘要、19 项归一化需求、产品化分类、Owner 候选和证据闭环状态；不返回原始 PDF、文件系统路径、业务载荷、凭据或生产授权材料。
