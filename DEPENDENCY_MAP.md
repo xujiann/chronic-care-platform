@@ -1,5 +1,17 @@
 # DEPENDENCY MAP — 主线依赖地图
 
+## 2026-09-01 地区需求目录依赖方向
+
+```text
+regional-requirement-catalog-v1（仓库配置）
+  -> regional-requirement-catalog validator / allowlisted projection
+     -> platform productization runtime
+        -> existing GET /api/platform/productization/center
+           -> existing platform productization UI
+```
+
+依赖保持从配置到 T00 产品化模块、既有只读路由和页面的单向流动。目录模块不读取原始 PDF、`data/db.json` 或领域数据库，不反向依赖 T01–T09 业务实现，也不调用外部系统；Owner 候选仅用于生成后续评审待办，不能取得领域写权限。未增加 npm/浏览器第三方包、数据库驱动、worker、运行进程、部署制品或 `server.js` 组合依赖。
+
 ## 2026-08-31 T06 急救信号资源授权依赖
 
 ```text

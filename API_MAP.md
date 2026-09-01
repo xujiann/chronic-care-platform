@@ -1,5 +1,11 @@
 # API MAP — 主线接口地图
 
+## 2026-09-01 地区需求只读投影（HTTP 兼容）
+
+既有 commission-only `GET /api/platform/productization/center` 保持 method/path、鉴权、角色、错误、审计动作和 `platform-productization-center-v1` 顶层 schemaVersion，响应以向后兼容方式增加 `regionalRequirements` 白名单只读投影。该字段只表达来源摘要、19 项归一化需求、产品化分类、Owner 候选和证据闭环状态；不返回原始 PDF、文件系统路径、业务载荷、凭据或生产授权材料。
+
+本切片没有新增 endpoint、请求字段、写入、副作用、幂等协议、路由插槽或公开 API 版本策略，也没有修改 `server.js`。19 项 `normalized` 不构成领域 Owner 审批或业务实现证据；R009 已按原始 PDF 第 73–79 页完成视觉复核并标记 `source-verified`，其余 PDF 页码待补，因此响应与平台整体均固定 `productionReady=false`、生产 `NO-GO`。
+
 ## 2026-08-31 T06 急救信号 PATCH 资源授权
 
 `PATCH /api/emergency-signals/:id` 未改变 method/path、允许角色、请求体、200/404/409 成功与错误兼容、幂等键、领域事件或响应头。新增稳定 403 `EMERGENCY_SIGNAL_SCOPE_DENIED`：institution 必须匹配信号来源或目标组织，county 必须匹配其区县/成员机构，commission 保持既有全局访问。预检在 body 解析前完成，命令锁内在 receipt replay 前重验，scope 归属字段不可由 patch 改写，拒绝写安全审计。T00 现以第 32 份合同登记 T06 直接测试，覆盖本机构/跨机构、区县内/区县外、commission、body-before-scope、审计及 scope 撤销后的 replay 拒绝；目录现有 317 个 endpoint 行为缺口和 319 个总复核项，全部 API 仍为 `NO-GO`。

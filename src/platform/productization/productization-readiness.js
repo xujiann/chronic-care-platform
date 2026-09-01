@@ -11,9 +11,11 @@ const REQUIRED_FILES = Object.freeze([
   "src/platform/productization/data-promotion-center.js",
   "src/platform/productization/work-item-center.js",
   "src/platform/productization/institution-integration-center.js",
+  "src/platform/productization/regional-requirement-catalog.js",
   "src/platform/regional/regional-product-assembly.js",
   "src/http/routes/platform-governance/productization-center.js",
-  "platform-productization-ui.js"
+  "platform-productization-ui.js",
+  "config/regional-requirement-catalog.json"
 ]);
 
 function validateProgram(value = program) {
@@ -50,6 +52,7 @@ function buildPlatformProductizationReadiness(options = {}) {
     { id: "productization:p0DataPromotion", passed: center.dataPromotion.localGateReady, detail: `${center.dataPromotion.summary.promotedP0} promoted P0 / ${center.dataPromotion.summary.repositoryPlanReady} owner-reviewed plan-ready / ${center.dataPromotion.summary.firstReleaseMigrationPlans} persistent first-release plans` },
     { id: "productization:workItemProjection", passed: center.workItems.ok, detail: `${center.workItems.summary.total} metadata-only projections` },
     { id: "productization:syntheticIntegration", passed: center.institutionIntegration.ok, detail: `${center.institutionIntegration.summary.adapters} adapters` },
+    { id: "productization:regionalRequirements", passed: center.regionalRequirements.ok && center.regionalRequirements.summary.requirements > 0, detail: `${center.regionalRequirements.summary.requirements} normalized requirements / ${center.regionalRequirements.summary.ownerReview} owner review` },
     { id: "productization:regionalAssembly", passed: assembly.ok, detail: assembly.region.code },
     { id: "productization:nonfunctional", passed: nonfunctional.ok, detail: `${nonfunctional.summary.testFiles} tests / ${nonfunctional.summary.routeFiles} routes` },
     { id: "productization:productionFailClosed", passed: center.productionReady === false && assembly.productionReady === false, detail: "NO-GO until site evidence and authorization" }
@@ -71,7 +74,9 @@ function buildPlatformProductizationReadiness(options = {}) {
       firstReleaseDerivedReadModels: center.dataPromotion.summary.firstReleaseDerivedReadModels,
       projectedWorkItems: center.workItems.summary.total,
       institutionAdapters: center.institutionIntegration.summary.adapters,
-      regionalBundles: assembly.regionalBundles.length
+      regionalBundles: assembly.regionalBundles.length,
+      regionalRequirements: center.regionalRequirements.summary.requirements,
+      regionalRequirementOwnerReview: center.regionalRequirements.summary.ownerReview
     }),
     iterations: Object.freeze(iterations),
     files: Object.freeze(files),
