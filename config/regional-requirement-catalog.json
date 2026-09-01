@@ -1,0 +1,505 @@
+{
+  "schemaVersion": "regional-requirement-catalog-v1",
+  "catalogId": "regional-health-platform-requirement-catalog-v1",
+  "sources": [
+    {
+      "id": "SRC-SH-SJ-2023-02",
+      "regionCode": "310117",
+      "regionName": "上海市松江区",
+      "projectName": "上海智慧健康松江——区域医疗卫生一体化云平台（第二批）",
+      "tenderNo": "SJJCZB2023025",
+      "procurementYear": 2023,
+      "documentRef": "招标文件SJJCZB2023025；研究文档《松江二期需求对照与平台功能建议》；研究台账《地区平台需求吸收台账》",
+      "evidenceStatus": "research-normalized"
+    }
+  ],
+  "requirements": [
+    {
+      "id": "SRC-SH-SJ-2023-02-R001",
+      "sourceId": "SRC-SH-SJ-2023-02",
+      "sourceLocations": [
+        "需求研究/松江二期需求对照与平台功能建议.md §5 表序号1"
+      ],
+      "title": "基础设施升级",
+      "targetCapabilityIds": [
+        "L-GOV-DEPLOY"
+      ],
+      "productClass": "DEPLOY",
+      "secondaryClasses": [],
+      "decision": "DEPLOY",
+      "priority": "P2",
+      "ownerProcess": "T00",
+      "ownerDependencies": [],
+      "bundleIds": [],
+      "status": "normalized",
+      "evidenceStatus": "research-normalized"
+    },
+    {
+      "id": "SRC-SH-SJ-2023-02-R002",
+      "sourceId": "SRC-SH-SJ-2023-02",
+      "sourceLocations": [
+        "需求研究/松江二期需求对照与平台功能建议.md §5 表序号2",
+        "需求研究/地区平台需求吸收台账.md §7 C-DATA-QUALITY"
+      ],
+      "title": "数据质量控制平台",
+      "targetCapabilityIds": [
+        "C-DATA-QUALITY"
+      ],
+      "productClass": "CORE",
+      "secondaryClasses": [],
+      "decision": "ENHANCE",
+      "priority": "P0",
+      "ownerProcess": "T02",
+      "ownerDependencies": [
+        "T00"
+      ],
+      "bundleIds": [
+        "health-platform-core-v1"
+      ],
+      "status": "normalized",
+      "evidenceStatus": "research-normalized"
+    },
+    {
+      "id": "SRC-SH-SJ-2023-02-R003",
+      "sourceId": "SRC-SH-SJ-2023-02",
+      "sourceLocations": [
+        "需求研究/松江二期需求对照与平台功能建议.md §5 表序号3"
+      ],
+      "title": "区域数据管理平台",
+      "targetCapabilityIds": [
+        "C-DATA-PLATFORM",
+        "C-DATA-LINEAGE"
+      ],
+      "productClass": "CORE",
+      "secondaryClasses": [],
+      "decision": "ENHANCE",
+      "priority": "P0",
+      "ownerProcess": "T02",
+      "ownerDependencies": [
+        "T00",
+        "T08"
+      ],
+      "bundleIds": [
+        "health-platform-core-v1"
+      ],
+      "status": "normalized",
+      "evidenceStatus": "research-normalized"
+    },
+    {
+      "id": "SRC-SH-SJ-2023-02-R004",
+      "sourceId": "SRC-SH-SJ-2023-02",
+      "sourceLocations": [
+        "需求研究/松江二期需求对照与平台功能建议.md §5 表序号4",
+        "需求研究/地区平台需求吸收台账.md §7 B-EHR-ARCHIVE"
+      ],
+      "title": "电子健康档案管理服务系统升级",
+      "targetCapabilityIds": [
+        "B-EHR-ARCHIVE"
+      ],
+      "productClass": "CORE",
+      "secondaryClasses": [
+        "SHARED"
+      ],
+      "decision": "ENHANCE",
+      "priority": "P0",
+      "ownerProcess": "T04",
+      "ownerDependencies": [
+        "T00",
+        "T08"
+      ],
+      "bundleIds": [
+        "health-platform-core-v1"
+      ],
+      "status": "normalized",
+      "evidenceStatus": "research-normalized"
+    },
+    {
+      "id": "SRC-SH-SJ-2023-02-R005",
+      "sourceId": "SRC-SH-SJ-2023-02",
+      "sourceLocations": [
+        "需求研究/松江二期需求对照与平台功能建议.md §5 表序号5",
+        "需求研究/地区平台需求吸收台账.md §7 F-PC-OPS"
+      ],
+      "title": "社区卫生综合管理平台",
+      "targetCapabilityIds": [
+        "F-PC-OPS"
+      ],
+      "productClass": "PACKAGE",
+      "secondaryClasses": [],
+      "decision": "BUILD",
+      "priority": "P1",
+      "ownerProcess": "T02",
+      "ownerDependencies": [
+        "T00",
+        "T04",
+        "T05"
+      ],
+      "bundleIds": [],
+      "status": "normalized",
+      "evidenceStatus": "research-normalized"
+    },
+    {
+      "id": "SRC-SH-SJ-2023-02-R006",
+      "sourceId": "SRC-SH-SJ-2023-02",
+      "sourceLocations": [
+        "需求研究/松江二期需求对照与平台功能建议.md §5 表序号6"
+      ],
+      "title": "接种验证信息管理",
+      "targetCapabilityIds": [
+        "G-PH-IMM"
+      ],
+      "productClass": "PACKAGE",
+      "secondaryClasses": [],
+      "decision": "ENHANCE",
+      "priority": "P1",
+      "ownerProcess": "T03",
+      "ownerDependencies": [
+        "T00",
+        "T04"
+      ],
+      "bundleIds": [],
+      "status": "normalized",
+      "evidenceStatus": "research-normalized"
+    },
+    {
+      "id": "SRC-SH-SJ-2023-02-R007",
+      "sourceId": "SRC-SH-SJ-2023-02",
+      "sourceLocations": [
+        "需求研究/松江二期需求对照与平台功能建议.md §5 表序号7"
+      ],
+      "title": "门诊分诊排队叫号",
+      "targetCapabilityIds": [
+        "E-CIT-QUEUE"
+      ],
+      "productClass": "PACKAGE",
+      "secondaryClasses": [],
+      "decision": "BUILD",
+      "priority": "P1",
+      "ownerProcess": "T05",
+      "ownerDependencies": [
+        "T00",
+        "T08"
+      ],
+      "bundleIds": [],
+      "status": "normalized",
+      "evidenceStatus": "research-normalized"
+    },
+    {
+      "id": "SRC-SH-SJ-2023-02-R008",
+      "sourceId": "SRC-SH-SJ-2023-02",
+      "sourceLocations": [
+        "需求研究/松江二期需求对照与平台功能建议.md §5 表序号8",
+        "需求研究/地区平台需求吸收台账.md §7 L-GOV-SENSITIVE"
+      ],
+      "title": "医疗机构反统方系统",
+      "targetCapabilityIds": [
+        "L-GOV-SENSITIVE"
+      ],
+      "productClass": "PACKAGE",
+      "secondaryClasses": [
+        "CORE"
+      ],
+      "decision": "BUILD",
+      "priority": "P1",
+      "ownerProcess": "T01",
+      "ownerDependencies": [
+        "T00",
+        "T02"
+      ],
+      "bundleIds": [
+        "health-platform-core-v1"
+      ],
+      "status": "normalized",
+      "evidenceStatus": "research-normalized"
+    },
+    {
+      "id": "SRC-SH-SJ-2023-02-R009",
+      "sourceId": "SRC-SH-SJ-2023-02",
+      "sourceLocations": [
+        "需求研究/松江二期需求对照与平台功能建议.md §5 表序号9",
+        "需求研究/地区平台需求吸收台账.md §7 H-SUP-CASE",
+        "原始PDF第73-79页，4.3.1（物理页与页脚页码一致，已视觉复核）"
+      ],
+      "title": "智慧卫监协管平台",
+      "targetCapabilityIds": [
+        "H-SUP-SUBJECT",
+        "H-SUP-INSPECT",
+        "H-SUP-CASE"
+      ],
+      "productClass": "SHARED",
+      "secondaryClasses": [],
+      "decision": "BUILD",
+      "priority": "P0",
+      "ownerProcess": "T03",
+      "ownerDependencies": [
+        "T00",
+        "T08"
+      ],
+      "bundleIds": [
+        "public-health-supervision-v1"
+      ],
+      "status": "normalized",
+      "evidenceStatus": "source-verified"
+    },
+    {
+      "id": "SRC-SH-SJ-2023-02-R010",
+      "sourceId": "SRC-SH-SJ-2023-02",
+      "sourceLocations": [
+        "需求研究/松江二期需求对照与平台功能建议.md §5 表序号10",
+        "需求研究/地区平台需求吸收台账.md §7 K-REG-DIP-PERF"
+      ],
+      "title": "基于病种分组的公立医院绩效评价",
+      "targetCapabilityIds": [
+        "K-REG-DIP-PERF"
+      ],
+      "productClass": "SHARED",
+      "secondaryClasses": [
+        "CONFIG"
+      ],
+      "decision": "ENHANCE",
+      "priority": "P1",
+      "ownerProcess": "T07",
+      "ownerDependencies": [
+        "T00",
+        "T02"
+      ],
+      "bundleIds": [],
+      "status": "normalized",
+      "evidenceStatus": "research-normalized"
+    },
+    {
+      "id": "SRC-SH-SJ-2023-02-R011",
+      "sourceId": "SRC-SH-SJ-2023-02",
+      "sourceLocations": [
+        "需求研究/松江二期需求对照与平台功能建议.md §5 表序号11"
+      ],
+      "title": "医院集成平台",
+      "targetCapabilityIds": [
+        "D-INT-API",
+        "D-INT-DOC"
+      ],
+      "productClass": "CORE",
+      "secondaryClasses": [],
+      "decision": "REUSE",
+      "priority": "P0",
+      "ownerProcess": "T08",
+      "ownerDependencies": [
+        "T00",
+        "T02"
+      ],
+      "bundleIds": [
+        "health-platform-core-v1",
+        "general-hospital-connectivity-v1"
+      ],
+      "status": "normalized",
+      "evidenceStatus": "research-normalized"
+    },
+    {
+      "id": "SRC-SH-SJ-2023-02-R012",
+      "sourceId": "SRC-SH-SJ-2023-02",
+      "sourceLocations": [
+        "需求研究/松江二期需求对照与平台功能建议.md §5 表序号12",
+        "需求研究/地区平台需求吸收台账.md §7 J-CLIN-PHARM"
+      ],
+      "title": "药事管理系统",
+      "targetCapabilityIds": [
+        "J-CLIN-PHARM"
+      ],
+      "productClass": "PACKAGE",
+      "secondaryClasses": [],
+      "decision": "BUILD",
+      "priority": "P1",
+      "ownerProcess": "T06",
+      "ownerDependencies": [
+        "T00",
+        "T08"
+      ],
+      "bundleIds": [],
+      "status": "normalized",
+      "evidenceStatus": "research-normalized"
+    },
+    {
+      "id": "SRC-SH-SJ-2023-02-R013",
+      "sourceId": "SRC-SH-SJ-2023-02",
+      "sourceLocations": [
+        "需求研究/松江二期需求对照与平台功能建议.md §5 表序号13",
+        "需求研究/地区平台需求吸收台账.md §7 J-CLIN-NURSING"
+      ],
+      "title": "智能护理系统",
+      "targetCapabilityIds": [
+        "J-CLIN-NURSING"
+      ],
+      "productClass": "PACKAGE",
+      "secondaryClasses": [],
+      "decision": "BUILD",
+      "priority": "P1",
+      "ownerProcess": "T05",
+      "ownerDependencies": [
+        "T00",
+        "T06",
+        "T08"
+      ],
+      "bundleIds": [],
+      "status": "normalized",
+      "evidenceStatus": "research-normalized"
+    },
+    {
+      "id": "SRC-SH-SJ-2023-02-R014",
+      "sourceId": "SRC-SH-SJ-2023-02",
+      "sourceLocations": [
+        "需求研究/松江二期需求对照与平台功能建议.md §5 表序号14",
+        "需求研究/地区平台需求吸收台账.md §7 J-CLIN-INFECTION"
+      ],
+      "title": "医疗临床管理系统",
+      "targetCapabilityIds": [
+        "J-CLIN-INFECTION",
+        "J-CLIN-PATH"
+      ],
+      "productClass": "PACKAGE",
+      "secondaryClasses": [],
+      "decision": "BUILD",
+      "priority": "P1",
+      "ownerProcess": "T06",
+      "ownerDependencies": [
+        "T00",
+        "T08"
+      ],
+      "bundleIds": [],
+      "status": "normalized",
+      "evidenceStatus": "research-normalized"
+    },
+    {
+      "id": "SRC-SH-SJ-2023-02-R015",
+      "sourceId": "SRC-SH-SJ-2023-02",
+      "sourceLocations": [
+        "需求研究/松江二期需求对照与平台功能建议.md §5 表序号15",
+        "需求研究/地区平台需求吸收台账.md §7 J-CLIN-CDSS"
+      ],
+      "title": "CDSS 临床决策支持",
+      "targetCapabilityIds": [
+        "J-CLIN-CDSS",
+        "L-GOV-AI"
+      ],
+      "productClass": "PACKAGE",
+      "secondaryClasses": [
+        "CORE"
+      ],
+      "decision": "BUILD",
+      "priority": "P1",
+      "ownerProcess": "T06",
+      "ownerDependencies": [
+        "T00",
+        "T01",
+        "T08"
+      ],
+      "bundleIds": [],
+      "status": "normalized",
+      "evidenceStatus": "research-normalized"
+    },
+    {
+      "id": "SRC-SH-SJ-2023-02-R016",
+      "sourceId": "SRC-SH-SJ-2023-02",
+      "sourceLocations": [
+        "需求研究/松江二期需求对照与平台功能建议.md §5 表序号16",
+        "需求研究/地区平台需求吸收台账.md §7 E-CIT-PAY"
+      ],
+      "title": "医疗付费一件事",
+      "targetCapabilityIds": [
+        "E-CIT-ORDER",
+        "E-CIT-PAY",
+        "E-CIT-REFUND"
+      ],
+      "productClass": "SHARED",
+      "secondaryClasses": [],
+      "decision": "ENHANCE",
+      "priority": "P0",
+      "ownerProcess": "T07",
+      "ownerDependencies": [
+        "T00",
+        "T05",
+        "T08"
+      ],
+      "bundleIds": [],
+      "status": "normalized",
+      "evidenceStatus": "research-normalized"
+    },
+    {
+      "id": "SRC-SH-SJ-2023-02-R017",
+      "sourceId": "SRC-SH-SJ-2023-02",
+      "sourceLocations": [
+        "需求研究/松江二期需求对照与平台功能建议.md §5 表序号17",
+        "需求研究/地区平台需求吸收台账.md §7 I-COL-MUTUAL"
+      ],
+      "title": "区域检查检验结果互认",
+      "targetCapabilityIds": [
+        "I-COL-MUTUAL"
+      ],
+      "productClass": "SHARED",
+      "secondaryClasses": [],
+      "decision": "ENHANCE",
+      "priority": "P0",
+      "ownerProcess": "T06",
+      "ownerDependencies": [
+        "T00",
+        "T05",
+        "T08"
+      ],
+      "bundleIds": [],
+      "status": "normalized",
+      "evidenceStatus": "research-normalized"
+    },
+    {
+      "id": "SRC-SH-SJ-2023-02-R018",
+      "sourceId": "SRC-SH-SJ-2023-02",
+      "sourceLocations": [
+        "需求研究/松江二期需求对照与平台功能建议.md §5 表序号18",
+        "需求研究/地区平台需求吸收台账.md §7 D-INT-DOC"
+      ],
+      "title": "电子病历卡和电子出院小结",
+      "targetCapabilityIds": [
+        "D-INT-DOC"
+      ],
+      "productClass": "SHARED",
+      "secondaryClasses": [],
+      "decision": "BUILD",
+      "priority": "P0",
+      "ownerProcess": "T08",
+      "ownerDependencies": [
+        "T00",
+        "T04"
+      ],
+      "bundleIds": [
+        "general-hospital-connectivity-v1"
+      ],
+      "status": "normalized",
+      "evidenceStatus": "research-normalized"
+    },
+    {
+      "id": "SRC-SH-SJ-2023-02-R019",
+      "sourceId": "SRC-SH-SJ-2023-02",
+      "sourceLocations": [
+        "需求研究/松江二期需求对照与平台功能建议.md §5 表序号19"
+      ],
+      "title": "数据安全一体化建设",
+      "targetCapabilityIds": [
+        "L-GOV-SEC",
+        "L-GOV-AUDIT"
+      ],
+      "productClass": "CORE",
+      "secondaryClasses": [],
+      "decision": "ENHANCE",
+      "priority": "P0",
+      "ownerProcess": "T01",
+      "ownerDependencies": [
+        "T00",
+        "T02",
+        "T08"
+      ],
+      "bundleIds": [
+        "health-platform-core-v1"
+      ],
+      "status": "normalized",
+      "evidenceStatus": "research-normalized"
+    }
+  ]
+}

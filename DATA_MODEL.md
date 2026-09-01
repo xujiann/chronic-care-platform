@@ -1,5 +1,11 @@
 # DATA MODEL — 主线数据地图
 
+## 2026-09-01 地区需求目录不是业务数据模型
+
+`regional-requirement-catalog-v1` 是仓库跟踪的产品化治理配置，不是居民、患者、机构、订单、支付、医疗文书或其他领域事实源。19 项记录当前均为 `normalized`，只保存受控来源元数据、产品化分类、Owner 候选和证据状态；只读投影不包含原始 PDF、业务载荷、凭据、Token 或生产连接信息。
+
+本切片不修改 `data/db.json`，不新增 JSON/SQLite/PostgreSQL 集合、表、字段、索引、DDL、migration、outbox 或审计事实，也不改变 `config/domain-data-ownership.json`。R009 已按原始 PDF 第 73–79 页完成视觉复核并标记 `source-verified`，其余需求的 PDF 页码待补；这些缺口必须通过后续受控来源复核更新配置，不能由运行时推断、回填或写入业务数据库。Owner review 通过之前，任何需求都不得从 `normalized` 自动提升为已批准、已实现或生产就绪。
+
 ## 2026-08-31 急救信号资源归属不变量
 
 本切片不新增或回填 `emergencySignals` 字段，不修改 JSON/SQLite/PostgreSQL schema。资源范围只消费既有信号上的 `orgCode`/`institutionCode`、来源/目标机构代码或名称、`regionCode`/`region`/`district`、受保护 `createdBy`，以及既有 `authOrganizations`/`authUsers` 组织事实。机构、来源、目标、地区、创建者组织和 `ownerRole` 现与居民/聚合身份字段一起禁止通过 PATCH 修改，防止调用方改变授权归属。未登记来源医院只有在受保护创建者能解析到当前 institution/county 时才允许；可解析到辖区外组织或完全无归属时失败关闭。commission 的既有范围不变。T00 新增的 API 行为合同只保存源码/测试锚点和分类字符串，不是业务集合、审计事实或数据库记录。生产数据回填与组织主数据核对仍属于首发迁移计划和现场工作，本切片不得创造推断值。

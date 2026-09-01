@@ -1,5 +1,12 @@
 # CURRENT ARCHITECTURE — 主线现状地图
 
+## 2026-09-01 地区需求产品化接入
+
+- `config/regional-requirement-catalog.json` 以 `regional-requirement-catalog-v1` 登记地区需求来源和 19 项归一化需求；`src/platform/productization/regional-requirement-catalog.js` 负责闭集校验、汇总及只读白名单投影，不读取原始 PDF，也不保存居民、患者、凭据或外部系统载荷。
+- 既有 `GET /api/platform/productization/center` 保持 method/path、commission 鉴权和 `platform-productization-center-v1` 顶层版本，仅向响应增加 `regionalRequirements`。未新增 endpoint、写命令、路由插槽或组合根依赖，`server.js` 保持不变。
+- 19 项当前均为 `normalized`，只能表示已进入产品化需求目录，不能表示业务能力已经实现、Owner 已审批或现场已验收。Owner review 仍待闭环；R009 已按原始 PDF 第 73–79 页完成视觉复核并标记 `source-verified`，其余条目基于研究稿完成归一化且 PDF 页码仍待补充。
+- 本切片不新增业务集合、SQLite/PostgreSQL 表、字段、DDL、migration、worker、第三方依赖或部署单元。地区需求目录和页面摘要均不能替代真实需求确认、领域 Owner 决策、外部联调与签名现场证据，平台继续 `productionReady=false`、生产 `NO-GO`。
+
 ## 2026-08-31 T06 急救信号更新资源范围
 
 `PATCH /api/emergency-signals/:id` 保持原 method/path、三类角色、成功响应、领域事件、outbox、CAS 和幂等协议。路由现在于请求体解析前读取目标并执行资源预检，命令在同聚合进程锁内、receipt replay 前再次读取并授权：机构仅能更新自身作为来源、目标或受保护创建者组织的信号，医共体仅能更新所属区县、成员机构或本组织创建的信号，commission 保持既有全局范围。机构范围复用组合根既有 `rowMatchesOrganizationScope`，区县范围只读取现有 `authOrganizations`/`authUsers` 组织事实及信号已有组织/地区/创建者字段；可解析到辖区外组织时拒绝，完全模糊归属失败关闭。拒绝使用既有安全审计端口单独记录，不与业务写混称原子事务。T00 现已把该 endpoint 登记为第 30 个完整行为验证 endpoint；该登记不新增路由、集合、DDL、依赖或部署单元，也不改变生产 `NO-GO`。

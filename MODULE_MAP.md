@@ -1,5 +1,17 @@
 # MODULE MAP — 主线模块地图
 
+## 2026-09-01 地区需求目录模块
+
+| 模块 | Owner | 标签 | 当前边界 |
+|---|---|---|---|
+| `config/regional-requirement-catalog.json` | T00 | B KEEP + IMPROVE | `regional-requirement-catalog-v1` 机器合同；登记来源与 19 项 `normalized` 需求，不保存原始 PDF、业务载荷、凭据或生产证据 |
+| `src/platform/productization/regional-requirement-catalog.js` | T00 | B KEEP + IMPROVE | 校验合同闭集、唯一 ID、产品化分类和 T00–T09 Owner 候选，构建最小只读投影；R009 的原始 PDF 第 73–79 页已复核，其余 Owner review 与页码证据未闭环时不提升状态 |
+| `src/platform/productization/runtime.js` | T00 | B KEEP + IMPROVE | 在既有 `platform-productization-center-v1` 中组合 `regionalRequirements`，不创建第二产品化中心或跨域写命令 |
+| `src/http/routes/platform-governance/productization-center.js` | T00 | A KEEP | 继续复用 commission-only `GET /api/platform/productization/center`；无新 endpoint、路由顺序、写入或 `server.js` 装配 |
+| `platform-productization-ui.js` / `platform.html` | T00 | B KEEP + IMPROVE | 只显示需求数量、分类、Owner 候选和证据状态的白名单摘要；不呈现原始采购文件或可变业务数据，不宣称能力已交付 |
+
+该模块是现有产品化治理边界的增量，不改变九个一级开发域、领域数据 Owner、模块化单体运行时或统一部署方式。19 项均需后续由相应 Owner 独立评审和实施。
+
 ## 2026-08-31 T06 急救信号更新模块
 
 | 模块 | Owner | 标签 | 当前边界 |
