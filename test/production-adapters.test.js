@@ -165,15 +165,52 @@ test("SMS adapter records provider acceptance without exposing credentials", asy
 });
 
 test("SMS adapter rejects negative provider receipts", async () => {
-  await assert.rejects(() => sendSmsVerificationCode({ phone: "13800000000", code: "654321", clientRequestId: "phone-code-negative-001" }, {
-    env: {
-      NODE_ENV: "production",
-      SMS_GATEWAY_URL: "https://sms.example.gov.cn/send",
-      SMS_GATEWAY_TOKEN: "provider-token",
-      SMS_TEMPLATE_ID: "resident-login-code"
-    },
-    fetchImpl: async () => jsonResponse({ providerMessageId: "provider-sms-rejected", status: "rejected" })
-  }), /rejected the request/);
+  const env = {
+    NODE_ENV: "production",
+    SMS_GATEWAY_URL: "https://sms.example.gov.cn/send",
+    SMS_GATEWAY_TOKEN: "provider-token",
+    SMS_TEMPLATE_ID: "resident-login-code"
+  };
+  for (const status of ["failed", "expired", "undeliverable", "rejected", "error", "denied"]) {
+    await assert.rejects(() => sendSmsVerificationCode({ phone: "13800000000", code: "654321", clientRequestId: `phone-code-negative-${status}` }, {
+      env,
+      fetchImpl: async () => jsonResponse({ providerMessageId: `provider-sms-${status}`, status })
+    }), (error) => error.code === "SMS_GATEWAY_REJECTED" && error.statusCode === 502);
+  }
+});
+
+test("SMS adapter accepts only canonical positive receipt statuses and preserves a missing-status fallback", async () => {
+  const env = {
+    NODE_ENV: "production",
+    SMS_GATEWAY_URL: "https://sms.example.gov.cn/send",
+    SMS_GATEWAY_TOKEN: "provider-token",
+    SMS_TEMPLATE_ID: "resident-login-code"
+  };
+  for (const status of ["accepted", "queued", "sent", "delivered", undefined, "   "]) {
+    const suffix = status?.trim() || "missing";
+    const body = { providerMessageId: `provider-sms-${suffix}` };
+    if (status !== undefined) body.status = status;
+    const receipt = await sendSmsVerificationCode({
+      phone: "13800000000",
+      code: "654321",
+      clientRequestId: `phone-code-${suffix}`
+    }, {
+      env,
+      fetchImpl: async () => jsonResponse(body)
+    });
+    assert.equal(receipt.status, status?.trim() || "accepted");
+  }
+
+  for (const status of ["processing", false, 0]) {
+    await assert.rejects(() => sendSmsVerificationCode({
+      phone: "13800000000",
+      code: "654321",
+      clientRequestId: `phone-code-unknown-${String(status)}`
+    }, {
+      env,
+      fetchImpl: async () => jsonResponse({ providerMessageId: `provider-sms-unknown-${String(status)}`, status })
+    }), (error) => error.code === "SMS_GATEWAY_RECEIPT_STATUS_INVALID" && error.statusCode === 502);
+  }
 });
 
 test("SMS delivery callbacks require a current valid HMAC signature", () => {
@@ -305,6 +342,26 @@ test("SMS delivery ledger is idempotent and does not regress terminal state", ()
   assert.equal(center.callbackConfigured, true);
   assert.doesNotMatch(JSON.stringify(center), /nonceDigest/);
   assert.doesNotMatch(JSON.stringify(center), /654321|provider-signature-must-not-leak/);
+});
+
+test("SMS acceptance ledger rejects explicit non-success statuses without persisting them", () => {
+  for (const status of ["failed", "expired", "undeliverable", "rejected", "processing", false, 0]) {
+    const data = { smsDeliveryReceipts: [] };
+    assert.throws(() => recordSmsDeliveryAcceptance(data, {
+      providerMessageId: `provider-sms-${status}`,
+      clientRequestId: `phone-code-${status}`,
+      status
+    }), (error) => error.code === "SMS_ACCEPTANCE_STATUS_INVALID");
+    assert.deepEqual(data.smsDeliveryReceipts, []);
+  }
+
+  const data = { smsDeliveryReceipts: [] };
+  const receipt = recordSmsDeliveryAcceptance(data, {
+    providerMessageId: "provider-sms-missing-status",
+    clientRequestId: "phone-code-missing-status"
+  });
+  assert.equal(receipt.status, "accepted");
+  assert.equal(data.smsDeliveryReceipts.length, 1);
 });
 
 test("phone verification codes are random and stored as keyed digests", () => {
