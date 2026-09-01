@@ -3,7 +3,12 @@ const fs = require("fs");
 const path = require("path");
 const LEGACY_REGIONAL_STATS_KEY = "da" + "lianHealthStatistics2025";
 const { createPlatformRuntimeComposition } = require("./src/http/platform-runtime-composition");
-const { createBrowserSecurityHeaders, createPlatformRequestHandler, createStaticContentRuntime } = require("./src/http/platform-request-handler");
+const {
+  createBrowserSecurityHeaders,
+  createPlatformRequestHandler,
+  createStaticContentRuntime,
+  publicRequestError
+} = require("./src/http/platform-request-handler");
 const platformProductizationRuntime = require("./src/platform/productization/runtime");
 const { loadRegionalRuntime } = require("./src/platform/regional/regional-runtime");
 const { ContractRegistry } = require("./src/platform/contracts/contract-registry");
@@ -28541,7 +28546,8 @@ function handleRequestError(_req, res, error) {
       sendJson(res, 503, { ok: false, code: error.code, message: error.message });
       return;
     }
-    sendJson(res, 500, { error: error.message });
+    const failure = publicRequestError(error);
+    sendJson(res, failure.status, failure.body);
 }
 
 const authorizationHttpRuntime = createAuthorizationHttpRuntime({
