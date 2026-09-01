@@ -39,7 +39,7 @@ test("static publication contract exposes only the explicit browser graph", () =
   const policy = createStaticAssetPolicy({ root: ROOT, contract, assets });
   const repositoryHtml = listFiles(ROOT).filter((file) => file.endsWith(".html")).sort();
 
-  assert.equal(contract.entrypoints.length, 44);
+  assert.equal(contract.entrypoints.length, 45);
   assert.deepEqual([...contract.entrypoints].sort(), repositoryHtml);
   assert.equal(assets.includes("index.html"), true);
   assert.equal(assets.includes("data/public-demo.json"), true);

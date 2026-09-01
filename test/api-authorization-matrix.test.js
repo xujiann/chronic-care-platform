@@ -21,7 +21,7 @@ test("modular API authorization matrix covers owners roles scopes purposes and h
   assert.equal(matrix.summary.declarations >= 606, true);
   assert.equal(matrix.summary.customAuthenticationEvidence, 13);
   assert.equal(matrix.summary.protected >= 550, true);
-  assert.equal(matrix.summary.highRisk, 10);
+  assert.equal(matrix.summary.highRisk, 15);
   assert.equal(matrix.summary.residentScoped > 0, true);
   assert.equal(matrix.summary.institutionScoped > 0, true);
   assert.equal(matrix.routes.every((route) => route.owner && route.identity && route.dataScope && route.purpose), true);

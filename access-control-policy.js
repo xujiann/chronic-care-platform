@@ -54,6 +54,7 @@
     "operations-about.html": entry("运行说明", ["commission"], { nav: false }),
     "public-health.html": entry("公共卫生", ["commission"], { group: "公共卫生", capabilities: ["publicHealth"] }),
     "public-health-highlights.html": entry("公卫亮点", ["commission"], { group: "公共卫生", capabilities: ["publicHealth"] }),
+    "public-health-supervision.html": entry("卫生监督闭环", ["commission", "institution"], { group: "公共卫生", accountTypes: manager, capabilities: ["publicHealth"] }),
     "immunization.html": entry("免疫规划", ["commission", "institution", "citizen"], { group: "公共卫生", capabilities: ["immunization"] }),
     "maternal-child-about.html": entry("妇幼健康", ["commission", "institution", "citizen"], { nav: false, capabilities: ["maternalChild"] }),
     "quality-safety.html": entry("质量安全", ["commission", "institution", "county"], { group: "监管治理", capabilities: ["qualitySafety"] }),

@@ -3876,6 +3876,531 @@
       ],
       "productionReady": false,
       "externalEvidenceRequired": true
+    },
+    {
+      "contractId": "public-health.supervision-subject-create-command.v1",
+      "key": "POST /api/public-health/supervision/subjects",
+      "method": "POST",
+      "path": "/api/public-health/supervision/subjects",
+      "owner": "T03",
+      "domain": "public-health",
+      "purpose": "create-scoped-health-supervision-subject-reference",
+      "customAuthenticationEvidence": false,
+      "authentication": {
+        "required": true,
+        "mechanism": "bearer-or-cookie-session",
+        "principalType": "platform-user",
+        "credentialSource": [
+          "header:authorization",
+          "cookie:session"
+        ],
+        "replayCsrf": {
+          "replayProtection": "actor-scoped-idempotency-key-hash-plus-subject-resource-lock",
+          "csrf": "platform-session-transport-policy"
+        }
+      },
+      "authorization": {
+        "model": "platform-rbac-plus-fail-closed-manager-organization-and-directory-jurisdiction-scope",
+        "roles": [
+          "commission"
+        ],
+        "dataScope": "city and health-admin medical-institution directory; district direct directory jurisdiction"
+      },
+      "coverage": {
+        "level": "endpoint",
+        "selector": "entire-route",
+        "actions": [
+          "create-supervision-subject-reference"
+        ],
+        "unverifiedRemainder": false
+      },
+      "idempotency": {
+        "key": "header:Idempotency-Key-or-body:idempotencyKey",
+        "payloadBinding": [
+          "actorScope",
+          "organizationCode",
+          "riskLevel",
+          "expectedVersion"
+        ],
+        "exactReplay": "rechecks current directory scope and returns the persisted creation response with status 200 without another subject, audit or state write",
+        "conflictingReuse": "PUBLIC_HEALTH_SUPERVISION_IDEMPOTENCY_CONFLICT",
+        "persistenceScope": "subject aggregate receipt and one chained security audit in one platform state write",
+        "distributedExactlyOnceClaimed": false
+      },
+      "concurrency": {
+        "cas": {
+          "required": true,
+          "field": "per-organization subject resource lock plus publicHealthSupervisionSubjects collection version",
+          "conflictCodes": [
+            "PUBLIC_HEALTH_SUPERVISION_VERSION_CONFLICT"
+          ]
+        }
+      },
+      "errors": [
+        {
+          "code": "PUBLIC_HEALTH_SUPERVISION_INPUT_INVALID",
+          "status": 400
+        },
+        {
+          "code": "PUBLIC_HEALTH_SUPERVISION_IDEMPOTENCY_KEY_REQUIRED",
+          "status": 400
+        },
+        {
+          "code": "PUBLIC_HEALTH_SUPERVISION_SCOPE_FORBIDDEN",
+          "status": 403
+        },
+        {
+          "code": "PUBLIC_HEALTH_SUPERVISION_NOT_FOUND",
+          "status": 404
+        },
+        {
+          "code": "PUBLIC_HEALTH_SUPERVISION_IDEMPOTENCY_CONFLICT",
+          "status": 409
+        },
+        {
+          "code": "PUBLIC_HEALTH_SUPERVISION_VERSION_CONFLICT",
+          "status": 409
+        },
+        {
+          "code": "PUBLIC_HEALTH_SUPERVISION_AUDIT_FAILED",
+          "status": 500
+        },
+        {
+          "code": "PUBLIC_HEALTH_SUPERVISION_STORAGE_FAILED",
+          "status": 500
+        }
+      ],
+      "audit": {
+        "accepted": "commits the minimal directory-backed subject reference, bounded receipt and chained security audit in one platform state write",
+        "replay": "returns the original subject creation response without another subject, receipt, audit or state write",
+        "rejected": "identity and manager organization scope precede body or state; directory jurisdiction denial records a separate minimized audit; validation and conflicts do not write; storage failures have no fallback business write"
+      },
+      "implementationEvidence": [
+        {
+          "file": "src/http/routes/public-health/health-supervision.js",
+          "anchors": [
+            "health-supervision:subject:",
+            "findApiCommandReceipt(records, command)",
+            "prepareWrite(created.nextData, data, [COLLECTIONS.subjects]"
+          ]
+        },
+        {
+          "file": "src/platform/storage/state-command-consistency.js",
+          "anchors": [
+            "function collectionVersion",
+            "function prepareCollectionCas"
+          ]
+        }
+      ],
+      "testEvidence": [
+        {
+          "file": "test/public-health-supervision-api.test.js",
+          "anchors": [
+            "subject create enforces explicit idempotency, directory scope and exact zero-write replay",
+            "PUBLIC_HEALTH_SUPERVISION_IDEMPOTENCY_CONFLICT",
+            "scope audit and storage failures are fail-closed and redacted"
+          ]
+        }
+      ],
+      "productionReady": false,
+      "externalEvidenceRequired": true
+    },
+    {
+      "contractId": "public-health.supervision-task-create-command.v1",
+      "key": "POST /api/public-health/supervision/inspection-tasks",
+      "method": "POST",
+      "path": "/api/public-health/supervision/inspection-tasks",
+      "owner": "T03",
+      "domain": "public-health",
+      "purpose": "create-scoped-health-supervision-inspection-task",
+      "customAuthenticationEvidence": false,
+      "authentication": {
+        "required": true,
+        "mechanism": "bearer-or-cookie-session",
+        "principalType": "platform-user",
+        "credentialSource": [
+          "header:authorization",
+          "cookie:session"
+        ],
+        "replayCsrf": {
+          "replayProtection": "actor-scoped-idempotency-key-hash-plus-subject-resource-lock",
+          "csrf": "platform-session-transport-policy"
+        }
+      },
+      "authorization": {
+        "model": "platform-rbac-plus-fail-closed-manager-organization-and-subject-scope",
+        "roles": [
+          "commission"
+        ],
+        "dataScope": "city and health-admin scoped subjects; district own-jurisdiction subjects"
+      },
+      "coverage": {
+        "level": "endpoint",
+        "selector": "entire-route",
+        "actions": [
+          "create-inspection-task"
+        ],
+        "unverifiedRemainder": false
+      },
+      "idempotency": {
+        "key": "header:Idempotency-Key-or-body:idempotencyKey",
+        "payloadBinding": [
+          "actorScope",
+          "subjectId",
+          "taskType",
+          "priority",
+          "dueAt",
+          "checklistTemplateId",
+          "checklistTemplateVersion",
+          "expectedVersion"
+        ],
+        "exactReplay": "rechecks current subject scope and returns the persisted creation response with status 200 without another task, audit or state write",
+        "conflictingReuse": "PUBLIC_HEALTH_SUPERVISION_IDEMPOTENCY_CONFLICT",
+        "persistenceScope": "inspection task aggregate receipt and one chained security audit in one platform state write",
+        "distributedExactlyOnceClaimed": false
+      },
+      "concurrency": {
+        "cas": {
+          "required": true,
+          "field": "per-subject resource lock plus publicHealthSupervisionInspectionTasks collection version",
+          "conflictCodes": [
+            "PUBLIC_HEALTH_SUPERVISION_VERSION_CONFLICT"
+          ]
+        }
+      },
+      "errors": [
+        {
+          "code": "PUBLIC_HEALTH_SUPERVISION_INPUT_INVALID",
+          "status": 400
+        },
+        {
+          "code": "PUBLIC_HEALTH_SUPERVISION_IDEMPOTENCY_KEY_REQUIRED",
+          "status": 400
+        },
+        {
+          "code": "PUBLIC_HEALTH_SUPERVISION_SCOPE_FORBIDDEN",
+          "status": 403
+        },
+        {
+          "code": "PUBLIC_HEALTH_SUPERVISION_NOT_FOUND",
+          "status": 404
+        },
+        {
+          "code": "PUBLIC_HEALTH_SUPERVISION_IDEMPOTENCY_CONFLICT",
+          "status": 409
+        },
+        {
+          "code": "PUBLIC_HEALTH_SUPERVISION_VERSION_CONFLICT",
+          "status": 409
+        },
+        {
+          "code": "PUBLIC_HEALTH_SUPERVISION_STORAGE_FAILED",
+          "status": 500
+        }
+      ],
+      "audit": {
+        "accepted": "commits the inspection task, bounded receipt and chained security audit in one platform state write",
+        "replay": "returns the original task creation response without another task, receipt, audit or state write",
+        "rejected": "identity and organization scope precede replay; missing or out-of-scope subjects, validation and conflicts do not write; storage failures have no fallback business write"
+      },
+      "implementationEvidence": [
+        {
+          "file": "src/http/routes/public-health/health-supervision.js",
+          "anchors": [
+            "health-supervision:subject:${String(payload.subjectId || \"\")}",
+            "findApiCommandReceipt(tasks, command)",
+            "prepareWrite(created.nextData, data, [COLLECTIONS.tasks]"
+          ]
+        },
+        {
+          "file": "src/public-health/health-supervision/service.js",
+          "anchors": [
+            "function createInspectionTaskToState",
+            "validateTaskCommand"
+          ]
+        }
+      ],
+      "testEvidence": [
+        {
+          "file": "test/public-health-supervision-api.test.js",
+          "anchors": [
+            "API completes task, inspection, remediation and independent review with one write per command",
+            "assert.equal(taskReplay.body.idempotent, true)",
+            "assert.equal(harness.calls.write, 2)"
+          ]
+        }
+      ],
+      "productionReady": false,
+      "externalEvidenceRequired": true
+    },
+    {
+      "contractId": "public-health.supervision-task-action-command.v1",
+      "key": "POST /api/public-health/supervision/inspection-tasks/:id/actions",
+      "method": "POST",
+      "path": "/api/public-health/supervision/inspection-tasks/:id/actions",
+      "owner": "T03",
+      "domain": "public-health",
+      "purpose": "transition-scoped-inspection-task-and-record-inspection",
+      "customAuthenticationEvidence": false,
+      "authentication": {
+        "required": true,
+        "mechanism": "bearer-or-cookie-session",
+        "principalType": "platform-user",
+        "credentialSource": [
+          "header:authorization",
+          "cookie:session"
+        ],
+        "replayCsrf": {
+          "replayProtection": "actor-scoped-idempotency-key-hash-plus-task-resource-lock",
+          "csrf": "platform-session-transport-policy"
+        }
+      },
+      "authorization": {
+        "model": "platform-rbac-plus-fail-closed-assigned-commission-organization-scope",
+        "roles": [
+          "commission"
+        ],
+        "dataScope": "inspection task assigned commission organization"
+      },
+      "coverage": {
+        "level": "endpoint",
+        "selector": "entire-route",
+        "actions": [
+          "accept",
+          "start",
+          "record-inspection",
+          "cancel"
+        ],
+        "unverifiedRemainder": false
+      },
+      "idempotency": {
+        "key": "header:Idempotency-Key-or-body:idempotencyKey",
+        "payloadBinding": [
+          "actorScope",
+          "taskId",
+          "action",
+          "expectedVersion",
+          "actionPayload"
+        ],
+        "exactReplay": "rechecks current task assignment and returns the persisted action response with status 200 without another aggregate, inspection record, finding, audit or state write",
+        "conflictingReuse": "PUBLIC_HEALTH_SUPERVISION_IDEMPOTENCY_CONFLICT",
+        "persistenceScope": "task aggregate receipt, optional immutable inspection record and findings, and one chained security audit in one platform state write",
+        "distributedExactlyOnceClaimed": false
+      },
+      "concurrency": {
+        "cas": {
+          "required": true,
+          "field": "per-task resource lock plus aggregate expectedVersion and publicHealthSupervisionInspectionTasks collection version",
+          "conflictCodes": [
+            "PUBLIC_HEALTH_SUPERVISION_VERSION_CONFLICT"
+          ]
+        }
+      },
+      "errors": [
+        {
+          "code": "PUBLIC_HEALTH_SUPERVISION_INPUT_INVALID",
+          "status": 400
+        },
+        {
+          "code": "PUBLIC_HEALTH_SUPERVISION_EXPECTED_VERSION_REQUIRED",
+          "status": 400
+        },
+        {
+          "code": "PUBLIC_HEALTH_SUPERVISION_SCOPE_FORBIDDEN",
+          "status": 403
+        },
+        {
+          "code": "PUBLIC_HEALTH_SUPERVISION_NOT_FOUND",
+          "status": 404
+        },
+        {
+          "code": "PUBLIC_HEALTH_SUPERVISION_IDEMPOTENCY_CONFLICT",
+          "status": 409
+        },
+        {
+          "code": "PUBLIC_HEALTH_SUPERVISION_VERSION_CONFLICT",
+          "status": 409
+        },
+        {
+          "code": "PUBLIC_HEALTH_SUPERVISION_STORAGE_FAILED",
+          "status": 500
+        }
+      ],
+      "audit": {
+        "accepted": "commits one task transition, bounded receipt, optional inspection record and findings, and chained security audit in one platform state write",
+        "replay": "returns the original action response without another aggregate, receipt, inspection record, finding, audit or state write",
+        "rejected": "identity and current task assignment scope precede replay; expectedVersion and command conflicts do not write; storage failures have no fallback business write"
+      },
+      "implementationEvidence": [
+        {
+          "file": "src/http/routes/public-health/health-supervision.js",
+          "anchors": [
+            "health-supervision:task:${taskId}",
+            "assertApiCommandExpectedVersion(task, command)",
+            "prepareWrite(changed.nextData, data, touched, COLLECTIONS.tasks)"
+          ]
+        },
+        {
+          "file": "src/public-health/health-supervision/service.js",
+          "anchors": [
+            "function applyInspectionTaskActionToState",
+            "inspection can only be recorded once from in-progress"
+          ]
+        }
+      ],
+      "testEvidence": [
+        {
+          "file": "test/public-health-supervision-api.test.js",
+          "anchors": [
+            "concurrent identical task actions commit once under the task lock",
+            "filter(Boolean).length, 1",
+            "assert.equal(harness.calls.write, before + 1)"
+          ]
+        },
+        {
+          "file": "test/public-health-supervision-service.test.js",
+          "anchors": [
+            "task state machine closes a compliant inspection with one immutable record"
+          ]
+        }
+      ],
+      "productionReady": false,
+      "externalEvidenceRequired": true
+    },
+    {
+      "contractId": "public-health.supervision-finding-action-command.v1",
+      "key": "POST /api/public-health/supervision/findings/:id/actions",
+      "method": "POST",
+      "path": "/api/public-health/supervision/findings/:id/actions",
+      "owner": "T03",
+      "domain": "public-health",
+      "purpose": "submit-or-review-scoped-supervision-remediation",
+      "customAuthenticationEvidence": false,
+      "authentication": {
+        "required": true,
+        "mechanism": "bearer-or-cookie-session",
+        "principalType": "platform-user",
+        "credentialSource": [
+          "header:authorization",
+          "cookie:session"
+        ],
+        "replayCsrf": {
+          "replayProtection": "actor-scoped-idempotency-key-hash-plus-parent-task-resource-lock",
+          "csrf": "platform-session-transport-policy"
+        }
+      },
+      "authorization": {
+        "model": "platform-rbac-plus-fail-closed-current-subject-ownership-or-assigned-reviewer-scope",
+        "roles": [
+          "commission",
+          "institution"
+        ],
+        "dataScope": "institution own subject for remediation submission; assigned commission organization for independent review"
+      },
+      "coverage": {
+        "level": "endpoint",
+        "selector": "entire-route",
+        "actions": [
+          "submit-remediation",
+          "review-remediation"
+        ],
+        "unverifiedRemainder": false
+      },
+      "idempotency": {
+        "key": "header:Idempotency-Key-or-body:idempotencyKey",
+        "payloadBinding": [
+          "actorScope",
+          "findingId",
+          "action",
+          "expectedVersion",
+          "note",
+          "decision",
+          "evidenceRefs"
+        ],
+        "exactReplay": "rechecks current subject or reviewer scope and returns the persisted action response with status 200 without another finding, task, audit or state write",
+        "conflictingReuse": "PUBLIC_HEALTH_SUPERVISION_IDEMPOTENCY_CONFLICT",
+        "persistenceScope": "finding receipt, finding and parent task transitions, and one chained security audit in one platform state write",
+        "distributedExactlyOnceClaimed": false
+      },
+      "concurrency": {
+        "cas": {
+          "required": true,
+          "field": "parent task resource lock plus finding expectedVersion and publicHealthSupervisionFindings collection version",
+          "conflictCodes": [
+            "PUBLIC_HEALTH_SUPERVISION_VERSION_CONFLICT"
+          ]
+        }
+      },
+      "errors": [
+        {
+          "code": "PUBLIC_HEALTH_SUPERVISION_INPUT_INVALID",
+          "status": 400
+        },
+        {
+          "code": "PUBLIC_HEALTH_SUPERVISION_EXPECTED_VERSION_REQUIRED",
+          "status": 400
+        },
+        {
+          "code": "PUBLIC_HEALTH_SUPERVISION_SCOPE_FORBIDDEN",
+          "status": 403
+        },
+        {
+          "code": "PUBLIC_HEALTH_SUPERVISION_NOT_FOUND",
+          "status": 404
+        },
+        {
+          "code": "PUBLIC_HEALTH_SUPERVISION_IDEMPOTENCY_CONFLICT",
+          "status": 409
+        },
+        {
+          "code": "PUBLIC_HEALTH_SUPERVISION_VERSION_CONFLICT",
+          "status": 409
+        },
+        {
+          "code": "PUBLIC_HEALTH_SUPERVISION_STORAGE_FAILED",
+          "status": 500
+        }
+      ],
+      "audit": {
+        "accepted": "commits the finding transition, parent task projection, bounded receipt and chained security audit in one platform state write",
+        "replay": "returns the original finding action response without another finding, task, receipt, audit or state write",
+        "rejected": "identity and current subject ownership or assigned reviewer scope precede replay; expectedVersion and command conflicts do not write; scope denial uses a separate minimized audit and storage failures have no fallback business write"
+      },
+      "implementationEvidence": [
+        {
+          "file": "src/http/routes/public-health/health-supervision.js",
+          "anchors": [
+            "health-supervision:task:${initialFinding.taskId}",
+            "assertApiCommandExpectedVersion(finding, command)",
+            "prepareWrite(changed.nextData, data, [COLLECTIONS.findings, COLLECTIONS.tasks]"
+          ]
+        },
+        {
+          "file": "src/public-health/health-supervision/service.js",
+          "anchors": [
+            "function applySupervisionFindingActionToState",
+            "taskFindings.every((item) => item.status === \"verified\")"
+          ]
+        }
+      ],
+      "testEvidence": [
+        {
+          "file": "test/public-health-supervision-api.test.js",
+          "anchors": [
+            "API completes task, inspection, remediation and independent review with one write per command",
+            "assert.equal(submittedReplay.body.idempotent, true)",
+            "assert.equal(approved.body.task.status, \"closed\")"
+          ]
+        },
+        {
+          "file": "test/public-health-supervision-service.test.js",
+          "anchors": [
+            "finding actions enforce institution ownership, assignment scope and stale versions"
+          ]
+        }
+      ],
+      "productionReady": false,
+      "externalEvidenceRequired": true
     }
   ]
 }

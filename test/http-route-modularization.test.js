@@ -28,7 +28,7 @@ const EXPECTED_DOMAINS = [
 ];
 
 test("platform routes have one explicit ordered manifest across domain modules", () => {
-  assert.equal(ROUTE_ORDER.length, 76);
+  assert.equal(ROUTE_ORDER.length, 77);
   assert.equal(new Set(ROUTE_ORDER.map((route) => route.id)).size, ROUTE_ORDER.length);
   assert.deepEqual([...new Set(ROUTE_ORDER.map((route) => route.domain))].sort(), EXPECTED_DOMAINS);
 
@@ -43,7 +43,7 @@ test("platform routes have one explicit ordered manifest across domain modules",
 test("large governance, public-health and clinical contexts are physically split by subdomain", () => {
   const files = runtimeSourceFiles(ROOT).map((file) => path.relative(ROOT, file).replaceAll("\\", "/"));
   const splitEntries = Object.entries(ROUTE_SUBDOMAINS);
-  assert.equal(splitEntries.length, 25);
+  assert.equal(splitEntries.length, 26);
   for (const [id, subdomain] of splitEntries) {
     const domain = id.startsWith("platform-governance-")
       ? "platform-governance"

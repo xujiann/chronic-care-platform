@@ -20,7 +20,7 @@
 ## 2026-08-31 当前架构事实机器对账
 
 - `scripts/documentation-fact-drift.js` 现以生产 API 目录、首批生产范围、SQLite migration、仓库 Markdown/PDF 闭集和 Accepted ADR 注册表为机器权威，对 ROADMAP、ARCHITECTURE、六张架构地图和 ADR 索引共 9 份当前文档失败关闭。
-- 当前对账值为 SQLite head v17/38 张非内部表、生产 API 609 项/347 个写入口/317 个行为证明缺口/319 个总复核项、首批范围 `FROZEN-NO-GO` 且范围内 API/集合复核与仓库迁移计划缺口均为 0、Markdown 273 份（204 current、68 snapshot、1 superseded）。
+- 当前对账值为 SQLite head v17/38 张非内部表、生产 API 614 项/351 个写入口/317 个行为证明缺口/319 个总复核项、首批范围 `FROZEN-NO-GO` 且范围内 API/集合复核与仓库迁移计划缺口均为 0、Markdown 273 份（204 current、68 snapshot、1 superseded）。
 - 该验证仅在内存 SQLite 中重放既有 migration 并读取仓库权威；不写 `data/db.json`、运行时 SQLite、生产证据、生成报告或归档产物，不改变任何运行时行为。
 
 ## 2026-08-31 首发数据迁移计划闭集
@@ -61,7 +61,7 @@
 flowchart TB
   B["浏览器多页面应用"] --> H["Node HTTP 入口\nserver.js"]
   H --> P["请求壳\n会话水合 / 错误边界 / 静态文件"]
-  P --> R["API Router\n76 个有序路由段"]
+  P --> R["API Router\n77 个有序路由段"]
   R --> C["运行时上下文\n13 个路由域"]
   C --> D["领域与平台模块\nsrc/ + 根目录遗留服务"]
   D --> J["JSON 快照\n252 个集合"]
@@ -110,20 +110,20 @@ flowchart TB
 | 专项应用 | 公卫、急救、血液、影像、体检、护理、陪诊等页面 | 专项领域体验与演示 |
 | 数智医院子站 | `digital-hospital-standard-platform/` | 标准能力展示；单个 `app.js` 约 10.5k 行 |
 | 居民小程序适配 | `resident-mini-program-platform/` | 居民端交付适配 |
-| API 路由入口 | `src/http/api-router.js`、`src/http/routes/index.js` | 76 个路由段的固定顺序与短路 |
+| API 路由入口 | `src/http/api-router.js`、`src/http/routes/index.js` | 77 个路由段的固定顺序与短路 |
 | 后台入口 | `scripts/*worker.js`、systemd timer | outbox 投递、同步、核对和控制任务 |
 
 ## 4. 运行时边界
 
 - `main` 是唯一集成和发布分支。
 - `config/process-workstreams.json` 定义 T00–T09 所有权；跨域协议、路由顺序、CI、组合根和部署属于 T00。
-- `config/domain-data-ownership.json` 登记 83 个生产候选集合；`shared` 和 `state-data` 明确为非所有者域。
+- `config/domain-data-ownership.json` 登记 111 个 owner 合同；`shared` 和 `state-data` 明确为非所有者域。
 - 开发环境允许 JSON 或 SQLite；生产策略声明 PostgreSQL 为事实源且禁止 fallback write。
 - 生产 Go/No-Go 默认 `NO-GO`，真实环境、联调、审批和站点证据不能由仓库生成。
 
 ## 5. 已确认的边界偏差
 
-1. 静态服务器与 Pages 现按 `config/static-publication.json` 的 44 个入口递归收集显式浏览器资源；未知路径统一 404。
+1. 静态服务器与 Pages 现按 `config/static-publication.json` 的 45 个入口递归收集显式浏览器资源；未知路径统一 404。
 2. 浏览器和 Service Worker 已迁移到合成的 `data/public-demo.json`；`data/db.json` 不进入静态制品。
 3. `server.js` 仍约 28.7k 行；SQLite migration 已抽离约 550 行，但路由拆分没有同步拆完组合根和领域实现。
 4. ARC-002 已删除 `pilot-cutover-alert-runtime` 对 `server.js` 的反向
@@ -141,7 +141,7 @@ flowchart TB
    unregister/Cache Storage 清理。SEC-004 另增加急救生命链、医生工作台、血液上线看板、陪诊工作台、产品运行驾驶舱、产品区域运行驾驶舱、质量安全工作台、区域切换工作台、血液召回面板、血液创新指挥中心及体检风险卡各 1 项恶意 API 载荷回归；Go/No-Go 回归锁定四方业务责任属性不再被登录角色过滤器误删。
    当前根 40 + 居民 13 + PWA 3 = 56 项；标准在线 context 仍保持阻止 Service Worker。
 7. 审计验证已收敛到 `src/identity-security/audit-chain.js` 的 v2 严格端口；内容、链接、结构和重复 ID 任一异常均失败，验证 API/合规报告不再读取时重封。全量状态写入中的审计数组由服务端管理。
-8. 机器 API 授权矩阵现从路由扫描和小型认证证据合同派生 616 条声明；`production-api-catalog-v3` 与 374 个字面条件路由取并集，形成 609 个唯一接口条目（601 个字面路由、8 个运行时策略）。认证证据共 13 项且无未分类。幂等证据注册表现有 32 份直接行为合同：30 个完整 endpoint 与 2 个转诊 action-slice。T09、T04/T05、T02/T06 共关闭冻结首发范围 17 个写入口；T06 急救信号死信重放和更新分别以直接测试绑定角色/资源范围、精确回放、冲突和审计行为。347 个写接口中 30 个 endpoint 为 `behavior-verified`，317 个仍为 `behavior-proof-required`；两个通用 action endpoint 使当前 319 项需复核，609 项全部 `NO-GO`。进程锁和 SQLite collection-version CAS 均不被解释为跨实例 exactly-once，`reviewedProofRequired` 保持为零。
+8. 机器 API 授权矩阵现从路由扫描和小型认证证据合同派生 621 条声明；`production-api-catalog-v3` 与 377 个字面条件路由取并集，形成 614 个唯一接口条目（606 个字面路由、8 个运行时策略）。认证证据共 13 项且无未分类。幂等证据注册表现有 36 份直接行为合同：34 个完整 endpoint 与 2 个转诊 action-slice。T03 卫生监督四个写入口已以直接测试绑定角色/资源范围、精确回放、冲突、CAS、单次持久化和审计行为。351 个写接口中 34 个 endpoint 为 `behavior-verified`，317 个仍为 `behavior-proof-required`；两个通用 action endpoint 使当前 319 项需复核，614 项全部 `NO-GO`。进程锁和 SQLite collection-version CAS 均不被解释为跨实例 exactly-once，`reviewedProofRequired` 保持为零。
 9. P1 生产适配器增量保持现有 owner：T01 的 `production-adapters.js` 承担 JWKS/JWT 与 SMS 协议；OTP、发送/登录限流和失败锁定由共享 `auth-security-state-store` 承载，单主机 SQLite 复用 `state_collections`、生产多实例使用组合根长期 PostgreSQL pool；T00 的 PostgreSQL 组合保持 shadow/rehearsal 且 `productionPrimary=false`，受控迁移评估继续失败关闭。连续审计已使用 v15 同事务 append-only source、最小投影和 checkpoint v3，worker/preflight/systemd 已进入部署制品；未签名 receipt、外部单调 anchor、真实 WORM/KMS 与现场证据使 `productionReady=false` 继续失败关闭。
    浏览器服务端登录不再把 token/bearer 写入 `localStorage`；Cookie 上下文在服务端和浏览器
    水合链路均优先，旧脚本可读 token 会在上下文请求前清除。生产 bearer/hybrid 只有显式
@@ -169,14 +169,14 @@ flowchart TB
     仅以 Report-Only 下发，因为动态 CSSOM/全角色运行时回归、真实托管响应头、独立扫描和现场验收
     均未证明，`productionReady` 保持 `false`。
 13. DATA-003 首个仓库内治理切片复用现有 `collection-governance`，不新建第二份 owner 清单。
-    当前快照 252 个集合已全部获得机器状态：60 个命中既有可写 owner 合同，19 个首发 legacy
-    引用完成唯一业务 owner/reader/classification 审查但仍禁止生产写入，3 个为既有系统集合，169 个
+    当前快照 252 个集合已全部获得机器状态：61 个命中既有可写 owner 合同，19 个首发 legacy
+    引用完成唯一业务 owner/reader/classification 审查但仍禁止生产写入，3 个为既有系统集合，168 个
     源码精确引用但 owner 未明确的集合标为 `review-required`，1 个仅存在种子的集合标为
-    `legacy-quarantined`。owner 清单共 106 个合同，27 个当前不在快照。静态扫描覆盖 599 个受跟踪
+    `legacy-quarantined`。owner 清单共 111 个合同，31 个当前不在快照。静态扫描覆盖 599 个受跟踪
     JS/HTML 运行时源；process owner 只作为
     review 证据且固定禁止推断数据 owner。新增/删除、重复状态、引用漂移、非 owner 域和生产晋升
     都在 CI 失败关闭；本切片没有修改 JSON/SQLite、schema、API 或运行时，仍为 `NO-GO`。
-14. SEC-004 治理清单已升级为 `browser-security-risk-inventory.v2`，当前扫描 145 个显式发布资产。
+14. SEC-004 治理清单已升级为 `browser-security-risk-inventory.v2`，当前扫描 148 个显式发布资产。
     `browser-safe-url-policy.v1` 复用居民短时凭据/对象存储的 HTTPS、无凭据和 exact-Origin 语义，
     为 internal navigation、official source、object storage、`tel` 与 blob download 建立唯一公共端口。
     血液主工作台、急救生命链、医生工作台、血液上线看板、陪诊工作台、产品运行驾驶舱、产品区域运行驾驶舱、质量安全工作台、区域切换工作台、血液召回面板、血液创新指挥中心及体检工作台的可信 DOM/text 切片与 Safe URL 内部闭环后，机器基线锁定

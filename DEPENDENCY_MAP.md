@@ -182,7 +182,7 @@ TypeScript 与 Node 类型仅用于开发门禁；lockfile audit 已修复 c8 �
 
 ## 4. 浏览器依赖
 
-- 44 个 HTML 页面和根目录脚本通过全局加载顺序共享状态。
+- 45 个 HTML 页面和根目录脚本通过全局加载顺序共享状态。
 - `auth.js`、`shared.js`、`platform-api-client.js`、`platform-shell.js` 是主要共享边界。
 - 动态浏览器凭据方向为 `HttpOnly Cookie → /api/auth/context → 脱敏身份投影`；`auth.js` 在
   任何普通 API 调用前清除旧 localStorage token，Cookie 与 Authorization 并存时服务端也选择

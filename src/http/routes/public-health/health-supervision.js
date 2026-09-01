@@ -217,6 +217,20 @@ function commandIdentity(req, user, payload, route, resourceId) {
 }
 
 function createRouteSegment(runtime) {
+  const { appendSecurityEvent, collectJson, randomUUID, readDatabase, requireApiRole, sealAuditTrail, sendJson, writeDatabase } = runtime;
+  return createScopedRouteSegment(Object.freeze({
+    appendSecurityEvent,
+    collectJson,
+    randomUUID,
+    readDatabase,
+    requireApiRole,
+    sealAuditTrail,
+    sendJson,
+    writeDatabase
+  }));
+}
+
+function createScopedRouteSegment(runtime) {
   return {
     id: "public-health-05",
     domain: "public-health",
