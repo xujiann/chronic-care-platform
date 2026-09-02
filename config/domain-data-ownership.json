@@ -496,6 +496,11 @@
       "classification": "internal",
       "readers": []
     },
+    "procurementRequirementGovernance": {
+      "owner": "platform-governance",
+      "classification": "internal",
+      "readers": []
+    },
     "institutionIntegrationProfiles": {
       "owner": "integration",
       "classification": "internal",

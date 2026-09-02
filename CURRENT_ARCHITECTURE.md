@@ -1,5 +1,12 @@
 # CURRENT ARCHITECTURE — 主线现状地图
 
+## 2026-09-02 招标需求治理 v2
+
+- `procurement-requirement-governance-v1` 以中性来源别名、PDF SHA-256、受复核页数、文本质量、外部未扫描状态和页码/章节锚点登记候选；原始 PDF、文件名、本地路径和全文不进入仓库状态或浏览器响应。
+- 独立能力注册表完整覆盖历史目录引用的 27 个稳定 ID，并以仓库证据、仅声明、缺失或外部证据待补四种状态派生差距；仓库证据不等于现场或生产就绪。
+- 产品化中心保持 v1 顶层兼容并增加 `requirementGovernance`；commission 复核入口使用显式幂等键、操作者绑定和乐观版本。复核只能接受、退回补充或本期不纳入，不能自动改代码、创建任务或解除生产门禁。
+- 首批 PDF CLI 只做允许目录、普通文件、魔数、大小、摘要、加密/活动内容预检并绑定人工提取清单；不在 HTTP 请求中解析，不调用 OCR、模型、网络或外部工具。全部投影固定 `productionReady=false`。
+
 ## 2026-09-01 T03 卫生监督业务闭环
 
 - `public-health-05 / health-supervision` 承载 1 个受范围约束的工作台查询和 4 个命令入口；路由只做认证、manager/组织范围、幂等/CAS、审计和持久化适配，纯状态转换位于 `src/public-health/health-supervision/`。
@@ -20,7 +27,7 @@
 ## 2026-08-31 当前架构事实机器对账
 
 - `scripts/documentation-fact-drift.js` 现以生产 API 目录、首批生产范围、SQLite migration、仓库 Markdown/PDF 闭集和 Accepted ADR 注册表为机器权威，对 ROADMAP、ARCHITECTURE、六张架构地图和 ADR 索引共 9 份当前文档失败关闭。
-- 当前对账值为 SQLite head v17/38 张非内部表、生产 API 614 项/351 个写入口/317 个行为证明缺口/319 个总复核项、首批范围 `FROZEN-NO-GO` 且范围内 API/集合复核与仓库迁移计划缺口均为 0、Markdown 273 份（204 current、68 snapshot、1 superseded）。
+- 当前对账值为 SQLite head v17/38 张非内部表、生产 API 615 项/352 个写入口/318 个行为证明缺口/320 个总复核项、首批范围 `FROZEN-NO-GO` 且范围内 API/集合复核与仓库迁移计划缺口均为 0、Markdown 274 份（205 current、68 snapshot、1 superseded）。
 - 该验证仅在内存 SQLite 中重放既有 migration 并读取仓库权威；不写 `data/db.json`、运行时 SQLite、生产证据、生成报告或归档产物，不改变任何运行时行为。
 
 ## 2026-08-31 首发数据迁移计划闭集
@@ -141,7 +148,7 @@ flowchart TB
    unregister/Cache Storage 清理。SEC-004 另增加急救生命链、医生工作台、血液上线看板、陪诊工作台、产品运行驾驶舱、产品区域运行驾驶舱、质量安全工作台、区域切换工作台、血液召回面板、血液创新指挥中心及体检风险卡各 1 项恶意 API 载荷回归；Go/No-Go 回归锁定四方业务责任属性不再被登录角色过滤器误删。
    当前根 40 + 居民 13 + PWA 3 = 56 项；标准在线 context 仍保持阻止 Service Worker。
 7. 审计验证已收敛到 `src/identity-security/audit-chain.js` 的 v2 严格端口；内容、链接、结构和重复 ID 任一异常均失败，验证 API/合规报告不再读取时重封。全量状态写入中的审计数组由服务端管理。
-8. 机器 API 授权矩阵现从路由扫描和小型认证证据合同派生 621 条声明；`production-api-catalog-v3` 与 377 个字面条件路由取并集，形成 614 个唯一接口条目（606 个字面路由、8 个运行时策略）。认证证据共 13 项且无未分类。幂等证据注册表现有 36 份直接行为合同：34 个完整 endpoint 与 2 个转诊 action-slice。T03 卫生监督四个写入口已以直接测试绑定角色/资源范围、精确回放、冲突、CAS、单次持久化和审计行为。351 个写接口中 34 个 endpoint 为 `behavior-verified`，317 个仍为 `behavior-proof-required`；两个通用 action endpoint 使当前 319 项需复核，614 项全部 `NO-GO`。进程锁和 SQLite collection-version CAS 均不被解释为跨实例 exactly-once，`reviewedProofRequired` 保持为零。
+8. 机器 API 授权矩阵现从路由扫描和小型认证证据合同派生 622 条声明；`production-api-catalog-v3` 与 377 个字面条件路由取并集，形成 615 个唯一接口条目（607 个字面路由、8 个运行时策略）。认证证据共 13 项且无未分类。幂等证据注册表现有 36 份直接行为合同：34 个完整 endpoint 与 2 个转诊 action-slice。招标需求人工复核入口保持高风险授权、幂等键和 CAS 失败关闭，复核状态、回执与安全审计已一次持久化，但稳定 HTTP 错误仍待直接证明；T03 卫生监督四个写入口已以直接测试绑定角色/资源范围、精确回放、冲突、CAS、单次持久化和审计行为。352 个写接口中 34 个 endpoint 为 `behavior-verified`，318 个仍为 `behavior-proof-required`；两个通用 action endpoint 使当前 320 项需复核，615 项全部 `NO-GO`。进程锁和 SQLite collection-version CAS 均不被解释为跨实例 exactly-once，`reviewedProofRequired` 当前为 1。
 9. P1 生产适配器增量保持现有 owner：T01 的 `production-adapters.js` 承担 JWKS/JWT 与 SMS 协议；OTP、发送/登录限流和失败锁定由共享 `auth-security-state-store` 承载，单主机 SQLite 复用 `state_collections`、生产多实例使用组合根长期 PostgreSQL pool；T00 的 PostgreSQL 组合保持 shadow/rehearsal 且 `productionPrimary=false`，受控迁移评估继续失败关闭。连续审计已使用 v15 同事务 append-only source、最小投影和 checkpoint v3，worker/preflight/systemd 已进入部署制品；未签名 receipt、外部单调 anchor、真实 WORM/KMS 与现场证据使 `productionReady=false` 继续失败关闭。
    浏览器服务端登录不再把 token/bearer 写入 `localStorage`；Cookie 上下文在服务端和浏览器
    水合链路均优先，旧脚本可读 token 会在上下文请求前清除。生产 bearer/hybrid 只有显式
@@ -306,7 +313,7 @@ Worker、外部数字医院注册及仍为 Proposed 的对象存储 v2 worker �
 `baseline/governance-20260817-enhancement-v1` 仅保留为可复现证据 tag。历史日期化路由/治理文档不再被
 `AGENTS.md` 作为当前工作流入口引用，原文和摘要保持不变。
 
-`repository-governance-v1` 从 Git 路径派生；当前闭集为 273 份 Markdown：204 份 `current`、68 份
+`repository-governance-v1` 从 Git 路径派生；当前闭集为 274 份 Markdown：205 份 `current`、68 份
 `snapshot`、1 份 `superseded`，每个路径必须唯一命中规则；snapshot 内容聚合摘要失败关闭。
 `output/pdf` 的 3 个 PDF 未修改，分别绑定 SHA-256、大小、页数、引入提交、来源与保留理由。现有仓库
 没有任何一个 PDF 的可复现生成器；医院运行脚本只是 verifier，不能被描述为 generator。机器门禁只读，

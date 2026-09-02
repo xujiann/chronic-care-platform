@@ -1,5 +1,11 @@
 # DATA MODEL — 主线数据地图
 
+## 2026-09-02 招标需求治理数据边界
+
+版本化配置保存中性 `sourceAlias`、PDF 摘要、大小、受复核页数、提取/安全状态、候选陈述、页码/章节锚点和能力 ID，不保存原始 PDF、原文件名、本地路径、全文、居民/患者/联系人、凭据或生产连接信息。
+
+唯一新增状态集合 `procurementRequirementGovernance` 由 `platform-governance` 拥有，内含有界的 `reviews/events/commands`。备注、操作者和幂等键只保存 SHA-256；命令回执保存最小复核结果快照，用于零写回放。该集合仍使用现有 JSON/SQLite 状态兼容路径，无新 DDL/migration/PostgreSQL 聚合，不具备生产写或晋级资格。
+
 ## 2026-09-01 T03 卫生监督数据边界
 
 新增四个受限领域集合：`publicHealthSupervisionSubjects`、`publicHealthSupervisionInspectionTasks`、`publicHealthSupervisionInspectionRecords`、`publicHealthSupervisionFindings`，Owner 均为 `public-health`，仅向 `platform-governance` 开放治理读取。检查记录写入后不可修改；整改提交与复核轮次内嵌于问题，避免第二事实源。
@@ -319,13 +325,13 @@ source/sink contract、目标摘要、cursor/source hash 与 receipt 摘要；ch
 
 ## 13. 生产 API 目录数据边界
 
-`production-api-catalog-v3` 是从路由源码、授权矩阵与两个小型证据注册表即时派生的治理元数据，不新增 JSON 集合、SQLite/PostgreSQL 表、字段、DDL、migration、outbox 或生产事实源。`config/api-authentication-evidence.json` 只登记可由控制流和负向测试证明的 custom auth 入口；SMS 认证继续从既有 `config/api-idempotency-evidence.json` 派生，避免第二份手工真相。两者均只保存源码/测试引用和分类字符串，不复制 614 项路由清单，也不保存真实 credential、provider payload 或外部回执。
+`production-api-catalog-v3` 是从路由源码、授权矩阵与两个小型证据注册表即时派生的治理元数据，不新增 JSON 集合、SQLite/PostgreSQL 表、字段、DDL、migration、outbox 或生产事实源。`config/api-authentication-evidence.json` 只登记可由控制流和负向测试证明的 custom auth 入口；SMS 认证继续从既有 `config/api-idempotency-evidence.json` 派生，避免第二份手工真相。两者均只保存源码/测试引用和分类字符串，不复制 615 项路由清单，也不保存真实 credential、provider payload 或外部回执。
 
 目录中的源码 marker 既不是认证证明，也不是幂等执行证据；只有 owner、控制流锚点和可执行负向测试一致时才产生认证 evidence contract。认证分类只描述 AS-IS 的 required/optional/none、凭据来源、replay/CSRF 和 scope，不代表目标政策充分或生产安全。幂等 `behavior-verified` 仍只证明当前仓库行为，不证明跨实例 exactly-once 或生产耐久性；所有生产状态继续 `NO-GO`。
 
 API-002 的 existing-proof 扩展现使注册表达到 36 份合同，其中 34 个为完整 endpoint、2 个为 action-slice。T09 使用既有 `researchDatasets`、`compliantDataExports`、`drugConsumableSupervisions` 与审计集合；T04/T05 复用慢病计划、反馈和会诊聚合；T02/T06 复用 operations、quality-safety 与 emergency signal 聚合、收件箱、发件箱及既有审计投影；T03 卫生监督四个写入口复用主体、任务、不可变检查记录、问题及审计集合。有界 receipt 保存散列命令身份和首次公共响应或精确结果快照，使聚合后续变化后仍可零写返回原响应。T07 标准药械状态机和 T03 highlight signal 合同保持既有边界。没有为证据注册本身新增表、DDL、migration、outbox 或事实源，也不宣称跨实例 exactly-once；生产 PostgreSQL 状态未改变。
 
-T07 第二批审计的 3 条 `reviewedProofRequired` 已全部由直接 endpoint 行为合同替换；formal grouping create 最后关闭资源范围、并发/CAS、稳定错误和原子审计证据缺口。机器验证仍禁止拒绝记录和正式合同同 key 并存，当前 `reviewedProofRequired` 为 0。
+T07 第二批审计的 3 条 `reviewedProofRequired` 已全部由直接 endpoint 行为合同替换；formal grouping create 最后关闭资源范围、并发/CAS、稳定错误和原子审计证据缺口。机器验证仍禁止拒绝记录和正式合同同 key 并存。招标需求人工复核入口已将复核状态、回执和安全审计一次持久化，因稳定 HTTP 错误尚未直接证明，当前 `reviewedProofRequired` 为 1。
 
 ## 14. 内部边界覆盖率数据边界
 

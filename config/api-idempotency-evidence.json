@@ -5,7 +5,47 @@
     "unregisteredWriteStatus": "behavior-proof-required",
     "productionPromotionAllowed": false
   },
-  "reviewedProofRequired": [],
+  "reviewedProofRequired": [
+    {
+      "reviewId": "platform-governance-procurement-requirement-review-proof-gap",
+      "key": "POST /api/platform/productization/requirements/:id/actions",
+      "method": "POST",
+      "path": "/api/platform/productization/requirements/:id/actions",
+      "owner": "T02",
+      "domain": "platform-governance",
+      "missingProof": [
+        "stable-error-contract"
+      ],
+      "evidence": [
+        {
+          "file": "src/platform/productization/procurement-requirement-governance.js",
+          "anchors": [
+            "const requestDigest = digest(JSON.stringify({ requirementId, action, expectedVersion, actorDigest: digest(actor), noteDigest: digest(note) }));",
+            "PROCUREMENT_REQUIREMENT_COMMAND_CONFLICT",
+            "PROCUREMENT_REQUIREMENT_VERSION_CONFLICT"
+          ]
+        },
+        {
+          "file": "src/http/routes/platform-governance/productization-center.js",
+          "anchors": [
+            "/api/platform/productization/requirements/:id/actions",
+            "if (!execution.replayed) {",
+            "execution.data.securityEvents = prependAuditTrailEntry",
+            "writeDatabase(execution.data);"
+          ]
+        },
+        {
+          "file": "test/procurement-requirement-route.test.js",
+          "anchors": [
+            "requirement review route binds idempotency and actor then persists minimized state",
+            "assert.equal(fixture.calls[0].securityEvents.length, 1);",
+            "requirement review replay does not write state or duplicate audit"
+          ]
+        }
+      ],
+      "productionReady": false
+    }
+  ],
   "contracts": [
     {
       "contractId": "identity-security.sms-delivery-callback-idempotency.v1",

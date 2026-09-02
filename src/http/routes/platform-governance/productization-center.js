@@ -4,7 +4,7 @@ const ROUTE_SEGMENT_ID = "platform-governance-11";
 const SUBDOMAIN = "productization-center";
 
 function createRouteSegment(runtime) {
-  const { appendSecurityEvent, applyPlatformWorkItemAction, applyPlatformWorkItemV2GovernanceAction, buildPlatformEnhancementCockpit, buildPlatformProductOperationsCockpit, buildPlatformProductizationCenter, collectJson, readDatabase, registerInstitutionIntegrationProfile, requireApiRole, runInstitutionSyntheticJointTest, sendJson, writeDatabase } = runtime;
+  const { appendSecurityEvent, applyPlatformWorkItemAction, applyPlatformWorkItemV2GovernanceAction, applyProcurementRequirementReviewAction, buildPlatformEnhancementCockpit, buildPlatformProductOperationsCockpit, buildPlatformProductizationCenter, collectJson, prependAuditTrailEntry, randomUUID, readDatabase, registerInstitutionIntegrationProfile, requireApiRole, runInstitutionSyntheticJointTest, sendJson, writeDatabase } = runtime;
   return {
     id: ROUTE_SEGMENT_ID,
     domain: "platform-governance",
@@ -19,7 +19,7 @@ function createRouteSegment(runtime) {
           action: "platform-productization-center-read",
           target: url.pathname,
           result: "allowed",
-          detail: `${report.dataPromotion.summary.promotedP0} promoted P0; ${report.dataPromotion.summary.repositoryPlanReady} owner-reviewed repository plan-ready; ${report.dataPromotion.summary.firstReleaseMigrationPlans} persistent first-release plans; ${report.workItems.summary.open} open work items; ${report.regionalRequirements.summary.requirements} normalized regional requirements; production gate closed`
+          detail: `${report.dataPromotion.summary.promotedP0} promoted P0; ${report.dataPromotion.summary.repositoryPlanReady} owner-reviewed repository plan-ready; ${report.dataPromotion.summary.firstReleaseMigrationPlans} persistent first-release plans; ${report.workItems.summary.open} open work items; ${report.regionalRequirements.summary.requirements} compatibility requirements; ${report.requirementGovernance.summary.candidates} procurement candidates; production gate closed`
         });
         sendJson(res, 200, report);
         return true;
@@ -69,6 +69,35 @@ function createRouteSegment(runtime) {
         writeDatabase(execution.data);
         appendSecurityEvent({ actor: user.name, role: user.role, action: `platform-work-item-${payload.action}`, target: execution.result.id, result: "allowed", detail: `version=${execution.result.version}; replayed=${execution.replayed}` });
         sendJson(res, 200, { ok: true, replayed: execution.replayed, item: execution.result, productionReady: false });
+        return true;
+      }
+
+      const requirementReviewMatch = url.pathname.match(/^\/api\/platform\/productization\/requirements\/([^/]+)\/actions$/);
+      if (req.method === "POST" && requirementReviewMatch) {
+        const user = requireApiRole(req, res, ["commission"], "/api/platform/productization/requirements/:id/actions");
+        if (!user) return true;
+        const idempotencyKey = String(req.headers?.["idempotency-key"] || "").trim();
+        if (!idempotencyKey) throw new TypeError("Idempotency-Key header is required");
+        const payload = await collectJson(req);
+        const execution = applyProcurementRequirementReviewAction(readDatabase(), {
+          ...payload,
+          commandId: idempotencyKey,
+          requirementId: decodeURIComponent(requirementReviewMatch[1])
+        }, user);
+        if (!execution.replayed) {
+          execution.data.securityEvents = prependAuditTrailEntry(execution.data.securityEvents, {
+            id: randomUUID(),
+            at: new Date().toLocaleString("zh-CN", { hour12: false }),
+            actor: user.name,
+            role: user.role,
+            action: `procurement-requirement-${payload.action}`,
+            target: execution.result.id,
+            result: "allowed",
+            detail: `version=${execution.result.version}; source content omitted; production gate closed`
+          });
+          writeDatabase(execution.data);
+        }
+        sendJson(res, 200, { ok: true, replayed: execution.replayed, requirement: execution.result, productionReady: false });
         return true;
       }
 

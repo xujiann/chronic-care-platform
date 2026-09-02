@@ -18,6 +18,10 @@ const {
   buildPlatformEnhancementCockpit
 } = require("./enhancement-runtime");
 const { buildRegionalRequirementCatalog } = require("./regional-requirement-catalog");
+const {
+  applyProcurementRequirementReviewAction,
+  buildProcurementRequirementGovernance
+} = require("./procurement-requirement-governance");
 
 function buildPlatformProductizationCenter(data, options = {}) {
   const dataPromotion = buildDataPromotionCenter(data, options);
@@ -26,22 +30,30 @@ function buildPlatformProductizationCenter(data, options = {}) {
   const regionalRequirements = buildRegionalRequirementCatalog({
     catalog: options.regionalRequirementCatalog,
     bundleCatalog: options.regionalCapabilityBundles,
+    capabilityRegistry: options.platformCapabilityRegistry,
+    now: options.now
+  });
+  const requirementGovernance = buildProcurementRequirementGovernance(data, {
+    catalog: options.procurementRequirementCatalog,
+    registry: options.platformCapabilityRegistry,
     now: options.now
   });
   return Object.freeze({
     schemaVersion: "platform-productization-center-v1",
     generatedAt: options.now || new Date().toISOString(),
-    ok: dataPromotion.ok && workItems.ok && institutionIntegration.ok && regionalRequirements.ok,
+    ok: dataPromotion.ok && workItems.ok && institutionIntegration.ok && regionalRequirements.ok && requirementGovernance.ok,
     productionReady: false,
     dataPromotion,
     workItems,
     institutionIntegration,
     regionalRequirements,
+    requirementGovernance,
     boundary: "Productization capabilities improve local operability but do not replace site evidence or production approval."
   });
 }
 
 module.exports = {
+  applyProcurementRequirementReviewAction,
   applyPlatformWorkItemV2GovernanceAction,
   applyPlatformWorkItemAction,
   buildDataPromotionCenter,
@@ -49,6 +61,7 @@ module.exports = {
   buildPlatformProductOperationsCockpit,
   buildPlatformEnhancementCockpit,
   buildPlatformProductizationCenter,
+  buildProcurementRequirementGovernance,
   buildRegionalRequirementCatalog,
   buildPlatformWorkItemCenter,
   registerInstitutionIntegrationProfile,

@@ -189,7 +189,7 @@ test("repository inventory covers every current state collection and never autho
   const report = run({ now: "2026-08-22T00:00:00.000Z" });
   assert.equal(report.ok, true);
   assert.equal(report.summary.collections, 252);
-  assert.equal(Object.keys(manifest.collections).length, 111);
+  assert.equal(Object.keys(manifest.collections).length, 112);
   assert.equal(report.summary.ownerAssigned, 80);
   assert.equal(report.summary.authoritative, 61);
   assert.equal(report.summary.ownerReviewedLegacy, 19);

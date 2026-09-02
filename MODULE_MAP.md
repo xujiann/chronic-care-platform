@@ -1,5 +1,16 @@
 # MODULE MAP — 主线模块地图
 
+## 2026-09-02 招标需求治理模块
+
+| 模块 | Owner | 标签 | 当前边界 |
+|---|---|---|---|
+| `config/procurement-requirement-governance.json` | T00 | B KEEP + IMPROVE | 中性文档指纹、候选与受控锚点；不保存 PDF、原文件名、路径或全文 |
+| `config/platform-capability-registry.json` | T00 + 能力 Owner | B KEEP + IMPROVE | 27 个稳定能力 ID 与仓库证据权威；不声明现场或生产就绪 |
+| `procurement-requirement-contracts` / `gap-analysis` | T00 | A KEEP | 闭集校验与只读差距派生；未知能力失败关闭 |
+| `procurement-document-import` + CLI | T00 | B KEEP + IMPROVE | 仓库外文件指纹检查并绑定人工清单；不写应用状态、不调用解析模型 |
+| `procurement-requirement-governance` | T00/T02 | B KEEP + IMPROVE | 最小复核覆盖层、操作者摘要、版本冲突与幂等回执；生产固定 NO-GO |
+| 产品化中心 route/runtime/UI | T00/T02 | B KEEP + IMPROVE | v1 响应兼容、新工作台和 commission 复核；不暴露原始内容 |
+
 ## 2026-09-01 T03 卫生监督模块
 
 | 模块 | Owner | 标签 | 当前边界 |
@@ -112,7 +123,7 @@
 | 前端共享 | `auth.js`、`shared.js`、`platform-api-client.js`、`platform-shell.js` | 身份上下文、API 调用、壳和设计系统；服务端 token 不进入 localStorage，Cookie 上下文优先，陈旧凭据启动即清理 |
 | 静态发布与浏览器安全 | `src/http/static-asset-policy.js`、`src/http/static-content-runtime.js`、`src/http/browser-security-policy.js`、`src/http/browser-security-inventory.js`、`browser-safe-url.js`、`page-auth-bootstrap.js`、`scripts/static-publication.js` | 45 个入口、148 个显式发布资产、Pages 制品和服务端读取共用默认拒绝契约；既有高风险页面、生产 Go/No-Go 页面及新增卫生监督页均按可信 DOM/text 渲染，Safe URL port 按 internal/official/object-storage/tel/blob 能力在 mutation 前检查协议、凭据和 exact-Origin。Inventory v2 现锁定 793 个 DOM HTML、6 个动态 URL 和 42 个动态样式风险；体检工作台、生产 Go/No-Go 页面与卫生监督页自身 P0/P1 finding 已归零，2 个 OHIF URL occurrence 仍复核。严格 CSP 仍是 Report-Only，生产 NO-GO |
 | 演示脱敏 | `src/platform/data/public-demo-snapshot.js` | 服务端合成、Pages 构建和 storage-admin 共用纯函数，凭据字段删除、个人姓名/身份/联系字段稳定掩码 |
-| API 生产目录 | `routeSourceFiles` + `api-authentication-evidence` + `api-idempotency-evidence` → `api-authorization-matrix-v3` → `production-api-catalog-v3` | 当前目录 614 项，13 项认证证据保持未分类为 0。36 份幂等行为合同覆盖 34 个完整 endpoint 与 2 个转诊 action-slice；T03 卫生监督四个写入口和 T06 急救信号入口均绑定独立完整 endpoint 直接证据。351 个写接口中 317 个仍缺 endpoint 级行为证明，通用 action remainder 使 319 项保持复核，全部生产 NO-GO。`reviewedProofRequired` 为零，有界 receipt、进程锁与 SQLite CAS 不是多实例生产证明 |
+| API 生产目录 | `routeSourceFiles` + `api-authentication-evidence` + `api-idempotency-evidence` → `api-authorization-matrix-v3` → `production-api-catalog-v3` | 当前目录 615 项，13 项认证证据保持未分类为 0。36 份幂等行为合同覆盖 34 个完整 endpoint 与 2 个转诊 action-slice；招标需求人工复核入口保持高风险授权、幂等键和 CAS 失败关闭，复核状态、回执与安全审计已一次持久化，但稳定错误证据尚未闭合。352 个写接口中 318 个仍缺 endpoint 级行为证明，通用 action remainder 使 320 项保持复核，全部生产 NO-GO。`reviewedProofRequired` 为 1，有界 receipt、进程锁与 SQLite CAS 不是多实例生产证明 |
 | 内部边界覆盖治理 | `config/internal-boundary-coverage.json` → `scripts/internal-boundary-coverage.js` | 复用现有 c8/直接行为测试，以 10 个不重叠源码组锁定 identity、audit、object storage、API governance、worker observability、区域共享命令、转诊 owner command、科研合规导出、浏览器响应头与 Safe URL 真实基线；每组绑定至少一条实际执行的负向合同，报告仅写临时目录 |
 | Playwright E2E 基础设施 | `playwright-browser-policy.v1`、`playwright-pwa-browser-policy.v1`、`playwright-port-policy`、三套 runner/config | 在线根 40 项（含生产 Go/No-Go 恶意响应与四方审批角色回归）与居民 13 项继续阻止 Service Worker；独立 PWA 3 项只在专项 context 允许 Worker，三套共 56 项唯一并集，统一 Chromium、动态端口和临时数据，并验证缓存/注册清理 |
 | 生产证据信任 provider | `src/platform/governance/production-evidence-trust-provider.js` → `scripts/production-preflight.js` | T00 通用 signed-envelope/anchor 验证端口与 production decision 适配；CLI 可部署装配，双角色 Ed25519、pin、撤销、时窗和发布上下文失败关闭；不拥有生产授权 |
@@ -359,7 +370,7 @@ owner、文件引用和 closed-world 核心概念匹配只是证据，不能自�
 |---|---|---|---|
 | `config/repository-governance.json` | T00 | 当前 workflow、Markdown 分类规则/闭集摘要、3 个 PDF 来源与 digest 的机器合同 | 不定义业务 owner，不包含 PDF 正文 |
 | `scripts/repository-governance.js` | T00 | 只读枚举 Git 路径，拒绝漏分/重叠/快照改写/旧 baseline/PDF 漂移 | 不生成或修改文档、PDF、报告和归档 |
-| `test/repository-governance.test.js` | T00 / TEST-001 | 锁定当前 273 份 Markdown、三类边界、当前 main 流程和 3 个 PDF 负向漂移 | 不证明 PDF 内容正确或生产可用 |
+| `test/repository-governance.test.js` | T00 / TEST-001 | 锁定当前 274 份 Markdown、三类边界、当前 main 流程和 3 个 PDF 负向漂移 | 不证明 PDF 内容正确或生产可用 |
 
 依赖方向为 `Git 跟踪路径 + ADR 状态 + 当前进程清单 + PDF bytes/source paths → repository governance
 verifier → governance-api/architecture:test`。snapshot 与 superseded 只提供历史证据，不得反向覆盖 current
