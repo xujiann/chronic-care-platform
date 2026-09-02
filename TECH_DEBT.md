@@ -96,7 +96,7 @@ T00 机器登记完成后，`production-release-scope` 中 17 个仓库内 API �
 | ARC-006 | 同名模块 | 根目录与 `src/` 有 6 组同名 | 文档明确前端/服务端/迁移角色，不做全仓改名 |
 | ARC-008 | operations 跨域写入 | OPS-02 为保持兼容，将 T06 的既有直写整体移入 T02；其中 `resourceDispatchRequests`、`taskMessages` 的机器 Owner 仍是 T05 care-coordination | 后续仅在独立 ADR/切片中改为 T05 owner port 或版本化事件；在完成行为矩阵前不得直接改写副作用 |
 | API-001 | 错误契约 | 多种 JSON 错误格式 | 新 API 使用版本化标准错误接口 |
-| API-002 | 接口目录复核 | v3 当前 615 项、13 项认证证据且未分类为 0。T00 已登记 36 份幂等合同、34 个 endpoint verified；招标需求人工复核入口保持高风险授权、幂等键和 CAS 失败关闭，复核状态、回执与审计一次持久化，T03 卫生监督四个写入口完成 endpoint 证据闭环，既有首发范围复核仍为零。招标需求入口尚缺稳定错误直接证据，`reviewedProofRequired` 为 1。318 个写接口仍缺 endpoint 级证明，320 项保持 review-required | 继续逐 owner 渐进补证。卫生监督及既有聚合 receipt 均有界，进程锁只覆盖单实例，JSON 路径和 SQLite CAS 均不是跨实例 exactly-once。`resourceDispatchRequests` 仍有 T05 owner 的既有跨域写债；PG 多实例、长期审计/归档和真实外部/现场证据均未决，相关 endpoint 保持 NO-GO |
+| API-002 | 接口目录复核 | v3 当前 617 项、13 项认证证据且未分类为 0。T00 已登记 39 份幂等合同、37 个 endpoint verified；招标需求复核、脱敏批次登记和交付治理入口保持高风险授权、幂等键和 CAS 失败关闭，状态、回执与审计一次持久化。`reviewedProofRequired` 为 0。354 个写接口中 317 个仍缺 endpoint 级证明，319 项保持 review-required | 继续逐 owner 渐进补证。既有聚合 receipt 均有界，进程锁只覆盖单实例，JSON 路径和 SQLite CAS 均不是跨实例 exactly-once。`resourceDispatchRequests` 仍有 T05 owner 的既有跨域写债；PG 多实例、长期审计/归档和真实外部/现场证据均未决，相关 endpoint 保持 NO-GO |
 | JOB-001 | Worker 一致性 | 12 个既有 worker profile、9 个部署入口已建立 `platform-worker-observability.v1` 脱敏兼容投影；领域 state/retry/lease/checkpoint/receipt 仍各自权威，仓库不据此推导生产授权 | 后续接入真实指标/日志采集器与告警路由前，必须另行确认 owner、留存、访问控制和现场启用证据；不得把兼容投影演变为统一领域状态机 |
 | TEST-006 | 静态基线与测试性能 | `test/api.test.js` 的全文件 `no-unreachable` 已关闭，原 3 个 care 显式 skip 已由 T05 owner/route 独立特征测试逐块重验并恢复执行；陪诊引用挂号单的存在性/scope 缺口与 handoff `reject/return` 投影已最小修复。typecheck 为 13 个唯一文件；两个前端文件的 16 个重复翻译键已有逐键 shadow/final 值和真实调用保护，去重保持首次插入顺序及最终生效值，lint 文件级例外已归零；API 热点仍作为独立 integration 批次输出耗时。五个可逆夹具切片已分别提取临时 seed/env/server、单个 HIS hospital mock、单个 SIEM alert mock、单个 financial gateway mock 和单个 object-storage gateway mock 生命周期；storage 的签名响应、四类 operation、动态 URL 与 mutable scan 状态通过领域 helper 和最小 setter 保真。43 个子测试顺序摘要继续锁定 suite 成员、断言、超时、单进程语义、CI 预算与 required checks 不降低 | API 巨型测试仍集中约 8,200 行业务断言和其余共享状态。后续只按一个共享服务生命周期继续小步拆分，不得按耗时并行化共享状态或把 helper 变成生产接口。耗时先观察多次 CI 分布，不凭单机样本设门槛；不得恢复文件级 lint 豁免；外部护理/陪诊/HIS/SIEM/financial/storage 投递与现场证据继续由生产 readiness 跟踪，不以本测试关闭 |
 
@@ -132,7 +132,7 @@ T00 机器登记完成后，`production-release-scope` 中 17 个仓库内 API �
 | TEST-005 | 2026-08-27 | 本地/CI 统一 Playwright Chromium；在线根 40 项与居民 13 项继续阻止 Service Worker；PWA 3 项使用独立允许策略、动态端口和临时数据；Go/No-Go 同时覆盖四方业务责任属性与恶意响应可信渲染 | 56 项唯一并集/漂移测试、居民同文件 13/13、PWA 重复 9/9、完整标准 E2E；不得把仓库浏览器测试解释为真实 HTTPS、托管安全头或现场验收 |
 | TEST-008 | 2026-08-23 | 专用 PWA/Service Worker E2E 验证居民登录后安装、v60→v61 激活清理、受控 update、离线 mobile/citizen 回退、API/源快照 404 缓存边界与逐项注销/清缓存 | 真实 HTTPS 终止、OS 安装提示/策略、浏览器设备矩阵、外部 Origin、现场缓存升级与独立安全验收继续外置；仓库测试不产生生产 GO |
 | GOV-001 | 2026-08-23 | `main`/`origin/main` 成为唯一当前集成与默认开发基线；固定 governance tag 仅作可复现证据，旧日期化 workflow 原文冻结 | process plan/verify 默认值、manifest/AGENTS/iteration program 漂移和 CI 目标分支负向测试 |
-| DOC-001 | 2026-08-24 | 关闭时为 267 份；当前 274 份 Markdown 以路径和 ADR 台账唯一分类为 205 current、68 snapshot、1 superseded；不删除历史证据 | 闭集路径/分类摘要、规则重叠、ADR status、当前事实和 snapshot 内容聚合摘要失败关闭 |
+| DOC-001 | 2026-08-24 | 关闭时为 267 份；当前 275 份 Markdown 以路径和 ADR 台账唯一分类为 206 current、68 snapshot、1 superseded；不删除历史证据 | 闭集路径/分类摘要、规则重叠、ADR status、当前事实和 snapshot 内容聚合摘要失败关闭 |
 | REPO-001 | 2026-08-23 | 3 个跟踪 PDF 均登记 SHA-256、大小、页数、引入提交、来源、保留理由和真实 generator 可用性；二进制本体未修改 | exact tracked inventory、digest/size/page/source 漂移负向测试；替换前必须补可复现生成源，禁止手工编辑 |
 
 ## 重复、死代码和命名结论

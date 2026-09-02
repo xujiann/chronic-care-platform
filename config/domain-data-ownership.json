@@ -501,6 +501,16 @@
       "classification": "internal",
       "readers": []
     },
+    "procurementRequirementCatalog": {
+      "owner": "platform-governance",
+      "classification": "internal",
+      "readers": []
+    },
+    "procurementRequirementDelivery": {
+      "owner": "platform-governance",
+      "classification": "internal",
+      "readers": []
+    },
     "institutionIntegrationProfiles": {
       "owner": "integration",
       "classification": "internal",

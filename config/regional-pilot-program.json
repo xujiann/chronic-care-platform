@@ -26,6 +26,7 @@
     "src/platform/productization/work-item-center.js",
     "src/platform/productization/institution-integration-center.js",
     "src/platform/regional/regional-product-assembly.js",
+    "platform-procurement-governance-ui.js",
     "platform-productization-ui.js",
     "test/chronic-followup-readiness.test.js",
     "test/t05-referral-command-api.test.js"

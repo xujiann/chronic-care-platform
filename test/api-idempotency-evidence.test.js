@@ -34,8 +34,8 @@ function formalGroupingReviewFixture() {
 
 test("idempotency evidence registry validates only directly proven endpoint and action-slice contracts", () => {
   assert.deepEqual(validateEvidenceRegistry(), []);
-  assert.equal(DEFAULT_REGISTRY.contracts.length, 37);
-  assert.equal(endpointEvidenceContracts().length, 35);
+  assert.equal(DEFAULT_REGISTRY.contracts.length, 39);
+  assert.equal(endpointEvidenceContracts().length, 37);
   assert.equal(actionSliceEvidenceContracts().length, 2);
   assert.equal(proofRequiredReviews().length, 0);
   const smsContract = DEFAULT_REGISTRY.contracts.find((contract) => contract.key === "POST /api/auth/sms-delivery-callback");
@@ -46,6 +46,8 @@ test("idempotency evidence registry validates only directly proven endpoint and 
     "POST /api/auth/sms-delivery-callback"
   ]);
   assert.deepEqual(DEFAULT_REGISTRY.contracts.map((contract) => contract.key), [
+    "POST /api/platform/productization/requirement-batches",
+    "POST /api/platform/productization/requirements/:id/lifecycle-actions",
     "POST /api/platform/productization/requirements/:id/actions",
     "POST /api/auth/sms-delivery-callback",
     "POST /api/regional-data-sharing/access-reviews",
@@ -113,7 +115,7 @@ test("procurement requirement review is promoted by stable endpoint behavior evi
 
 test("catalog promotes only whole endpoints and retains generic action routes as review-required", () => {
   const catalog = buildProductionApiCatalog();
-  assert.equal(catalog.summary.writeIdempotencyBehaviorVerified, 35);
+  assert.equal(catalog.summary.writeIdempotencyBehaviorVerified, 37);
   assert.equal(catalog.summary.writeIdempotencyActionSlicesVerified, 2);
   assert.equal(catalog.summary.writeIdempotencyBehaviorProofRequired,
     catalog.summary.writeRoutes - catalog.summary.writeIdempotencyBehaviorVerified);
@@ -122,6 +124,8 @@ test("catalog promotes only whole endpoints and retains generic action routes as
   assert.equal(catalog.summary.writeIdempotencyBehaviorProofRequired >= 308, true);
 
   for (const key of [
+    "POST /api/platform/productization/requirement-batches",
+    "POST /api/platform/productization/requirements/:id/lifecycle-actions",
     "POST /api/platform/productization/requirements/:id/actions",
     "POST /api/auth/sms-delivery-callback",
     "POST /api/regional-data-sharing/access-reviews",

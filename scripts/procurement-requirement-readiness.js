@@ -9,16 +9,21 @@ const defaultOwnership = require("../config/domain-data-ownership.json");
 const defaultAuthorization = require("../config/high-risk-api-authorization.json");
 const { validateGovernanceCatalog } = require("../src/platform/productization/procurement-requirement-contracts");
 const { buildProcurementRequirementGovernance } = require("../src/platform/productization/procurement-requirement-governance");
+const { buildProcurementRequirementDelivery } = require("../src/platform/productization/procurement-requirement-delivery");
 const { buildProcurementRevisionComparisons } = require("../src/platform/productization/procurement-requirement-versioning");
 
 const ROOT = path.resolve(__dirname, "..");
-const ADR_PATH = path.join(ROOT, "docs", "adr", "2026-09-02-procurement-requirement-governance-v2.md");
+const ADR_PATH = path.join(ROOT, "docs", "adr", "2026-09-02-procurement-requirement-governance-center-v3.md");
 const ROUTE_PATH = path.join(ROOT, "src", "http", "routes", "platform-governance", "productization-center.js");
 const IMPORT_PATH = path.join(ROOT, "src", "platform", "productization", "procurement-document-import.js");
 const IMPORT_CLI_PATH = path.join(ROOT, "scripts", "procurement-requirement-import.js");
 const VERSIONING_PATH = path.join(ROOT, "src", "platform", "productization", "procurement-requirement-versioning.js");
+const CATALOG_REGISTRY_PATH = path.join(ROOT, "src", "platform", "productization", "procurement-requirement-catalog-registry.js");
+const DELIVERY_PATH = path.join(ROOT, "src", "platform", "productization", "procurement-requirement-delivery.js");
+const STATE_DATA_PATH = path.join(ROOT, "src", "http", "routes", "state-data.js");
 const UI_PATHS = Object.freeze([
   path.join(ROOT, "platform.html"),
+  path.join(ROOT, "platform-procurement-governance-ui.js"),
   path.join(ROOT, "platform-productization-ui.js")
 ]);
 const REQUIRED_ADR_SECTIONS = Object.freeze([
@@ -33,6 +38,8 @@ const REQUIRED_ADR_SECTIONS = Object.freeze([
 const SOURCE_LOCALITY_MARKERS = Object.freeze(["上海", "松江", "武汉", "Shanghai", "Songjiang", "Wuhan"]);
 const FORBIDDEN_DATA_KEYS = /^(?:file(?:name|path)?|localPath|raw(?:Text|Document)?|excerpt|prompt|instruction|patient|resident|credential|password|secret|token)$/i;
 const REVIEW_ROUTE = "POST /api/platform/productization/requirements/:id/actions";
+const IMPORT_ROUTE = "POST /api/platform/productization/requirement-batches";
+const DELIVERY_ROUTE = "POST /api/platform/productization/requirements/:id/lifecycle-actions";
 
 function check(id, passed, detail) {
   return Object.freeze({ id, passed: Boolean(passed), detail: String(detail || "") });
@@ -68,6 +75,9 @@ function buildProcurementRequirementReadiness(options = {}) {
   const importText = options.importText ?? readText(path.join(root, path.relative(ROOT, IMPORT_PATH)));
   const importCliText = options.importCliText ?? readText(path.join(root, path.relative(ROOT, IMPORT_CLI_PATH)));
   const versioningText = options.versioningText ?? readText(path.join(root, path.relative(ROOT, VERSIONING_PATH)));
+  const catalogRegistryText = options.catalogRegistryText ?? readText(path.join(root, path.relative(ROOT, CATALOG_REGISTRY_PATH)));
+  const deliveryText = options.deliveryText ?? readText(path.join(root, path.relative(ROOT, DELIVERY_PATH)));
+  const stateDataText = options.stateDataText ?? readText(path.join(root, path.relative(ROOT, STATE_DATA_PATH)));
   const uiTexts = options.uiTexts || Object.fromEntries(UI_PATHS.map((file) => [path.basename(file), readText(path.join(root, path.relative(ROOT, file)))]));
   const checks = [];
 
@@ -79,11 +89,15 @@ function buildProcurementRequirementReadiness(options = {}) {
   }
 
   let view;
+  let deliveryView;
   try {
     view = buildProcurementRequirementGovernance({}, { catalog, registry, rootDir: root, now: "readiness-snapshot" });
+    deliveryView = buildProcurementRequirementDelivery({}, { catalog, registry, rootDir: root, now: "readiness-snapshot" });
     const failClosed = view.productionReady === false
       && view.documents.every((item) => item.productionReady === false)
-      && view.items.every((item) => item.productionReady === false && item.gap.productionReady === false);
+      && view.items.every((item) => item.productionReady === false && item.gap.productionReady === false)
+      && deliveryView.productionReady === false
+      && deliveryView.exportBundle.productionReady === false;
     checks.push(check("requirements:production-boundary", failClosed, failClosed ? "all governance and gap projections remain production NO-GO" : "a governance projection can claim production readiness"));
   } catch (error) {
     checks.push(check("requirements:production-boundary", false, error.message));
@@ -98,11 +112,13 @@ function buildProcurementRequirementReadiness(options = {}) {
   const locality = localityFindings({ ADR: adrText, ...uiTexts });
   checks.push(check("requirements:generic-language", locality.length === 0, locality.length ? locality.join(", ") : "new ADR and workbench UI contain no source-locality markers"));
 
-  const owned = ownership.collections?.procurementRequirementGovernance;
-  checks.push(check("requirements:state-ownership", owned?.owner === "platform-governance" && owned?.classification === "internal", owned ? `${owned.owner}/${owned.classification}` : "collection is not registered"));
+  const ownedCollections = ["procurementRequirementGovernance", "procurementRequirementCatalog", "procurementRequirementDelivery"].map((key) => ownership.collections?.[key]);
+  checks.push(check("requirements:state-ownership", ownedCollections.every((owned) => owned?.owner === "platform-governance" && owned?.classification === "internal"), `${ownedCollections.filter(Boolean).length}/3 collections registered`));
+  const isolatedStateWrites = [/SERVER_MANAGED_PROCUREMENT_COLLECTIONS/, /PROCUREMENT_SERVER_MANAGED_COLLECTION_CONFLICT/, /PROCUREMENT_SERVER_MANAGED_COLLECTION_WRITE_DENIED/, /serverManagedProcurementState\(currentData\)/].every((marker) => marker.test(stateDataText));
+  checks.push(check("requirements:state-write-isolation", isolatedStateWrites, isolatedStateWrites ? "legacy full-state and delegated collection writes cannot forge procurement governance aggregates" : "procurement governance aggregates remain writable through a legacy state surface"));
 
-  const auth = authorization.routes?.[REVIEW_ROUTE];
-  checks.push(check("requirements:review-authorization", auth?.roles?.length === 1 && auth.roles[0] === "commission" && auth.owner === "T02", auth ? `${auth.owner}; roles=${auth.roles?.join(",")}` : "review route is not registered"));
+  const governedRoutes = [REVIEW_ROUTE, IMPORT_ROUTE, DELIVERY_ROUTE].map((key) => authorization.routes?.[key]);
+  checks.push(check("requirements:governance-authorization", governedRoutes.every((auth) => auth?.roles?.length === 1 && auth.roles[0] === "commission" && auth.owner === "T02"), `${governedRoutes.filter(Boolean).length}/3 routes registered`));
 
   const noUploadSurface = !/procurement-document-import|multipart|formdata|upload/i.test(routeText);
   checks.push(check("requirements:offline-import-boundary", noUploadSurface, noUploadSurface ? "HTTP route does not expose PDF upload or importer execution" : "HTTP route appears to expose document import or upload"));
@@ -180,9 +196,21 @@ function buildProcurementRequirementReadiness(options = {}) {
     && [/logicalRequirementId/, /semanticDigest/, /comparisonDigest/, /added/, /changed/, /withdrawn/, /unchanged/, /supersedesDocumentId/].every((marker) => marker.test(versioningText));
   checks.push(check("requirements:linear-source-revisions", linearRevisionModel, linearRevisionModel ? `${sourceSeries.size} source series / ${catalogDocuments.length} immutable revisions / ${revisionComparisons.length} derived comparisons` : "linear source revision or derived change evidence is incomplete"));
 
+  const registrationClosedLoop = [/applyProcurementImportRegistration/, /validateArtifact/, /buildEffectiveProcurementCatalog/, /resultSnapshot/, /expectedVersion/, /PROCUREMENT_IMPORT_REGISTRATION_COMMAND_CONFLICT/].every((marker) => marker.test(catalogRegistryText));
+  checks.push(check("requirements:catalog-registration", registrationClosedLoop, registrationClosedLoop ? "sanitized artifacts enter the effective catalog with CAS, exact replay and atomic audit route" : "catalog registration evidence is incomplete"));
+
+  const deliveryClosedLoop = [/plan/, /start-delivery/, /submit-evidence/, /verify-evidence/, /request-acceptance/, /accept-delivery/, /return-delivery/, /resubmit-delivery/, /acceptanceStatus/, /source-stale/, /REQUIRED_EVIDENCE/, /PROCUREMENT_DELIVERY_INDEPENDENCE_REQUIRED/, /PROCUREMENT_DELIVERY_ACCEPTANCE_INDEPENDENCE_REQUIRED/, /resultSnapshot/].every((marker) => marker.test(deliveryText));
+  checks.push(check("requirements:delivery-lifecycle", deliveryClosedLoop, deliveryClosedLoop ? "accepted requirements support bound planning, delivery, three evidence types, independent verification and human acceptance return/resubmission" : "delivery lifecycle evidence is incomplete"));
+
+  const exportText = JSON.stringify(deliveryView?.exportBundle || {});
+  const safeExport = deliveryView?.exportBundle?.schemaVersion === "procurement-requirement-governance-export-v1"
+    && findForbiddenKeys(deliveryView.exportBundle).length === 0
+    && !/(?:documentDigest|byteSize|sourceAlias|candidateId|title)/i.test(exportText);
+  checks.push(check("requirements:safe-export", safeExport, safeExport ? "export is an allowlisted neutral projection and remains production NO-GO" : "export exposes non-allowlisted source or candidate fields"));
+
   const ok = checks.every((item) => item.passed);
   return Object.freeze({
-    schemaVersion: "procurement-requirement-readiness-v2",
+    schemaVersion: "procurement-requirement-readiness-v3",
     ok,
     status: ok ? "local-governance-ready" : "governance-blocked",
     localGovernanceReady: ok,
@@ -195,10 +223,11 @@ function buildProcurementRequirementReadiness(options = {}) {
       candidates: view?.summary?.candidates || 0,
       sourceSeries: sourceSeries.size,
       documentRevisions: catalogDocuments.length,
-      revisionComparisons: revisionComparisons?.length || 0
+      revisionComparisons: revisionComparisons?.length || 0,
+      deliveryEvidenceTypes: deliveryView?.requiredEvidenceTypes?.length || 0
     }),
     checks: Object.freeze(checks),
-    boundary: "该门禁只验证仓库内的最小化合同、通用性、离线批次、真实路径与文件身份、扫描证明合同、来源修订、授权登记和失败关闭边界；它不执行恶意文件扫描，不证明扫描覆盖、提取质量、现场验收或生产就绪。"
+    boundary: "该门禁只验证仓库内的最小化合同、通用性、离线批次、目录登记、来源修订、人工复核、产品规划、独立仓库证据核验、安全导出和失败关闭边界；它不执行恶意文件扫描，不证明扫描覆盖、提取质量、现场验收或生产就绪。"
   });
 }
 
@@ -224,6 +253,8 @@ module.exports = {
   IMPORT_PATH,
   REQUIRED_ADR_SECTIONS,
   REVIEW_ROUTE,
+  IMPORT_ROUTE,
+  DELIVERY_ROUTE,
   SOURCE_LOCALITY_MARKERS,
   VERSIONING_PATH,
   buildProcurementRequirementReadiness,

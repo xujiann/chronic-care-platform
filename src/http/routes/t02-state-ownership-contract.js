@@ -107,6 +107,8 @@ const PLATFORM_WRITE_CONTRACTS = Object.freeze({
       institutionJointTestRuns: "integration",
       platformWorkItemCommands: "platform-governance",
       platformWorkItems: "platform-governance",
+      procurementRequirementCatalog: "platform-governance",
+      procurementRequirementDelivery: "platform-governance",
       procurementRequirementGovernance: "platform-governance",
       securityEvents: "platform-governance"
     })

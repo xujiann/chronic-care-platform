@@ -17,6 +17,11 @@ const SERVER_MANAGED_REGIONAL_COLLECTIONS = Object.freeze([
   "regionalSharingSnapshots",
   "regionalSharingAccessReviews"
 ]);
+const SERVER_MANAGED_PROCUREMENT_COLLECTIONS = Object.freeze([
+  "procurementRequirementCatalog",
+  "procurementRequirementGovernance",
+  "procurementRequirementDelivery"
+]);
 
 const AUTH_USER_READ_SECRET_FIELDS = Object.freeze([
   "password",
@@ -41,6 +46,25 @@ function serverManagedRegionalState(currentData = {}) {
 
 function firstServerManagedRegionalConflict(currentData = {}, payload = {}) {
   return SERVER_MANAGED_REGIONAL_COLLECTIONS.find((collection) =>
+    Object.hasOwn(payload, collection) && !isDeepStrictEqual(payload[collection], currentData[collection])
+  ) || null;
+}
+
+function projectProcurementForStateRead(state = {}, user = {}) {
+  if (user.role === "commission") return state;
+  const projected = { ...state };
+  SERVER_MANAGED_PROCUREMENT_COLLECTIONS.forEach((collection) => delete projected[collection]);
+  return projected;
+}
+
+function serverManagedProcurementState(currentData = {}) {
+  return Object.fromEntries(SERVER_MANAGED_PROCUREMENT_COLLECTIONS
+    .filter((collection) => Object.hasOwn(currentData, collection))
+    .map((collection) => [collection, currentData[collection]]));
+}
+
+function firstServerManagedProcurementConflict(currentData = {}, payload = {}) {
+  return SERVER_MANAGED_PROCUREMENT_COLLECTIONS.find((collection) =>
     Object.hasOwn(payload, collection) && !isDeepStrictEqual(payload[collection], currentData[collection])
   ) || null;
 }
@@ -75,7 +99,7 @@ function createRouteSegments(runtime, options = {}) {
     if (req.method === "GET" && url.pathname === "/api/state") {
         const user = requireApiRole(req, res, ["commission", "institution", "insurance", "citizen", "county"], "/api/state");
         if (!user) return true;
-        const scopedState = scopeStateForUser(readDatabase(), user);
+        const scopedState = projectProcurementForStateRead(scopeStateForUser(readDatabase(), user), user);
         sendJson(res, 200, redactSensitiveResponse(projectAuthUsersForStateRead(scopedState), user));
         return true;
       }
@@ -113,9 +137,20 @@ function createRouteSegments(runtime, options = {}) {
           });
           return true;
         }
+        const procurementConflict = firstServerManagedProcurementConflict(currentData, payload);
+        if (procurementConflict) {
+          sendJson(res, 409, {
+            error: "Conflict",
+            code: "PROCUREMENT_SERVER_MANAGED_COLLECTION_CONFLICT",
+            message: "招标需求治理集合由服务端命令管理，提交值必须省略或与当前值完全一致。",
+            collection: procurementConflict
+          });
+          return true;
+        }
         const effectivePayload = {
           ...payload,
-          ...serverManagedRegionalState(currentData)
+          ...serverManagedRegionalState(currentData),
+          ...serverManagedProcurementState(currentData)
         };
         const versionConflict = firstVersionConflict(currentData, effectivePayload);
         if (versionConflict) {
@@ -198,6 +233,15 @@ function createRouteSegments(runtime, options = {}) {
             error: "Forbidden",
             code: "REGIONAL_SHARING_SERVER_MANAGED_COLLECTION_WRITE_DENIED",
             message: "区域共享集合只能通过其 owner command 写入。",
+            collection
+          });
+          return true;
+        }
+        if (SERVER_MANAGED_PROCUREMENT_COLLECTIONS.includes(collection)) {
+          sendJson(res, 403, {
+            error: "Forbidden",
+            code: "PROCUREMENT_SERVER_MANAGED_COLLECTION_WRITE_DENIED",
+            message: "招标需求治理集合只能通过其治理命令写入。",
             collection
           });
           return true;
@@ -298,9 +342,13 @@ function createRouteSegments(runtime, options = {}) {
 
 module.exports = {
   AUTH_USER_READ_SECRET_FIELDS,
+  SERVER_MANAGED_PROCUREMENT_COLLECTIONS,
   SERVER_MANAGED_REGIONAL_COLLECTIONS,
   createRouteSegments,
   firstServerManagedRegionalConflict,
+  firstServerManagedProcurementConflict,
+  projectProcurementForStateRead,
   projectAuthUsersForStateRead,
-  serverManagedRegionalState
+  serverManagedRegionalState,
+  serverManagedProcurementState
 };

@@ -171,3 +171,40 @@ test("a legacy receipt without an exact result snapshot fails closed", () => {
     (error) => error.code === "PROCUREMENT_REQUIREMENT_REPLAY_UNAVAILABLE" && error.statusCode === 409
   );
 });
+
+test("changed semantic evidence invalidates approval and requires a versioned re-review", () => {
+  const first = applyProcurementRequirementReviewAction({}, command(), REVIEWER, { now: NOW });
+  const catalog = structuredClone(defaultCatalog);
+  catalog.documents[0].candidates[0].semanticDigest = `sha256:${"d".repeat(64)}`;
+  const invalidated = buildProcurementRequirementGovernance(first.data, { catalog, now: NOW });
+  const item = invalidated.items.find((candidate) => candidate.id === "PR-SAMPLE-001-R001");
+  assert.equal(item.reviewStatus, "revision-required");
+  assert.equal(item.evidenceBindingStatus, "invalidated");
+  const rereviewed = applyProcurementRequirementReviewAction(first.data, command({ commandId: "review-command-evidence-refresh", expectedVersion: 1 }), REVIEWER, { catalog, now: NOW });
+  assert.equal(rereviewed.result.reviewStatus, "accepted");
+  assert.equal(rereviewed.result.evidenceBindingStatus, "current");
+  assert.equal(rereviewed.result.version, 2);
+});
+
+test("changed mapping proposal invalidates approval even when source semantics are unchanged", () => {
+  const first = applyProcurementRequirementReviewAction({}, command(), REVIEWER, { now: NOW });
+  const catalog = structuredClone(defaultCatalog);
+  catalog.documents[0].candidates[0].priority = catalog.documents[0].candidates[0].priority === "P0" ? "P1" : "P0";
+  const invalidated = buildProcurementRequirementGovernance(first.data, { catalog, now: NOW });
+  const item = invalidated.items.find((candidate) => candidate.id === "PR-SAMPLE-001-R001");
+  assert.equal(item.reviewStatus, "revision-required");
+  assert.equal(item.evidenceBindingStatus, "invalidated");
+});
+
+test("review state rejects orphaned decisions and altered audit history", () => {
+  const first = applyProcurementRequirementReviewAction({}, command(), REVIEWER, { now: NOW });
+
+  const orphaned = structuredClone(first.data);
+  orphaned.procurementRequirementGovernance.events = [];
+  orphaned.procurementRequirementGovernance.commands = [];
+  assert.throws(() => buildProcurementRequirementGovernance(orphaned, { now: NOW }), /review state is invalid/);
+
+  const altered = structuredClone(first.data);
+  altered.procurementRequirementGovernance.reviews[0].version = 999;
+  assert.throws(() => buildProcurementRequirementGovernance(altered, { now: NOW }), /review state is invalid/);
+});

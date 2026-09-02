@@ -8,6 +8,52 @@
   "reviewedProofRequired": [],
   "contracts": [
     {
+      "contractId": "platform-governance.procurement-import-registration-command.v1",
+      "key": "POST /api/platform/productization/requirement-batches",
+      "method": "POST",
+      "path": "/api/platform/productization/requirement-batches",
+      "owner": "T02",
+      "domain": "platform-governance",
+      "purpose": "register-sanitized-procurement-requirement-batch",
+      "customAuthenticationEvidence": false,
+      "authentication": { "required": true, "mechanism": "bearer-or-cookie-session", "principalType": "platform-user", "credentialSource": ["header:authorization", "cookie:session"], "replayCsrf": { "replayProtection": "actor-bound-hashed-idempotency-key-and-artifact-digest", "csrf": "platform-session-transport-policy" } },
+      "authorization": { "model": "platform-rbac", "roles": ["commission"], "dataScope": "platform procurement requirement catalog" },
+      "coverage": { "level": "endpoint", "selector": "entire-route", "actions": ["register-import-batch"], "unverifiedRemainder": false },
+      "idempotency": { "key": "header:Idempotency-Key", "payloadBinding": ["actorDigest", "artifactDigest", "expectedVersion"], "exactReplay": "returns the persisted minimized registration snapshot with replayed=true and no state or audit write", "conflictingReuse": "PROCUREMENT_IMPORT_REGISTRATION_COMMAND_CONFLICT", "persistenceScope": "catalog documents, event, command receipt and security audit in one platform state write", "distributedExactlyOnceClaimed": false },
+      "concurrency": { "cas": { "required": true, "field": "catalog expectedVersion plus platform storage collection version", "conflictCodes": ["PROCUREMENT_IMPORT_REGISTRATION_VERSION_CONFLICT"] } },
+      "errors": [
+        { "code": "PROCUREMENT_IMPORT_REGISTRATION_IDEMPOTENCY_KEY_REQUIRED", "status": 400 }, { "code": "PROCUREMENT_IMPORT_REGISTRATION_INPUT_INVALID", "status": 400 }, { "code": "PROCUREMENT_IMPORT_REGISTRATION_SCOPE_FORBIDDEN", "status": 403 }, { "code": "PROCUREMENT_IMPORT_REGISTRATION_COMMAND_CONFLICT", "status": 409 }, { "code": "PROCUREMENT_IMPORT_REGISTRATION_REPLAY_UNAVAILABLE", "status": 409 }, { "code": "PROCUREMENT_IMPORT_REGISTRATION_VERSION_CONFLICT", "status": 409 }, { "code": "PROCUREMENT_IMPORT_REGISTRATION_CAPACITY_EXCEEDED", "status": 409 }, { "code": "PROCUREMENT_IMPORT_REGISTRATION_AUDIT_FAILED", "status": 500 }, { "code": "PROCUREMENT_IMPORT_REGISTRATION_STORAGE_FAILED", "status": 500 }, { "code": "PROCUREMENT_IMPORT_REGISTRATION_COMMAND_FAILED", "status": 500 }
+      ],
+      "audit": { "accepted": "commits sanitized documents, receipt and chained security audit in one platform state write", "replay": "returns the persisted snapshot without another state or audit write", "rejected": "authorization precedes body; invalid artifacts, conflicts, audit failures and storage failures have no fallback write" },
+      "implementationEvidence": [{ "file": "src/platform/productization/procurement-requirement-catalog-registry.js", "anchors": ["applyProcurementImportRegistration", "validateArtifact", "resultSnapshot"] }, { "file": "src/http/routes/platform-governance/productization-center.js", "anchors": ["/api/platform/productization/requirement-batches", "procurement-import-batch-register"] }],
+      "testEvidence": [{ "file": "test/procurement-requirement-catalog-registry.test.js", "anchors": ["sanitized import artifacts register atomically", "exact replay"] }, { "file": "test/procurement-requirement-route.test.js", "anchors": ["new procurement routes fail closed when audit or storage fails", "PROCUREMENT_IMPORT_REGISTRATION_STORAGE_FAILED"] }],
+      "productionReady": false,
+      "externalEvidenceRequired": true
+    },
+    {
+      "contractId": "platform-governance.procurement-delivery-lifecycle-command.v1",
+      "key": "POST /api/platform/productization/requirements/:id/lifecycle-actions",
+      "method": "POST",
+      "path": "/api/platform/productization/requirements/:id/lifecycle-actions",
+      "owner": "T02",
+      "domain": "platform-governance",
+      "purpose": "govern-procurement-requirement-delivery-lifecycle",
+      "customAuthenticationEvidence": false,
+      "authentication": { "required": true, "mechanism": "bearer-or-cookie-session", "principalType": "platform-user", "credentialSource": ["header:authorization", "cookie:session"], "replayCsrf": { "replayProtection": "actor-bound-hashed-idempotency-key-and-payload-digest", "csrf": "platform-session-transport-policy" } },
+      "authorization": { "model": "platform-rbac-plus-accepted-requirement-scope", "roles": ["commission"], "dataScope": "platform procurement requirement delivery" },
+      "coverage": { "level": "endpoint", "selector": "entire-route", "actions": ["plan", "start-delivery", "submit-evidence", "verify-evidence", "request-acceptance", "accept-delivery", "return-delivery", "resubmit-delivery"], "unverifiedRemainder": false },
+      "idempotency": { "key": "header:Idempotency-Key", "payloadBinding": ["actorDigest", "requirementId", "action", "expectedVersion", "releaseWindow", "evidenceType", "evidenceDigest"], "exactReplay": "returns the persisted minimized delivery snapshot with replayed=true and no state or audit write even after the requirement review is invalidated", "conflictingReuse": "PROCUREMENT_DELIVERY_COMMAND_CONFLICT", "persistenceScope": "bound delivery plan, evidence status, acceptance status, event, command receipt and security audit in one platform state write", "distributedExactlyOnceClaimed": false },
+      "concurrency": { "cas": { "required": true, "field": "per-plan expectedVersion plus platform storage collection version", "conflictCodes": ["PROCUREMENT_DELIVERY_VERSION_CONFLICT"] } },
+      "errors": [
+        { "code": "PROCUREMENT_DELIVERY_IDEMPOTENCY_KEY_REQUIRED", "status": 400 }, { "code": "PROCUREMENT_DELIVERY_INPUT_INVALID", "status": 400 }, { "code": "PROCUREMENT_DELIVERY_SCOPE_FORBIDDEN", "status": 403 }, { "code": "PROCUREMENT_DELIVERY_NOT_FOUND", "status": 404 }, { "code": "PROCUREMENT_DELIVERY_EVIDENCE_NOT_FOUND", "status": 404 }, { "code": "PROCUREMENT_DELIVERY_COMMAND_CONFLICT", "status": 409 }, { "code": "PROCUREMENT_DELIVERY_REPLAY_UNAVAILABLE", "status": 409 }, { "code": "PROCUREMENT_DELIVERY_VERSION_CONFLICT", "status": 409 }, { "code": "PROCUREMENT_DELIVERY_TRANSITION_CONFLICT", "status": 409 }, { "code": "PROCUREMENT_DELIVERY_INDEPENDENCE_REQUIRED", "status": 409 }, { "code": "PROCUREMENT_DELIVERY_ACCEPTANCE_INDEPENDENCE_REQUIRED", "status": 409 }, { "code": "PROCUREMENT_DELIVERY_SOURCE_STALE", "status": 409 }, { "code": "PROCUREMENT_DELIVERY_CAPACITY_EXCEEDED", "status": 409 }, { "code": "PROCUREMENT_DELIVERY_AUDIT_FAILED", "status": 500 }, { "code": "PROCUREMENT_DELIVERY_STORAGE_FAILED", "status": 500 }, { "code": "PROCUREMENT_DELIVERY_COMMAND_FAILED", "status": 500 }
+      ],
+      "audit": { "accepted": "commits one bound plan, evidence or human acceptance transition, receipt and chained security audit in one platform state write", "replay": "returns the persisted snapshot without another state or audit write", "rejected": "authorization precedes body; validation, stale bindings, stale versions, independence failures, audit failures and storage failures have no fallback write" },
+      "implementationEvidence": [{ "file": "src/platform/productization/procurement-requirement-delivery.js", "anchors": ["applyProcurementRequirementDeliveryAction", "requirementBindingDigest", "request-acceptance", "PROCUREMENT_DELIVERY_ACCEPTANCE_INDEPENDENCE_REQUIRED", "source-stale", "resultSnapshot"] }, { "file": "src/http/routes/platform-governance/productization-center.js", "anchors": ["lifecycle-actions", "procurement-delivery-"] }],
+      "testEvidence": [{ "file": "test/procurement-requirement-delivery.test.js", "anchors": ["accepted requirement completes", "acceptance return and resubmission", "exact replay survives", "stale plans remain visible"] }, { "file": "test/procurement-requirement-route.test.js", "anchors": ["new procurement routes fail closed when audit or storage fails", "PROCUREMENT_DELIVERY_STORAGE_FAILED"] }],
+      "productionReady": false,
+      "externalEvidenceRequired": true
+    },
+    {
       "contractId": "platform-governance.procurement-requirement-review-command.v1",
       "key": "POST /api/platform/productization/requirements/:id/actions",
       "method": "POST",

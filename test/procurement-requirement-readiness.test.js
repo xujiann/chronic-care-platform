@@ -11,7 +11,7 @@ const {
 
 test("procurement requirement governance passes local readiness and remains production NO-GO", () => {
   const report = buildProcurementRequirementReadiness();
-  assert.equal(report.schemaVersion, "procurement-requirement-readiness-v2");
+  assert.equal(report.schemaVersion, "procurement-requirement-readiness-v3");
   assert.equal(report.ok, true);
   assert.equal(report.localGovernanceReady, true);
   assert.equal(report.productionReady, false);
@@ -27,12 +27,16 @@ test("procurement requirement governance passes local readiness and remains prod
     "requirements:adr",
     "requirements:generic-language",
     "requirements:state-ownership",
-    "requirements:review-authorization",
+    "requirements:state-write-isolation",
+    "requirements:governance-authorization",
     "requirements:offline-import-boundary",
     "requirements:offline-atomic-batch",
     "requirements:pdf-realpath-identity",
     "requirements:replaceable-scan-attestation",
-    "requirements:linear-source-revisions"
+    "requirements:linear-source-revisions",
+    "requirements:catalog-registration",
+    "requirements:delivery-lifecycle",
+    "requirements:safe-export"
   ]);
   assert.match(report.boundary, /不证明.*生产就绪/);
 });

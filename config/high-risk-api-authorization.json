@@ -16,6 +16,8 @@
     "POST /api/public-health/supervision/inspection-tasks": { "owner": "T03", "roles": ["commission"], "dataScope": "city and health-admin platform; district jurisdiction", "purpose": "create-health-supervision-inspection-task" },
     "POST /api/public-health/supervision/inspection-tasks/:id/actions": { "owner": "T03", "roles": ["commission"], "dataScope": "city and health-admin platform; district jurisdiction", "purpose": "operate-health-supervision-inspection-task" },
     "POST /api/public-health/supervision/findings/:id/actions": { "owner": "T03", "roles": ["commission", "institution"], "dataScope": "commission jurisdiction or medical institution own subject", "purpose": "submit-or-review-health-supervision-remediation" },
-    "POST /api/platform/productization/requirements/:id/actions": { "owner": "T02", "roles": ["commission"], "dataScope": "platform", "purpose": "human-review-procurement-requirement-candidate" }
+    "POST /api/platform/productization/requirements/:id/actions": { "owner": "T02", "roles": ["commission"], "dataScope": "platform", "purpose": "human-review-procurement-requirement-candidate" },
+    "POST /api/platform/productization/requirement-batches": { "owner": "T02", "roles": ["commission"], "dataScope": "platform", "purpose": "register-sanitized-procurement-requirement-batch" },
+    "POST /api/platform/productization/requirements/:id/lifecycle-actions": { "owner": "T02", "roles": ["commission"], "dataScope": "platform", "purpose": "govern-procurement-requirement-delivery-lifecycle" }
   }
 }

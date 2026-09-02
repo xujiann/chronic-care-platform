@@ -15,23 +15,49 @@ const PROCUREMENT_REQUIREMENT_ERRORS = Object.freeze({
   PROCUREMENT_REQUIREMENT_AUDIT_FAILED: Object.freeze([500, "Internal Server Error", "招标需求复核审计记录失败。"]),
   PROCUREMENT_REQUIREMENT_STORAGE_FAILED: Object.freeze([500, "Internal Server Error", "招标需求复核保存失败。"]),
   PROCUREMENT_REQUIREMENT_COMMAND_FAILED: Object.freeze([500, "Internal Server Error", "招标需求复核执行失败。"])
+  ,PROCUREMENT_IMPORT_REGISTRATION_IDEMPOTENCY_KEY_REQUIRED: Object.freeze([400, "Bad Request", "必须提供受控导入登记幂等键。"])
+  ,PROCUREMENT_IMPORT_REGISTRATION_INPUT_INVALID: Object.freeze([400, "Bad Request", "受控导入登记请求无效。"])
+  ,PROCUREMENT_IMPORT_REGISTRATION_SCOPE_FORBIDDEN: Object.freeze([403, "Forbidden", "当前身份不能登记受控导入。"])
+  ,PROCUREMENT_IMPORT_REGISTRATION_COMMAND_CONFLICT: Object.freeze([409, "Conflict", "幂等键已用于不同的导入登记请求。"])
+  ,PROCUREMENT_IMPORT_REGISTRATION_REPLAY_UNAVAILABLE: Object.freeze([409, "Conflict", "历史导入回执缺少精确结果快照，不能重放。"])
+  ,PROCUREMENT_IMPORT_REGISTRATION_VERSION_CONFLICT: Object.freeze([409, "Conflict", "受控导入登记版本冲突。"])
+  ,PROCUREMENT_IMPORT_REGISTRATION_CAPACITY_EXCEEDED: Object.freeze([409, "Conflict", "受控导入登记已达到容量上限。"])
+  ,PROCUREMENT_IMPORT_REGISTRATION_AUDIT_FAILED: Object.freeze([500, "Internal Server Error", "受控导入登记审计失败。"])
+  ,PROCUREMENT_IMPORT_REGISTRATION_STORAGE_FAILED: Object.freeze([500, "Internal Server Error", "受控导入登记保存失败。"])
+  ,PROCUREMENT_IMPORT_REGISTRATION_COMMAND_FAILED: Object.freeze([500, "Internal Server Error", "受控导入登记执行失败。"])
+  ,PROCUREMENT_DELIVERY_IDEMPOTENCY_KEY_REQUIRED: Object.freeze([400, "Bad Request", "必须提供交付治理幂等键。"])
+  ,PROCUREMENT_DELIVERY_INPUT_INVALID: Object.freeze([400, "Bad Request", "招标需求交付治理请求无效。"])
+  ,PROCUREMENT_DELIVERY_SCOPE_FORBIDDEN: Object.freeze([403, "Forbidden", "当前身份不能治理交付。"])
+  ,PROCUREMENT_DELIVERY_NOT_FOUND: Object.freeze([404, "Not Found", "已采纳招标需求不存在。"])
+  ,PROCUREMENT_DELIVERY_EVIDENCE_NOT_FOUND: Object.freeze([404, "Not Found", "待核验仓库证据不存在。"])
+  ,PROCUREMENT_DELIVERY_COMMAND_CONFLICT: Object.freeze([409, "Conflict", "幂等键已用于不同的交付治理请求。"])
+  ,PROCUREMENT_DELIVERY_REPLAY_UNAVAILABLE: Object.freeze([409, "Conflict", "历史交付回执缺少精确结果快照，不能重放。"])
+  ,PROCUREMENT_DELIVERY_VERSION_CONFLICT: Object.freeze([409, "Conflict", "招标需求交付治理版本冲突。"])
+  ,PROCUREMENT_DELIVERY_TRANSITION_CONFLICT: Object.freeze([409, "Conflict", "当前状态不允许执行该交付治理动作。"])
+  ,PROCUREMENT_DELIVERY_INDEPENDENCE_REQUIRED: Object.freeze([409, "Conflict", "证据提交人与核验人必须相互独立。"])
+  ,PROCUREMENT_DELIVERY_ACCEPTANCE_INDEPENDENCE_REQUIRED: Object.freeze([409, "Conflict", "交付验收申请人与验收人必须相互独立。"])
+  ,PROCUREMENT_DELIVERY_SOURCE_STALE: Object.freeze([409, "Conflict", "产品计划绑定的需求复核证据已经失效。"])
+  ,PROCUREMENT_DELIVERY_CAPACITY_EXCEEDED: Object.freeze([409, "Conflict", "招标需求交付治理记录已达到容量上限。"])
+  ,PROCUREMENT_DELIVERY_AUDIT_FAILED: Object.freeze([500, "Internal Server Error", "招标需求交付治理审计失败。"])
+  ,PROCUREMENT_DELIVERY_STORAGE_FAILED: Object.freeze([500, "Internal Server Error", "招标需求交付治理保存失败。"])
+  ,PROCUREMENT_DELIVERY_COMMAND_FAILED: Object.freeze([500, "Internal Server Error", "招标需求交付治理执行失败。"])
 });
 
-function sendProcurementRequirementError(sendJson, res, error, stage = "command") {
-  let code = stage === "input" ? "PROCUREMENT_REQUIREMENT_INPUT_INVALID" : stage === "command" ? error?.code : undefined;
+function sendProcurementRequirementError(sendJson, res, error, stage = "command", family = "PROCUREMENT_REQUIREMENT") {
+  let code = stage === "input" ? `${family}_INPUT_INVALID` : stage === "command" ? error?.code : undefined;
   if (!PROCUREMENT_REQUIREMENT_ERRORS[code]) {
-    if (error instanceof SyntaxError) code = "PROCUREMENT_REQUIREMENT_INPUT_INVALID";
-    else if (stage === "storage" && (error?.code === "STORAGE_CONFLICT" || error?.name === "StorageConflictError" || /optimistic lock conflict|version conflict|CAS conflict/i.test(String(error?.message || "")))) code = "PROCUREMENT_REQUIREMENT_VERSION_CONFLICT";
-    else if (stage === "audit") code = "PROCUREMENT_REQUIREMENT_AUDIT_FAILED";
-    else if (stage === "storage") code = "PROCUREMENT_REQUIREMENT_STORAGE_FAILED";
-    else code = "PROCUREMENT_REQUIREMENT_COMMAND_FAILED";
+    if (error instanceof SyntaxError) code = `${family}_INPUT_INVALID`;
+    else if (stage === "storage" && (error?.code === "STORAGE_CONFLICT" || error?.name === "StorageConflictError" || /optimistic lock conflict|version conflict|CAS conflict/i.test(String(error?.message || "")))) code = `${family}_VERSION_CONFLICT`;
+    else if (stage === "audit") code = `${family}_AUDIT_FAILED`;
+    else if (stage === "storage") code = `${family}_STORAGE_FAILED`;
+    else code = `${family}_COMMAND_FAILED`;
   }
   const [statusCode, label, message] = PROCUREMENT_REQUIREMENT_ERRORS[code];
   sendJson(res, statusCode, { ok: false, error: label, code, message });
 }
 
 function createRouteSegment(runtime) {
-  const { appendSecurityEvent, applyPlatformWorkItemAction, applyPlatformWorkItemV2GovernanceAction, applyProcurementRequirementReviewAction, buildPlatformEnhancementCockpit, buildPlatformProductOperationsCockpit, buildPlatformProductizationCenter, collectJson, prependAuditTrailEntry, randomUUID, readDatabase, registerInstitutionIntegrationProfile, requireApiRole, runInstitutionSyntheticJointTest, sendJson, writeDatabase } = runtime;
+  const { appendSecurityEvent, applyPlatformWorkItemAction, applyPlatformWorkItemV2GovernanceAction, applyProcurementImportRegistration, applyProcurementRequirementDeliveryAction, applyProcurementRequirementReviewAction, buildPlatformEnhancementCockpit, buildPlatformProductOperationsCockpit, buildPlatformProductizationCenter, collectJson, prependAuditTrailEntry, randomUUID, readDatabase, registerInstitutionIntegrationProfile, requireApiRole, runInstitutionSyntheticJointTest, sendJson, writeDatabase } = runtime;
   return {
     id: ROUTE_SEGMENT_ID,
     domain: "platform-governance",
@@ -151,6 +177,81 @@ function createRouteSegment(runtime) {
           }
         }
         sendJson(res, 200, { ok: true, replayed: execution.replayed, requirement: execution.result, productionReady: false });
+        return true;
+      }
+
+      if (req.method === "POST" && url.pathname === "/api/platform/productization/requirement-batches") {
+        const family = "PROCUREMENT_IMPORT_REGISTRATION";
+        const user = requireApiRole(req, res, ["commission"], url.pathname);
+        if (!user) return true;
+        const idempotencyKey = String(req.headers?.["idempotency-key"] || "").trim();
+        if (!idempotencyKey) {
+          sendProcurementRequirementError(sendJson, res, { code: `${family}_IDEMPOTENCY_KEY_REQUIRED` });
+          return true;
+        }
+        let payload;
+        try { payload = await collectJson(req); } catch (error) {
+          sendProcurementRequirementError(sendJson, res, error, "input", family);
+          return true;
+        }
+        let execution;
+        try {
+          execution = applyProcurementImportRegistration(readDatabase(), { ...payload, commandId: idempotencyKey }, user);
+        } catch (error) {
+          sendProcurementRequirementError(sendJson, res, error, "command", family);
+          return true;
+        }
+        if (!execution.replayed) {
+          try {
+            execution.data.securityEvents = prependAuditTrailEntry(execution.data.securityEvents, { id: randomUUID(), at: new Date().toLocaleString("zh-CN", { hour12: false }), actor: user.name, role: user.role, action: "procurement-import-batch-register", target: execution.result.artifactDigest, result: "allowed", detail: `documents=${execution.result.registeredDocuments}; candidates=${execution.result.registeredCandidates}; source content omitted; production gate closed` });
+          } catch (error) {
+            sendProcurementRequirementError(sendJson, res, error, "audit", family);
+            return true;
+          }
+          try { writeDatabase(execution.data); } catch (error) {
+            sendProcurementRequirementError(sendJson, res, error, "storage", family);
+            return true;
+          }
+        }
+        sendJson(res, 200, { ok: true, replayed: execution.replayed, registration: execution.result, productionReady: false });
+        return true;
+      }
+
+      const requirementDeliveryMatch = url.pathname.match(/^\/api\/platform\/productization\/requirements\/([^/]+)\/lifecycle-actions$/);
+      if (req.method === "POST" && requirementDeliveryMatch) {
+        const family = "PROCUREMENT_DELIVERY";
+        const user = requireApiRole(req, res, ["commission"], "/api/platform/productization/requirements/:id/lifecycle-actions");
+        if (!user) return true;
+        const idempotencyKey = String(req.headers?.["idempotency-key"] || "").trim();
+        if (!idempotencyKey) {
+          sendProcurementRequirementError(sendJson, res, { code: `${family}_IDEMPOTENCY_KEY_REQUIRED` });
+          return true;
+        }
+        let payload;
+        try { payload = await collectJson(req); } catch (error) {
+          sendProcurementRequirementError(sendJson, res, error, "input", family);
+          return true;
+        }
+        let execution;
+        try {
+          execution = applyProcurementRequirementDeliveryAction(readDatabase(), { ...payload, commandId: idempotencyKey, requirementId: decodeURIComponent(requirementDeliveryMatch[1]) }, user);
+        } catch (error) {
+          sendProcurementRequirementError(sendJson, res, error, "command", family);
+          return true;
+        }
+        if (!execution.replayed) {
+          try {
+            execution.data.securityEvents = prependAuditTrailEntry(execution.data.securityEvents, { id: randomUUID(), at: new Date().toLocaleString("zh-CN", { hour12: false }), actor: user.name, role: user.role, action: `procurement-delivery-${payload.action}`, target: execution.result.requirementId, result: "allowed", detail: `version=${execution.result.version}; evidence content omitted; production gate closed` });
+          } catch (error) {
+            sendProcurementRequirementError(sendJson, res, error, "audit", family);
+            return true;
+          }
+          try { writeDatabase(execution.data); } catch (error) {
+            sendProcurementRequirementError(sendJson, res, error, "storage", family);
+            return true;
+          }
+        }
+        sendJson(res, 200, { ok: true, replayed: execution.replayed, delivery: execution.result, productionReady: false });
         return true;
       }
 

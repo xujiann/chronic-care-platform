@@ -17,6 +17,10 @@ test("platform nonfunctional gate locks current frontend and composition budgets
   assert.ok(report.summary.routeFiles >= 43);
   assert.equal(report.productionReady, false);
   assert.ok(report.externalGates.includes("load-and-capacity-test"));
+  const procurementAsset = report.assets.find((item) => item.file === "platform-procurement-governance-ui.js");
+  assert.equal(procurementAsset?.withinBudget, true);
+  assert.equal(budgets.frontendAssets.find((item) => item.file === "platform-productization-ui.js")?.maximumBytes, 30000);
+  assert.equal(budgets.frontendAssets.find((item) => item.file === "platform-procurement-governance-ui.js")?.maximumBytes, 30000);
 });
 
 test("platform nonfunctional gate rejects asset growth beyond its budget", () => {
