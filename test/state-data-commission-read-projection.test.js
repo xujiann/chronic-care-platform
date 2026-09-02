@@ -5,8 +5,12 @@ const test = require("node:test");
 
 const {
   AUTH_USER_READ_SECRET_FIELDS,
+  SERVER_MANAGED_PROCUREMENT_COLLECTIONS,
   createRouteSegments,
-  projectAuthUsersForStateRead
+  firstServerManagedProcurementConflict,
+  projectAuthUsersForStateRead,
+  projectProcurementForStateRead,
+  serverManagedProcurementState
 } = require("../src/http/routes/state-data");
 
 function responseDouble() {
@@ -123,4 +127,26 @@ test("GET /api/state stops before reading state when authorization is denied", a
 
   assert.equal(handled, true);
   assert.equal(readCount, 0);
+});
+
+test("procurement governance aggregates are server-managed against legacy state writes", () => {
+  assert.deepEqual([...SERVER_MANAGED_PROCUREMENT_COLLECTIONS], ["procurementRequirementCatalog", "procurementRequirementGovernance", "procurementRequirementDelivery"]);
+  const current = { procurementRequirementCatalog: { version: 1 }, procurementRequirementGovernance: { reviews: [] }, procurementRequirementDelivery: { plans: [] }, residents: [] };
+  assert.deepEqual(serverManagedProcurementState(current), { procurementRequirementCatalog: { version: 1 }, procurementRequirementGovernance: { reviews: [] }, procurementRequirementDelivery: { plans: [] } });
+  assert.equal(firstServerManagedProcurementConflict(current, { procurementRequirementDelivery: { plans: [{ forged: true }] } }), "procurementRequirementDelivery");
+  assert.equal(firstServerManagedProcurementConflict(current, { procurementRequirementDelivery: { plans: [] } }), null);
+});
+
+test("non-commission state reads never expose procurement governance internals", () => {
+  const source = {
+    procurementRequirementCatalog: { documents: [{ sha256: "private-document-digest" }] },
+    procurementRequirementGovernance: { commands: [{ actorDigest: "private-actor-digest" }] },
+    procurementRequirementDelivery: { plans: [{ evidence: [{ digest: "private-evidence-digest" }] }] },
+    residents: []
+  };
+  for (const role of ["citizen", "institution", "insurance", "county"]) {
+    const projected = projectProcurementForStateRead(source, { role });
+    SERVER_MANAGED_PROCUREMENT_COLLECTIONS.forEach((collection) => assert.equal(Object.hasOwn(projected, collection), false));
+  }
+  assert.equal(projectProcurementForStateRead(source, { role: "commission" }), source);
 });

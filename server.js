@@ -11934,6 +11934,16 @@ function normalizeState(data) {
       && !Array.isArray(data.procurementRequirementGovernance)
       ? { procurementRequirementGovernance: structuredClone(data.procurementRequirementGovernance) }
       : {}),
+    ...(data.procurementRequirementCatalog
+      && typeof data.procurementRequirementCatalog === "object"
+      && !Array.isArray(data.procurementRequirementCatalog)
+      ? { procurementRequirementCatalog: structuredClone(data.procurementRequirementCatalog) }
+      : {}),
+    ...(data.procurementRequirementDelivery
+      && typeof data.procurementRequirementDelivery === "object"
+      && !Array.isArray(data.procurementRequirementDelivery)
+      ? { procurementRequirementDelivery: structuredClone(data.procurementRequirementDelivery) }
+      : {}),
     personalRecords: PhysicalExaminationService.mergeSeedRecords(Array.isArray(data.personalRecords) ? data.personalRecords : seedPersonalRecords()).map(cleanPersonalRecordText),
     recordCorrections: Array.isArray(data.recordCorrections) ? data.recordCorrections.slice(-1000) : [],
     recordSharePackages: Array.isArray(data.recordSharePackages) ? data.recordSharePackages.slice(-1000) : [],

@@ -77,19 +77,36 @@
         <div id="platform-productization-work-items" class="evidence-grid"></div>
         <h3>机构接入适配器</h3>
         <div id="platform-productization-integrations" class="evidence-grid"></div>
-        <h3>历史需求兼容目录</h3>
-        <div id="platform-productization-regional-requirements" class="evidence-grid" aria-live="polite"></div>
-        <div class="panel-title compact-title">
-          <h3>招标需求治理工作台</h3>
-          <span id="platform-procurement-requirement-version" class="badge warn">治理视图未登记 · 未获生产授权</span>
-        </div>
-        <p class="muted">来源文件保留在受控位置；平台仅展示中性来源系列、修订和变化统计，不展示文件路径、原文或地域机构信息。</p>
-        <div id="platform-procurement-requirement-workbench" class="evidence-grid" aria-live="polite"></div>
         <h3>产品运行驾驶舱</h3>
         <div id="platform-product-operations" aria-live="polite"></div>
         <h3>增强迭代驾驶舱</h3>
         <div id="platform-enhancement-operations" aria-live="polite"></div>
         <p id="platform-productization-boundary" class="implementation-boundary"></p>
+      </section>
+
+      <section id="platform-procurement-governance-center" class="panel">
+        <div class="panel-title">
+          <h2>招标需求治理中心</h2>
+          <span id="platform-procurement-requirement-version" class="badge warn">治理视图未登记 · 生产未授权</span>
+        </div>
+        <p id="platform-procurement-governance-boundary" class="muted">受控导入、人工复核、产品规划、仓库证据核验和独立交付验收形成仓库闭环；生产授权仍保持关闭。</p>
+        <div id="platform-procurement-governance-metrics" class="metric-grid"></div>
+        <div class="action-row">
+          <button id="platform-procurement-import-trigger" class="secondary-button" type="button" aria-controls="platform-procurement-import-artifact">登记脱敏导入文件</button>
+          <input id="platform-procurement-import-artifact" type="file" accept="application/json,.json" hidden aria-hidden="true" tabindex="-1" />
+          <button id="export-platform-procurement-governance" class="secondary-button" type="button">导出治理台账</button>
+        </div>
+        <p class="muted">只接收离线工具生成的脱敏 JSON；不在浏览器上传 PDF、路径或招标原文。</p>
+        <div id="platform-procurement-governance-filters" class="action-row"></div>
+        <p id="platform-procurement-governance-announcement" class="muted" aria-live="polite"></p>
+        <h3>需求池与人工复核</h3>
+        <div id="platform-procurement-requirement-workbench" class="evidence-grid" aria-live="polite"></div>
+        <h3>版本差异</h3>
+        <div id="platform-procurement-revision-comparisons" class="evidence-grid"></div>
+        <h3>产品规划与开发建议</h3>
+        <div id="platform-procurement-product-planning" class="evidence-grid"></div>
+        <h3>交付证据</h3>
+        <div id="platform-procurement-delivery-evidence" class="evidence-grid"></div>
       </section>
 
       <section class="panel" id="platform-go-live-slices-panel">
@@ -688,6 +705,7 @@
     <script src="./regional-cutover-workbench-ui.js"></script>
     <script src="./product-operations-ui.js"></script>
     <script src="./product-regional-operations-ui.js"></script>
+    <script src="./platform-procurement-governance-ui.js"></script>
     <script src="./platform-productization-ui.js"></script>
     <script src="./platform.js"></script>
     <script src="./production-security.js"></script>

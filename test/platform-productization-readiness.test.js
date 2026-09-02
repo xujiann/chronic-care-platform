@@ -26,6 +26,7 @@ test("productization readiness completes local gates and keeps production fail c
   assert.equal(report.summary.regionalRequirementOwnerReview, 19);
   assert.equal(report.containsPatientData, false);
   assert.equal(report.containsCredentials, false);
+  assert.equal(report.files.find((item) => item.file === "platform-procurement-governance-ui.js")?.present, true);
   assert.equal(report.checks.every((item) => item.passed), true);
   assert.equal(report.checks.find((item) => item.id === "productization:regionalAssembly").detail, "template");
   assert.equal(report.checks.find((item) => item.id === "productization:regionalRequirements").detail, "19 normalized requirements / 19 owner review");

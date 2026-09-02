@@ -12,8 +12,12 @@ const REQUIRED_FILES = Object.freeze([
   "src/platform/productization/work-item-center.js",
   "src/platform/productization/institution-integration-center.js",
   "src/platform/productization/regional-requirement-catalog.js",
+  "src/platform/productization/procurement-requirement-catalog-registry.js",
+  "src/platform/productization/procurement-requirement-governance.js",
+  "src/platform/productization/procurement-requirement-delivery.js",
   "src/platform/regional/regional-product-assembly.js",
   "src/http/routes/platform-governance/productization-center.js",
+  "platform-procurement-governance-ui.js",
   "platform-productization-ui.js",
   "config/regional-requirement-catalog.json"
 ]);
@@ -53,6 +57,7 @@ function buildPlatformProductizationReadiness(options = {}) {
     { id: "productization:workItemProjection", passed: center.workItems.ok, detail: `${center.workItems.summary.total} metadata-only projections` },
     { id: "productization:syntheticIntegration", passed: center.institutionIntegration.ok, detail: `${center.institutionIntegration.summary.adapters} adapters` },
     { id: "productization:regionalRequirements", passed: center.regionalRequirements.ok && center.regionalRequirements.summary.requirements > 0, detail: `${center.regionalRequirements.summary.requirements} normalized requirements / ${center.regionalRequirements.summary.ownerReview} owner review` },
+    { id: "productization:procurementGovernance", passed: center.requirementGovernance.ok && center.requirementDelivery.ok, detail: `${center.requirementGovernance.summary.candidates} candidates / ${center.requirementDelivery.summary.approved} approved plans / production gate closed` },
     { id: "productization:regionalAssembly", passed: assembly.ok, detail: assembly.region.code },
     { id: "productization:nonfunctional", passed: nonfunctional.ok, detail: `${nonfunctional.summary.testFiles} tests / ${nonfunctional.summary.routeFiles} routes` },
     { id: "productization:productionFailClosed", passed: center.productionReady === false && assembly.productionReady === false, detail: "NO-GO until site evidence and authorization" }

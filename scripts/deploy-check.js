@@ -433,6 +433,7 @@ function buildDeployCheckReport(options = {}) {
     assertFile("src/platform/productization/productization-readiness.js"),
     assertFile("src/platform/regional/regional-product-assembly.js"),
     assertFile("src/http/routes/platform-governance/productization-center.js"),
+    assertFile("platform-procurement-governance-ui.js"),
     assertFile("platform-productization-ui.js"),
     assertFile("scripts/platform-productization-readiness.js"),
     assertFile("docs/平台产品化增强第一优先级交付-2026-08-17.md"),

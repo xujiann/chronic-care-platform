@@ -106,6 +106,56 @@ test("requirement review replay does not write state or duplicate audit", async 
   assert.equal(fixture.audits.length, 0);
 });
 
+test("sanitized import registration and delivery lifecycle routes persist one audited write", async () => {
+  const importCalls = [];
+  const imported = harness({
+    payload: { expectedVersion: 0, artifact: { schemaVersion: "procurement-controlled-import-batch-v2" } },
+    runtime: {
+      applyProcurementImportRegistration(data, command, user) {
+        importCalls.push({ data, command, user });
+        return { data: { procurementRequirementCatalog: { schemaVersion: "procurement-requirement-catalog-state-v1" } }, result: { artifactDigest: `sha256:${"a".repeat(64)}`, registeredDocuments: 1, registeredCandidates: 2, version: 1, productionReady: false }, replayed: false };
+      }
+    }
+  });
+  await imported.segment.handle({ method: "POST", headers: { "idempotency-key": "import-route-command-0001" } }, {}, new URL("https://example.gov.cn/api/platform/productization/requirement-batches"));
+  assert.equal(importCalls[0].command.commandId, "import-route-command-0001");
+  assert.equal(importCalls[0].user.role, "commission");
+  assert.equal(imported.calls.length, 1);
+  assert.equal(imported.calls[0].securityEvents.length, 1);
+  assert.equal(imported.audits[0].action, "procurement-import-batch-register");
+  assert.equal(imported.responses[0].body.productionReady, false);
+
+  const deliveryCalls = [];
+  const delivery = harness({
+    payload: { action: "plan", expectedVersion: 0, releaseWindow: "next-release" },
+    runtime: {
+      applyProcurementRequirementDeliveryAction(data, command, user) {
+        deliveryCalls.push({ data, command, user });
+        return { data: { procurementRequirementDelivery: { schemaVersion: "procurement-requirement-delivery-state-v1" } }, result: { requirementId: command.requirementId, status: "planned", version: 1, productionReady: false }, replayed: false };
+      }
+    }
+  });
+  await delivery.segment.handle({ method: "POST", headers: { "idempotency-key": "delivery-route-command-0001" } }, {}, new URL("https://example.gov.cn/api/platform/productization/requirements/PR-SAMPLE-001-R001/lifecycle-actions"));
+  assert.equal(deliveryCalls[0].command.commandId, "delivery-route-command-0001");
+  assert.equal(deliveryCalls[0].command.requirementId, "PR-SAMPLE-001-R001");
+  assert.equal(delivery.calls.length, 1);
+  assert.equal(delivery.calls[0].securityEvents.length, 1);
+  assert.equal(delivery.audits[0].action, "procurement-delivery-plan");
+  assert.equal(delivery.responses[0].body.delivery.status, "planned");
+});
+
+test("import and delivery exact replay never duplicate state or audit", async () => {
+  for (const [fixture, url] of [
+    [harness({ payload: { expectedVersion: 0, artifact: {} }, runtime: { applyProcurementImportRegistration: () => ({ data: {}, result: { artifactDigest: `sha256:${"b".repeat(64)}` }, replayed: true }) } }), "https://example.gov.cn/api/platform/productization/requirement-batches"],
+    [harness({ payload: { action: "plan", expectedVersion: 0, releaseWindow: "backlog" }, runtime: { applyProcurementRequirementDeliveryAction: () => ({ data: {}, result: { requirementId: "PR-SAMPLE-001-R001" }, replayed: true }) } }), "https://example.gov.cn/api/platform/productization/requirements/PR-SAMPLE-001-R001/lifecycle-actions"]
+  ]) {
+    await fixture.segment.handle({ method: "POST", headers: { "idempotency-key": "replay-route-command-0001" } }, {}, new URL(url));
+    assert.equal(fixture.responses[0].body.replayed, true);
+    assert.equal(fixture.calls.length, 0);
+    assert.equal(fixture.audits.length, 0);
+  }
+});
+
 test("requirement review route fails closed for a legacy receipt without an exact snapshot", async () => {
   const fixture = harness({
     payload: { action: "accept", expectedVersion: 0, note: "历史回执缺少结果快照时不能重新推导响应" },
@@ -259,4 +309,64 @@ test("requirement review route fails closed when audit or storage fails", async 
   );
   assert.equal(storageConflict.responses[0].status, 409);
   assert.equal(storageConflict.responses[0].body.code, "PROCUREMENT_REQUIREMENT_VERSION_CONFLICT");
+});
+
+test("new procurement routes fail closed when audit or storage fails", async () => {
+  const cases = [
+    {
+      url: "https://example.gov.cn/api/platform/productization/requirement-batches",
+      payload: { expectedVersion: 0, artifact: {} },
+      method: "applyProcurementImportRegistration",
+      result: { artifactDigest: `sha256:${"a".repeat(64)}`, registeredDocuments: 1, registeredCandidates: 1, version: 1 },
+      data: { procurementRequirementCatalog: { schemaVersion: "procurement-requirement-catalog-state-v1" } },
+      auditCode: "PROCUREMENT_IMPORT_REGISTRATION_AUDIT_FAILED",
+      storageCode: "PROCUREMENT_IMPORT_REGISTRATION_STORAGE_FAILED",
+      versionCode: "PROCUREMENT_IMPORT_REGISTRATION_VERSION_CONFLICT"
+    },
+    {
+      url: "https://example.gov.cn/api/platform/productization/requirements/PR-SAMPLE-001-R001/lifecycle-actions",
+      payload: { action: "plan", expectedVersion: 0, releaseWindow: "backlog" },
+      method: "applyProcurementRequirementDeliveryAction",
+      result: { requirementId: "PR-SAMPLE-001-R001", status: "planned", version: 1 },
+      data: { procurementRequirementDelivery: { schemaVersion: "procurement-requirement-delivery-state-v1" } },
+      auditCode: "PROCUREMENT_DELIVERY_AUDIT_FAILED",
+      storageCode: "PROCUREMENT_DELIVERY_STORAGE_FAILED",
+      versionCode: "PROCUREMENT_DELIVERY_VERSION_CONFLICT"
+    }
+  ];
+
+  for (const item of cases) {
+    const runtimeResult = () => ({ data: structuredClone(item.data), result: { ...item.result, productionReady: false }, replayed: false });
+    const auditFailure = harness({
+      payload: item.payload,
+      runtime: { [item.method]: runtimeResult },
+      prependAuditTrailEntry() { throw new Error("secret audit path C:\\private"); }
+    });
+    await auditFailure.segment.handle({ method: "POST", headers: { "idempotency-key": `audit-${item.method}` } }, {}, new URL(item.url));
+    assert.equal(auditFailure.responses[0].status, 500);
+    assert.equal(auditFailure.responses[0].body.code, item.auditCode);
+    assert.equal(auditFailure.calls.length, 0);
+    assert.doesNotMatch(JSON.stringify(auditFailure.responses[0]), /secret|private/i);
+
+    let writeAttempts = 0;
+    const storageFailure = harness({
+      payload: item.payload,
+      runtime: { [item.method]: runtimeResult },
+      writeDatabase() { writeAttempts += 1; throw new Error("credential database detail"); }
+    });
+    await storageFailure.segment.handle({ method: "POST", headers: { "idempotency-key": `storage-${item.method}` } }, {}, new URL(item.url));
+    assert.equal(writeAttempts, 1);
+    assert.equal(storageFailure.responses[0].status, 500);
+    assert.equal(storageFailure.responses[0].body.code, item.storageCode);
+    assert.doesNotMatch(JSON.stringify(storageFailure.responses[0]), /credential|database detail/i);
+
+    const storageConflict = harness({
+      payload: item.payload,
+      runtime: { [item.method]: runtimeResult },
+      writeDatabase() { const error = new Error("SQLite CAS conflict detail"); error.code = "STORAGE_CONFLICT"; throw error; }
+    });
+    await storageConflict.segment.handle({ method: "POST", headers: { "idempotency-key": `conflict-${item.method}` } }, {}, new URL(item.url));
+    assert.equal(storageConflict.responses[0].status, 409);
+    assert.equal(storageConflict.responses[0].body.code, item.versionCode);
+  }
 });

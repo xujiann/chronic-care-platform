@@ -77,4 +77,61 @@ test("procurement requirement review persists through the real SQLite API bounda
   assert.equal(after.body.requirementGovernance.items[0].version, 1);
   assert.equal(after.body.requirementGovernance.containsLocalPath, false);
   assert.equal(after.body.requirementGovernance.productionReady, false);
+  const deliveryItem = after.body.requirementDelivery.items.find((item) => item.requirementId === candidate.id);
+  assert.equal(deliveryItem.status, "awaiting-plan");
+
+  const planned = await json(baseUrl, `/api/platform/productization/requirements/${encodeURIComponent(candidate.id)}/lifecycle-actions`, {
+    method: "POST",
+    headers: { ...headers, "Idempotency-Key": "procurement-api-plan-0001" },
+    body: JSON.stringify({ action: "plan", expectedVersion: 0, releaseWindow: "next-release" })
+  });
+  assert.equal(planned.response.status, 200, JSON.stringify(planned.body));
+  assert.equal(planned.body.delivery.status, "planned");
+  assert.equal(planned.body.delivery.productionReady, false);
+
+  const started = await json(baseUrl, `/api/platform/productization/requirements/${encodeURIComponent(candidate.id)}/lifecycle-actions`, {
+    method: "POST",
+    headers: { ...headers, "Idempotency-Key": "procurement-api-start-0001" },
+    body: JSON.stringify({ action: "start-delivery", expectedVersion: 1 })
+  });
+  assert.equal(started.response.status, 200, JSON.stringify(started.body));
+  assert.equal(started.body.delivery.status, "in-delivery");
+
+  const submitted = await json(baseUrl, `/api/platform/productization/requirements/${encodeURIComponent(candidate.id)}/lifecycle-actions`, {
+    method: "POST",
+    headers: { ...headers, "Idempotency-Key": "procurement-api-evidence-0001" },
+    body: JSON.stringify({ action: "submit-evidence", expectedVersion: 2, evidenceType: "implementation", evidenceDigest: `sha256:${"a".repeat(64)}` })
+  });
+  assert.equal(submitted.response.status, 200, JSON.stringify(submitted.body));
+  assert.equal(submitted.body.delivery.status, "evidence-review");
+
+  const finalCenter = await json(baseUrl, "/api/platform/productization/center", { headers });
+  assert.equal(finalCenter.body.requirementDelivery.summary.evidenceReview, 1);
+  assert.equal(finalCenter.body.requirementDelivery.exportBundle.productionReady, false);
+  assert.equal(JSON.stringify(finalCenter.body.requirementDelivery.exportBundle).includes("PR-SAMPLE"), false);
+
+  const sourceDocument = structuredClone(require("../config/procurement-requirement-governance.json").documents[1]);
+  sourceDocument.id = "DOC-API-NEUTRAL-0003";
+  sourceDocument.seriesId = "SRC-000000000003";
+  sourceDocument.sourceAlias = "需求来源 000000000003";
+  sourceDocument.sha256 = `sha256:${"c".repeat(64)}`;
+  sourceDocument.candidates = [{ ...sourceDocument.candidates[0], id: "PR-API-NEUTRAL-003-R001", logicalRequirementId: "REQ-000000000006", semanticDigest: `sha256:${"d".repeat(64)}` }];
+  const artifact = {
+    schemaVersion: "procurement-controlled-import-batch-v2",
+    documents: [sourceDocument],
+    revisionComparisons: [],
+    summary: { documents: 1, byteSize: sourceDocument.byteSize, candidates: 1, reviewedPages: sourceDocument.reviewedPageCount },
+    productionReady: false,
+    boundary: "sanitized"
+  };
+  const registered = await json(baseUrl, "/api/platform/productization/requirement-batches", {
+    method: "POST",
+    headers: { ...headers, "Idempotency-Key": "procurement-api-import-0001" },
+    body: JSON.stringify({ expectedVersion: 0, artifact })
+  });
+  assert.equal(registered.response.status, 200, JSON.stringify(registered.body));
+  assert.equal(registered.body.registration.registeredDocuments, 1);
+  const importedCenter = await json(baseUrl, "/api/platform/productization/center", { headers });
+  assert.equal(importedCenter.body.requirementGovernance.summary.candidates, before.body.requirementGovernance.summary.candidates + 1);
+  assert.equal(importedCenter.body.requirementGovernance.catalogRegistrationVersion, 1);
 });

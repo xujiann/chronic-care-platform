@@ -267,6 +267,7 @@
     { "pattern": "config/p0-data-promotions.json", "owner": "T00" },
     { "pattern": "config/regional-capability-bundles.json", "owner": "T00" },
     { "pattern": "config/regional-requirement-catalog.json", "owner": "T00" },
+    { "pattern": "platform-procurement-governance-ui.js", "owner": "T00" },
     { "pattern": "platform-productization-ui.js", "owner": "T00" },
     { "pattern": "scripts/platform-productization-readiness.js", "owner": "T00" },
     { "pattern": "test/platform-productization*.test.js", "owner": "T00" },

@@ -4,10 +4,12 @@
 
 | Method / Path | 角色与范围 | 语义 |
 |---|---|---|
-| `GET /api/platform/productization/center` | commission / platform | 在既有 v1 响应增加中性 `requirementGovernance` 工作台和差距投影 |
+| `GET /api/platform/productization/center` | commission / platform | 在既有 v1 响应增加中性 `requirementGovernance` 与 `requirementDelivery` 工作台、差距、失效计划和交付验收投影 |
 | `POST /api/platform/productization/requirements/:id/actions` | commission / platform | `accept`、`request-revision`、`reject` 人工复核；强制 `Idempotency-Key` 与 `expectedVersion` |
+| `POST /api/platform/productization/requirement-batches` | commission / platform | 登记离线生成的脱敏 JSON 批次；原子合并有效目录，不接收 PDF、路径或原文 |
+| `POST /api/platform/productization/requirements/:id/lifecycle-actions` | commission / platform | 产品规划、实施、三类仓库证据独立核验，以及验收申请、人工验收、退回整改和重新提交；旧证据绑定失效后禁止操作 |
 
-写入口先鉴权再读取 body，命令摘要绑定操作者；同键同意图零写回放，同键异意图和陈旧版本失败关闭。复核状态、命令回执与安全审计已合并为一次状态持久化，同键回放不重复审计；白名单稳定 HTTP 错误合同和负向证据已闭合，`reviewedProofRequired=0`，但 `productionReady=false`。PDF 批量导入仍只在离线受控命令中运行，不暴露为 HTTP API。
+写入口先鉴权再读取 body，命令摘要绑定操作者；同键同意图零写回放，同键异意图和陈旧版本失败关闭。目录、复核、交付、验收状态、命令回执与安全审计按命令一次持久化，同键回放不重复审计。存储冲突按各接口错误族返回稳定版本冲突；审计或存储失败无回退写。PDF 检查与提取仍只在离线受控命令中运行，HTTP 只接收严格最小化的 JSON 登记结果。人工交付验收不代表现场验收或生产授权，全部保持 `productionReady=false`。
 
 ## 2026-09-01 T03 卫生监督 API
 
@@ -33,7 +35,7 @@
 
 ## 2026-08-31 API 当前事实机器对账
 
-生产 API 目录当前为 615 项，其中 352 个写入口、318 个 endpoint 仍缺直接行为证明、总 `review-required` 为 320；首批生产范围的 `apiReviewRequired` 已为 0，但整体仍为 `FROZEN-NO-GO`。新增招标需求人工复核入口以及卫生监督 1 个只读与 4 个写入口均保持 `productionReady=false`，不改变首批冻结范围。
+生产 API 目录当前为 617 项，其中 354 个写入口、317 个 endpoint 仍缺直接行为证明、总 `review-required` 为 319；首批生产范围的 `apiReviewRequired` 已为 0，但整体仍为 `FROZEN-NO-GO`。招标需求复核、脱敏批次登记和交付治理入口均保持 `productionReady=false`，不改变首批冻结范围。
 
 ## 2026-08-31 首发迁移计划不改变 API
 
@@ -163,10 +165,10 @@ HTTP request
 - 所有既有状态写入在同一 SQLite 事务内核对并追加 v15 审计 source；该 hook 不暴露新 HTTP API，同 ID 异内容会使原请求整体失败回滚。
 - `PUT /api/state` 保持原路径和成功形状。审计数组以及四个 T02 区域共享集合均为服务端管理字段：省略时保留，提交时必须与当前值逐项深相等。区域集合的删除、修改、重排或伪造追加优先返回 `409 REGIONAL_SHARING_SERVER_MANAGED_COLLECTION_CONFLICT`；其他集合的乐观版本冲突仍返回 `409 STORAGE_CONFLICT`。集合级兼容入口对四个区域集合返回 `403 REGIONAL_SHARING_SERVER_MANAGED_COLLECTION_WRITE_DENIED`。
 - `GET /api/state` 保持 method/path、允许角色、状态码和顶层集合兼容。鉴权与既有角色范围投影完成后，`authUsers` 专用投影删除 `password`、`passwordHash`，保留账号、角色、机构、状态和 `externalSubject` 等管理字段；读取不修改权威快照。该增量只关闭认证口令泄露，commission 其余全状态最小权限债务仍为 `NO-GO`。
-- `npm run api:authorization-matrix` 从模块化路由源码生成/校验 owner、身份、角色、范围、用途和 16 条高风险接口唯一性。
+- `npm run api:authorization-matrix` 从模块化路由源码生成/校验 owner、身份、角色、范围、用途和 18 条高风险接口唯一性。
 - `npm run api:authentication-evidence` 校验 13 项认证合同的 owner、mechanism、credential source、required/optional/none、replay/CSRF、scope、实现锚点和可执行负向测试。其中 SMS callback 从现有幂等合同派生；原 13 个未分类 key 中 12 个真实入口已分类，T10 cutover pack 绑定 commission 直接拒绝证据，1 个公卫词法误配已从 inventory 删除，未分类认证为 0。
-- `npm run api:production-catalog` 合并上述授权矩阵与同一 route source inventory 的字面条件；当前 615 项全部 `NO-GO`。352 个写接口中 35 个完整 endpoint 有直接幂等行为合同，317 个仍缺 endpoint 级行为证明；2 个转诊 action-slice 不晋升通用 endpoint，退款 runtime-role variant 仍复核，因此总 `review-required` 为 319。
-- `npm run api:idempotency-evidence` 校验 37 份证据合同且显式待补证明为 0。招标需求人工复核入口已绑定角色、操作者、幂等键和 CAS，将复核状态、回执与审计一次持久化，并以固定脱敏错误覆盖输入、冲突、审计和存储失败。其余完整合同绑定各入口的身份、职责/资源范围、原响应或精确结果回放、CAS、单次持久化与稳定错误负测。所有合同保持 `productionReady=false`，进程锁与 SQLite CAS 不等于跨实例 exactly-once。
+- `npm run api:production-catalog` 合并上述授权矩阵与同一 route source inventory 的字面条件；当前 617 项全部 `NO-GO`。354 个写接口中 37 个完整 endpoint 有直接幂等行为合同，317 个仍缺 endpoint 级行为证明；2 个转诊 action-slice 不晋升通用 endpoint，退款 runtime-role variant 仍复核，因此总 `review-required` 为 319。
+- `npm run api:idempotency-evidence` 校验 39 份证据合同且显式待补证明为 0。招标需求复核、脱敏批次登记和交付治理入口已绑定角色、操作者、幂等键和 CAS，将领域状态、回执与审计一次持久化，并以固定脱敏错误覆盖输入、冲突、审计和存储失败。其余完整合同绑定各入口的身份、职责/资源范围、原响应或精确结果回放、CAS、单次持久化与稳定错误负测。所有合同保持 `productionReady=false`，进程锁与 SQLite CAS 不等于跨实例 exactly-once。
 - 身份/SMS HTTP 路径保持不变；组合根已为短信发送生成随机 request ID，适配器现在拒绝缺失幂等 ID，OIDC refresh 返回的 ID token 必须通过 JWKS/claims 验证后才暴露脱敏 claims。
 - `POST /api/attachments/upload-intents` 在完成身份和居民范围校验后检查服务端元数据容量；已有
   500 条或更多记录时返回 `507 SECURE_ATTACHMENT_METADATA_CAPACITY_EXCEEDED`，且不调用对象

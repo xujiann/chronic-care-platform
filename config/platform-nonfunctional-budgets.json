@@ -6,7 +6,8 @@
     { "file": "platform.js", "maximumBytes": 239000, "maximumLines": 3815 },
     { "file": "operations.js", "maximumBytes": 223000, "maximumLines": 3725 },
     { "file": "regional-cutover-workbench-ui.js", "maximumBytes": 20000, "maximumLines": 500 },
-    { "file": "platform-productization-ui.js", "maximumBytes": 30000, "maximumLines": 600 }
+    { "file": "platform-productization-ui.js", "maximumBytes": 30000, "maximumLines": 600 },
+    { "file": "platform-procurement-governance-ui.js", "maximumBytes": 30000, "maximumLines": 500 }
   ],
   "runtime": {
     "serverFile": "server.js",

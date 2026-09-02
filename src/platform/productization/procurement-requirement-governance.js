@@ -5,7 +5,8 @@ const defaultCatalog = require("../../../config/procurement-requirement-governan
 const defaultRegistry = require("../../../config/platform-capability-registry.json");
 const { opaqueId, validateGovernanceCatalog } = require("./procurement-requirement-contracts");
 const { analyzeRequirementGap } = require("./procurement-requirement-gap-analysis");
-const { buildProcurementRevisionComparisons } = require("./procurement-requirement-versioning");
+const { buildProcurementRevisionComparisons, candidateSemanticDigest } = require("./procurement-requirement-versioning");
+const { baseState: procurementCatalogState, buildEffectiveProcurementCatalog } = require("./procurement-requirement-catalog-registry");
 const { StateCommandError } = require("../storage/state-command-consistency");
 
 const TRANSITIONS = Object.freeze({
@@ -28,13 +29,96 @@ function assertSafeCommand(value, location = "command") {
   }
 }
 
+const REVIEW_STATE_KEYS = new Set(["schemaVersion", "reviews", "events", "commands"]);
+const REVIEW_KEYS = new Set(["requirementId", "status", "targetCapabilityIds", "productClass", "decision", "priority", "ownerProcess", "evidenceBinding", "noteDigest", "actorDigest", "version", "updatedAt"]);
+const REVIEW_EVENT_KEYS = new Set(["eventId", "requirementId", "action", "resultingStatus", "actorDigest", "noteDigest", "version", "at"]);
+const REVIEW_COMMAND_KEYS = new Set(["commandKeyDigest", "requestDigest", "requirementId", "resultingVersion", "reviewSnapshot", "resultSnapshot", "recordedAt"]);
+const BINDING_KEYS = new Set(["catalogId", "seriesId", "sourceRevision", "documentDigest", "logicalRequirementId", "semanticDigest", "candidateContractDigest", "sourceAnchorDigest", "capabilityRegistryDigest"]);
+const SHA256_PATTERN = /^sha256:[a-f0-9]{64}$/;
+const ACTION_RESULTS = Object.freeze({ accept: "accepted", "request-revision": "revision-required", reject: "rejected" });
+
+function exactKeys(value, allowed) {
+  return value && typeof value === "object" && !Array.isArray(value) && Object.keys(value).every((key) => allowed.has(key));
+}
+
+function validOpaqueId(value) {
+  return typeof value === "string" && value.length >= 4 && value.length <= 96 && /^[A-Za-z0-9]+(?:[._:-][A-Za-z0-9]+)*$/.test(value);
+}
+
+function validTimestamp(value) {
+  return typeof value === "string" && value.length <= 40 && Number.isFinite(Date.parse(value));
+}
+
+function validEvidenceBinding(binding) {
+  if (binding === undefined) return true; // Existing v1 records are retained but projected as invalidated.
+  return exactKeys(binding, BINDING_KEYS)
+    && validOpaqueId(binding.catalogId)
+    && /^SRC-[A-F0-9]{12}$/.test(String(binding.seriesId || ""))
+    && Number.isInteger(binding.sourceRevision) && binding.sourceRevision > 0
+    && /^REQ-[A-F0-9]{12}$/.test(String(binding.logicalRequirementId || ""))
+    && [binding.documentDigest, binding.semanticDigest, binding.candidateContractDigest, binding.sourceAnchorDigest, binding.capabilityRegistryDigest]
+      .every((value) => SHA256_PATTERN.test(String(value || "")));
+}
+
+function validReview(review) {
+  return exactKeys(review, REVIEW_KEYS)
+    && validOpaqueId(review.requirementId)
+    && ["accepted", "revision-required", "rejected"].includes(review.status)
+    && Array.isArray(review.targetCapabilityIds) && review.targetCapabilityIds.length >= 1 && review.targetCapabilityIds.length <= 8
+    && new Set(review.targetCapabilityIds).size === review.targetCapabilityIds.length
+    && review.targetCapabilityIds.every(validOpaqueId)
+    && ["CORE", "SHARED", "PACKAGE", "CONFIG", "DEPLOY"].includes(review.productClass)
+    && ["REUSE", "ENHANCE", "BUILD", "CONFIGURE", "DEPLOY"].includes(review.decision)
+    && ["P0", "P1", "P2"].includes(review.priority)
+    && /^T(?:0\d)$/.test(String(review.ownerProcess || ""))
+    && validEvidenceBinding(review.evidenceBinding)
+    && SHA256_PATTERN.test(String(review.noteDigest || ""))
+    && SHA256_PATTERN.test(String(review.actorDigest || ""))
+    && Number.isInteger(review.version) && review.version > 0
+    && validTimestamp(review.updatedAt);
+}
+
+function reviewEquals(left, right) {
+  return JSON.stringify(left) === JSON.stringify(right);
+}
+
+function validatePersistedReviewState(state) {
+  if (!exactKeys(state, REVIEW_STATE_KEYS)
+    || state.schemaVersion !== "procurement-requirement-review-state-v1"
+    || !Array.isArray(state.reviews) || !Array.isArray(state.events) || !Array.isArray(state.commands)
+    || state.events.length !== state.commands.length
+    || state.events.length > defaultCatalog.limits.maximumReviewEvents
+    || state.commands.length > defaultCatalog.limits.maximumCommandReceipts
+    || state.reviews.some((review) => !validReview(review))) return false;
+
+  const latest = new Map();
+  const versions = new Map();
+  for (let index = 0; index < state.commands.length; index += 1) {
+    const event = state.events[index];
+    const receipt = state.commands[index];
+    const snapshot = receipt?.reviewSnapshot;
+    if (!exactKeys(event, REVIEW_EVENT_KEYS) || !exactKeys(receipt, REVIEW_COMMAND_KEYS) || !validReview(snapshot)) return false;
+    const priorVersion = versions.get(event.requirementId) || 0;
+    if (!SHA256_PATTERN.test(String(receipt.commandKeyDigest || ""))
+      || !SHA256_PATTERN.test(String(receipt.requestDigest || ""))
+      || event.eventId !== `pre-${receipt.commandKeyDigest.slice(7, 23)}`
+      || event.requirementId !== receipt.requirementId || event.requirementId !== snapshot.requirementId
+      || ACTION_RESULTS[event.action] !== event.resultingStatus || event.resultingStatus !== snapshot.status
+      || event.version !== priorVersion + 1 || event.version !== receipt.resultingVersion || event.version !== snapshot.version
+      || event.actorDigest !== snapshot.actorDigest || event.noteDigest !== snapshot.noteDigest
+      || !validTimestamp(event.at) || event.at !== receipt.recordedAt || event.at !== snapshot.updatedAt
+      || (receipt.resultSnapshot !== undefined && receipt.resultSnapshot !== null && (typeof receipt.resultSnapshot !== "object" || Array.isArray(receipt.resultSnapshot)))) return false;
+    versions.set(event.requirementId, event.version);
+    latest.set(event.requirementId, snapshot);
+  }
+  if (state.reviews.length !== latest.size || new Set(state.reviews.map((review) => review.requirementId)).size !== state.reviews.length) return false;
+  return state.reviews.every((review) => latest.has(review.requirementId) && reviewEquals(review, latest.get(review.requirementId)));
+}
+
 function baseState(value) {
-  const state = value && typeof value === "object" && !Array.isArray(value) ? structuredClone(value) : {};
-  if (state.schemaVersion && state.schemaVersion !== "procurement-requirement-review-state-v1") throw new TypeError("procurement requirement review state is invalid");
-  state.schemaVersion = "procurement-requirement-review-state-v1";
-  state.reviews = Array.isArray(state.reviews) ? state.reviews : [];
-  state.events = Array.isArray(state.events) ? state.events : [];
-  state.commands = Array.isArray(state.commands) ? state.commands : [];
+  if (value === undefined || value === null) return { schemaVersion: "procurement-requirement-review-state-v1", reviews: [], events: [], commands: [] };
+  const state = value && typeof value === "object" && !Array.isArray(value) ? structuredClone(value) : null;
+  if (!state || !validatePersistedReviewState(state)) throw new TypeError("procurement requirement review state is invalid");
   return state;
 }
 
@@ -51,8 +135,28 @@ function sourceRows(catalog) {
   return currentDocuments(catalog).flatMap((document) => document.candidates.map((candidate) => ({ document, candidate })));
 }
 
+function evidenceBinding(document, candidate, registry, catalogId = defaultCatalog.catalogId) {
+  return Object.freeze({
+    catalogId,
+    seriesId: document.seriesId,
+    sourceRevision: document.revision,
+    documentDigest: document.sha256,
+    logicalRequirementId: candidate.logicalRequirementId,
+    semanticDigest: candidate.semanticDigest,
+    candidateContractDigest: candidateSemanticDigest(candidate),
+    sourceAnchorDigest: digest(JSON.stringify(candidate.sourceAnchor)),
+    capabilityRegistryDigest: digest(JSON.stringify(registry))
+  });
+}
+
+function bindingMatches(review, binding) {
+  return review?.evidenceBinding && Object.keys(binding).every((key) => review.evidenceBinding[key] === binding[key]);
+}
+
 function publicCandidate(document, candidate, review, registry, options = {}, change = "baseline") {
-  const status = review?.status || "pending-review";
+  const binding = evidenceBinding(document, candidate, registry, options.catalogId);
+  const boundReview = bindingMatches(review, binding) ? review : null;
+  const status = boundReview?.status || (review ? "revision-required" : "pending-review");
   const normalized = Object.freeze({
     id: candidate.id,
     logicalRequirementId: candidate.logicalRequirementId,
@@ -63,22 +167,25 @@ function publicCandidate(document, candidate, review, registry, options = {}, ch
     change,
     title: `需求候选 ${candidate.logicalRequirementId.slice(4)}`,
     sourceAnchor: Object.freeze({ pageStart: candidate.sourceAnchor.pageStart, pageEnd: candidate.sourceAnchor.pageEnd }),
-    targetCapabilityIds: Object.freeze([...(review?.targetCapabilityIds || candidate.targetCapabilityIds)]),
-    productClass: review?.productClass || candidate.productClass,
-    decision: review?.decision || candidate.decision,
-    priority: review?.priority || candidate.priority,
-    ownerProcess: review?.ownerProcess || candidate.ownerProcess,
+    targetCapabilityIds: Object.freeze([...(boundReview?.targetCapabilityIds || candidate.targetCapabilityIds)]),
+    productClass: boundReview?.productClass || candidate.productClass,
+    decision: boundReview?.decision || candidate.decision,
+    priority: boundReview?.priority || candidate.priority,
+    ownerProcess: boundReview?.ownerProcess || candidate.ownerProcess,
     evidenceStatus: candidate.evidenceStatus,
     reviewStatus: status,
     version: review?.version || 0,
     updatedAt: review?.updatedAt || "",
+    evidenceBindingStatus: boundReview ? "current" : review ? "invalidated" : "unreviewed",
+    reviewBindingDigest: boundReview ? digest(JSON.stringify(boundReview.evidenceBinding)) : "",
     productionReady: false
   });
   return Object.freeze({ ...normalized, gap: analyzeRequirementGap(normalized, registry, options) });
 }
 
 function buildProcurementRequirementGovernance(data = {}, options = {}) {
-  const catalog = options.catalog || defaultCatalog;
+  const catalog = buildEffectiveProcurementCatalog(data, options);
+  const catalogState = procurementCatalogState(data.procurementRequirementCatalog);
   const registry = options.registry || defaultRegistry;
   validateGovernanceCatalog(catalog, { ...options, registry });
   const state = baseState(data.procurementRequirementGovernance);
@@ -90,7 +197,7 @@ function buildProcurementRequirementGovernance(data = {}, options = {}) {
     comparison.changed.forEach((item) => changes.set(item.candidateId, "changed"));
   }
   const current = new Set(currentDocuments(catalog).map((document) => document.id));
-  const items = sourceRows(catalog).map(({ document, candidate }) => publicCandidate(document, candidate, reviews.get(candidate.id), registry, options, changes.get(candidate.id) || (document.revision > 1 ? "unchanged" : "baseline")));
+  const items = sourceRows(catalog).map(({ document, candidate }) => publicCandidate(document, candidate, reviews.get(candidate.id), registry, { ...options, catalogId: catalog.catalogId }, changes.get(candidate.id) || (document.revision > 1 ? "unchanged" : "baseline")));
   const documents = catalog.documents.map((document) => Object.freeze({
     id: document.id,
     seriesId: document.seriesId,
@@ -98,9 +205,9 @@ function buildProcurementRequirementGovernance(data = {}, options = {}) {
     revision: document.revision,
     supersedesDocumentId: document.supersedesDocumentId,
     isCurrent: current.has(document.id),
-    documentDigest: document.sha256,
+    evidenceId: `EVD-${digest(document.sha256).slice(7, 23).toUpperCase()}`,
     mediaType: document.mediaType,
-    byteSize: document.byteSize,
+    byteSizeBand: document.byteSize < 1048576 ? "under-1mb" : document.byteSize < 10485760 ? "1mb-to-10mb" : "10mb-or-more",
     reviewedPageCount: document.reviewedPageCount,
     extractionMode: document.extractionMode,
     textQuality: document.textQuality,
@@ -118,6 +225,7 @@ function buildProcurementRequirementGovernance(data = {}, options = {}) {
     containsRawDocument: false,
     containsLocalPath: false,
     containsBusinessPayload: false,
+    catalogRegistrationVersion: catalogState.version,
     summary: Object.freeze({
       documents: documents.length,
       sourceSeries: current.size,
@@ -144,7 +252,7 @@ function buildProcurementRequirementGovernance(data = {}, options = {}) {
 }
 
 function applyProcurementRequirementReviewAction(data = {}, command = {}, user = {}, options = {}) {
-  const catalog = options.catalog || defaultCatalog;
+  const catalog = buildEffectiveProcurementCatalog(data, options);
   const registry = options.registry || defaultRegistry;
   validateGovernanceCatalog(catalog, { ...options, registry });
   let commandId;
@@ -176,7 +284,7 @@ function applyProcurementRequirementReviewAction(data = {}, command = {}, user =
   const next = structuredClone(data || {});
   const state = baseState(next.procurementRequirementGovernance);
   const review = state.reviews.find((item) => item.requirementId === requirementId);
-  const current = review?.status || "pending-review";
+  let current = review?.status || "pending-review";
   const currentVersion = review?.version || 0;
   const requestDigest = digest(JSON.stringify({ requirementId, action, expectedVersion, actorDigest: digest(actor), noteDigest: digest(note) }));
   const commandKeyDigest = digest(commandId);
@@ -193,6 +301,7 @@ function applyProcurementRequirementReviewAction(data = {}, command = {}, user =
     });
   }
   if (!row) throw new StateCommandError("PROCUREMENT_REQUIREMENT_NOT_FOUND", "招标需求候选不存在。", 404);
+  if (review && !bindingMatches(review, evidenceBinding(row.document, row.candidate, registry, catalog.catalogId))) current = "revision-required";
   if (currentVersion !== expectedVersion) {
     throw new StateCommandError("PROCUREMENT_REQUIREMENT_VERSION_CONFLICT", "招标需求复核版本冲突。", 409);
   }
@@ -207,6 +316,7 @@ function applyProcurementRequirementReviewAction(data = {}, command = {}, user =
     decision: row.candidate.decision,
     priority: row.candidate.priority,
     ownerProcess: row.candidate.ownerProcess,
+    evidenceBinding: evidenceBinding(row.document, row.candidate, registry, catalog.catalogId),
     noteDigest: digest(note),
     actorDigest: digest(actor),
     version: currentVersion + 1,
@@ -218,7 +328,7 @@ function applyProcurementRequirementReviewAction(data = {}, command = {}, user =
   state.commands.push(receipt);
   if (state.events.length > catalog.limits.maximumReviewEvents || state.commands.length > catalog.limits.maximumCommandReceipts) throw new StateCommandError("PROCUREMENT_REQUIREMENT_CAPACITY_EXCEEDED", "招标需求治理记录已达到受控容量上限。", 409);
   next.procurementRequirementGovernance = state;
-  const report = buildProcurementRequirementGovernance(next, { ...options, catalog, registry, now });
+  const report = buildProcurementRequirementGovernance(next, { ...options, registry, now });
   const result = report.items.find((item) => item.id === requirementId);
   receipt.resultSnapshot = structuredClone(result);
   return Object.freeze({ data: next, result, replayed: false });
