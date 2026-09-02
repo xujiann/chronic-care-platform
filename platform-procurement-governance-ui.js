@@ -10,7 +10,16 @@
   const EVIDENCE_LABELS = Object.freeze({ implementation: "实现证据", test: "测试证据", review: "独立复核证据" });
 
   function escapeHtml(value) { return String(value ?? "").replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" })[character]); }
-  function metric(label, value) { return `<article class="metric"><strong>${escapeHtml(value)}</strong><span>${escapeHtml(label)}</span></article>`; }
+  function metric(documentRef, label, value) {
+    const card = documentRef.createElement("article");
+    const count = documentRef.createElement("strong");
+    const caption = documentRef.createElement("span");
+    card.className = "metric";
+    count.textContent = String(value);
+    caption.textContent = String(label);
+    card.append(count, caption);
+    return card;
+  }
   function safeCount(value) { return Number.isSafeInteger(value) && value >= 0 ? value : 0; }
   function safeEnum(value, values, fallback) { return values.includes(value) ? value : fallback; }
   function textList(value, fallback = "未登记") { return Array.isArray(value) && value.length ? value.map(String).join("、") : fallback; }
@@ -204,7 +213,8 @@
     const safeBundle = safeExportBundle(bundle);
     if (!safeBundle || typeof root.Blob !== "function" || !root.URL?.createObjectURL) return;
     const link = document.createElement("a"); const url = root.URL.createObjectURL(new root.Blob([`${JSON.stringify(safeBundle, null, 2)}\n`], { type: "application/json;charset=utf-8" }));
-    if (root.HealthBrowserSafeUrl?.setElementUrl) root.HealthBrowserSafeUrl.setElementUrl(link, "href", url, { capability: "blob-download", baseUrl: root.location }); else link.href = url;
+    if (!root.HealthBrowserSafeUrl?.setElementUrl) return root.URL.revokeObjectURL?.(url);
+    root.HealthBrowserSafeUrl.setElementUrl(link, "href", url, { capability: "blob-download", baseUrl: root.location });
     link.download = `招标需求治理台账-${new Date().toISOString().slice(0, 10).replaceAll("-", "")}.json`; link.click(); root.URL.revokeObjectURL?.(url);
   }
 
@@ -220,7 +230,23 @@
     const governance = report.requirementGovernance || { summary: {}, items: [], revisionComparisons: [] }; const delivery = report.requirementDelivery || { summary: {}, items: [] };
     const version = document.querySelector("#platform-procurement-requirement-version"); const metrics = document.querySelector("#platform-procurement-governance-metrics");
     if (version) { version.textContent = governance.schemaVersion === "procurement-requirement-governance-view-v2" && delivery.schemaVersion === "procurement-requirement-delivery-view-v1" ? "完整治理闭环已就绪 · 生产未授权" : "治理视图未登记 · 生产未授权"; version.dataset.productionReady = "false"; }
-    if (metrics) metrics.innerHTML = [metric("来源系列", safeCount(governance.summary?.sourceSeries)), metric("候选需求", safeCount(governance.summary?.candidates)), metric("待人工复核", safeCount(governance.summary?.pendingReview)), metric("已采纳", safeCount(governance.summary?.accepted)), metric("待规划", safeCount(delivery.summary?.awaitingPlan)), metric("实施中", safeCount(delivery.summary?.inDelivery)), metric("证据待补", safeCount(delivery.summary?.evidenceMissing)), metric("仓库证据已核验", safeCount(delivery.summary?.repositoryVerified)), metric("待独立验收", safeCount(delivery.summary?.acceptanceReview)), metric("验收已退回", safeCount(delivery.summary?.acceptanceReturned)), metric("交付验收通过", safeCount(delivery.summary?.deliveryAccepted)), metric("来源失效计划", safeCount(delivery.summary?.stalePlans))].join("");
+    if (metrics) {
+      const documentRef = metrics.ownerDocument || document;
+      metrics.replaceChildren(
+        metric(documentRef, "来源系列", safeCount(governance.summary?.sourceSeries)),
+        metric(documentRef, "候选需求", safeCount(governance.summary?.candidates)),
+        metric(documentRef, "待人工复核", safeCount(governance.summary?.pendingReview)),
+        metric(documentRef, "已采纳", safeCount(governance.summary?.accepted)),
+        metric(documentRef, "待规划", safeCount(delivery.summary?.awaitingPlan)),
+        metric(documentRef, "实施中", safeCount(delivery.summary?.inDelivery)),
+        metric(documentRef, "证据待补", safeCount(delivery.summary?.evidenceMissing)),
+        metric(documentRef, "仓库证据已核验", safeCount(delivery.summary?.repositoryVerified)),
+        metric(documentRef, "待独立验收", safeCount(delivery.summary?.acceptanceReview)),
+        metric(documentRef, "验收已退回", safeCount(delivery.summary?.acceptanceReturned)),
+        metric(documentRef, "交付验收通过", safeCount(delivery.summary?.deliveryAccepted)),
+        metric(documentRef, "来源失效计划", safeCount(delivery.summary?.stalePlans))
+      );
+    }
     renderRequirementFilters(governance, document.querySelector("#platform-procurement-governance-filters")); renderRequirementGovernance(governance, document.querySelector("#platform-procurement-requirement-workbench")); renderRevisionComparisons(governance, document.querySelector("#platform-procurement-revision-comparisons")); renderDelivery(delivery, document.querySelector("#platform-procurement-product-planning"), document.querySelector("#platform-procurement-delivery-evidence"));
     const boundary = document.querySelector("#platform-procurement-governance-boundary"); if (boundary) boundary.textContent = delivery.boundary || governance.boundary || "仓库交付验收闭环已受控，生产授权仍保持关闭。"; bindStaticControls();
   }

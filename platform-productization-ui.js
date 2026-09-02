@@ -26,8 +26,15 @@
       metric("开放待办", report.workItems.summary.open),
       metric("机构接入档案", report.institutionIntegration.summary.profiles)
     ].join("");
-    workItems.innerHTML = report.workItems.items.slice(0, 12).map((item) => `<article class="evidence-card" data-platform-work-item="${escapeHtml(item.id)}"><h3>${escapeHtml(item.label)}</h3><p>${escapeHtml(item.domain)} · ${escapeHtml(item.status)} · ${escapeHtml(item.priority)}</p><p class="muted">来源：${escapeHtml(item.sourceCollection)}；版本：${escapeHtml(item.version)}</p></article>`).join("") || "<p class=\"muted\">暂无统一待办。</p>";
-    integrations.innerHTML = report.institutionIntegration.adapters.map((item) => `<article class="evidence-card"><h3>${escapeHtml(item.id)}</h3><p>${escapeHtml(item.domain)} · ${escapeHtml(item.scenarios)} 个合成场景</p></article>`).join("");
+    workItems.innerHTML = report.workItems.items.slice(0, 12).map((item) => `<article class="evidence-card" data-platform-work-item="${escapeHtml(item.id)}">
+      <h3>${escapeHtml(item.label)}</h3>
+      <p>${escapeHtml(item.domain)} · ${escapeHtml(item.status)} · ${escapeHtml(item.priority)}</p>
+      <p class="muted">来源：${escapeHtml(item.sourceCollection)}；版本：${escapeHtml(item.version)}</p>
+    </article>`).join("") || "<p class=\"muted\">暂无统一待办。</p>";
+    integrations.innerHTML = report.institutionIntegration.adapters.map((item) => `<article class="evidence-card">
+      <h3>${escapeHtml(item.id)}</h3>
+      <p>${escapeHtml(item.domain)} · ${escapeHtml(item.scenarios)} 个合成场景</p>
+    </article>`).join("");
     boundary.textContent = report.boundary;
     root.HealthPlatformProcurementGovernanceUi?.render(report, { refresh: loadCenter });
   }
