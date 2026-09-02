@@ -2,6 +2,33 @@
 
 const ROUTE_SEGMENT_ID = "platform-governance-11";
 const SUBDOMAIN = "productization-center";
+const PROCUREMENT_REQUIREMENT_ERRORS = Object.freeze({
+  PROCUREMENT_REQUIREMENT_IDEMPOTENCY_KEY_REQUIRED: Object.freeze([400, "Bad Request", "必须提供招标需求复核幂等键。"]),
+  PROCUREMENT_REQUIREMENT_INPUT_INVALID: Object.freeze([400, "Bad Request", "招标需求复核请求无效。"]),
+  PROCUREMENT_REQUIREMENT_SCOPE_FORBIDDEN: Object.freeze([403, "Forbidden", "当前身份不能复核招标需求。"]),
+  PROCUREMENT_REQUIREMENT_NOT_FOUND: Object.freeze([404, "Not Found", "招标需求候选不存在。"]),
+  PROCUREMENT_REQUIREMENT_COMMAND_CONFLICT: Object.freeze([409, "Conflict", "幂等键已用于不同的复核请求。"]),
+  PROCUREMENT_REQUIREMENT_REPLAY_UNAVAILABLE: Object.freeze([409, "Conflict", "历史回执缺少精确结果快照，不能重放。"]),
+  PROCUREMENT_REQUIREMENT_VERSION_CONFLICT: Object.freeze([409, "Conflict", "招标需求复核版本冲突。"]),
+  PROCUREMENT_REQUIREMENT_TRANSITION_CONFLICT: Object.freeze([409, "Conflict", "当前状态不允许执行该复核动作。"]),
+  PROCUREMENT_REQUIREMENT_CAPACITY_EXCEEDED: Object.freeze([409, "Conflict", "招标需求治理记录已达到受控容量上限。"]),
+  PROCUREMENT_REQUIREMENT_AUDIT_FAILED: Object.freeze([500, "Internal Server Error", "招标需求复核审计记录失败。"]),
+  PROCUREMENT_REQUIREMENT_STORAGE_FAILED: Object.freeze([500, "Internal Server Error", "招标需求复核保存失败。"]),
+  PROCUREMENT_REQUIREMENT_COMMAND_FAILED: Object.freeze([500, "Internal Server Error", "招标需求复核执行失败。"])
+});
+
+function sendProcurementRequirementError(sendJson, res, error, stage = "command") {
+  let code = stage === "input" ? "PROCUREMENT_REQUIREMENT_INPUT_INVALID" : stage === "command" ? error?.code : undefined;
+  if (!PROCUREMENT_REQUIREMENT_ERRORS[code]) {
+    if (error instanceof SyntaxError) code = "PROCUREMENT_REQUIREMENT_INPUT_INVALID";
+    else if (stage === "storage" && (error?.code === "STORAGE_CONFLICT" || error?.name === "StorageConflictError" || /optimistic lock conflict|version conflict|CAS conflict/i.test(String(error?.message || "")))) code = "PROCUREMENT_REQUIREMENT_VERSION_CONFLICT";
+    else if (stage === "audit") code = "PROCUREMENT_REQUIREMENT_AUDIT_FAILED";
+    else if (stage === "storage") code = "PROCUREMENT_REQUIREMENT_STORAGE_FAILED";
+    else code = "PROCUREMENT_REQUIREMENT_COMMAND_FAILED";
+  }
+  const [statusCode, label, message] = PROCUREMENT_REQUIREMENT_ERRORS[code];
+  sendJson(res, statusCode, { ok: false, error: label, code, message });
+}
 
 function createRouteSegment(runtime) {
   const { appendSecurityEvent, applyPlatformWorkItemAction, applyPlatformWorkItemV2GovernanceAction, applyProcurementRequirementReviewAction, buildPlatformEnhancementCockpit, buildPlatformProductOperationsCockpit, buildPlatformProductizationCenter, collectJson, prependAuditTrailEntry, randomUUID, readDatabase, registerInstitutionIntegrationProfile, requireApiRole, runInstitutionSyntheticJointTest, sendJson, writeDatabase } = runtime;
@@ -77,25 +104,51 @@ function createRouteSegment(runtime) {
         const user = requireApiRole(req, res, ["commission"], "/api/platform/productization/requirements/:id/actions");
         if (!user) return true;
         const idempotencyKey = String(req.headers?.["idempotency-key"] || "").trim();
-        if (!idempotencyKey) throw new TypeError("Idempotency-Key header is required");
-        const payload = await collectJson(req);
-        const execution = applyProcurementRequirementReviewAction(readDatabase(), {
-          ...payload,
-          commandId: idempotencyKey,
-          requirementId: decodeURIComponent(requirementReviewMatch[1])
-        }, user);
+        if (!idempotencyKey) {
+          sendProcurementRequirementError(sendJson, res, { code: "PROCUREMENT_REQUIREMENT_IDEMPOTENCY_KEY_REQUIRED" });
+          return true;
+        }
+        const requirementId = decodeURIComponent(requirementReviewMatch[1]);
+        let payload;
+        try {
+          payload = await collectJson(req);
+        } catch (error) {
+          sendProcurementRequirementError(sendJson, res, error, "input");
+          return true;
+        }
+        let execution;
+        try {
+          execution = applyProcurementRequirementReviewAction(readDatabase(), {
+            ...payload,
+            commandId: idempotencyKey,
+            requirementId
+          }, user);
+        } catch (error) {
+          sendProcurementRequirementError(sendJson, res, error);
+          return true;
+        }
         if (!execution.replayed) {
-          execution.data.securityEvents = prependAuditTrailEntry(execution.data.securityEvents, {
-            id: randomUUID(),
-            at: new Date().toLocaleString("zh-CN", { hour12: false }),
-            actor: user.name,
-            role: user.role,
-            action: `procurement-requirement-${payload.action}`,
-            target: execution.result.id,
-            result: "allowed",
-            detail: `version=${execution.result.version}; source content omitted; production gate closed`
-          });
-          writeDatabase(execution.data);
+          try {
+            execution.data.securityEvents = prependAuditTrailEntry(execution.data.securityEvents, {
+              id: randomUUID(),
+              at: new Date().toLocaleString("zh-CN", { hour12: false }),
+              actor: user.name,
+              role: user.role,
+              action: `procurement-requirement-${payload.action}`,
+              target: execution.result.id,
+              result: "allowed",
+              detail: `version=${execution.result.version}; source content omitted; production gate closed`
+            });
+          } catch (error) {
+            sendProcurementRequirementError(sendJson, res, error, "audit");
+            return true;
+          }
+          try {
+            writeDatabase(execution.data);
+          } catch (error) {
+            sendProcurementRequirementError(sendJson, res, error, "storage");
+            return true;
+          }
         }
         sendJson(res, 200, { ok: true, replayed: execution.replayed, requirement: execution.result, productionReady: false });
         return true;
@@ -147,4 +200,4 @@ function createRouteSegment(runtime) {
   };
 }
 
-module.exports = { ROUTE_SEGMENT_ID, SUBDOMAIN, createRouteSegment };
+module.exports = { PROCUREMENT_REQUIREMENT_ERRORS, ROUTE_SEGMENT_ID, SUBDOMAIN, createRouteSegment, sendProcurementRequirementError };

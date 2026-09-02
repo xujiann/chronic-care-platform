@@ -5,48 +5,91 @@
     "unregisteredWriteStatus": "behavior-proof-required",
     "productionPromotionAllowed": false
   },
-  "reviewedProofRequired": [
+  "reviewedProofRequired": [],
+  "contracts": [
     {
-      "reviewId": "platform-governance-procurement-requirement-review-proof-gap",
+      "contractId": "platform-governance.procurement-requirement-review-command.v1",
       "key": "POST /api/platform/productization/requirements/:id/actions",
       "method": "POST",
       "path": "/api/platform/productization/requirements/:id/actions",
       "owner": "T02",
       "domain": "platform-governance",
-      "missingProof": [
-        "stable-error-contract"
+      "purpose": "human-review-procurement-requirement-candidate",
+      "customAuthenticationEvidence": false,
+      "authentication": {
+        "required": true,
+        "mechanism": "bearer-or-cookie-session",
+        "principalType": "platform-user",
+        "credentialSource": ["header:authorization", "cookie:session"],
+        "replayCsrf": {
+          "replayProtection": "actor-bound-hashed-idempotency-key-and-payload-digest",
+          "csrf": "platform-session-transport-policy"
+        }
+      },
+      "authorization": {
+        "model": "platform-rbac-plus-current-candidate-resource-scope",
+        "roles": ["commission"],
+        "dataScope": "platform procurement requirement governance"
+      },
+      "coverage": {
+        "level": "endpoint",
+        "selector": "entire-route",
+        "actions": ["accept", "request-revision", "reject"],
+        "unverifiedRemainder": false
+      },
+      "idempotency": {
+        "key": "header:Idempotency-Key",
+        "payloadBinding": ["actorDigest", "requirementId", "action", "expectedVersion", "noteDigest"],
+        "exactReplay": "returns the persisted minimized review snapshot with replayed=true and no state or audit write",
+        "conflictingReuse": "PROCUREMENT_REQUIREMENT_COMMAND_CONFLICT",
+        "persistenceScope": "review state, event, command receipt and security audit in one platform state write",
+        "distributedExactlyOnceClaimed": false
+      },
+      "concurrency": {
+        "cas": {
+          "required": true,
+          "field": "expectedVersion plus platform storage collection version",
+          "conflictCodes": ["PROCUREMENT_REQUIREMENT_VERSION_CONFLICT"]
+        }
+      },
+      "errors": [
+        { "code": "PROCUREMENT_REQUIREMENT_IDEMPOTENCY_KEY_REQUIRED", "status": 400 },
+        { "code": "PROCUREMENT_REQUIREMENT_INPUT_INVALID", "status": 400 },
+        { "code": "PROCUREMENT_REQUIREMENT_SCOPE_FORBIDDEN", "status": 403 },
+        { "code": "PROCUREMENT_REQUIREMENT_NOT_FOUND", "status": 404 },
+        { "code": "PROCUREMENT_REQUIREMENT_COMMAND_CONFLICT", "status": 409 },
+        { "code": "PROCUREMENT_REQUIREMENT_REPLAY_UNAVAILABLE", "status": 409 },
+        { "code": "PROCUREMENT_REQUIREMENT_VERSION_CONFLICT", "status": 409 },
+        { "code": "PROCUREMENT_REQUIREMENT_TRANSITION_CONFLICT", "status": 409 },
+        { "code": "PROCUREMENT_REQUIREMENT_CAPACITY_EXCEEDED", "status": 409 },
+        { "code": "PROCUREMENT_REQUIREMENT_AUDIT_FAILED", "status": 500 },
+        { "code": "PROCUREMENT_REQUIREMENT_STORAGE_FAILED", "status": 500 },
+        { "code": "PROCUREMENT_REQUIREMENT_COMMAND_FAILED", "status": 500 }
       ],
-      "evidence": [
+      "audit": {
+        "accepted": "commits one minimized review, receipt and chained security audit in one platform state write",
+        "replay": "returns the persisted snapshot without another state or audit write; legacy receipts without a snapshot fail closed",
+        "rejected": "authorization stops before body and state; validation, conflicts, audit failures and storage failures have no fallback write"
+      },
+      "implementationEvidence": [
         {
           "file": "src/platform/productization/procurement-requirement-governance.js",
-          "anchors": [
-            "const requestDigest = digest(JSON.stringify({ requirementId, action, expectedVersion, actorDigest: digest(actor), noteDigest: digest(note) }));",
-            "PROCUREMENT_REQUIREMENT_COMMAND_CONFLICT",
-            "PROCUREMENT_REQUIREMENT_VERSION_CONFLICT"
-          ]
+          "anchors": ["StateCommandError", "PROCUREMENT_REQUIREMENT_COMMAND_CONFLICT", "PROCUREMENT_REQUIREMENT_REPLAY_UNAVAILABLE", "PROCUREMENT_REQUIREMENT_VERSION_CONFLICT", "resultSnapshot: null"]
         },
         {
           "file": "src/http/routes/platform-governance/productization-center.js",
-          "anchors": [
-            "/api/platform/productization/requirements/:id/actions",
-            "if (!execution.replayed) {",
-            "execution.data.securityEvents = prependAuditTrailEntry",
-            "writeDatabase(execution.data);"
-          ]
-        },
-        {
-          "file": "test/procurement-requirement-route.test.js",
-          "anchors": [
-            "requirement review route binds idempotency and actor then persists minimized state",
-            "assert.equal(fixture.calls[0].securityEvents.length, 1);",
-            "requirement review replay does not write state or duplicate audit"
-          ]
+          "anchors": ["function sendProcurementRequirementError", "execution.data.securityEvents = prependAuditTrailEntry", "writeDatabase(execution.data);"]
         }
       ],
-      "productionReady": false
-    }
-  ],
-  "contracts": [
+      "testEvidence": [
+        {
+          "file": "test/procurement-requirement-route.test.js",
+          "anchors": ["requirement review replay does not write state or duplicate audit", "legacy receipt without an exact snapshot", "returns stable redacted input and not-found errors", "fails closed when audit or storage fails"]
+        }
+      ],
+      "productionReady": false,
+      "externalEvidenceRequired": true
+    },
     {
       "contractId": "identity-security.sms-delivery-callback-idempotency.v1",
       "key": "POST /api/auth/sms-delivery-callback",

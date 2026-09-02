@@ -14,6 +14,8 @@ test("platform productization UI is an independent bounded module", () => {
   assert.match(html, /id="platform-productization-panel"/);
   assert.match(html, /id="platform-productization-regional-requirements"/);
   assert.match(html, /id="platform-procurement-requirement-workbench"/);
+  assert.match(html, /id="platform-procurement-requirement-version"/);
+  assert.match(html, /不展示文件路径、原文或地域机构信息/);
   assert.match(html, /platform-productization-ui\.js/);
   assert.match(html, /id="platform-product-operations"/);
   assert.match(html, /product-operations-ui\.js/);
@@ -26,6 +28,12 @@ test("platform productization UI is an independent bounded module", () => {
   assert.match(source, /report\.requirementGovernance \|\| \{ summary: \{\}, items: \[\] \}/);
   assert.match(source, /renderRegionalRequirements/);
   assert.match(source, /renderRequirementGovernance/);
+  assert.match(source, /metric\("来源系列", safeCount\(requirementSummary\.sourceSeries/);
+  assert.match(source, /metric\("文档修订", safeCount\(requirementSummary\.documentRevisions/);
+  assert.match(source, /metric\("累计新增需求", safeCount\(requirementSummary\.added/);
+  assert.match(source, /metric\("累计变更需求", safeCount\(requirementSummary\.changed/);
+  assert.match(source, /metric\("累计撤回需求", safeCount\(requirementSummary\.withdrawn/);
+  assert.match(source, /productionReady=false/);
   assert.match(source, /\/platform\/productization\/requirements\/\$\{encodeURIComponent\(item\.id\)\}\/actions/);
   assert.match(source, /escapeHtml/);
   assert.doesNotMatch(source, /innerHTML\s*=\s*[^;]*(?:error|message)\.message/);
@@ -40,6 +48,7 @@ function renderHarness() {
     "#platform-productization-integrations",
     "#platform-productization-regional-requirements",
     "#platform-procurement-requirement-workbench",
+    "#platform-procurement-requirement-version",
     "#platform-productization-boundary"
   ];
   const document = {
@@ -116,17 +125,34 @@ test("procurement requirement workbench is optional, minimized and DOM-safe", ()
   const fixture = renderHarness();
   assert.doesNotThrow(() => fixture.render(baseReport()));
   assert.equal(fixture.elements["#platform-procurement-requirement-workbench"].children[0].textContent, "暂无待治理的招标需求。");
+  assert.equal(fixture.elements["#platform-procurement-requirement-version"].textContent, "治理视图未登记 · 未获生产授权");
+  assert.equal(fixture.elements["#platform-procurement-requirement-version"].dataset.productionReady, "false");
 
   const hostile = '<svg onload="globalThis.compromised=true">';
   fixture.render({
     ...baseReport(),
     requirementGovernance: {
-      summary: { candidates: hostile, pendingReview: hostile, gaps: hostile },
+      schemaVersion: hostile,
+      summary: {
+        sourceSeries: hostile,
+        documentRevisions: hostile,
+        historicalRevisions: hostile,
+        added: hostile,
+        changed: hostile,
+        withdrawn: hostile,
+        candidates: hostile,
+        pendingReview: hostile,
+        gaps: hostile
+      },
       items: [{
-        id: hostile,
+        id: "PR-SAFE-ROUTE-0001",
+        logicalRequirementId: hostile,
         sourceAlias: hostile,
+        seriesId: hostile,
+        sourceRevision: hostile,
+        change: "changed",
         title: hostile,
-        sourceAnchor: { pageStart: hostile, pageEnd: hostile, section: hostile },
+        sourceAnchor: { pageStart: hostile, pageEnd: hostile, section: "不应展示的原文标题" },
         targetCapabilityIds: [hostile],
         productClass: hostile,
         decision: hostile,
@@ -139,8 +165,14 @@ test("procurement requirement workbench is optional, minimized and DOM-safe", ()
   });
   const target = fixture.elements["#platform-procurement-requirement-workbench"];
   assert.equal(target.children[0].tagName, "article");
-  assert.equal(target.children[0].children[0].textContent, hostile);
+  assert.equal(target.children[0].children[0].textContent, "需求候选 未登记");
+  assert.doesNotMatch(target.children[0].children[1].textContent, /svg|onload|中性来源.*svg/);
+  assert.match(target.children[0].children[1].textContent, /版本变化：变更/);
+  assert.match(target.children[0].children[2].textContent, /不展示原文/);
+  assert.equal(target.children[0].children.some((child) => child.textContent.includes("不应展示的原文标题")), false);
   assert.equal(target.children[0].children.at(-1).children.length, 3);
   assert.equal(target.children.some((child) => child.tagName === "svg"), false);
+  assert.equal(fixture.elements["#platform-procurement-requirement-version"].textContent, "治理视图未登记 · 未获生产授权");
+  assert.doesNotMatch(fixture.elements["#platform-productization-metrics"].innerHTML, /svg|onload/);
   assert.equal(fixture.compromised, undefined);
 });
