@@ -37,7 +37,7 @@ test("idempotency evidence registry validates only directly proven endpoint and 
   assert.equal(DEFAULT_REGISTRY.contracts.length, 36);
   assert.equal(endpointEvidenceContracts().length, 34);
   assert.equal(actionSliceEvidenceContracts().length, 2);
-  assert.equal(proofRequiredReviews().length, 0);
+  assert.equal(proofRequiredReviews().length, 1);
   assert.equal(DEFAULT_REGISTRY.contracts[0].key, "POST /api/auth/sms-delivery-callback");
   assert.equal(DEFAULT_REGISTRY.contracts[0].owner, "T01");
   assert.equal(DEFAULT_REGISTRY.contracts.every((contract) => contract.productionReady === false), true);
@@ -87,7 +87,7 @@ test("idempotency evidence registry validates only directly proven endpoint and 
 
 test("formal grouping create replaces the final reviewed T07 proof gap with endpoint evidence", () => {
   const key = "POST /api/disease-payment/formal-grouping/jobs";
-  assert.deepEqual(proofRequiredReviews(), []);
+  assert.equal(proofRequiredReviews().some((review) => review.key === key), false);
   const catalog = buildProductionApiCatalog();
   const contract = DEFAULT_REGISTRY.contracts.find((candidate) => candidate.key === key);
   const entry = catalog.entries.find((candidate) => candidate.key === key);
@@ -96,6 +96,23 @@ test("formal grouping create replaces the final reviewed T07 proof gap with endp
   assert.equal(entry.idempotency.behaviorEvidence.status, "behavior-verified");
   assert.equal(entry.production.repositoryReview, "catalogued");
   assert.equal(entry.production.status, "NO-GO");
+});
+
+test("procurement requirement review remains explicitly behavior-proof-required", () => {
+  const key = "POST /api/platform/productization/requirements/:id/actions";
+  assert.deepEqual(proofRequiredReviews().map((review) => ({
+    key: review.key,
+    owner: review.owner,
+    missingProof: review.missingProof
+  })), [{
+    key,
+    owner: "T02",
+    missingProof: ["stable-error-contract"]
+  }]);
+  const entry = buildProductionApiCatalog().entries.find((candidate) => candidate.key === key);
+  assert.equal(entry.idempotency.behaviorEvidence.status, "behavior-proof-required");
+  assert.equal(entry.production.repositoryReview, "review-required");
+  assert.equal(entry.production.productionReady, false);
 });
 
 test("catalog promotes only whole endpoints and retains generic action routes as review-required", () => {

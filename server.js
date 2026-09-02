@@ -11929,6 +11929,11 @@ function normalizeState(data) {
     platformRoadmap: Array.isArray(data.platformRoadmap) ? data.platformRoadmap : seedPlatformRoadmap(),
     platformAudit: Array.isArray(data.platformAudit) ? data.platformAudit : seedPlatformAudit(),
     platformProcessAudit: Array.isArray(data.platformProcessAudit) ? data.platformProcessAudit : seedPlatformProcessAudit(),
+    ...(data.procurementRequirementGovernance
+      && typeof data.procurementRequirementGovernance === "object"
+      && !Array.isArray(data.procurementRequirementGovernance)
+      ? { procurementRequirementGovernance: structuredClone(data.procurementRequirementGovernance) }
+      : {}),
     personalRecords: PhysicalExaminationService.mergeSeedRecords(Array.isArray(data.personalRecords) ? data.personalRecords : seedPersonalRecords()).map(cleanPersonalRecordText),
     recordCorrections: Array.isArray(data.recordCorrections) ? data.recordCorrections.slice(-1000) : [],
     recordSharePackages: Array.isArray(data.recordSharePackages) ? data.recordSharePackages.slice(-1000) : [],

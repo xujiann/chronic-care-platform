@@ -2,6 +2,8 @@
 
 const defaultCatalog = require("../../../config/regional-requirement-catalog.json");
 const defaultBundleCatalog = require("../../../config/regional-capability-bundles.json");
+const defaultCapabilityRegistry = require("../../../config/platform-capability-registry.json");
+const { validateCapabilityRegistry } = require("./procurement-requirement-contracts");
 
 const PRODUCT_CLASSES = new Set(["CORE", "SHARED", "PACKAGE", "CONFIG", "DEPLOY"]);
 const DECISIONS = new Set(["REUSE", "ENHANCE", "BUILD", "CONFIGURE", "DEPLOY"]);
@@ -78,7 +80,7 @@ function validateSource(source, index) {
   if (!EVIDENCE_STATUSES.has(source.evidenceStatus)) throw new TypeError(`${label}.evidenceStatus is invalid`);
 }
 
-function validateRequirement(requirement, index, sourceIds, bundleIds) {
+function validateRequirement(requirement, index, sourceIds, bundleIds, capabilityIds) {
   const label = `requirements[${index}]`;
   assertExactKeys(label, requirement, REQUIREMENT_KEYS);
   opaqueId(`${label}.id`, requirement.id);
@@ -99,6 +101,7 @@ function validateRequirement(requirement, index, sourceIds, bundleIds) {
     maximum: 8,
     normalize: (value, capabilityIndex) => opaqueId(`${label}.targetCapabilityIds[${capabilityIndex}]`, value, 96)
   });
+  if (requirement.targetCapabilityIds.some((capabilityId) => !capabilityIds.has(capabilityId))) throw new TypeError(`${label}.targetCapabilityIds contains an unregistered capability`);
   if (!PRODUCT_CLASSES.has(requirement.productClass)) throw new TypeError(`${label}.productClass is invalid`);
   uniqueArray(`${label}.secondaryClasses`, requirement.secondaryClasses, {
     maximum: 4,
@@ -138,8 +141,11 @@ function validateRegionalRequirementCatalog(catalog = defaultCatalog, options = 
   catalog.sources.forEach(validateSource);
   const sourceIds = new Set(catalog.sources.map((source) => source.id));
   const bundleIds = registeredBundleIds(options.bundleCatalog);
+  const capabilityRegistry = options.capabilityRegistry || defaultCapabilityRegistry;
+  validateCapabilityRegistry(capabilityRegistry, options);
+  const capabilityIds = new Set(capabilityRegistry.capabilities.map((item) => item.id));
   if (sourceIds.size !== catalog.sources.length) throw new TypeError("regional requirement source ids must be unique");
-  catalog.requirements.forEach((requirement, index) => validateRequirement(requirement, index, sourceIds, bundleIds));
+  catalog.requirements.forEach((requirement, index) => validateRequirement(requirement, index, sourceIds, bundleIds, capabilityIds));
   if (new Set(catalog.requirements.map((requirement) => requirement.id)).size !== catalog.requirements.length) throw new TypeError("regional requirement ids must be unique");
   return true;
 }

@@ -23,7 +23,7 @@ test("platform governance segments use distinct least-privilege service contexts
       "phase2-operations": 54,
       "mutual-recognition-overview": 4,
       "mutual-recognition-decision": 9,
-      "productization-center": 13,
+      "productization-center": 16,
       "operations-dashboard": 8,
       "operations-command": 20
     }

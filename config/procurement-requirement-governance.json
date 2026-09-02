@@ -1,0 +1,103 @@
+{
+  "schemaVersion": "procurement-requirement-governance-v1",
+  "catalogId": "procurement-requirement-intake-v1",
+  "limits": {
+    "maximumPdfBytes": 52428800,
+    "maximumPages": 2000,
+    "maximumDocuments": 100,
+    "maximumCandidatesPerDocument": 200,
+    "maximumReviewEvents": 5000,
+    "maximumCommandReceipts": 5000
+  },
+  "review": {
+    "actions": ["accept", "request-revision", "reject"],
+    "statuses": ["pending-review", "accepted", "revision-required", "rejected"],
+    "requiredRole": "commission",
+    "productionReady": false
+  },
+  "documents": [
+    {
+      "id": "DOC-SAMPLE-2023-001",
+      "sourceAlias": "需求样本文档 001",
+      "sha256": "sha256:6b9b1f693e76a6aa8918dfc1ff9dff1c173b3561037648ef720f14a4d81bcb8b",
+      "mediaType": "application/pdf",
+      "byteSize": 1814271,
+      "reviewedPageCount": 250,
+      "extractionMode": "human-verified-pages",
+      "textQuality": "reviewable",
+      "securityStatus": "unscanned-external-source",
+      "status": "candidate-review",
+      "candidates": [
+        {
+          "id": "PR-SAMPLE-001-R001",
+          "title": "卫生监督对象统一管理",
+          "sourceAnchor": { "pageStart": 73, "pageEnd": 79, "section": "4.3.1" },
+          "targetCapabilityIds": ["H-SUP-SUBJECT"],
+          "productClass": "SHARED",
+          "decision": "ENHANCE",
+          "priority": "P0",
+          "ownerProcess": "T03",
+          "evidenceStatus": "source-verified"
+        },
+        {
+          "id": "PR-SAMPLE-001-R002",
+          "title": "卫生监督检查任务闭环",
+          "sourceAnchor": { "pageStart": 73, "pageEnd": 79, "section": "4.3.1" },
+          "targetCapabilityIds": ["H-SUP-INSPECT"],
+          "productClass": "SHARED",
+          "decision": "ENHANCE",
+          "priority": "P0",
+          "ownerProcess": "T03",
+          "evidenceStatus": "source-verified"
+        },
+        {
+          "id": "PR-SAMPLE-001-R003",
+          "title": "卫生监督案件协同处置",
+          "sourceAnchor": { "pageStart": 73, "pageEnd": 79, "section": "4.3.1" },
+          "targetCapabilityIds": ["H-SUP-CASE"],
+          "productClass": "SHARED",
+          "decision": "BUILD",
+          "priority": "P0",
+          "ownerProcess": "T03",
+          "evidenceStatus": "source-verified"
+        }
+      ]
+    },
+    {
+      "id": "DOC-SAMPLE-2026-002",
+      "sourceAlias": "需求样本文档 002",
+      "sha256": "sha256:8dca60033ae2aae3fd284b1eabdbd3e9953fee1596eaeba3067aa6a8193c167e",
+      "mediaType": "application/pdf",
+      "byteSize": 209962,
+      "reviewedPageCount": 9,
+      "extractionMode": "native-text-reviewed",
+      "textQuality": "reviewable",
+      "securityStatus": "unscanned-external-source",
+      "status": "candidate-review",
+      "candidates": [
+        {
+          "id": "PR-SAMPLE-002-R001",
+          "title": "平台运行维护服务管理",
+          "sourceAnchor": { "pageStart": 1, "pageEnd": 9, "section": "服务要求" },
+          "targetCapabilityIds": ["L-GOV-DEPLOY"],
+          "productClass": "DEPLOY",
+          "decision": "DEPLOY",
+          "priority": "P1",
+          "ownerProcess": "T00",
+          "evidenceStatus": "provisional"
+        },
+        {
+          "id": "PR-SAMPLE-002-R002",
+          "title": "运维人员与服务质量考核",
+          "sourceAnchor": { "pageStart": 1, "pageEnd": 9, "section": "考核与验收" },
+          "targetCapabilityIds": ["L-GOV-AUDIT", "L-GOV-DEPLOY"],
+          "productClass": "CONFIG",
+          "decision": "CONFIGURE",
+          "priority": "P1",
+          "ownerProcess": "T00",
+          "evidenceStatus": "provisional"
+        }
+      ]
+    }
+  ]
+}

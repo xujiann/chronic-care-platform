@@ -1,5 +1,18 @@
 # DEPENDENCY MAP — 主线依赖地图
 
+## 2026-09-02 招标需求治理依赖方向
+
+```text
+仓库外 PDF + 人工提取清单
+  -> 受控 CLI（允许根/普通文件/魔数/大小/摘要/活动内容预检）
+     -> 中性 intake 配置
+        -> 严格合同 + 能力注册表 -> 差距分析
+           -> 产品化中心 GET -> 安全 DOM 工作台
+           -> commission 复核 POST -> 单一治理状态集合 + 摘要化回执/事件
+```
+
+PDF 内容始终是数据，不能反向调用 Shell、网络、Git、模型、发布或领域写端口。HTTP 不依赖文件读取或解析器；能力 Owner 实现也不反向依赖招标目录。首批只增加一个平台治理状态集合，不增加 DDL、worker、第三方包或独立部署单元。
+
 ## 2026-09-01 T03 卫生监督依赖方向
 
 ```text
@@ -315,7 +328,7 @@ CORE_DATA_DEFINITIONS → collection-governance → CI/release 治理投影`。�
   通过同进程服务复用领域一次性派单证据 registry，避免跨进程伪造 capability，且没有新增反向依赖或静态环。
 - 主分支必需检查名称仍为 `complete-unit-test` 与 `test`。聚合 test 使用 `always()`
   并要求三个风险域结果全部为 success，失败、取消和跳过均 fail-closed。
-- governance-api 先校验 custom auth 控制流/负向测试证据，再校验声明级授权矩阵、显式幂等行为证据合同和派生生产 API 目录；依赖方向为 `routeSourceFiles + authentication/idempotency 小型 evidence registry → authorization matrix v3 → production catalog v3`。只有显式标记的 SMS 外部 principal 从幂等合同派生 custom auth，平台 session/RBAC 合同继续复用授权矩阵。T04/T05 四条冻结首发写 API 的新增依赖固定为 `owner route → state-command-consistency → readDatabase/writeDatabase`；共享端口只提供摘要、actor scope、同资源进程尾和 collection CAS，不读取领域集合或拥有业务状态机。receipt 内嵌既有 owner aggregate/record，没有新集合、反向依赖、外部调用或并行写轨。T07 financial dispatch/formal grouping 依赖保持不变。T03 highlight signal 写入方向为 `session/RBAC → orgType/sourceOrgCode scope → strict body normalization → header/body/id/canonical key selection → actor organization namespace hash → per-key process tail → fresh snapshot → bounded publicHealthSignals + chained securityEvents → one state write/SQLite collection-version CAS`；读取方向为 `session/RBAC → orgType/orgCode fail-closed → readDatabase → build highlights → public signal projection → district organization/allowlist projection → projected-count audit → response`。POST、独立 GET 与 system 内嵌 highlights 复用同一纯投影；system 与 highlights 各自在读取前拒绝不支持的组织范围，system 的其余字段仍由原 builder 保持兼容。scope denial 单独走既有安全审计端口，精确重放锁内直接返回。没有增加集合、DDL、outbox、worker、PG adapter、跨域端口或外部依赖；200 条 ledger、单进程命令尾和 SQLite CAS 不等于分布式 exactly-once。`reviewedProofRequired` 为零，证据门禁仍不写数据库、报告或发布制品。
+- governance-api 先校验 custom auth 控制流/负向测试证据，再校验声明级授权矩阵、显式幂等行为证据合同和派生生产 API 目录；依赖方向为 `routeSourceFiles + authentication/idempotency 小型 evidence registry → authorization matrix v3 → production catalog v3`。只有显式标记的 SMS 外部 principal 从幂等合同派生 custom auth，平台 session/RBAC 合同继续复用授权矩阵。T04/T05 四条冻结首发写 API 的新增依赖固定为 `owner route → state-command-consistency → readDatabase/writeDatabase`；共享端口只提供摘要、actor scope、同资源进程尾和 collection CAS，不读取领域集合或拥有业务状态机。receipt 内嵌既有 owner aggregate/record，没有新集合、反向依赖、外部调用或并行写轨。T07 financial dispatch/formal grouping 依赖保持不变。T03 highlight signal 写入方向为 `session/RBAC → orgType/sourceOrgCode scope → strict body normalization → header/body/id/canonical key selection → actor organization namespace hash → per-key process tail → fresh snapshot → bounded publicHealthSignals + chained securityEvents → one state write/SQLite collection-version CAS`；读取方向为 `session/RBAC → orgType/orgCode fail-closed → readDatabase → build highlights → public signal projection → district organization/allowlist projection → projected-count audit → response`。POST、独立 GET 与 system 内嵌 highlights 复用同一纯投影；system 与 highlights 各自在读取前拒绝不支持的组织范围，system 的其余字段仍由原 builder 保持兼容。scope denial 单独走既有安全审计端口，精确重放锁内直接返回。没有增加集合、DDL、outbox、worker、PG adapter、跨域端口或外部依赖；200 条 ledger、单进程命令尾和 SQLite CAS 不等于分布式 exactly-once。招标需求人工复核已将状态、回执和安全审计合并为一次写入，仍缺稳定错误直接证据，`reviewedProofRequired` 为 1；证据门禁本身仍不写数据库、报告或发布制品。
 - T02/T06 首发行为补证的依赖方向固定为 `operations/quality route → api-command-behavior → existing state reader/writer + collection CAS`。共享端口只拥有 actor-scope 摘要、同资源进程尾、expectedVersion 与有界 receipt 语义，不读取领域集合、不替换既有状态机，也不新增反向依赖、数据库表或外部调用；operations 继续保留 `resourceDispatchRequests`/`taskMessages` 的 T05 owner 跨域债务，不能据本补证推导新的数据 owner。
 - governance-api 同时执行 `data:collection-governance:verify`；新集合、陈旧/重复状态、owner/reader
   边界、源码使用状态漂移或任何生产晋升标志都会失败，命令默认只输出摘要且不写 release。

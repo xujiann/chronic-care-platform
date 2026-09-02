@@ -21,7 +21,7 @@ test("modular API authorization matrix covers owners roles scopes purposes and h
   assert.equal(matrix.summary.declarations >= 606, true);
   assert.equal(matrix.summary.customAuthenticationEvidence, 13);
   assert.equal(matrix.summary.protected >= 550, true);
-  assert.equal(matrix.summary.highRisk, 15);
+  assert.equal(matrix.summary.highRisk, 16);
   assert.equal(matrix.summary.residentScoped > 0, true);
   assert.equal(matrix.summary.institutionScoped > 0, true);
   assert.equal(matrix.routes.every((route) => route.owner && route.identity && route.dataScope && route.purpose), true);
@@ -43,6 +43,13 @@ test("modular API authorization matrix covers owners roles scopes purposes and h
   assert.equal(regionalAccess.owner, "T02");
   assert.equal(regionalAccess.highRisk, true);
   assert.deepEqual(regionalAccess.roles, ["commission", "institution"]);
+  const procurementReview = matrix.routes.find((route) => route.key === "POST /api/platform/productization/requirements/:id/actions");
+  assert.equal(procurementReview.owner, "T02");
+  assert.equal(procurementReview.domain, "platform-governance");
+  assert.equal(procurementReview.highRisk, true);
+  assert.deepEqual(procurementReview.roles, ["commission"]);
+  assert.equal(procurementReview.dataScope, "platform");
+  assert.equal(procurementReview.purpose, "human-review-procurement-requirement-candidate");
   const publicHealthHighlightRoutes = matrix.routes.filter((route) => route.key === "GET /api/public-health/highlights");
   assert.equal(publicHealthHighlightRoutes.length, 1);
   const [publicHealthHighlights] = publicHealthHighlightRoutes;
