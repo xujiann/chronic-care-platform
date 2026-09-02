@@ -7,7 +7,7 @@
 | `GET /api/platform/productization/center` | commission / platform | 在既有 v1 响应增加中性 `requirementGovernance` 工作台和差距投影 |
 | `POST /api/platform/productization/requirements/:id/actions` | commission / platform | `accept`、`request-revision`、`reject` 人工复核；强制 `Idempotency-Key` 与 `expectedVersion` |
 
-写入口先鉴权再读取 body，命令摘要绑定操作者；同键同意图零写回放，同键异意图和陈旧版本失败关闭。复核状态、命令回执与安全审计已合并为一次状态持久化，同键回放不重复审计；当前仍缺稳定 HTTP 错误合同，因此保留 `behavior-proof-required`、`reviewedProofRequired=1` 和 `productionReady=false`。PDF 导入不暴露为 HTTP API。
+写入口先鉴权再读取 body，命令摘要绑定操作者；同键同意图零写回放，同键异意图和陈旧版本失败关闭。复核状态、命令回执与安全审计已合并为一次状态持久化，同键回放不重复审计；白名单稳定 HTTP 错误合同和负向证据已闭合，`reviewedProofRequired=0`，但 `productionReady=false`。PDF 批量导入仍只在离线受控命令中运行，不暴露为 HTTP API。
 
 ## 2026-09-01 T03 卫生监督 API
 
@@ -165,8 +165,8 @@ HTTP request
 - `GET /api/state` 保持 method/path、允许角色、状态码和顶层集合兼容。鉴权与既有角色范围投影完成后，`authUsers` 专用投影删除 `password`、`passwordHash`，保留账号、角色、机构、状态和 `externalSubject` 等管理字段；读取不修改权威快照。该增量只关闭认证口令泄露，commission 其余全状态最小权限债务仍为 `NO-GO`。
 - `npm run api:authorization-matrix` 从模块化路由源码生成/校验 owner、身份、角色、范围、用途和 16 条高风险接口唯一性。
 - `npm run api:authentication-evidence` 校验 13 项认证合同的 owner、mechanism、credential source、required/optional/none、replay/CSRF、scope、实现锚点和可执行负向测试。其中 SMS callback 从现有幂等合同派生；原 13 个未分类 key 中 12 个真实入口已分类，T10 cutover pack 绑定 commission 直接拒绝证据，1 个公卫词法误配已从 inventory 删除，未分类认证为 0。
-- `npm run api:production-catalog` 合并上述授权矩阵与同一 route source inventory 的字面条件；当前 615 项全部 `NO-GO`。352 个写接口中 34 个完整 endpoint 有直接幂等行为合同，318 个仍缺 endpoint 级行为证明；2 个转诊 action-slice 不晋升通用 endpoint，退款 runtime-role variant 仍复核，因此总 `review-required` 为 320。
-- `npm run api:idempotency-evidence` 校验 36 份证据合同与 1 项显式待补证明。招标需求人工复核入口已绑定角色、操作者、幂等键和 CAS，并将复核状态、回执与审计一次持久化；稳定 HTTP 错误仍为 `reviewedProofRequired`。其余完整合同绑定各入口的身份、职责/资源范围、原响应或精确结果回放、CAS、单次持久化与稳定错误负测。所有合同保持 `productionReady=false`，进程锁与 SQLite CAS 不等于跨实例 exactly-once。
+- `npm run api:production-catalog` 合并上述授权矩阵与同一 route source inventory 的字面条件；当前 615 项全部 `NO-GO`。352 个写接口中 35 个完整 endpoint 有直接幂等行为合同，317 个仍缺 endpoint 级行为证明；2 个转诊 action-slice 不晋升通用 endpoint，退款 runtime-role variant 仍复核，因此总 `review-required` 为 319。
+- `npm run api:idempotency-evidence` 校验 37 份证据合同且显式待补证明为 0。招标需求人工复核入口已绑定角色、操作者、幂等键和 CAS，将复核状态、回执与审计一次持久化，并以固定脱敏错误覆盖输入、冲突、审计和存储失败。其余完整合同绑定各入口的身份、职责/资源范围、原响应或精确结果回放、CAS、单次持久化与稳定错误负测。所有合同保持 `productionReady=false`，进程锁与 SQLite CAS 不等于跨实例 exactly-once。
 - 身份/SMS HTTP 路径保持不变；组合根已为短信发送生成随机 request ID，适配器现在拒绝缺失幂等 ID，OIDC refresh 返回的 ID token 必须通过 JWKS/claims 验证后才暴露脱敏 claims。
 - `POST /api/attachments/upload-intents` 在完成身份和居民范围校验后检查服务端元数据容量；已有
   500 条或更多记录时返回 `507 SECURE_ATTACHMENT_METADATA_CAPACITY_EXCEEDED`，且不调用对象

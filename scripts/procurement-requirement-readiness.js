@@ -9,10 +9,14 @@ const defaultOwnership = require("../config/domain-data-ownership.json");
 const defaultAuthorization = require("../config/high-risk-api-authorization.json");
 const { validateGovernanceCatalog } = require("../src/platform/productization/procurement-requirement-contracts");
 const { buildProcurementRequirementGovernance } = require("../src/platform/productization/procurement-requirement-governance");
+const { buildProcurementRevisionComparisons } = require("../src/platform/productization/procurement-requirement-versioning");
 
 const ROOT = path.resolve(__dirname, "..");
 const ADR_PATH = path.join(ROOT, "docs", "adr", "2026-09-02-procurement-requirement-governance-v2.md");
 const ROUTE_PATH = path.join(ROOT, "src", "http", "routes", "platform-governance", "productization-center.js");
+const IMPORT_PATH = path.join(ROOT, "src", "platform", "productization", "procurement-document-import.js");
+const IMPORT_CLI_PATH = path.join(ROOT, "scripts", "procurement-requirement-import.js");
+const VERSIONING_PATH = path.join(ROOT, "src", "platform", "productization", "procurement-requirement-versioning.js");
 const UI_PATHS = Object.freeze([
   path.join(ROOT, "platform.html"),
   path.join(ROOT, "platform-productization-ui.js")
@@ -61,6 +65,9 @@ function buildProcurementRequirementReadiness(options = {}) {
   const authorization = options.authorization || defaultAuthorization;
   const adrText = options.adrText ?? readText(path.join(root, path.relative(ROOT, ADR_PATH)));
   const routeText = options.routeText ?? readText(path.join(root, path.relative(ROOT, ROUTE_PATH)));
+  const importText = options.importText ?? readText(path.join(root, path.relative(ROOT, IMPORT_PATH)));
+  const importCliText = options.importCliText ?? readText(path.join(root, path.relative(ROOT, IMPORT_CLI_PATH)));
+  const versioningText = options.versioningText ?? readText(path.join(root, path.relative(ROOT, VERSIONING_PATH)));
   const uiTexts = options.uiTexts || Object.fromEntries(UI_PATHS.map((file) => [path.basename(file), readText(path.join(root, path.relative(ROOT, file)))]));
   const checks = [];
 
@@ -100,9 +107,82 @@ function buildProcurementRequirementReadiness(options = {}) {
   const noUploadSurface = !/procurement-document-import|multipart|formdata|upload/i.test(routeText);
   checks.push(check("requirements:offline-import-boundary", noUploadSurface, noUploadSurface ? "HTTP route does not expose PDF upload or importer execution" : "HTTP route appears to expose document import or upload"));
 
+  const batchLimitKeys = ["maximumBatchDocuments", "maximumBatchBytes", "maximumBatchCandidates", "maximumBatchReviewedPages"];
+  const aggregatePreflightIndex = importCliText.indexOf("validateBatchAggregates(prepared)");
+  const pdfInspectionIndex = importCliText.indexOf("inspectPdf(item.pdf");
+  const boundedBatch = batchLimitKeys.every((key) => Number.isInteger(catalog.limits?.[key]) && catalog.limits[key] > 0)
+    && /buildControlledImportBatch/.test(importText)
+    && /procurement-pdf-batch-v1/.test(importCliText)
+    && /fs\.openSync\(temporaryPath,\s*["']wx["']/.test(importCliText)
+    && /fs\.fsyncSync/.test(importCliText)
+    && /fs\.linkSync\(temporaryPath,\s*finalPath\)/.test(importCliText)
+    && /output already exists/.test(importCliText)
+    && aggregatePreflightIndex >= 0
+    && pdfInspectionIndex > aggregatePreflightIndex;
+  checks.push(check("requirements:offline-atomic-batch", boundedBatch, boundedBatch ? `${catalog.limits.maximumBatchDocuments} documents / ${catalog.limits.maximumBatchBytes} bytes / ${catalog.limits.maximumBatchCandidates} candidates / ${catalog.limits.maximumBatchReviewedPages} reviewed pages; non-overwriting output` : "offline batch limits or non-overwriting output control is incomplete"));
+
+  const realPathBoundary = [
+    /realpathSync\.native/,
+    /lstatSync/,
+    /O_NOFOLLOW/,
+    /sameIdentity/,
+    /withinRoot\(realFile,\s*realRoot\)/,
+    /assertSafeAbsolutePath\(realRoot/,
+    /assertSafeAbsolutePath\(realFile/,
+    /expectedIdentity/,
+    /PDF changed during inspection/
+  ].every((marker) => marker.test(importText));
+  const resolvedOutputBoundary = /assertSafeAbsolutePath\(realParent/.test(importCliText);
+  checks.push(check("requirements:pdf-realpath-identity", realPathBoundary && resolvedOutputBoundary, realPathBoundary && resolvedOutputBoundary ? "resolved local namespaces, real root containment, preflight binding, non-link identity and before/after file identity are checked" : "resolved namespace, real-path containment or file-identity evidence is incomplete"));
+
+  const scannerAttestation = [
+    /required-clean/,
+    /validateScanResult/,
+    /result\.verdict\s*!==\s*["']clean["']/,
+    /artifactDigest/,
+    /scanEvidenceDigest/,
+    /scanner-attested-clean/,
+    /unscanned-external-source/
+  ].every((marker) => marker.test(importText));
+  checks.push(check("requirements:replaceable-scan-attestation", scannerAttestation, scannerAttestation ? "replaceable scanner evidence is artifact-bound; absent or invalid required-clean evidence fails closed" : "scanner attestation port or artifact binding is incomplete"));
+
+  let revisionComparisons = [];
+  try {
+    revisionComparisons = buildProcurementRevisionComparisons(catalog);
+  } catch (error) {
+    revisionComparisons = null;
+  }
+  const catalogDocuments = Array.isArray(catalog.documents) ? catalog.documents : [];
+  const sourceSeries = new Set(catalogDocuments.map((document) => document.seriesId));
+  const sourceChains = new Map();
+  for (const document of catalogDocuments) {
+    if (!sourceChains.has(document.seriesId)) sourceChains.set(document.seriesId, []);
+    sourceChains.get(document.seriesId).push(document);
+  }
+  const contiguousSourceChains = [...sourceChains.values()].every((documents) => [...documents]
+    .sort((left, right) => left.revision - right.revision)
+    .every((document, index, ordered) => index === 0
+      ? document.revision === 1 && document.supersedesDocumentId === null
+      : document.revision === ordered[index - 1].revision + 1 && document.supersedesDocumentId === ordered[index - 1].id));
+  const linearRevisionModel = catalog.schemaVersion === "procurement-requirement-governance-v2"
+    && catalogDocuments.length > 0
+    && contiguousSourceChains
+    && catalogDocuments.every((document) => /^SRC-[A-F0-9]{12}$/.test(document.seriesId)
+      && Number.isInteger(document.revision)
+      && document.sourceAlias === `需求来源 ${document.seriesId.slice(4)}`
+      && document.candidates.every((candidate) => /^REQ-[A-F0-9]{12}$/.test(candidate.logicalRequirementId)
+        && /^sha256:[a-f0-9]{64}$/.test(candidate.semanticDigest)
+        && /^SEC-[A-Z0-9.-]{1,32}$/.test(candidate.sourceAnchor?.sectionCode)
+        && !Object.hasOwn(candidate, "title")
+        && !Object.hasOwn(candidate.sourceAnchor || {}, "section")))
+    && Array.isArray(revisionComparisons)
+    && revisionComparisons.every((comparison) => comparison.productionReady === false)
+    && [/logicalRequirementId/, /semanticDigest/, /comparisonDigest/, /added/, /changed/, /withdrawn/, /unchanged/, /supersedesDocumentId/].every((marker) => marker.test(versioningText));
+  checks.push(check("requirements:linear-source-revisions", linearRevisionModel, linearRevisionModel ? `${sourceSeries.size} source series / ${catalogDocuments.length} immutable revisions / ${revisionComparisons.length} derived comparisons` : "linear source revision or derived change evidence is incomplete"));
+
   const ok = checks.every((item) => item.passed);
   return Object.freeze({
-    schemaVersion: "procurement-requirement-readiness-v1",
+    schemaVersion: "procurement-requirement-readiness-v2",
     ok,
     status: ok ? "local-governance-ready" : "governance-blocked",
     localGovernanceReady: ok,
@@ -112,10 +192,13 @@ function buildProcurementRequirementReadiness(options = {}) {
       passed: checks.filter((item) => item.passed).length,
       failed: checks.filter((item) => !item.passed).length,
       documents: view?.summary?.documents || 0,
-      candidates: view?.summary?.candidates || 0
+      candidates: view?.summary?.candidates || 0,
+      sourceSeries: sourceSeries.size,
+      documentRevisions: catalogDocuments.length,
+      revisionComparisons: revisionComparisons?.length || 0
     }),
     checks: Object.freeze(checks),
-    boundary: "该门禁只验证仓库内的最小化合同、通用性、授权登记和失败关闭边界；不扫描恶意文件，不证明提取质量、现场验收或生产就绪。"
+    boundary: "该门禁只验证仓库内的最小化合同、通用性、离线批次、真实路径与文件身份、扫描证明合同、来源修订、授权登记和失败关闭边界；它不执行恶意文件扫描，不证明扫描覆盖、提取质量、现场验收或生产就绪。"
   });
 }
 
@@ -137,9 +220,12 @@ if (require.main === module) {
 module.exports = {
   ADR_PATH,
   FORBIDDEN_DATA_KEYS,
+  IMPORT_CLI_PATH,
+  IMPORT_PATH,
   REQUIRED_ADR_SECTIONS,
   REVIEW_ROUTE,
   SOURCE_LOCALITY_MARKERS,
+  VERSIONING_PATH,
   buildProcurementRequirementReadiness,
   findForbiddenKeys,
   localityFindings

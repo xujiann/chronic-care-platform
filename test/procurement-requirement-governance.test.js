@@ -2,6 +2,8 @@
 
 const assert = require("node:assert/strict");
 const test = require("node:test");
+const defaultCatalog = require("../config/procurement-requirement-governance.json");
+const { StateCommandError } = require("../src/platform/storage/state-command-consistency");
 const {
   applyProcurementRequirementReviewAction,
   buildProcurementRequirementGovernance
@@ -23,9 +25,16 @@ function command(overrides = {}) {
 
 test("requirement governance exposes only minimized candidates and starts fail closed", () => {
   const report = buildProcurementRequirementGovernance({}, { now: NOW });
-  assert.equal(report.schemaVersion, "procurement-requirement-governance-view-v1");
+  assert.equal(report.schemaVersion, "procurement-requirement-governance-view-v2");
   assert.deepEqual(report.summary, {
     documents: 2,
+    sourceSeries: 2,
+    documentRevisions: 2,
+    historicalRevisions: 0,
+    revisionComparisons: 0,
+    added: 0,
+    changed: 0,
+    withdrawn: 0,
     candidates: 5,
     pendingReview: 5,
     accepted: 0,
@@ -38,8 +47,11 @@ test("requirement governance exposes only minimized candidates and starts fail c
   assert.equal(report.containsRawDocument, false);
   assert.equal(report.containsLocalPath, false);
   assert.equal(report.items.every((item) => item.productionReady === false), true);
+  assert.match(report.items[0].title, /^需求候选 [A-F0-9]{12}$/);
   assert.equal(Object.hasOwn(report.documents[0], "path"), false);
   assert.equal(Object.hasOwn(report.items[0], "excerpt"), false);
+  assert.equal(Object.hasOwn(report.items[0].sourceAnchor, "section"), false);
+  assert.equal(report.items.every((item) => item.change === "baseline"), true);
 });
 
 test("commission review persists a digest-only decision and computes repository coverage", () => {
@@ -93,10 +105,69 @@ test("review commands are idempotent and reject stale or changed intent", () => 
 test("review boundary rejects unauthorized actors and source-content command fields", () => {
   assert.throws(
     () => applyProcurementRequirementReviewAction({}, command(), { name: "viewer-user", role: "viewer" }, { now: NOW }),
-    /requires commission role/
+    (error) => error instanceof StateCommandError && error.code === "PROCUREMENT_REQUIREMENT_SCOPE_FORBIDDEN" && error.statusCode === 403
   );
   assert.throws(
     () => applyProcurementRequirementReviewAction({}, command({ rawExcerpt: "untrusted document content" }), REVIEWER, { now: NOW }),
-    /rawExcerpt is not allowed/
+    (error) => error instanceof StateCommandError && error.code === "PROCUREMENT_REQUIREMENT_INPUT_INVALID" && error.statusCode === 400 && !error.message.includes("rawExcerpt")
+  );
+});
+
+test("governance exposes only the current source revision and derived differences", () => {
+  const catalog = structuredClone(defaultCatalog);
+  const prior = catalog.documents[0];
+  catalog.documents.push({
+    ...structuredClone(prior),
+    id: "DOC-SAMPLE-2023-001-V2",
+    revision: 2,
+    supersedesDocumentId: prior.id,
+    sha256: `sha256:${"f".repeat(64)}`,
+    candidates: [
+      { ...structuredClone(prior.candidates[0]), id: "PR-SAMPLE-001-V2-R001", priority: "P1" },
+      { ...structuredClone(prior.candidates[2]), id: "PR-SAMPLE-001-V2-R004", logicalRequirementId: "REQ-000000000006", semanticDigest: `sha256:${"a".repeat(64)}` }
+    ]
+  });
+  const report = buildProcurementRequirementGovernance({}, { catalog, now: NOW });
+  assert.equal(report.summary.sourceSeries, 2);
+  assert.equal(report.summary.documentRevisions, 3);
+  assert.equal(report.summary.historicalRevisions, 1);
+  assert.equal(report.summary.added, 1);
+  assert.equal(report.summary.changed, 1);
+  assert.equal(report.summary.withdrawn, 2);
+  assert.equal(report.documents.find((item) => item.id === prior.id).isCurrent, false);
+  assert.equal(report.items.some((item) => item.id === prior.candidates[1].id), false);
+  assert.equal(report.items.find((item) => item.logicalRequirementId === "REQ-000000000001").change, "changed");
+  assert.equal(report.productionReady, false);
+});
+
+test("a historical review permits exact replay but rejects a new command", () => {
+  const first = applyProcurementRequirementReviewAction({}, command(), REVIEWER, { now: NOW });
+  const catalog = structuredClone(defaultCatalog);
+  const prior = catalog.documents[0];
+  catalog.documents.push({
+    ...structuredClone(prior),
+    id: "DOC-SAMPLE-2023-REPLACEMENT",
+    revision: 2,
+    supersedesDocumentId: prior.id,
+    sha256: `sha256:${"e".repeat(64)}`,
+    candidates: [{ ...structuredClone(prior.candidates[1]), id: "PR-SAMPLE-001-V2-R002" }]
+  });
+  const replay = applyProcurementRequirementReviewAction(first.data, command(), REVIEWER, { catalog, now: NOW });
+  assert.equal(replay.replayed, true);
+  assert.deepEqual(replay.result, first.result);
+  assert.deepEqual(replay.data.procurementRequirementGovernance.commands[0].resultSnapshot, first.result);
+  assert.throws(
+    () => applyProcurementRequirementReviewAction(first.data, command({ commandId: "review-command-historical-new" }), REVIEWER, { catalog, now: NOW }),
+    (error) => error.code === "PROCUREMENT_REQUIREMENT_NOT_FOUND" && error.statusCode === 404
+  );
+});
+
+test("a legacy receipt without an exact result snapshot fails closed", () => {
+  const first = applyProcurementRequirementReviewAction({}, command(), REVIEWER, { now: NOW });
+  const legacy = structuredClone(first.data);
+  delete legacy.procurementRequirementGovernance.commands[0].resultSnapshot;
+  assert.throws(
+    () => applyProcurementRequirementReviewAction(legacy, command(), REVIEWER, { now: NOW }),
+    (error) => error.code === "PROCUREMENT_REQUIREMENT_REPLAY_UNAVAILABLE" && error.statusCode === 409
   );
 });

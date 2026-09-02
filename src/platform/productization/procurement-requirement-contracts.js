@@ -10,9 +10,10 @@ const DECISIONS = new Set(["REUSE", "ENHANCE", "BUILD", "CONFIGURE", "DEPLOY"]);
 const PRIORITIES = new Set(["P0", "P1", "P2"]);
 const EVIDENCE_STATUSES = new Set(["provisional", "source-verified"]);
 const COVERAGE = new Set(["repository-verified", "declared-only", "missing", "external-evidence-required"]);
-const DOCUMENT_KEYS = new Set(["id", "sourceAlias", "sha256", "mediaType", "byteSize", "reviewedPageCount", "extractionMode", "textQuality", "securityStatus", "status", "candidates"]);
-const CANDIDATE_KEYS = new Set(["id", "title", "sourceAnchor", "targetCapabilityIds", "productClass", "decision", "priority", "ownerProcess", "evidenceStatus"]);
-const ANCHOR_KEYS = new Set(["pageStart", "pageEnd", "section"]);
+const SECURITY_STATUSES = new Set(["unscanned-external-source", "scanner-attested-clean"]);
+const DOCUMENT_KEYS = new Set(["id", "seriesId", "sourceAlias", "revision", "supersedesDocumentId", "sha256", "mediaType", "byteSize", "reviewedPageCount", "extractionMode", "textQuality", "securityStatus", "scanEvidenceDigest", "status", "candidates"]);
+const CANDIDATE_KEYS = new Set(["id", "logicalRequirementId", "semanticDigest", "sourceAnchor", "targetCapabilityIds", "productClass", "decision", "priority", "ownerProcess", "evidenceStatus"]);
+const ANCHOR_KEYS = new Set(["pageStart", "pageEnd", "sectionCode"]);
 const CAPABILITY_KEYS = new Set(["id", "title", "ownerProcess", "productClass", "coverage", "evidence"]);
 
 function exactKeys(label, value, keys) {
@@ -72,12 +73,13 @@ function validateCandidate(candidate, index, capabilityIds, pageCount) {
   const label = `candidates[${index}]`;
   exactKeys(label, candidate, CANDIDATE_KEYS);
   opaqueId(`${label}.id`, candidate.id);
-  boundedText(`${label}.title`, candidate.title, 2, 160);
+  if (!/^REQ-[A-F0-9]{12}$/.test(String(candidate.logicalRequirementId || ""))) throw new TypeError(`${label}.logicalRequirementId is invalid`);
+  if (!/^sha256:[a-f0-9]{64}$/.test(String(candidate.semanticDigest || ""))) throw new TypeError(`${label}.semanticDigest is invalid`);
   exactKeys(`${label}.sourceAnchor`, candidate.sourceAnchor, ANCHOR_KEYS);
   const start = candidate.sourceAnchor.pageStart;
   const end = candidate.sourceAnchor.pageEnd;
   if (!Number.isInteger(start) || !Number.isInteger(end) || start < 1 || end < start || end > pageCount) throw new TypeError(`${label}.sourceAnchor pages are invalid`);
-  boundedText(`${label}.sourceAnchor.section`, candidate.sourceAnchor.section, 1, 80);
+  if (!/^SEC-[A-Z0-9.-]{1,32}$/.test(String(candidate.sourceAnchor.sectionCode || ""))) throw new TypeError(`${label}.sourceAnchor.sectionCode is invalid`);
   const mapped = boundedUnique(`${label}.targetCapabilityIds`, candidate.targetCapabilityIds, 1, 8, (id) => opaqueId(`${label}.targetCapabilityIds[]`, id));
   if (mapped.some((id) => !capabilityIds.has(id))) throw new TypeError(`${label} contains an unregistered capability`);
   if (!PRODUCT_CLASSES.has(candidate.productClass)) throw new TypeError(`${label}.productClass is invalid`);
@@ -92,9 +94,9 @@ function validateGovernanceCatalog(catalog = defaultGovernance, options = {}) {
   const registry = options.registry || defaultRegistry;
   validateCapabilityRegistry(registry, options);
   exactKeys("governance catalog", catalog, new Set(["schemaVersion", "catalogId", "limits", "review", "documents"]));
-  if (catalog.schemaVersion !== "procurement-requirement-governance-v1") throw new TypeError("procurement requirement governance schema is invalid");
+  if (catalog.schemaVersion !== "procurement-requirement-governance-v2") throw new TypeError("procurement requirement governance schema is invalid");
   opaqueId("catalogId", catalog.catalogId);
-  exactKeys("limits", catalog.limits, new Set(["maximumPdfBytes", "maximumPages", "maximumDocuments", "maximumCandidatesPerDocument", "maximumReviewEvents", "maximumCommandReceipts"]));
+  exactKeys("limits", catalog.limits, new Set(["maximumPdfBytes", "maximumPages", "maximumDocuments", "maximumBatchDocuments", "maximumBatchBytes", "maximumBatchCandidates", "maximumBatchReviewedPages", "maximumCandidatesPerDocument", "maximumReviewEvents", "maximumCommandReceipts"]));
   for (const [key, value] of Object.entries(catalog.limits)) if (!Number.isInteger(value) || value < 1) throw new TypeError(`limits.${key} must be a positive integer`);
   exactKeys("review", catalog.review, new Set(["actions", "statuses", "requiredRole", "productionReady"]));
   if (JSON.stringify(catalog.review.actions) !== JSON.stringify(["accept", "request-revision", "reject"])) throw new TypeError("review actions are invalid");
@@ -103,28 +105,52 @@ function validateGovernanceCatalog(catalog = defaultGovernance, options = {}) {
   if (!Array.isArray(catalog.documents) || catalog.documents.length < 1 || catalog.documents.length > catalog.limits.maximumDocuments) throw new TypeError("documents are empty or exceed the limit");
   const capabilityIds = new Set(registry.capabilities.map((item) => item.id));
   const documentIds = new Set();
+  const documentDigests = new Set();
   const candidateIds = new Set();
+  const series = new Map();
   for (const [index, document] of catalog.documents.entries()) {
     const label = `documents[${index}]`;
     exactKeys(label, document, DOCUMENT_KEYS);
     documentIds.add(opaqueId(`${label}.id`, document.id));
+    const seriesId = String(document.seriesId || "");
+    if (!/^SRC-[A-F0-9]{12}$/.test(seriesId)) throw new TypeError(`${label}.seriesId is invalid`);
     const alias = boundedText(`${label}.sourceAlias`, document.sourceAlias, 4, 80);
-    if (/[/\\]|OneDrive|^[A-Za-z]:/i.test(alias)) throw new TypeError(`${label}.sourceAlias must be neutral and path-free`);
+    if (alias !== `需求来源 ${seriesId.slice(4)}`) throw new TypeError(`${label}.sourceAlias must be generated from the neutral series id`);
+    if (!Number.isInteger(document.revision) || document.revision < 1 || document.revision > 1000) throw new TypeError(`${label}.revision is invalid`);
+    if (document.supersedesDocumentId !== null) opaqueId(`${label}.supersedesDocumentId`, document.supersedesDocumentId);
     if (!/^sha256:[a-f0-9]{64}$/.test(String(document.sha256 || ""))) throw new TypeError(`${label}.sha256 is invalid`);
+    documentDigests.add(document.sha256);
     if (document.mediaType !== "application/pdf") throw new TypeError(`${label}.mediaType must be application/pdf`);
     if (!Number.isInteger(document.byteSize) || document.byteSize < 5 || document.byteSize > catalog.limits.maximumPdfBytes) throw new TypeError(`${label}.byteSize is invalid`);
     if (!Number.isInteger(document.reviewedPageCount) || document.reviewedPageCount < 1 || document.reviewedPageCount > catalog.limits.maximumPages) throw new TypeError(`${label}.reviewedPageCount is invalid`);
     if (!["human-verified-pages", "native-text-reviewed", "controlled-extractor"].includes(document.extractionMode)) throw new TypeError(`${label}.extractionMode is invalid`);
-    if (!["reviewable", "needs-ocr"].includes(document.textQuality) || document.securityStatus !== "unscanned-external-source" || document.status !== "candidate-review") throw new TypeError(`${label} extraction or security status is invalid`);
+    if (!["reviewable", "needs-ocr"].includes(document.textQuality) || !SECURITY_STATUSES.has(document.securityStatus) || document.status !== "candidate-review") throw new TypeError(`${label} extraction or security status is invalid`);
+    if (document.securityStatus === "unscanned-external-source" && document.scanEvidenceDigest !== null) throw new TypeError(`${label}.scanEvidenceDigest must be null for an unscanned source`);
+    if (document.securityStatus === "scanner-attested-clean" && !/^sha256:[a-f0-9]{64}$/.test(String(document.scanEvidenceDigest || ""))) throw new TypeError(`${label}.scanEvidenceDigest is invalid`);
     if (!Array.isArray(document.candidates) || document.candidates.length < 1 || document.candidates.length > catalog.limits.maximumCandidatesPerDocument) throw new TypeError(`${label}.candidates are empty or exceed the limit`);
     document.candidates.forEach((candidate, candidateIndex) => {
       validateCandidate(candidate, candidateIndex, capabilityIds, document.reviewedPageCount);
       candidateIds.add(candidate.id);
     });
+    if (!series.has(seriesId)) series.set(seriesId, []);
+    series.get(seriesId).push(document);
   }
   if (documentIds.size !== catalog.documents.length) throw new TypeError("document ids must be unique");
+  if (documentDigests.size !== catalog.documents.length) throw new TypeError("document digests must be unique");
   const candidateCount = catalog.documents.reduce((count, document) => count + document.candidates.length, 0);
   if (candidateIds.size !== candidateCount) throw new TypeError("candidate ids must be unique across documents");
+  for (const [seriesId, documents] of series) {
+    const ordered = [...documents].sort((left, right) => left.revision - right.revision);
+    const revisions = new Set(ordered.map((document) => document.revision));
+    if (revisions.size !== ordered.length) throw new TypeError(`${seriesId} revisions must be unique`);
+    ordered.forEach((document, index) => {
+      const previous = ordered[index - 1];
+      if (index === 0 && (document.revision !== 1 || document.supersedesDocumentId !== null)) throw new TypeError(`${seriesId} must start at revision 1 without a predecessor`);
+      if (index > 0 && (document.revision !== previous.revision + 1 || document.supersedesDocumentId !== previous.id)) throw new TypeError(`${seriesId} must form a contiguous linear revision chain`);
+      const logicalIds = document.candidates.map((candidate) => candidate.logicalRequirementId);
+      if (new Set(logicalIds).size !== logicalIds.length) throw new TypeError(`${document.id} logical requirement ids must be unique`);
+    });
+  }
   return true;
 }
 
@@ -134,6 +160,7 @@ module.exports = {
   EVIDENCE_STATUSES,
   PRIORITIES,
   PRODUCT_CLASSES,
+  SECURITY_STATUSES,
   boundedText,
   opaqueId,
   validateCandidate,

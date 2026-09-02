@@ -34,18 +34,19 @@ function formalGroupingReviewFixture() {
 
 test("idempotency evidence registry validates only directly proven endpoint and action-slice contracts", () => {
   assert.deepEqual(validateEvidenceRegistry(), []);
-  assert.equal(DEFAULT_REGISTRY.contracts.length, 36);
-  assert.equal(endpointEvidenceContracts().length, 34);
+  assert.equal(DEFAULT_REGISTRY.contracts.length, 37);
+  assert.equal(endpointEvidenceContracts().length, 35);
   assert.equal(actionSliceEvidenceContracts().length, 2);
-  assert.equal(proofRequiredReviews().length, 1);
-  assert.equal(DEFAULT_REGISTRY.contracts[0].key, "POST /api/auth/sms-delivery-callback");
-  assert.equal(DEFAULT_REGISTRY.contracts[0].owner, "T01");
+  assert.equal(proofRequiredReviews().length, 0);
+  const smsContract = DEFAULT_REGISTRY.contracts.find((contract) => contract.key === "POST /api/auth/sms-delivery-callback");
+  assert.equal(smsContract.owner, "T01");
   assert.equal(DEFAULT_REGISTRY.contracts.every((contract) => contract.productionReady === false), true);
   assert.equal(DEFAULT_REGISTRY.contracts.every((contract) => contract.idempotency.distributedExactlyOnceClaimed === false), true);
   assert.deepEqual(DEFAULT_REGISTRY.contracts.filter((contract) => contract.customAuthenticationEvidence).map((contract) => contract.key), [
     "POST /api/auth/sms-delivery-callback"
   ]);
   assert.deepEqual(DEFAULT_REGISTRY.contracts.map((contract) => contract.key), [
+    "POST /api/platform/productization/requirements/:id/actions",
     "POST /api/auth/sms-delivery-callback",
     "POST /api/regional-data-sharing/access-reviews",
     "POST /api/referrals/:id/actions",
@@ -98,26 +99,21 @@ test("formal grouping create replaces the final reviewed T07 proof gap with endp
   assert.equal(entry.production.status, "NO-GO");
 });
 
-test("procurement requirement review remains explicitly behavior-proof-required", () => {
+test("procurement requirement review is promoted by stable endpoint behavior evidence", () => {
   const key = "POST /api/platform/productization/requirements/:id/actions";
-  assert.deepEqual(proofRequiredReviews().map((review) => ({
-    key: review.key,
-    owner: review.owner,
-    missingProof: review.missingProof
-  })), [{
-    key,
-    owner: "T02",
-    missingProof: ["stable-error-contract"]
-  }]);
+  assert.deepEqual(proofRequiredReviews(), []);
+  const contract = DEFAULT_REGISTRY.contracts.find((candidate) => candidate.key === key);
+  assert.equal(contract.contractId, "platform-governance.procurement-requirement-review-command.v1");
+  assert.equal(contract.coverage.level, "endpoint");
   const entry = buildProductionApiCatalog().entries.find((candidate) => candidate.key === key);
-  assert.equal(entry.idempotency.behaviorEvidence.status, "behavior-proof-required");
-  assert.equal(entry.production.repositoryReview, "review-required");
+  assert.equal(entry.idempotency.behaviorEvidence.status, "behavior-verified");
+  assert.equal(entry.production.repositoryReview, "catalogued");
   assert.equal(entry.production.productionReady, false);
 });
 
 test("catalog promotes only whole endpoints and retains generic action routes as review-required", () => {
   const catalog = buildProductionApiCatalog();
-  assert.equal(catalog.summary.writeIdempotencyBehaviorVerified, 34);
+  assert.equal(catalog.summary.writeIdempotencyBehaviorVerified, 35);
   assert.equal(catalog.summary.writeIdempotencyActionSlicesVerified, 2);
   assert.equal(catalog.summary.writeIdempotencyBehaviorProofRequired,
     catalog.summary.writeRoutes - catalog.summary.writeIdempotencyBehaviorVerified);
@@ -126,6 +122,7 @@ test("catalog promotes only whole endpoints and retains generic action routes as
   assert.equal(catalog.summary.writeIdempotencyBehaviorProofRequired >= 308, true);
 
   for (const key of [
+    "POST /api/platform/productization/requirements/:id/actions",
     "POST /api/auth/sms-delivery-callback",
     "POST /api/regional-data-sharing/access-reviews",
     "POST /api/referrals/:id/actions",
