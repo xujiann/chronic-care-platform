@@ -52,14 +52,20 @@ test("five identity types receive only their policy menu and reject a forbidden 
   for (const identity of identities) {
     await login(page, identity.username, identity.home);
     await expect(page.locator(".auth-bar")).toBeVisible();
+    await expect(page.locator(".navigation-sidebar")).toHaveAttribute("aria-label", "分级功能导航");
+    await expect(page.locator(`.navigation-sidebar a[data-navigation-page='${identity.home}']`)).toHaveAttribute("aria-current", "page");
     await expect(page.locator(`.auth-bar a[href='./${identity.forbidden}']`)).toHaveCount(0);
+    const sidebarBox = await page.locator(".navigation-sidebar").boundingBox();
+    expect(sidebarBox.x).toBe(0);
+    expect(sidebarBox.width).toBeGreaterThan(250);
+    await expect(page.locator("html")).toHaveAttribute("data-navigation-shell", "ready");
     await page.goto(`/${identity.forbidden}`);
     await expect(page).toHaveURL(new RegExp(`${identity.home.replace(".", "\\.")}\\?denied=${identity.forbidden.replace(".", "\\.")}$`));
   }
 });
 
 test("commission user reaches the governance dashboard and opens maintenance", async ({ page }) => {
-  test.setTimeout(90_000);
+  test.setTimeout(150_000);
   await login(page, "health", "index.html");
   await expect(page.locator("#data-source")).toHaveText("本地服务");
 

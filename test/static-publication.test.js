@@ -42,6 +42,7 @@ test("static publication contract exposes only the explicit browser graph", () =
   assert.equal(contract.entrypoints.length, 45);
   assert.deepEqual([...contract.entrypoints].sort(), repositoryHtml);
   assert.equal(assets.includes("index.html"), true);
+  assert.equal(assets.includes("navigation-shell.css"), true);
   assert.equal(assets.includes("data/public-demo.json"), true);
   assert.equal(assets.includes("data/db.json"), false);
   assert.equal(assets.includes("server.js"), false);

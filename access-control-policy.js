@@ -21,6 +21,16 @@
     citizen: "citizen.html",
     county: "county.html"
   });
+  const NAVIGATION_GROUPS = Object.freeze([
+    Object.freeze({ id: "overview", label: "平台总览", groups: Object.freeze(["总览"]) }),
+    Object.freeze({ id: "governance", label: "治理与监管", groups: Object.freeze(["监管治理", "平台治理"]) }),
+    Object.freeze({ id: "public-health", label: "公共卫生", groups: Object.freeze(["公共卫生"]) }),
+    Object.freeze({ id: "institution", label: "机构与临床", groups: Object.freeze(["机构发展", "机构工作", "临床服务"]) }),
+    Object.freeze({ id: "care", label: "连续健康服务", groups: Object.freeze(["连续服务", "医共体"]) }),
+    Object.freeze({ id: "payment", label: "医保支付", groups: Object.freeze(["医保支付"]) }),
+    Object.freeze({ id: "resident", label: "居民服务", groups: Object.freeze(["居民服务"]) }),
+    Object.freeze({ id: "other", label: "其他功能", groups: Object.freeze(["其他"]) })
+  ]);
 
   const manager = Object.freeze(["manager"]);
   const institutionAccounts = Object.freeze(["manager", "doctor", "nurse", "blood_technologist"]);
@@ -36,7 +46,8 @@
       orgTypes: Object.freeze([...(options.orgTypes || [])]),
       permissions: Object.freeze([...(options.permissions || [])]),
       capabilities: Object.freeze([...(options.capabilities || [])]),
-      group: options.group || "其他"
+      group: options.group || "其他",
+      parent: options.parent || ""
     });
   }
 
@@ -53,40 +64,40 @@
     "operations.html": entry("运行监测", ["commission"], { group: "平台治理" }),
     "operations-about.html": entry("运行说明", ["commission"], { nav: false }),
     "public-health.html": entry("公共卫生", ["commission"], { group: "公共卫生", capabilities: ["publicHealth"] }),
-    "public-health-highlights.html": entry("公卫亮点", ["commission"], { group: "公共卫生", capabilities: ["publicHealth"] }),
-    "public-health-supervision.html": entry("卫生监督闭环", ["commission", "institution"], { group: "公共卫生", accountTypes: manager, capabilities: ["publicHealth"] }),
-    "immunization.html": entry("免疫规划", ["commission", "institution", "citizen"], { group: "公共卫生", capabilities: ["immunization"] }),
+    "public-health-highlights.html": entry("公卫亮点", ["commission"], { group: "公共卫生", parent: "public-health.html", capabilities: ["publicHealth"] }),
+    "public-health-supervision.html": entry("卫生监督闭环", ["commission", "institution"], { group: "公共卫生", parent: "public-health.html", accountTypes: manager, capabilities: ["publicHealth"] }),
+    "immunization.html": entry("免疫规划", ["commission", "institution", "citizen"], { group: "公共卫生", parent: "public-health.html", capabilities: ["immunization"] }),
     "maternal-child-about.html": entry("妇幼健康", ["commission", "institution", "citizen"], { nav: false, capabilities: ["maternalChild"] }),
     "quality-safety.html": entry("质量安全", ["commission", "institution", "county"], { group: "监管治理", capabilities: ["qualitySafety"] }),
     "quality-safety-about.html": entry("质量安全说明", ["commission", "institution", "county"], { nav: false }),
     "digital-hospital-standards.html": entry("数智医院标准", ["commission"], { group: "机构发展" }),
-    "digital-hospital-self-assessment.html": entry("医院自评", ["commission", "institution"], { group: "机构发展" }),
-    "digital-hospital-evaluation.html": entry("评价预评", ["commission", "institution"], { group: "机构发展" }),
+    "digital-hospital-self-assessment.html": entry("医院自评", ["commission", "institution"], { group: "机构发展", parent: "digital-hospital-standards.html" }),
+    "digital-hospital-evaluation.html": entry("评价预评", ["commission", "institution"], { group: "机构发展", parent: "digital-hospital-standards.html" }),
     "regional-data-sharing.html": entry("区域共享", ["commission", "institution"], { group: "平台治理", capabilities: ["regionalSharing"] }),
     "regional-data-sharing-about.html": entry("共享说明", ["commission", "institution"], { nav: false }),
     "institution.html": entry("医疗机构", ["institution"], { group: "机构工作", accountTypes: institutionAccounts, orgTypes: ["medical_institution"] }),
-    "doctor.html": entry("医生工作站", ["institution"], { group: "机构工作", accountTypes: ["doctor"], orgTypes: ["medical_institution"] }),
+    "doctor.html": entry("医生工作站", ["institution"], { group: "机构工作", parent: "institution.html", accountTypes: ["doctor"], orgTypes: ["medical_institution"] }),
     "internet-nursing.html": entry("互联网护理", ["commission", "institution", "citizen", "county"], { group: "连续服务", capabilities: ["internetNursing"] }),
     "escort.html": entry("助医陪诊", ["commission", "institution"], { group: "连续服务", capabilities: ["escort"] }),
     "referral-teleconsultation-about.html": entry("转诊会诊", ["commission", "institution", "county"], { nav: false, capabilities: ["referral"] }),
     "imaging-cloud.html": entry("影像云", ["commission", "institution", "county", "citizen"], { group: "临床服务", capabilities: ["imagingCloud"] }),
     "emergency.html": entry("急救协同", ["commission", "institution", "citizen"], { group: "临床服务", capabilities: ["emergency"] }),
     "physical-examination.html": entry("健康体检", ["commission", "institution", "citizen"], { group: "临床服务", capabilities: ["physicalExamination"] }),
-    "physical-examination-standalone.html": entry("体检独立门户", ["institution", "citizen"], { group: "临床服务", capabilities: ["physicalExamination"] }),
+    "physical-examination-standalone.html": entry("体检独立门户", ["institution", "citizen"], { group: "临床服务", parent: "physical-examination.html", capabilities: ["physicalExamination"] }),
     "blood.html": entry("血液管理", ["commission", "institution"], { group: "临床服务", capabilities: ["blood"] }),
-    "blood-business.html": entry("血液业务", ["commission", "institution"], { group: "临床服务", capabilities: ["blood"] }),
-    "blood-go-live.html": entry("血液上线", ["commission", "institution"], { group: "临床服务", capabilities: ["blood"] }),
-    "blood-innovation.html": entry("血液创新", ["commission", "institution"], { group: "临床服务", capabilities: ["blood"] }),
+    "blood-business.html": entry("血液业务", ["commission", "institution"], { group: "临床服务", parent: "blood.html", capabilities: ["blood"] }),
+    "blood-go-live.html": entry("血液上线", ["commission", "institution"], { group: "临床服务", parent: "blood.html", capabilities: ["blood"] }),
+    "blood-innovation.html": entry("血液创新", ["commission", "institution"], { group: "临床服务", parent: "blood.html", capabilities: ["blood"] }),
     "insurance.html": entry("医保管理", ["insurance"], { group: "医保支付" }),
-    "disease-payment.html": entry("按病种支付", ["insurance", "commission", "institution"], { group: "医保支付", capabilities: ["diseasePayment"] }),
+    "disease-payment.html": entry("按病种支付", ["insurance", "commission", "institution"], { group: "医保支付", parent: "insurance.html", capabilities: ["diseasePayment"] }),
     "drug-consumable-about.html": entry("药耗管理", ["commission", "institution", "insurance"], { nav: false, capabilities: ["drugConsumable"] }),
     "county.html": entry("县域医共体", ["county"], { group: "医共体" }),
     "citizen.html": entry("居民服务", ["citizen"], { group: "居民服务", accountTypes: residentAccounts }),
-    "mobile-preview.html": entry("手机预览", ["citizen"], { group: "居民服务", accountTypes: residentAccounts }),
-    "resident-mini-program.html": entry("居民小程序", ["citizen"], { group: "居民服务", accountTypes: residentAccounts }),
+    "mobile-preview.html": entry("手机预览", ["citizen"], { group: "居民服务", parent: "citizen.html", accountTypes: residentAccounts }),
+    "resident-mini-program.html": entry("居民小程序", ["citizen"], { group: "居民服务", parent: "citizen.html", accountTypes: residentAccounts }),
     "research-sandbox-about.html": entry("科研沙箱", ["commission", "institution"], { nav: false, capabilities: ["researchSandbox"] }),
     "t10-specialty-cutover.html": entry("专科切换", ["commission", "institution", "county"], { group: "平台治理" }),
-    "digital-hospital-standard-platform/index.html": entry("数智医院标准平台", ["commission", "institution"], { group: "机构发展" })
+    "digital-hospital-standard-platform/index.html": entry("数智医院标准平台", ["commission", "institution"], { group: "机构发展", parent: "digital-hospital-standards.html" })
   });
 
   function normalizePageName(value) {
@@ -154,8 +165,37 @@
   function pagesForUser(user, context = {}, options = {}) {
     return Object.entries(PAGE_CATALOG)
       .filter(([page, policy]) => policy.nav && canAccessPage(page, user, context))
-      .map(([page, policy]) => Object.freeze({ page, href: `./${page}`, label: policy.label, group: policy.group }))
+      .map(([page, policy]) => Object.freeze({ page, href: `./${page}`, label: policy.label, group: policy.group, parent: policy.parent }))
       .filter((item) => options.includeHome !== false || item.page !== homeForUser(user, context));
+  }
+
+  function menuTreeForUser(user, context = {}, options = {}) {
+    const pages = pagesForUser(user, context, { ...options, includeHome: options.includeHome !== false });
+    const availablePages = new Set(pages.map((item) => item.page));
+    const grouped = new Map(NAVIGATION_GROUPS.map((item) => [item.id, { id: item.id, label: item.label, items: [] }]));
+    const pageNodes = new Map(pages.map((item) => [item.page, { ...item, children: [] }]));
+
+    pages.forEach((item) => {
+      const node = pageNodes.get(item.page);
+      if (item.parent && availablePages.has(item.parent)) {
+        pageNodes.get(item.parent).children.push(node);
+        return;
+      }
+      const definition = NAVIGATION_GROUPS.find((candidate) => candidate.groups.includes(item.group)) || NAVIGATION_GROUPS[NAVIGATION_GROUPS.length - 1];
+      grouped.get(definition.id).items.push(node);
+    });
+
+    return Object.freeze(NAVIGATION_GROUPS
+      .map((definition) => grouped.get(definition.id))
+      .filter((group) => group.items.length)
+      .map((group) => Object.freeze({
+        id: group.id,
+        label: group.label,
+        items: Object.freeze(group.items.map((item) => Object.freeze({
+          ...item,
+          children: Object.freeze(item.children.map((child) => Object.freeze({ ...child, children: Object.freeze([]) })))
+        })))
+      })));
   }
 
   function homeForUser(user, context = {}) {
@@ -185,6 +225,7 @@
     knownRoles: KNOWN_ROLES,
     roleLabels: ROLE_LABELS,
     defaultHomes: DEFAULT_HOMES,
+    navigationGroups: NAVIGATION_GROUPS,
     pageCatalog: PAGE_CATALOG,
     normalizePageName,
     normalizeAccountType,
@@ -192,6 +233,7 @@
     canAccessPage,
     canUsePermission,
     pagesForUser,
+    menuTreeForUser,
     homeForUser,
     eligibleUsersForPage,
     rolesForPage

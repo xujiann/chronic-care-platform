@@ -40,6 +40,8 @@ test("resident mini program validates session, isolates family scope and fits 39
   expect(layout.document).toBeLessThanOrEqual(layout.viewport);
   expect(layout.minimumTarget).toBeGreaterThanOrEqual(44);
 
+  await page.locator(".navigation-toggle").click();
+  await expect.poll(() => page.locator(".navigation-sidebar").evaluate((element) => element.getBoundingClientRect().left)).toBe(0);
   await page.getByRole("button", { name: "我的", exact: true }).click();
   await page.locator("#large-text-toggle").check();
   await expect(page.locator("body")).toHaveClass(/large-text/);
@@ -422,15 +424,20 @@ test("resident shell is mobile safe at 320, 375, 390 and 430 widths", async ({ p
         const rect = element.getBoundingClientRect();
         return style.display !== "none" && style.visibility !== "hidden" && rect.width > 0 && rect.height > 0;
       });
+      const targetHeights = targets.map((element) => ({
+        label: element.getAttribute("aria-label") || element.textContent.trim(),
+        height: element.getBoundingClientRect().height
+      })).sort((left, right) => left.height - right.height);
       return {
         clientWidth: document.documentElement.clientWidth,
         scrollWidth: document.documentElement.scrollWidth,
-        minimumHeight: Math.min(...targets.map((element) => element.getBoundingClientRect().height)),
+        minimumHeight: targetHeights[0]?.height || 0,
+        minimumTarget: targetHeights[0]?.label || "unknown",
         english: (document.querySelector("#app-main")?.innerText || "").match(/[A-Za-z]{2,}/g) || []
       };
     });
     expect(result.scrollWidth).toBe(result.clientWidth);
-    expect(result.minimumHeight).toBeGreaterThanOrEqual(44);
+    expect(result.minimumHeight, `minimum target: ${result.minimumTarget}`).toBeGreaterThanOrEqual(44);
     expect(result.english).toEqual([]);
   }
   await page.setViewportSize({ width: 320, height: 844 });

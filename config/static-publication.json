@@ -53,6 +53,7 @@
     "config/disease-payment/templates/local-drg-package.template.json",
     "config/disease-payment/templates/local-dip-package.template.json",
     "manifest.webmanifest",
+    "navigation-shell.css",
     "pwa-icon.svg",
     "service-worker.js"
   ],

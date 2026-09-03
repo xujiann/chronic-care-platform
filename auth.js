@@ -443,6 +443,15 @@
     return safeUrlPort().setElementUrl(element, "href", target, internalUrlOptions());
   }
 
+  function ensureNavigationStyles() {
+    if (!document.head || document.querySelector("#health-navigation-shell-styles")) return;
+    const link = document.createElement("link");
+    link.id = "health-navigation-shell-styles";
+    link.rel = "stylesheet";
+    setInternalHref(link, localHref("navigation-shell.css"));
+    document.head.append(link);
+  }
+
   function requireRole(roles) {
     // Legacy inline guards run in <head>. The server static guard has already
     // authenticated this request; the central policy decides after cookie hydration.
@@ -585,45 +594,177 @@
 
   function renderSessionBar() {
     if (document.body?.dataset.authPage === "login") return;
-    const shell = document.querySelector(".portal-shell, .citizen-shell, .app");
+    const shell = document.querySelector(".portal-shell, .citizen-shell, .app, .app-shell, .mini-app, .preview-shell, main");
     if (!shell || document.querySelector(".auth-bar")) return;
     const user = getUser();
-    const bar = document.createElement("section");
-    bar.className = "auth-bar";
+    const current = accessPolicy?.normalizePageName(location.pathname) || "";
+    const bar = document.createElement("aside");
+    bar.className = "auth-bar navigation-sidebar";
+    bar.id = "health-navigation-sidebar";
+    bar.setAttribute("aria-label", "分级功能导航");
+
+    const brand = document.createElement("div");
+    brand.className = "navigation-brand";
+    const brandMark = document.createElement("span");
+    brandMark.className = "navigation-brand-mark";
+    brandMark.setAttribute("aria-hidden", "true");
+    brandMark.textContent = "健";
+    const brandCopy = document.createElement("div");
+    const brandTitle = document.createElement("strong");
+    const brandDetail = document.createElement("span");
+    brandTitle.textContent = "卫生健康信息平台";
+    brandDetail.textContent = "统一功能导航";
+    brandCopy.append(brandTitle, brandDetail);
+    brand.append(brandMark, brandCopy);
 
     const identity = document.createElement("div");
+    identity.className = "navigation-identity";
     const name = document.createElement("strong");
     const detail = document.createElement("span");
     identity.append(name, detail);
 
     const nav = document.createElement("nav");
+    nav.className = "navigation-primary";
+    nav.setAttribute("aria-label", "平台功能");
+    const menuTree = accessPolicy?.menuTreeForUser?.(user, {}, { includeHome: true }) || [];
+    const menuPages = new Set();
+    const appendMenuLink = (container, item, level) => {
+      const link = document.createElement("a");
+      setInternalHref(link, localHref(item.page));
+      link.textContent = item.label;
+      link.dataset.navigationLevel = String(level);
+      link.dataset.navigationPage = item.page;
+      menuPages.add(item.page);
+      if (item.page === current) link.setAttribute("aria-current", "page");
+      container.append(link);
+      (item.children || []).forEach((child) => appendMenuLink(container, child, level + 1));
+    };
+
+    menuTree.forEach((group, index) => {
+      const details = document.createElement("details");
+      details.className = "navigation-group";
+      const containsCurrent = group.items.some((item) => item.page === current || item.children.some((child) => child.page === current));
+      details.open = containsCurrent || (!current && index === 0);
+      const summary = document.createElement("summary");
+      summary.textContent = group.label;
+      const links = document.createElement("div");
+      links.className = "navigation-group-links";
+      group.items.forEach((item) => appendMenuLink(links, item, 2));
+      details.append(summary, links);
+      nav.append(details);
+    });
+
     if (user) {
       name.textContent = displayAuthText(user.name);
-      detail.textContent = `${displayAuthText(user.roleName)} · ${displayAuthText(user.orgName || "未绑定机构")} · ${displayAuthText(user.dataScope || "默认范围")} · ${String(user.authMode || "").startsWith("server") ? "安全服务端会话" : "本地演示"} · ${new Date(user.loginAt || Date.now()).toLocaleString("zh-CN")}`;
-      (accessPolicy?.pagesForUser(user) || []).forEach(({ page: href, label }) => {
-        const link = document.createElement("a");
-        setInternalHref(link, localHref(href));
-        link.textContent = label;
-        nav.append(link);
-      });
+      detail.textContent = `${displayAuthText(user.roleName)} · ${displayAuthText(user.orgName || "未绑定机构")} · ${displayAuthText(user.dataScope || "默认范围")}`;
       const logoutButton = document.createElement("button");
       logoutButton.type = "button";
       logoutButton.dataset.logout = "";
       logoutButton.textContent = "退出";
-      nav.append(logoutButton);
+      identity.append(logoutButton);
     } else {
       name.textContent = "未登录";
-      detail.textContent = "请先选择角色进入健康城市系统";
+      detail.textContent = "登录后显示与身份匹配的完整功能";
       const loginLink = document.createElement("a");
       setInternalHref(loginLink, `${localHref("login.html")}?redirect=${encodeURIComponent(currentPage())}`);
       loginLink.textContent = "登录";
-      nav.append(loginLink);
+      loginLink.className = "navigation-login-link";
+      identity.append(loginLink);
     }
-    bar.append(identity, nav);
-    shell.prepend(bar);
+
+    const localNavigation = document.createElement("div");
+    localNavigation.className = "navigation-local";
+    bar.append(brand, localNavigation, nav, identity);
+    document.body.append(bar);
+    installNavigationToggle(bar);
+    relocatePageNavigation(bar, localNavigation, menuPages);
+    document.documentElement.setAttribute("data-navigation-shell", "ready");
     bar.querySelector("[data-logout]")?.addEventListener("click", logout);
     filterRoleLinks();
     filterRoleFeatures();
+  }
+
+  function installNavigationToggle(sidebar) {
+    const toggle = document.createElement("button");
+    toggle.type = "button";
+    toggle.className = "navigation-toggle";
+    toggle.setAttribute("aria-controls", sidebar.id);
+    toggle.setAttribute("aria-expanded", "false");
+    toggle.setAttribute("aria-label", "打开功能导航");
+    toggle.textContent = "菜单";
+
+    const scrim = document.createElement("button");
+    scrim.type = "button";
+    scrim.className = "navigation-scrim";
+    scrim.setAttribute("aria-label", "关闭功能导航");
+
+    const setOpen = (open) => {
+      document.documentElement.setAttribute("data-navigation-open", open ? "true" : "false");
+      toggle.setAttribute("aria-expanded", open ? "true" : "false");
+      toggle.setAttribute("aria-label", open ? "关闭功能导航" : "打开功能导航");
+    };
+    toggle.addEventListener("click", () => setOpen(toggle.getAttribute("aria-expanded") !== "true"));
+    scrim.addEventListener("click", () => setOpen(false));
+    sidebar.addEventListener("click", (event) => {
+      if (event.target.closest("a, button") && window.matchMedia("(max-width: 900px)").matches) setOpen(false);
+    });
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") setOpen(false);
+    });
+    document.body.append(toggle, scrim);
+  }
+
+  function relocatePageNavigation(sidebar, localNavigation, menuPages) {
+    const labels = new Map([
+      ["nav", "当前工作台"],
+      ["dashboard-section-nav", "驾驶舱分区"],
+      ["nursing-role-nav", "护理工作台"],
+      ["blood-nav", "血液业务"],
+      ["top-nav", "专科切换"],
+      ["service-tabs", "居民服务"],
+      ["bottom-nav", "居民小程序"],
+      ["nav-list", "标准平台功能"]
+    ]);
+    const moved = new Set();
+    const moveNavigation = (source, label) => {
+      if (!source || moved.has(source) || source.closest(".navigation-sidebar")) return;
+      moved.add(source);
+      const section = document.createElement("details");
+      section.className = "navigation-local-group";
+      section.open = true;
+      const summary = document.createElement("summary");
+      summary.textContent = label;
+      section.append(summary, source);
+      localNavigation.append(section);
+    };
+
+    document.querySelectorAll("body > .sidebar .nav, .dashboard-section-nav, .nursing-role-nav, .blood-nav, .top-nav, .service-tabs, .bottom-nav, .app-shell > .side-nav .nav-list").forEach((source) => {
+      const matchedClass = [...labels.keys()].find((className) => source.classList.contains(className));
+      moveNavigation(source, labels.get(matchedClass) || "本页功能");
+    });
+
+    document.querySelectorAll("header nav").forEach((source) => {
+      if (source.closest(".navigation-sidebar")) return;
+      source.querySelectorAll("a[href]").forEach((link) => {
+        const page = normalizePageName(link.getAttribute("href"));
+        if (page && menuPages.has(page)) {
+          link.hidden = true;
+          link.classList.add("navigation-duplicate-link");
+        }
+      });
+      if (source.querySelector("a:not([hidden]), button:not([hidden])")) moveNavigation(source, "页面快捷入口");
+      else source.hidden = true;
+    });
+
+    document.querySelectorAll(".citizen-header .header-actions > a[href], .topbar-actions > a[href]").forEach((link) => {
+      const page = normalizePageName(link.getAttribute("href"));
+      if (page && menuPages.has(page)) {
+        link.hidden = true;
+        link.classList.add("navigation-duplicate-link");
+      }
+    });
+
+    sidebar.querySelectorAll("nav a[aria-current='page']").forEach((link) => link.closest("details")?.setAttribute("open", ""));
   }
 
   function displayAuthText(value) {
@@ -667,6 +808,7 @@
     filterRoleFeatures
   };
 
+  ensureNavigationStyles();
   const startPageAccess = () => { initializePageAccess().catch(() => enforceCurrentPageAccess()); };
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", startPageAccess);
   else startPageAccess();
