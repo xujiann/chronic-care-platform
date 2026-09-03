@@ -1,5 +1,7 @@
 "use strict";
 
+const unifiedWorkCenter = require("./care-coordination/unified-work-center");
+
 const {
   ReferralCommandError,
   buildReferralDeliveryOperations,
@@ -142,6 +144,7 @@ function createRouteSegments(runtime) {
   }
 
   return [
+    ...(typeof runtime.buildUnifiedTasks === "function" ? [unifiedWorkCenter.createRouteSegment(runtime)] : []),
     {
       id: "care-coordination-01",
       domain: "care-coordination",

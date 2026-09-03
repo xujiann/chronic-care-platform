@@ -89,7 +89,7 @@ function seedDigitalHospitalSelfAssessments(options = {}) {
       cycle: "2026-pilot",
       targetLevel: "基层医疗机构轻量试点",
       institutionId: "MR3",
-      institutionName: "青泥洼桥社区卫生服务中心",
+      institutionName: "示范社区卫生服务中心",
       assignedTo: "基层机构管理员",
       dueAt: dateOffset(5, options),
       status: "correction-required",

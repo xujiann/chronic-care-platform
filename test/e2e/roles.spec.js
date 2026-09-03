@@ -28,7 +28,7 @@ async function login(page, username, expectedPage) {
 
 async function apiLogin(request, username) {
   const storage = await request.storageState();
-  const csrf = storage.cookies.find((cookie) => cookie.name === "health_platform_csrf")?.value || "";
+  const csrf = storage.cookies.find((cookie) => cookie.name === "health_platform_csrf_v2")?.value || "";
   const response = await request.post("/api/auth/login", {
     headers: csrf ? { "x-csrf-token": csrf } : {},
     data: { username, password: "123456" }
@@ -36,7 +36,7 @@ async function apiLogin(request, username) {
   expect(response.ok()).toBe(true);
   await response.json();
   const authenticatedStorage = await request.storageState();
-  const authenticatedCsrf = authenticatedStorage.cookies.find((cookie) => cookie.name === "health_platform_csrf")?.value || "";
+  const authenticatedCsrf = authenticatedStorage.cookies.find((cookie) => cookie.name === "health_platform_csrf_v2")?.value || "";
   expect(authenticatedCsrf).not.toBe("");
   return { "x-csrf-token": authenticatedCsrf };
 }
@@ -52,14 +52,45 @@ test("five identity types receive only their policy menu and reject a forbidden 
   for (const identity of identities) {
     await login(page, identity.username, identity.home);
     await expect(page.locator(".auth-bar")).toBeVisible();
+    await expect(page.locator(".navigation-sidebar")).toHaveAttribute("aria-label", "分级功能导航");
+    await expect(page.locator(`.navigation-sidebar a[data-navigation-page='${identity.home}']`)).toHaveAttribute("aria-current", "page");
     await expect(page.locator(`.auth-bar a[href='./${identity.forbidden}']`)).toHaveCount(0);
+    const sidebarBox = await page.locator(".navigation-sidebar").boundingBox();
+    expect(sidebarBox.x).toBe(0);
+    expect(sidebarBox.width).toBeGreaterThan(250);
+    await expect(page.locator("html")).toHaveAttribute("data-navigation-shell", "ready");
     await page.goto(`/${identity.forbidden}`);
     await expect(page).toHaveURL(new RegExp(`${identity.home.replace(".", "\\.")}\\?denied=${identity.forbidden.replace(".", "\\.")}$`));
   }
 });
 
+test("specialist accounts see bounded functions and can search the unified sidebar", async ({ page }) => {
+  await login(page, "nurse", "internet-nursing.html");
+  await expect(page.locator(".navigation-identity")).toContainText("互联网护理岗位");
+  await expect(page.locator(".navigation-identity")).toContainText("DEMO-NURSE");
+  await expect(page.locator(".navigation-identity")).toContainText("10 项功能");
+  await expect(page.locator(".navigation-primary a[data-navigation-page]")).toHaveCount(10);
+  await expect(page.locator(".navigation-primary a[data-navigation-page='blood.html']")).toHaveCount(0);
+  await expect(page.locator(".navigation-primary a[data-navigation-page='internet-nursing.html']")).toHaveAttribute("aria-current", "page");
+
+  const search = page.locator("#health-navigation-search");
+  await search.fill("体检");
+  await expect(page.locator(".navigation-search-status")).toHaveText("找到 2 项");
+  await expect(page.locator(".navigation-group-links > a:visible")).toHaveCount(2);
+  await expect(page.locator(".navigation-group-links > a:visible").first()).toContainText("健康体检");
+  await search.clear();
+  await expect(page.locator(".navigation-search-status")).toHaveText("共 10 项");
+
+  await login(page, "blood_quality", "blood.html");
+  await expect(page.locator(".navigation-identity")).toContainText("血液冷链质控岗位");
+  await expect(page.locator(".navigation-identity")).toContainText("7 项功能");
+  await expect(page.locator(".navigation-primary a[data-navigation-page]")).toHaveCount(7);
+  await expect(page.locator(".navigation-primary a[data-navigation-page='index.html']")).toHaveCount(0);
+  await expect(page.locator(".navigation-primary a[data-navigation-page='blood.html']")).toHaveAttribute("aria-current", "page");
+});
+
 test("commission user reaches the governance dashboard and opens maintenance", async ({ page }) => {
-  test.setTimeout(90_000);
+  test.setTimeout(150_000);
   await login(page, "health", "index.html");
   await expect(page.locator("#data-source")).toHaveText("本地服务");
 
@@ -70,6 +101,7 @@ test("commission user reaches the governance dashboard and opens maintenance", a
   await expect(page.locator("[data-chronic-risk-resident='r1']")).toContainText("逾期随访");
 
   await page.goto("/platform.html");
+  await page.getByRole("button", { name: "显示全部", exact: true }).click();
 
   await expect(page.getByRole("heading", { name: "统一应用目录" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "医疗机构信用评价" })).toBeVisible();
@@ -101,6 +133,17 @@ test("commission user reaches the governance dashboard and opens maintenance", a
   await expect(page.locator("#identity-lifecycle-metrics")).toContainText("仅限本地开发和测试");
   await expect(page.locator("#identity-lifecycle-metrics")).toContainText("会话保留");
   await expect(page.locator("#identity-lifecycle-metrics")).toContainText("最近清理 0 条");
+  await expect(page.locator("#identity-account-list .identity-account-row")).toHaveCount(17);
+  const nurseAccount = page.locator("#identity-account-list .identity-account-row", { hasText: "DEMO-NURSE" });
+  await expect(nurseAccount).toContainText("10 项功能");
+  await expect(nurseAccount).toContainText("外部身份待绑定");
+  await page.locator("#identity-account-search").fill("输血科");
+  await expect(page.locator("#identity-account-list .identity-account-row")).toHaveCount(2);
+  await expect(page.locator("#identity-account-filter-status")).toHaveText("当前显示 2/17 个账号");
+  await page.locator("#identity-account-search").fill("");
+  await page.locator("#identity-account-role-filter").selectOption("institution");
+  await expect(page.locator("#identity-account-list .identity-account-row")).toHaveCount(7);
+  await page.locator("#identity-account-role-filter").selectOption("all");
 
   await page.goto("/workbench.html");
   await expect(page.locator("#system-readiness")).toBeVisible({ timeout: 30_000 });
@@ -110,6 +153,7 @@ test("commission user reaches the governance dashboard and opens maintenance", a
   await expect(page.locator("#system-readiness")).toContainText("HIS/EMR/LIS/PACS/心电");
 
   await page.goto("/platform.html");
+  await page.getByRole("button", { name: "显示全部", exact: true }).click();
 
   await expect(page.locator("#application-catalog tbody tr")).toHaveCount(6, { timeout: 30_000 });
   const applicationRow = page.locator("#application-catalog tbody tr", { hasText: "全民健康信息平台一、二期" });

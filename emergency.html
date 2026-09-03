@@ -26,7 +26,7 @@
       <article class="panel" data-emergency-panel="citizen-call">
         <div class="panel-title"><h2>居民辅助呼救</h2><span>位置与症状补充</span></div>
         <form id="emergency-call-form" class="filter-grid">
-          <label>现场地址<input name="address" required value="区域中山区人民路示范点" /></label>
+          <label>现场地址<input name="address" required value="示范地区人民路服务点" /></label>
           <label>主要症状<textarea name="chiefComplaint" required>胸痛、呼吸困难</textarea></label>
           <label>患者姓名<input name="patientName" value="待核实患者" /></label>
           <label>患者人数<input name="patientCount" type="number" min="1" max="99" value="1" /></label>
@@ -39,7 +39,7 @@
         <div class="panel-title"><h2>智能 SOS 自动呼救</h2><span>确认后提交 120 队列并打开系统拨号</span></div>
         <form id="emergency-sos-form" class="filter-grid">
           <label>突发信号<select name="detectedSignal"><option value="collapse">疑似晕厥/倒地</option><option value="chest-pain">突发胸痛</option><option value="breathing-difficulty">呼吸困难</option><option value="stroke-suspected">疑似卒中</option><option value="manual-sos">手动 SOS</option></select></label>
-          <label>现场地址<input name="address" required value="区域中山区人民路示范点" /></label>
+          <label>现场地址<input name="address" required value="示范地区人民路服务点" /></label>
           <label>简要症状<input name="chiefComplaint" required value="突发疾病，已触发 SOS" /></label>
           <label>纬度<input name="latitude" type="number" step="0.000001" value="38.920000" required /></label>
           <label>经度<input name="longitude" type="number" step="0.000001" value="121.650000" required /></label>
@@ -73,7 +73,7 @@
       <div class="portal-grid lifechain-grid">
         <article class="lifechain-card"><h3>2. 预授权设备自动 SOS</h3><p>仅已由患者明确授权的设备可基于高风险信号自动提交 120 信息队列。</p>
           <form id="lifechain-authorization-form" class="filter-grid compact-form"><label>设备编号<input name="deviceId" required value="wearable-demo-01" /></label><label class="sos-confirm"><input name="confirmed" type="checkbox" value="true" required /> 我确认启用自动 SOS 预授权</label><button type="submit">保存预授权</button></form>
-          <form id="lifechain-device-sos-form" class="filter-grid compact-form"><label>风险信号<select name="detectedSignal"><option value="fall-detected">跌倒识别</option><option value="cardiac-risk">心脏风险</option><option value="hypoxia-risk">低氧风险</option><option value="no-motion">持续无活动</option></select></label><label>风险分<input name="riskScore" type="number" min="60" max="100" value="82" required /></label><label>设备编号<input name="deviceId" required value="wearable-demo-01" /></label><label>位置<input name="address" required value="区域中山区人民路示范点" /></label><label>纬度<input name="latitude" type="number" step="0.000001" value="38.920000" required /></label><label>经度<input name="longitude" type="number" step="0.000001" value="121.650000" required /></label><label>网络<select name="networkStatus"><option value="online">正常网络</option><option value="weak">弱网</option><option value="offline">离线降级</option></select></label><button type="submit" class="sos-button">模拟设备自动 SOS</button></form>
+          <form id="lifechain-device-sos-form" class="filter-grid compact-form"><label>风险信号<select name="detectedSignal"><option value="fall-detected">跌倒识别</option><option value="cardiac-risk">心脏风险</option><option value="hypoxia-risk">低氧风险</option><option value="no-motion">持续无活动</option></select></label><label>风险分<input name="riskScore" type="number" min="60" max="100" value="82" required /></label><label>设备编号<input name="deviceId" required value="wearable-demo-01" /></label><label>位置<input name="address" required value="示范地区人民路服务点" /></label><label>纬度<input name="latitude" type="number" step="0.000001" value="38.920000" required /></label><label>经度<input name="longitude" type="number" step="0.000001" value="121.650000" required /></label><label>网络<select name="networkStatus"><option value="online">正常网络</option><option value="weak">弱网</option><option value="offline">离线降级</option></select></label><button type="submit" class="sos-button">模拟设备自动 SOS</button></form>
         </article>
         <article class="lifechain-card"><h3>4. 家属急救协同</h3><p>只向患者授权的紧急联系人生成通知任务；真实短信/电话需接入签约通道。</p>
           <form id="lifechain-family-form" class="filter-grid compact-form"><label>联系人<input name="contactName" required value="紧急联系人" /></label><label>关系<input name="relation" value="家属" /></label><label>脱敏电话<input name="phoneMasked" required value="138****8000" /></label><label class="sos-confirm"><input name="confirmed" type="checkbox" value="true" required /> 我确认授权紧急通知</label><button type="submit">保存联系人</button></form>

@@ -305,8 +305,20 @@ const ROUTE_ORDER = Object.freeze([
     "id": "public-health-05"
   },
   {
+    "domain": "public-health",
+    "id": "public-health-06"
+  },
+  {
     "domain": "care-coordination",
     "id": "care-coordination-10"
+  },
+  {
+    "domain": "care-coordination",
+    "id": "work-center-01"
+  },
+  {
+    "domain": "identity-security",
+    "id": "identity-security-account-lifecycle"
   },
   {
     "domain": "identity-security",
@@ -352,7 +364,8 @@ function createPlatformApiRouter(runtimeContexts) {
     if (segmentsById.has(segment.id)) throw new TypeError(`duplicate route segment id: ${segment.id}`);
     segmentsById.set(segment.id, segment);
   }
-  for (const segment of care_coordination.createRouteSegments(runtimeContexts.forDomain("care-coordination"))) {
+  for (const rawSegment of care_coordination.createRouteSegments(runtimeContexts.forDomain("care-coordination"))) {
+    const segment = attachRouteSubdomain(rawSegment);
     if (segmentsById.has(segment.id)) throw new TypeError(`duplicate route segment id: ${segment.id}`);
     segmentsById.set(segment.id, segment);
   }
@@ -365,7 +378,11 @@ function createPlatformApiRouter(runtimeContexts) {
     if (segmentsById.has(segment.id)) throw new TypeError(`duplicate route segment id: ${segment.id}`);
     segmentsById.set(segment.id, segment);
   }
-  for (const segment of identity_security.createRouteSegments(runtimeContexts.forDomain("identity-security"))) {
+  for (const rawSegment of identity_security.createRouteSegments(runtimeContexts.forDomain("identity-security"), {
+    regionalContext: runtimeContexts.regional,
+    environment: process.env
+  })) {
+    const segment = attachRouteSubdomain(rawSegment);
     if (segmentsById.has(segment.id)) throw new TypeError(`duplicate route segment id: ${segment.id}`);
     segmentsById.set(segment.id, segment);
   }

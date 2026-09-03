@@ -9,7 +9,8 @@ const {
   loginRedirect
 } = require("./static-page-guard");
 
-const BROWSER_SESSION_COOKIE = "health_city_browser_session";
+const BROWSER_SESSION_COOKIE = "health_platform_session_v2";
+const LEGACY_BROWSER_SESSION_COOKIES = Object.freeze(["health_city_browser_session"]);
 
 function cookieValue(req, name) {
   for (const cookie of String(req.headers.cookie || "").split(";")) {
@@ -26,8 +27,11 @@ function createAuthorizationHttpRuntime(options = {}) {
   if (typeof verifyToken !== "function" || typeof sessionStore !== "function") {
     throw new TypeError("authorization HTTP runtime requires token verification and session store");
   }
+  const sessionCookieToken = (req) => cookieValue(req, BROWSER_SESSION_COOKIE)
+    || LEGACY_BROWSER_SESSION_COOKIES.map((name) => cookieValue(req, name)).find(Boolean)
+    || "";
   const browserSession = (req) => {
-    const verified = verifyToken(cookieValue(req, BROWSER_SESSION_COOKIE));
+    const verified = verifyToken(sessionCookieToken(req));
     return verified ? sessionStore().get(verified.sessionId) || null : null;
   };
   return Object.freeze({
@@ -35,7 +39,7 @@ function createAuthorizationHttpRuntime(options = {}) {
     async hydrateStaticRequestSession(req) {
       const store = sessionStore();
       if (typeof store.hydrate !== "function") return null;
-      const verified = verifyToken(cookieValue(req, BROWSER_SESSION_COOKIE));
+      const verified = verifyToken(sessionCookieToken(req));
       return verified ? store.hydrate(verified.sessionId) : null;
     },
     evaluateStaticRequest(req) {

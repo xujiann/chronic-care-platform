@@ -1384,7 +1384,7 @@ async function acknowledgeCountySla(state, id, mode) {
 async function archiveReferralSignoff(state, role) {
   const payload = {
     signerName: "现场联调负责人",
-    signerOrg: "中山区县域医共体",
+    signerOrg: "示范县域医共体",
     evidenceNote: `${role} onsite signoff archived from county command board`,
     attachmentName: `${role}-signoff-screenshot.png`,
     evidenceType: "onsite-signoff"

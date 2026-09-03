@@ -82,6 +82,7 @@ function authorize(user, policy, resource = {}) {
 function safeAuthorizationContext(user, access = {}) {
   const safeUser = {
     id: String(user?.id || ""),
+    accountCode: String(user?.accountCode || ""),
     username: String(user?.username || ""),
     name: String(user?.name || ""),
     role: String(user?.role || ""),

@@ -21,6 +21,7 @@ const HIGH_RISK = require("../config/high-risk-api-authorization.json").routes;
 const PUBLIC_ROUTES = Object.freeze([
   { method: "GET", path: "/api/live", owner: "T01", purpose: "liveness-probe" },
   { method: "GET", path: "/api/health", owner: "T01", purpose: "readiness-probe" },
+  { method: "GET", path: "/api/auth/login-catalog", owner: "T01", purpose: "list-development-login-accounts" },
   { method: "POST", path: "/api/auth/login", owner: "T01", purpose: "establish-session" },
   { method: "POST", path: "/api/auth/phone-code", owner: "T01", purpose: "request-phone-verification" },
   { method: "POST", path: "/api/auth/phone-login", owner: "T01", purpose: "establish-phone-session" }

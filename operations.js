@@ -2026,7 +2026,8 @@ function renderHandoverOwnerMatrix(ownerMatrix, filteredSnapshots) {
 async function signoffOperationsHandover(items) {
   const rows = Array.isArray(items) ? items : [];
   if (!rows.length) return;
-  const note = window.prompt("请输入本班交接备注", "已确认交接事项、责任组、SLA和下一班关注点。") || "已确认交接事项、责任组、SLA和下一班关注点。";
+  const note = await window.HealthStructuredDialog.prompt({ title: "本班交接备注", defaultValue: "已确认交接事项、责任组、SLA和下一班关注点。", minLength: 2 });
+  if (note === null) return;
   const payload = {
     shift: new Date().toLocaleString("zh-CN", { hour12: false }),
     itemIds: rows.map((item) => item.id),

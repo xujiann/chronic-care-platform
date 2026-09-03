@@ -125,7 +125,7 @@ input:focus-visible {
 .primary-action,
 .secondary-action,
 .danger-action {
-  min-height: 44px;
+  min-height: 45px;
   border: 0;
   cursor: pointer;
 }

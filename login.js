@@ -10,8 +10,8 @@
   const params = new URLSearchParams(location.search);
   const requestedPage = policy.normalizePageName(params.get("redirect") || "");
   const requestedPolicy = policy.pageCatalog[requestedPage];
-  const allAccounts = auth.demoUsers || [];
-  const accounts = requestedPolicy && requestedPage !== "health-city.html"
+  let allAccounts = (auth.demoUsers || []).filter((user) => user.catalogVisible !== false);
+  let accounts = requestedPolicy && requestedPage !== "health-city.html"
     ? policy.eligibleUsersForPage(requestedPage, allAccounts)
     : allAccounts;
   let selectedRole = accounts[0]?.role || "";
@@ -26,8 +26,9 @@
 
   function accountTypeLabel(user) {
     const labels = {
-      manager: "管理岗位", doctor: "医生", nurse: "护士", blood_technologist: "输血技师",
-      blood_quality: "血液质控", resident: "居民", guardian: "监护代办"
+      manager: "管理岗位", doctor: "医生", nurse: "护士", pharmacist: "药师", technician: "医技人员",
+      blood_technologist: "输血技师", blood_quality: "血液质控", reviewer: "经办审核",
+      settlement: "结算经办", coordinator: "协同岗位", clinician: "临床岗位", resident: "居民", guardian: "监护代办"
     };
     return labels[policy.normalizeAccountType(user)] || user.roleName || "授权岗位";
   }
@@ -63,7 +64,10 @@
 
   function renderAccountCards() {
     const roleAccounts = accounts.filter((user) => user.role === selectedRole);
-    byId("demo-accounts").innerHTML = roleAccounts.map((user) => `<button type="button" data-user="${escapeText(user.username)}" aria-pressed="${user.username === selectedUsername}"><strong>${escapeText(accountTypeLabel(user))}</strong><span>${escapeText(user.roleName)}</span><small>${escapeText(user.orgName || "未绑定机构")}</small></button>`).join("");
+    byId("demo-accounts").innerHTML = roleAccounts.map((user) => {
+      const functionCount = policy.pagesForUser(user, {}, { includeHome: true }).length;
+      return `<button type="button" data-user="${escapeText(user.username)}" aria-pressed="${user.username === selectedUsername}"><strong>${escapeText(accountTypeLabel(user))}</strong><span>${escapeText(user.roleName)}</span><small>${escapeText(user.orgName || "未绑定机构")} · ${escapeText(user.username)}</small><em>${functionCount} 项授权功能</em></button>`;
+    }).join("");
     document.querySelectorAll("[data-user]").forEach((button) => button.addEventListener("click", () => selectAccount(button.dataset.user)));
   }
 
@@ -74,9 +78,13 @@
     byId("access-preview-role").textContent = `${policy.roleLabels[user.role]} · ${accountTypeLabel(user)}`;
     byId("access-preview-organization").textContent = `所属机构：${user.orgName || "未绑定机构"}`;
     byId("access-preview-scope").textContent = `数据范围：${user.dataScope || "未授予"}`;
-    const pages = policy.pagesForUser(user).slice(0, 12);
-    byId("access-preview-functions").innerHTML = pages.length
-      ? pages.map((item) => `<span>${escapeText(item.label)}</span>`).join("")
+    const pages = policy.pagesForUser(user, {}, { includeHome: true });
+    const visiblePages = pages.slice(0, 12);
+    const home = policy.pageCatalog[policy.homeForUser(user)]?.label || "身份首页";
+    const groups = new Set(pages.map((item) => item.group));
+    byId("access-preview-summary").textContent = `共 ${pages.length} 项功能 · ${groups.size} 个功能分组 · 首页：${home}`;
+    byId("access-preview-functions").innerHTML = visiblePages.length
+      ? `${visiblePages.map((item) => `<span>${escapeText(item.label)}</span>`).join("")}${pages.length > visiblePages.length ? `<span>还有 ${pages.length - visiblePages.length} 项</span>` : ""}`
       : "<em>该账号没有可用业务功能</em>";
   }
 
@@ -107,11 +115,27 @@
       ? "演示居民验证码为 888888，仅用于本地样例环境。"
       : "验证码仅发送至已完成实名绑定的手机号。";
     if (demoMode) {
-      byId("login-user").innerHTML = accounts.map((user) => `<option value="${escapeText(user.username)}">${escapeText(user.roleName)} · ${escapeText(user.orgName || user.name)}</option>`).join("");
-      renderIdentityTypes();
-      renderAccountCards();
-      selectAccount(selectedUsername);
+      renderAccountCatalog();
+      auth.getLoginAccountCatalog().then((catalog) => {
+        if (!Array.isArray(catalog) || !catalog.length) return;
+        allAccounts = catalog;
+        accounts = requestedPolicy && requestedPage !== "health-city.html"
+          ? policy.eligibleUsersForPage(requestedPage, allAccounts)
+          : allAccounts;
+        selectedRole = accounts.some((user) => user.role === selectedRole) ? selectedRole : (accounts[0]?.role || "");
+        selectedUsername = accounts.some((user) => user.username === selectedUsername)
+          ? selectedUsername
+          : (accounts.find((user) => user.role === selectedRole)?.username || accounts[0]?.username || "");
+        renderAccountCatalog();
+      });
     }
+  }
+
+  function renderAccountCatalog() {
+    byId("login-user").innerHTML = accounts.map((user) => `<option value="${escapeText(user.username)}">${escapeText(user.roleName)} · ${escapeText(user.orgName || user.name)} · ${escapeText(user.username)}</option>`).join("");
+    renderIdentityTypes();
+    renderAccountCards();
+    selectAccount(selectedUsername);
   }
 
   function setPhoneCodeCooldown(seconds) {

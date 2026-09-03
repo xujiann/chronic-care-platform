@@ -42,18 +42,14 @@ test("citizen mobile action dock remembers and resets the current service order"
   await expect(actionDock).not.toContainText("最近使用：");
 
   await page.goto("/citizen.html?client=mini-program&page=registration&compact=1");
-  const serviceRail = page.locator("#mobile-service-rail .mobile-service-rail-scroll");
-  const currentRegistration = serviceRail.locator('[data-mobile-rail-tab="registration"][aria-current="page"]');
+  await expect(page.locator(".navigation-toggle")).toBeVisible();
+  await page.locator(".navigation-toggle").click();
+  const navigationSidebar = page.locator(".navigation-sidebar");
+  await expect(navigationSidebar).toBeVisible();
+  await expect.poll(() => navigationSidebar.evaluate((element) => element.getBoundingClientRect().left)).toBe(0);
+  const currentRegistration = page.locator('.navigation-local [data-service-tab="registration"][aria-current="page"]');
   await expect(currentRegistration).toBeVisible();
-  await expect.poll(() => serviceRail.evaluate((element) => element.scrollLeft)).toBeGreaterThan(0);
-  const registrationIsInsideRail = await serviceRail.evaluate((element) => {
-    const current = element.querySelector('[data-mobile-rail-tab="registration"][aria-current="page"]');
-    if (!current) return false;
-    const railBox = element.getBoundingClientRect();
-    const currentBox = current.getBoundingClientRect();
-    return currentBox.left >= railBox.left - 1 && currentBox.right <= railBox.right + 1;
-  });
-  expect(registrationIsInsideRail).toBe(true);
+  await expect(page.locator("#mobile-service-rail")).toBeHidden();
 
   const overflow = await page.evaluate(() => ({
     width: document.documentElement.clientWidth,

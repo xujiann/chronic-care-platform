@@ -79,24 +79,24 @@
     if (!sample) return;
     const payload = { action };
     if (action === "record-joint-test") {
-      payload.executionId = window.prompt("现场联调执行单号", sample.review?.executionId || "") || "";
-      if (!payload.executionId.trim()) return;
-      payload.evidenceRef = window.prompt("接收端回执或证据编号", sample.review?.evidenceRef || "") || "";
-      if (!payload.evidenceRef.trim()) return;
+      payload.executionId = await window.HealthStructuredDialog.prompt({ title: "现场联调执行单号", defaultValue: sample.review?.executionId || "", multiline: false });
+      if (payload.executionId === null) return;
+      payload.evidenceRef = await window.HealthStructuredDialog.prompt({ title: "接收端回执或证据编号", defaultValue: sample.review?.evidenceRef || "", multiline: false });
+      if (payload.evidenceRef === null) return;
       payload.results = {
         success: window.confirm("成功场景是否通过？"),
         failure: window.confirm("失败场景是否按预期拒绝并留痕？"),
         retry: window.confirm("重试与幂等场景是否通过？"),
         reconciliation: window.confirm("回执对账场景是否通过？")
       };
-      payload.note = window.prompt("联调结论", "已按合成样例执行成功、失败、重试和对账验证。") || "";
-      if (!payload.note.trim()) return;
+      payload.note = await window.HealthStructuredDialog.prompt({ title: "联调结论", defaultValue: "已按合成样例执行成功、失败、重试和对账验证。", minLength: 6 });
+      if (payload.note === null) return;
     } else if (action === "review-joint-test") {
-      payload.note = window.prompt("独立复核意见", "已核对执行单、接收端回执和四类场景结果，同意通过。") || "";
-      if (!payload.note.trim()) return;
+      payload.note = await window.HealthStructuredDialog.prompt({ title: "独立复核意见", defaultValue: "已核对执行单、接收端回执和四类场景结果，同意通过。", minLength: 6 });
+      if (payload.note === null) return;
     } else if (action === "revoke-joint-test") {
-      payload.note = window.prompt("撤销原因", "接收端配置或证据发生变化，需要重新联调。") || "";
-      if (!payload.note.trim()) return;
+      payload.note = await window.HealthStructuredDialog.prompt({ title: "撤销原因", defaultValue: "接收端配置或证据发生变化，需要重新联调。", minLength: 6 });
+      if (payload.note === null) return;
     } else {
       return;
     }

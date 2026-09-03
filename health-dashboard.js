@@ -750,7 +750,7 @@ function buildDashboardJurisdictionRow(district, context = {}) {
   const dailyReports = context.dailyReports || [];
   const openActions = context.openActions || [];
   const scopedResources = all ? resources : resources.filter((item) => item.region === district);
-  const scopedOrganizations = all ? organizations : organizations.filter((item) => dashboardDistrictName(item.name) === district || (item.parentCode === "ORG-DIST-ZS" && district === "中山区"));
+  const scopedOrganizations = all ? organizations : organizations.filter((item) => dashboardDistrictName(item.name) === district || (item.parentCode === "ORG-DIST-ZS" && district === "示范区"));
   const scopedReports = all ? dailyReports : dailyReports.filter((item) => item.region === district);
   const scopedActions = all ? openActions : openActions.filter((item) => item.region === district || JSON.stringify(item).includes(district));
   const serviceTotals = scopedReports.reduce((totals, item) => {

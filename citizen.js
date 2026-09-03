@@ -29,7 +29,7 @@ const fallbackState = {
       gender: "男",
       birthDate: "1968-02-11",
       phone: "DEMO-MOBILE-R1",
-      organization: "青泥洼桥社区卫生服务中心",
+      organization: "示范社区卫生服务中心",
       familyDoctor: "刘医生",
       address: "演示地址A",
       metrics: { systolic: 166, diastolic: 96, glucose: 6.8, bmi: 29.4 }
@@ -45,7 +45,7 @@ const fallbackState = {
     {
       id: "esp-demo-community",
       name: "社区助医陪诊服务站",
-      district: "中山区",
+      district: "示范区",
       published: true,
       trainedWorkers: 8,
       pricing: { halfDayFee: 120 }
@@ -77,7 +77,7 @@ const fallbackState = {
     { id: "p2fdt-chronic", name: "慢病连续管理签约模板", requiredFields: ["residentId", "diseaseType", "teamId", "packageId"], reviewSteps: ["resident-apply", "team-assessment", "institution-review"], status: "active" }
   ],
   phase2FamilyDoctorTeams: [
-    { id: "p2fdtm-qnw", teamName: "青泥洼桥社区家庭医生团队", institutionCode: "MR3", institutionName: "青泥洼桥社区卫生服务中心", leaderDoctorId: "doc-liu", leaderDoctorName: "刘医生", doctorIds: ["doc-liu"], status: "active" }
+    { id: "p2fdtm-qnw", teamName: "示范社区家庭医生团队", institutionCode: "MR3", institutionName: "示范社区卫生服务中心", leaderDoctorId: "doc-liu", leaderDoctorName: "刘医生", doctorIds: ["doc-liu"], status: "active" }
   ],
   phase2FamilyDoctorServicePackages: [
     { id: "p2fdp-basic", packageCode: "FD-PKG-BASIC", templateId: "p2fdt-basic", name: "基础公卫签约包", serviceItems: ["健康档案复核", "年度健康评估"], visitFrequency: "quarterly", status: "active" },
@@ -109,7 +109,7 @@ const emrRecords = [
   {
     residentId: "r1",
     date: "2026-04-12",
-    institution: "青泥洼桥社区卫生服务中心",
+    institution: "示范社区卫生服务中心",
     department: "全科门诊",
     type: "随访",
     diagnosis: "高血压随访",
@@ -131,7 +131,7 @@ const emrRecords = [
   {
     residentId: "r4",
     date: "2026-03-30",
-    institution: "青泥洼桥社区卫生服务中心",
+    institution: "示范社区卫生服务中心",
     department: "家庭医生工作室",
     type: "签约服务",
     diagnosis: "高血压稳定管理",
@@ -146,7 +146,7 @@ const personalHealthData = {
     { residentId: "r1", date: "2026-05-21", name: "肾功能", result: "未见明显异常", source: "区域中心医院" },
     { residentId: "r1", date: "2026-05-21", name: "心电图", result: "窦性心律", source: "区域中心医院" },
     { residentId: "r2", date: "2026-05-18", name: "空腹血糖", result: "7.8 mmol/L，偏高", source: "区域医科大学附属医院" },
-    { residentId: "r4", date: "2026-03-30", name: "血压复测", result: "148/88 mmHg", source: "青泥洼桥社区卫生服务中心" }
+    { residentId: "r4", date: "2026-03-30", name: "血压复测", result: "148/88 mmHg", source: "示范社区卫生服务中心" }
   ],
   medications: [
     { residentId: "r1", date: "2026-05-21", name: "苯磺酸氨氯地平片", usage: "每日 1 次", source: "心内科门诊" },
@@ -163,7 +163,7 @@ const personalHealthData = {
   ],
   admissions: [
     { residentId: "r1", date: "2024-06-18", name: "日间观察", result: "血压波动观察，未住院", source: "区域中心医院" },
-    { residentId: "r3", date: "2025-12-09", name: "体检中心", result: "年度体检，无住院记录", source: "甘井子区人民医院" }
+    { residentId: "r3", date: "2025-12-09", name: "体检中心", result: "年度体检，无住院记录", source: "示范区人民医院" }
   ],
   imaging: [
     { residentId: "r1", date: "2026-05-21", name: "胸部 CT 影像索引", result: "影像号 IMG-DEMO-20260521，结论摘要已归档，原始 DICOM 待院内 PACS 授权调阅。", source: "区域中心医院 PACS", meta: { attachmentType: "影像", fileName: "IMG-DEMO-20260521.dcm", accessMode: "院内授权调阅" } },
@@ -399,7 +399,7 @@ const registrationSchedules = [
   { id: "reg-sch-cardio-am", hospital: "区域中心医院", department: "心内科", doctor: "王医生", date: todayOffset(2), period: "上午", remaining: 6, fee: 18, cancelBeforeHours: 24, source: "医院号源池", tags: ["高血压复诊", "支持陪诊"] },
   { id: "reg-sch-cardio-waitlist-am", hospital: "区域中心医院", department: "心内科", doctor: "孙医生", date: todayOffset(1), period: "上午", remaining: 0, fee: 18, cancelBeforeHours: 12, source: "医院号源池", tags: ["号源已满", "支持候补"] },
   { id: "reg-sch-endocrine-pm", hospital: "区域医科大学附属医院", department: "内分泌科", doctor: "赵医生", date: todayOffset(3), period: "下午", remaining: 4, fee: 22, cancelBeforeHours: 12, source: "医院号源池", tags: ["糖尿病复诊", "检查解读"] },
-  { id: "reg-sch-community-am", hospital: "青泥洼桥社区卫生服务中心", department: "全科门诊", doctor: "刘医生", date: todayOffset(1), period: "上午", remaining: 12, fee: 8, cancelBeforeHours: 4, source: "基层预约池", tags: ["家庭医生", "慢病随访"] }
+  { id: "reg-sch-community-am", hospital: "示范社区卫生服务中心", department: "全科门诊", doctor: "刘医生", date: todayOffset(1), period: "上午", remaining: 12, fee: 8, cancelBeforeHours: 4, source: "基层预约池", tags: ["家庭医生", "慢病随访"] }
 ];
 
 const citizenModuleInterfaces = [
@@ -544,7 +544,7 @@ let citizenOperationsPublicFeed = {
   ],
   hospitalServices: [
     { id: "cop-hospital-mr1", institutionName: "区域中心医院", enabledServices: ["appointment", "report-query", "internet-nursing", "escort"], status: "active-demo", launchScope: "white-list-demo", productionReady: false },
-    { id: "cop-hospital-mr3", institutionName: "青泥洼桥社区卫生服务中心", enabledServices: ["family-doctor", "chronic-followup", "internet-nursing"], status: "active-demo", launchScope: "white-list-demo", productionReady: false }
+    { id: "cop-hospital-mr3", institutionName: "示范社区卫生服务中心", enabledServices: ["family-doctor", "chronic-followup", "internet-nursing"], status: "active-demo", launchScope: "white-list-demo", productionReady: false }
   ],
   boundary: "当前为演示公开信息，正式服务范围、协议和支付退费规则以现场联调及审核发布版本为准。"
 };
@@ -2179,7 +2179,8 @@ function bindResidentTaskActions() {
     const button = event.target.closest("[data-resident-task-action]");
     if (!button) return;
     const action = button.dataset.residentTaskAction;
-    const comment = action === "resident-confirm" ? "居民端确认服务安排" : window.prompt("请填写处理说明", defaultResidentTaskComment(action)) || defaultResidentTaskComment(action);
+    const comment = action === "resident-confirm" ? "居民端确认服务安排" : await window.HealthStructuredDialog.prompt({ title: "服务待办处理说明", defaultValue: defaultResidentTaskComment(action), minLength: 2 });
+    if (comment === null) return;
     button.disabled = true;
     try {
       await submitResidentTaskAction(button.dataset.taskId, button.dataset.taskCollection, {
@@ -3813,7 +3814,8 @@ function bindLifecycleActionButtons() {
       : lifecycleAction?.action || "请家庭医生协助处理生命周期健康管理待办";
     const comment = actionType === "acknowledge"
       ? defaultComment
-      : window.prompt("请补充提醒内容", defaultComment) || defaultComment;
+      : await window.HealthStructuredDialog.prompt({ title: "提醒医生", label: "提醒内容", defaultValue: defaultComment, minLength: 2 });
+    if (comment === null) return;
     button.disabled = true;
     try {
       await submitLifecycleAction(actionId, { action: actionType, comment });

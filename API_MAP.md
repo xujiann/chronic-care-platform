@@ -35,7 +35,7 @@
 
 ## 2026-08-31 API 当前事实机器对账
 
-生产 API 目录当前为 617 项，其中 354 个写入口、317 个 endpoint 仍缺直接行为证明、总 `review-required` 为 319；首批生产范围的 `apiReviewRequired` 已为 0，但整体仍为 `FROZEN-NO-GO`。招标需求复核、脱敏批次登记和交付治理入口均保持 `productionReady=false`，不改变首批冻结范围。
+生产 API 目录当前为 629 项，其中 362 个写入口、325 个 endpoint 仍缺直接行为证明、总 `review-required` 为 327；首批生产范围的 `apiReviewRequired` 已为 0，但整体仍为 `FROZEN-NO-GO`。招标需求复核、脱敏批次登记和交付治理入口均保持 `productionReady=false`，不改变首批冻结范围。
 
 ## 2026-08-31 首发迁移计划不改变 API
 
@@ -167,7 +167,7 @@ HTTP request
 - `GET /api/state` 保持 method/path、允许角色、状态码和顶层集合兼容。鉴权与既有角色范围投影完成后，`authUsers` 专用投影删除 `password`、`passwordHash`，保留账号、角色、机构、状态和 `externalSubject` 等管理字段；读取不修改权威快照。该增量只关闭认证口令泄露，commission 其余全状态最小权限债务仍为 `NO-GO`。
 - `npm run api:authorization-matrix` 从模块化路由源码生成/校验 owner、身份、角色、范围、用途和 18 条高风险接口唯一性。
 - `npm run api:authentication-evidence` 校验 13 项认证合同的 owner、mechanism、credential source、required/optional/none、replay/CSRF、scope、实现锚点和可执行负向测试。其中 SMS callback 从现有幂等合同派生；原 13 个未分类 key 中 12 个真实入口已分类，T10 cutover pack 绑定 commission 直接拒绝证据，1 个公卫词法误配已从 inventory 删除，未分类认证为 0。
-- `npm run api:production-catalog` 合并上述授权矩阵与同一 route source inventory 的字面条件；当前 617 项全部 `NO-GO`。354 个写接口中 37 个完整 endpoint 有直接幂等行为合同，317 个仍缺 endpoint 级行为证明；2 个转诊 action-slice 不晋升通用 endpoint，退款 runtime-role variant 仍复核，因此总 `review-required` 为 319。
+- `npm run api:production-catalog` 合并上述授权矩阵与同一 route source inventory 的字面条件；当前 629 项全部 `NO-GO`。362 个写接口中 37 个完整 endpoint 有直接幂等行为合同，325 个仍缺 endpoint 级行为证明；2 个转诊 action-slice 不晋升通用 endpoint，退款 runtime-role variant 仍复核，因此总 `review-required` 为 327。
 - `npm run api:idempotency-evidence` 校验 39 份证据合同且显式待补证明为 0。招标需求复核、脱敏批次登记和交付治理入口已绑定角色、操作者、幂等键和 CAS，将领域状态、回执与审计一次持久化，并以固定脱敏错误覆盖输入、冲突、审计和存储失败。其余完整合同绑定各入口的身份、职责/资源范围、原响应或精确结果回放、CAS、单次持久化与稳定错误负测。所有合同保持 `productionReady=false`，进程锁与 SQLite CAS 不等于跨实例 exactly-once。
 - 身份/SMS HTTP 路径保持不变；组合根已为短信发送生成随机 request ID，适配器现在拒绝缺失幂等 ID，OIDC refresh 返回的 ID token 必须通过 JWKS/claims 验证后才暴露脱敏 claims。
 - `POST /api/attachments/upload-intents` 在完成身份和居民范围校验后检查服务端元数据容量；已有

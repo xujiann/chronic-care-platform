@@ -68,9 +68,14 @@ async function handleAction(event) {
       const amountFen = Number(batch?.adjustedAmountFen ?? batch?.standardAmountFen ?? 0);
       const coreReturnCycle = (batch?.coreReturnCycles || []).at(-1);
       const paymentFailureCycle = (batch?.paymentFailureCycles || []).at(-1);
-      const correctionDigest = action === "resubmit-core" ? String(window.prompt("请输入补正证据SHA-256摘要（64位十六进制）") || "").trim().toLowerCase() : "";
-      const paymentResolution = action === "retry-payment" ? String(window.prompt("请输入拨付失败处置结论") || "").trim() : "";
-      const paymentResolutionDigest = action === "retry-payment" ? String(window.prompt("请输入处置证据SHA-256摘要（64位十六进制）") || "").trim().toLowerCase() : "";
+      const correctionInput = action === "resubmit-core" ? await window.HealthStructuredDialog.prompt({ title: "补正证据摘要", label: "SHA-256 摘要（64位十六进制）", multiline: false, pattern: "^[a-fA-F0-9]{64}$", patternMessage: "请输入64位SHA-256十六进制摘要。" }) : "";
+      if (correctionInput === null) return;
+      const correctionDigest = String(correctionInput).trim().toLowerCase();
+      const paymentResolution = action === "retry-payment" ? await window.HealthStructuredDialog.prompt({ title: "拨付失败处置结论", minLength: 2 }) : "";
+      if (paymentResolution === null) return;
+      const paymentResolutionInput = action === "retry-payment" ? await window.HealthStructuredDialog.prompt({ title: "处置证据摘要", label: "SHA-256 摘要（64位十六进制）", multiline: false, pattern: "^[a-fA-F0-9]{64}$", patternMessage: "请输入64位SHA-256十六进制摘要。" }) : "";
+      if (paymentResolutionInput === null) return;
+      const paymentResolutionDigest = String(paymentResolutionInput).trim().toLowerCase();
       if (action === "resubmit-core" && !/^[a-f0-9]{64}$/.test(correctionDigest)) throw new Error("补正证据摘要必须为64位SHA-256十六进制");
       if (action === "retry-payment" && (!paymentResolution || !/^[a-f0-9]{64}$/.test(paymentResolutionDigest))) throw new Error("拨付失败处置结论和64位SHA-256证据摘要不能为空");
       const payloads = {
@@ -115,8 +120,8 @@ async function handleAction(event) {
       let body = action === "review" ? { approved: true, role: "当地医保规则包复核", opinion: "来源、目录、支付参数、差异和影响报告已复核" } : {};
       if (action === "rollback") {
         if (!window.confirm("仅在尚未生成生效后结算批次时允许回退。确认继续？")) return;
-        const reason = window.prompt("填写规则包回退原因");
-        if (!reason) return;
+        const reason = await window.HealthStructuredDialog.prompt({ title: "规则包回退原因", minLength: 2 });
+        if (reason === null) return;
         body = { reason };
       }
       await requestPayment(`/local-packages/${encodeURIComponent(button.dataset.id)}/${action}`, { method: "POST", body: JSON.stringify(body) });

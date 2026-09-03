@@ -21,23 +21,23 @@
     document.head.append(pendingStyle);
   }
   const demoUsers = [
-    { id: "u-nurse", username: "nurse", password: "123456", name: "互联网护理演示护士", role: "institution", roleName: "护士工作站", orgCode: "MR1", orgName: "区域中心医院", orgType: "medical_institution", orgLevel: "三级医院", dataScope: "互联网护理订单与服务轨迹", home: "internet-nursing.html", nurseId: "inn-001", accountType: "nurse" },
-    { id: "u-blood-quality", username: "blood_quality", password: "123456", name: "血液中心质控审核员", role: "commission", roleName: "血液中心冷链质控", orgCode: "BLOOD-DL", orgName: "区域血液中心", orgType: "blood_center", orgLevel: "市级", dataScope: "冷链异常、质量处置与血液放行", home: "blood.html", accountType: "blood_quality", bloodPermissions: ["cold_chain_quality_review"] },
-    { id: "u-blood-tech-1", username: "blood_tech_1", password: "123456", name: "输血科配血复核员甲", role: "institution", roleName: "输血科检验技师", orgCode: "MR1", orgName: "区域中心医院", orgType: "medical_institution", orgLevel: "三级医院", dataScope: "本机构交叉配血与发血复核", home: "blood.html", accountType: "blood_technologist", bloodPermissions: ["compatibility_review"] },
-    { id: "u-blood-tech-2", username: "blood_tech_2", password: "123456", name: "输血科配血复核员乙", role: "institution", roleName: "输血科检验技师", orgCode: "MR1", orgName: "区域中心医院", orgType: "medical_institution", orgLevel: "三级医院", dataScope: "本机构交叉配血与发血复核", home: "blood.html", accountType: "blood_technologist", bloodPermissions: ["compatibility_review"] },
-    { id: "u-city", username: "city", password: "123456", name: "市级管理员", role: "commission", roleName: "市级健康城市管理", orgCode: "ORG-CITY-DL", orgName: "区域健康城市平台", orgType: "city", orgLevel: "市级", dataScope: "全市", home: "workbench.html" },
-    { id: "u-district", username: "district", password: "123456", name: "区市县管理员", role: "commission", roleName: "区市县管理端", orgCode: "ORG-DIST-ZS", orgName: "中山区健康城市平台", orgType: "district", orgLevel: "区市县", dataScope: "中山区", home: "workbench.html" },
-    { id: "u-health", username: "health", password: "123456", name: "区域卫生健康委管理员", role: "commission", roleName: "区域卫生健康委", orgCode: "ORG-HEALTH-DL", orgName: "区域卫生健康委", orgType: "health_admin", orgLevel: "市级", dataScope: "医疗资源、统计直报、公共卫生、分级诊疗和数据质量监管", home: "index.html" },
-    { id: "u-mi", username: "mi", password: "123456", name: "区域医保局管理员", role: "insurance", roleName: "区域医保局管理端", orgCode: "ORG-MI-DL", orgName: "区域医保局", orgType: "insurance_bureau", orgLevel: "市级", dataScope: "医保政策、基金监管、待遇管理和跨区县监督", home: "insurance.html" },
-    { id: "u-hospital", username: "hospital", password: "123456", name: "医疗机构管理员", role: "institution", roleName: "医疗机构端", orgCode: "MR1", orgName: "区域中心医院", orgType: "medical_institution", orgLevel: "三级医院", dataScope: "本机构", home: "institution.html" },
-    { id: "u-community", username: "community", password: "123456", name: "基层机构管理员", role: "institution", roleName: "基层医疗机构端", orgCode: "MR3", orgName: "青泥洼桥社区卫生服务中心", orgType: "medical_institution", orgLevel: "基层医疗机构", dataScope: "本机构与签约居民", home: "institution.html" },
-    { id: "u1", username: "whjw", password: "123456", name: "区域卫生健康委管理员", role: "commission", roleName: "区域卫生健康委", orgCode: "ORG-HEALTH-DL", orgName: "区域卫生健康委", orgType: "health_admin", orgLevel: "市级", dataScope: "医疗资源、统计直报、公共卫生、分级诊疗和数据质量监管", home: "index.html" },
-    { id: "u2", username: "doctor", password: "123456", name: "刘医生", role: "institution", roleName: "医生账户", orgCode: "MR3", orgName: "青泥洼桥社区卫生服务中心", orgType: "medical_institution", orgLevel: "基层医疗机构", dataScope: "签约居民、随访、长期处方、多点执业申请", home: "doctor.html", doctorId: "doc-liu", accountType: "doctor" },
-    { id: "u-doctor-wang", username: "doctor_wang", password: "123456", name: "王医生", role: "institution", roleName: "医生账户", orgCode: "MR1", orgName: "区域中心医院", orgType: "medical_institution", orgLevel: "三级医院", dataScope: "本机构诊疗、转诊接诊、多点执业备案", home: "doctor.html", doctorId: "doc-wang", accountType: "doctor" },
-    { id: "u3", username: "insurance", password: "123456", name: "区域医保中心审核员", role: "insurance", roleName: "区域医保中心经办端", orgCode: "ORG-MI-CENTER-DL", orgName: "区域医保中心", orgType: "insurance_center", orgLevel: "市级", dataScope: "医保结算经办、凭证核验、固定取药审核和经办留痕", home: "insurance.html" },
-    { id: "u-mi-district", username: "district_mi", password: "123456", name: "区市县医保局管理员", role: "insurance", roleName: "区市县医保局管理端", orgCode: "ORG-MI-DIST-ZS", orgName: "中山区医保局", orgType: "district_insurance_bureau", orgLevel: "区市县", dataScope: "本区医保基金监管、机构监管和慢病待遇协同", home: "insurance.html" },
-    { id: "u4", username: "citizen", password: "123456", phone: "DEMO-MOBILE-R1", smsCode: DEMO_SMS_CODE, name: "演示居民A", role: "citizen", roleName: "个人端", orgCode: "PERSON-R1", orgName: "演示居民A家庭", orgType: "citizen", orgLevel: "个人", dataScope: "本人及家庭授权成员", home: "citizen.html", residentId: "r1", accountId: "a1" },
-    { id: "u5", username: "county", password: "123456", name: "医共体办公室", role: "county", roleName: "县域医共体平台", orgCode: "ORG-CONSORTIUM-ZS", orgName: "中山区县域医共体", orgType: "county_consortium", orgLevel: "区市县", dataScope: "医共体成员机构", home: "county.html" }
+    { id: "u-health", accountCode: "DEMO-HEALTH-ADMIN", catalogOrder: 10, username: "health", password: "123456", name: "卫生健康主管部门管理员（演示）", role: "commission", roleName: "卫生健康综合管理岗位", orgCode: "ORG-HEALTH-DL", orgName: "地区卫生健康主管部门", orgType: "health_admin", orgLevel: "市级", dataScope: "示范地区医疗资源、统计直报、公共卫生、分级诊疗和数据质量监管", home: "index.html", accountType: "manager" },
+    { id: "u-city", accountCode: "DEMO-PLATFORM-OPS", catalogOrder: 20, username: "city", password: "123456", name: "平台运营管理员（演示）", role: "commission", roleName: "平台运营管理岗位", orgCode: "ORG-CITY-DL", orgName: "卫生健康信息平台运营中心", orgType: "city", orgLevel: "市级", dataScope: "示范地区全域运行监测与跨部门协同", home: "workbench.html", accountType: "manager" },
+    { id: "u-district", accountCode: "DEMO-AREA-ADMIN", catalogOrder: 30, username: "district", password: "123456", name: "辖区卫生健康管理员（演示）", role: "commission", roleName: "辖区综合管理岗位", orgCode: "ORG-DIST-ZS", orgName: "示范区卫生健康管理中心", orgType: "district", orgLevel: "区县级", dataScope: "示范辖区居民、机构与公共卫生业务", home: "workbench.html", accountType: "manager" },
+    { id: "u-blood-quality", accountCode: "DEMO-BLOOD-QUALITY", catalogOrder: 40, username: "blood_quality", password: "123456", name: "血液质量审核员（演示）", role: "commission", roleName: "血液冷链质控岗位", orgCode: "BLOOD-DL", orgName: "区域血液中心", orgType: "blood_center", orgLevel: "市级", dataScope: "冷链异常、质量处置与血液放行", home: "blood.html", accountType: "blood_quality", bloodPermissions: ["cold_chain_quality_review"] },
+    { id: "u-nurse", accountCode: "DEMO-NURSE", catalogOrder: 110, username: "nurse", password: "123456", name: "互联网护理护士（演示）", role: "institution", roleName: "互联网护理岗位", orgCode: "MR1", orgName: "示范医院", orgType: "medical_institution", orgLevel: "三级医院", dataScope: "互联网护理订单与服务轨迹", home: "internet-nursing.html", nurseId: "inn-001", accountType: "nurse" },
+    { id: "u-hospital", accountCode: "DEMO-HOSPITAL-ADMIN", catalogOrder: 120, username: "hospital", password: "123456", name: "医院管理员（演示）", role: "institution", roleName: "医院综合管理岗位", orgCode: "MR1", orgName: "示范医院", orgType: "medical_institution", orgLevel: "三级医院", dataScope: "本机构业务与管理数据", home: "institution.html", accountType: "manager" },
+    { id: "u-community", accountCode: "DEMO-PRIMARY-ADMIN", catalogOrder: 130, username: "community", password: "123456", name: "基层机构管理员（演示）", role: "institution", roleName: "基层机构管理岗位", orgCode: "MR3", orgName: "基层医疗机构", orgType: "medical_institution", orgLevel: "基层医疗机构", dataScope: "本机构与签约居民", home: "institution.html", accountType: "manager" },
+    { id: "u2", accountCode: "DEMO-PRIMARY-DOCTOR", catalogOrder: 140, username: "doctor", password: "123456", name: "基层全科医生（演示）", role: "institution", roleName: "基层医生岗位", orgCode: "MR3", orgName: "基层医疗机构", orgType: "medical_institution", orgLevel: "基层医疗机构", dataScope: "签约居民、随访、长期处方和多点执业申请", home: "doctor.html", doctorId: "doc-liu", accountType: "doctor" },
+    { id: "u-doctor-wang", accountCode: "DEMO-HOSPITAL-DOCTOR", catalogOrder: 150, username: "doctor_wang", password: "123456", name: "医院临床医生（演示）", role: "institution", roleName: "医院医生岗位", orgCode: "MR1", orgName: "示范医院", orgType: "medical_institution", orgLevel: "三级医院", dataScope: "本机构诊疗、转诊接诊和多点执业备案", home: "doctor.html", doctorId: "doc-wang", accountType: "doctor" },
+    { id: "u-blood-tech-1", accountCode: "DEMO-BLOOD-MATCH", catalogOrder: 160, username: "blood_tech_1", password: "123456", name: "输血科配血复核员（演示）", role: "institution", roleName: "输血科配血复核岗位", orgCode: "MR1", orgName: "示范医院", orgType: "medical_institution", orgLevel: "三级医院", dataScope: "本机构交叉配血复核", home: "blood.html", accountType: "blood_technologist", bloodPermissions: ["compatibility_review"] },
+    { id: "u-blood-tech-2", accountCode: "DEMO-BLOOD-ISSUE", catalogOrder: 170, username: "blood_tech_2", password: "123456", name: "输血科发血复核员（演示）", role: "institution", roleName: "输血科发血复核岗位", orgCode: "MR1", orgName: "示范医院", orgType: "medical_institution", orgLevel: "三级医院", dataScope: "本机构发血复核", home: "blood.html", accountType: "blood_technologist", bloodPermissions: ["compatibility_review"] },
+    { id: "u-mi", accountCode: "DEMO-INSURANCE-ADMIN", catalogOrder: 210, username: "mi", password: "123456", name: "医疗保障主管部门管理员（演示）", role: "insurance", roleName: "医疗保障综合管理岗位", orgCode: "ORG-MI-DL", orgName: "地区医疗保障主管部门", orgType: "insurance_bureau", orgLevel: "市级", dataScope: "医保政策、基金监管、待遇管理和辖区监督", home: "insurance.html", accountType: "manager" },
+    { id: "u3", accountCode: "DEMO-INSURANCE-REVIEW", catalogOrder: 220, username: "insurance", password: "123456", name: "医疗保障经办审核员（演示）", role: "insurance", roleName: "医疗保障经办审核岗位", orgCode: "ORG-MI-CENTER-DL", orgName: "地区医疗保障经办中心", orgType: "insurance_center", orgLevel: "市级", dataScope: "医保结算、凭证核验、固定取药审核和经办留痕", home: "insurance.html", accountType: "reviewer" },
+    { id: "u-mi-district", accountCode: "DEMO-AREA-INSURANCE", catalogOrder: 230, username: "district_mi", password: "123456", name: "辖区医疗保障管理员（演示）", role: "insurance", roleName: "辖区医疗保障管理岗位", orgCode: "ORG-MI-DIST-ZS", orgName: "示范区医疗保障管理部门", orgType: "district_insurance_bureau", orgLevel: "区县级", dataScope: "示范辖区基金、机构和慢病待遇协同", home: "insurance.html", accountType: "manager" },
+    { id: "u5", accountCode: "DEMO-CONSORTIUM-ADMIN", catalogOrder: 310, username: "county", password: "123456", name: "医共体协同管理员（演示）", role: "county", roleName: "医共体协同管理岗位", orgCode: "ORG-CONSORTIUM-ZS", orgName: "示范县域医共体", orgType: "county_consortium", orgLevel: "区县级", dataScope: "医共体成员机构与协同业务", home: "county.html", accountType: "manager" },
+    { id: "u4", accountCode: "DEMO-RESIDENT", catalogOrder: 410, username: "citizen", password: "123456", phone: "DEMO-MOBILE-R1", smsCode: DEMO_SMS_CODE, name: "居民用户（演示）", role: "citizen", roleName: "居民个人岗位", orgCode: "PERSON-R1", orgName: "演示家庭账户", orgType: "citizen", orgLevel: "个人", dataScope: "本人及经授权的家庭成员", home: "citizen.html", residentId: "r1", accountId: "a1", accountType: "resident" },
+    { id: "u1", accountCode: "LEGACY-WHJW", catalogOrder: 999, catalogVisible: false, legacyAliasFor: "health", username: "whjw", password: "123456", name: "卫生健康主管部门兼容账号", role: "commission", roleName: "兼容别名（不展示）", orgCode: "ORG-HEALTH-DL", orgName: "地区卫生健康主管部门", orgType: "health_admin", orgLevel: "市级", dataScope: "兼容历史自动化调用", home: "index.html", accountType: "manager" }
   ];
 
   const accessPolicy = window.HealthAccessPolicy;
@@ -86,6 +86,25 @@
       authMode: bearerOnly ? "server-bearer" : authMode
     };
     persistBrowserSession(session);
+    const context = payload.authorizationContext;
+    if (context?.user && [context.permissions, context.regionalCapabilities, context.pages, context.menus].every(Array.isArray)) {
+      const established = {
+        ...session,
+        ...context.user,
+        permissions: context.permissions,
+        regionalCapabilities: context.regionalCapabilities,
+        authorizedPages: context.pages,
+        authorizedMenus: context.menus,
+        regionalAuthorization: context.regional || null,
+        policyVersion: context.policy?.version || context.policy?.schemaVersion || "",
+        productionReady: context.productionReady === true,
+        authContextVersion: context.version || context.schemaVersion || "auth-context-v1"
+      };
+      persistBrowserSession(established);
+      authContextState = "ready";
+      volatileBearerToken = "";
+      return { ok: true, user: established };
+    }
     const contextResult = await refreshAuthContext({ useBearer: bearerOnly });
     if (!contextResult.ok) {
       clearBrowserSession();
@@ -344,7 +363,7 @@
     const method = String(options.method || "GET").toUpperCase();
     const headers = authHeaders(options.headers || {});
     if (!["GET", "HEAD", "OPTIONS"].includes(method)) {
-      const csrfToken = readCookie("health_platform_csrf");
+      const csrfToken = readCookie("health_platform_csrf_v2");
       if (csrfToken) headers.set("X-CSRF-Token", csrfToken);
     }
     return fetch(url, {
@@ -441,6 +460,31 @@
 
   function setInternalHref(element, target) {
     return safeUrlPort().setElementUrl(element, "href", target, internalUrlOptions());
+  }
+
+  async function getLoginAccountCatalog() {
+    const fallback = demoUsers
+      .filter((user) => user.catalogVisible !== false)
+      .map(sanitizeUser)
+      .sort((left, right) => Number(left.catalogOrder || 999) - Number(right.catalogOrder || 999));
+    if (!API_BASE || !isDemoMode()) return fallback;
+    try {
+      const response = await fetch(`${API_BASE}/auth/login-catalog`, { method: "GET", credentials: "same-origin" });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || !payload.ok || !Array.isArray(payload.accounts)) return fallback;
+      return payload.accounts.filter((user) => user?.username && user?.role && user?.home);
+    } catch {
+      return fallback;
+    }
+  }
+
+  function ensureNavigationStyles() {
+    if (!document.head || document.querySelector("#health-navigation-shell-styles")) return;
+    const link = document.createElement("link");
+    link.id = "health-navigation-shell-styles";
+    link.rel = "stylesheet";
+    setInternalHref(link, localHref("navigation-shell.css"));
+    document.head.append(link);
   }
 
   function requireRole(roles) {
@@ -564,6 +608,7 @@
         link.remove();
       }
     });
+    refreshLocalNavigationVisibility();
   }
 
   function filterRoleFeatures() {
@@ -581,49 +626,298 @@
         && (!permission || accessPolicy?.canUsePermission(permission, user));
       if (!allowed) element.remove();
     });
+    refreshLocalNavigationVisibility();
+  }
+
+  function refreshLocalNavigationVisibility() {
+    document.querySelectorAll(".navigation-local-group").forEach((group) => {
+      const hasVisibleAction = [...group.querySelectorAll("a, button")]
+        .some((element) => !element.hidden && !element.classList.contains("navigation-duplicate-link"));
+      group.hidden = !hasVisibleAction;
+    });
   }
 
   function renderSessionBar() {
     if (document.body?.dataset.authPage === "login") return;
-    const shell = document.querySelector(".portal-shell, .citizen-shell, .app");
-    if (!shell || document.querySelector(".auth-bar")) return;
+    const shell = document.querySelector(".portal-shell, .citizen-shell, .app, .app-shell, .mini-app, .preview-shell, main");
+    if (!shell || document.querySelector("#health-navigation-sidebar")) return;
     const user = getUser();
-    const bar = document.createElement("section");
-    bar.className = "auth-bar";
+    const current = accessPolicy?.normalizePageName(location.pathname) || "";
+    const bar = document.createElement("aside");
+    bar.className = "auth-bar navigation-sidebar";
+    bar.id = "health-navigation-sidebar";
+    bar.setAttribute("aria-label", "分级功能导航");
+
+    const brand = document.createElement("div");
+    brand.className = "navigation-brand";
+    const brandMark = document.createElement("span");
+    brandMark.className = "navigation-brand-mark";
+    brandMark.setAttribute("aria-hidden", "true");
+    brandMark.textContent = "健";
+    const brandCopy = document.createElement("div");
+    const brandTitle = document.createElement("strong");
+    const brandDetail = document.createElement("span");
+    brandTitle.textContent = "卫生健康信息平台";
+    brandDetail.textContent = "统一功能导航";
+    brandCopy.append(brandTitle, brandDetail);
+    brand.append(brandMark, brandCopy);
 
     const identity = document.createElement("div");
+    identity.className = "navigation-identity";
     const name = document.createElement("strong");
-    const detail = document.createElement("span");
-    identity.append(name, detail);
+    const role = document.createElement("span");
+    role.className = "navigation-identity-role";
+    const organization = document.createElement("span");
+    organization.className = "navigation-identity-organization";
+    const scope = document.createElement("p");
+    scope.className = "navigation-identity-scope";
+    const identityMeta = document.createElement("div");
+    identityMeta.className = "navigation-identity-meta";
+    const accountCode = document.createElement("span");
+    const functionCount = document.createElement("span");
+    identityMeta.append(accountCode, functionCount);
+    const identityActions = document.createElement("div");
+    identityActions.className = "navigation-identity-actions";
+    identity.append(name, role, organization, scope, identityMeta, identityActions);
 
     const nav = document.createElement("nav");
+    nav.className = "navigation-primary";
+    nav.setAttribute("aria-label", "平台功能");
+    const menuTree = accessPolicy?.menuTreeForUser?.(user, {}, { includeHome: true }) || [];
+    const countMenuNode = (item) => 1 + (item.children || []).reduce((count, child) => count + countMenuNode(child), 0);
+    const menuNodeContainsPage = (item, page) => item.page === page
+      || (item.children || []).some((child) => menuNodeContainsPage(child, page));
+    const totalFunctions = menuTree.reduce((total, group) => total + group.items.reduce((count, item) => count + countMenuNode(item), 0), 0);
+    const menuPages = new Set();
+    const appendMenuLink = (container, item, level) => {
+      const link = document.createElement("a");
+      setInternalHref(link, localHref(item.page));
+      link.textContent = item.label;
+      link.dataset.navigationLevel = String(level);
+      link.dataset.navigationPage = item.page;
+      menuPages.add(item.page);
+      if (item.page === current) link.setAttribute("aria-current", "page");
+      container.append(link);
+      (item.children || []).forEach((child) => appendMenuLink(container, child, level + 1));
+    };
+
+    menuTree.forEach((group, index) => {
+      const details = document.createElement("details");
+      details.className = "navigation-group";
+      details.dataset.navigationGroup = group.id;
+      const containsCurrent = group.items.some((item) => menuNodeContainsPage(item, current));
+      details.open = containsCurrent || (!current && index === 0);
+      const summary = document.createElement("summary");
+      const summaryLabel = document.createElement("span");
+      summaryLabel.textContent = group.label;
+      const summaryCount = document.createElement("span");
+      summaryCount.className = "navigation-group-count";
+      summaryCount.textContent = String(group.items.reduce((count, item) => count + countMenuNode(item), 0));
+      summary.append(summaryLabel, summaryCount);
+      const links = document.createElement("div");
+      links.className = "navigation-group-links";
+      group.items.forEach((item) => appendMenuLink(links, item, 2));
+      details.append(summary, links);
+      nav.append(details);
+    });
+
     if (user) {
       name.textContent = displayAuthText(user.name);
-      detail.textContent = `${displayAuthText(user.roleName)} · ${displayAuthText(user.orgName || "未绑定机构")} · ${displayAuthText(user.dataScope || "默认范围")} · ${String(user.authMode || "").startsWith("server") ? "安全服务端会话" : "本地演示"} · ${new Date(user.loginAt || Date.now()).toLocaleString("zh-CN")}`;
-      (accessPolicy?.pagesForUser(user) || []).forEach(({ page: href, label }) => {
-        const link = document.createElement("a");
-        setInternalHref(link, localHref(href));
-        link.textContent = label;
-        nav.append(link);
-      });
+      role.textContent = displayAuthText(user.roleName || accessPolicy?.roleLabels?.[user.role] || "授权岗位");
+      organization.textContent = displayAuthText(user.orgName || "未绑定机构");
+      scope.textContent = displayAuthText(user.dataScope || "默认数据范围");
+      scope.title = scope.textContent;
+      accountCode.textContent = displayAuthText(user.accountCode || user.username || "未编码账号");
+      functionCount.textContent = `${totalFunctions} 项功能`;
+      const homeLink = document.createElement("a");
+      homeLink.className = "navigation-home-link";
+      homeLink.dataset.navigationHome = "";
+      setInternalHref(homeLink, localHref(accessPolicy?.homeForUser(user) || user.home || "health-city.html"));
+      homeLink.textContent = "我的首页";
       const logoutButton = document.createElement("button");
       logoutButton.type = "button";
       logoutButton.dataset.logout = "";
       logoutButton.textContent = "退出";
-      nav.append(logoutButton);
+      identityActions.append(homeLink, logoutButton);
     } else {
       name.textContent = "未登录";
-      detail.textContent = "请先选择角色进入健康城市系统";
+      role.textContent = "访客模式";
+      organization.textContent = "登录后显示所属机构";
+      scope.textContent = "仅开放平台介绍和公开总览。";
+      accountCode.textContent = "ANONYMOUS";
+      functionCount.textContent = `${totalFunctions} 项公开功能`;
       const loginLink = document.createElement("a");
       setInternalHref(loginLink, `${localHref("login.html")}?redirect=${encodeURIComponent(currentPage())}`);
       loginLink.textContent = "登录";
-      nav.append(loginLink);
+      loginLink.className = "navigation-login-link";
+      identityActions.append(loginLink);
     }
-    bar.append(identity, nav);
-    shell.prepend(bar);
+
+    const navigationTools = document.createElement("div");
+    navigationTools.className = "navigation-tools";
+    const searchLabel = document.createElement("label");
+    searchLabel.setAttribute("for", "health-navigation-search");
+    searchLabel.textContent = "搜索功能";
+    const search = document.createElement("input");
+    search.id = "health-navigation-search";
+    search.type = "search";
+    search.placeholder = "输入功能名称";
+    search.autocomplete = "off";
+    const searchStatus = document.createElement("span");
+    searchStatus.className = "navigation-search-status";
+    searchStatus.setAttribute("aria-live", "polite");
+    searchStatus.textContent = `共 ${totalFunctions} 项`;
+    searchLabel.append(search, searchStatus);
+    navigationTools.append(searchLabel);
+
+    const runtimeStatus = document.createElement("div");
+    runtimeStatus.className = "navigation-runtime-status";
+    runtimeStatus.setAttribute("role", "status");
+    const runtimeTitle = document.createElement("strong");
+    const runtimeDetail = document.createElement("span");
+    const staticPreview = location.protocol === "file:" || !API_BASE;
+    runtimeTitle.textContent = isDemoMode() ? "演示数据环境" : "授权服务环境";
+    runtimeDetail.textContent = staticPreview
+      ? "数据来源：脱敏静态快照；写操作不可用"
+      : "数据来源：当前授权接口；失败不会生成本地成功记录";
+    runtimeStatus.append(runtimeTitle, runtimeDetail);
+
+    const filterNavigation = () => {
+      const query = search.value.trim().toLocaleLowerCase("zh-CN");
+      let matches = 0;
+      nav.querySelectorAll(".navigation-group").forEach((group) => {
+        let groupMatches = 0;
+        group.querySelectorAll(".navigation-group-links > a").forEach((link) => {
+          const visible = !query || link.textContent.toLocaleLowerCase("zh-CN").includes(query);
+          link.hidden = !visible;
+          if (visible) groupMatches += 1;
+        });
+        group.hidden = groupMatches === 0;
+        if (query && groupMatches) group.open = true;
+        matches += groupMatches;
+      });
+      searchStatus.textContent = query ? `找到 ${matches} 项` : `共 ${totalFunctions} 项`;
+    };
+    search.addEventListener("input", filterNavigation);
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "/" && !event.ctrlKey && !event.metaKey && !event.altKey && !/input|textarea|select/i.test(event.target?.tagName || "")) {
+        event.preventDefault();
+        search.focus();
+      }
+    });
+
+    const localNavigation = document.createElement("div");
+    localNavigation.className = "navigation-local";
+    bar.append(brand, identity, runtimeStatus, navigationTools, localNavigation, nav);
+    document.body.append(bar);
+    installNavigationToggle(bar);
+    relocatePageNavigation(bar, localNavigation, menuPages, user);
+    new MutationObserver(() => refreshLocalNavigationVisibility()).observe(localNavigation, {
+      childList: true,
+      subtree: true
+    });
+    document.documentElement.setAttribute("data-navigation-shell", "ready");
     bar.querySelector("[data-logout]")?.addEventListener("click", logout);
     filterRoleLinks();
     filterRoleFeatures();
+  }
+
+  function installNavigationToggle(sidebar) {
+    const toggle = document.createElement("button");
+    toggle.type = "button";
+    toggle.className = "navigation-toggle";
+    toggle.setAttribute("aria-controls", sidebar.id);
+    toggle.setAttribute("aria-expanded", "false");
+    toggle.setAttribute("aria-label", "打开功能导航");
+    toggle.textContent = "菜单";
+
+    const scrim = document.createElement("button");
+    scrim.type = "button";
+    scrim.className = "navigation-scrim";
+    scrim.setAttribute("aria-label", "关闭功能导航");
+
+    const setOpen = (open) => {
+      document.documentElement.setAttribute("data-navigation-open", open ? "true" : "false");
+      toggle.setAttribute("aria-expanded", open ? "true" : "false");
+      toggle.setAttribute("aria-label", open ? "关闭功能导航" : "打开功能导航");
+    };
+    toggle.addEventListener("click", () => setOpen(toggle.getAttribute("aria-expanded") !== "true"));
+    scrim.addEventListener("click", () => setOpen(false));
+    sidebar.addEventListener("click", (event) => {
+      if (event.target.closest("a, button") && window.matchMedia("(max-width: 900px)").matches) setOpen(false);
+    });
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") setOpen(false);
+    });
+    document.body.append(toggle, scrim);
+  }
+
+  function relocatePageNavigation(sidebar, localNavigation, menuPages, user) {
+    const labels = new Map([
+      ["nav", "当前工作台"],
+      ["dashboard-section-nav", "驾驶舱分区"],
+      ["nursing-role-nav", "护理工作台"],
+      ["blood-nav", "血液业务"],
+      ["top-nav", "专科切换"],
+      ["service-tabs", "居民服务"],
+      ["bottom-nav", "居民小程序"],
+      ["nav-list", "标准平台功能"]
+    ]);
+    const moved = new Set();
+    const constrainLocalNavigation = (source) => {
+      if (!source?.classList.contains("nursing-role-nav") || !user) return;
+      const accountType = normalizeAccountType(user);
+      let allowedTargets = null;
+      if (user.role === "citizen") allowedTargets = new Set(["#nursing-mobile-workbench", "#nursing-appointment-panel"]);
+      else if (user.role === "county") allowedTargets = new Set(["#nursing-regulatory-section"]);
+      else if (accountType === "nurse") allowedTargets = new Set(["#nursing-mobile-workbench", "#nursing-nurse-response"]);
+      else if (accountType === "doctor") allowedTargets = new Set(["#nursing-hospital-management"]);
+      if (!allowedTargets) return;
+      source.querySelectorAll("a[href^='#']").forEach((link) => {
+        link.hidden = !allowedTargets.has(link.getAttribute("href"));
+      });
+    };
+    const moveNavigation = (source, label) => {
+      if (!source || moved.has(source) || source.closest(".navigation-sidebar")) return;
+      constrainLocalNavigation(source);
+      moved.add(source);
+      const section = document.createElement("details");
+      section.className = "navigation-local-group";
+      section.open = true;
+      const summary = document.createElement("summary");
+      summary.textContent = label;
+      section.append(summary, source);
+      localNavigation.append(section);
+    };
+
+    document.querySelectorAll("body > .sidebar .nav, .dashboard-section-nav, .nursing-role-nav, .blood-nav, .top-nav, .service-tabs, .bottom-nav, .app-shell > .side-nav .nav-list").forEach((source) => {
+      const matchedClass = [...labels.keys()].find((className) => source.classList.contains(className));
+      moveNavigation(source, labels.get(matchedClass) || "本页功能");
+    });
+
+    document.querySelectorAll("header nav").forEach((source) => {
+      if (source.closest(".navigation-sidebar")) return;
+      source.querySelectorAll("a[href]").forEach((link) => {
+        const page = normalizePageName(link.getAttribute("href"));
+        if (page && menuPages.has(page)) {
+          link.hidden = true;
+          link.classList.add("navigation-duplicate-link");
+        }
+      });
+      if (source.querySelector("a:not([hidden]), button:not([hidden])")) moveNavigation(source, "页面快捷入口");
+      else source.hidden = true;
+    });
+
+    document.querySelectorAll(".citizen-header .header-actions > a[href], .topbar-actions > a[href]").forEach((link) => {
+      const page = normalizePageName(link.getAttribute("href"));
+      if (page && menuPages.has(page)) {
+        link.hidden = true;
+        link.classList.add("navigation-duplicate-link");
+      }
+    });
+
+    refreshLocalNavigationVisibility();
+    sidebar.querySelectorAll("nav a[aria-current='page']").forEach((link) => link.closest("details")?.setAttribute("open", ""));
   }
 
   function displayAuthText(value) {
@@ -645,6 +939,7 @@
     login,
     loginByPhone,
     sendPhoneCode,
+    getLoginAccountCatalog,
     normalizeAccountType,
     buildExternalIdentityKey,
     hasRecentStepUp,
@@ -667,6 +962,7 @@
     filterRoleFeatures
   };
 
+  ensureNavigationStyles();
   const startPageAccess = () => { initializePageAccess().catch(() => enforceCurrentPageAccess()); };
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", startPageAccess);
   else startPageAccess();

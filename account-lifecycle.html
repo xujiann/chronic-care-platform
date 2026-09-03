@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>账号全生命周期工作台</title>
+    <link rel="stylesheet" href="./portal.css" />
+    <link rel="stylesheet" href="./governance-workbench.css" />
+    <script src="./access-control-policy.js"></script>
+    <script src="./browser-safe-url.js"></script>
+    <script src="./auth.js"></script>
+    <script src="./page-auth-bootstrap.js" data-roles="commission"></script>
+  </head>
+  <body>
+    <main class="portal-shell governance-page">
+      <header class="portal-header"><div><span>统一身份治理</span><h1>账号全生命周期工作台</h1><p>通过申请、冲突检查、独立复核、目录预检和审计时间线管理账号开通、变更、停用、恢复与临时授权。</p></div></header>
+      <section id="account-source-banner" class="work-source-banner" data-tone="warning" role="status" aria-live="polite">
+        <div><strong id="account-source-title">正在读取账号治理数据</strong><p id="account-source-detail">生产写入必须由服务端受理并返回回执，前端不会伪造完成状态。</p></div>
+        <div class="work-source-actions"><button id="directory-preview" class="secondary-work-button" type="button">目录预检</button><button id="new-account-request" class="primary-work-button" type="button">发起账号申请</button><button id="account-refresh" class="secondary-work-button" type="button">刷新</button></div>
+      </section>
+      <section id="account-metrics" class="work-metric-grid" aria-label="账号指标"></section>
+
+      <section class="panel" aria-labelledby="request-center-title">
+        <div class="panel-title"><h2 id="request-center-title">申请与双人复核</h2><span id="request-summary">0 项申请</span></div>
+        <div class="work-filter-grid">
+          <label>搜索<input id="request-keyword" type="search" placeholder="申请编号、账号或申请人" /></label>
+          <label>类型<select id="request-type-filter"><option value="all">全部类型</option><option value="open">账号开通</option><option value="change">账号变更</option><option value="deactivate">账号停用</option><option value="restore">账号恢复</option><option value="temporaryGrant">临时授权</option></select></label>
+          <label>状态<select id="request-status-filter"><option value="all">全部状态</option><option value="pending-review">待复核</option><option value="approved">已批准</option><option value="rejected">已退回</option><option value="applied">已执行</option></select></label>
+        </div>
+        <div class="request-board">
+          <div id="request-list" class="request-list"></div>
+          <aside><h3>审批时间线</h3><div id="request-detail" class="timeline-list"></div></aside>
+        </div>
+      </section>
+
+      <section class="panel" aria-labelledby="directory-title">
+        <div class="panel-title"><h2 id="directory-title">身份目录差异与受控操作</h2><span id="directory-summary">尚未预检</span></div>
+        <p>目录预检仅生成差异计划；受控绑定和停用同步必须再次填写审计说明与精确确认短语，并由服务端执行安全校验。</p>
+        <div id="directory-list" class="directory-list"><div class="empty-state">运行身份目录预检后显示绑定、停用和人工复核事项。</div></div>
+        <div class="button-row"><button id="directory-apply" class="secondary-work-button" type="button" disabled>申请执行目录停用同步</button></div>
+      </section>
+    </main>
+
+    <dialog id="account-request-dialog" class="governance-dialog">
+      <form id="account-request-form" method="dialog">
+        <header><h2>发起账号生命周期申请</h2><button class="secondary-work-button" type="button" data-close-dialog>关闭</button></header>
+        <div class="governance-form">
+          <label>申请类型<select name="type" required><option value="open">账号开通</option><option value="change">账号变更</option><option value="deactivate">账号停用</option><option value="restore">账号恢复</option><option value="temporaryGrant">临时授权</option></select></label>
+          <label>目标账号<select name="accountId"><option value="">新账号或请选择</option></select></label>
+          <label>登录名<input name="username" autocomplete="off" /></label>
+          <label>显示名称<input name="displayName" autocomplete="off" /></label>
+          <label>角色<select name="role"><option value="commission">卫生健康管理</option><option value="institution">医疗机构</option><option value="insurance">医疗保障</option><option value="county">医共体协同</option><option value="citizen">居民</option></select></label>
+          <label>机构编码<input name="orgCode" autocomplete="off" /></label>
+          <label class="full">权限项<textarea name="permissions" rows="3" placeholder="使用逗号或换行分隔；临时授权必填"></textarea></label>
+          <label>授权开始<input name="validFrom" type="datetime-local" /></label>
+          <label>授权结束<input name="validUntil" type="datetime-local" /></label>
+          <label class="full">申请原因<textarea name="reason" rows="4" required placeholder="至少 8 个字符，说明业务依据和数据范围"></textarea></label>
+          <div class="full"><button id="conflict-check" class="secondary-work-button" type="button">运行冲突检查</button><span id="conflict-result" role="status"></span></div>
+          <ul id="conflict-list" class="conflict-list full" hidden></ul>
+          <p id="account-request-errors" class="form-errors" hidden></p>
+        </div>
+        <footer><button class="secondary-work-button" type="button" data-close-dialog>取消</button><button id="account-request-submit" class="primary-work-button" value="submit">提交复核</button></footer>
+      </form>
+    </dialog>
+
+    <dialog id="account-review-dialog" class="governance-dialog">
+      <form id="account-review-form" method="dialog">
+        <header><h2>账号申请独立复核</h2><button class="secondary-work-button" type="button" data-close-dialog>关闭</button></header>
+        <div class="governance-form"><input name="requestId" type="hidden" /><label>复核结论<select name="decision"><option value="approve">批准</option><option value="reject">退回</option></select></label><label class="full">复核意见<textarea name="note" rows="4" required placeholder="至少 8 个字符"></textarea></label><p id="account-review-errors" class="form-errors" hidden></p></div>
+        <footer><button class="secondary-work-button" type="button" data-close-dialog>取消</button><button id="account-review-submit" class="primary-work-button" value="submit">提交复核</button></footer>
+      </form>
+    </dialog>
+
+    <dialog id="directory-action-dialog" class="governance-dialog">
+      <form id="directory-action-form" method="dialog">
+        <header><h2 id="directory-action-title">身份目录受控操作</h2><button class="secondary-work-button" type="button" data-close-dialog>关闭</button></header>
+        <div class="governance-form"><input name="action" type="hidden" /><input name="localUserId" type="hidden" /><input name="externalSubject" type="hidden" /><label class="full">审计说明<textarea name="note" rows="4" required placeholder="至少 8 个字符"></textarea></label><label class="full">确认短语<input name="confirmation" autocomplete="off" /></label><p id="directory-action-errors" class="form-errors" hidden></p></div>
+        <footer><button class="secondary-work-button" type="button" data-close-dialog>取消</button><button id="directory-action-submit" class="primary-work-button" value="submit">提交受控操作</button></footer>
+      </form>
+    </dialog>
+
+    <script src="./shared.js"></script>
+    <script src="./account-lifecycle-core.js"></script>
+    <script src="./account-lifecycle.js"></script>
+  </body>
+</html>

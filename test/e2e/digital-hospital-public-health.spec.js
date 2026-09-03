@@ -11,7 +11,17 @@ async function loginCommission(page) {
 async function openPublicHealth(page) {
   await loginCommission(page);
   await page.goto("/digital-hospital-standard-platform/index.html");
-  await page.getByRole("button", { name: "公共卫生", exact: true }).click();
+  const navigationToggle = page.locator(".navigation-toggle");
+  if ((page.viewportSize()?.width || 1024) <= 900) {
+    await expect(navigationToggle).toBeVisible();
+    await navigationToggle.click();
+    await expect(navigationToggle).toHaveAttribute("aria-expanded", "true");
+    await expect.poll(() => page.locator(".navigation-sidebar").evaluate((element) => element.getBoundingClientRect().left)).toBe(0);
+  }
+  const publicHealthNavigation = page.locator('.navigation-local .nav-item[data-view="public-health"]');
+  await publicHealthNavigation.waitFor({ state: "attached" });
+  await publicHealthNavigation.scrollIntoViewIfNeeded();
+  await publicHealthNavigation.click();
   await expect(page.getByRole("heading", { name: "公共卫生", exact: true })).toBeVisible();
 }
 

@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>统一待办与消息中心</title>
+    <link rel="stylesheet" href="./portal.css" />
+    <link rel="stylesheet" href="./governance-workbench.css" />
+    <script src="./access-control-policy.js"></script>
+    <script src="./browser-safe-url.js"></script>
+    <script src="./auth.js"></script>
+    <script src="./page-auth-bootstrap.js" data-roles="commission,institution,insurance,county"></script>
+  </head>
+  <body>
+    <main class="portal-shell governance-page">
+      <header class="portal-header">
+        <div>
+          <span>跨域协同工作台</span>
+          <h1>统一待办与消息中心</h1>
+          <p>汇总当前账号授权范围内的业务任务与站内消息，提供领取、转派、催办、退回、升级、批量处理、时限跟踪和原业务深链。</p>
+        </div>
+      </header>
+
+      <section id="work-source-banner" class="work-source-banner" data-tone="warning" role="status" aria-live="polite">
+        <div><strong id="work-source-title">正在读取授权任务</strong><p id="work-source-detail">请稍候，页面不会用演示结果替代失败的写操作。</p></div>
+        <div class="work-source-actions"><button id="work-refresh" class="secondary-work-button" type="button">刷新</button></div>
+      </section>
+
+      <section id="work-metrics" class="work-metric-grid" aria-label="任务指标"></section>
+
+      <div class="work-layout">
+        <section class="panel" aria-labelledby="task-list-title">
+          <div class="panel-title"><h2 id="task-list-title">授权任务队列</h2><span id="task-count">0 项</span></div>
+          <div class="work-filter-grid">
+            <label>搜索任务<input id="task-keyword" type="search" placeholder="任务名称、编号、领域或责任人" /></label>
+            <label>状态<select id="task-status"><option value="all">全部状态</option></select></label>
+            <label>业务领域<select id="task-domain"><option value="all">全部领域</option></select></label>
+            <label>时限<select id="task-sla"><option value="all">全部时限</option><option value="overdue">已经超时</option><option value="due">尚未超时</option></select></label>
+          </div>
+          <div class="work-toolbar">
+            <div class="work-toolbar-group"><label><input id="select-all-tasks" type="checkbox" /> 选择当前页</label><span id="selection-count">已选 0 项</span></div>
+            <div class="work-toolbar-group"><select id="batch-action" aria-label="批量操作"><option value="claim">批量领取</option><option value="remind">批量催办</option><option value="return">批量退回</option><option value="escalate">批量升级</option><option value="complete">批量完成</option></select><button id="batch-run" class="primary-work-button" type="button" disabled>执行批量操作</button></div>
+          </div>
+          <div class="table-wrap"><table class="work-table"><thead><tr><th scope="col">选择</th><th scope="col">任务</th><th scope="col">状态与时限</th><th scope="col">责任</th><th scope="col">操作</th></tr></thead><tbody id="task-list"></tbody></table></div>
+        </section>
+
+        <aside class="panel" aria-labelledby="message-title">
+          <div class="panel-title"><h2 id="message-title">消息与回执</h2><span id="message-count">0 条</span></div>
+          <div id="message-list" class="message-list"></div>
+        </aside>
+      </div>
+    </main>
+
+    <dialog id="task-action-dialog" class="governance-dialog">
+      <form id="task-action-form" method="dialog">
+        <header><h2 id="task-action-title">处理任务</h2><button class="secondary-work-button" type="button" data-close-dialog>关闭</button></header>
+        <div class="governance-form">
+          <input name="taskId" type="hidden" />
+          <input name="action" type="hidden" />
+          <label class="full">任务<span id="task-action-subject"></span></label>
+          <label id="assignee-field">接收人<input name="assignee" autocomplete="off" placeholder="填写账号、岗位或工作组" /></label>
+          <label id="channel-field">催办渠道<select name="channel"><option value="in_app">站内消息</option><option value="sms">短信</option><option value="subscription">订阅消息</option></select></label>
+          <label class="full">处理说明<textarea name="comment" rows="4" placeholder="说明处置依据、交接事项或催办内容"></textarea></label>
+          <p id="task-action-errors" class="form-errors" hidden></p>
+        </div>
+        <footer><button class="secondary-work-button" type="button" data-close-dialog>取消</button><button id="task-action-submit" class="primary-work-button" value="submit">提交</button></footer>
+      </form>
+    </dialog>
+
+    <script src="./shared.js"></script>
+    <script src="./unified-work-center-core.js"></script>
+    <script src="./unified-work-center.js"></script>
+  </body>
+</html>

@@ -3,7 +3,7 @@ const API_BASE = location.protocol === "file:" ? "" : "/api";
 const LEGACY_REGIONAL_STATS_KEY = "da" + "lianHealthStatistics2025";
 let apiEnabled = false;
 
-const organizations = ["青泥洼桥社区卫生服务中心", "星海湾社区卫生服务中心", "甘井子区人民医院", "金普新区疾控中心"];
+const organizations = ["示范社区卫生服务中心", "示范街道社区卫生服务中心", "示范区人民医院", "示范区疾病预防控制中心"];
 
 const seedState = {
   residents: [
@@ -14,7 +14,7 @@ const seedState = {
       gender: "男",
       birthDate: "1968-02-11",
       phone: "DEMO-MOBILE-R1",
-      organization: "青泥洼桥社区卫生服务中心",
+      organization: "示范社区卫生服务中心",
       familyDoctor: "刘医生",
       address: "演示地址A",
       metrics: { systolic: 166, diastolic: 96, glucose: 6.8, bmi: 29.4 }
@@ -26,7 +26,7 @@ const seedState = {
       gender: "女",
       birthDate: "1975-05-20",
       phone: "DEMO-MOBILE-R2",
-      organization: "星海湾社区卫生服务中心",
+      organization: "示范街道社区卫生服务中心",
       familyDoctor: "赵医生",
       address: "演示地址B",
       metrics: { systolic: 138, diastolic: 84, glucose: 7.8, bmi: 25.1 }
@@ -38,7 +38,7 @@ const seedState = {
       gender: "男",
       birthDate: "1988-11-09",
       phone: "DEMO-MOBILE-R3",
-      organization: "甘井子区人民医院",
+      organization: "示范区人民医院",
       familyDoctor: "孙医生",
       address: "演示地址C",
       metrics: { systolic: 126, diastolic: 78, glucose: 5.5, bmi: 24.2 }
@@ -50,7 +50,7 @@ const seedState = {
       gender: "女",
       birthDate: "1964-10-01",
       phone: "DEMO-MOBILE-R4",
-      organization: "青泥洼桥社区卫生服务中心",
+      organization: "示范社区卫生服务中心",
       familyDoctor: "刘医生",
       address: "演示地址D",
       metrics: { systolic: 148, diastolic: 88, glucose: 6.3, bmi: 28.6 }

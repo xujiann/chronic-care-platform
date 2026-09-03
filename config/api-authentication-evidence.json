@@ -19,7 +19,7 @@
         "mode": "required",
         "mechanism": "bearer-or-cookie-session",
         "principalType": "platform-user",
-        "credentialSource": ["cookie:health_city_browser_session", "header:authorization-bearer"]
+        "credentialSource": ["cookie:health_platform_session_v2", "legacy-cookie:health_city_browser_session", "header:authorization-bearer"]
       },
       "authorization": {
         "model": "live-session-known-role-context",
@@ -67,7 +67,7 @@
         "mode": "required",
         "mechanism": "bearer-or-cookie-session",
         "principalType": "platform-user",
-        "credentialSource": ["cookie:health_city_browser_session", "header:authorization-bearer"]
+        "credentialSource": ["cookie:health_platform_session_v2", "legacy-cookie:health_city_browser_session", "header:authorization-bearer"]
       },
       "authorization": {
         "model": "validated-live-session-self-context",
@@ -121,7 +121,7 @@
         "mode": "optional",
         "mechanism": "optional-bearer-or-cookie-session",
         "principalType": "optional-platform-user",
-        "credentialSource": ["cookie:health_city_browser_session", "header:authorization-bearer", "anonymous-no-session"]
+        "credentialSource": ["cookie:health_platform_session_v2", "legacy-cookie:health_city_browser_session", "header:authorization-bearer", "anonymous-no-session"]
       },
       "authorization": {
         "model": "optional-self-session-revocation",
@@ -272,7 +272,7 @@
         "mode": "required",
         "mechanism": "live-session-plus-upstream-token",
         "principalType": "platform-user",
-        "credentialSource": ["cookie:health_city_browser_session", "header:authorization-bearer", "json-body:upstreamToken"]
+        "credentialSource": ["cookie:health_platform_session_v2", "legacy-cookie:health_city_browser_session", "header:authorization-bearer", "json-body:upstreamToken"]
       },
       "authorization": {
         "model": "validated-live-session-self-revocation",
@@ -415,7 +415,7 @@
         "mode": "required",
         "mechanism": "bearer-or-cookie-session",
         "principalType": "platform-user",
-        "credentialSource": ["cookie:health_city_browser_session", "header:authorization-bearer"]
+        "credentialSource": ["cookie:health_platform_session_v2", "legacy-cookie:health_city_browser_session", "header:authorization-bearer"]
       },
       "authorization": {
         "model": "commission-role-t10-specialty-cutover-read",

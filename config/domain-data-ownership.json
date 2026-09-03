@@ -681,6 +681,36 @@
       "classification": "restricted",
       "readers": ["platform-governance"]
     },
+    "publicHealthSupervisionCases": {
+      "owner": "public-health",
+      "classification": "restricted",
+      "readers": ["platform-governance"]
+    },
+    "unifiedWorkTaskStates": {
+      "owner": "care-coordination",
+      "classification": "restricted",
+      "readers": ["platform-governance"]
+    },
+    "unifiedWorkCenterCommandReceipts": {
+      "owner": "care-coordination",
+      "classification": "internal",
+      "readers": ["platform-governance"]
+    },
+    "accountLifecycleRequests": {
+      "owner": "identity-security",
+      "classification": "restricted",
+      "readers": ["platform-governance"]
+    },
+    "accountTemporaryGrants": {
+      "owner": "identity-security",
+      "classification": "restricted",
+      "readers": ["platform-governance"]
+    },
+    "accountLifecycleCommandReceipts": {
+      "owner": "identity-security",
+      "classification": "internal",
+      "readers": ["platform-governance"]
+    },
     "birthCertificates": {
       "owner": "public-health",
       "classification": "restricted",

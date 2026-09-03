@@ -5,6 +5,7 @@ const test = require("node:test");
 const { createPlatformRuntimeComposition } = require("../src/http/platform-runtime-composition");
 const {
   createPlatformRequestHandler,
+  isAnonymousAuthBootstrapRequest,
   publicRequestError
 } = require("../src/http/platform-request-handler");
 
@@ -55,6 +56,31 @@ test("request handler centralizes API session failure and static dispatch", asyn
   await failed({ url: "/api/health" }, response);
   assert.equal(responses[0].status, 503);
   assert.equal(responses[0].body.code, "SESSION_STORE_UNAVAILABLE");
+});
+
+test("stale sessions cannot block anonymous authentication bootstrap routes", async () => {
+  for (const request of [
+    { method: "POST", url: "/api/auth/login" },
+    { method: "POST", url: "/api/auth/phone-login" },
+    { method: "POST", url: "/api/auth/phone-code" },
+    { method: "GET", url: "/api/auth/login-catalog?scope=demo" }
+  ]) assert.equal(isAnonymousAuthBootstrapRequest(request), true, request.url);
+  assert.equal(isAnonymousAuthBootstrapRequest({ method: "GET", url: "/api/auth/context" }), false);
+
+  let hydrated = 0;
+  let handled = 0;
+  const handler = createPlatformRequestHandler({
+    observability: { run: async (_req, _res, work) => work(), recordDependency: () => {} },
+    hydrateRequestSession: async () => { hydrated += 1; throw new Error("stale session"); },
+    hydrateStaticRequestSession: async () => {},
+    isProtectedStaticRequest: () => false,
+    handleApi: async () => { handled += 1; },
+    serveStatic: () => {}, recordRequestMetrics: () => {}, sendJson: () => {},
+    handleError: (_req, _res, error) => { throw error; }, logger: { error: () => {} }
+  });
+  await handler({ method: "POST", url: "/api/auth/login" }, { on: () => {} });
+  assert.equal(hydrated, 0);
+  assert.equal(handled, 1);
 });
 
 test("request handler rejects malformed URI encoding as a stable client error", async () => {

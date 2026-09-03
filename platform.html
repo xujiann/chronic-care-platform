@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>区域全民健康信息平台</title>
     <link rel="stylesheet" href="./portal.css" />
+    <link rel="stylesheet" href="./platform-section-router.css" />
     <script src="./regional-context.js"></script>
     <script src="./access-control-policy.js"></script>
     <script src="./browser-safe-url.js"></script>
@@ -332,8 +333,8 @@
 
       <section class="panel">
         <div class="panel-title">
-          <h2>P0 production deployment path</h2>
-          <span>Release gate, production storage, government identity, and audit retention tracks</span>
+          <h2>P0 生产部署路径</h2>
+          <span>发布门禁、生产存储、政务身份认证和审计留存轨道</span>
         </div>
         <div id="production-deployment-plan" class="priority-list"></div>
       </section>
@@ -349,6 +350,24 @@
           <button class="inline-action" type="button" data-session-cleanup-action>清理保留会话</button>
         </div>
         <div id="identity-lifecycle-metrics" class="metric-grid"></div>
+        <div class="panel-title compact-title identity-account-title">
+          <div>
+            <h3>账号与功能治理台账</h3>
+            <span id="identity-account-filter-status" class="muted" aria-live="polite">等待账号目录</span>
+          </div>
+        </div>
+        <div class="identity-account-toolbar" aria-label="账号治理筛选">
+          <label>检索账号或机构<input id="identity-account-search" type="search" placeholder="账号编码、姓名、机构或数据范围" autocomplete="off" /></label>
+          <label>角色<select id="identity-account-role-filter"><option value="all">全部角色</option><option value="commission">卫生健康主管部门</option><option value="institution">医疗卫生机构</option><option value="insurance">医疗保障部门</option><option value="county">县域医共体</option><option value="citizen">居民个人</option></select></label>
+          <label>状态<select id="identity-account-status-filter"><option value="all">全部状态</option><option value="enabled">启用</option><option value="disabled">停用</option><option value="external-unbound">外部身份待绑定</option><option value="review">存在待复核项</option></select></label>
+        </div>
+        <div id="identity-account-summary" class="metric-grid identity-account-summary"></div>
+        <div id="identity-account-list" class="priority-list identity-account-list"></div>
+        <p id="identity-account-boundary" class="implementation-boundary"></p>
+        <div class="panel-title compact-title">
+          <h3>外部身份目录同步</h3>
+          <span class="muted">预检、受控绑定和停用同步</span>
+        </div>
         <div id="identity-directory-plan" class="priority-list"></div>
         <div class="panel-title compact-title">
           <h3>短信送达回执</h3>
@@ -702,11 +721,14 @@
     </dialog>
 
     <script src="./shared.js"></script>
+    <script src="./structured-dialog.js"></script>
     <script src="./regional-cutover-workbench-ui.js"></script>
     <script src="./product-operations-ui.js"></script>
     <script src="./product-regional-operations-ui.js"></script>
     <script src="./platform-procurement-governance-ui.js"></script>
     <script src="./platform-productization-ui.js"></script>
+    <script src="./platform-identity-governance-ui.js"></script>
+    <script src="./platform-section-router.js"></script>
     <script src="./platform.js"></script>
     <script src="./production-security.js"></script>
     <script src="./production-go-no-go-ui.js"></script>

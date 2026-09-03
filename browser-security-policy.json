@@ -157,7 +157,7 @@
       {"asset":"institution.js","type":"dom-insert-adjacent-html","priority":"P0","fingerprint":"de0041755a4c6d6b410ec4e3e00471110eab848c1cf3c7faa821f4001b70892a","count":2},
       {"asset":"insurance.js","type":"dom-inner-html","priority":"P0","fingerprint":"92ae67ea71744b4713030c8b83a09760af9dcb9c851223295838fb59386e83f6","count":11},
       {"asset":"internet-nursing.js","type":"dom-inner-html","priority":"P0","fingerprint":"a586fe1d92cd9a5124037cd6420e5284640e94c5468467aaae6fc70c04bcd7d5","count":23},
-      {"asset":"login.js","type":"dom-inner-html","priority":"P0","fingerprint":"d4de968f3d1fd6b9dbfc14dcadf6a3e5e5a640233c6985bc869736857045ad6f","count":6},
+      {"asset":"login.js","type":"dom-inner-html","priority":"P0","fingerprint":"15de20b972e61e7be8aafd78831adfd993e1ffef62e3365ef3333be555e1517b","count":6},
       {"asset":"mobile-preview.js","type":"cssom-property-mutation","priority":"P1","fingerprint":"31d347dc65dd8ca5fc90d7b9230aa21854b71a4f2b5bda3a7cb798a74058b461","count":2},
       {"asset":"mobile-preview.js","type":"dom-inner-html","priority":"P0","fingerprint":"a6ad11fa4b4f2eab589f341d76048b2f7a29d284337dfadbd5aa322426c39f94","count":2},
       {"asset":"operations.js","type":"dom-inner-html","priority":"P0","fingerprint":"ccc91e44ef9b0cd2ee3c3e32b7f32a3c3609dc699e8674455f41af08c8e421ea","count":50},

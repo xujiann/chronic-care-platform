@@ -65,6 +65,36 @@ test("menus, homes and login candidates derive from the same policy", () => {
   assert.equal(candidates[0].accountType, "doctor");
 });
 
+test("new work centers stay within reviewed role and account boundaries", () => {
+  assert.equal(policy.canAccessPage("unified-work-center.html", user({ accountType: "doctor" })), true);
+  assert.equal(policy.canAccessPage("account-lifecycle.html", user({ role: "commission", accountType: "manager" })), true);
+  assert.equal(policy.canAccessPage("account-lifecycle.html", user({ role: "institution", accountType: "manager" })), false);
+  assert.equal(policy.canAccessPage("public-health-supervision-cases.html", user()), true);
+  assert.equal(policy.canAccessPage("public-health-supervision-cases.html", user({ accountType: "doctor" })), false);
+});
+
+test("authorized navigation is grouped by function and nests related child pages", () => {
+  const commission = user({
+    role: "commission",
+    accountType: "manager",
+    orgType: "health_commission",
+    home: "index.html"
+  });
+  const tree = policy.menuTreeForUser(commission);
+  assert.ok(tree.length >= 5);
+  assert.deepEqual(tree.slice(0, 3).map((group) => group.label), ["平台总览", "治理与监管", "公共卫生"]);
+
+  const clinical = tree.find((group) => group.id === "institution");
+  const blood = clinical.items.find((item) => item.page === "blood.html");
+  assert.deepEqual(blood.children.map((item) => item.page), ["blood-business.html", "blood-go-live.html", "blood-innovation.html"]);
+
+  const institutionOnly = user({ home: "institution.html" });
+  const institutionTree = policy.menuTreeForUser(institutionOnly);
+  const flattened = institutionTree.flatMap((group) => group.items.flatMap((item) => [item.page, ...item.children.map((child) => child.page)]));
+  assert.ok(flattened.includes("institution.html"));
+  assert.ok(!flattened.includes("insurance.html"));
+});
+
 test("explicit permission checks fail closed", () => {
   assert.equal(policy.canUsePermission("referral.accept", user({ permissions: ["referral.accept"] })), true);
   assert.equal(policy.canUsePermission("referral.accept", user()), false);

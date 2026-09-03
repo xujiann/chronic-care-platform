@@ -1248,7 +1248,12 @@ function createRouteSegments(runtime) {
         const user = requireApiRole(req, res, ["insurance", "commission"], url.pathname);
         if (!user) return true;
         const data = readDatabase();
-        const result = DiseasePaymentService.reviewSpecialCase(data.diseasePayment, decodeURIComponent(diseasePaymentSpecialReviewMatch[1]), await collectJson(req), user.name);
+        const result = DiseasePaymentService.reviewSpecialCase(
+          data.diseasePayment,
+          decodeURIComponent(diseasePaymentSpecialReviewMatch[1]),
+          await collectJson(req),
+          user.workflowActor || user.name
+        );
         data.diseasePayment = result.state;
         writeDatabase(data);
         sendJson(res, 200, result.row);

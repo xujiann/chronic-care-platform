@@ -55,6 +55,7 @@ test("commission keeps all four business-responsibility approval actions after a
   });
 
   await page.goto("/platform.html");
+  await page.getByRole("button", { name: "安全与发布", exact: true }).click();
   await expect(page.locator("#production-go-no-go-status")).toHaveText("awaiting-four-party-approval");
   await page.evaluate(() => window.HealthCityAuth.filterRoleFeatures());
 
@@ -62,9 +63,14 @@ test("commission keeps all four business-responsibility approval actions after a
   await expect(approvals).toHaveCount(4);
   expect(await approvals.evaluateAll((buttons) => buttons.map((button) => button.dataset.approvalRole))).toEqual(RESPONSIBILITIES);
 
-  const prompts = ["审批意见满足最小长度", "audit://four-party-approval-proof"];
-  page.on("dialog", async (dialog) => dialog.accept(prompts.shift()));
   await approvals.first().click();
+  const structuredDialog = page.locator("#health-structured-dialog");
+  await expect(structuredDialog.getByRole("heading", { name: "审批意见", exact: true })).toBeVisible();
+  await structuredDialog.locator("textarea[name='value']").fill("审批意见满足最小长度");
+  await structuredDialog.getByRole("button", { name: "确认", exact: true }).click();
+  await expect(structuredDialog.getByRole("heading", { name: "最小化签署证据引用（不得包含患者可识别信息）", exact: true })).toBeVisible();
+  await structuredDialog.locator("textarea[name='value']").fill("audit://four-party-approval-proof");
+  await structuredDialog.getByRole("button", { name: "确认", exact: true }).click();
   await expect.poll(() => posts.length).toBe(1);
   expect(new URL(posts[0].url).pathname).toBe("/api/production-go-no-go/approvals/pgng-approval-business/actions");
   expect(posts[0].body).toEqual({

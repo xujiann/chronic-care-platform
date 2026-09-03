@@ -71,12 +71,29 @@ test("authorization context requires authentication and denies unknown roles", a
   assert.equal(unknown.body.code, "UNKNOWN_ROLE_DENIED");
 });
 
+test("development login catalog is ordered, safe and excludes legacy aliases", async () => {
+  const response = await fetch(`${baseUrl}/api/auth/login-catalog`);
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.equal(body.ok, true);
+  assert.equal(body.schemaVersion, "login-account-catalog-v1");
+  assert.equal(body.demo, true);
+  assert.equal(body.accounts.some((item) => item.username === "health"), true);
+  assert.equal(body.accounts.some((item) => item.username === "whjw"), false);
+  assert.equal(body.accounts.every((item) => item.password === undefined && item.passwordHash === undefined), true);
+  assert.equal(new Set(body.accounts.map((item) => item.username)).size, body.accounts.length);
+  assert.deepEqual(
+    body.accounts.map((item) => item.catalogOrder),
+    body.accounts.map((item) => item.catalogOrder).sort((left, right) => left - right)
+  );
+});
+
 test("browser cookie can read context while unsafe requests require signed CSRF", async () => {
   const doctor = await login("doctor");
   const setCookies = doctor.response.headers.getSetCookie();
   const cookieHeader = setCookies.map((value) => value.split(";")[0]).join("; ");
-  assert.match(cookieHeader, /health_city_browser_session=/);
-  assert.match(cookieHeader, /health_platform_csrf=/);
+  assert.match(cookieHeader, /health_platform_session_v2=/);
+  assert.match(cookieHeader, /health_platform_csrf_v2=/);
 
   const context = await fetch(`${baseUrl}/api/auth/context`, { headers: { Cookie: cookieHeader } });
   assert.equal(context.status, 200);
@@ -86,7 +103,7 @@ test("browser cookie can read context while unsafe requests require signed CSRF"
   assert.equal(rejected.status, 403);
   assert.equal((await rejected.json()).code, "CSRF_VALIDATION_FAILED");
 
-  const csrf = decodeURIComponent(cookieHeader.match(/(?:^|; )health_platform_csrf=([^;]+)/)[1]);
+  const csrf = decodeURIComponent(cookieHeader.match(/(?:^|; )health_platform_csrf_v2=([^;]+)/)[1]);
   const accepted = await fetch(`${baseUrl}/api/auth/logout`, {
     method: "POST",
     headers: { Cookie: cookieHeader, "X-CSRF-Token": csrf }
@@ -120,7 +137,7 @@ test("protected static business pages require and enforce the browser session", 
   assert.match(anonymous.headers.get("location"), /^\/login\.html\?redirect=/);
 
   const doctor = await login("doctor");
-  const cookie = `health_city_browser_session=${encodeURIComponent(doctor.body.token)}`;
+  const cookie = `health_platform_session_v2=${encodeURIComponent(doctor.body.token)}`;
   const allowed = await fetch(`${baseUrl}/doctor.html`, { headers: { Cookie: cookie }, redirect: "manual" });
   assert.equal(allowed.status, 200);
 

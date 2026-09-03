@@ -6,6 +6,7 @@ const path = require("node:path");
 const test = require("node:test");
 const vm = require("node:vm");
 const policy = require("../access-control-policy");
+const seedData = require("../data/db.json");
 
 const ROOT = path.resolve(__dirname, "..");
 
@@ -53,6 +54,62 @@ test("every demo identity has an authorized deterministic home and menu", () => 
     for (const item of menu) {
       assert.equal(policy.canAccessPage(item.page, user), true, `${user.username} menu ${item.page} must be authorized`);
     }
+  }
+});
+
+test("login catalog presents unique neutral accounts and hides compatibility aliases", () => {
+  const users = loadDemoUsers();
+  const visible = users.filter((user) => user.catalogVisible !== false);
+  assert.equal(visible.length, 16);
+  assert.equal(new Set(visible.map((user) => user.username)).size, visible.length);
+  assert.equal(new Set(visible.map((user) => user.accountCode)).size, visible.length);
+  assert.equal(visible.some((user) => user.username === "health"), true);
+  assert.equal(visible.some((user) => user.username === "whjw"), false);
+  assert.equal(users.find((user) => user.username === "whjw").legacyAliasFor, "health");
+  for (const user of visible) {
+    assert.ok(user.accountCode, `${user.username} must have a stable account code`);
+    assert.ok(user.accountType, `${user.username} must have an explicit account type`);
+    assert.ok(user.roleName, `${user.username} must have a distinct岗位 name`);
+    assert.ok(user.orgName, `${user.username} must have an organization display name`);
+    assert.doesNotMatch(
+      [user.name, user.roleName, user.orgName, user.dataScope].join(" "),
+      /大连|Dalian|中山区|青泥洼桥/,
+      `${user.username} login presentation must stay region-neutral`
+    );
+  }
+});
+
+test("tracked account master data keeps the complete canonical identity fields", () => {
+  const users = loadDemoUsers();
+  const browserByUsername = new Map(users.map((user) => [user.username, user]));
+  assert.equal(seedData.authUsers.length, users.length);
+  for (const stored of seedData.authUsers) {
+    const browser = browserByUsername.get(stored.username);
+    assert.ok(browser, `${stored.username} must exist in the browser catalog`);
+    for (const field of ["accountCode", "catalogOrder", "accountType", "role", "roleName", "orgCode", "orgType", "home"]) {
+      assert.equal(stored[field], browser[field], `${stored.username} ${field} must not drift`);
+    }
+    assert.equal(stored.catalogVisible !== false, browser.catalogVisible !== false, `${stored.username} visibility must not drift`);
+  }
+});
+
+test("specialist accounts receive bounded function sets instead of the whole role catalog", () => {
+  const users = new Map(loadDemoUsers().map((user) => [user.username, user]));
+  const expectations = {
+    blood_quality: { count: 7, allowed: ["unified-work-center.html", "blood.html", "blood-go-live.html"], denied: ["index.html", "public-health.html", "disease-payment.html"] },
+    nurse: { count: 10, allowed: ["unified-work-center.html", "maternal-child.html", "internet-nursing.html", "emergency.html"], denied: ["blood.html", "quality-safety.html", "digital-hospital-evaluation.html"] },
+    doctor: { count: 16, allowed: ["unified-work-center.html", "doctor.html", "regional-data-sharing.html", "referral-teleconsultation.html", "disease-payment.html", "drug-consumable.html"], denied: ["blood.html", "quality-safety.html"] },
+    blood_tech_1: { count: 8, allowed: ["unified-work-center.html", "institution.html", "blood-business.html"], denied: ["internet-nursing.html", "physical-examination.html"] },
+    insurance: { count: 6, allowed: ["unified-work-center.html", "insurance.html", "disease-payment.html", "drug-consumable.html"], denied: ["doctor.html", "platform.html"] },
+    county: { count: 9, allowed: ["unified-work-center.html", "county.html", "quality-safety.html", "referral-teleconsultation.html"], denied: ["insurance.html", "blood.html"] },
+    citizen: { count: 11, allowed: ["citizen.html", "resident-mini-program.html"], denied: ["institution.html", "platform.html"] }
+  };
+  for (const [username, expectation] of Object.entries(expectations)) {
+    const user = users.get(username);
+    const pages = policy.pagesForUser(user, {}, { includeHome: true }).map((item) => item.page);
+    assert.equal(pages.length, expectation.count, `${username} function count must stay reviewed`);
+    expectation.allowed.forEach((page) => assert.equal(policy.canAccessPage(page, user), true, `${username} must access ${page}`));
+    expectation.denied.forEach((page) => assert.equal(policy.canAccessPage(page, user), false, `${username} must not access ${page}`));
   }
 });
 

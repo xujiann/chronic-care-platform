@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>科研沙箱工作台 · 区域全民健康信息平台</title>
+  <link rel="stylesheet" href="./portal.css" /><link rel="stylesheet" href="./domain-task-workbench.css" />
+  <script src="./regional-context.js"></script><script src="./access-control-policy.js"></script><script src="./browser-safe-url.js"></script><script src="./auth.js"></script>
+  <script defer src="./platform-domain-modules.js"></script><script defer src="./platform-api-client.js"></script><script defer src="./platform-design-system.js"></script><script defer src="./platform-shell.js"></script>
+  <script src="./page-auth-bootstrap.js" data-roles="commission,institution"></script>
+  <script defer src="./domain-task-ui.js"></script><script defer src="./research-sandbox.js"></script>
+</head>
+<body><main class="portal-shell domain-workbench">
+  <header class="portal-header"><div><span>科研创新</span><h1>科研数据集与安全沙箱工作台</h1><p>从伦理证据、最小必要审批到沙箱访问、合规导出和成果回流形成可审计链路。</p></div><nav><a href="./platform.html">平台治理</a><a href="./quality-safety.html">质量安全</a><a href="./research-sandbox-about.html">模块说明</a></nav></header>
+  <p id="domain-workbench-status" class="domain-workbench-status" role="status" aria-live="polite">正在加载……</p><p id="domain-workbench-error" class="domain-workbench-error" role="alert"></p>
+  <section id="domain-workbench-metrics" class="metric-grid"></section>
+  <section class="panel"><div class="panel-title"><h2>数据集筛选</h2><span>只呈现去标识化治理状态</span></div><div class="workbench-toolbar"><label>状态<select id="domain-status-filter"><option value="">全部状态</option></select></label><label>关键词<input id="domain-keyword-filter" type="search" placeholder="数据集编号、病种或伦理批件" /></label><button id="domain-refresh" type="button">刷新业务数据</button></div></section>
+  <section class="portal-grid"><article class="panel wide"><div class="panel-title"><h2>科研治理队列</h2><span>申请—伦理—授权—沙箱—导出—成果</span></div><div id="domain-task-list" class="domain-task-list"></div></article><article class="panel"><div class="panel-title"><h2>数据集详情</h2><span>不展示个人级数据</span></div><div id="domain-task-detail"></div></article></section>
+</main></body></html>
