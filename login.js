@@ -64,7 +64,10 @@
 
   function renderAccountCards() {
     const roleAccounts = accounts.filter((user) => user.role === selectedRole);
-    byId("demo-accounts").innerHTML = roleAccounts.map((user) => `<button type="button" data-user="${escapeText(user.username)}" aria-pressed="${user.username === selectedUsername}"><strong>${escapeText(accountTypeLabel(user))}</strong><span>${escapeText(user.roleName)}</span><small>${escapeText(user.orgName || "未绑定机构")} · ${escapeText(user.username)}</small></button>`).join("");
+    byId("demo-accounts").innerHTML = roleAccounts.map((user) => {
+      const functionCount = policy.pagesForUser(user, {}, { includeHome: true }).length;
+      return `<button type="button" data-user="${escapeText(user.username)}" aria-pressed="${user.username === selectedUsername}"><strong>${escapeText(accountTypeLabel(user))}</strong><span>${escapeText(user.roleName)}</span><small>${escapeText(user.orgName || "未绑定机构")} · ${escapeText(user.username)}</small><em>${functionCount} 项授权功能</em></button>`;
+    }).join("");
     document.querySelectorAll("[data-user]").forEach((button) => button.addEventListener("click", () => selectAccount(button.dataset.user)));
   }
 
@@ -75,9 +78,13 @@
     byId("access-preview-role").textContent = `${policy.roleLabels[user.role]} · ${accountTypeLabel(user)}`;
     byId("access-preview-organization").textContent = `所属机构：${user.orgName || "未绑定机构"}`;
     byId("access-preview-scope").textContent = `数据范围：${user.dataScope || "未授予"}`;
-    const pages = policy.pagesForUser(user).slice(0, 12);
-    byId("access-preview-functions").innerHTML = pages.length
-      ? pages.map((item) => `<span>${escapeText(item.label)}</span>`).join("")
+    const pages = policy.pagesForUser(user, {}, { includeHome: true });
+    const visiblePages = pages.slice(0, 12);
+    const home = policy.pageCatalog[policy.homeForUser(user)]?.label || "身份首页";
+    const groups = new Set(pages.map((item) => item.group));
+    byId("access-preview-summary").textContent = `共 ${pages.length} 项功能 · ${groups.size} 个功能分组 · 首页：${home}`;
+    byId("access-preview-functions").innerHTML = visiblePages.length
+      ? `${visiblePages.map((item) => `<span>${escapeText(item.label)}</span>`).join("")}${pages.length > visiblePages.length ? `<span>还有 ${pages.length - visiblePages.length} 项</span>` : ""}`
       : "<em>该账号没有可用业务功能</em>";
   }
 

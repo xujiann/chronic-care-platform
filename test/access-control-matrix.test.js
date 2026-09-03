@@ -6,6 +6,7 @@ const path = require("node:path");
 const test = require("node:test");
 const vm = require("node:vm");
 const policy = require("../access-control-policy");
+const seedData = require("../data/db.json");
 
 const ROOT = path.resolve(__dirname, "..");
 
@@ -75,6 +76,40 @@ test("login catalog presents unique neutral accounts and hides compatibility ali
       /大连|Dalian|中山区|青泥洼桥/,
       `${user.username} login presentation must stay region-neutral`
     );
+  }
+});
+
+test("tracked account master data keeps the complete canonical identity fields", () => {
+  const users = loadDemoUsers();
+  const browserByUsername = new Map(users.map((user) => [user.username, user]));
+  assert.equal(seedData.authUsers.length, users.length);
+  for (const stored of seedData.authUsers) {
+    const browser = browserByUsername.get(stored.username);
+    assert.ok(browser, `${stored.username} must exist in the browser catalog`);
+    for (const field of ["accountCode", "catalogOrder", "accountType", "role", "roleName", "orgCode", "orgType", "home"]) {
+      assert.equal(stored[field], browser[field], `${stored.username} ${field} must not drift`);
+    }
+    assert.equal(stored.catalogVisible !== false, browser.catalogVisible !== false, `${stored.username} visibility must not drift`);
+  }
+});
+
+test("specialist accounts receive bounded function sets instead of the whole role catalog", () => {
+  const users = new Map(loadDemoUsers().map((user) => [user.username, user]));
+  const expectations = {
+    blood_quality: { count: 6, allowed: ["blood.html", "blood-go-live.html"], denied: ["index.html", "public-health.html", "disease-payment.html"] },
+    nurse: { count: 8, allowed: ["internet-nursing.html", "emergency.html"], denied: ["blood.html", "quality-safety.html", "digital-hospital-evaluation.html"] },
+    doctor: { count: 12, allowed: ["doctor.html", "regional-data-sharing.html", "disease-payment.html"], denied: ["blood.html", "quality-safety.html"] },
+    blood_tech_1: { count: 7, allowed: ["institution.html", "blood-business.html"], denied: ["internet-nursing.html", "physical-examination.html"] },
+    insurance: { count: 4, allowed: ["insurance.html", "disease-payment.html"], denied: ["doctor.html", "platform.html"] },
+    county: { count: 7, allowed: ["county.html", "quality-safety.html"], denied: ["insurance.html", "blood.html"] },
+    citizen: { count: 11, allowed: ["citizen.html", "resident-mini-program.html"], denied: ["institution.html", "platform.html"] }
+  };
+  for (const [username, expectation] of Object.entries(expectations)) {
+    const user = users.get(username);
+    const pages = policy.pagesForUser(user, {}, { includeHome: true }).map((item) => item.page);
+    assert.equal(pages.length, expectation.count, `${username} function count must stay reviewed`);
+    expectation.allowed.forEach((page) => assert.equal(policy.canAccessPage(page, user), true, `${username} must access ${page}`));
+    expectation.denied.forEach((page) => assert.equal(policy.canAccessPage(page, user), false, `${username} must not access ${page}`));
   }
 });
 

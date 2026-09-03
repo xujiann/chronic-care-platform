@@ -608,6 +608,7 @@
         link.remove();
       }
     });
+    refreshLocalNavigationVisibility();
   }
 
   function filterRoleFeatures() {
@@ -625,12 +626,21 @@
         && (!permission || accessPolicy?.canUsePermission(permission, user));
       if (!allowed) element.remove();
     });
+    refreshLocalNavigationVisibility();
+  }
+
+  function refreshLocalNavigationVisibility() {
+    document.querySelectorAll(".navigation-local-group").forEach((group) => {
+      const hasVisibleAction = [...group.querySelectorAll("a, button")]
+        .some((element) => !element.hidden && !element.classList.contains("navigation-duplicate-link"));
+      group.hidden = !hasVisibleAction;
+    });
   }
 
   function renderSessionBar() {
     if (document.body?.dataset.authPage === "login") return;
     const shell = document.querySelector(".portal-shell, .citizen-shell, .app, .app-shell, .mini-app, .preview-shell, main");
-    if (!shell || document.querySelector(".auth-bar")) return;
+    if (!shell || document.querySelector("#health-navigation-sidebar")) return;
     const user = getUser();
     const current = accessPolicy?.normalizePageName(location.pathname) || "";
     const bar = document.createElement("aside");
@@ -655,13 +665,26 @@
     const identity = document.createElement("div");
     identity.className = "navigation-identity";
     const name = document.createElement("strong");
-    const detail = document.createElement("span");
-    identity.append(name, detail);
+    const role = document.createElement("span");
+    role.className = "navigation-identity-role";
+    const organization = document.createElement("span");
+    organization.className = "navigation-identity-organization";
+    const scope = document.createElement("p");
+    scope.className = "navigation-identity-scope";
+    const identityMeta = document.createElement("div");
+    identityMeta.className = "navigation-identity-meta";
+    const accountCode = document.createElement("span");
+    const functionCount = document.createElement("span");
+    identityMeta.append(accountCode, functionCount);
+    const identityActions = document.createElement("div");
+    identityActions.className = "navigation-identity-actions";
+    identity.append(name, role, organization, scope, identityMeta, identityActions);
 
     const nav = document.createElement("nav");
     nav.className = "navigation-primary";
     nav.setAttribute("aria-label", "平台功能");
     const menuTree = accessPolicy?.menuTreeForUser?.(user, {}, { includeHome: true }) || [];
+    const totalFunctions = menuTree.reduce((total, group) => total + group.items.reduce((count, item) => count + 1 + (item.children || []).length, 0), 0);
     const menuPages = new Set();
     const appendMenuLink = (container, item, level) => {
       const link = document.createElement("a");
@@ -678,10 +701,16 @@
     menuTree.forEach((group, index) => {
       const details = document.createElement("details");
       details.className = "navigation-group";
+      details.dataset.navigationGroup = group.id;
       const containsCurrent = group.items.some((item) => item.page === current || item.children.some((child) => child.page === current));
       details.open = containsCurrent || (!current && index === 0);
       const summary = document.createElement("summary");
-      summary.textContent = group.label;
+      const summaryLabel = document.createElement("span");
+      summaryLabel.textContent = group.label;
+      const summaryCount = document.createElement("span");
+      summaryCount.className = "navigation-group-count";
+      summaryCount.textContent = String(group.items.reduce((count, item) => count + 1 + (item.children || []).length, 0));
+      summary.append(summaryLabel, summaryCount);
       const links = document.createElement("div");
       links.className = "navigation-group-links";
       group.items.forEach((item) => appendMenuLink(links, item, 2));
@@ -691,28 +720,87 @@
 
     if (user) {
       name.textContent = displayAuthText(user.name);
-      detail.textContent = `${displayAuthText(user.roleName)} · ${displayAuthText(user.orgName || "未绑定机构")} · ${displayAuthText(user.dataScope || "默认范围")}`;
+      role.textContent = displayAuthText(user.roleName || accessPolicy?.roleLabels?.[user.role] || "授权岗位");
+      organization.textContent = displayAuthText(user.orgName || "未绑定机构");
+      scope.textContent = displayAuthText(user.dataScope || "默认数据范围");
+      scope.title = scope.textContent;
+      accountCode.textContent = displayAuthText(user.accountCode || user.username || "未编码账号");
+      functionCount.textContent = `${totalFunctions} 项功能`;
+      const homeLink = document.createElement("a");
+      homeLink.className = "navigation-home-link";
+      homeLink.dataset.navigationHome = "";
+      setInternalHref(homeLink, localHref(accessPolicy?.homeForUser(user) || user.home || "health-city.html"));
+      homeLink.textContent = "我的首页";
       const logoutButton = document.createElement("button");
       logoutButton.type = "button";
       logoutButton.dataset.logout = "";
       logoutButton.textContent = "退出";
-      identity.append(logoutButton);
+      identityActions.append(homeLink, logoutButton);
     } else {
       name.textContent = "未登录";
-      detail.textContent = "登录后显示与身份匹配的完整功能";
+      role.textContent = "访客模式";
+      organization.textContent = "登录后显示所属机构";
+      scope.textContent = "仅开放平台介绍和公开总览。";
+      accountCode.textContent = "ANONYMOUS";
+      functionCount.textContent = `${totalFunctions} 项公开功能`;
       const loginLink = document.createElement("a");
       setInternalHref(loginLink, `${localHref("login.html")}?redirect=${encodeURIComponent(currentPage())}`);
       loginLink.textContent = "登录";
       loginLink.className = "navigation-login-link";
-      identity.append(loginLink);
+      identityActions.append(loginLink);
     }
+
+    const navigationTools = document.createElement("div");
+    navigationTools.className = "navigation-tools";
+    const searchLabel = document.createElement("label");
+    searchLabel.setAttribute("for", "health-navigation-search");
+    searchLabel.textContent = "搜索功能";
+    const search = document.createElement("input");
+    search.id = "health-navigation-search";
+    search.type = "search";
+    search.placeholder = "输入功能名称";
+    search.autocomplete = "off";
+    const searchStatus = document.createElement("span");
+    searchStatus.className = "navigation-search-status";
+    searchStatus.setAttribute("aria-live", "polite");
+    searchStatus.textContent = `共 ${totalFunctions} 项`;
+    searchLabel.append(search, searchStatus);
+    navigationTools.append(searchLabel);
+
+    const filterNavigation = () => {
+      const query = search.value.trim().toLocaleLowerCase("zh-CN");
+      let matches = 0;
+      nav.querySelectorAll(".navigation-group").forEach((group) => {
+        let groupMatches = 0;
+        group.querySelectorAll(".navigation-group-links > a").forEach((link) => {
+          const visible = !query || link.textContent.toLocaleLowerCase("zh-CN").includes(query);
+          link.hidden = !visible;
+          if (visible) groupMatches += 1;
+        });
+        group.hidden = groupMatches === 0;
+        if (query && groupMatches) group.open = true;
+        matches += groupMatches;
+      });
+      searchStatus.textContent = query ? `找到 ${matches} 项` : `共 ${totalFunctions} 项`;
+    };
+    search.addEventListener("input", filterNavigation);
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "/" && !event.ctrlKey && !event.metaKey && !event.altKey && !/input|textarea|select/i.test(event.target?.tagName || "")) {
+        event.preventDefault();
+        search.focus();
+      }
+    });
 
     const localNavigation = document.createElement("div");
     localNavigation.className = "navigation-local";
-    bar.append(brand, localNavigation, nav, identity);
+    bar.append(brand, identity, navigationTools, localNavigation, nav);
     document.body.append(bar);
     installNavigationToggle(bar);
-    relocatePageNavigation(bar, localNavigation, menuPages);
+    relocatePageNavigation(bar, localNavigation, menuPages, user);
+    new MutationObserver(() => refreshLocalNavigationVisibility()).observe(localNavigation, {
+      childList: true,
+      subtree: true
+    });
     document.documentElement.setAttribute("data-navigation-shell", "ready");
     bar.querySelector("[data-logout]")?.addEventListener("click", logout);
     filterRoleLinks();
@@ -749,7 +837,7 @@
     document.body.append(toggle, scrim);
   }
 
-  function relocatePageNavigation(sidebar, localNavigation, menuPages) {
+  function relocatePageNavigation(sidebar, localNavigation, menuPages, user) {
     const labels = new Map([
       ["nav", "当前工作台"],
       ["dashboard-section-nav", "驾驶舱分区"],
@@ -761,8 +849,22 @@
       ["nav-list", "标准平台功能"]
     ]);
     const moved = new Set();
+    const constrainLocalNavigation = (source) => {
+      if (!source?.classList.contains("nursing-role-nav") || !user) return;
+      const accountType = normalizeAccountType(user);
+      let allowedTargets = null;
+      if (user.role === "citizen") allowedTargets = new Set(["#nursing-mobile-workbench", "#nursing-appointment-panel"]);
+      else if (user.role === "county") allowedTargets = new Set(["#nursing-regulatory-section"]);
+      else if (accountType === "nurse") allowedTargets = new Set(["#nursing-mobile-workbench", "#nursing-nurse-response"]);
+      else if (accountType === "doctor") allowedTargets = new Set(["#nursing-hospital-management"]);
+      if (!allowedTargets) return;
+      source.querySelectorAll("a[href^='#']").forEach((link) => {
+        link.hidden = !allowedTargets.has(link.getAttribute("href"));
+      });
+    };
     const moveNavigation = (source, label) => {
       if (!source || moved.has(source) || source.closest(".navigation-sidebar")) return;
+      constrainLocalNavigation(source);
       moved.add(source);
       const section = document.createElement("details");
       section.className = "navigation-local-group";
@@ -799,6 +901,7 @@
       }
     });
 
+    refreshLocalNavigationVisibility();
     sidebar.querySelectorAll("nav a[aria-current='page']").forEach((link) => link.closest("details")?.setAttribute("open", ""));
   }
 

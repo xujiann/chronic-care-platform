@@ -64,6 +64,31 @@ test("five identity types receive only their policy menu and reject a forbidden 
   }
 });
 
+test("specialist accounts see bounded functions and can search the unified sidebar", async ({ page }) => {
+  await login(page, "nurse", "internet-nursing.html");
+  await expect(page.locator(".navigation-identity")).toContainText("互联网护理岗位");
+  await expect(page.locator(".navigation-identity")).toContainText("DEMO-NURSE");
+  await expect(page.locator(".navigation-identity")).toContainText("8 项功能");
+  await expect(page.locator(".navigation-primary a[data-navigation-page]")).toHaveCount(8);
+  await expect(page.locator(".navigation-primary a[data-navigation-page='blood.html']")).toHaveCount(0);
+  await expect(page.locator(".navigation-primary a[data-navigation-page='internet-nursing.html']")).toHaveAttribute("aria-current", "page");
+
+  const search = page.locator("#health-navigation-search");
+  await search.fill("体检");
+  await expect(page.locator(".navigation-search-status")).toHaveText("找到 2 项");
+  await expect(page.locator(".navigation-group-links > a:visible")).toHaveCount(2);
+  await expect(page.locator(".navigation-group-links > a:visible").first()).toContainText("健康体检");
+  await search.clear();
+  await expect(page.locator(".navigation-search-status")).toHaveText("共 8 项");
+
+  await login(page, "blood_quality", "blood.html");
+  await expect(page.locator(".navigation-identity")).toContainText("血液冷链质控岗位");
+  await expect(page.locator(".navigation-identity")).toContainText("6 项功能");
+  await expect(page.locator(".navigation-primary a[data-navigation-page]")).toHaveCount(6);
+  await expect(page.locator(".navigation-primary a[data-navigation-page='index.html']")).toHaveCount(0);
+  await expect(page.locator(".navigation-primary a[data-navigation-page='blood.html']")).toHaveAttribute("aria-current", "page");
+});
+
 test("commission user reaches the governance dashboard and opens maintenance", async ({ page }) => {
   test.setTimeout(150_000);
   await login(page, "health", "index.html");

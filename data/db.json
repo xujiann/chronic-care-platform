@@ -15720,6 +15720,8 @@
   "authUsers": [
     {
       "id": "u-nurse",
+      "accountCode": "DEMO-NURSE",
+      "catalogOrder": 110,
       "username": "nurse",
       "password": "123456",
       "name": "互联网护理护士（演示）",
@@ -15737,6 +15739,8 @@
     },
     {
       "id": "u-blood-quality",
+      "accountCode": "DEMO-BLOOD-QUALITY",
+      "catalogOrder": 40,
       "username": "blood_quality",
       "password": "123456",
       "name": "血液质量审核员（演示）",
@@ -15756,6 +15760,8 @@
     },
     {
       "id": "u-blood-tech-1",
+      "accountCode": "DEMO-BLOOD-MATCH",
+      "catalogOrder": 160,
       "username": "blood_tech_1",
       "password": "123456",
       "name": "输血科配血复核员（演示）",
@@ -15775,6 +15781,8 @@
     },
     {
       "id": "u-blood-tech-2",
+      "accountCode": "DEMO-BLOOD-ISSUE",
+      "catalogOrder": 170,
       "username": "blood_tech_2",
       "password": "123456",
       "name": "输血科发血复核员（演示）",
@@ -15794,6 +15802,8 @@
     },
     {
       "id": "u-city",
+      "accountCode": "DEMO-PLATFORM-OPS",
+      "catalogOrder": 20,
       "username": "city",
       "name": "平台运营管理员（演示）",
       "role": "commission",
@@ -15804,10 +15814,13 @@
       "orgLevel": "市级",
       "dataScope": "示范地区全域运行监测与跨部门协同",
       "home": "workbench.html",
+      "accountType": "manager",
       "status": "启用"
     },
     {
       "id": "u-district",
+      "accountCode": "DEMO-AREA-ADMIN",
+      "catalogOrder": 30,
       "username": "district",
       "name": "辖区卫生健康管理员（演示）",
       "role": "commission",
@@ -15818,10 +15831,13 @@
       "orgLevel": "区县级",
       "dataScope": "示范辖区居民、机构与公共卫生业务",
       "home": "workbench.html",
+      "accountType": "manager",
       "status": "启用"
     },
     {
       "id": "u-health",
+      "accountCode": "DEMO-HEALTH-ADMIN",
+      "catalogOrder": 10,
       "username": "health",
       "name": "卫生健康主管部门管理员（演示）",
       "role": "commission",
@@ -15832,10 +15848,13 @@
       "orgLevel": "市级",
       "dataScope": "示范地区医疗资源、统计直报、公共卫生、分级诊疗和数据质量监管",
       "home": "index.html",
+      "accountType": "manager",
       "status": "启用"
     },
     {
       "id": "u-mi",
+      "accountCode": "DEMO-INSURANCE-ADMIN",
+      "catalogOrder": 210,
       "username": "mi",
       "name": "医疗保障主管部门管理员（演示）",
       "workflowActor": "地区医疗保障主管部门管理员",
@@ -15847,10 +15866,13 @@
       "orgLevel": "市级",
       "dataScope": "医保政策、基金监管、待遇管理和辖区监督",
       "home": "insurance.html",
+      "accountType": "manager",
       "status": "启用"
     },
     {
       "id": "u-hospital",
+      "accountCode": "DEMO-HOSPITAL-ADMIN",
+      "catalogOrder": 120,
       "username": "hospital",
       "name": "医院管理员（演示）",
       "role": "institution",
@@ -15861,10 +15883,13 @@
       "orgLevel": "三级医院",
       "dataScope": "本机构业务与管理数据",
       "home": "institution.html",
+      "accountType": "manager",
       "status": "启用"
     },
     {
       "id": "u-community",
+      "accountCode": "DEMO-PRIMARY-ADMIN",
+      "catalogOrder": 130,
       "username": "community",
       "name": "基层机构管理员（演示）",
       "role": "institution",
@@ -15875,10 +15900,15 @@
       "orgLevel": "基层医疗机构",
       "dataScope": "本机构与签约居民",
       "home": "institution.html",
+      "accountType": "manager",
       "status": "启用"
     },
     {
       "id": "u1",
+      "accountCode": "LEGACY-WHJW",
+      "catalogOrder": 999,
+      "catalogVisible": false,
+      "legacyAliasFor": "health",
       "username": "whjw",
       "name": "卫生健康主管部门兼容账号",
       "role": "commission",
@@ -15889,10 +15919,13 @@
       "orgLevel": "市级",
       "dataScope": "兼容历史自动化调用",
       "home": "index.html",
+      "accountType": "manager",
       "status": "启用"
     },
     {
       "id": "u2",
+      "accountCode": "DEMO-PRIMARY-DOCTOR",
+      "catalogOrder": 140,
       "username": "doctor",
       "name": "基层全科医生（演示）",
       "role": "institution",
@@ -15909,6 +15942,8 @@
     },
     {
       "id": "u-doctor-wang",
+      "accountCode": "DEMO-HOSPITAL-DOCTOR",
+      "catalogOrder": 150,
       "username": "doctor_wang",
       "name": "医院临床医生（演示）",
       "role": "institution",
@@ -15925,6 +15960,8 @@
     },
     {
       "id": "u3",
+      "accountCode": "DEMO-INSURANCE-REVIEW",
+      "catalogOrder": 220,
       "username": "insurance",
       "name": "医疗保障经办审核员（演示）",
       "workflowActor": "地区医疗保障经办中心审核员",
@@ -15936,10 +15973,13 @@
       "orgLevel": "市级",
       "dataScope": "医保结算、凭证核验、固定取药审核和经办留痕",
       "home": "insurance.html",
+      "accountType": "reviewer",
       "status": "启用"
     },
     {
       "id": "u-mi-district",
+      "accountCode": "DEMO-AREA-INSURANCE",
+      "catalogOrder": 230,
       "username": "district_mi",
       "name": "辖区医疗保障管理员（演示）",
       "role": "insurance",
@@ -15950,10 +15990,13 @@
       "orgLevel": "区县级",
       "dataScope": "示范辖区基金、机构和慢病待遇协同",
       "home": "insurance.html",
+      "accountType": "manager",
       "status": "启用"
     },
     {
       "id": "u4",
+      "accountCode": "DEMO-RESIDENT",
+      "catalogOrder": 410,
       "username": "citizen",
       "name": "居民用户（演示）",
       "role": "citizen",
@@ -15966,10 +16009,13 @@
       "home": "citizen.html",
       "residentId": "r1",
       "accountId": "a1",
+      "accountType": "resident",
       "status": "启用"
     },
     {
       "id": "u5",
+      "accountCode": "DEMO-CONSORTIUM-ADMIN",
+      "catalogOrder": 310,
       "username": "county",
       "name": "医共体协同管理员（演示）",
       "role": "county",
@@ -15980,6 +16026,7 @@
       "orgLevel": "区县级",
       "dataScope": "医共体成员机构与协同业务",
       "home": "county.html",
+      "accountType": "manager",
       "status": "启用"
     }
   ],

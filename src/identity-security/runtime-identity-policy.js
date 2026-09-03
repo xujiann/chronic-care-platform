@@ -26,7 +26,7 @@ const ROLE_PERMISSIONS = Object.freeze({
 });
 const STRONG_ASSURANCE_LEVELS = new Set(["aal2", "aal3", "mfa", "phr", "urn:mace:incommon:iap:silver"]);
 const USER_IDENTITY_FIELDS = Object.freeze([
-  "id", "username", "name", "role", "roleName", "accountType", "orgCode", "orgName", "orgType", "orgLevel",
+  "id", "accountCode", "username", "name", "role", "roleName", "accountType", "orgCode", "orgName", "orgType", "orgLevel",
   "dataScope", "home", "residentId", "accountId", "doctorId", "nurseId", "regionCode"
 ]);
 
