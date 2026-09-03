@@ -169,7 +169,7 @@ const QUALITY_TEXT = {
   securityEvents: "安全事件",
   "Regional Central Hospital": "区域中心医院",
   "Regional Medical University Hospital": "区域医科大学附属医院",
-  "Qingniwaqiao Community Health Service Center": "青泥洼桥社区卫生服务中心",
+  "Qingniwaqiao Community Health Service Center": "示范社区卫生服务中心",
   "Regional mutual recognition QC": "区域互认质控",
   "Security administration": "安全管理",
   "Institution integration group": "机构接口联调组",

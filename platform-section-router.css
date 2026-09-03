@@ -1,0 +1,55 @@
+.platform-section-router {
+  margin-bottom: 16px;
+  border: 1px solid var(--line, #d8e2e7);
+  border-radius: 10px;
+  padding: 12px 14px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: var(--shadow, 0 12px 30px rgba(31, 42, 55, 0.08));
+}
+
+.platform-section-router-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.platform-section-router-heading h2 { margin: 0; font-size: 18px; }
+.platform-section-router-heading p,
+.platform-section-router-announcement { margin: 0; color: var(--muted, #667085); font-size: 13px; }
+
+.platform-section-router-tabs {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  padding: 2px 2px 6px;
+  scrollbar-width: thin;
+}
+
+.platform-section-router-button {
+  flex: 0 0 auto;
+  min-height: 38px;
+  border: 1px solid var(--line, #d8e2e7);
+  border-radius: 999px;
+  padding: 7px 14px;
+  background: #fff;
+  color: var(--ink, #17202a);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.platform-section-router-button:hover,
+.platform-section-router-button:focus-visible { border-color: var(--blue, #276ef1); color: var(--blue, #276ef1); }
+.platform-section-router-button.is-active { border-color: var(--blue, #276ef1); background: var(--blue, #276ef1); color: #fff; }
+.platform-section-router-announcement { min-height: 18px; margin-top: 4px; }
+main.portal-shell > section[data-platform-view-hidden="true"] { display: none !important; }
+
+@media (max-width: 720px) {
+  .platform-section-router { padding: 10px; }
+  .platform-section-router-heading { display: block; }
+  .platform-section-router-heading p { margin-top: 4px; }
+  .platform-section-router-tabs { margin-inline: -2px; }
+}

@@ -684,7 +684,10 @@
     nav.className = "navigation-primary";
     nav.setAttribute("aria-label", "平台功能");
     const menuTree = accessPolicy?.menuTreeForUser?.(user, {}, { includeHome: true }) || [];
-    const totalFunctions = menuTree.reduce((total, group) => total + group.items.reduce((count, item) => count + 1 + (item.children || []).length, 0), 0);
+    const countMenuNode = (item) => 1 + (item.children || []).reduce((count, child) => count + countMenuNode(child), 0);
+    const menuNodeContainsPage = (item, page) => item.page === page
+      || (item.children || []).some((child) => menuNodeContainsPage(child, page));
+    const totalFunctions = menuTree.reduce((total, group) => total + group.items.reduce((count, item) => count + countMenuNode(item), 0), 0);
     const menuPages = new Set();
     const appendMenuLink = (container, item, level) => {
       const link = document.createElement("a");
@@ -702,14 +705,14 @@
       const details = document.createElement("details");
       details.className = "navigation-group";
       details.dataset.navigationGroup = group.id;
-      const containsCurrent = group.items.some((item) => item.page === current || item.children.some((child) => child.page === current));
+      const containsCurrent = group.items.some((item) => menuNodeContainsPage(item, current));
       details.open = containsCurrent || (!current && index === 0);
       const summary = document.createElement("summary");
       const summaryLabel = document.createElement("span");
       summaryLabel.textContent = group.label;
       const summaryCount = document.createElement("span");
       summaryCount.className = "navigation-group-count";
-      summaryCount.textContent = String(group.items.reduce((count, item) => count + 1 + (item.children || []).length, 0));
+      summaryCount.textContent = String(group.items.reduce((count, item) => count + countMenuNode(item), 0));
       summary.append(summaryLabel, summaryCount);
       const links = document.createElement("div");
       links.className = "navigation-group-links";
@@ -767,6 +770,18 @@
     searchLabel.append(search, searchStatus);
     navigationTools.append(searchLabel);
 
+    const runtimeStatus = document.createElement("div");
+    runtimeStatus.className = "navigation-runtime-status";
+    runtimeStatus.setAttribute("role", "status");
+    const runtimeTitle = document.createElement("strong");
+    const runtimeDetail = document.createElement("span");
+    const staticPreview = location.protocol === "file:" || !API_BASE;
+    runtimeTitle.textContent = isDemoMode() ? "演示数据环境" : "授权服务环境";
+    runtimeDetail.textContent = staticPreview
+      ? "数据来源：脱敏静态快照；写操作不可用"
+      : "数据来源：当前授权接口；失败不会生成本地成功记录";
+    runtimeStatus.append(runtimeTitle, runtimeDetail);
+
     const filterNavigation = () => {
       const query = search.value.trim().toLocaleLowerCase("zh-CN");
       let matches = 0;
@@ -793,7 +808,7 @@
 
     const localNavigation = document.createElement("div");
     localNavigation.className = "navigation-local";
-    bar.append(brand, identity, navigationTools, localNavigation, nav);
+    bar.append(brand, identity, runtimeStatus, navigationTools, localNavigation, nav);
     document.body.append(bar);
     installNavigationToggle(bar);
     relocatePageNavigation(bar, localNavigation, menuPages, user);

@@ -1173,92 +1173,92 @@ async function handlePublicHealthRespiratoryPathogenSubmit(event) {
   }
 }
 
-function promptRequired(label, fallback = "") {
-  const value = window.prompt(label, fallback);
+async function promptRequired(label, fallback = "") {
+  const value = await window.HealthStructuredDialog.prompt({ title: label, defaultValue: fallback, minLength: 1 });
   if (value === null) throw new Error("操作已取消");
   if (!String(value).trim()) throw new Error(`${label}不能为空`);
   return String(value).trim();
 }
 
-function publicHealthModernizationActionBody(button) {
+async function publicHealthModernizationActionBody(button) {
   const action = button.dataset.modernizationAction;
   const expectedVersion = Number(button.dataset.modernizationVersion);
   const body = { action, expectedVersion };
   if (action === "verify-signal") {
     body.decision = button.dataset.modernizationDecision;
-    body.note = promptRequired("人工核实说明");
-    body.evidenceRefs = [promptRequired("核实证据引用")];
+    body.note = await promptRequired("人工核实说明");
+    body.evidenceRefs = [await promptRequired("核实证据引用")];
   } else if (action === "review-rule-change") {
     body.decision = button.dataset.modernizationDecision;
-    body.note = promptRequired("独立复核意见");
-    body.evidenceRefs = [promptRequired("独立复核证据引用")];
+    body.note = await promptRequired("独立复核意见");
+    body.evidenceRefs = [await promptRequired("独立复核证据引用")];
   } else if (action === "activate-rule-change") {
-    body.note = promptRequired("受控激活说明");
-    body.evidenceRefs = [promptRequired("受控变更窗口证据引用")];
+    body.note = await promptRequired("受控激活说明");
+    body.evidenceRefs = [await promptRequired("受控变更窗口证据引用")];
   } else if (action === "run-shadow-model") {
     body.expectedModelVersion = expectedVersion;
     body.expectedVersion = 0;
-    body.signalIds = promptRequired("人工确认且质量合格的信号编号（逗号分隔）")
+    body.signalIds = (await promptRequired("人工确认且质量合格的信号编号（逗号分隔）"))
       .split(",").map((item) => item.trim()).filter(Boolean);
-    body.windowStart = promptRequired("观察窗起点（ISO 日期时间）", new Date(Date.now() - 3600000).toISOString());
-    body.windowEnd = promptRequired("观察窗终点（ISO 日期时间）", new Date().toISOString());
-    body.evidenceRefs = [promptRequired("影子评估证据引用")];
+    body.windowStart = await promptRequired("观察窗起点（ISO 日期时间）", new Date(Date.now() - 3600000).toISOString());
+    body.windowEnd = await promptRequired("观察窗终点（ISO 日期时间）", new Date().toISOString());
+    body.evidenceRefs = [await promptRequired("影子评估证据引用")];
   } else if (action === "review-model-validation") {
     body.decision = button.dataset.modernizationDecision;
-    body.note = promptRequired("独立复核意见");
-    body.evidenceRefs = [promptRequired("独立复核证据引用")];
+    body.note = await promptRequired("独立复核意见");
+    body.evidenceRefs = [await promptRequired("独立复核证据引用")];
   } else if (action === "verify-respiratory-pathogen-batch") {
     body.decision = button.dataset.modernizationDecision;
-    body.note = promptRequired("聚合批次人工复核意见");
-    body.evidenceRefs = [promptRequired("聚合批次复核证据引用")];
+    body.note = await promptRequired("聚合批次人工复核意见");
+    body.evidenceRefs = [await promptRequired("聚合批次复核证据引用")];
   } else if (action === "publish-respiratory-pathogen-signals") {
-    body.note = promptRequired("最小化病原信号发布说明");
-    body.evidenceRefs = [promptRequired("信号发布批准证据引用")];
+    body.note = await promptRequired("最小化病原信号发布说明");
+    body.evidenceRefs = [await promptRequired("信号发布批准证据引用")];
   } else if (["request-suspend", "request-reinstate", "request-revoke", "request-supersede"].includes(action)) {
-    body.reasonCode = promptRequired("生命周期申请原因码（不填写居民或材料正文）", "scheduled-evidence-governance");
+    body.reasonCode = await promptRequired("生命周期申请原因码（不填写居民或材料正文）", "scheduled-evidence-governance");
     if (action === "request-supersede") {
-      body.successorEvidenceId = promptRequired("同机构、同证据轨道的新证据编号");
+      body.successorEvidenceId = await promptRequired("同机构、同证据轨道的新证据编号");
     }
   } else if (action === "approve-lifecycle") {
     body.lifecycleRequestId = button.dataset.modernizationRequestId;
   } else if (action === "reject-lifecycle") {
     body.lifecycleRequestId = button.dataset.modernizationRequestId;
-    body.reviewReasonCode = promptRequired("驳回原因码（不填写证据正文）", "insufficient-evidence");
+    body.reviewReasonCode = await promptRequired("驳回原因码（不填写证据正文）", "insufficient-evidence");
   } else if (action === "verify-alert") {
-    body.riskLevel = promptRequired("风险等级：low / medium / high / critical", "medium");
-    body.conclusion = promptRequired("人工研判结论");
-    body.evidenceRefs = [promptRequired("研判证据引用")];
+    body.riskLevel = await promptRequired("风险等级：low / medium / high / critical", "medium");
+    body.conclusion = await promptRequired("人工研判结论");
+    body.evidenceRefs = [await promptRequired("研判证据引用")];
   } else if (action === "dispatch-alert") {
-    body.medicalInstitutionId = promptRequired("医疗机构编号");
-    body.primaryCareOrganizationId = promptRequired("基层机构编号");
-    body.dueAt = promptRequired("完成期限（ISO 日期时间）", new Date(Date.now() + 86400000).toISOString());
-    body.note = promptRequired("派发说明");
+    body.medicalInstitutionId = await promptRequired("医疗机构编号");
+    body.primaryCareOrganizationId = await promptRequired("基层机构编号");
+    body.dueAt = await promptRequired("完成期限（ISO 日期时间）", new Date(Date.now() + 86400000).toISOString());
+    body.note = await promptRequired("派发说明");
   } else if (action === "start-investigation") {
-    body.investigationOwner = promptRequired("调查责任人");
-    body.note = promptRequired("调查说明");
+    body.investigationOwner = await promptRequired("调查责任人");
+    body.note = await promptRequired("调查说明");
   } else if (action === "record-official-report") {
-    body.trustedReceiptId = promptRequired("服务器已验真的正式上报 trustedReceiptId");
+    body.trustedReceiptId = await promptRequired("服务器已验真的正式上报 trustedReceiptId");
   } else if (action === "record-feedback") {
-    body.trustedReceiptId = promptRequired("服务器已验真且绑定当前上报前序的反馈 trustedReceiptId");
+    body.trustedReceiptId = await promptRequired("服务器已验真且绑定当前上报前序的反馈 trustedReceiptId");
   } else if (action === "close-alert") {
-    body.conclusion = promptRequired("关闭结论");
-    body.evidenceRefs = [promptRequired("关闭证据引用")];
+    body.conclusion = await promptRequired("关闭结论");
+    body.evidenceRefs = [await promptRequired("关闭证据引用")];
   } else if (action === "reopen-alert" || ["start-task", "retry-task", "reopen-task"].includes(action)) {
-    body.note = promptRequired("操作说明");
+    body.note = await promptRequired("操作说明");
   } else if (action === "accept-task") {
-    body.assignedTo = promptRequired("责任人");
-    body.note = promptRequired("接单说明");
+    body.assignedTo = await promptRequired("责任人");
+    body.note = await promptRequired("接单说明");
   } else if (action === "record-task-receipt") {
-    body.receiptStatus = promptRequired("回执状态：accepted / rejected", "accepted");
-    body.receiptCode = promptRequired("回执编号");
-    body.evidenceRefs = [promptRequired("回执证据引用")];
+    body.receiptStatus = await promptRequired("回执状态：accepted / rejected", "accepted");
+    body.receiptCode = await promptRequired("回执编号");
+    body.evidenceRefs = [await promptRequired("回执证据引用")];
     if (body.receiptStatus === "rejected") {
-      body.reason = promptRequired("拒收原因");
-      body.exceptionOwner = promptRequired("异常责任人");
-      body.exceptionDueAt = promptRequired("异常期限（ISO 日期时间）", new Date(Date.now() + 86400000).toISOString());
+      body.reason = await promptRequired("拒收原因");
+      body.exceptionOwner = await promptRequired("异常责任人");
+      body.exceptionDueAt = await promptRequired("异常期限（ISO 日期时间）", new Date(Date.now() + 86400000).toISOString());
     }
   } else if (action === "close-task") {
-    body.conclusion = promptRequired("任务闭环结论");
+    body.conclusion = await promptRequired("任务闭环结论");
     body.evidenceRefs = button.dataset.modernizationTaskType === "medical-public-health-verification"
       ? ["case-source-review", "medical-public-health-receipt"]
       : ["primary-care-followup-record", "community-health-receipt"];
@@ -1285,7 +1285,7 @@ async function handlePublicHealthModernizationAction(event) {
   if (!routes[kind]) return;
   button.disabled = true;
   try {
-    await postPublicHealthModernization(routes[kind], `public-health-${kind}-${action}`, publicHealthModernizationActionBody(button));
+    await postPublicHealthModernization(routes[kind], `public-health-${kind}-${action}`, await publicHealthModernizationActionBody(button));
     await loadPublicHealthModernizationWorkbenches();
   } catch (error) {
     window.alert(`操作失败关闭：${error.code || error.message || "服务不可用"}`);

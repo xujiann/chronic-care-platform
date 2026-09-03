@@ -194,7 +194,7 @@ const defaultPlatformCapabilities = [
   },
   {
     group: "区级机构对接及应用实施",
-    source: "中山区、沙河口区、甘井子区、高新区区属医疗机构数据采集和应用下沉",
+    source: "示范一区、示范二区、示范三区及高新区医疗机构数据采集和应用下沉",
     target: "区属医院、基层医疗机构、妇幼机构、体检机构接入，市级应用下沉",
     existing: ["countyConsortium", "countyCollaborationOrders", "countyAiDiagnosisCases", "medicalResources"],
     status: "已衔接",
@@ -261,7 +261,7 @@ const defaultPlatformEvidence = [
   { id: "ev-interface", category: "接口联调", name: "外部系统接口联调验收", owner: "市级平台/医疗机构", source: "HIS、EMR、LIS、PACS、医保、电子证照、卫生统计等对接计划", artifacts: ["联调计划", "字段映射", "异常清单", "回归测试"], status: "演示对接完成", next: "真实院内系统、医保核心和电子证照联调仍按现场窗口推进。", records: [
     { id: "evr-integration-readiness", owner: "平台技术组/接口联调", testRecord: "HIS/EMR/LIS/PACS/医保/证照/统计接口契约、签名、幂等和重试策略已完成演示门禁", at: "2026-06-22 07:35:00", link: "release/integration-readiness-report.md", fileName: "integration-readiness-report.md", status: "自动化证据已归档" }
   ] },
-  { id: "ev-launch", category: "上线验收", name: "区级实施和应用上线材料", owner: "实施组", source: "中山、沙河口、甘井子、高新区实施批次和应用培训记录", artifacts: ["上线确认", "培训签到", "试运行问题", "用户反馈"], status: "演示验收建档", next: "按真实区县、机构、应用和批次补充上线签字、培训签到、试运行问题和用户反馈。", records: [
+  { id: "ev-launch", category: "上线验收", name: "区级实施和应用上线材料", owner: "实施组", source: "示范一区、示范二区、示范三区及高新区实施批次和应用培训记录", artifacts: ["上线确认", "培训签到", "试运行问题", "用户反馈"], status: "演示验收建档", next: "按真实区县、机构、应用和批次补充上线签字、培训签到、试运行问题和用户反馈。", records: [
     { id: "evr-operations-readiness", owner: "实施组/运维组", testRecord: "健康检查、运行指标、外部依赖和生产运维脚本已形成运维就绪证据", at: "2026-06-22 07:40:00", link: "release/operations-readiness-report.md", fileName: "operations-readiness-report.md", status: "自动化证据已归档" },
     { id: "evr-release-readiness", owner: "项目办/发布经理", testRecord: "发布门禁、生产切换清单、存储模型和测评证据已纳入 release report", at: "2026-06-22 07:42:00", link: "release/release-report.md", fileName: "release-report.md", status: "自动化证据已归档" },
     { id: "evr-mobile-pwa", owner: "居民端实施组", testRecord: "居民端 manifest、service worker、弱网回退和移动入口已通过静态测试", at: "2026-06-22 07:44:00", link: "citizen.html", fileName: "citizen-pwa-static-check.md", status: "居民端 PWA 壳已验证" }
@@ -325,8 +325,8 @@ const defaultPlatformDataBusChannels = [
 
 const defaultInstitutionCreditEvaluations = [
   { id: "credit-central", name: "区域中心医院", institutionType: "三级医院", period: "2026上半年", score: 92, grade: "A", indicators: "依法执业98/质量安全90/数据报送88/服务信用92", owner: "医政医管处", status: "已评价", next: "保持月度数据质量复核并公示优秀项。" },
-  { id: "credit-ganjingzi", name: "甘井子区人民医院", institutionType: "二级医院", period: "2026上半年", score: 84, grade: "B", indicators: "依法执业92/质量安全86/数据报送76/服务信用82", owner: "属地卫生行政部门", status: "整改中", next: "30日内完成统计迟报和接口数据缺项整改。" },
-  { id: "credit-community", name: "青泥洼桥社区卫生服务中心", institutionType: "基层机构", period: "2026上半年", score: 88, grade: "B+", indicators: "依法执业95/质量安全87/数据报送85/服务信用86", owner: "中山区卫生健康局", status: "已评价", next: "补齐家庭医生签约数据质控证据。" }
+  { id: "credit-ganjingzi", name: "示范区人民医院", institutionType: "二级医院", period: "2026上半年", score: 84, grade: "B", indicators: "依法执业92/质量安全86/数据报送76/服务信用82", owner: "属地卫生健康行政部门", status: "整改中", next: "30日内完成统计迟报和接口数据缺项整改。" },
+  { id: "credit-community", name: "示范社区卫生服务中心", institutionType: "基层机构", period: "2026上半年", score: 88, grade: "B+", indicators: "依法执业95/质量安全87/数据报送85/服务信用86", owner: "示范区卫生健康行政部门", status: "已评价", next: "补齐家庭医生签约数据质控证据。" }
 ];
 
 const defaultSecurityAcceptanceLedger = [
@@ -415,8 +415,8 @@ const defaultCitizenServiceBlacklist = [
 
 const defaultCitizenHospitalServiceConfigs = [
   { id: "cop-hospital-mr1", institutionCode: "MR1", institutionName: "区域中心医院", enabledServices: ["appointment", "report-query", "internet-nursing", "escort"], status: "active-demo", launchScope: "white-list-demo", productionReady: false },
-  { id: "cop-hospital-mr3", institutionCode: "MR3", institutionName: "青泥洼桥社区卫生服务中心", enabledServices: ["family-doctor", "chronic-followup", "internet-nursing"], status: "active-demo", launchScope: "white-list-demo", productionReady: false },
-  { id: "cop-hospital-mr5", institutionCode: "MR5", institutionName: "甘井子区人民医院", enabledServices: ["appointment", "report-query"], status: "onsite-confirmation-pending", launchScope: "disabled", productionReady: false }
+  { id: "cop-hospital-mr3", institutionCode: "MR3", institutionName: "示范社区卫生服务中心", enabledServices: ["family-doctor", "chronic-followup", "internet-nursing"], status: "active-demo", launchScope: "white-list-demo", productionReady: false },
+  { id: "cop-hospital-mr5", institutionCode: "MR5", institutionName: "示范区人民医院", enabledServices: ["appointment", "report-query"], status: "onsite-confirmation-pending", launchScope: "disabled", productionReady: false }
 ];
 
 const defaultCommercialCryptoCapabilities = [
@@ -1302,7 +1302,7 @@ function renderProductionDeploymentPlan(items) {
         </div>
         <div class="capability-side">
           <span class="badge ${badge}">${item.status || "planned"}</span>
-          <small>${item.owner || "owner pending"} · ${item.track || "production"}</small>
+          <small>${item.owner || "责任人待分派"} · ${item.track || "生产轨道"}</small>
           ${evidence}
           <button class="inline-action" type="button" data-edit-platform="productionDeploymentPlan" data-id="${item.id}">维护</button>
         </div>
@@ -2606,21 +2606,25 @@ async function runPlatformCapabilityReviewAction(action, id, button) {
   if (!capability) return;
   const payload = { action, note: "" };
   if (action === "assign") {
-    payload.owner = window.prompt("能力域责任人", capability.review?.owner || "") || "";
+    payload.owner = await window.HealthStructuredDialog.prompt({ title: "分派能力域责任人", label: "责任人或责任组", defaultValue: capability.review?.owner || "", minLength: 2 });
+    payload.owner ||= "";
     if (!payload.owner.trim()) return;
     payload.note = `能力域责任已分派给 ${payload.owner.trim()}。`;
   } else if (action === "record-evidence") {
-    payload.evidenceRef = window.prompt("证据文件、工单或验收记录引用", capability.sourceEvidence?.[0] || "") || "";
+    payload.evidenceRef = await window.HealthStructuredDialog.prompt({ title: "补录能力域证据", label: "证据文件、工单或验收记录引用", defaultValue: capability.sourceEvidence?.[0] || "", minLength: 3 });
+    payload.evidenceRef ||= "";
     if (!payload.evidenceRef.trim()) return;
     payload.note = `补录能力域复核证据：${payload.evidenceRef.trim()}`;
   } else if (action === "review") {
     payload.evidenceRefs = capability.review?.evidenceRefs?.length ? [] : (capability.sourceEvidence || []).slice(0, 3);
     payload.note = "仓库实现、自动化检查和当前生产边界已完成生产前复核。";
   } else if (action === "request-improvement") {
-    payload.note = window.prompt("请输入整改要求", "请补齐验收证据并完成责任人复核。") || "";
+    payload.note = await window.HealthStructuredDialog.prompt({ title: "登记整改要求", label: "整改要求", defaultValue: "请补齐验收证据并完成责任人复核。", minLength: 4 });
+    payload.note ||= "";
     if (!payload.note.trim()) return;
   } else {
-    payload.note = window.prompt("请输入能力域复核备注", "") || "";
+    payload.note = await window.HealthStructuredDialog.prompt({ title: "能力域复核", label: "复核备注", minLength: 4 });
+    payload.note ||= "";
     if (!payload.note.trim()) return;
   }
   if (button) button.disabled = true;
@@ -2658,11 +2662,13 @@ async function runPlatformProductionBlockerAction(action, id, button) {
   if (!blocker) return;
   const payload = { action, note: "" };
   if (action === "assign") {
-    payload.owner = window.prompt("生产阻断责任人", blocker.review?.owner || blocker.owner || "") || "";
+    payload.owner = await window.HealthStructuredDialog.prompt({ title: "分派生产阻断责任人", label: "责任人或责任组", defaultValue: blocker.review?.owner || blocker.owner || "", minLength: 2 });
+    payload.owner ||= "";
     if (!payload.owner.trim()) return;
     payload.note = `生产阻断 ${id} 已分派给 ${payload.owner.trim()}。`;
   } else if (action === "record-evidence") {
-    payload.evidenceRef = window.prompt("请输入证据文件、工单或验收记录引用", `ticket:${id}`) || "";
+    payload.evidenceRef = await window.HealthStructuredDialog.prompt({ title: "补录生产阻断证据", label: "证据文件、工单或验收记录引用", defaultValue: `ticket:${id}`, minLength: 3 });
+    payload.evidenceRef ||= "";
     if (!payload.evidenceRef.trim()) return;
     payload.note = `补录生产阻断证据：${payload.evidenceRef.trim()}`;
   } else if (action === "start-remediation") {
@@ -2672,21 +2678,26 @@ async function runPlatformProductionBlockerAction(action, id, button) {
   } else if (action === "review-evidence") {
     payload.note = `已复核 ${id} 当前证据；正式放行仍等待现场验收与签字。`;
   } else if (action === "record-site-acceptance") {
-    payload.acceptanceId = window.prompt("Enter the signed site acceptance ID", `site-signoff-${id}`) || "";
+    payload.acceptanceId = await window.HealthStructuredDialog.prompt({ title: "登记现场验收", label: "已签字的现场验收编号", defaultValue: `site-signoff-${id}`, minLength: 4 });
+    payload.acceptanceId ||= "";
     if (!payload.acceptanceId.trim()) return;
-    const signerNames = (window.prompt("Enter business, information, operations, security signers separated by commas", "") || "")
+    const signerInput = await window.HealthStructuredDialog.prompt({ title: "登记四方签字人", label: "业务、信息、运维、安全签字人（逗号分隔）", helperText: "必须依次填写四名独立签字人。", minLength: 7 });
+    const signerNames = (signerInput || "")
       .split(",").map((item) => item.trim()).filter(Boolean);
     if (signerNames.length !== 4) return;
     payload.signers = ["business", "information", "operations", "security"].map((role, index) => ({ role, name: signerNames[index] }));
-    payload.note = `Site acceptance ${payload.acceptanceId.trim()} recorded for ${id}.`;
+    payload.note = `现场验收 ${payload.acceptanceId.trim()} 已登记到 ${id}。`;
   } else if (action === "revoke-site-acceptance") {
-    payload.note = window.prompt("Enter the reason for revoking this site acceptance", "Site evidence changed and must be remediated.") || "";
+    payload.note = await window.HealthStructuredDialog.prompt({ title: "撤销现场验收", label: "撤销原因", defaultValue: "现场证据发生变化，需要重新整改。", minLength: 4 });
+    payload.note ||= "";
     if (!payload.note.trim()) return;
   } else if (action === "reopen") {
-    payload.note = window.prompt("请输入重新整改原因", "现场条件或证据发生变化，需要重新整改。") || "";
+    payload.note = await window.HealthStructuredDialog.prompt({ title: "重新启动整改", label: "重新整改原因", defaultValue: "现场条件或证据发生变化，需要重新整改。", minLength: 4 });
+    payload.note ||= "";
     if (!payload.note.trim()) return;
   } else {
-    payload.note = window.prompt("请输入生产阻断处置备注", "") || "";
+    payload.note = await window.HealthStructuredDialog.prompt({ title: "生产阻断处置", label: "处置备注", minLength: 4 });
+    payload.note ||= "";
     if (!payload.note.trim()) return;
   }
   if (button) button.disabled = true;
@@ -2814,9 +2825,11 @@ async function runIdentityDirectoryAction(action, button) {
   const statusTarget = document.querySelector("#identity-lifecycle-status");
   const payload = {};
   if (action === "apply") {
-    payload.note = window.prompt("停用同步审计说明", "统一身份目录停用同步经责任人复核") || "";
+    payload.note = await window.HealthStructuredDialog.prompt({ title: "执行身份目录停用同步", label: "停用同步审计说明", defaultValue: "统一身份目录停用同步经责任人复核", minLength: 8 });
+    payload.note ||= "";
     if (payload.note.trim().length < 8) return;
-    payload.confirmation = window.prompt("输入停用同步确认短语", "") || "";
+    payload.confirmation = await window.HealthStructuredDialog.prompt({ title: "确认停用同步", label: "确认短语", helperText: "请输入 APPLY IDENTITY DIRECTORY DEACTIVATIONS 以继续。", minLength: 38, multiline: false });
+    payload.confirmation ||= "";
     if (payload.confirmation !== "APPLY IDENTITY DIRECTORY DEACTIVATIONS") return;
   }
   if (button) button.disabled = true;
@@ -2848,7 +2861,7 @@ async function runIdentityDirectoryAction(action, button) {
 
 async function runSessionCleanupAction(button) {
   if (!PLATFORM_API_BASE || !button) return;
-  const confirmation = window.prompt("输入会话清理确认短语", "") || "";
+  const confirmation = await window.HealthStructuredDialog.prompt({ title: "清理保留会话", label: "确认短语", helperText: "请输入 PURGE RETAINED SESSIONS 以继续。", minLength: 23, multiline: false }) || "";
   if (confirmation !== "PURGE RETAINED SESSIONS") return;
   const request = window.HealthCityAuth?.authFetch || fetch;
   const statusTarget = document.querySelector("#identity-lifecycle-status");
@@ -2883,9 +2896,9 @@ async function runSessionCleanupAction(button) {
 
 async function runIdentityBindingAction(button) {
   if (!PLATFORM_API_BASE || !button) return;
-  const note = window.prompt("外部身份受控绑定说明", "统一身份目录账号与本地账号经责任人核对") || "";
+  const note = await window.HealthStructuredDialog.prompt({ title: "外部身份受控绑定", label: "绑定说明", defaultValue: "统一身份目录账号与本地账号经责任人核对", minLength: 8 }) || "";
   if (note.trim().length < 8) return;
-  const confirmation = window.prompt("输入身份绑定确认短语", "") || "";
+  const confirmation = await window.HealthStructuredDialog.prompt({ title: "确认身份绑定", label: "确认短语", helperText: "请输入 BIND EXTERNAL IDENTITY 以继续。", minLength: 22, multiline: false }) || "";
   if (confirmation !== "BIND EXTERNAL IDENTITY") return;
   const request = window.HealthCityAuth?.authFetch || fetch;
   const statusTarget = document.querySelector("#identity-lifecycle-status");
@@ -2923,7 +2936,7 @@ async function runIdentityBindingAction(button) {
 
 async function runPostgresPrimaryReadRehearsal(button) {
   if (!PLATFORM_API_BASE) return;
-  const note = window.prompt("主读取演练说明", "平台割接前 PostgreSQL 主读取完整性复核") || "";
+  const note = await window.HealthStructuredDialog.prompt({ title: "PostgreSQL 主读取演练", label: "演练说明", defaultValue: "平台割接前 PostgreSQL 主读取完整性复核", minLength: 8 }) || "";
   if (note.trim().length < 8) return;
   const request = window.HealthCityAuth?.authFetch || fetch;
   const statusTarget = document.querySelector("#postgres-primary-read-status");
@@ -2963,16 +2976,16 @@ async function runPostgresReconciliationCaseAction(action, id, button) {
   let note = "";
   let evidenceRefs = [];
   if (action === "assign") {
-    owner = window.prompt("责任组", owner) || "";
+    owner = await window.HealthStructuredDialog.prompt({ title: "分派差异工单", label: "责任组", defaultValue: owner, minLength: 2 }) || "";
     if (!owner.trim()) return;
-    note = `Assigned from the platform cutover center to ${owner.trim()}.`;
+    note = `平台割接中心已将差异工单分派给 ${owner.trim()}。`;
   } else if (action === "acknowledge") {
-    note = "Database operations accepted this reconciliation case from the platform cutover center.";
+    note = "数据库运维已接收平台割接中心下发的差异工单。";
   } else if (action === "resolve") {
-    note = "Matched shadow reconciliation verified; difference case closed from the platform cutover center.";
+    note = "影子核对结果已经复核一致，平台割接中心关闭差异工单。";
     evidenceRefs = [`reconciliation:${item?.clearedRunId || "matched-run"}`, `case:${id}`];
   } else {
-    note = window.prompt(action === "reopen" ? "重新打开原因" : "处置备注", "") || "";
+    note = await window.HealthStructuredDialog.prompt({ title: action === "reopen" ? "重新打开差异工单" : "处置差异工单", label: action === "reopen" ? "重新打开原因" : "处置备注", minLength: 4 }) || "";
     if (!note.trim()) return;
   }
   if (button) button.disabled = true;
@@ -3667,7 +3680,7 @@ async function exportPlatformCapabilityMap() {
     downloadText(`平台功能总览导出失败-${todayStamp()}.md`, [
       "# 平台功能总览导出失败",
       "",
-      `错误：${error.message || "unknown error"}`,
+      `错误：${error.message || "未知错误"}`,
       "",
       "请确认登录角色为卫生健康委管理端，并检查动态后端是否可访问。"
     ].join("\n"));
@@ -3695,7 +3708,7 @@ async function exportPlatformGoLiveSlices() {
     downloadText(`上线三切片收口导出失败-${todayStamp()}.md`, [
       "# 上线三切片收口导出失败",
       "",
-      `错误：${error.message || "unknown error"}`,
+      `错误：${error.message || "未知错误"}`,
       "",
       "请确认已使用卫生健康委管理端账号登录，并检查动态后端是否可访问。"
     ].join("\n"));
@@ -3720,7 +3733,7 @@ async function exportPlatformStandardsLedgers() {
     if (!response.ok) throw new Error(text || `HTTP ${response.status}`);
     downloadText(`卫生健康信息平台六类台账-${todayStamp()}.md`, text);
   } catch (error) {
-    downloadText(`卫生健康信息平台六类台账导出失败-${todayStamp()}.md`, `# 导出失败\n\n${error.message || "unknown error"}\n`);
+    downloadText(`卫生健康信息平台六类台账导出失败-${todayStamp()}.md`, `# 导出失败\n\n${error.message || "未知错误"}\n`);
   }
 }
 
@@ -3739,7 +3752,7 @@ async function exportPlatformStandardsLedgerDetail() {
     if (!response.ok) throw new Error(text || `HTTP ${response.status}`);
     downloadText(`${title}-${todayStamp()}.md`, text);
   } catch (error) {
-    downloadText(`${title}-导出失败-${todayStamp()}.md`, `# 导出失败\n\n${error.message || "unknown error"}\n`);
+    downloadText(`${title}-导出失败-${todayStamp()}.md`, `# 导出失败\n\n${error.message || "未知错误"}\n`);
   }
 }
 

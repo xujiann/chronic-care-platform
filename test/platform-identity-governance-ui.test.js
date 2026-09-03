@@ -69,8 +69,8 @@ test("account governance derives every account function mapping from the shared 
   assert.equal(view.summary.total, 17);
   assert.equal(view.summary.enabled, 17);
   assert.equal(view.summary.mappingReady, 17);
-  assert.equal(view.accounts.find((row) => row.username === "nurse").assignedFunctionCount, 8);
-  assert.equal(view.accounts.find((row) => row.username === "blood_quality").assignedFunctionCount, 6);
+  assert.equal(view.accounts.find((row) => row.username === "nurse").assignedFunctionCount, 10);
+  assert.equal(view.accounts.find((row) => row.username === "blood_quality").assignedFunctionCount, 7);
   assert.equal(view.accounts.find((row) => row.username === "citizen").assignedFunctionCount, 11);
   assert.equal(view.accounts.find((row) => row.username === "whjw").catalogVisible, false);
   assert.match(view.accounts.find((row) => row.username === "whjw").risks.join(" "), /兼容账号不展示/);
@@ -82,7 +82,7 @@ test("disabled accounts keep their assigned mapping but expose zero effective fu
   const disabledAccounts = accounts.map((account) => account.username === "nurse" ? { ...account, status: "停用" } : account);
   const row = governance.buildView(disabledAccounts, policy).accounts.find((account) => account.username === "nurse");
   assert.equal(row.enabled, false);
-  assert.equal(row.assignedFunctionCount, 8);
+  assert.equal(row.assignedFunctionCount, 10);
   assert.equal(row.functionCount, 0);
   assert.match(row.risks.join(" "), /账号已停用/);
 });

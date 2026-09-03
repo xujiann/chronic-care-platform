@@ -65,6 +65,14 @@ test("menus, homes and login candidates derive from the same policy", () => {
   assert.equal(candidates[0].accountType, "doctor");
 });
 
+test("new work centers stay within reviewed role and account boundaries", () => {
+  assert.equal(policy.canAccessPage("unified-work-center.html", user({ accountType: "doctor" })), true);
+  assert.equal(policy.canAccessPage("account-lifecycle.html", user({ role: "commission", accountType: "manager" })), true);
+  assert.equal(policy.canAccessPage("account-lifecycle.html", user({ role: "institution", accountType: "manager" })), false);
+  assert.equal(policy.canAccessPage("public-health-supervision-cases.html", user()), true);
+  assert.equal(policy.canAccessPage("public-health-supervision-cases.html", user({ accountType: "doctor" })), false);
+});
+
 test("authorized navigation is grouped by function and nests related child pages", () => {
   const commission = user({
     role: "commission",

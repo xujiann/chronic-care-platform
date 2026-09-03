@@ -14,7 +14,7 @@
     { "id": "E-CIT-REFUND", "title": "医疗退费服务", "ownerProcess": "T07", "productClass": "SHARED", "coverage": "declared-only", "evidence": [] },
     { "id": "F-PC-OPS", "title": "基层机构运营管理", "ownerProcess": "T02", "productClass": "PACKAGE", "coverage": "declared-only", "evidence": [] },
     { "id": "G-PH-IMM", "title": "预防接种信息管理", "ownerProcess": "T03", "productClass": "PACKAGE", "coverage": "declared-only", "evidence": [] },
-    { "id": "H-SUP-CASE", "title": "卫生监督案件协同", "ownerProcess": "T03", "productClass": "SHARED", "coverage": "missing", "evidence": [] },
+    { "id": "H-SUP-CASE", "title": "卫生监督案件协同", "ownerProcess": "T03", "productClass": "SHARED", "coverage": "repository-verified", "evidence": ["src/public-health/health-supervision/case-service.js", "src/http/routes/public-health/health-supervision-cases.js", "test/domain-workbenches.test.js"] },
     { "id": "H-SUP-INSPECT", "title": "卫生监督检查闭环", "ownerProcess": "T03", "productClass": "SHARED", "coverage": "repository-verified", "evidence": ["src/public-health/health-supervision/service.js", "src/http/routes/public-health/health-supervision.js", "test/public-health-supervision-api.test.js"] },
     { "id": "H-SUP-SUBJECT", "title": "卫生监督对象管理", "ownerProcess": "T03", "productClass": "SHARED", "coverage": "repository-verified", "evidence": ["src/public-health/health-supervision/service.js", "src/http/routes/public-health/health-supervision.js", "test/public-health-supervision-api.test.js"] },
     { "id": "I-COL-MUTUAL", "title": "检查检验结果互认", "ownerProcess": "T06", "productClass": "SHARED", "coverage": "declared-only", "evidence": [] },

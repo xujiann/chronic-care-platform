@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>卫生监督案件协同 · 区域全民健康信息平台</title>
+  <link rel="stylesheet" href="./portal.css" /><link rel="stylesheet" href="./domain-task-workbench.css" />
+  <script src="./regional-context.js"></script><script src="./access-control-policy.js"></script><script src="./browser-safe-url.js"></script><script src="./auth.js"></script>
+  <script defer src="./platform-domain-modules.js"></script><script defer src="./platform-api-client.js"></script><script defer src="./platform-design-system.js"></script><script defer src="./platform-shell.js"></script>
+  <script src="./page-auth-bootstrap.js" data-roles="commission,institution"></script>
+  <script defer src="./domain-task-ui.js"></script><script defer src="./public-health-supervision-cases.js"></script>
+</head>
+<body><main class="portal-shell domain-workbench">
+  <header class="portal-header"><div><span>公共卫生 · 卫生监督</span><h1>卫生监督案件协同工作台</h1><p>按法定流程管理立案、调查取证、审核、处罚、整改、复查和结案。</p></div><nav><a href="./public-health-supervision.html">监督检查</a><a href="./public-health.html">公共卫生</a><a href="./workbench.html">统一待办</a></nav></header>
+  <section class="panel"><div class="panel-title"><h2>案件闭环</h2><span>状态转换由服务端闭集规则校验</span></div><div class="domain-flow"><span>立案</span><span>调查取证</span><span>审核</span><span>处罚</span><span>整改</span><span>复查</span><span>结案</span></div></section>
+  <p id="domain-workbench-status" class="domain-workbench-status" role="status" aria-live="polite">正在加载……</p><p id="domain-workbench-error" class="domain-workbench-error" role="alert"></p>
+  <section id="domain-workbench-metrics" class="metric-grid"></section>
+  <section class="panel" data-role="commission"><div class="panel-title"><h2>登记立案</h2><span>立案成功后由业务接口返回案件编号</span></div>
+    <form id="supervision-case-create-form" class="workbench-toolbar">
+      <label>监督主体代码<input name="subjectCode" required maxlength="160" autocomplete="off" /></label>
+      <label>主体机构代码<input name="subjectOrganizationCode" required maxlength="160" autocomplete="off" /></label>
+      <label>检查任务编号<input name="inspectionTaskId" maxlength="160" autocomplete="off" /></label>
+      <label>案由<input name="cause" required maxlength="500" autocomplete="off" /></label>
+      <label>优先级<select name="priority"><option>普通</option><option>重点</option><option>紧急</option></select></label>
+      <button type="submit">提交立案</button>
+    </form>
+  </section>
+  <section class="panel"><div class="panel-title"><h2>案件筛选</h2><span>仅显示当前辖区和机构范围</span></div><div class="workbench-toolbar"><label>状态<select id="domain-status-filter"><option value="">全部状态</option></select></label><label>关键词<input id="domain-keyword-filter" type="search" placeholder="案件编号、主体代码或案由" /></label><button id="domain-refresh" type="button">刷新业务数据</button></div></section>
+  <section class="portal-grid"><article class="panel wide"><div class="panel-title"><h2>案件队列</h2><span>每次动作写入审计时间线</span></div><div id="domain-task-list" class="domain-task-list"></div></article><article class="panel"><div class="panel-title"><h2>案件详情</h2><span>证据引用不在页面缓存</span></div><div id="domain-task-detail"></div></article></section>
+</main></body></html>

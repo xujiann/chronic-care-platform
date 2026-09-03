@@ -151,11 +151,11 @@
       incidents: [
         { id: "PHE-20260728-003", revision: 1, laneId: "infectious-reporting", title: "传染病直报回执超时", level: "P0", source: "连续探测", hospitalCode: "H000001", owner: "疾控与医政联络组", status: "待核查", discoveredAt: "2026-07-28 09:52", dueAt: "2026-07-28 10:22", lastUpdatedAt: "2026-07-28 09:52", latestAction: "等待核对上报端与接收端回执", evidenceIds: [] },
         { id: "PHE-20260728-002", revision: 2, laneId: "public-health-followup", title: "重点人群随访数据延迟", level: "P1", source: "时效规则", hospitalCode: "H000003", owner: "基层卫生处协同组", status: "处置中", discoveredAt: "2026-07-28 08:40", dueAt: "2026-07-28 12:00", lastUpdatedAt: "2026-07-28 09:35", latestAction: "医院已补传，等待平台侧重算", evidenceIds: [] },
-        { id: "PHE-20260727-006", revision: 3, laneId: "immunization", title: "免疫规划代码映射差异", level: "P1", source: "数据校验", hospitalCode: "H000002", owner: "疾控免疫科", status: "待复核", discoveredAt: "2026-07-27 15:10", dueAt: "2026-07-28 15:10", lastUpdatedAt: "2026-07-28 09:10", latestAction: "映射表已修订，等待业务复核", submittedForReviewBy: "省级管理员", evidenceIds: ["PHEV-IMM-RECEIPT", "PHEV-IMM-JOINT", "PHEV-IMM-APPROVAL"] },
+        { id: "PHE-20260727-006", revision: 3, laneId: "immunization", title: "免疫规划代码映射差异", level: "P1", source: "数据校验", hospitalCode: "H000002", owner: "疾控免疫科", status: "待复核", discoveredAt: "2026-07-27 15:10", dueAt: "2026-07-28 15:10", lastUpdatedAt: "2026-07-28 09:10", latestAction: "映射表已修订，等待业务复核", submittedForReviewBy: "疾控免疫科", evidenceIds: ["PHEV-IMM-RECEIPT", "PHEV-IMM-JOINT", "PHEV-IMM-APPROVAL"] },
         { id: "PHE-20260727-004", revision: 4, laneId: "maternal-child", title: "妇幼健康批次完整性告警", level: "P1", source: "完整性规则", hospitalCode: "H000001", owner: "妇幼健康处", status: "已关闭", discoveredAt: "2026-07-27 10:20", dueAt: "2026-07-27 14:20", lastUpdatedAt: "2026-07-27 13:05", closedAt: "2026-07-27 13:05", latestAction: "补传完成，完整性复核通过", submittedForReviewBy: "省级管理员", evidenceIds: ["PHEV-MCH-RECEIPT", "PHEV-MCH-JOINT", "PHEV-MCH-APPROVAL"] },
       ],
       incidentEvidence: [
-        { id: "PHEV-IMM-APPROVAL", revision: 1, incidentId: "PHE-20260727-006", hospitalCode: "H000002", evidenceType: "production-approval", referenceNo: "APPROVAL-IMM-20260728-01", summary: "免疫规划映射修订生产审批摘要，等待独立签收。", digest: "sha256:9f52d954e6f7c124a2aa0ba85e855e41660ad58444ff59aca58b57a4d8a85cc8", status: "submitted", submittedBy: "省级管理员", submittedAt: "2026-07-28 09:08", productionEvidence: false },
+        { id: "PHEV-IMM-APPROVAL", revision: 1, incidentId: "PHE-20260727-006", hospitalCode: "H000002", evidenceType: "production-approval", referenceNo: "APPROVAL-IMM-20260728-01", summary: "免疫规划映射修订生产审批摘要，等待独立签收。", digest: "sha256:9f52d954e6f7c124a2aa0ba85e855e41660ad58444ff59aca58b57a4d8a85cc8", status: "submitted", submittedBy: "国家级管理员", submittedAt: "2026-07-28 09:08", productionEvidence: false },
         { id: "PHEV-IMM-JOINT", revision: 2, incidentId: "PHE-20260727-006", hospitalCode: "H000002", evidenceType: "site-joint-test", referenceNo: "JOINT-IMM-20260728-01", summary: "免疫规划代码映射双向联调记录已完成独立核验。", digest: "sha256:301a1796fd9661bdb02e71518ccb4e6348295b99237f48bb106693e74ab9ce8d", status: "accepted", submittedBy: "省级管理员", submittedAt: "2026-07-28 08:42", reviewedBy: "国家级管理员", reviewedAt: "2026-07-28 08:55", reviewNote: "联调编号、摘要与事件引用一致。", productionEvidence: false },
         { id: "PHEV-IMM-RECEIPT", revision: 2, incidentId: "PHE-20260727-006", hospitalCode: "H000002", evidenceType: "business-receipt", referenceNo: "RECEIPT-IMM-20260728-01", summary: "免疫规划接收端确认代码映射修订后的业务回执摘要。", digest: "sha256:7c7e799af6a6314648370d2970b89245b10f37dba6fd291f34ea0c6ef6c34d1a", status: "accepted", submittedBy: "省级管理员", submittedAt: "2026-07-28 08:40", reviewedBy: "国家级管理员", reviewedAt: "2026-07-28 08:54", reviewNote: "回执编号和最小化摘要核验通过。", productionEvidence: false },
         { id: "PHEV-MCH-APPROVAL", revision: 2, incidentId: "PHE-20260727-004", hospitalCode: "H000001", evidenceType: "production-approval", referenceNo: "APPROVAL-MCH-20260727-01", summary: "妇幼健康批次补传生产审批编号已完成独立签收。", digest: "sha256:8427f7328d6ca1d36e701da40aa7590bc68d08fb8fd9b3c619498d73363a9f40", status: "accepted", submittedBy: "省级管理员", submittedAt: "2026-07-27 12:35", reviewedBy: "国家级管理员", reviewedAt: "2026-07-27 12:55", reviewNote: "生产审批编号与事件范围一致。", productionEvidence: false },
@@ -163,7 +163,7 @@
         { id: "PHEV-MCH-RECEIPT", revision: 2, incidentId: "PHE-20260727-004", hospitalCode: "H000001", evidenceType: "business-receipt", referenceNo: "RECEIPT-MCH-20260727-01", summary: "妇幼健康批次补传完成后的接收端业务回执摘要。", digest: "sha256:0240e42f4fd02344ad81f58aebdc8e109595e10a00d18e055e6dbb495c0af77c", status: "accepted", submittedBy: "省级管理员", submittedAt: "2026-07-27 12:18", reviewedBy: "国家级管理员", reviewedAt: "2026-07-27 12:48", reviewNote: "业务回执编号、摘要和证据摘要一致。", productionEvidence: false },
       ],
       evidenceActions: [
-        { id: "PHEVA-003", evidenceId: "PHEV-IMM-APPROVAL", incidentId: "PHE-20260727-006", action: "登记现场证据", actor: "省级管理员", at: "2026-07-28 09:08", result: "登记生产审批编号，等待独立签收", revision: 1 },
+        { id: "PHEVA-003", evidenceId: "PHEV-IMM-APPROVAL", incidentId: "PHE-20260727-006", action: "登记现场证据", actor: "国家级管理员", at: "2026-07-28 09:08", result: "登记生产审批编号，等待独立签收", revision: 1 },
         { id: "PHEVA-002", evidenceId: "PHEV-IMM-JOINT", incidentId: "PHE-20260727-006", action: "独立签收证据", actor: "国家级管理员", at: "2026-07-28 08:55", result: "联调编号、摘要与事件引用一致", revision: 2 },
         { id: "PHEVA-001", evidenceId: "PHEV-IMM-RECEIPT", incidentId: "PHE-20260727-006", action: "独立签收证据", actor: "国家级管理员", at: "2026-07-28 08:54", result: "回执编号和最小化摘要核验通过", revision: 2 },
       ],
@@ -810,6 +810,26 @@
   }
 
   let state = loadState();
+
+  function authenticatedRoleName(user) {
+    if (!user) return state.activeRole;
+    if (user.role === "institution") return "医院管理员";
+    if (user.role === "commission") return "省级管理员";
+    return state.activeRole;
+  }
+
+  function applyAuthenticatedScope() {
+    const user = window.HealthCityAuth?.getUser?.();
+    const roleName = authenticatedRoleName(user);
+    if (state.roles.some((role) => role.name === roleName)) state.activeRole = roleName;
+    if (user?.role === "institution" && user.orgName) {
+      const exact = state.hospitals.find((hospital) => hospital.name === user.orgName);
+      if (exact) state.selectedHospital = exact.code;
+    }
+    return user;
+  }
+
+  const authenticatedUser = applyAuthenticatedScope();
 
   const workspace = document.getElementById("workspace");
   const viewTitle = document.getElementById("viewTitle");
@@ -2138,6 +2158,8 @@
   function renderRoleSelect() {
     roleSelect.innerHTML = state.roles.map((role) => `<option value="${role.name}">${role.name}</option>`).join("");
     roleSelect.value = state.activeRole;
+    roleSelect.disabled = Boolean(authenticatedUser);
+    roleSelect.title = authenticatedUser ? "岗位由统一身份中心确定，不能在业务页面内切换" : "本地静态演示角色";
   }
 
   function renderNav() {
@@ -10551,6 +10573,11 @@
   });
 
   roleSelect.addEventListener("change", () => {
+    if (authenticatedUser) {
+      roleSelect.value = authenticatedRoleName(authenticatedUser);
+      showNotice("岗位由统一身份中心确定，如需变更请通过账号生命周期流程申请。");
+      return;
+    }
     state.activeRole = roleSelect.value;
     addAudit("切换演示角色", state.activeRole, "已切换");
     saveState();

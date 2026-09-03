@@ -926,7 +926,7 @@ function renderChronicFollowupWorkbench(state) {
           <span>${item.collection}</span>
           <span>${item.due || "no due date"}</span>
         </div>
-        <p>${statusText} - ${item.assignee || item.owner || item.pharmacy || "owner pending"}</p>
+        <p>${statusText} - ${item.assignee || item.owner || item.pharmacy || "责任人待分派"}</p>
         <p>${item.nextStep || item.intervention || item.advice || item.result || "Follow the chronic care plan and close the loop after disposition."}</p>
         <p>Feedback: ${latestFeedback ? `${latestFeedback.result} - ${latestFeedback.meta?.nextRequest || ""}` : "no new resident feedback"}</p>
         <p>Message: ${latestMessage ? `${latestMessage.title} - ${latestMessage.body || ""}` : "no open institution message"}</p>

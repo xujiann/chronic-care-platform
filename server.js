@@ -11558,6 +11558,17 @@ function normalizeState(data) {
     publicHealthInfectiousReportingDeliveries: Array.isArray(data.publicHealthInfectiousReportingDeliveries)
       ? data.publicHealthInfectiousReportingDeliveries
       : [],
+    publicHealthSupervisionSubjects: Array.isArray(data.publicHealthSupervisionSubjects) ? data.publicHealthSupervisionSubjects.slice(0, 500) : [],
+    publicHealthSupervisionInspectionTasks: Array.isArray(data.publicHealthSupervisionInspectionTasks) ? data.publicHealthSupervisionInspectionTasks.slice(0, 2000) : [],
+    publicHealthSupervisionInspectionRecords: Array.isArray(data.publicHealthSupervisionInspectionRecords) ? data.publicHealthSupervisionInspectionRecords.slice(0, 2000) : [],
+    publicHealthSupervisionFindings: Array.isArray(data.publicHealthSupervisionFindings) ? data.publicHealthSupervisionFindings.slice(0, 5000) : [],
+    publicHealthSupervisionCases: Array.isArray(data.publicHealthSupervisionCases) ? data.publicHealthSupervisionCases.slice(0, 2000) : [],
+    unifiedWorkTaskStates: Array.isArray(data.unifiedWorkTaskStates) ? data.unifiedWorkTaskStates.slice(0, 5000) : [],
+    unifiedWorkCenterCommandReceipts: Array.isArray(data.unifiedWorkCenterCommandReceipts) ? data.unifiedWorkCenterCommandReceipts.slice(0, 2000) : [],
+    accountLifecycleRequests: Array.isArray(data.accountLifecycleRequests) ? data.accountLifecycleRequests.slice(0, 5000) : [],
+    accountTemporaryGrants: Array.isArray(data.accountTemporaryGrants) ? data.accountTemporaryGrants.slice(0, 5000) : [],
+    accountLifecycleCommandReceipts: Array.isArray(data.accountLifecycleCommandReceipts) ? data.accountLifecycleCommandReceipts.slice(0, 2000) : [],
+    accountLifecycleVersion: Number.isSafeInteger(Number(data.accountLifecycleVersion)) ? Number(data.accountLifecycleVersion) : 0,
     digitalHospitalPublicHealthCoordination: normalizeDigitalHospitalPublicHealthCoordination(data.digitalHospitalPublicHealthCoordination),
     publicHealthTriggerRules: mergeByKey(seedPublicHealthTriggerRules(), data.publicHealthTriggerRules, "id"),
     publicHealthCoordinationHandoffs: Array.isArray(data.publicHealthCoordinationHandoffs)

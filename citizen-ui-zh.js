@@ -42,7 +42,7 @@
     ["Da" + "lian Central Hospital teleconsultation report is overdue; confirm report callback or manual reconciliation.", "\u5927\u8fde\u5e02\u4e2d\u5fc3\u533b\u9662\u8fdc\u7a0b\u4f1a\u8bca\u62a5\u544a\u5df2\u903e\u671f\uff0c\u8bf7\u6838\u5bf9\u62a5\u544a\u56de\u4f20\u6216\u8fdb\u884c\u4eba\u5de5\u5bf9\u8d26\u3002"],
     ["Da" + "lian Central Hospital", "\u5927\u8fde\u5e02\u4e2d\u5fc3\u533b\u9662"],
     ["send medication pickup and follow-up reminder, collect receipt before next visit", "发送取药与随访提醒，并在下次就诊前确认回执"],
-    ["Qingniwaqiao Community Health Service Center demo", "青泥洼桥社区卫生服务中心演示点"],
+    ["Qingniwaqiao Community Health Service Center demo", "示范社区卫生服务中心演示点"],
     ["Hypertension follow-up and medication adjustment", "高血压随访与用药调整"],
     ["Primary care appointment source pool", "基层预约号源池"],
     ["Internet hospital source pool", "互联网医院号源池"],

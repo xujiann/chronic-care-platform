@@ -96,12 +96,12 @@ test("tracked account master data keeps the complete canonical identity fields",
 test("specialist accounts receive bounded function sets instead of the whole role catalog", () => {
   const users = new Map(loadDemoUsers().map((user) => [user.username, user]));
   const expectations = {
-    blood_quality: { count: 6, allowed: ["blood.html", "blood-go-live.html"], denied: ["index.html", "public-health.html", "disease-payment.html"] },
-    nurse: { count: 8, allowed: ["internet-nursing.html", "emergency.html"], denied: ["blood.html", "quality-safety.html", "digital-hospital-evaluation.html"] },
-    doctor: { count: 12, allowed: ["doctor.html", "regional-data-sharing.html", "disease-payment.html"], denied: ["blood.html", "quality-safety.html"] },
-    blood_tech_1: { count: 7, allowed: ["institution.html", "blood-business.html"], denied: ["internet-nursing.html", "physical-examination.html"] },
-    insurance: { count: 4, allowed: ["insurance.html", "disease-payment.html"], denied: ["doctor.html", "platform.html"] },
-    county: { count: 7, allowed: ["county.html", "quality-safety.html"], denied: ["insurance.html", "blood.html"] },
+    blood_quality: { count: 7, allowed: ["unified-work-center.html", "blood.html", "blood-go-live.html"], denied: ["index.html", "public-health.html", "disease-payment.html"] },
+    nurse: { count: 10, allowed: ["unified-work-center.html", "maternal-child.html", "internet-nursing.html", "emergency.html"], denied: ["blood.html", "quality-safety.html", "digital-hospital-evaluation.html"] },
+    doctor: { count: 16, allowed: ["unified-work-center.html", "doctor.html", "regional-data-sharing.html", "referral-teleconsultation.html", "disease-payment.html", "drug-consumable.html"], denied: ["blood.html", "quality-safety.html"] },
+    blood_tech_1: { count: 8, allowed: ["unified-work-center.html", "institution.html", "blood-business.html"], denied: ["internet-nursing.html", "physical-examination.html"] },
+    insurance: { count: 6, allowed: ["unified-work-center.html", "insurance.html", "disease-payment.html", "drug-consumable.html"], denied: ["doctor.html", "platform.html"] },
+    county: { count: 9, allowed: ["unified-work-center.html", "county.html", "quality-safety.html", "referral-teleconsultation.html"], denied: ["insurance.html", "blood.html"] },
     citizen: { count: 11, allowed: ["citizen.html", "resident-mini-program.html"], denied: ["institution.html", "platform.html"] }
   };
   for (const [username, expectation] of Object.entries(expectations)) {

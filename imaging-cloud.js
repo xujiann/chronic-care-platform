@@ -711,7 +711,8 @@ async function startMutualRecognition(studyId) {
 async function decideMutualRecognition(studyId, decision = "recognize") {
   const approved = decision === "recognize";
   if (!IMAGING_API_BASE || !window.confirm(approved ? "确认该影像检查满足互认条件？" : "确认不予互认并登记原因？")) return;
-  const reasonCode = approved ? "qc-passed" : (window.prompt("请输入不予互认原因编码", "quality-not-qualified") || "").trim();
+  const reasonCode = approved ? "qc-passed" : await window.HealthStructuredDialog.prompt({ title: "不予互认原因编码", defaultValue: "quality-not-qualified", multiline: false, pattern: "^[A-Za-z0-9._:-]+$", patternMessage: "原因编码只能包含字母、数字、点、下划线、冒号或连字符。" });
+  if (reasonCode === null) return;
   if (!reasonCode) return;
   const response = await (window.HealthCityAuth?.authFetch || fetch)(`${IMAGING_API_BASE}/imaging-cloud/studies/${encodeURIComponent(studyId)}/mutual-recognition/decision`, {
     method: "POST",
@@ -726,9 +727,11 @@ async function decideMutualRecognition(studyId, decision = "recognize") {
 
 async function submitMutualRecognitionAppeal(studyId) {
   if (!IMAGING_API_BASE) return;
-  const reason = (window.prompt("请输入申诉理由（不填写患者身份信息）", "补充质控证据后申请复核") || "").trim();
-  if (!reason) return;
-  const evidenceRefs = (window.prompt("请输入证据引用，多个引用用逗号分隔", "IMG-QC-EVIDENCE-001") || "").split(",").map((item) => item.trim()).filter(Boolean);
+  const reason = await window.HealthStructuredDialog.prompt({ title: "互认申诉理由", defaultValue: "补充质控证据后申请复核", helperText: "请勿填写患者身份信息。", minLength: 2 });
+  if (reason === null) return;
+  const evidenceInput = await window.HealthStructuredDialog.prompt({ title: "申诉证据引用", label: "多个引用用逗号分隔", defaultValue: "IMG-QC-EVIDENCE-001" });
+  if (evidenceInput === null) return;
+  const evidenceRefs = evidenceInput.split(",").map((item) => item.trim()).filter(Boolean);
   if (!evidenceRefs.length) return;
   const response = await (window.HealthCityAuth?.authFetch || fetch)(`${IMAGING_API_BASE}/imaging-cloud/studies/${encodeURIComponent(studyId)}/mutual-recognition/appeal`, {
     method: "POST",
@@ -743,8 +746,8 @@ async function submitMutualRecognitionAppeal(studyId) {
 
 async function reviewMutualRecognitionAppeal(studyId, decision) {
   if (!IMAGING_API_BASE || !window.confirm(decision === "approve" ? "确认通过申诉并恢复互认？" : "确认驳回申诉？")) return;
-  const comment = (window.prompt("请输入独立复核意见", decision === "approve" ? "补充证据有效，复核通过" : "补充证据仍不满足互认规则") || "").trim();
-  if (!comment) return;
+  const comment = await window.HealthStructuredDialog.prompt({ title: "独立复核意见", defaultValue: decision === "approve" ? "补充证据有效，复核通过" : "补充证据仍不满足互认规则", minLength: 2 });
+  if (comment === null) return;
   const response = await (window.HealthCityAuth?.authFetch || fetch)(`${IMAGING_API_BASE}/imaging-cloud/studies/${encodeURIComponent(studyId)}/mutual-recognition/appeal/review`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },

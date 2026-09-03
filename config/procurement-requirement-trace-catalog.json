@@ -1,0 +1,41 @@
+{
+  "schemaVersion": "procurement-requirement-trace-catalog-v1",
+  "capabilities": [
+    {
+      "capabilityId": "H-SUP-SUBJECT",
+      "pages": ["public-health-supervision.html"],
+      "interfaces": [
+        "GET /api/public-health/supervision/workbench",
+        "POST /api/public-health/supervision/subjects"
+      ],
+      "tests": [
+        "test/public-health-supervision-api.test.js",
+        "test/public-health-supervision-ui.test.js"
+      ]
+    },
+    {
+      "capabilityId": "H-SUP-INSPECT",
+      "pages": ["public-health-supervision.html"],
+      "interfaces": [
+        "POST /api/public-health/supervision/inspection-tasks",
+        "POST /api/public-health/supervision/inspection-tasks/:id/actions",
+        "POST /api/public-health/supervision/findings/:id/actions"
+      ],
+      "tests": [
+        "test/public-health-supervision-api.test.js",
+        "test/public-health-supervision-service.test.js",
+        "test/public-health-supervision-ui.test.js"
+      ]
+    },
+    {
+      "capabilityId": "H-SUP-CASE",
+      "pages": ["public-health-supervision-cases.html"],
+      "interfaces": [
+        "GET /api/public-health/supervision/cases",
+        "POST /api/public-health/supervision/cases",
+        "POST /api/public-health/supervision/cases/:id/actions"
+      ],
+      "tests": ["test/domain-workbenches.test.js"]
+    }
+  ]
+}

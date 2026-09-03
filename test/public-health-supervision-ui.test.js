@@ -18,7 +18,7 @@ test("health supervision page is manager-scoped and exposes the approved workflo
     "supervision-tasks",
     "supervision-findings"
   ]) assert.match(html, new RegExp(`id="${id}"`));
-  assert.match(html, /生产保持 NO-GO/);
+  assert.match(html, /GIS、视频、附件上传或外部交换仍保持 NO-GO/);
 });
 
 test("health supervision UI uses the shared API client and trusted text DOM only", () => {
@@ -34,6 +34,6 @@ test("health supervision UI uses the shared API client and trusted text DOM only
 test("page declares empty, error and production boundary states", () => {
   assert.match(source, /暂无检查任务/);
   assert.match(source, /工作台加载失败/);
-  assert.match(source, /案件、GIS、视频、附件上传和外部交换未包含/);
+  assert.match(source, /案件进入独立协同工作台；GIS、视频、附件上传和外部交换仍保持 NO-GO/);
   assert.match(source, /productionReady === false/);
 });

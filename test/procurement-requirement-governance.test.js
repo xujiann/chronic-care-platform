@@ -3,6 +3,7 @@
 const assert = require("node:assert/strict");
 const test = require("node:test");
 const defaultCatalog = require("../config/procurement-requirement-governance.json");
+const defaultRegistry = require("../config/platform-capability-registry.json");
 const { StateCommandError } = require("../src/platform/storage/state-command-consistency");
 const {
   applyProcurementRequirementReviewAction,
@@ -72,17 +73,32 @@ test("commission review persists a digest-only decision and computes repository 
   assert.equal(report.summary.gaps, 0);
 });
 
-test("missing capabilities remain explicit gaps after human acceptance", () => {
+test("repository-verified supervision case capability closes the procurement repository gap", () => {
   const execution = applyProcurementRequirementReviewAction({}, command({
     commandId: "review-command-0002",
     requirementId: "PR-SAMPLE-001-R003"
   }), REVIEWER, { now: NOW });
-  assert.equal(execution.result.gap.overall, "missing");
+  assert.equal(execution.result.gap.overall, "covered-in-repository");
   assert.equal(execution.result.gap.mappings[0].capabilityId, "H-SUP-CASE");
+  assert.equal(execution.result.gap.mappings[0].coverage, "repository-verified");
   const report = buildProcurementRequirementGovernance(execution.data, { now: NOW });
   assert.equal(report.summary.accepted, 1);
-  assert.equal(report.summary.gaps, 1);
+  assert.equal(report.summary.coveredInRepository, 1);
+  assert.equal(report.summary.gaps, 0);
   assert.equal(report.approvedRequirements.length, 1);
+});
+
+test("an explicitly unverified capability remains a gap and cannot borrow repository evidence", () => {
+  const registry = structuredClone(defaultRegistry);
+  const capability = registry.capabilities.find((item) => item.id === "H-SUP-CASE");
+  capability.coverage = "missing";
+  capability.evidence = [];
+  const execution = applyProcurementRequirementReviewAction({}, command({
+    commandId: "review-command-gap-regression",
+    requirementId: "PR-SAMPLE-001-R003"
+  }), REVIEWER, { now: NOW, registry });
+  assert.equal(execution.result.gap.overall, "missing");
+  assert.equal(execution.result.gap.mappings[0].evidenceCount, 0);
 });
 
 test("review commands are idempotent and reject stale or changed intent", () => {

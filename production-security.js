@@ -65,32 +65,31 @@
   }
 
   function ask(message, current = "") {
-    const value = window.prompt(message, current);
-    return value === null ? null : value.trim();
+    return window.HealthStructuredDialog.prompt({ title: message, defaultValue: current, minLength: 1 });
   }
 
-  function buildFindingPayload(action) {
+  async function buildFindingPayload(action) {
     const payload = { action: action.replace(/-(passed|failed)$/, "") };
     if (action.startsWith("verify-retest-")) payload.result = action.endsWith("passed") ? "passed" : "failed";
     if (action === "assign") {
-      payload.owner = ask("整改责任人");
+      payload.owner = await ask("整改责任人");
       if (payload.owner === null) return null;
-      payload.dueAt = ask("整改期限（YYYY-MM-DD）");
+      payload.dueAt = await ask("整改期限（YYYY-MM-DD）");
       if (payload.dueAt === null) return null;
     }
     if (["record-remediation", "verify-retest-passed", "verify-retest-failed"].includes(action)) {
-      payload.evidenceRef = ask("脱敏证据引用（文件编号、摘要或受控路径）");
+      payload.evidenceRef = await ask("脱敏证据引用（文件编号、摘要或受控路径）");
       if (payload.evidenceRef === null) return null;
     }
     if (action === "request-waiver") {
-      payload.expiresAt = ask("豁免到期日（高危不超过 30 天，其他不超过 90 天）");
+      payload.expiresAt = await ask("豁免到期日（高危不超过 30 天，其他不超过 90 天）");
       if (payload.expiresAt === null) return null;
-      payload.reason = ask("豁免原因");
+      payload.reason = await ask("豁免原因");
       if (payload.reason === null) return null;
-      payload.compensatingControl = ask("补偿控制");
+      payload.compensatingControl = await ask("补偿控制");
       if (payload.compensatingControl === null) return null;
     }
-    payload.note = ask("处置说明（至少 6 个字符）");
+    payload.note = await window.HealthStructuredDialog.prompt({ title: "处置说明", label: "处置说明（至少 6 个字符）", minLength: 6 });
     return payload.note === null ? null : payload;
   }
 
@@ -132,11 +131,11 @@
     try {
       if (findingButton) {
         const action = findingButton.dataset.productionSecurityAction;
-        const payload = buildFindingPayload(action);
+        const payload = await buildFindingPayload(action);
         if (payload) await post(`/findings/${encodeURIComponent(findingButton.dataset.id)}/actions`, payload);
       } else {
         const action = approvalButton.dataset.productionSecurityApproval;
-        const note = ask("独立安全放行意见（至少 6 个字符）");
+        const note = await window.HealthStructuredDialog.prompt({ title: "独立安全放行意见", minLength: 6 });
         if (note !== null) await post(`/release-approvals/${encodeURIComponent(approvalButton.dataset.id)}/actions`, { action, note });
       }
     } catch (error) {

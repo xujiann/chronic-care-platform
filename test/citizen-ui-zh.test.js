@@ -47,7 +47,7 @@ test("居民端现场动态数据中的指标、时段和技术来源统一转�
   assert.doesNotMatch(translated, /systolic|bmi|\bAM\b|关联Orthanc检查|FD-PKG-HBP/i);
 
   const appointment = uiZh.translateVisibleText("Qingniwaqiao Community Health Service Center demo · General Practice · Doctor Chen · schedule-change replacement · Internet hospital source pool · Ready");
-  assert.equal(appointment, "青泥洼桥社区卫生服务中心演示点 · 全科医学科 · 陈医生 · 改期替补号源 · 互联网医院号源池 · 已就绪");
+  assert.equal(appointment, "示范社区卫生服务中心演示点 · 全科医学科 · 陈医生 · 改期替补号源 · 互联网医院号源池 · 已就绪");
 
   assert.equal(uiZh.translateVisibleText("HC-****3219 · MI-****E-R1 · 2.0-demo"), "健康卡尾号3219 · 医保凭证已脱敏 · 2.0-演示版");
 });

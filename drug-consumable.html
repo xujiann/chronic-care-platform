@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>药耗协同工作台 · 区域全民健康信息平台</title>
+  <link rel="stylesheet" href="./portal.css" /><link rel="stylesheet" href="./domain-task-workbench.css" />
+  <script src="./regional-context.js"></script><script src="./access-control-policy.js"></script><script src="./browser-safe-url.js"></script><script src="./auth.js"></script>
+  <script defer src="./platform-domain-modules.js"></script><script defer src="./platform-api-client.js"></script><script defer src="./platform-design-system.js"></script><script defer src="./platform-shell.js"></script>
+  <script src="./page-auth-bootstrap.js" data-roles="commission,institution,insurance"></script>
+  <script defer src="./domain-task-ui.js"></script><script defer src="./drug-consumable.js"></script>
+</head>
+<body><main class="portal-shell domain-workbench">
+  <header class="portal-header"><div><span>药品与医用耗材</span><h1>药耗监管与整改协同工作台</h1><p>贯通线索复核、机构整改、医保核验和追溯证据留存。</p></div><nav><a href="./institution.html">机构端</a><a href="./insurance.html">医保端</a><a href="./platform.html">平台治理</a><a href="./drug-consumable-about.html">模块说明</a></nav></header>
+  <p id="domain-workbench-status" class="domain-workbench-status" role="status" aria-live="polite">正在加载……</p><p id="domain-workbench-error" class="domain-workbench-error" role="alert"></p>
+  <section id="domain-workbench-metrics" class="metric-grid"></section>
+  <section class="panel"><div class="panel-title"><h2>任务筛选</h2><span>不同角色显示不同操作</span></div><div class="workbench-toolbar"><label>状态<select id="domain-status-filter"><option value="">全部状态</option></select></label><label>关键词<input id="domain-keyword-filter" type="search" placeholder="记录编号、品类、机构或问题" /></label><button id="domain-refresh" type="button">刷新业务数据</button></div></section>
+  <section class="portal-grid"><article class="panel wide"><div class="panel-title"><h2>药耗任务队列</h2><span>复核—整改—医保同步—闭环</span></div><div id="domain-task-list" class="domain-task-list"></div></article><article class="panel"><div class="panel-title"><h2>任务详情</h2><span>保留版本与下一步</span></div><div id="domain-task-detail"></div></article></section>
+</main></body></html>

@@ -1,4 +1,4 @@
-# 大连卫生健康信息平台 MVP
+# 卫生健康信息平台 MVP
 
 ## 工程治理入口
 
@@ -11,7 +11,7 @@
 开始开发前必须遵守 `AGENTS.md` 的 T00–T09 所有权与每日
 PLAN → 审批 → 实现 → 测试 → review → PR → merge 流程。
 
-这是一个面向卫生健康信息化场景的可运行 MVP，用于验证大连市卫生健康委、医疗机构、医保局/医保中心/区市县医保局、居民端、县域医共体平台和统一运营工作台之间的数据贯通、业务闭环、权限隔离、审计保全和静态展示发布。
+这是一个面向不同地区与机构的通用卫生健康信息化可运行 MVP，用于验证卫生健康行政部门、医疗机构、医保部门、居民端、县域医共体平台和统一运营工作台之间的数据贯通、业务闭环、权限隔离、审计保全和静态展示发布。
 
 当前仓库已经完成 P0/P1/P2 的本地演示级与 API 基础闭环；剩余生产化事项主要依赖真实身份源、医疗机构接口、医保核心系统、公安民政共享、安全测评和现场部署资源。
 
@@ -34,7 +34,7 @@ PLAN → 审批 → 实现 → 测试 → review → PR → merge 流程。
 ## 快速启动
 
 ```powershell
-cd "C:\Users\drxuj\OneDrive\3.信息化\0.高质量发展 信息化\chronic-care-platform"
+cd "C:\Users\drxuj\Projects\卫生健康信息平台"
 npm.cmd install
 npm.cmd run dev
 ```
@@ -74,12 +74,12 @@ JSON 数据目录启动隔离服务。`test:all` 保持原自动发现语义，�
 |---|---|---|
 | `city` | `workbench.html` | 市级健康城市管理 |
 | `district` | `workbench.html` | 区市县管理端 |
-| `health` / `whjw` | `index.html` | 大连市卫生健康委 |
+| `health` / `whjw` | `index.html` | 市级卫生健康行政部门 |
 | `hospital` | `institution.html` | 三级医疗机构 |
 | `community` | `institution.html` | 基层医疗机构 |
 | `doctor` / `doctor_wang` | `doctor.html` | 医生账户 |
-| `mi` | `insurance.html` | 大连市医保局管理端 |
-| `insurance` | `insurance.html` | 大连市医保中心经办端 |
+| `mi` | `insurance.html` | 市级医保管理端 |
+| `insurance` | `insurance.html` | 市级医保经办端 |
 | `district_mi` | `insurance.html` | 区市县医保局管理端 |
 | `citizen` | `citizen.html` | 居民端 |
 | `county` | `county.html` | 县域医共体平台 |
@@ -92,6 +92,13 @@ JSON 数据目录启动隔离服务。`test:all` 保持原自动发现语义，�
 | `health-city.html` | 健康城市系统总览 |
 | `workbench.html` | 统一运营工作台、全流程审计矩阵、路线图、系统就绪报告 |
 | `platform.html` | 平台建设驾驶舱、应用目录、信用评价、科研专病库治理、移动无障碍治理、安全信创台账 |
+| `unified-work-center.html` | 按账号和组织范围聚合待办、消息、回执与任务动作 |
+| `account-lifecycle.html` | 账号申请、临时授权、冻结、解冻和双人复核治理 |
+| `maternal-child.html` | 妇幼健康业务任务工作台 |
+| `referral-teleconsultation.html` | 双向转诊与远程会诊任务工作台 |
+| `drug-consumable.html` | 药品耗材治理任务工作台 |
+| `research-sandbox.html` | 科研数据沙箱申请、审核、访问和成果回流工作台 |
+| `public-health-supervision-cases.html` | 卫生监督检查、发现问题和案件处置闭环工作台 |
 | `research-sandbox-about.html` | 科研数据沙箱政策说明、运行边界、政策依据、现场验收证据和发布证据 |
 | `index.html` | 卫健委端：慢病、统计、应急、质量、审计、互认、绩效 |
 | `institution.html` | 医疗机构端：授权档案、转诊、固定取药、证照、多点执业 |
@@ -174,6 +181,9 @@ SQLite 结构化镜像已覆盖居民、账户、主索引、个人健康档案�
 | `PATCH /api/chronic-management-plans/:id`、`/api/chronic-comorbidity-plans/:id`、`/api/chronic-tcm-services/:id`、`/api/chronic-self-management/:id`、`/api/chronic-medication-support/:id`、`/api/chronic-quality-metrics/:id` | 慢病管理计划、多病共管、中医药、自我管理、用药保障和质控记录的单条更新，支持机构/卫健委权限、居民授权范围和乐观锁 |
 | `GET /api/tasks` / `POST /api/tasks/:id/actions` | 统一任务中心 |
 | `GET /api/messages` / `POST /api/messages/:id/receipt` | 站内消息与送达回执 |
+| `GET /api/work-center` / `POST /api/work-center/tasks/:id/actions` / `POST /api/work-center/tasks/:id/messages` / `POST /api/work-center/messages/:id/receipt` | 跨域统一待办、消息、回执及版本化处置动作 |
+| `GET/POST /api/auth/account-lifecycle-requests` / `POST /api/auth/account-lifecycle-requests/conflicts` / `POST /api/auth/account-lifecycle-requests/:id/reviews` | 账号申请、职责冲突检查、双人复核与临时授权治理 |
+| `GET/POST /api/public-health/supervision/cases` / `POST /api/public-health/supervision/cases/:id/actions` | 卫生监督案件立案、调查、审核、处罚、整改、复查和结案闭环 |
 | `GET /api/data-quality/issues` / `GET /api/data-quality/scorecard` | 数据质量治理 |
 | `GET /api/security/compliance-report` / `GET /api/security/high-risk-events` | 安全合规证据 |
 | `GET /api/credit-evaluations/calculate` | 信用评价自动计算 |

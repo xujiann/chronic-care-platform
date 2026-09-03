@@ -65,7 +65,7 @@
       metric("监督问题", summary.findings || 0, `${summary.pendingRemediation || 0} 项待闭环`)
     ]);
     root.document.querySelector("#supervision-boundary").textContent = payload.productionReady === false
-      ? "首增量仅支持任务—检查—问题—整改复核；案件、GIS、视频、附件上传和外部交换未包含，生产保持 NO-GO。"
+      ? "检查工作台支持任务—检查—问题—整改复核，案件进入独立协同工作台；GIS、视频、附件上传和外部交换仍保持 NO-GO。"
       : "生产边界状态异常，禁止继续操作。";
 
     const role = currentRole();

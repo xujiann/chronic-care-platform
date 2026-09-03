@@ -117,9 +117,8 @@
     if (boundary) boundary.textContent = center.boundary || "";
   }
 
-  function ask(label) {
-    const value = window.prompt(label);
-    return value === null ? null : value.trim();
+  function ask(label, options = {}) {
+    return window.HealthStructuredDialog.prompt({ title: label, minLength: 1, ...options });
   }
 
   async function request(path, body) {
@@ -160,9 +159,9 @@
     try {
       if (approval) {
         const action = approval.dataset.goNoGoApproval;
-        const note = ask(action === "approve" ? "审批意见（至少6个字符）" : "撤销原因（至少6个字符）");
+        const note = await ask(action === "approve" ? "审批意见" : "撤销原因", { minLength: 6 });
         if (note === null) return;
-        const evidenceRef = action === "approve" ? ask("最小化签署证据引用（不得包含患者可识别信息）") : "";
+        const evidenceRef = action === "approve" ? await ask("最小化签署证据引用（不得包含患者可识别信息）") : "";
         if (action === "approve" && evidenceRef === null) return;
         await request(`/approvals/${encodeURIComponent(approval.dataset.id)}/actions`, {
           action,
@@ -172,19 +171,19 @@
         });
       } else {
         const choice = decision.dataset.goNoGoDecision;
-        const changeTicket = ask("生产变更单号");
+        const changeTicket = await ask("生产变更单号");
         if (changeTicket === null) return;
         let cutoverWindow = "";
         let rollbackOwner = "";
         if (choice === "GO") {
-          cutoverWindow = ask("割接窗口");
+          cutoverWindow = await ask("割接窗口");
           if (cutoverWindow === null) return;
-          rollbackOwner = ask("回滚决策责任人");
+          rollbackOwner = await ask("回滚决策责任人");
           if (rollbackOwner === null) return;
         }
-        const note = ask("指挥决策说明（至少6个字符）");
+        const note = await ask("指挥决策说明", { minLength: 6 });
         if (note === null) return;
-        const confirmation = choice === "GO" ? ask("输入 APPROVE PRODUCTION GO LIVE 确认正式GO") : "";
+        const confirmation = choice === "GO" ? await ask("输入 APPROVE PRODUCTION GO LIVE 确认正式GO", { multiline: false, pattern: "^APPROVE PRODUCTION GO LIVE$", patternMessage: "请输入完整确认语句。" }) : "";
         if (choice === "GO" && confirmation === null) return;
         await request("/decision", { decision: choice, changeTicket, cutoverWindow, rollbackOwner, note, confirmation });
       }

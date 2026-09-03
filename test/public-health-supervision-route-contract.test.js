@@ -18,7 +18,8 @@ test("health supervision is an explicit least-privilege public-health segment", 
     "public-health-operations",
     "vital-records",
     "infectious-reporting",
-    "health-supervision"
+    "health-supervision",
+    "health-supervision-cases"
   ]);
 });
 

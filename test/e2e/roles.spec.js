@@ -68,8 +68,8 @@ test("specialist accounts see bounded functions and can search the unified sideb
   await login(page, "nurse", "internet-nursing.html");
   await expect(page.locator(".navigation-identity")).toContainText("互联网护理岗位");
   await expect(page.locator(".navigation-identity")).toContainText("DEMO-NURSE");
-  await expect(page.locator(".navigation-identity")).toContainText("8 项功能");
-  await expect(page.locator(".navigation-primary a[data-navigation-page]")).toHaveCount(8);
+  await expect(page.locator(".navigation-identity")).toContainText("10 项功能");
+  await expect(page.locator(".navigation-primary a[data-navigation-page]")).toHaveCount(10);
   await expect(page.locator(".navigation-primary a[data-navigation-page='blood.html']")).toHaveCount(0);
   await expect(page.locator(".navigation-primary a[data-navigation-page='internet-nursing.html']")).toHaveAttribute("aria-current", "page");
 
@@ -79,12 +79,12 @@ test("specialist accounts see bounded functions and can search the unified sideb
   await expect(page.locator(".navigation-group-links > a:visible")).toHaveCount(2);
   await expect(page.locator(".navigation-group-links > a:visible").first()).toContainText("健康体检");
   await search.clear();
-  await expect(page.locator(".navigation-search-status")).toHaveText("共 8 项");
+  await expect(page.locator(".navigation-search-status")).toHaveText("共 10 项");
 
   await login(page, "blood_quality", "blood.html");
   await expect(page.locator(".navigation-identity")).toContainText("血液冷链质控岗位");
-  await expect(page.locator(".navigation-identity")).toContainText("6 项功能");
-  await expect(page.locator(".navigation-primary a[data-navigation-page]")).toHaveCount(6);
+  await expect(page.locator(".navigation-identity")).toContainText("7 项功能");
+  await expect(page.locator(".navigation-primary a[data-navigation-page]")).toHaveCount(7);
   await expect(page.locator(".navigation-primary a[data-navigation-page='index.html']")).toHaveCount(0);
   await expect(page.locator(".navigation-primary a[data-navigation-page='blood.html']")).toHaveAttribute("aria-current", "page");
 });
@@ -101,6 +101,7 @@ test("commission user reaches the governance dashboard and opens maintenance", a
   await expect(page.locator("[data-chronic-risk-resident='r1']")).toContainText("逾期随访");
 
   await page.goto("/platform.html");
+  await page.getByRole("button", { name: "显示全部", exact: true }).click();
 
   await expect(page.getByRole("heading", { name: "统一应用目录" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "医疗机构信用评价" })).toBeVisible();
@@ -134,7 +135,7 @@ test("commission user reaches the governance dashboard and opens maintenance", a
   await expect(page.locator("#identity-lifecycle-metrics")).toContainText("最近清理 0 条");
   await expect(page.locator("#identity-account-list .identity-account-row")).toHaveCount(17);
   const nurseAccount = page.locator("#identity-account-list .identity-account-row", { hasText: "DEMO-NURSE" });
-  await expect(nurseAccount).toContainText("8 项功能");
+  await expect(nurseAccount).toContainText("10 项功能");
   await expect(nurseAccount).toContainText("外部身份待绑定");
   await page.locator("#identity-account-search").fill("输血科");
   await expect(page.locator("#identity-account-list .identity-account-row")).toHaveCount(2);
@@ -152,6 +153,7 @@ test("commission user reaches the governance dashboard and opens maintenance", a
   await expect(page.locator("#system-readiness")).toContainText("HIS/EMR/LIS/PACS/心电");
 
   await page.goto("/platform.html");
+  await page.getByRole("button", { name: "显示全部", exact: true }).click();
 
   await expect(page.locator("#application-catalog tbody tr")).toHaveCount(6, { timeout: 30_000 });
   const applicationRow = page.locator("#application-catalog tbody tr", { hasText: "全民健康信息平台一、二期" });

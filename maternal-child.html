@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>妇幼健康工作台 · 区域全民健康信息平台</title>
+  <link rel="stylesheet" href="./portal.css" />
+  <link rel="stylesheet" href="./domain-task-workbench.css" />
+  <script src="./regional-context.js"></script><script src="./access-control-policy.js"></script><script src="./browser-safe-url.js"></script><script src="./auth.js"></script>
+  <script defer src="./platform-domain-modules.js"></script><script defer src="./platform-api-client.js"></script><script defer src="./platform-design-system.js"></script><script defer src="./platform-shell.js"></script>
+  <script src="./page-auth-bootstrap.js" data-roles="commission,institution"></script>
+  <script defer src="./domain-task-ui.js"></script><script defer src="./maternal-child.js"></script>
+</head>
+<body><main class="portal-shell domain-workbench">
+  <header class="portal-header"><div><span>妇幼健康</span><h1>出生证明与妇幼接续任务工作台</h1><p>集中处理签发、妇幼入册、公安共享和新生儿健康服务接续。</p></div><nav><a href="./index.html">卫健管理</a><a href="./institution.html">机构端</a><a href="./immunization.html">免疫规划</a><a href="./maternal-child-about.html">模块说明</a></nav></header>
+  <p id="domain-workbench-status" class="domain-workbench-status" role="status" aria-live="polite">正在加载……</p><p id="domain-workbench-error" class="domain-workbench-error" role="alert"></p>
+  <section id="domain-workbench-metrics" class="metric-grid" aria-label="妇幼任务摘要"></section>
+  <section class="panel"><div class="panel-title"><h2>任务筛选</h2><span>只显示当前账号有权查看的数据</span></div><div class="workbench-toolbar"><label>状态<select id="domain-status-filter"><option value="">全部状态</option></select></label><label>关键词<input id="domain-keyword-filter" type="search" placeholder="任务编号、新生儿或签发机构" /></label><button id="domain-refresh" type="button">刷新业务数据</button></div></section>
+  <section class="portal-grid"><article class="panel wide"><div class="panel-title"><h2>妇幼任务队列</h2><span>签发—共享—入册—服务接续</span></div><div id="domain-task-list" class="domain-task-list"></div></article><article class="panel"><div class="panel-title"><h2>任务详情</h2><span>来源、状态与下一步</span></div><div id="domain-task-detail"></div></article></section>
+</main></body></html>

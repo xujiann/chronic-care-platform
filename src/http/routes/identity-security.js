@@ -1,6 +1,7 @@
 "use strict";
 
 const { buildAuthorizationContext } = require("./authorization-context");
+const accountLifecycle = require("./identity-security/account-lifecycle");
 
 const {
   SESSION_SECURITY_AUDIT_PERSISTENCE_CONTRACT,
@@ -94,7 +95,12 @@ function createRouteSegments(runtime, options = {}) {
       return null;
     }
   };
+  const accountLifecycleReady = accountLifecycle.REQUIRED_DEPENDENCIES
+    .every((dependency) => typeof runtime?.[dependency] === "function");
   return [
+    ...(accountLifecycleReady
+      ? [accountLifecycle.createRouteSegment({ ...runtime, enforceSensitiveMutation: enforceMutationSecurity })]
+      : []),
     {
       id: "identity-security-01",
       domain: "identity-security",

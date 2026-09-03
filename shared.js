@@ -14,7 +14,7 @@ const HEALTH_CITY_ZH_TERMS = {
   "platformProcessAudit": "平台流程审计",
   "/api/metrics": "运行指标接口",
   "operations-readiness": "运维就绪证据",
-  "Qingniwaqiao Community Health Service Center": "青泥洼桥社区卫生服务中心",
+  "Qingniwaqiao Community Health Service Center": "示范社区卫生服务中心",
   "Regional Central Hospital": "区域中心医院",
   "Regional Women and Children Medical Center": "区域妇女儿童医疗中心",
   "critical": "严重预警",
