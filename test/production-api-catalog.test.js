@@ -74,7 +74,7 @@ test("production API catalog reuses the authorization inventory and stays fail c
   assert.equal(catalog.summary.authenticationEvidenceVerified, 13);
   assert.equal(catalog.summary.unclassifiedAuthentication, 0);
   assert.equal(catalog.summary.routeInventoryOnly, 0);
-  assert.equal(catalog.summary.publicRoutes, 7);
+  assert.equal(catalog.summary.publicRoutes, 8);
   assert.equal(catalog.summary.optionalAuthenticationRoutes, 1);
   assert.equal(catalog.summary.entries, expectedKeys.size);
   assert.equal(catalog.summary.declarations, matrix.routes.length);

@@ -29,6 +29,13 @@ function publicRequestError(error) {
   });
 }
 
+function isAnonymousAuthBootstrapRequest(req = {}) {
+  const method = String(req.method || "GET").toUpperCase();
+  const pathname = String(req.url || "").split("?", 1)[0];
+  return (method === "POST" && ["/api/auth/login", "/api/auth/phone-login", "/api/auth/phone-code"].includes(pathname))
+    || (method === "GET" && pathname === "/api/auth/login-catalog");
+}
+
 function createPlatformRequestHandler(options = {}) {
   const observability = options.observability;
   if (!observability || typeof observability.run !== "function" || typeof observability.recordDependency !== "function") {
@@ -58,15 +65,17 @@ function createPlatformRequestHandler(options = {}) {
       res.on("finish", () => recordRequestMetrics(req, res, startedAt));
       try {
         if (String(req.url || "").startsWith("/api/")) {
-          try {
-            await hydrateRequestSession(req);
-            observability.recordDependency("session-store", { ok: true });
-          } catch (error) {
-            const policyFailure = Boolean(error.statusCode);
-            observability.recordDependency("session-store", { ok: policyFailure, detail: error.code || error.message });
-            if (!policyFailure) logger.error(`central session lookup failed: ${error.message}`);
-            sendSessionFailure(res, error);
-            return;
+          if (!isAnonymousAuthBootstrapRequest(req)) {
+            try {
+              await hydrateRequestSession(req);
+              observability.recordDependency("session-store", { ok: true });
+            } catch (error) {
+              const policyFailure = Boolean(error.statusCode);
+              observability.recordDependency("session-store", { ok: policyFailure, detail: error.code || error.message });
+              if (!policyFailure) logger.error(`central session lookup failed: ${error.message}`);
+              sendSessionFailure(res, error);
+              return;
+            }
           }
           await handleApi(req, res);
           return;
@@ -100,5 +109,6 @@ module.exports = {
   createBrowserSecurityHeaders,
   createPlatformRequestHandler,
   createStaticContentRuntime,
+  isAnonymousAuthBootstrapRequest,
   publicRequestError
 };

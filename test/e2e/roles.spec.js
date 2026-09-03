@@ -28,7 +28,7 @@ async function login(page, username, expectedPage) {
 
 async function apiLogin(request, username) {
   const storage = await request.storageState();
-  const csrf = storage.cookies.find((cookie) => cookie.name === "health_platform_csrf")?.value || "";
+  const csrf = storage.cookies.find((cookie) => cookie.name === "health_platform_csrf_v2")?.value || "";
   const response = await request.post("/api/auth/login", {
     headers: csrf ? { "x-csrf-token": csrf } : {},
     data: { username, password: "123456" }
@@ -36,7 +36,7 @@ async function apiLogin(request, username) {
   expect(response.ok()).toBe(true);
   await response.json();
   const authenticatedStorage = await request.storageState();
-  const authenticatedCsrf = authenticatedStorage.cookies.find((cookie) => cookie.name === "health_platform_csrf")?.value || "";
+  const authenticatedCsrf = authenticatedStorage.cookies.find((cookie) => cookie.name === "health_platform_csrf_v2")?.value || "";
   expect(authenticatedCsrf).not.toBe("");
   return { "x-csrf-token": authenticatedCsrf };
 }

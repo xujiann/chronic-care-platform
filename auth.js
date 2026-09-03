@@ -21,23 +21,23 @@
     document.head.append(pendingStyle);
   }
   const demoUsers = [
-    { id: "u-nurse", username: "nurse", password: "123456", name: "互联网护理演示护士", role: "institution", roleName: "护士工作站", orgCode: "MR1", orgName: "区域中心医院", orgType: "medical_institution", orgLevel: "三级医院", dataScope: "互联网护理订单与服务轨迹", home: "internet-nursing.html", nurseId: "inn-001", accountType: "nurse" },
-    { id: "u-blood-quality", username: "blood_quality", password: "123456", name: "血液中心质控审核员", role: "commission", roleName: "血液中心冷链质控", orgCode: "BLOOD-DL", orgName: "区域血液中心", orgType: "blood_center", orgLevel: "市级", dataScope: "冷链异常、质量处置与血液放行", home: "blood.html", accountType: "blood_quality", bloodPermissions: ["cold_chain_quality_review"] },
-    { id: "u-blood-tech-1", username: "blood_tech_1", password: "123456", name: "输血科配血复核员甲", role: "institution", roleName: "输血科检验技师", orgCode: "MR1", orgName: "区域中心医院", orgType: "medical_institution", orgLevel: "三级医院", dataScope: "本机构交叉配血与发血复核", home: "blood.html", accountType: "blood_technologist", bloodPermissions: ["compatibility_review"] },
-    { id: "u-blood-tech-2", username: "blood_tech_2", password: "123456", name: "输血科配血复核员乙", role: "institution", roleName: "输血科检验技师", orgCode: "MR1", orgName: "区域中心医院", orgType: "medical_institution", orgLevel: "三级医院", dataScope: "本机构交叉配血与发血复核", home: "blood.html", accountType: "blood_technologist", bloodPermissions: ["compatibility_review"] },
-    { id: "u-city", username: "city", password: "123456", name: "市级管理员", role: "commission", roleName: "市级健康城市管理", orgCode: "ORG-CITY-DL", orgName: "区域健康城市平台", orgType: "city", orgLevel: "市级", dataScope: "全市", home: "workbench.html" },
-    { id: "u-district", username: "district", password: "123456", name: "区市县管理员", role: "commission", roleName: "区市县管理端", orgCode: "ORG-DIST-ZS", orgName: "中山区健康城市平台", orgType: "district", orgLevel: "区市县", dataScope: "中山区", home: "workbench.html" },
-    { id: "u-health", username: "health", password: "123456", name: "区域卫生健康委管理员", role: "commission", roleName: "区域卫生健康委", orgCode: "ORG-HEALTH-DL", orgName: "区域卫生健康委", orgType: "health_admin", orgLevel: "市级", dataScope: "医疗资源、统计直报、公共卫生、分级诊疗和数据质量监管", home: "index.html" },
-    { id: "u-mi", username: "mi", password: "123456", name: "区域医保局管理员", role: "insurance", roleName: "区域医保局管理端", orgCode: "ORG-MI-DL", orgName: "区域医保局", orgType: "insurance_bureau", orgLevel: "市级", dataScope: "医保政策、基金监管、待遇管理和跨区县监督", home: "insurance.html" },
-    { id: "u-hospital", username: "hospital", password: "123456", name: "医疗机构管理员", role: "institution", roleName: "医疗机构端", orgCode: "MR1", orgName: "区域中心医院", orgType: "medical_institution", orgLevel: "三级医院", dataScope: "本机构", home: "institution.html" },
-    { id: "u-community", username: "community", password: "123456", name: "基层机构管理员", role: "institution", roleName: "基层医疗机构端", orgCode: "MR3", orgName: "青泥洼桥社区卫生服务中心", orgType: "medical_institution", orgLevel: "基层医疗机构", dataScope: "本机构与签约居民", home: "institution.html" },
-    { id: "u1", username: "whjw", password: "123456", name: "区域卫生健康委管理员", role: "commission", roleName: "区域卫生健康委", orgCode: "ORG-HEALTH-DL", orgName: "区域卫生健康委", orgType: "health_admin", orgLevel: "市级", dataScope: "医疗资源、统计直报、公共卫生、分级诊疗和数据质量监管", home: "index.html" },
-    { id: "u2", username: "doctor", password: "123456", name: "刘医生", role: "institution", roleName: "医生账户", orgCode: "MR3", orgName: "青泥洼桥社区卫生服务中心", orgType: "medical_institution", orgLevel: "基层医疗机构", dataScope: "签约居民、随访、长期处方、多点执业申请", home: "doctor.html", doctorId: "doc-liu", accountType: "doctor" },
-    { id: "u-doctor-wang", username: "doctor_wang", password: "123456", name: "王医生", role: "institution", roleName: "医生账户", orgCode: "MR1", orgName: "区域中心医院", orgType: "medical_institution", orgLevel: "三级医院", dataScope: "本机构诊疗、转诊接诊、多点执业备案", home: "doctor.html", doctorId: "doc-wang", accountType: "doctor" },
-    { id: "u3", username: "insurance", password: "123456", name: "区域医保中心审核员", role: "insurance", roleName: "区域医保中心经办端", orgCode: "ORG-MI-CENTER-DL", orgName: "区域医保中心", orgType: "insurance_center", orgLevel: "市级", dataScope: "医保结算经办、凭证核验、固定取药审核和经办留痕", home: "insurance.html" },
-    { id: "u-mi-district", username: "district_mi", password: "123456", name: "区市县医保局管理员", role: "insurance", roleName: "区市县医保局管理端", orgCode: "ORG-MI-DIST-ZS", orgName: "中山区医保局", orgType: "district_insurance_bureau", orgLevel: "区市县", dataScope: "本区医保基金监管、机构监管和慢病待遇协同", home: "insurance.html" },
-    { id: "u4", username: "citizen", password: "123456", phone: "DEMO-MOBILE-R1", smsCode: DEMO_SMS_CODE, name: "演示居民A", role: "citizen", roleName: "个人端", orgCode: "PERSON-R1", orgName: "演示居民A家庭", orgType: "citizen", orgLevel: "个人", dataScope: "本人及家庭授权成员", home: "citizen.html", residentId: "r1", accountId: "a1" },
-    { id: "u5", username: "county", password: "123456", name: "医共体办公室", role: "county", roleName: "县域医共体平台", orgCode: "ORG-CONSORTIUM-ZS", orgName: "中山区县域医共体", orgType: "county_consortium", orgLevel: "区市县", dataScope: "医共体成员机构", home: "county.html" }
+    { id: "u-health", accountCode: "DEMO-HEALTH-ADMIN", catalogOrder: 10, username: "health", password: "123456", name: "卫生健康主管部门管理员（演示）", role: "commission", roleName: "卫生健康综合管理岗位", orgCode: "ORG-HEALTH-DL", orgName: "地区卫生健康主管部门", orgType: "health_admin", orgLevel: "市级", dataScope: "示范地区医疗资源、统计直报、公共卫生、分级诊疗和数据质量监管", home: "index.html", accountType: "manager" },
+    { id: "u-city", accountCode: "DEMO-PLATFORM-OPS", catalogOrder: 20, username: "city", password: "123456", name: "平台运营管理员（演示）", role: "commission", roleName: "平台运营管理岗位", orgCode: "ORG-CITY-DL", orgName: "卫生健康信息平台运营中心", orgType: "city", orgLevel: "市级", dataScope: "示范地区全域运行监测与跨部门协同", home: "workbench.html", accountType: "manager" },
+    { id: "u-district", accountCode: "DEMO-AREA-ADMIN", catalogOrder: 30, username: "district", password: "123456", name: "辖区卫生健康管理员（演示）", role: "commission", roleName: "辖区综合管理岗位", orgCode: "ORG-DIST-ZS", orgName: "示范区卫生健康管理中心", orgType: "district", orgLevel: "区县级", dataScope: "示范辖区居民、机构与公共卫生业务", home: "workbench.html", accountType: "manager" },
+    { id: "u-blood-quality", accountCode: "DEMO-BLOOD-QUALITY", catalogOrder: 40, username: "blood_quality", password: "123456", name: "血液质量审核员（演示）", role: "commission", roleName: "血液冷链质控岗位", orgCode: "BLOOD-DL", orgName: "区域血液中心", orgType: "blood_center", orgLevel: "市级", dataScope: "冷链异常、质量处置与血液放行", home: "blood.html", accountType: "blood_quality", bloodPermissions: ["cold_chain_quality_review"] },
+    { id: "u-nurse", accountCode: "DEMO-NURSE", catalogOrder: 110, username: "nurse", password: "123456", name: "互联网护理护士（演示）", role: "institution", roleName: "互联网护理岗位", orgCode: "MR1", orgName: "示范医院", orgType: "medical_institution", orgLevel: "三级医院", dataScope: "互联网护理订单与服务轨迹", home: "internet-nursing.html", nurseId: "inn-001", accountType: "nurse" },
+    { id: "u-hospital", accountCode: "DEMO-HOSPITAL-ADMIN", catalogOrder: 120, username: "hospital", password: "123456", name: "医院管理员（演示）", role: "institution", roleName: "医院综合管理岗位", orgCode: "MR1", orgName: "示范医院", orgType: "medical_institution", orgLevel: "三级医院", dataScope: "本机构业务与管理数据", home: "institution.html", accountType: "manager" },
+    { id: "u-community", accountCode: "DEMO-PRIMARY-ADMIN", catalogOrder: 130, username: "community", password: "123456", name: "基层机构管理员（演示）", role: "institution", roleName: "基层机构管理岗位", orgCode: "MR3", orgName: "基层医疗机构", orgType: "medical_institution", orgLevel: "基层医疗机构", dataScope: "本机构与签约居民", home: "institution.html", accountType: "manager" },
+    { id: "u2", accountCode: "DEMO-PRIMARY-DOCTOR", catalogOrder: 140, username: "doctor", password: "123456", name: "基层全科医生（演示）", role: "institution", roleName: "基层医生岗位", orgCode: "MR3", orgName: "基层医疗机构", orgType: "medical_institution", orgLevel: "基层医疗机构", dataScope: "签约居民、随访、长期处方和多点执业申请", home: "doctor.html", doctorId: "doc-liu", accountType: "doctor" },
+    { id: "u-doctor-wang", accountCode: "DEMO-HOSPITAL-DOCTOR", catalogOrder: 150, username: "doctor_wang", password: "123456", name: "医院临床医生（演示）", role: "institution", roleName: "医院医生岗位", orgCode: "MR1", orgName: "示范医院", orgType: "medical_institution", orgLevel: "三级医院", dataScope: "本机构诊疗、转诊接诊和多点执业备案", home: "doctor.html", doctorId: "doc-wang", accountType: "doctor" },
+    { id: "u-blood-tech-1", accountCode: "DEMO-BLOOD-MATCH", catalogOrder: 160, username: "blood_tech_1", password: "123456", name: "输血科配血复核员（演示）", role: "institution", roleName: "输血科配血复核岗位", orgCode: "MR1", orgName: "示范医院", orgType: "medical_institution", orgLevel: "三级医院", dataScope: "本机构交叉配血复核", home: "blood.html", accountType: "blood_technologist", bloodPermissions: ["compatibility_review"] },
+    { id: "u-blood-tech-2", accountCode: "DEMO-BLOOD-ISSUE", catalogOrder: 170, username: "blood_tech_2", password: "123456", name: "输血科发血复核员（演示）", role: "institution", roleName: "输血科发血复核岗位", orgCode: "MR1", orgName: "示范医院", orgType: "medical_institution", orgLevel: "三级医院", dataScope: "本机构发血复核", home: "blood.html", accountType: "blood_technologist", bloodPermissions: ["compatibility_review"] },
+    { id: "u-mi", accountCode: "DEMO-INSURANCE-ADMIN", catalogOrder: 210, username: "mi", password: "123456", name: "医疗保障主管部门管理员（演示）", role: "insurance", roleName: "医疗保障综合管理岗位", orgCode: "ORG-MI-DL", orgName: "地区医疗保障主管部门", orgType: "insurance_bureau", orgLevel: "市级", dataScope: "医保政策、基金监管、待遇管理和辖区监督", home: "insurance.html", accountType: "manager" },
+    { id: "u3", accountCode: "DEMO-INSURANCE-REVIEW", catalogOrder: 220, username: "insurance", password: "123456", name: "医疗保障经办审核员（演示）", role: "insurance", roleName: "医疗保障经办审核岗位", orgCode: "ORG-MI-CENTER-DL", orgName: "地区医疗保障经办中心", orgType: "insurance_center", orgLevel: "市级", dataScope: "医保结算、凭证核验、固定取药审核和经办留痕", home: "insurance.html", accountType: "reviewer" },
+    { id: "u-mi-district", accountCode: "DEMO-AREA-INSURANCE", catalogOrder: 230, username: "district_mi", password: "123456", name: "辖区医疗保障管理员（演示）", role: "insurance", roleName: "辖区医疗保障管理岗位", orgCode: "ORG-MI-DIST-ZS", orgName: "示范区医疗保障管理部门", orgType: "district_insurance_bureau", orgLevel: "区县级", dataScope: "示范辖区基金、机构和慢病待遇协同", home: "insurance.html", accountType: "manager" },
+    { id: "u5", accountCode: "DEMO-CONSORTIUM-ADMIN", catalogOrder: 310, username: "county", password: "123456", name: "医共体协同管理员（演示）", role: "county", roleName: "医共体协同管理岗位", orgCode: "ORG-CONSORTIUM-ZS", orgName: "示范县域医共体", orgType: "county_consortium", orgLevel: "区县级", dataScope: "医共体成员机构与协同业务", home: "county.html", accountType: "manager" },
+    { id: "u4", accountCode: "DEMO-RESIDENT", catalogOrder: 410, username: "citizen", password: "123456", phone: "DEMO-MOBILE-R1", smsCode: DEMO_SMS_CODE, name: "居民用户（演示）", role: "citizen", roleName: "居民个人岗位", orgCode: "PERSON-R1", orgName: "演示家庭账户", orgType: "citizen", orgLevel: "个人", dataScope: "本人及经授权的家庭成员", home: "citizen.html", residentId: "r1", accountId: "a1", accountType: "resident" },
+    { id: "u1", accountCode: "LEGACY-WHJW", catalogOrder: 999, catalogVisible: false, legacyAliasFor: "health", username: "whjw", password: "123456", name: "卫生健康主管部门兼容账号", role: "commission", roleName: "兼容别名（不展示）", orgCode: "ORG-HEALTH-DL", orgName: "地区卫生健康主管部门", orgType: "health_admin", orgLevel: "市级", dataScope: "兼容历史自动化调用", home: "index.html", accountType: "manager" }
   ];
 
   const accessPolicy = window.HealthAccessPolicy;
@@ -86,6 +86,25 @@
       authMode: bearerOnly ? "server-bearer" : authMode
     };
     persistBrowserSession(session);
+    const context = payload.authorizationContext;
+    if (context?.user && [context.permissions, context.regionalCapabilities, context.pages, context.menus].every(Array.isArray)) {
+      const established = {
+        ...session,
+        ...context.user,
+        permissions: context.permissions,
+        regionalCapabilities: context.regionalCapabilities,
+        authorizedPages: context.pages,
+        authorizedMenus: context.menus,
+        regionalAuthorization: context.regional || null,
+        policyVersion: context.policy?.version || context.policy?.schemaVersion || "",
+        productionReady: context.productionReady === true,
+        authContextVersion: context.version || context.schemaVersion || "auth-context-v1"
+      };
+      persistBrowserSession(established);
+      authContextState = "ready";
+      volatileBearerToken = "";
+      return { ok: true, user: established };
+    }
     const contextResult = await refreshAuthContext({ useBearer: bearerOnly });
     if (!contextResult.ok) {
       clearBrowserSession();
@@ -344,7 +363,7 @@
     const method = String(options.method || "GET").toUpperCase();
     const headers = authHeaders(options.headers || {});
     if (!["GET", "HEAD", "OPTIONS"].includes(method)) {
-      const csrfToken = readCookie("health_platform_csrf");
+      const csrfToken = readCookie("health_platform_csrf_v2");
       if (csrfToken) headers.set("X-CSRF-Token", csrfToken);
     }
     return fetch(url, {
@@ -441,6 +460,22 @@
 
   function setInternalHref(element, target) {
     return safeUrlPort().setElementUrl(element, "href", target, internalUrlOptions());
+  }
+
+  async function getLoginAccountCatalog() {
+    const fallback = demoUsers
+      .filter((user) => user.catalogVisible !== false)
+      .map(sanitizeUser)
+      .sort((left, right) => Number(left.catalogOrder || 999) - Number(right.catalogOrder || 999));
+    if (!API_BASE || !isDemoMode()) return fallback;
+    try {
+      const response = await fetch(`${API_BASE}/auth/login-catalog`, { method: "GET", credentials: "same-origin" });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || !payload.ok || !Array.isArray(payload.accounts)) return fallback;
+      return payload.accounts.filter((user) => user?.username && user?.role && user?.home);
+    } catch {
+      return fallback;
+    }
   }
 
   function ensureNavigationStyles() {
@@ -786,6 +821,7 @@
     login,
     loginByPhone,
     sendPhoneCode,
+    getLoginAccountCatalog,
     normalizeAccountType,
     buildExternalIdentityKey,
     hasRecentStepUp,

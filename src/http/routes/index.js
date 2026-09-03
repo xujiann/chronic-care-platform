@@ -365,7 +365,10 @@ function createPlatformApiRouter(runtimeContexts) {
     if (segmentsById.has(segment.id)) throw new TypeError(`duplicate route segment id: ${segment.id}`);
     segmentsById.set(segment.id, segment);
   }
-  for (const segment of identity_security.createRouteSegments(runtimeContexts.forDomain("identity-security"))) {
+  for (const segment of identity_security.createRouteSegments(runtimeContexts.forDomain("identity-security"), {
+    regionalContext: runtimeContexts.regional,
+    environment: process.env
+  })) {
     if (segmentsById.has(segment.id)) throw new TypeError(`duplicate route segment id: ${segment.id}`);
     segmentsById.set(segment.id, segment);
   }

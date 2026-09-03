@@ -4219,12 +4219,12 @@ test("internet nursing module exposes appointment, management and nurse workflow
   assert.deepEqual([...accessPolicy.pageCatalog["internet-nursing.html"].roles], ["commission", "institution", "citizen", "county"]);
   assert.match(read("auth.js"), /username: "nurse"/);
   assert.match(read("auth.js"), /password: "123456"/);
-  assert.match(read("auth.js"), /护士工作站/);
+  assert.match(read("auth.js"), /互联网护理岗位/);
   assert.match(read("auth.js"), /互联网护理/);
   assert.match(read("auth.js"), /displayAuthText/);
   assert.match(readServerRuntime(), /username: "nurse"/);
   assert.match(readServerRuntime(), /password: "123456"/);
-  assert.match(readServerRuntime(), /护士工作站/);
+  assert.match(readServerRuntime(), /互联网护理岗位/);
   assert.match(read("package.json"), /internet-nursing:readiness/);
   assert.match(read("scripts/internet-nursing-readiness.js"), /nursing:serviceRecordClosure/);
   assert.match(read("scripts/internet-nursing-readiness.js"), /nursing:productionIntegration/);

@@ -2,8 +2,12 @@
 
 const { createHmac, timingSafeEqual } = require("node:crypto");
 
-const SESSION_COOKIE_NAME = "health_city_browser_session";
-const CSRF_COOKIE_NAME = "health_platform_csrf";
+// Version the browser credential namespace so an obsolete or Secure-only
+// development cookie cannot shadow a newly issued local session forever.
+const SESSION_COOKIE_NAME = "health_platform_session_v2";
+const CSRF_COOKIE_NAME = "health_platform_csrf_v2";
+const LEGACY_SESSION_COOKIE_NAMES = Object.freeze(["health_city_browser_session"]);
+const LEGACY_CSRF_COOKIE_NAMES = Object.freeze(["health_platform_csrf"]);
 const ACTIVE_ACCOUNT_STATES = new Set(["active", "enabled", "启用"]);
 const KNOWN_ROLES = new Set(["commission", "institution", "insurance", "citizen", "county"]);
 const ACCOUNT_TYPES_BY_ROLE = Object.freeze({
@@ -272,7 +276,10 @@ function sessionTransport(env = process.env) {
 function sessionFromRequest(req, currentSession, env = process.env) {
   const transport = sessionTransport(env);
   const authorization = text(req?.headers?.authorization);
-  const cookieToken = transport.cookieEnabled ? parseCookies(req?.headers?.cookie)[SESSION_COOKIE_NAME] : "";
+  const cookies = parseCookies(req?.headers?.cookie);
+  const cookieToken = transport.cookieEnabled
+    ? cookies[SESSION_COOKIE_NAME] || LEGACY_SESSION_COOKIE_NAMES.map((name) => cookies[name]).find(Boolean) || ""
+    : "";
   let source = "none";
   let request = req;
   if (cookieToken) {
@@ -344,8 +351,12 @@ function issueSessionCookies(res, session, env = process.env) {
 
 function clearSessionCookies(res, env = process.env) {
   if (!sessionTransport(env).cookieEnabled) return;
-  appendSetCookie(res, `${SESSION_COOKIE_NAME}=; ${cookieAttributes(env)}; Max-Age=0`);
-  appendSetCookie(res, `${CSRF_COOKIE_NAME}=; Path=/; SameSite=${text(env.AUTH_COOKIE_SAME_SITE || "Strict")}; Max-Age=0`);
+  [SESSION_COOKIE_NAME, ...LEGACY_SESSION_COOKIE_NAMES].forEach((name) => {
+    appendSetCookie(res, `${name}=; ${cookieAttributes(env)}; Max-Age=0`);
+  });
+  [CSRF_COOKIE_NAME, ...LEGACY_CSRF_COOKIE_NAMES].forEach((name) => {
+    appendSetCookie(res, `${name}=; Path=/; SameSite=${text(env.AUTH_COOKIE_SAME_SITE || "Strict")}; Max-Age=0`);
+  });
 }
 
 function sessionResponse(session, env = process.env) {

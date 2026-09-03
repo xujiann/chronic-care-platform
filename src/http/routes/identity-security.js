@@ -1,5 +1,7 @@
 "use strict";
 
+const { buildAuthorizationContext } = require("./authorization-context");
+
 const {
   SESSION_SECURITY_AUDIT_PERSISTENCE_CONTRACT,
   SessionSecurityAuditError,
@@ -30,7 +32,7 @@ const {
   validateLocalAccount
 } = require("../../identity-security/runtime-identity-policy");
 
-function createRouteSegments(runtime) {
+function createRouteSegments(runtime, options = {}) {
   const { SmsDeliveryCallbackError, appendDataAccessLog, appendSecurityEvent, applyIdentityDirectoryBinding, applyIdentityDirectoryDeactivations, applySmsDeliveryCallback, authLoginLockStatus, buildComplianceReport, buildIdentityDirectorySyncPlan, buildSmsDeliveryCenter, canAccessResident, cleanupRuntimeSessions, clearAuthLoginFailures, clearPhoneLoginFailures, collectJson, consumeAuthRateLimit, createSession, currentSession, fetchIdentityDirectory, fetchOidcUserInfo, findAuthUser, findCitizenAuthUserByPhone, highRiskSecurityEvents, isProductionRuntime, issuePhoneVerificationCode, mapExternalIdentityClaims, maskPhone, normalizePhone, normalizeState, phoneLoginLockStatus, prependAuditTrailEntry, productionAdapterCenter, randomUUID, readDatabase, recordAuthLoginFailure, recordPhoneLoginFailure, redactSensitiveResponse, refreshOidcAccessToken, refreshSessionStoreStatus, requestRateLimitSubject, requireApiRole, revokeOidcToken, revokeSession, sendJson, sessionStoreStatus, verifyAuditTrail, verifyPassword, verifyPhoneCode, verifySmsDeliveryCallback, writeDatabase } = runtime;
   let auditRepository;
   const sessionSecurityAuditRepository = () => {
@@ -56,6 +58,10 @@ function createRouteSegments(runtime) {
     return Array.isArray(data?.authUsers) ? validateLocalAccount(user, data).user : user;
   };
   const resolveSession = (req) => sessionFromRequest(req, currentSession, process.env);
+  const loginAuthorizationContext = (user) => buildAuthorizationContext(user, {
+    environment: options.environment || process.env,
+    regionalContext: options.regionalContext || {}
+  });
   const rejectPolicy = (res, error) => {
     const known = error instanceof IdentityPolicyError;
     sendJson(res, known ? error.statusCode : 500, {
@@ -243,6 +249,37 @@ function createRouteSegments(runtime) {
       id: "identity-security-02",
       domain: "identity-security",
       async handle(req, res, url) {
+    if (req.method === "GET" && url.pathname === "/api/auth/login-catalog") {
+        if (isProductionRuntime()) {
+          sendJson(res, 404, { ok: false, code: "LOGIN_CATALOG_DISABLED", message: "正式环境不公开账号目录" });
+          return true;
+        }
+        const data = readDatabase();
+        const accounts = (Array.isArray(data.authUsers) ? data.authUsers : [])
+          .filter((user) => user.status !== "停用" && user.catalogVisible !== false)
+          .map((user) => {
+            try {
+              const validated = validateLocalAccount(user, data).user;
+              return {
+                ...publicIdentity(validated),
+                accountCode: String(user.accountCode || user.username || ""),
+                catalogOrder: Number(user.catalogOrder || 999)
+              };
+            } catch {
+              return null;
+            }
+          })
+          .filter(Boolean)
+          .sort((left, right) => left.catalogOrder - right.catalogOrder || left.username.localeCompare(right.username));
+        sendJson(res, 200, {
+          ok: true,
+          schemaVersion: "login-account-catalog-v1",
+          demo: true,
+          accounts
+        });
+        return true;
+      }
+
     const securityControlActionMatch = url.pathname.match(/^\/api\/security\/controls\/([^/]+)\/actions$/);
       if (req.method === "POST" && securityControlActionMatch) {
         const user = requireApiRole(req, res, ["commission"], "/api/security/controls/:id/actions");
@@ -368,7 +405,11 @@ function createRouteSegments(runtime) {
           session,
           { actor: validatedUser.name, role: validatedUser.role, action: "登录", target: validatedUser.home, result: "允许", detail: "签名会话已签发，支持密钥轮换校验" }
         );
-        sendJson(res, 200, { ok: true, ...sessionResponse(session, process.env) });
+        sendJson(res, 200, {
+          ok: true,
+          ...sessionResponse(session, process.env),
+          authorizationContext: loginAuthorizationContext(validatedUser)
+        });
         return true;
       }
 
@@ -810,7 +851,11 @@ function createRouteSegments(runtime) {
           session,
           { actor: user.name, role: user.role, action: "phone-code login", target: user.home, result: "allowed", detail: "resident phone-code session issued" }
         );
-        sendJson(res, 200, { ok: true, ...sessionResponse(session, process.env) });
+        sendJson(res, 200, {
+          ok: true,
+          ...sessionResponse(session, process.env),
+          authorizationContext: loginAuthorizationContext(validatedUser)
+        });
         return true;
       }
 
