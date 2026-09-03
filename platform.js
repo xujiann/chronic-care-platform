@@ -1,4 +1,5 @@
 const fallbackPlatformState = {
+  authUsers: [],
   residents: [],
   diseases: [],
   followups: [],
@@ -1395,6 +1396,9 @@ function renderIdentityLifecycleCenter() {
     smsStatusTarget.className = `badge ${sms.callbackConfigured ? "info" : "warn"}`;
   }
   if (boundaryTarget) boundaryTarget.textContent = [center.boundary, smsDelivery.boundary].filter(Boolean).join(" ") || "身份和短信供应商仍需现场联合验收。";
+  window.HealthPlatformIdentityGovernanceUi?.render(platformState.authUsers || [], {
+    policy: window.HealthAccessPolicy
+  });
 }
 
 function renderFinancialGatewayOperationsCenter() {

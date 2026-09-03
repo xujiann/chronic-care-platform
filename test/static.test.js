@@ -4524,12 +4524,18 @@ test("production identity and message adapters keep runtime and site boundaries 
   assert.match(read("session-store.js"), /request-hydrated-memory/);
   assert.match(read("docs\/production-identity-message-adapters.md"), /SESSION_TOPOLOGY=multi-host/);
   assert.match(read("platform.html"), /identity-lifecycle-center/);
+  assert.match(read("platform.html"), /identity-account-summary/);
+  assert.match(read("platform.html"), /identity-account-search/);
+  assert.match(read("platform.html"), /identity-account-role-filter/);
+  assert.match(read("platform.html"), /identity-account-status-filter/);
+  assert.match(read("platform.html"), /platform-identity-governance-ui\.js/);
   assert.match(read("platform.html"), /sms-delivery-receipts/);
   assert.match(read("platform.js"), /smsDelivery/);
   assert.match(read("platform.js"), /renderIdentityLifecycleCenter/);
   assert.match(read("platform.js"), /runIdentityBindingAction/);
   assert.match(read("platform.js"), /runIdentityDirectoryAction/);
   assert.match(read("platform.js"), /runSessionCleanupAction/);
+  assert.match(read("platform.js"), /HealthPlatformIdentityGovernanceUi/);
   assert.match(read("portal.css"), /\.evidence-grid article[\s\S]*?min-width:\s*0/);
   assert.match(read("portal.css"), /\.evidence-grid li[\s\S]*?overflow-wrap:\s*anywhere/);
 });

@@ -132,6 +132,17 @@ test("commission user reaches the governance dashboard and opens maintenance", a
   await expect(page.locator("#identity-lifecycle-metrics")).toContainText("仅限本地开发和测试");
   await expect(page.locator("#identity-lifecycle-metrics")).toContainText("会话保留");
   await expect(page.locator("#identity-lifecycle-metrics")).toContainText("最近清理 0 条");
+  await expect(page.locator("#identity-account-list .identity-account-row")).toHaveCount(17);
+  const nurseAccount = page.locator("#identity-account-list .identity-account-row", { hasText: "DEMO-NURSE" });
+  await expect(nurseAccount).toContainText("8 项功能");
+  await expect(nurseAccount).toContainText("外部身份待绑定");
+  await page.locator("#identity-account-search").fill("输血科");
+  await expect(page.locator("#identity-account-list .identity-account-row")).toHaveCount(2);
+  await expect(page.locator("#identity-account-filter-status")).toHaveText("当前显示 2/17 个账号");
+  await page.locator("#identity-account-search").fill("");
+  await page.locator("#identity-account-role-filter").selectOption("institution");
+  await expect(page.locator("#identity-account-list .identity-account-row")).toHaveCount(7);
+  await page.locator("#identity-account-role-filter").selectOption("all");
 
   await page.goto("/workbench.html");
   await expect(page.locator("#system-readiness")).toBeVisible({ timeout: 30_000 });

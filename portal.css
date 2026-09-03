@@ -4057,6 +4057,81 @@ dialog::backdrop {
   gap: 10px;
 }
 
+.identity-account-title {
+  margin-top: 18px;
+}
+
+.identity-account-title > div {
+  display: grid;
+  gap: 4px;
+}
+
+.identity-account-toolbar {
+  display: grid;
+  grid-template-columns: minmax(260px, 1.5fr) repeat(2, minmax(170px, 0.6fr));
+  gap: 10px;
+  margin: 10px 0 14px;
+}
+
+.identity-account-toolbar label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.identity-account-toolbar input,
+.identity-account-toolbar select {
+  width: 100%;
+  min-height: 42px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 10px;
+  color: var(--ink);
+  background: #fff;
+  font: inherit;
+}
+
+.identity-account-summary {
+  margin-bottom: 14px;
+}
+
+.identity-account-row {
+  grid-template-columns: 58px minmax(0, 1fr) minmax(190px, 0.34fr);
+}
+
+.identity-account-main,
+.identity-account-side {
+  min-width: 0;
+}
+
+.identity-account-main small,
+.identity-account-side small,
+.identity-account-scope {
+  display: block;
+  margin-top: 5px;
+  overflow-wrap: anywhere;
+}
+
+.identity-account-risks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 9px;
+}
+
+.identity-account-risks .badge {
+  white-space: normal;
+}
+
+.identity-account-empty {
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  padding: 18px;
+  text-align: center;
+}
+
 .priority-row {
   display: grid;
   grid-template-columns: 58px 1fr 140px;
@@ -5109,6 +5184,7 @@ tbody tr:hover {
     flex-direction: column;
   }
   .metric-grid,
+  .identity-account-toolbar,
   .dashboard-control-grid,
   .function-report-grid,
   .population-metric-grid,
