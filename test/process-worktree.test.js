@@ -150,9 +150,9 @@ test("CI isolates browser E2E and release readiness behind the required test agg
   const requiredAggregate = workflowJob(workflow, "test");
 
   assert.match(workflow, /\n  regional-foundation:\r?\n    runs-on: ubuntu-latest\r?\n    timeout-minutes: 5\r?\n/);
-  assert.match(workflow, /\n  complete-unit-test:\r?\n    runs-on: ubuntu-latest\r?\n    timeout-minutes: 10\r?\n/);
+  assert.match(workflow, /\n  complete-unit-test:\r?\n    runs-on: ubuntu-latest\r?\n    timeout-minutes: 15\r?\n/);
 
-  assert.match(governanceJob, /timeout-minutes: 10/);
+  assert.match(governanceJob, /timeout-minutes: 15/);
   assert.match(governanceJob, /Verify process ownership boundary/);
   assert.match(governanceJob, /Run API regression tests/);
   assert.match(governanceJob, /Verify custom API authentication behavior evidence[\s\S]*npm run api:authentication-evidence/);
