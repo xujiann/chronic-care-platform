@@ -330,19 +330,81 @@ jobs:
         run: npm run deployment:package -- --strict --release-id=${{ github.sha }}
       - name: Verify immutable production deployment package
         run: npm run deployment:verify
+      - name: Audit production dependencies
+        shell: bash
+        run: |
+          set +e
+          timeout --signal=TERM 2m npm audit --omit=dev
+          first_status=$?
+          set -e
+
+          if [[ "$first_status" -eq 0 ]]; then
+            echo "DEPENDENCY_AUDIT_STATUS=passed" >> "$GITHUB_ENV"
+            exit 0
+          fi
+
+          if [[ "$first_status" -ne 124 ]]; then
+            echo "DEPENDENCY_AUDIT_STATUS=failed" >> "$GITHUB_ENV"
+            echo "npm audit returned status $first_status; treating it as a security failure."
+            exit "$first_status"
+          fi
+
+          echo "npm audit timed out; retrying once to tolerate a transient registry error."
+          sleep 10
+          set +e
+          timeout --signal=TERM 2m npm audit --omit=dev
+          second_status=$?
+          set -e
+
+          if [[ "$second_status" -eq 0 ]]; then
+            echo "DEPENDENCY_AUDIT_STATUS=passed" >> "$GITHUB_ENV"
+            exit 0
+          fi
+
+          if [[ "$second_status" -ne 124 ]]; then
+            echo "DEPENDENCY_AUDIT_STATUS=failed" >> "$GITHUB_ENV"
+            echo "npm audit returned status $second_status after retry; treating it as a security failure."
+            exit "$second_status"
+          fi
+
+          echo "DEPENDENCY_AUDIT_STATUS=unavailable" >> "$GITHUB_ENV"
+          echo "::warning::npm audit timed out twice. Preview publication may continue, but production promotion remains NO-GO."
+      - name: Record dependency audit evidence
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          node <<'NODE'
+          const fs = require("node:fs");
+          const status = process.env.DEPENDENCY_AUDIT_STATUS || "failed";
+          const evidence = {
+            schemaVersion: "1.0",
+            generatedAt: new Date().toISOString(),
+            status,
+            securityGatePassed: status === "passed",
+            previewPublicationBlocked: status === "failed",
+            productionPromotionDecision: status === "passed" ? "DEFER_TO_GLOBAL_GATE" : "NO-GO",
+            reason:
+              status === "passed"
+                ? "Production dependencies passed npm audit; the global production gate still decides promotion."
+                : status === "unavailable"
+                  ? "The npm audit endpoint timed out twice; production promotion remains blocked."
+                  : "The dependency audit returned a security failure; preview publication and production promotion remain blocked."
+          };
+          fs.mkdirSync("release", { recursive: true });
+          fs.writeFileSync(
+            "release/dependency-audit-evidence.json",
+            `${JSON.stringify(evidence, null, 2)}\n`,
+            "utf8"
+          );
+          console.log(JSON.stringify(evidence));
+          NODE
       - name: Upload release readiness report
+        if: ${{ always() }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: release-readiness-report
           path: release/
           if-no-files-found: error
-      - name: Audit production dependencies
-        run: |
-          timeout --signal=TERM 5m npm audit --omit=dev || {
-            echo "npm audit failed or timed out; retrying once to tolerate a transient registry error."
-            sleep 10
-            timeout --signal=TERM 5m npm audit --omit=dev
-          }
 
   test:
     needs:

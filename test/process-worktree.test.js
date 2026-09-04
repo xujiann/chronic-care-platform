@@ -171,10 +171,20 @@ test("CI isolates browser E2E and release readiness behind the required test agg
   assert.match(releaseJob, /timeout-minutes: 25/);
   assert.match(releaseJob, /Run deployment readiness gate/);
   assert.match(releaseJob, /Upload release readiness report/);
-  assert.match(releaseJob, /timeout --signal=TERM 5m npm audit --omit=dev/);
-  assert.equal(releaseJob.match(/timeout --signal=TERM 5m npm audit --omit=dev/g)?.length, 2);
-  assert.match(releaseJob, /failed or timed out/);
-  assert.match(releaseJob, /retrying once to tolerate a transient registry error/);
+  assert.match(releaseJob, /timeout --signal=TERM 2m npm audit --omit=dev/);
+  assert.equal(releaseJob.match(/timeout --signal=TERM 2m npm audit --omit=dev/g)?.length, 2);
+  assert.match(releaseJob, /first_status.*-ne 124/s);
+  assert.match(releaseJob, /second_status.*-ne 124/s);
+  assert.match(releaseJob, /DEPENDENCY_AUDIT_STATUS=failed/);
+  assert.match(releaseJob, /DEPENDENCY_AUDIT_STATUS=unavailable/);
+  assert.match(releaseJob, /Preview publication may continue, but production promotion remains NO-GO/);
+  assert.match(releaseJob, /Record dependency audit evidence/);
+  assert.match(releaseJob, /productionPromotionDecision/);
+  assert.match(releaseJob, /status === "passed" \? "DEFER_TO_GLOBAL_GATE" : "NO-GO"/);
+  assert.ok(
+    releaseJob.indexOf("Audit production dependencies") <
+      releaseJob.indexOf("Upload release readiness report")
+  );
   assert.doesNotMatch(releaseJob, /Install Chromium|npm run test:e2e/);
 
   assert.match(requiredAggregate, /needs:\r?\n      - governance-api\r?\n      - browser-e2e\r?\n      - release-readiness/);
