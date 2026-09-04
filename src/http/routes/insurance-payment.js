@@ -1,6 +1,7 @@
 "use strict";
 
 const InsurancePaymentRefundTransaction = require("../../../insurance-payment-refund-transaction");
+const MedicalPaymentOneStop = require("../../insurance-payment/medical-payment-one-stop-service");
 
 const formalGroupingCreateTails = new Map();
 const FORMAL_GROUPING_COMMISSION_SCOPES = new Set(["city", "health_admin", "platform"]);
@@ -234,6 +235,40 @@ function createRouteSegments(runtime) {
           detail: `${center.summary.callbackEvents} callbacks / ${center.summary.reconciliationDifferences} reconciliation differences`
         });
         sendJson(res, 200, center);
+        return true;
+      }
+
+      if (req.method === "GET" && url.pathname === "/api/medical-payments/center") {
+        const user = requireApiRole(req, res, ["commission", "institution", "insurance"], "/api/medical-payments/center");
+        if (!user) return true;
+        try {
+          const center = MedicalPaymentOneStop.buildMedicalPaymentOneStopCenter(readDatabase(), user, process.env);
+          appendSecurityEvent({
+            actor: user.name || user.username,
+            role: user.role,
+            action: "medical payment one-stop read",
+            target: center.scope.organizationCode,
+            result: "allowed",
+            detail: `${center.summary.transactions} transactions / ${center.summary.refundRequests} refunds`
+          });
+          sendJson(res, 200, center);
+        } catch (error) {
+          const known = error instanceof MedicalPaymentOneStop.MedicalPaymentCenterError;
+          appendSecurityEvent({
+            actor: user.name || user.username,
+            role: user.role,
+            action: "medical payment one-stop read",
+            target: String(user.orgCode || "unbound").slice(0, 120),
+            result: "denied",
+            detail: known ? error.code : "MEDICAL_PAYMENT_CENTER_READ_FAILED"
+          });
+          sendJson(res, known ? error.statusCode : 503, {
+            ok: false,
+            code: known ? error.code : "MEDICAL_PAYMENT_CENTER_READ_FAILED",
+            message: known ? error.message : "medical payment center is temporarily unavailable",
+            productionReady: false
+          });
+        }
         return true;
       }
 

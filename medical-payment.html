@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>医疗付费一件事</title>
+    <link rel="stylesheet" href="./portal.css" />
+    <link rel="stylesheet" href="./governance-workbench.css" />
+    <link rel="stylesheet" href="./medical-payment.css" />
+    <script src="./access-control-policy.js"></script>
+    <script src="./browser-safe-url.js"></script>
+    <script src="./auth.js"></script>
+    <script src="./page-auth-bootstrap.js" data-roles="commission,institution,insurance"></script>
+  </head>
+  <body>
+    <main class="portal-shell governance-page payment-page">
+      <header class="portal-header">
+        <div>
+          <span>统一医疗订单 · 支付 · 退费 · 对账</span>
+          <h1>医疗付费一件事</h1>
+          <p>复用现有支付、医保、退款和对账账本，按当前账号与机构范围汇总处理队列。页面不保存支付凭据，也不会把静态示例或网关受理状态解释为资金已结算。</p>
+        </div>
+      </header>
+
+      <section id="payment-source-banner" class="work-source-banner" data-tone="warning" role="status" aria-live="polite">
+        <div><strong id="payment-source-title">正在读取授权支付数据</strong><p id="payment-source-detail">正在校验账号、机构和网关范围。</p></div>
+        <div class="work-source-actions">
+          <button id="payment-create-open" class="primary-work-button" type="button" disabled>发起缴费</button>
+          <button id="reconciliation-open" class="secondary-work-button" type="button" disabled>登记日终对账</button>
+          <button id="payment-refresh" class="secondary-work-button" type="button">刷新</button>
+        </div>
+      </section>
+
+      <section id="payment-metrics" class="work-metric-grid" aria-label="医疗付费指标"></section>
+
+      <section class="panel" aria-labelledby="payment-queue-title">
+        <div class="panel-title"><h2 id="payment-queue-title">订单与交易队列</h2><span id="payment-queue-count">0 项</span></div>
+        <div class="work-filter-grid payment-filter-grid">
+          <label>搜索<input id="payment-search" type="search" placeholder="订单号、交易号、机构代码" /></label>
+          <label>通道<select id="payment-gateway-filter"><option value="all">全部通道</option><option value="PAYMENT">支付</option><option value="INSURANCE">医保</option></select></label>
+          <label>状态<select id="payment-status-filter"><option value="all">全部状态</option></select></label>
+        </div>
+        <div class="table-wrap">
+          <table class="work-table payment-table">
+            <thead><tr><th scope="col">订单</th><th scope="col">金额构成</th><th scope="col">通道状态</th><th scope="col">对账</th><th scope="col">操作</th></tr></thead>
+            <tbody id="payment-queue"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <div class="payment-two-column">
+        <section class="panel" aria-labelledby="refund-title">
+          <div class="panel-title"><h2 id="refund-title">退费复核与异常</h2><span id="refund-count">0 项</span></div>
+          <div id="refund-list" class="payment-card-list"></div>
+        </section>
+        <section class="panel" aria-labelledby="reconciliation-title">
+          <div class="panel-title"><h2 id="reconciliation-title">日终对账</h2><span id="reconciliation-count">0 批</span></div>
+          <div id="reconciliation-list" class="payment-card-list"></div>
+        </section>
+      </div>
+
+      <section class="panel" aria-labelledby="gateway-title">
+        <div class="panel-title"><h2 id="gateway-title">通道就绪与上线边界</h2><span>生产保持 NO-GO</span></div>
+        <div id="gateway-list" class="payment-gateway-grid"></div>
+        <ul id="payment-blockers" class="payment-blockers"></ul>
+      </section>
+    </main>
+
+    <dialog id="payment-dialog" class="governance-dialog">
+      <form id="payment-form" method="dialog">
+        <header><h2>发起医疗缴费</h2><button type="button" class="secondary-work-button" data-close-dialog>关闭</button></header>
+        <div class="governance-form">
+          <label>医疗订单号<input name="orderNo" required maxlength="160" autocomplete="off" /></label>
+          <label>金额（分）<input name="amountFen" required type="number" min="1" step="1" /></label>
+          <label>币种<input name="currency" value="CNY" readonly /></label>
+          <label>机构代码<input name="institutionCode" required maxlength="120" autocomplete="off" /></label>
+          <p class="full payment-form-hint">提交后只表示支付网关已受理；资金结果必须以验签回调和日终对账为准。</p>
+          <p class="form-errors" data-form-error hidden></p>
+        </div>
+        <footer><button type="button" class="secondary-work-button" data-close-dialog>取消</button><button class="primary-work-button" value="submit">提交</button></footer>
+      </form>
+    </dialog>
+
+    <dialog id="refund-dialog" class="governance-dialog">
+      <form id="refund-form" method="dialog">
+        <header><h2>申请医疗退费</h2><button type="button" class="secondary-work-button" data-close-dialog>关闭</button></header>
+        <div class="governance-form">
+          <input name="paymentEventId" type="hidden" />
+          <input name="paymentTradeNo" type="hidden" />
+          <input name="orderReference" type="hidden" />
+          <label>订单<span id="refund-order-reference" class="payment-readonly-value"></span></label>
+          <label>可退金额<span id="refund-available" class="payment-readonly-value"></span></label>
+          <label>退费金额（分）<input name="refundAmountFen" required type="number" min="1" step="1" /></label>
+          <label>原因代码<select name="reasonCode"><option value="SERVICE_CANCELLED">服务取消</option><option value="DUPLICATE_PAYMENT">重复支付</option><option value="OVERCHARGE">多收费用</option><option value="OTHER">其他</option></select></label>
+          <label class="full">退费原因<textarea name="refundReason" required maxlength="240" rows="3"></textarea></label>
+          <p class="form-errors" data-form-error hidden></p>
+        </div>
+        <footer><button type="button" class="secondary-work-button" data-close-dialog>取消</button><button class="primary-work-button" value="submit">提交申请</button></footer>
+      </form>
+    </dialog>
+
+    <dialog id="review-dialog" class="governance-dialog">
+      <form id="review-form" method="dialog">
+        <header><h2>退费独立复核</h2><button type="button" class="secondary-work-button" data-close-dialog>关闭</button></header>
+        <div class="governance-form">
+          <input name="refundId" type="hidden" />
+          <label>复核域<select name="reviewDomain"><option value="business-review">业务复核</option><option value="finance-review">财务复核</option></select></label>
+          <label>结论<select name="approved"><option value="true">通过</option><option value="false">退回</option></select></label>
+          <label class="full">复核意见<textarea name="opinion" required maxlength="240" rows="3"></textarea></label>
+          <p class="full payment-form-hint">申请人与复核人必须分离，业务复核与财务复核也必须由不同账号完成。</p>
+          <p class="form-errors" data-form-error hidden></p>
+        </div>
+        <footer><button type="button" class="secondary-work-button" data-close-dialog>取消</button><button class="primary-work-button" value="submit">提交复核</button></footer>
+      </form>
+    </dialog>
+
+    <dialog id="reconciliation-dialog" class="governance-dialog">
+      <form id="reconciliation-form" method="dialog">
+        <header><h2>登记日终对账摘要</h2><button type="button" class="secondary-work-button" data-close-dialog>关闭</button></header>
+        <div class="governance-form">
+          <label>通道<select name="gatewayType"><option value="PAYMENT">支付</option><option value="INSURANCE">医保</option></select></label>
+          <label>业务日期<input name="businessDate" required type="date" /></label>
+          <label>账单总笔数<input name="total" required type="number" min="0" step="1" /></label>
+          <label>成功笔数<input name="succeeded" required type="number" min="0" step="1" /></label>
+          <label>异常笔数<input name="exceptions" required type="number" min="0" step="1" /></label>
+          <label>账单总金额（分）<input name="grossAmountFen" required type="number" min="0" step="1" /></label>
+          <label class="full">支付机构账单 SHA-256 摘要<input name="statementDigest" required pattern="[a-fA-F0-9]{64}" maxlength="64" autocomplete="off" /></label>
+          <p class="full payment-form-hint">摘要必须来自受控账单文件；页面不生成伪造摘要，也不上传账单原文。</p>
+          <p class="form-errors" data-form-error hidden></p>
+        </div>
+        <footer><button type="button" class="secondary-work-button" data-close-dialog>取消</button><button class="primary-work-button" value="submit">提交对账</button></footer>
+      </form>
+    </dialog>
+
+    <script src="./shared.js"></script>
+    <script src="./medical-payment.js"></script>
+  </body>
+</html>

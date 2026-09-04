@@ -18,6 +18,7 @@ test("commission navigation exposes the new governed work centers and pages rema
     ["maternal-child.html", "出生证明与妇幼接续任务工作台"],
     ["referral-teleconsultation.html", "转诊与远程会诊任务工作台"],
     ["drug-consumable.html", "药耗监管与整改协同工作台"],
+    ["medical-payment.html", "医疗付费一件事"],
     ["research-sandbox.html", "科研数据集与安全沙箱工作台"],
     ["public-health-supervision-cases.html", "卫生监督案件协同工作台"]
   ];
@@ -37,9 +38,35 @@ test("commission navigation exposes the new governed work centers and pages rema
     if (target === "account-lifecycle.html") {
       await expect(page.locator("#account-source-title")).toHaveText("账号治理数据已连接");
     }
+    if (target === "medical-payment.html") {
+      await expect(page.locator("#payment-source-title")).toHaveText("医疗付费业务服务已连接");
+    }
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
     expect(overflow, `${target} must stay inside the mobile viewport`).toBe(false);
   }
+});
+
+test("medical payment center renders hostile provider text as inert content", async ({ page }) => {
+  const hostile = '<img src=x onerror="globalThis.paymentCompromised=true">';
+  await loginCommission(page);
+  await page.route("**/api/medical-payments/center", (route) => route.fulfill({
+    status: 200,
+    contentType: "application/json",
+    body: JSON.stringify({
+      schemaVersion: "medical-payment-one-stop-view-v1",
+      productionReady: false,
+      scope: { role: "commission", organizationCode: "cross-organization", gatewayTypes: ["PAYMENT"] },
+      actions: { dispatchPayment: false, requestRefund: false, reviewRefund: false, runReconciliation: false },
+      summary: { orders: 1, transactions: 1, pending: 0, succeeded: 1, exceptions: 0, grossAmountFen: 100, personalAmountFen: 100, insuranceAmountFen: 0, refundRequests: 0, refundPendingReview: 0, refundExceptions: 0, reconciliationRuns: 0, reconciliationDifferences: 0 },
+      queue: [{ id: "hostile-payment", gatewayType: "PAYMENT", operation: "create-payment", orderReference: hostile, institutionCode: hostile, receiptId: hostile, status: "succeeded", reconciliationStatus: hostile, businessDate: "2026-09-04", amountFen: 100, personalAmountFen: 100, insuranceAmountFen: 0, reservedRefundFen: 0, availableRefundFen: 0, actions: { requestRefund: false } }],
+      refunds: [], refundExceptions: [], reconciliationRuns: [], gateways: [], blockers: [hostile]
+    })
+  }));
+  await page.goto("/medical-payment.html");
+  await expect(page.locator("#payment-queue")).toContainText(hostile);
+  await expect(page.locator("#payment-blockers")).toContainText(hostile);
+  await expect(page.locator("#payment-queue img, #payment-blockers img")).toHaveCount(0);
+  expect(await page.evaluate(() => globalThis.paymentCompromised)).toBeUndefined();
 });
 
 test("account lifecycle remains commission-manager only", async ({ page }) => {

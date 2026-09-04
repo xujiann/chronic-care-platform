@@ -36,6 +36,47 @@
         "POST /api/public-health/supervision/cases/:id/actions"
       ],
       "tests": ["test/domain-workbenches.test.js"]
+    },
+    {
+      "capabilityId": "E-CIT-ORDER",
+      "pages": ["medical-payment.html"],
+      "interfaces": [
+        "GET /api/medical-payments/center",
+        "POST /api/financial-gateways/dispatch"
+      ],
+      "tests": [
+        "test/medical-payment-one-stop-service.test.js",
+        "test/medical-payment-one-stop-route.test.js",
+        "test/medical-payment-one-stop-ui.test.js"
+      ]
+    },
+    {
+      "capabilityId": "E-CIT-PAY",
+      "pages": ["medical-payment.html"],
+      "interfaces": [
+        "GET /api/medical-payments/center",
+        "POST /api/financial-gateways/dispatch",
+        "POST /api/financial-gateways/reconciliation-runs"
+      ],
+      "tests": [
+        "test/financial-gateways.test.js",
+        "test/medical-payment-one-stop-route.test.js",
+        "test/medical-payment-one-stop-ui.test.js"
+      ]
+    },
+    {
+      "capabilityId": "E-CIT-REFUND",
+      "pages": ["medical-payment.html"],
+      "interfaces": [
+        "GET /api/medical-payments/center",
+        "POST /api/online-payments/refunds",
+        "POST /api/online-payments/refunds/:id/reviews"
+      ],
+      "tests": [
+        "test/insurance-payment-refund-transaction.test.js",
+        "test/medical-payment-one-stop-service.test.js",
+        "test/medical-payment-one-stop-ui.test.js"
+      ]
     }
   ]
 }
