@@ -171,8 +171,9 @@ test("CI isolates browser E2E and release readiness behind the required test agg
   assert.match(releaseJob, /timeout-minutes: 25/);
   assert.match(releaseJob, /Run deployment readiness gate/);
   assert.match(releaseJob, /Upload release readiness report/);
-  assert.match(releaseJob, /npm audit --omit=dev/);
-  assert.equal(releaseJob.match(/npm audit --omit=dev/g)?.length, 2);
+  assert.match(releaseJob, /timeout --signal=TERM 5m npm audit --omit=dev/);
+  assert.equal(releaseJob.match(/timeout --signal=TERM 5m npm audit --omit=dev/g)?.length, 2);
+  assert.match(releaseJob, /failed or timed out/);
   assert.match(releaseJob, /retrying once to tolerate a transient registry error/);
   assert.doesNotMatch(releaseJob, /Install Chromium|npm run test:e2e/);
 

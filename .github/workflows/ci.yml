@@ -338,10 +338,10 @@ jobs:
           if-no-files-found: error
       - name: Audit production dependencies
         run: |
-          npm audit --omit=dev || {
-            echo "npm audit failed; retrying once to tolerate a transient registry error."
+          timeout --signal=TERM 5m npm audit --omit=dev || {
+            echo "npm audit failed or timed out; retrying once to tolerate a transient registry error."
             sleep 10
-            npm audit --omit=dev
+            timeout --signal=TERM 5m npm audit --omit=dev
           }
 
   test:
