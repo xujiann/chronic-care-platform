@@ -1,5 +1,11 @@
 # DATA MODEL — 主线数据地图
 
+## 2026-09-04 医疗付费一件事数据边界
+
+本增量不新增订单、支付、退款或对账集合，不修改 SQLite/PostgreSQL schema、migration、索引、outbox 或数据 Owner。只读中心从既有 `integrationGatewayEvents`、`onlinePaymentRefunds` 和 `financialReconciliationRuns` 生成瞬时投影；机构范围只接受事件载荷中已有的可信 `institutionCode` 与退款既有 `organizationId`，不按机构名称猜测或回填归属。
+
+公共投影删除原请求载荷、幂等键、nonce、签名、内部 runtime、支付交易号字段和原始回调证据，只保留订单引用、最小通道状态、金额构成、可退余额、退款阶段、对账差异和生产阻断。能力注册表与招标追踪配置是仓库治理证据，不是支付事实或生产授权。
+
 ## 2026-09-02 招标需求治理数据边界
 
 版本化配置保存中性 `sourceAlias`、PDF 摘要、大小、受复核页数、提取/安全状态、候选陈述、页码/章节锚点和能力 ID，不保存原始 PDF、原文件名、本地路径、全文、居民/患者/联系人、凭据或生产连接信息。

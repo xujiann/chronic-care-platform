@@ -94,6 +94,7 @@
     "blood-go-live.html": entry("血液上线", ["commission", "institution"], { group: "临床服务", parent: "blood.html", accountTypes: ["manager", "blood_quality", "blood_technologist"], capabilities: ["blood"] }),
     "blood-innovation.html": entry("血液创新", ["commission", "institution"], { group: "临床服务", parent: "blood.html", accountTypes: ["manager", "blood_quality", "blood_technologist"], capabilities: ["blood"] }),
     "insurance.html": entry("医保管理", ["insurance"], { group: "医保支付", accountTypes: ["manager", "reviewer", "settlement"] }),
+    "medical-payment.html": entry("医疗付费一件事", ["commission", "institution", "insurance"], { group: "医保支付", parent: "insurance.html", accountTypes: ["manager", "reviewer", "settlement", "doctor"] }),
     "disease-payment.html": entry("按病种支付", ["insurance", "commission", "institution"], { group: "医保支付", parent: "insurance.html", accountTypes: ["manager", "reviewer", "settlement", "doctor"], capabilities: ["diseasePayment"] }),
     "drug-consumable.html": entry("药耗管理", ["commission", "institution", "insurance"], { group: "医保支付", accountTypes: ["manager", "reviewer", "settlement", "doctor", "pharmacist"], capabilities: ["drugConsumable"] }),
     "drug-consumable-about.html": entry("药耗管理说明", ["commission", "institution", "insurance"], { nav: false, accountTypes: ["manager", "reviewer", "settlement", "doctor", "pharmacist"], capabilities: ["drugConsumable"] }),

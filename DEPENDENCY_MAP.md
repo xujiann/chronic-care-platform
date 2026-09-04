@@ -1,5 +1,18 @@
 # DEPENDENCY MAP — 主线依赖地图
 
+## 2026-09-04 医疗付费一件事依赖方向
+
+```text
+medical-payment 页面
+  -> GET medical-payments/center
+     -> T07 scoped read model
+        -> existing financial events + refunds + reconciliation runs
+  -> existing dispatch / refund / review / reconciliation POST routes
+     -> existing T07 domain services, gateway adapter, audit and persistence
+```
+
+页面不读取 `data/db.json` 作为生产回退，不直接调用外部 provider，也不保存凭据或支付状态。新 read model 只依赖既有 T07 金融与退款模块，不依赖 `server.js`、T05 订单集合或 T08 原始回调；写入继续沿既有 route/service/persistence 方向，没有第二账本、请求路径双写、新 worker、第三方包或部署进程。
+
 ## 2026-09-02 招标需求治理依赖方向
 
 ```text
