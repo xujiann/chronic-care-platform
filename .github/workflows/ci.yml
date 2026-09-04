@@ -334,7 +334,7 @@ jobs:
         shell: bash
         run: |
           set +e
-          timeout --signal=TERM 2m npm audit --omit=dev
+          timeout --signal=TERM 2m npm audit --omit=dev --registry=https://registry.npmjs.org
           first_status=$?
           set -e
 
@@ -352,7 +352,7 @@ jobs:
           echo "npm audit timed out; retrying once to tolerate a transient registry error."
           sleep 10
           set +e
-          timeout --signal=TERM 2m npm audit --omit=dev
+          timeout --signal=TERM 2m npm audit --omit=dev --registry=https://registry.npmjs.org
           second_status=$?
           set -e
 
