@@ -1,5 +1,18 @@
 # DEPENDENCY MAP — 主线依赖地图
 
+## 2026-09-04 区域医疗文书依赖方向
+
+```text
+regional-clinical-documents 页面
+  -> GET integration/clinical-documents/center
+     -> T08 scoped read model
+        -> existing integration gateway events + secure attachments
+  -> existing integration retry / attachment download-intent POST routes
+     -> existing integration, object-storage, authorization, audit and persistence ports
+```
+
+页面不读取原始 PDF 或 `data/db.json`，不保存临床事实和对象存储凭据。主管部门投影不包含临床摘要和附件标识，机构投影强制匹配可信机构代码；正式上级报送、医生工作站嵌入和现场签字不能反向写入仓库能力状态。
+
 ## 2026-09-04 医疗付费一件事依赖方向
 
 ```text

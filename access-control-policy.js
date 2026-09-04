@@ -79,6 +79,7 @@
     "digital-hospital-evaluation.html": entry("评价预评", ["commission", "institution"], { group: "机构发展", parent: "digital-hospital-standards.html", accountTypes: manager }),
     "regional-data-sharing.html": entry("区域共享", ["commission", "institution"], { group: "平台治理", accountTypes: ["manager", "doctor"], capabilities: ["regionalSharing"] }),
     "regional-data-sharing-about.html": entry("共享说明", ["commission", "institution"], { nav: false, accountTypes: ["manager", "doctor"] }),
+    "regional-clinical-documents.html": entry("区域医疗文书", ["commission", "institution"], { group: "平台治理", parent: "regional-data-sharing.html", accountTypes: ["manager", "doctor"] }),
     "institution.html": entry("医疗机构", ["institution"], { group: "机构工作", accountTypes: institutionAccounts, orgTypes: ["medical_institution"] }),
     "doctor.html": entry("医生工作站", ["institution"], { group: "机构工作", parent: "institution.html", accountTypes: ["doctor"], orgTypes: ["medical_institution"] }),
     "internet-nursing.html": entry("互联网护理", ["commission", "institution", "citizen", "county"], { group: "连续服务", accountTypes: ["manager", "doctor", "nurse", "resident", "guardian"], capabilities: ["internetNursing"] }),

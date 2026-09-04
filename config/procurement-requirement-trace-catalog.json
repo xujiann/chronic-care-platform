@@ -38,6 +38,21 @@
       "tests": ["test/domain-workbenches.test.js"]
     },
     {
+      "capabilityId": "D-INT-DOC",
+      "pages": ["regional-clinical-documents.html"],
+      "interfaces": [
+        "GET /api/integration/clinical-documents/center",
+        "POST /api/integration/events",
+        "POST /api/integration/events/:id/retry",
+        "POST /api/attachments/:id/download-intent"
+      ],
+      "tests": [
+        "test/regional-clinical-document-service.test.js",
+        "test/regional-clinical-document-route.test.js",
+        "test/regional-clinical-document-ui.test.js"
+      ]
+    },
+    {
       "capabilityId": "E-CIT-ORDER",
       "pages": ["medical-payment.html"],
       "interfaces": [
