@@ -149,10 +149,10 @@ test("CI isolates browser E2E and release readiness behind the required test agg
   const releaseJob = workflowJob(workflow, "release-readiness");
   const requiredAggregate = workflowJob(workflow, "test");
 
-  assert.match(workflow, /\n  regional-foundation:\r?\n    runs-on: ubuntu-latest\r?\n    timeout-minutes: 5\r?\n/);
-  assert.match(workflow, /\n  complete-unit-test:\r?\n    runs-on: ubuntu-latest\r?\n    timeout-minutes: 15\r?\n/);
+  assert.match(workflow, /\n  regional-foundation:\r?\n    runs-on: ubuntu-latest\r?\n    timeout-minutes: 10\r?\n/);
+  assert.match(workflow, /\n  complete-unit-test:\r?\n    runs-on: ubuntu-latest\r?\n    timeout-minutes: 20\r?\n/);
 
-  assert.match(governanceJob, /timeout-minutes: 15/);
+  assert.match(governanceJob, /timeout-minutes: 20/);
   assert.match(governanceJob, /Verify process ownership boundary/);
   assert.match(governanceJob, /Run API regression tests/);
   assert.match(governanceJob, /Verify custom API authentication behavior evidence[\s\S]*npm run api:authentication-evidence/);
@@ -168,10 +168,23 @@ test("CI isolates browser E2E and release readiness behind the required test agg
   assert.match(browserJob, /npm run test:e2e/);
   assert.doesNotMatch(browserJob, /Run API regression tests|Run deployment readiness gate/);
 
-  assert.match(releaseJob, /timeout-minutes: 15/);
+  assert.match(releaseJob, /timeout-minutes: 25/);
   assert.match(releaseJob, /Run deployment readiness gate/);
   assert.match(releaseJob, /Upload release readiness report/);
-  assert.match(releaseJob, /npm audit --omit=dev/);
+  assert.match(releaseJob, /timeout --signal=TERM 2m npm audit --omit=dev/);
+  assert.equal(releaseJob.match(/timeout --signal=TERM 2m npm audit --omit=dev/g)?.length, 2);
+  assert.match(releaseJob, /first_status.*-ne 124/s);
+  assert.match(releaseJob, /second_status.*-ne 124/s);
+  assert.match(releaseJob, /DEPENDENCY_AUDIT_STATUS=failed/);
+  assert.match(releaseJob, /DEPENDENCY_AUDIT_STATUS=unavailable/);
+  assert.match(releaseJob, /Preview publication may continue, but production promotion remains NO-GO/);
+  assert.match(releaseJob, /Record dependency audit evidence/);
+  assert.match(releaseJob, /productionPromotionDecision/);
+  assert.match(releaseJob, /status === "passed" \? "DEFER_TO_GLOBAL_GATE" : "NO-GO"/);
+  assert.ok(
+    releaseJob.indexOf("Audit production dependencies") <
+      releaseJob.indexOf("Upload release readiness report")
+  );
   assert.doesNotMatch(releaseJob, /Install Chromium|npm run test:e2e/);
 
   assert.match(requiredAggregate, /needs:\r?\n      - governance-api\r?\n      - browser-e2e\r?\n      - release-readiness/);
