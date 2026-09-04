@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>区域医疗文书中心</title>
+    <link rel="stylesheet" href="./portal.css" />
+    <link rel="stylesheet" href="./governance-workbench.css" />
+    <link rel="stylesheet" href="./regional-clinical-documents.css" />
+    <script src="./access-control-policy.js"></script>
+    <script src="./browser-safe-url.js"></script>
+    <script src="./auth.js"></script>
+    <script src="./page-auth-bootstrap.js" data-roles="commission,institution"></script>
+  </head>
+  <body>
+    <main class="portal-shell governance-page clinical-document-page">
+      <header class="portal-header">
+        <div>
+          <span>病历卡 · 出院小结 · 采集校验 · 报送协同</span>
+          <h1>区域医疗文书中心</h1>
+          <p>复用既有集成事件、授权和安全附件能力，形成电子病历卡与电子出院小结的当日归集、校验、查询和异常闭环。页面不会把内部采集成功解释为上级平台已正式接收。</p>
+        </div>
+      </header>
+
+      <section id="document-source-banner" class="work-source-banner" data-tone="warning" role="status" aria-live="polite">
+        <div><strong id="document-source-title">正在读取授权医疗文书</strong><p id="document-source-detail">正在校验账号、机构与临床详情范围。</p></div>
+        <div class="work-source-actions"><button id="document-refresh" class="secondary-work-button" type="button">刷新</button></div>
+      </section>
+
+      <section id="document-metrics" class="work-metric-grid" aria-label="区域医疗文书指标"></section>
+
+      <section class="panel" aria-labelledby="document-list-title">
+        <div class="panel-title"><h2 id="document-list-title">医疗文书归集清单</h2><span id="document-count">0 份</span></div>
+        <div class="work-filter-grid clinical-document-filters">
+          <label>搜索<input id="document-search" type="search" placeholder="文书引用、居民引用、机构代码" /></label>
+          <label>文书类型<select id="document-type-filter"><option value="all">全部类型</option><option value="medical-record-card">电子病历卡</option><option value="discharge-summary">电子出院小结</option></select></label>
+          <label>报送状态<select id="document-status-filter"><option value="all">全部状态</option><option value="reported">已报送</option><option value="pending-report">待报送</option><option value="exception">异常</option></select></label>
+          <label>机构<select id="document-institution-filter"><option value="all">全部机构</option></select></label>
+        </div>
+        <div class="table-wrap">
+          <table class="work-table clinical-document-table">
+            <thead><tr><th scope="col">文书与居民</th><th scope="col">机构与日期</th><th scope="col">采集校验</th><th scope="col">报送状态</th><th scope="col">操作</th></tr></thead>
+            <tbody id="document-list"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <div class="clinical-document-two-column">
+        <section class="panel" aria-labelledby="document-exception-title">
+          <div class="panel-title"><h2 id="document-exception-title">异常校验与补传</h2><span id="document-exception-count">0 项</span></div>
+          <div id="document-exceptions" class="clinical-document-card-list"></div>
+        </section>
+        <section class="panel" aria-labelledby="workstation-reminder-title">
+          <div class="panel-title"><h2 id="workstation-reminder-title">医生工作站调阅提醒</h2><span id="workstation-reminder-count">0 项</span></div>
+          <div id="workstation-reminders" class="clinical-document-card-list"></div>
+        </section>
+      </div>
+
+      <section class="panel" aria-labelledby="upload-log-title">
+        <div class="panel-title"><h2 id="upload-log-title">采集与报送日志</h2><span id="upload-log-count">0 条</span></div>
+        <div id="upload-logs" class="clinical-document-log-list"></div>
+      </section>
+
+      <section class="panel" aria-labelledby="document-capability-title">
+        <div class="panel-title"><h2 id="document-capability-title">能力与上线边界</h2><span>生产保持 NO-GO</span></div>
+        <div id="document-capabilities" class="clinical-document-capability-grid"></div>
+        <ul id="document-blockers" class="clinical-document-blockers"></ul>
+      </section>
+    </main>
+
+    <dialog id="document-detail-dialog" class="governance-dialog clinical-document-dialog">
+      <article>
+        <header><div><span id="document-detail-type">医疗文书</span><h2 id="document-detail-title">文书详情</h2></div><button type="button" class="secondary-work-button" data-close-dialog>关闭</button></header>
+        <dl id="document-detail-fields" class="clinical-document-detail-grid"></dl>
+        <section aria-labelledby="document-clinical-summary-title"><h3 id="document-clinical-summary-title">授权临床摘要</h3><p id="document-clinical-summary">当前账号无权查看临床摘要。</p></section>
+        <footer><button type="button" class="secondary-work-button" data-close-dialog>返回</button><button id="document-detail-pdf" type="button" class="primary-work-button" disabled>申请 PDF 短时调阅</button></footer>
+      </article>
+    </dialog>
+
+    <script src="./shared.js"></script>
+    <script src="./regional-clinical-documents.js"></script>
+  </body>
+</html>

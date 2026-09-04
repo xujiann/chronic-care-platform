@@ -17,6 +17,8 @@ PLAN → 审批 → 实现 → 测试 → review → PR → merge 流程。
 
 医疗付费一件事现通过 `medical-payment.html` 汇总当前账号授权范围内的订单引用、支付/医保交易、退费复核、异常和日终对账，并复用既有金融网关与退款写接口。静态站只显示禁写结构示例；真实支付机构、医保核心、商户凭据、签名回调、账单传输和现场对账验收未完成前，所有结果均保持生产 `NO-GO`。
 
+区域医疗文书中心现通过 `regional-clinical-documents.html` 汇总电子病历卡与电子出院小结的采集校验、报送状态、异常补传、日志和医生工作站提醒，并复用既有集成事件与安全附件接口。主管部门只查看跨机构运行元数据，医疗机构按可信机构代码查看最小临床摘要并申请 PDF 短时调阅；真实机构文书接口、上级平台回执、生产对象存储与工作站嵌入验收完成前保持生产 `NO-GO`。
+
 居民健康档案公共接入可通过 `npm.cmd run citizen-records:check`、`npm.cmd run citizen-records:test` 和 `npm.cmd run citizen-records:readiness` 验证。T00 已接入授权策略、照护工作区路由和当前 PWA 缓存；真实身份与关系目录、HIS/EMR/LIS/PACS、对象存储、SIEM、法务同意版本、上线签字及公网 TLS 未提供前，`productionReady` 保持 `false`。
 
 挂号、双向转诊与家庭医生闭环可通过 `npm.cmd run registration-referral:check`、`npm.cmd run registration-referral:test` 和 `npm.cmd run registration-referral:acceptance` 验证。公共 API 使用服务端时间、`Idempotency-Key`、演员/机构范围及既有聚合 `expectedVersion` 执行 40 类命令，并持久化哈希链审计；真实 HIS、支付、医保、转诊和消息回调以及现场责任、SLA、切换和回滚签字未齐前，生产上线继续阻断。
@@ -100,6 +102,7 @@ JSON 数据目录启动隔离服务。`test:all` 保持原自动发现语义，�
 | `referral-teleconsultation.html` | 双向转诊与远程会诊任务工作台 |
 | `drug-consumable.html` | 药品耗材治理任务工作台 |
 | `medical-payment.html` | 医疗付费一件事：订单、支付、退费、异常与对账 |
+| `regional-clinical-documents.html` | 区域医疗文书中心：病历卡、出院小结、采集校验、报送与异常闭环 |
 | `research-sandbox.html` | 科研数据沙箱申请、审核、访问和成果回流工作台 |
 | `public-health-supervision-cases.html` | 卫生监督检查、发现问题和案件处置闭环工作台 |
 | `research-sandbox-about.html` | 科研数据沙箱政策说明、运行边界、政策依据、现场验收证据和发布证据 |

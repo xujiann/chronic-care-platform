@@ -19,6 +19,7 @@ test("commission navigation exposes the new governed work centers and pages rema
     ["referral-teleconsultation.html", "转诊与远程会诊任务工作台"],
     ["drug-consumable.html", "药耗监管与整改协同工作台"],
     ["medical-payment.html", "医疗付费一件事"],
+    ["regional-clinical-documents.html", "区域医疗文书中心"],
     ["research-sandbox.html", "科研数据集与安全沙箱工作台"],
     ["public-health-supervision-cases.html", "卫生监督案件协同工作台"]
   ];
@@ -40,6 +41,9 @@ test("commission navigation exposes the new governed work centers and pages rema
     }
     if (target === "medical-payment.html") {
       await expect(page.locator("#payment-source-title")).toHaveText("医疗付费业务服务已连接");
+    }
+    if (target === "regional-clinical-documents.html") {
+      await expect(page.locator("#document-source-title")).toHaveText("区域医疗文书业务服务已连接");
     }
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
     expect(overflow, `${target} must stay inside the mobile viewport`).toBe(false);
@@ -67,6 +71,35 @@ test("medical payment center renders hostile provider text as inert content", as
   await expect(page.locator("#payment-blockers")).toContainText(hostile);
   await expect(page.locator("#payment-queue img, #payment-blockers img")).toHaveCount(0);
   expect(await page.evaluate(() => globalThis.paymentCompromised)).toBeUndefined();
+});
+
+test("regional clinical document center renders hostile provider text as inert content", async ({ page }) => {
+  const hostile = '<img src=x onerror="globalThis.documentCenterCompromised=true">';
+  await loginCommission(page);
+  await page.route("**/api/integration/clinical-documents/center", (route) => route.fulfill({
+    status: 200,
+    contentType: "application/json",
+    body: JSON.stringify({
+      schemaVersion: "regional-clinical-document-center-v1",
+      sourceRequirement: "D-INT-DOC",
+      productionReady: false,
+      scope: { role: "commission", organizationCode: "cross-organization", crossInstitutionVisible: true, clinicalDetailVisible: false },
+      actions: { queryDocuments: true, queryClinicalDetail: false, requestPdfIntent: false, retryExceptions: true },
+      summary: { documents: 1, institutions: 1, collectedToday: 1, medicalRecordCards: 0, dischargeSummaries: 1, pendingReport: 0, reported: 0, exceptions: 1, pdfReady: 0 },
+      documents: [{ id: "hostile-document", documentType: "discharge-summary", documentLabel: hostile, sourceRecordReference: hostile, residentReference: hostile, institutionCode: hostile, documentDate: "2026-09-04", receivedAt: "2026-09-04T10:00:00.000Z", status: "exception", reportingStatus: "exception", clinicalSummary: "", validation: { status: "exception", passed: false, failedChecks: [hostile] }, pdf: { available: false, attachmentId: "", filename: "", integrityStatus: "not-ready" }, retryCount: 0, actions: { queryDetail: false, viewPdf: false, retryException: true } }],
+      exceptions: [{ id: "hostile-document", documentLabel: hostile, institutionCode: hostile, residentReference: hostile, issueCodes: [hostile], retryCount: 0, actions: { retryException: true }, nextAction: hostile }],
+      uploadLogs: [{ id: "hostile-document", sourceRecordReference: hostile, documentLabel: hostile, institutionCode: hostile, receivedAt: "2026-09-04T10:00:00.000Z", validationStatus: "exception", reportingStatus: "exception", retryCount: 0 }],
+      workstationReminders: [],
+      capabilities: [{ id: "hostile", label: hostile, status: "external-evidence-required", interface: hostile }],
+      blockers: [hostile]
+    })
+  }));
+  await page.goto("/regional-clinical-documents.html");
+  await expect(page.locator("#document-list")).toContainText(hostile);
+  await expect(page.locator("#document-exceptions")).toContainText(hostile);
+  await expect(page.locator("#document-blockers")).toContainText(hostile);
+  await expect(page.locator("#document-list img, #document-exceptions img, #document-blockers img")).toHaveCount(0);
+  expect(await page.evaluate(() => globalThis.documentCenterCompromised)).toBeUndefined();
 });
 
 test("account lifecycle remains commission-manager only", async ({ page }) => {

@@ -3,18 +3,21 @@
 const clinicalResultExchange = require("./t08-clinical-result-exchange");
 const externalJointTest = require("./integration/external-joint-test");
 const objectStorageV2 = require("./integration/object-storage-v2");
+const regionalClinicalDocuments = require("./integration/regional-clinical-documents");
 
 const SECURE_ATTACHMENT_METADATA_LIMIT = 500;
 
 function createRouteSegments(runtime) {
   const { APPOINTMENT_CONTRACT_ID, PHYSICAL_EXAM_CONTRACT_ID, appendDataAccessLog, appendSecurityEvent, applyObjectLifecycle, buildIntegrationSample, canAccessResident, canAccessSecureAttachment, collectJson, createObjectDownloadIntent, createObjectUploadIntent, dispatchFinancialRequest, dispatchHospitalRequest, financialDispatchRequestDigest, finalizeObjectUpload, hospitalConnectorCenter, landAppointmentIntegrationEvent, landPhysicalExamIntegrationEvent, normalizeHospitalConnectorDomain, normalizeIntegrationEvent, objectStorageCenter, objectStorageLegacyWritesAllowed, prependAuditTrailEntry, randomUUID, readDatabase, requireApiRole, sendJson, summarizeIntegrationGateway, updateIntegrationEvent, validateAttachmentMetadata, verifyIntegrationSignature, withFinancialDispatchLock, withFinancialDispatchStateLock, withObjectStorageDurableRepository, writeDatabase } = runtime;
   const handleObjectStorageV2 = objectStorageV2.createHandler({ ...runtime, withObjectStorageDurableRepository });
+  const handleRegionalClinicalDocuments = regionalClinicalDocuments.createHandler(runtime);
   return [
     {
       id: "integration-01",
       domain: "integration",
       async handle(req, res, url) {
     if (await handleObjectStorageV2(req, res, url)) return true;
+    if (await handleRegionalClinicalDocuments(req, res, url)) return true;
     if (req.method === "GET" && url.pathname === "/api/attachments/storage") {
         const user = requireApiRole(req, res, ["commission", "institution"], "/api/attachments/storage");
         if (!user) return true;

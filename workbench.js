@@ -35,11 +35,11 @@ document.addEventListener("DOMContentLoaded", async () => {
   const siteReadinessPackPromise = loadSiteReadinessPack();
   const siteTemplateReadmesPromise = loadSiteTemplateReadmes();
   const siteLaunchEvidencePromise = loadSiteLaunchEvidence();
+  const unifiedTaskReportPromise = loadUnifiedTaskReport();
+  const drugConsumableSupervisionPromise = loadDrugConsumableSupervision();
   const releaseReportPromise = loadReleaseReport();
   const productionCutoverPromise = loadProductionCutoverChecklist();
   const releaseArtifactManifestPromise = loadReleaseArtifactManifest();
-  const unifiedTaskReportPromise = loadUnifiedTaskReport();
-  const drugConsumableSupervisionPromise = loadDrugConsumableSupervision();
 
   // Readiness is the first operational signal on this page and must not wait for
   // the heavier release-report and cutover aggregations to finish.
@@ -55,9 +55,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     siteReadinessPack,
     siteTemplateReadmes,
     siteLaunchEvidence,
-    releaseReport,
-    productionCutover,
-    releaseArtifactManifest,
     unifiedTaskReport,
     drugConsumableSupervision
   ] = await Promise.all([
@@ -70,9 +67,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     siteReadinessPackPromise,
     siteTemplateReadmesPromise,
     siteLaunchEvidencePromise,
-    releaseReportPromise,
-    productionCutoverPromise,
-    releaseArtifactManifestPromise,
     unifiedTaskReportPromise,
     drugConsumableSupervisionPromise
   ]);
@@ -82,7 +76,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   currentSiteTemplateReadmes = siteTemplateReadmes;
   renderMetrics(state, tasks, roadmap, operations);
   renderDrugConsumableSupervision(drugConsumableSupervision, state);
-  renderReleaseEvidenceGates(state, readiness, operations, processAudit, serviceAcceptanceSummary, siteReadinessPack, releaseReport, productionCutover, releaseArtifactManifest);
+  renderReleaseEvidenceGates(state, readiness, operations, processAudit, serviceAcceptanceSummary, siteReadinessPack, null, null, null);
   renderAcceptanceLedgers(state, acceptanceLedgers, serviceAcceptanceSummary);
   renderSiteReadinessPack(siteReadinessPack, siteTemplateReadmes, siteLaunchEvidence);
   renderSourceAlignment(state);
@@ -93,6 +87,17 @@ document.addEventListener("DOMContentLoaded", async () => {
   renderUnifiedTasks(tasks);
   renderDataMaturity(state);
   renderNextQueue(roadmap);
+
+  // The aggregate release endpoints rebuild the complete release report and can
+  // take tens of seconds as the platform grows. Keep the operational workbench
+  // usable from the lightweight live evidence above, then enrich it when the
+  // complete reports and task feeds are ready.
+  const [releaseReport, productionCutover, releaseArtifactManifest] = await Promise.all([
+    releaseReportPromise,
+    productionCutoverPromise,
+    releaseArtifactManifestPromise
+  ]);
+  renderReleaseEvidenceGates(state, readiness, operations, processAudit, serviceAcceptanceSummary, siteReadinessPack, releaseReport, productionCutover, releaseArtifactManifest);
 });
 
 async function loadOperationalMetrics() {
@@ -459,7 +464,7 @@ function renderSystemReadiness(readiness) {
   container.innerHTML = `<article class="priority-row">
     <div class="priority-rank ${readiness.passed ? "info" : "danger"}">${readiness.passed ? "OK" : "!"}</div>
     <div>
-      <h3>${readiness.service || "系统"}发布就绪总览</h3>
+      <h3>${typeof readiness.service === "string" ? readiness.service : readiness.service?.name || "系统"}发布就绪总览</h3>
       <p>生成时间：${readiness.generatedAt || "未知"}；P2 集合、审计链和运行负载已纳入统一检查。</p>
       <div class="standard-tags">${dependencySummary ? `<span class="badge danger">现场高风险依赖：${dependencySummary.high}</span><span class="badge warn">现场中风险依赖：${dependencySummary.medium}</span>` : ""}</div>
       <div class="standard-tags">${dependencyRows || `<span class="badge info">暂无外部依赖提示</span>`}</div>
@@ -494,6 +499,7 @@ function renderReleaseEvidenceGates(state, readiness, operations, processAudit, 
   const serviceAcceptance = serviceAcceptanceSummary?.serviceAcceptance || releaseReport?.serviceAcceptance || null;
   const chronicService = serviceAcceptance?.chronic?.summary || null;
   const countyService = serviceAcceptance?.county?.summary || null;
+  const releaseManifestCheck = checksById["release-artifact-manifest"] || null;
 
   const gates = [
     {
@@ -566,7 +572,7 @@ function renderReleaseEvidenceGates(state, readiness, operations, processAudit, 
       passed: releaseReport ? Boolean(releaseReport.ok) : readiness ? Boolean(readiness.passed) : Boolean(state.platformRoadmap?.length),
       detail: releaseReport
         ? `${releaseReport.summary?.passed || 0}/${releaseReport.summary?.total || 0} release checks passed; warnings=${releaseReport.summary?.warnings || 0}`
-        : readiness ? `${readiness.checks?.filter((item) => item.passed).length || 0}/${readiness.checks?.length || 0} readiness checks passed` : "static snapshot preview; run Node API for live readiness",
+        : readiness ? `${readiness.checks?.filter((item) => item.passed).length || 0}/${readiness.checks?.length || 0} release checks passed from system readiness evidence` : "static snapshot preview; run Node API for live readiness",
       evidence: "release/release-report.md"
     },
     {
@@ -575,16 +581,16 @@ function renderReleaseEvidenceGates(state, readiness, operations, processAudit, 
       passed: productionCutover ? Boolean(productionCutover.ok) : Boolean(releaseReport?.productionCutover?.every((item) => item.passed)),
       detail: productionCutover
         ? `${productionCutover.summary?.passed || 0}/${productionCutover.summary?.total || 0} cutover items passed; blocked=${productionCutover.summary?.blocked || 0}`
-        : "site signoff checklist is available from release report",
+        : "blocked until the production site signoff checklist and external evidence are accepted",
       evidence: "release/production-cutover-checklist.md"
     },
     {
       id: "release:manifest",
       title: "Release artifact manifest",
-      passed: releaseArtifactManifest ? Boolean(releaseArtifactManifest.ok) : Boolean(releaseReport?.ok),
+      passed: releaseArtifactManifest ? Boolean(releaseArtifactManifest.ok) : Boolean(releaseManifestCheck?.passed),
       detail: releaseArtifactManifest
         ? `${releaseArtifactManifest.summary?.artifacts || 0} artifacts; ${releaseArtifactManifest.summary?.templateReadmes || 0} template READMEs; ${releaseArtifactManifest.summary?.releaseChecks || 0} release checks indexed`
-        : "run Node API for release artifact index",
+        : releaseManifestCheck?.detail || "release artifacts are indexed by the system readiness evidence",
       evidence: "release/release-artifact-manifest.md"
     }
   ];
