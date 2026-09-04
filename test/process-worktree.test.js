@@ -171,8 +171,16 @@ test("CI isolates browser E2E and release readiness behind the required test agg
   assert.match(releaseJob, /timeout-minutes: 25/);
   assert.match(releaseJob, /Run deployment readiness gate/);
   assert.match(releaseJob, /Upload release readiness report/);
-  assert.match(releaseJob, /timeout --signal=TERM 2m npm audit --omit=dev/);
-  assert.equal(releaseJob.match(/timeout --signal=TERM 2m npm audit --omit=dev/g)?.length, 2);
+  assert.match(
+    releaseJob,
+    /timeout --signal=TERM 2m npm audit --omit=dev --registry=https:\/\/registry\.npmjs\.org/
+  );
+  assert.equal(
+    releaseJob.match(
+      /timeout --signal=TERM 2m npm audit --omit=dev --registry=https:\/\/registry\.npmjs\.org/g
+    )?.length,
+    2
+  );
   assert.match(releaseJob, /first_status.*-ne 124/s);
   assert.match(releaseJob, /second_status.*-ne 124/s);
   assert.match(releaseJob, /DEPENDENCY_AUDIT_STATUS=failed/);
