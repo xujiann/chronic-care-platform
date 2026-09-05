@@ -2,6 +2,7 @@
 
 const { buildAuthorizationContext } = require("./authorization-context");
 const accountLifecycle = require("./identity-security/account-lifecycle");
+const AuditGovernance = require("../../identity-security/audit-governance-center");
 
 const {
   SESSION_SECURITY_AUDIT_PERSISTENCE_CONTRACT,
@@ -105,7 +106,7 @@ function createRouteSegments(runtime, options = {}) {
       id: "identity-security-01",
       domain: "identity-security",
       async handle(req, res, url) {
-    if (req.method === "POST" && url.pathname === "/api/auth/identity/preview") {
+      if (req.method === "POST" && url.pathname === "/api/auth/identity/preview") {
         const user = requireApiRole(req, res, ["commission"], "/api/auth/identity/preview");
         if (!user) return true;
         const payload = await collectJson(req);
@@ -115,6 +116,45 @@ function createRouteSegments(runtime, options = {}) {
           mappedAt: new Date().toISOString(),
           mapping: mapExternalIdentityClaims(claims, readDatabase())
         });
+        return true;
+      }
+
+      if (req.method === "GET" && url.pathname === "/api/security/audit-governance/center") {
+        const user = requireApiRole(req, res, ["commission"], "/api/security/audit-governance/center");
+        if (!user) return true;
+        try {
+          const center = AuditGovernance.buildAuditGovernanceCenter(readDatabase(), user, { environment: process.env });
+          appendSecurityEvent({
+            actor: user.name || user.username,
+            role: user.role,
+            action: "platform audit governance center read",
+            target: AuditGovernance.CAPABILITY_ID,
+            result: "allowed",
+            detail: `${center.summary.totalRecords} records / ${center.summary.highRiskEvents} high-risk / ${center.summary.blockedControls} controls blocked`
+          });
+          sendJson(res, 200, center);
+        } catch (error) {
+          const known = error instanceof AuditGovernance.AuditGovernanceCenterError;
+          try {
+            appendSecurityEvent({
+              actor: user.name || user.username,
+              role: user.role,
+              action: "platform audit governance center read",
+              target: AuditGovernance.CAPABILITY_ID,
+              result: "denied",
+              detail: known ? error.code : "AUDIT_GOVERNANCE_CENTER_FAILED"
+            });
+          } catch {
+            // The read remains fail-closed when the audit sink is unavailable.
+          }
+          sendJson(res, known ? error.statusCode : 503, {
+            ok: false,
+            code: known ? error.code : "AUDIT_GOVERNANCE_CENTER_FAILED",
+            message: known ? error.message : "platform audit governance center is temporarily unavailable",
+            productionReady: false,
+            decision: "NO-GO"
+          });
+        }
         return true;
       }
 

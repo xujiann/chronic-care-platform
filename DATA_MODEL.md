@@ -1,5 +1,11 @@
 # DATA MODEL — 主线数据地图
 
+## 2026-09-06 平台审计治理数据边界
+
+本增量不新增安全事件、数据访问、投递、留存或风险集合，不修改 JSON/SQLite/PostgreSQL schema、migration、索引、outbox、Worker 或数据 Owner。中心只读 T01 已拥有的 `securityEvents` 与 `dataAccessLogs`，并复用 `audit-chain-v2` 与 `append-only-audit-source-v2` 合同生成不持久化的治理投影。
+
+公共响应只包含固定分类、数量、日期桶、配置布尔值和哈希摘要；`actor`、`target`、`detail`、`personIndex`、`residentId`、`scope`、`purpose` 及原始事件均不会返回。中心不读取 `securityAcceptanceLedger`、`productionDeploymentPlan` 或其他业务集合，不取得审计修复、重封、原始导出、Worker 激活和生产晋级权限。
+
 ## 2026-09-06 平台人工智能治理数据边界
 
 本增量不新增模型、规则、建议、居民、事件或审计状态集合，不修改 JSON/SQLite/PostgreSQL schema、migration、索引、outbox 或数据 Owner。平台中心只读取 `phase2ClinicalAssistRules`、`phase2ClinicalAssistAlerts`、`phase2ClinicalAssistReceipts` 和 `diseaseRegistryModels` 的数量、版本/复核存在性等最小治理元数据；这些集合已在中央所有权合同中允许 `platform-governance` 读取。

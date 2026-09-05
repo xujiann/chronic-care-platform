@@ -1,5 +1,11 @@
 # CURRENT ARCHITECTURE — 主线现状地图
 
+## 2026-09-06 T01 平台审计治理
+
+- `src/identity-security/audit-governance-center.js` 只读取 T01 已拥有的 `securityEvents` 与 `dataAccessLogs`，先执行统一 `audit-chain-v2` 严格校验，再形成固定结果/事件/角色分类、日期桶、控制与风险的瞬时聚合；不新增审计事实源或持久化状态。
+- `GET /api/security/audit-governance/center` 位于 T01 identity-security route segment。commission manager 鉴权先于读取；来源结构、链完整性或读取审计失败均稳定 503，且响应不含 actor、患者/居民、机构、访问目标、用途或事件正文。
+- `audit-governance.html` 进入分级左侧导航并只用 DOM/text 渲染。append-only source v2、连续投递和留存只展示仓库合同及配置布尔状态；原始导出、链修复、Worker 激活和生产放行均禁用，`L-GOV-AUDIT` 仅形成仓库证据，生产固定 `NO-GO`。
+
 ## 2026-09-06 T01 平台人工智能治理
 
 - `src/identity-security/ai-governance-center.js` 建立四类跨域 AI 场景、八类控制和开放风险的只读治理投影；只读取 `domain-data-ownership` 已允许 `platform-governance` 访问的临床规则/提醒/回执与科研模型集合。
@@ -10,7 +16,7 @@
 
 - `src/clinical-specialties/quality-safety/ai-cdss-governance-center.js` 只读取既有 `phase2ClinicalAssistRules/Alerts/Receipts/PluginContracts`，形成规则/模型卡、证据绑定、人工复核、漂移与事件信号的瞬时治理投影；不新增患者、模型或审计事实源。
 - `GET /api/quality-safety/ai-cdss/center` 位于 T06 既有 quality-safety route segment。主管部门仅查看跨机构治理元数据；机构医生按可信 `doctorId`、机构管理员按可信机构代码/名称精确收敛；机构缺少代码时失败关闭。
-- `clinical-ai-cdss.html` 进入分级左侧导航并只用 DOM/text 渲染。`J-CLIN-CDSS` 形成临床侧仓库证据，并由后续 T01 平台中心汇总最小治理元数据；自动诊断、医嘱、处方和生产激活均禁用。当前静态发布为 56 个入口、185 个显式资产，生产 API 为 633 项且写入口仍为 362 个。
+- `clinical-ai-cdss.html` 进入分级左侧导航并只用 DOM/text 渲染。`J-CLIN-CDSS` 形成临床侧仓库证据，并由后续 T01 平台中心汇总最小治理元数据；自动诊断、医嘱、处方和生产激活均禁用。当前静态发布为 57 个入口、188 个显式资产，生产 API 为 634 项且写入口仍为 362 个。
 
 ## 2026-09-04 T08 区域医疗文书
 
@@ -51,7 +57,7 @@
 ## 2026-08-31 当前架构事实机器对账
 
 - `scripts/documentation-fact-drift.js` 现以生产 API 目录、首批生产范围、SQLite migration、仓库 Markdown/PDF 闭集和 Accepted ADR 注册表为机器权威，对 ROADMAP、ARCHITECTURE、六张架构地图和 ADR 索引共 9 份当前文档失败关闭。
-- 当前对账值为 SQLite head v17/38 张非内部表、生产 API 633 项/362 个写入口/325 个行为证明缺口/327 个总复核项、首批范围 `FROZEN-NO-GO` 且范围内 API/集合复核与仓库迁移计划缺口均为 0、Markdown 275 份（206 current、68 snapshot、1 superseded）。
+- 当前对账值为 SQLite head v17/38 张非内部表、生产 API 634 项/362 个写入口/325 个行为证明缺口/327 个总复核项、首批范围 `FROZEN-NO-GO` 且范围内 API/集合复核与仓库迁移计划缺口均为 0、Markdown 275 份（206 current、68 snapshot、1 superseded）。
 - 该验证仅在内存 SQLite 中重放既有 migration 并读取仓库权威；不写 `data/db.json`、运行时 SQLite、生产证据、生成报告或归档产物，不改变任何运行时行为。
 
 ## 2026-08-31 首发数据迁移计划闭集
