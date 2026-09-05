@@ -71,6 +71,7 @@ function buildPhase2ClinicalAssistReadiness(options = {}) {
   const data = options.data ?? readJson("data/db.json");
   const pkg = options.pkg ?? readJson("package.json");
   const serverSource = options.serverSource ?? readRuntimeSource(ROOT);
+  const clinicalSource = options.clinicalSource ?? readText("src/clinical-specialties/clinical-decision-support/index.js");
   const platformSource = options.platformSource ?? readText("platform.js");
   const platformHtml = options.platformHtml ?? readText("platform.html");
   const doctorSource = options.doctorSource ?? readText("doctor.js");
@@ -94,7 +95,7 @@ function buildPhase2ClinicalAssistReadiness(options = {}) {
     check("phase2ClinicalAssist:doctor-workstation", doctorScopes.length >= 2 && alerts.every((item) => item.serviceIntegrationStatus && item.recommendation), `${doctorScopes.length} doctor workstation scopes`),
     check("phase2ClinicalAssist:message-receipts", receipts.length >= 3 && receipts.every((item) => alertIds.has(item.alertId) && item.auditHash && item.messageChannel), `${receipts.length} message receipts`),
     check("phase2ClinicalAssist:plugin-contracts", contracts.length >= 3 && contracts.every((item) => item.endpoint && item.payloadFields?.length && item.status), `${contracts.length} plugin contracts`),
-    check("phase2ClinicalAssist:runtime-api", serverSource.includes("/api/phase2/clinical-assist") && serverSource.includes("buildPhase2ClinicalAssistOverview") && serverSource.includes("phase2-clinical-assist-receipt") && serverSource.includes("phase2-clinical-assist-rule-config"), "runtime API, receipt, rule config and audit actions are wired"),
+    check("phase2ClinicalAssist:runtime-api", serverSource.includes("/api/phase2/clinical-assist") && serverSource.includes("buildPhase2ClinicalAssistOverview") && serverSource.includes("executePhase2ClinicalAssistReceipt") && clinicalSource.includes("clinical-decision-support.v1") && clinicalSource.includes("phase2-clinical-assist-receipt") && serverSource.includes("phase2-clinical-assist-rule-config"), "runtime API, versioned clinical command, receipt and rule audit actions are wired"),
     check("phase2ClinicalAssist:doctor-ui", doctorHtml.includes("doctor-clinical-assist") && doctorSource.includes("renderDoctorClinicalAssist") && doctorSource.includes("data-clinical-assist-receipt"), "doctor workstation UI and receipt action are wired"),
     check("phase2ClinicalAssist:platform-ui", platformHtml.includes("phase2-clinical-assist") && platformSource.includes("renderPhase2ClinicalAssist"), "platform supervision UI is wired"),
     check("phase2ClinicalAssist:release-wiring", Boolean(pkg.scripts?.["phase2:clinical-assist-readiness"]) && manifestSource.includes("phase2-clinical-assist-readiness-report.md") && deployCheckSource.includes("phase2ClinicalAssistReadiness") && releaseReportSource.includes("phase2ClinicalAssist"), "package script, manifest, deploy check and release report are wired")

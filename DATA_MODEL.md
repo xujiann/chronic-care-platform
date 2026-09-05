@@ -1,5 +1,9 @@
 # DATA MODEL — 主线数据地图
 
+## AI/CDSS 治理增量（2026-09-05）
+
+AI/CDSS 复用 `phase2ClinicalAssistRules`、`phase2ClinicalAssistAlerts`、`phase2ClinicalAssistReceipts` 和插件合同；临床集合 Owner 不变。规则新增可选 `governance`（v1、状态、规则卡、来源摘要、独立审核、历史和幂等回执），提醒新增兼容 `version`，回执可含仅服务端可见 `commandMetadata`。无 DDL/回填，不修改跟踪数据；通用 state 不暴露这四个集合，写入只允许领域命令。每条规则最多1000条治理历史/回执，满额拒绝新命令且不淘汰重放证据；归档迁移需另行受控执行。
+
 ## 2026-09-04 医疗付费一件事数据边界
 
 本增量不新增订单、支付、退款或对账集合，不修改 SQLite/PostgreSQL schema、migration、索引、outbox 或数据 Owner。只读中心从既有 `integrationGatewayEvents`、`onlinePaymentRefunds` 和 `financialReconciliationRuns` 生成瞬时投影；机构范围只接受事件载荷中已有的可信 `institutionCode` 与退款既有 `organizationId`，不按机构名称猜测或回填归属。

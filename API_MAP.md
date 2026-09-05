@@ -1,5 +1,9 @@
 # API MAP — 主线接口地图
 
+## AI/CDSS 治理增量（2026-09-05）
+
+新增 `GET /api/ai-governance/center`、`POST /api/ai-governance/rules/:id/actions`，仅主管部门 manager；actions 接收 action/expectedVersion/idempotencyKey/card，登记、送审、独立批准/拒绝、暂停、回滚。来源漂移失败关闭，回滚回到 draft，生产始终 false。旧 `/api/phase2/clinical-assist` 按机构/医生裁剪，回执可选版本/幂等，已治理但未批准的建议禁止采纳；旧 config 仅主管部门且拒绝已登记规则。通用 state 的临床集合写返回403/409，不允许绕过。
+
 ## 2026-09-04 区域医疗文书 API
 
 | 接口 | 角色与范围 | 语义 |

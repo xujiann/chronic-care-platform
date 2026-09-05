@@ -1,5 +1,9 @@
 # TECH DEBT — 主线技术债与风险台账
 
+## AI/CDSS 治理增量（2026-09-05）
+
+AI/CDSS 已关闭：缺版本审批、机构信息缺失扩大范围、内部幂等回执透出、旧配置/通用 state 绕过、审批源漂移、同一规则治理与临床回执交叉覆盖。仍保留：无key旧临床回执不提供严格幂等；共享快照和进程锁不保证跨实例exactly-once；真实模型推理、评测/漂移采集、HIS工作站签名、正式规则审批与生产证据仍待后续。新工作台增加3项静态资产，不新增HTML危险sink。
+
 ## 2026-09-04 医疗付费一件事后的剩余债务
 
 | ID | 已完成的仓库能力 | 剩余风险/下一步 |
@@ -140,7 +144,7 @@ T00 机器登记完成后，`production-release-scope` 中 17 个仓库内 API �
 | TEST-005 | 2026-08-27 | 本地/CI 统一 Playwright Chromium；在线根 40 项与居民 13 项继续阻止 Service Worker；PWA 3 项使用独立允许策略、动态端口和临时数据；Go/No-Go 同时覆盖四方业务责任属性与恶意响应可信渲染 | 56 项唯一并集/漂移测试、居民同文件 13/13、PWA 重复 9/9、完整标准 E2E；不得把仓库浏览器测试解释为真实 HTTPS、托管安全头或现场验收 |
 | TEST-008 | 2026-08-23 | 专用 PWA/Service Worker E2E 验证居民登录后安装、v60→v61 激活清理、受控 update、离线 mobile/citizen 回退、API/源快照 404 缓存边界与逐项注销/清缓存 | 真实 HTTPS 终止、OS 安装提示/策略、浏览器设备矩阵、外部 Origin、现场缓存升级与独立安全验收继续外置；仓库测试不产生生产 GO |
 | GOV-001 | 2026-08-23 | `main`/`origin/main` 成为唯一当前集成与默认开发基线；固定 governance tag 仅作可复现证据，旧日期化 workflow 原文冻结 | process plan/verify 默认值、manifest/AGENTS/iteration program 漂移和 CI 目标分支负向测试 |
-| DOC-001 | 2026-08-24 | 关闭时为 267 份；当前 275 份 Markdown 以路径和 ADR 台账唯一分类为 206 current、68 snapshot、1 superseded；不删除历史证据 | 闭集路径/分类摘要、规则重叠、ADR status、当前事实和 snapshot 内容聚合摘要失败关闭 |
+| DOC-001 | 2026-08-24 | 关闭时为 267 份；当前 277 份 Markdown 以路径和 ADR 台账唯一分类为 208 current、68 snapshot、1 superseded；不删除历史证据 | 闭集路径/分类摘要、规则重叠、ADR status、当前事实和 snapshot 内容聚合摘要失败关闭 |
 | REPO-001 | 2026-08-23 | 3 个跟踪 PDF 均登记 SHA-256、大小、页数、引入提交、来源、保留理由和真实 generator 可用性；二进制本体未修改 | exact tracked inventory、digest/size/page/source 漂移负向测试；替换前必须补可复现生成源，禁止手工编辑 |
 
 ## 重复、死代码和命名结论

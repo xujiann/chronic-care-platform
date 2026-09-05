@@ -8,6 +8,7 @@
   },
   "integration": [
     "test/api.test.js",
+    "test/ai-governance-runtime-api.test.js",
     "test/audit-retention.test.js",
     "test/citizen-operations-readiness.test.js",
     "test/conflict-api.test.js",

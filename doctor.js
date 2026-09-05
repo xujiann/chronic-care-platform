@@ -1,6 +1,7 @@
 const doctorApiBase = location.protocol === "file:" || location.hostname.endsWith("github.io") ? "" : "/api";
 const doctorFallbackState = { doctorProfiles: [], multiPracticeApplications: [], multiPracticePolicy: {}, taskMessages: [], phase2ClinicalAssistRules: [], phase2ClinicalAssistAlerts: [], phase2ClinicalAssistReceipts: [], phase2ClinicalAssistPluginContracts: [] };
 let doctorRuntime = { doctor: null, applications: [], messages: [], policy: {}, ledger: [], summary: {}, clinicalAssist: {} };
+const doctorClinicalCommands = new Map();
 
 document.addEventListener("DOMContentLoaded", async () => {
   doctorRuntime = await loadDoctorRuntime();
@@ -166,13 +167,19 @@ function renderDoctorClinicalAssist() {
         doctorButton("保留并说明", item.id, "kept-order-with-reason")
       );
     }
+    const reason = pendingReceipt && doctorApiBase ? doctorElement("label", {}, [
+      doctorElement("span", { text: "保留原医嘱的临床理由（至少 8 个字符）" }),
+      doctorElement("textarea", { attributes: { "aria-label": "保留原医嘱的临床理由", rows: "3", maxlength: "2000" }, dataset: { clinicalAssistReason: item.id } })
+    ]) : null;
     return doctorElement("section", { className: "item" }, [
       doctorElement("div", {}, [
         doctorElement("h3", { text: `${item.alertTitle || item.category || "临床辅助提醒"} · ${item.residentName || item.residentId || ""}` }),
         doctorElement("p", { text: item.alertDetail || "" }),
         doctorElement("p", { text: decisionUnavailable ? "当前规则未获有效治理批准，建议暂不可采纳；可保留原医嘱并说明原因。" : `建议：${item.recommendation || ""}` }),
         decisionUnavailable ? doctorElement("p", { text: `治理状态：${item.governanceStatus || "待核验"} · decisionAvailable=false` }) : null,
-        doctorElement("p", { text: `工作站：${item.pluginSurface || "doctor-workstation"} · 回执 ${item.messageReceiptStatus || "pending"} · ${item.lastAction || ""}` })
+        doctorElement("p", { text: `工作站：${item.pluginSurface || "doctor-workstation"} · 回执 ${item.messageReceiptStatus || "pending"} · ${item.lastAction || ""}` }),
+        reason,
+        doctorElement("p", { attributes: { role: "status", "aria-live": "polite" }, dataset: { clinicalAssistStatus: item.id } })
       ]),
       doctorElement("div", { className: "actions" }, actions)
     ]);
@@ -183,20 +190,46 @@ async function submitDoctorClinicalAssistReceipt(alertId, doctorAction) {
   if (!doctorApiBase) return;
   const alert = doctorRuntime.clinicalAssist?.alerts?.find((item) => item.id === alertId);
   if (!alert || (doctorAction === "accepted-recommendation" && alert.decisionAvailable === false)) return;
-  const request = window.HealthCityAuth?.authFetch || fetch;
-  const response = await request(`${doctorApiBase}/phase2/clinical-assist/alerts/${encodeURIComponent(alertId)}/receipt`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      receiptStatus: "received",
-      doctorAction,
-      actionDetail: doctorAction === "accepted-recommendation" ? "医生已采纳临床辅助提醒并回写处理结果。" : "医生登记临床理由后保留原医嘱。",
-      messageChannel: "doctor-workstation"
-    })
-  });
-  if (!response.ok) return;
-  doctorRuntime = await loadDoctorRuntime();
-  renderDoctorWorkbench();
+  if (doctorClinicalCommands.get(alertId)?.busy) return;
+  const status = Array.from(document.querySelectorAll("[data-clinical-assist-status]")).find((node) => node.dataset.clinicalAssistStatus === alertId);
+  const reason = Array.from(document.querySelectorAll("[data-clinical-assist-reason]")).find((node) => node.dataset.clinicalAssistReason === alertId);
+  const accepting = doctorAction === "accepted-recommendation";
+  const actionDetail = accepting ? "医生已采纳临床辅助提醒并回写处理结果。" : (reason?.value || "").trim();
+  if (!accepting && (actionDetail.length < 8 || actionDetail.length > 2000)) {
+    if (status) status.textContent = "请填写 8–2000 个字符的实际临床理由后再提交。";
+    reason?.focus();
+    return;
+  }
+  const payload = { receiptStatus: "received", doctorAction, actionDetail, messageChannel: "doctor-workstation", expectedVersion: Number.isSafeInteger(alert.version) ? alert.version : 0 };
+  const fingerprint = JSON.stringify(payload);
+  let command = doctorClinicalCommands.get(alertId);
+  const buttons = Array.from(document.querySelectorAll("[data-clinical-assist-receipt]")).filter((node) => node.dataset.clinicalAssistReceipt === alertId);
+  try {
+    if (!command || command.fingerprint !== fingerprint) {
+      command = { fingerprint, key: `doctor-receipt-${crypto.randomUUID()}`, busy: false };
+      doctorClinicalCommands.set(alertId, command);
+    }
+    command.busy = true;
+    buttons.forEach((button) => { button.disabled = true; });
+    if (reason) reason.disabled = true;
+    if (status) status.textContent = "正在提交回执，请等待服务端确认。";
+    const request = window.HealthCityAuth?.authFetch || fetch;
+    const response = await request(`${doctorApiBase}/phase2/clinical-assist/alerts/${encodeURIComponent(alertId)}/receipt`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Idempotency-Key": command.key },
+      body: JSON.stringify({ ...payload, idempotencyKey: command.key })
+    });
+    if (!response.ok) throw new Error(response.status === 409 ? "提醒版本或治理状态已变化，请刷新页面后复核。" : `回执未确认（${response.status}），可重试相同操作。`);
+    doctorClinicalCommands.delete(alertId);
+    doctorRuntime = await loadDoctorRuntime();
+    renderDoctorWorkbench();
+  } catch (error) {
+    if (status) status.textContent = error.message || "回执未确认，可重试相同操作。";
+  } finally {
+    if (command) command.busy = false;
+    buttons.forEach((button) => { button.disabled = button.dataset.doctorAction === "accepted-recommendation" && alert.decisionAvailable === false; });
+    if (reason) reason.disabled = false;
+  }
 }
 
 function buildStaticClinicalAssist(state, doctor) {
