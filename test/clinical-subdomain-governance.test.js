@@ -47,7 +47,7 @@ test("clinical specialty governance defines exactly five bounded subdomains", ()
   );
   assert.deepEqual(
     registry.subdomains[4].implementedUseCases.map((useCase) => useCase.id),
-    ["quality-safety-dashboard-query.v1"]
+    ["clinical-ai-cdss-governance-center.v1", "quality-safety-dashboard-query.v1"]
   );
 });
 

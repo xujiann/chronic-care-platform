@@ -1,5 +1,19 @@
 # DEPENDENCY MAP — 主线依赖地图
 
+## 2026-09-05 临床决策支持安全治理依赖方向
+
+```text
+clinical-ai-cdss 页面
+  -> GET quality-safety/ai-cdss/center
+     -> T06/quality-safety read model
+        -> existing clinical assist rules + alerts + receipts + plugin contracts
+        -> trusted actor organization / doctor scope
+  -> existing phase2 clinical-assist receipt and rule-config commands
+     -> existing authorization, audit and persistence ports
+```
+
+新服务不依赖 `server.js`、公共卫生 AI 实现、原始患者记录或外部模型 provider，不新增跨域写入。T06 只声明对 T01 `L-GOV-AI` 的上游治理缺口，不反向修改其能力状态；真实模型注册、临床验证、漂移、不良事件、厂商接入和现场签字继续外置并保持生产 NO-GO。
+
 ## 2026-09-04 区域医疗文书依赖方向
 
 ```text

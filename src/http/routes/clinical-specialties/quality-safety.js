@@ -3,6 +3,7 @@
 const {
   createQualitySafetyDashboardQuery
 } = require("../../../clinical-specialties/quality-safety/dashboard-query");
+const ClinicalAiCdssGovernance = require("../../../clinical-specialties/quality-safety/ai-cdss-governance-center");
 const {
   appendApiCommandReceipt,
   apiCommandHttpError,
@@ -24,6 +25,45 @@ function createRouteSegment(runtime) {
       id: "clinical-specialties-05",
       domain: "clinical-specialties",
       async handle(req, res, url) {
+    if (req.method === "GET" && url.pathname === "/api/quality-safety/ai-cdss/center") {
+        const user = requireApiRole(req, res, ["commission", "institution"], "/api/quality-safety/ai-cdss/center");
+        if (!user) return true;
+        try {
+          const center = ClinicalAiCdssGovernance.buildClinicalAiCdssGovernanceCenter(readDatabase(), user);
+          appendSecurityEvent({
+            actor: user.name || user.username,
+            role: user.role,
+            action: "clinical ai cdss governance center read",
+            target: center.scope.organizationCode,
+            result: "allowed",
+            detail: `${center.summary.rules} rules / ${center.summary.suggestions} suggestions / ${center.summary.openGovernanceSignals} signals`
+          });
+          sendJson(res, 200, center);
+        } catch (error) {
+          const known = error instanceof ClinicalAiCdssGovernance.ClinicalAiCdssGovernanceError;
+          try {
+            appendSecurityEvent({
+              actor: user.name || user.username,
+              role: user.role,
+              action: "clinical ai cdss governance center read",
+              target: String(user.orgCode || "unbound").slice(0, 120),
+              result: "denied",
+              detail: known ? error.code : "CLINICAL_AI_CDSS_CENTER_FAILED"
+            });
+          } catch {
+            // The center remains fail-closed even when the audit sink is unavailable.
+          }
+          sendJson(res, known ? error.statusCode : 503, {
+            ok: false,
+            code: known ? error.code : "CLINICAL_AI_CDSS_CENTER_FAILED",
+            message: known ? error.message : "clinical ai cdss governance center is temporarily unavailable",
+            productionReady: false,
+            decision: "NO-GO"
+          });
+        }
+        return true;
+      }
+
     if (req.method === "GET" && url.pathname === "/api/quality-safety/dashboard") {
         const user = requireApiRole(req, res, ["commission", "institution", "county"], "/api/quality-safety/dashboard");
         if (!user) return true;

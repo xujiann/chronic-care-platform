@@ -1,0 +1,54 @@
+.clinical-ai-page { --clinical-ai-blue: #1d4ed8; --clinical-ai-teal: #0f766e; --clinical-ai-amber: #b45309; }
+.clinical-ai-hero { display: grid; grid-template-columns: minmax(0, 1fr) 210px; gap: 24px; align-items: center; }
+.clinical-ai-decision { border: 1px solid rgba(255,255,255,.28); border-radius: 16px; padding: 16px; background: rgba(15,23,42,.2); }
+.clinical-ai-decision span, .clinical-ai-decision strong, .clinical-ai-decision small { display: block; }
+.clinical-ai-decision span, .clinical-ai-decision small { opacity: .82; }
+.clinical-ai-decision strong { margin: 5px 0; font-size: 28px; letter-spacing: .08em; }
+.clinical-ai-kicker { display: block; color: var(--clinical-ai-blue); font-size: 12px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.clinical-ai-rule-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.clinical-ai-rule-card { border: 1px solid var(--work-border); border-radius: 14px; padding: 15px; background: linear-gradient(150deg, #fff, #f8fafc); }
+.clinical-ai-rule-card header { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.clinical-ai-rule-card h3 { margin: 0; color: var(--work-navy); font-size: 16px; }
+.clinical-ai-rule-meta { margin-top: 4px; color: var(--muted); font-size: 12px; }
+.clinical-ai-rule-use { margin: 12px 0 0; color: var(--work-navy); line-height: 1.6; }
+.clinical-ai-rule-card dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 12px 0 0; }
+.clinical-ai-rule-card dl div { border: 1px solid var(--work-border); border-radius: 9px; padding: 9px; background: #fff; }
+.clinical-ai-rule-card dt { color: var(--muted); font-size: 11px; }
+.clinical-ai-rule-card dd { margin: 4px 0 0; color: var(--work-navy); font-weight: 700; overflow-wrap: anywhere; }
+.clinical-ai-rule-card ul { margin: 12px 0 0; padding-left: 20px; color: #9a3412; font-size: 13px; }
+.clinical-ai-rule-card li + li { margin-top: 4px; }
+.clinical-ai-filters { grid-template-columns: minmax(250px, 1.5fr) repeat(2, minmax(150px, .6fr)); margin-bottom: 14px; }
+.clinical-ai-table { min-width: 940px; }
+.clinical-ai-table small, .clinical-ai-table strong { display: block; }
+.clinical-ai-table small { margin-top: 4px; color: var(--muted); }
+.clinical-ai-two-column { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: 16px; }
+.clinical-ai-card-list { display: grid; gap: 10px; }
+.clinical-ai-card { border: 1px solid var(--work-border); border-radius: 12px; padding: 13px; background: #fff; }
+.clinical-ai-card header { display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; }
+.clinical-ai-card h3 { margin: 0; color: var(--work-navy); font-size: 15px; }
+.clinical-ai-card p { margin: 6px 0 0; color: var(--muted); font-size: 13px; line-height: 1.55; }
+.clinical-ai-coverage { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; padding: 12px; border-radius: 11px; background: #eff6ff; color: #1e3a8a; }
+.clinical-ai-coverage strong { font-size: 22px; }
+.clinical-ai-contract-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.clinical-ai-contract { border: 1px solid var(--work-border); border-radius: 12px; padding: 13px; background: #f8fafc; }
+.clinical-ai-contract strong, .clinical-ai-contract span { display: block; }
+.clinical-ai-contract strong { color: var(--work-navy); }
+.clinical-ai-contract span { margin-top: 5px; color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
+.clinical-ai-boundary-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+.clinical-ai-boundary-grid h3 { margin: 0 0 8px; color: var(--work-navy); font-size: 15px; }
+.clinical-ai-boundary-grid ul { margin: 0; padding-left: 22px; color: var(--muted); line-height: 1.65; }
+.clinical-ai-boundary-grid div:last-child ul { color: #9a3412; }
+.clinical-ai-upstream { margin: 14px 0 0; padding: 12px; border-radius: 10px; background: #fff7ed; color: #9a3412; }
+@media (max-width: 960px) {
+  .clinical-ai-contract-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 760px) {
+  .clinical-ai-hero, .clinical-ai-rule-grid, .clinical-ai-two-column, .clinical-ai-boundary-grid { grid-template-columns: 1fr; }
+  .clinical-ai-decision { max-width: none; }
+  .clinical-ai-filters { grid-template-columns: 1fr 1fr; }
+  .clinical-ai-filters label:first-child { grid-column: 1 / -1; }
+}
+@media (max-width: 520px) {
+  .clinical-ai-contract-grid, .clinical-ai-filters, .clinical-ai-rule-card dl { grid-template-columns: 1fr; }
+  .clinical-ai-filters label:first-child { grid-column: auto; }
+}

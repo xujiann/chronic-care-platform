@@ -1,5 +1,11 @@
 # DATA MODEL — 主线数据地图
 
+## 2026-09-05 临床决策支持安全治理数据边界
+
+本增量不新增患者、模型、建议、回执或审计集合，不修改 JSON/SQLite/PostgreSQL schema、migration、索引、outbox 或数据 Owner。中心只读既有 `phase2ClinicalAssistRules`、`phase2ClinicalAssistAlerts`、`phase2ClinicalAssistReceipts` 和 `phase2ClinicalAssistPluginContracts`，生成不持久化的规则/模型卡、授权建议、人工复核台账、治理信号和集成合同投影。
+
+主管部门投影不包含居民、医生、临床建议正文、机构名称或复核说明；机构投影只在可信机构/医生范围内返回脱敏居民引用和最小建议。缺少规则版本、审批、适用人群验证、效果漂移、不良事件和真实回执均表达为缺口，不能回写成完成状态。`J-CLIN-CDSS` 仓库证据不是临床事实或生产授权，`L-GOV-AI` 继续由 T01 独立建设。
+
 ## 2026-09-04 医疗付费一件事数据边界
 
 本增量不新增订单、支付、退款或对账集合，不修改 SQLite/PostgreSQL schema、migration、索引、outbox 或数据 Owner。只读中心从既有 `integrationGatewayEvents`、`onlinePaymentRefunds` 和 `financialReconciliationRuns` 生成瞬时投影；机构范围只接受事件载荷中已有的可信 `institutionCode` 与退款既有 `organizationId`，不按机构名称猜测或回填归属。
