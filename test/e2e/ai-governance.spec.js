@@ -114,3 +114,21 @@ test("institution accounts cannot open governance or see its navigation", async 
   await page.goto("/ai-governance.html");
   await expect(page).toHaveURL(/institution\.html\?denied=ai-governance\.html$/);
 });
+
+test("source drift replaces historic approval with registration-only controls", async ({ page }) => {
+  await login(page);
+  const stale = center("stale", 8);
+  stale.summary.stale = 1;
+  stale.rules[0].governance.storedStatus = "approved";
+  stale.rules[0].governance.sourceIntegrity = "drifted";
+  stale.rules[0].governance.card.sourceDigest = "b".repeat(64);
+  await page.route("**/api/ai-governance/center", (route) => json(route, stale));
+  await page.goto("/ai-governance.html");
+  await expect(page.locator("#ai-rules")).toContainText("来源漂移，待重新登记");
+  await expect(page.locator("#ai-rules")).toContainText("历史批准不适用于当前来源");
+  await expect(page.locator("#ai-summary")).toContainText("来源漂移待登记");
+  await page.locator("[data-ai-select]").click();
+  await expect(page.locator("#ai-action option")).toHaveCount(1);
+  await expect(page.locator("#ai-action")).toHaveValue("register");
+  await expect(page.locator("#ai-source-digest")).toHaveValue(digest);
+});

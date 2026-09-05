@@ -4,9 +4,9 @@
   const auth = window.HealthCityAuth;
   const state = { rules: [], ready: false, busy: false, selected: null, pending: null };
   const $ = (selector) => document.querySelector(selector);
-  const labels = { unregistered: "未登记", draft: "草稿", submitted: "待独立审批", approved: "治理已批准", rejected: "已拒绝", suspended: "已停用" };
+  const labels = { unregistered: "未登记", stale: "来源漂移，待重新登记", draft: "草稿", submitted: "待独立审批", approved: "治理已批准", rejected: "已拒绝", suspended: "已停用" };
   const actions = { register: "登记元数据", submit: "送交独立审批", approve: "独立批准", reject: "独立拒绝", suspend: "停用", rollback: "回滚至草稿" };
-  const allowedActions = { unregistered: ["register"], draft: ["register", "submit"], submitted: ["approve", "reject"], approved: ["suspend"], rejected: ["register", "rollback"], suspended: ["register", "rollback"] };
+  const allowedActions = { unregistered: ["register"], stale: ["register"], draft: ["register", "submit"], submitted: ["approve", "reject"], approved: ["suspend"], rejected: ["register", "rollback"], suspended: ["register", "rollback"] };
   const cardFields = { sourceRef: "#ai-source-ref", sourceDigest: "#ai-source-digest", ruleVersion: "#ai-rule-version", evidenceRef: "#ai-evidence-ref", evidenceDigest: "#ai-evidence-digest", riskLevel: "#ai-risk-level" };
   const el = (tag, text) => {
     const node = document.createElement(tag);
@@ -46,7 +46,7 @@
   function render(summary = {}) {
     const metrics = $("#ai-summary");
     metrics.replaceChildren();
-    Object.entries({ total: "规则总数", submitted: "待审批", approved: "治理已批准", suspended: "已停用" }).forEach(([key, label]) => {
+    Object.entries({ total: "规则总数", submitted: "待审批", approved: "治理已批准", suspended: "已停用", stale: "来源漂移待登记" }).forEach(([key, label]) => {
       const card = el("article");
       card.className = "work-metric";
       card.append(el("span", label), el("strong", Number.isSafeInteger(summary[key]) ? summary[key] : 0));
@@ -61,6 +61,7 @@
       const article = el("article");
       article.className = "ai-rule-card";
       article.append(el("h3", rule.id), el("p", `${labels[governance.status] || "未知状态（操作禁用）"} · 治理版本 ${governance.version ?? 0}`));
+      if (governance.status === "stale") article.append(el("p", `当前规则来源已变化。历史状态：${labels[governance.storedStatus] || "未记录"}；历史批准不适用于当前来源，必须重新登记并独立复核。`));
       article.append(el("p", `来源引用：${card.sourceRef || "未登记"} · 规则版本：${card.ruleVersion || "未登记"} · 风险：${card.riskLevel || "待评估"}`));
       article.append(el("p", `来源摘要：${card.sourceDigest || "未登记"}`), el("p", `证据引用：${card.evidenceRef || "未登记"} · 摘要：${card.evidenceDigest || "未登记"}`));
       article.append(el("p", `送审人：${governance.submittedBy || "未送审"} · 复核人：${governance.reviewedBy || "未复核"} · 生产未就绪`));
