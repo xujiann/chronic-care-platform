@@ -29,6 +29,15 @@ test("clinical resolver rejects ambiguous names and accepts a unique trusted dir
   assert.equal(resolveClinicalOrganizationCode(data, { institution: "示范机构一" }), "");
 });
 
+test("name resolution cannot bypass duplicate organization code rejection", () => {
+  const data = fixture();
+  data.authOrganizations.push({ orgCode: "MR1", name: "示范机构一" });
+  assert.equal(resolveClinicalOrganizationCode(data, { institution: "示范机构一" }), "");
+  assert.equal(resolveClinicalOrganizationCode(data, { sourceInstitution: "示范机构一" }), "");
+  data.authOrganizations[2].name = "另一目录名称";
+  assert.equal(resolveClinicalOrganizationCode(data, { institution: "示范机构一" }), "");
+});
+
 test("historical medical resource IDs resolve only to an existing unique directory code", () => {
   const data = fixture();
   const original = structuredClone(data);

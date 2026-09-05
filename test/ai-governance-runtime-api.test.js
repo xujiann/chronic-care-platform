@@ -60,6 +60,30 @@ test("real governance HTTP commands persist, replay, isolate roles and require i
   assert.equal((await command(institution, "register", 0, "forbidden-register", card)).status, 403);
   const registered = await command(author, "register", 0, "register-001", card);
   assert.equal(registered.status, 200, JSON.stringify(registered.body));
+  const clinicalCollections = ["phase2ClinicalAssistRules", "phase2ClinicalAssistAlerts", "phase2ClinicalAssistReceipts", "phase2ClinicalAssistPluginContracts"];
+  for (const actor of [author, institution]) {
+    const state = await request(base, "/api/state", actor);
+    assert.equal(state.status, 200);
+    for (const collection of clinicalCollections) assert.equal(Object.hasOwn(state.body, collection), false, `${collection} must not expose internal clinical or governance metadata`);
+  }
+  const forgedRules = [{ id: rule.id, governance: { version: 999, status: "approved", card } }];
+  const rawWrite = await request(base, "/api/state", author, { method: "PUT", body: JSON.stringify({ phase2ClinicalAssistRules: forgedRules }) });
+  assert.equal(rawWrite.status, 409, JSON.stringify(rawWrite.body));
+  assert.equal(rawWrite.body.code, "CDSS_SERVER_MANAGED_COLLECTION_CONFLICT");
+  const collectionWrite = await request(base, "/api/state-collections/phase2ClinicalAssistRules", author, { method: "PUT", body: JSON.stringify({ items: forgedRules }) });
+  assert.equal(collectionWrite.status, 403, JSON.stringify(collectionWrite.body));
+  assert.equal(collectionWrite.body.code, "CDSS_SERVER_MANAGED_COLLECTION_WRITE_DENIED");
+  const legacyConfigPath = `/api/phase2/clinical-assist/rules/${encodeURIComponent(rule.id)}/config`;
+  const legacyConfig = { method: "POST", body: JSON.stringify({ configStatus: "active", severity: "high" }) };
+  const governedConfigWrite = await request(base, legacyConfigPath, author, legacyConfig);
+  assert.equal(governedConfigWrite.status, 409, JSON.stringify(governedConfigWrite.body));
+  assert.equal(governedConfigWrite.body.code, "CDSS_GOVERNED_RULE_REQUIRES_WORKFLOW");
+  assert.equal((await request(base, legacyConfigPath, institution, legacyConfig)).status, 403);
+  const afterDeniedWrites = await request(base, "/api/ai-governance/center", author);
+  const retainedRule = afterDeniedWrites.body.rules.find((item) => item.id === rule.id);
+  assert.equal(retainedRule.governance.version, 1);
+  assert.equal(retainedRule.governance.status, "draft");
+  assert.equal(retainedRule.governance.sourceDigest, rule.governance.sourceDigest);
   const replay = await command(author, "register", 0, "register-001", card);
   assert.equal(replay.status, 200);
   assert.equal(replay.body.idempotentReplay, true);
