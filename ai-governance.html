@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>人工智能与临床规则治理</title>
+    <link rel="stylesheet" href="./portal.css" />
+    <link rel="stylesheet" href="./governance-workbench.css" />
+    <link rel="stylesheet" href="./ai-governance.css" />
+    <script src="./access-control-policy.js"></script>
+    <script src="./browser-safe-url.js"></script>
+    <script src="./auth.js"></script>
+    <script src="./page-auth-bootstrap.js" data-roles="commission"></script>
+  </head>
+  <body>
+    <main class="portal-shell governance-page ai-governance-page">
+      <header class="portal-header"><div><span>规则登记 · 独立复核 · 版本追溯</span><h1>人工智能与临床规则治理</h1><p>管理现有临床辅助规则的受控来源、证据与审批状态。登记和审批不代表临床有效性验证，也不会自动执行诊断、处方或医嘱。</p></div></header>
+      <section class="panel" aria-labelledby="ai-boundary-title"><h2 id="ai-boundary-title">生产保持 NO-GO</h2><p>生产未就绪（productionReady: false）。真实模型验证、机构联调、独立安全评估和签名现场证据仍待完成。本工作台不展示患者数据，不执行模型推理。</p><p>临床使用入口：<a href="./doctor.html#doctor-clinical-assist">医生工作站临床辅助</a>（需要具有机构范围的医生账号）。</p></section>
+      <section id="ai-source-banner" class="work-source-banner" data-tone="warning" role="status" aria-live="polite"><div><strong id="ai-source-title">正在读取治理状态</strong><p id="ai-source-detail">校验治理账号权限。</p></div><button id="ai-refresh" class="secondary-work-button" type="button">刷新 / 重试</button></section>
+      <section id="ai-summary" class="work-metric-grid" aria-label="规则治理指标"></section>
+      <section class="panel" aria-labelledby="ai-rules-title"><h2 id="ai-rules-title">规则治理目录</h2><p>来源或规则内容变更后需要重新登记。独立审批人不得是本次登记人或送审人；最终权限和状态以服务端核验为准。</p><div id="ai-rules" class="ai-rule-list"></div></section>
+      <section id="ai-command-panel" class="panel" hidden aria-labelledby="ai-command-title">
+        <h2 id="ai-command-title">规则治理操作</h2><p id="ai-selected-rule"></p>
+        <form id="ai-command-form">
+          <label>操作<select id="ai-action" required></select></label>
+          <fieldset id="ai-card-fields"><legend>受控元数据</legend><p>仅填写受控引用、版本和 SHA-256 摘要，不填写患者原文、地址、凭据或密钥。所有引用仅作为文本展示。</p>
+            <label>来源引用<input id="ai-source-ref" name="sourceRef" maxlength="160" required /></label>
+            <label>当前规则来源 SHA-256（服务端计算）<input id="ai-source-digest" name="sourceDigest" pattern="[a-fA-F0-9]{64}" minlength="64" maxlength="64" readonly required /></label>
+            <label>规则版本<input id="ai-rule-version" name="ruleVersion" maxlength="80" required /></label>
+            <label>证据引用<input id="ai-evidence-ref" name="evidenceRef" maxlength="160" required /></label>
+            <label>证据 SHA-256<input id="ai-evidence-digest" name="evidenceDigest" pattern="[a-fA-F0-9]{64}" minlength="64" maxlength="64" required /></label>
+            <label>风险等级<select id="ai-risk-level" name="riskLevel"><option value="low">低</option><option value="medium">中</option><option value="high">高</option></select></label>
+          </fieldset>
+          <p>停用立即撤销治理批准；停用或拒绝后，仅存在历史批准记录时可以回滚。回滚返回待复核草稿，不恢复生产资格。</p>
+          <button id="ai-submit" class="primary-work-button" type="submit">提交治理操作</button>
+        </form>
+      </section>
+    </main>
+    <script src="./shared.js"></script>
+    <script src="./ai-governance-ui.js"></script>
+  </body>
+</html>

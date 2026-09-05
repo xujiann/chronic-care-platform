@@ -63,6 +63,7 @@
     "unified-work-center.html": entry("统一待办与消息", ["commission", "institution", "insurance", "county"], { group: "监管治理" }),
     "platform.html": entry("全民健康平台", ["commission"], { group: "平台治理", accountTypes: manager }),
     "account-lifecycle.html": entry("账号生命周期", ["commission"], { group: "平台治理", accountTypes: manager }),
+    "ai-governance.html": entry("人工智能与临床规则治理", ["commission"], { group: "平台治理", parent: "platform.html" }),
     "operations.html": entry("运行监测", ["commission"], { group: "平台治理", accountTypes: manager }),
     "operations-about.html": entry("运行说明", ["commission"], { nav: false, accountTypes: manager }),
     "public-health.html": entry("公共卫生", ["commission"], { group: "公共卫生", accountTypes: manager, capabilities: ["publicHealth"] }),
