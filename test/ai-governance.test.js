@@ -33,7 +33,7 @@ test("center omits clinical data and refuses unauthorized or missing actors", ()
   assert.equal(result.summary.unregistered, 1);
   assert.equal(JSON.stringify(result).includes("private"), false);
   assert.equal(JSON.stringify(result).includes("threshold"), false);
-  for (const actor of [null, { role: "citizen", id: "x" }, { role: "commission" }]) {
+  for (const actor of [null, { role: "citizen", id: "x" }, { role: "commission" }, { role: "commission", id: "blood-quality", accountType: "blood_quality" }, { role: "commission", id: "specialist", accountType: "specialist" }]) {
     assert.throws(() => buildAiGovernanceCenter(seed(), actor));
     assert.throws(() => run(seed(), "register", 0, actor));
   }

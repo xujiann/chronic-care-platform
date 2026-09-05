@@ -9,6 +9,7 @@ class AiGovernanceError extends Error {
 function fail(code, statusCode = 400) { throw new AiGovernanceError(code, code, statusCode); }
 function assertActor(user) {
   if (!user || user.role !== "commission") fail("AI_GOVERNANCE_FORBIDDEN", 403);
+  if (user.accountType !== undefined && user.accountType !== "manager") fail("AI_GOVERNANCE_FORBIDDEN", 403);
   const actor = user.id || user.username;
   if (typeof actor !== "string" || !actor.trim()) fail("AI_GOVERNANCE_ACTOR_REQUIRED", 403);
   return actor;
