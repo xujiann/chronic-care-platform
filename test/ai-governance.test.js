@@ -140,3 +140,9 @@ test("HTTP rejects malformed resource encoding and invalid appended audit", asyn
     assert.equal(data.phase2ClinicalAssistRules[0].governance, undefined);
   }
 });
+test("production API catalog matches the two authorized AI governance endpoints", () => {
+  const { buildProductionApiCatalog } = require("../scripts/production-api-catalog");
+  const entries = buildProductionApiCatalog().entries.filter((entry) => entry.key.includes("/api/ai-governance/"));
+  assert.deepEqual(entries.map((entry) => entry.key).sort(), ["GET /api/ai-governance/center", "POST /api/ai-governance/rules/:id/actions"]);
+  for (const entry of entries) { assert.deepEqual(entry.authorization.roles, ["commission"]); assert.equal(entry.authentication.required, true); }
+});
