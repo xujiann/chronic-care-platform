@@ -288,7 +288,11 @@
         "entrypoint": "node scripts/clinical-subdomain-test-gate.js --subdomain quality-safety",
         "status": "local-independent-test-ready",
         "productionReady": false,
-        "testFiles": ["test/quality-safety-dashboard-query.test.js"]
+        "testFiles": [
+          "test/quality-safety-dashboard-query.test.js",
+          "test/quality-safety-ai-cdss-governance-center.test.js",
+          "test/quality-safety-ai-cdss-governance-route.test.js"
+        ]
       },
       "writeBoundary": "quality-owned-only",
       "registeredCollections": [
@@ -308,6 +312,14 @@
       ],
       "externalReadCollections": [],
       "implementedUseCases": [
+        {
+          "id": "clinical-ai-cdss-governance-center.v1",
+          "source": "src/clinical-specialties/quality-safety/ai-cdss-governance-center.js",
+          "route": "GET /api/quality-safety/ai-cdss/center",
+          "ports": ["readDatabase", "appendSecurityEvent"],
+          "contracts": [],
+          "sideEffects": ["security-event-audit-persisted-by-http-adapter"]
+        },
         {
           "id": "quality-safety-dashboard-query.v1",
           "source": "src/clinical-specialties/quality-safety/dashboard-query.js",

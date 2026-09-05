@@ -2,6 +2,23 @@
   "schemaVersion": "procurement-requirement-trace-catalog-v1",
   "capabilities": [
     {
+      "capabilityId": "J-CLIN-CDSS",
+      "pages": [
+        "clinical-ai-cdss.html"
+      ],
+      "interfaces": [
+        "GET /api/quality-safety/ai-cdss/center",
+        "GET /api/phase2/clinical-assist",
+        "POST /api/phase2/clinical-assist/alerts/:id/receipt",
+        "POST /api/phase2/clinical-assist/rules/:id/config"
+      ],
+      "tests": [
+        "test/quality-safety-ai-cdss-governance-center.test.js",
+        "test/quality-safety-ai-cdss-governance-route.test.js",
+        "test/clinical-ai-cdss-ui.test.js"
+      ]
+    },
+    {
       "capabilityId": "H-SUP-SUBJECT",
       "pages": ["public-health-supervision.html"],
       "interfaces": [

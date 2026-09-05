@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>临床决策支持安全治理中心</title>
+    <link rel="stylesheet" href="./portal.css" />
+    <link rel="stylesheet" href="./governance-workbench.css" />
+    <link rel="stylesheet" href="./clinical-ai-cdss.css" />
+    <script src="./access-control-policy.js"></script>
+    <script src="./browser-safe-url.js"></script>
+    <script src="./auth.js"></script>
+    <script src="./page-auth-bootstrap.js" data-roles="commission,institution"></script>
+  </head>
+  <body>
+    <main class="portal-shell governance-page clinical-ai-page">
+      <header class="portal-header clinical-ai-hero">
+        <div>
+          <span>规则/模型卡 · 证据追踪 · 人工复核 · 漂移与事件治理</span>
+          <h1>临床决策支持安全治理中心</h1>
+          <p>统一查看临床提醒的适用边界、证据绑定、医生复核和安全风险。所有输出仅作辅助建议，不自动形成诊断、医嘱、处方或生产放行结论。</p>
+        </div>
+        <div class="clinical-ai-decision" aria-label="生产决策">
+          <span>生产决策</span>
+          <strong id="clinical-ai-decision">NO-GO</strong>
+          <small>仓库验证不替代临床与现场验收</small>
+        </div>
+      </header>
+
+      <section id="clinical-ai-source-banner" class="work-source-banner" data-tone="warning" role="status" aria-live="polite">
+        <div>
+          <strong id="clinical-ai-source-title">正在读取授权治理数据</strong>
+          <p id="clinical-ai-source-detail">正在校验账号、机构、医生与临床详情范围。</p>
+        </div>
+        <div class="work-source-actions">
+          <a class="secondary-work-button" href="./doctor.html">进入医生工作站</a>
+          <button id="clinical-ai-refresh" class="secondary-work-button" type="button">刷新</button>
+        </div>
+      </section>
+
+      <section id="clinical-ai-metrics" class="work-metric-grid" aria-label="临床决策支持治理指标"></section>
+
+      <section class="panel" aria-labelledby="clinical-ai-rules-title">
+        <div class="panel-title">
+          <div><span class="clinical-ai-kicker">受控规则资产</span><h2 id="clinical-ai-rules-title">规则与模型卡</h2></div>
+          <span id="clinical-ai-rule-count">0 项</span>
+        </div>
+        <div id="clinical-ai-rules" class="clinical-ai-rule-grid"></div>
+      </section>
+
+      <section class="panel" aria-labelledby="clinical-ai-suggestions-title">
+        <div class="panel-title">
+          <div><span class="clinical-ai-kicker">人机协同闭环</span><h2 id="clinical-ai-suggestions-title">临床建议与人工复核状态</h2></div>
+          <span id="clinical-ai-suggestion-count">0 条</span>
+        </div>
+        <div class="work-filter-grid clinical-ai-filters">
+          <label>搜索<input id="clinical-ai-search" type="search" placeholder="建议、规则、居民引用或执业人员引用" /></label>
+          <label>风险等级<select id="clinical-ai-risk-filter"><option value="all">全部风险</option><option value="high">高风险</option><option value="medium">中风险</option><option value="low">低风险</option></select></label>
+          <label>复核状态<select id="clinical-ai-review-filter"><option value="all">全部状态</option><option value="pending-human-review">待人工复核</option><option value="reviewed">已复核</option></select></label>
+        </div>
+        <div class="table-wrap">
+          <table class="work-table clinical-ai-table">
+            <thead><tr><th scope="col">建议与规则</th><th scope="col">授权范围</th><th scope="col">证据</th><th scope="col">人工复核</th><th scope="col">安全边界</th></tr></thead>
+            <tbody id="clinical-ai-suggestions"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <div class="clinical-ai-two-column">
+        <section class="panel" aria-labelledby="clinical-ai-reviews-title">
+          <div class="panel-title"><h2 id="clinical-ai-reviews-title">人工复核台账</h2><span id="clinical-ai-review-count">0 条</span></div>
+          <div id="clinical-ai-reviews" class="clinical-ai-card-list"></div>
+        </section>
+        <section class="panel" aria-labelledby="clinical-ai-signals-title">
+          <div class="panel-title"><h2 id="clinical-ai-signals-title">漂移与安全信号</h2><span id="clinical-ai-signal-count">0 项</span></div>
+          <div id="clinical-ai-signals" class="clinical-ai-card-list"></div>
+          <div class="clinical-ai-coverage"><span>人工复核覆盖率</span><strong id="clinical-ai-review-coverage">0%</strong></div>
+        </section>
+      </div>
+
+      <section class="panel" aria-labelledby="clinical-ai-contracts-title">
+        <div class="panel-title"><h2 id="clinical-ai-contracts-title">集成合同与上线证据</h2><span id="clinical-ai-contract-count">0 项</span></div>
+        <div id="clinical-ai-contracts" class="clinical-ai-contract-grid"></div>
+      </section>
+
+      <section class="panel clinical-ai-boundary-panel" aria-labelledby="clinical-ai-boundaries-title">
+        <div class="panel-title"><h2 id="clinical-ai-boundaries-title">能力边界与阻断项</h2><span>生产保持 NO-GO</span></div>
+        <div class="clinical-ai-boundary-grid">
+          <div><h3>安全使用边界</h3><ul id="clinical-ai-boundaries"></ul></div>
+          <div><h3>上线阻断项</h3><ul id="clinical-ai-blockers"></ul></div>
+        </div>
+        <p id="clinical-ai-upstream" class="clinical-ai-upstream"></p>
+      </section>
+    </main>
+
+    <script src="./shared.js"></script>
+    <script src="./clinical-ai-cdss.js"></script>
+  </body>
+</html>

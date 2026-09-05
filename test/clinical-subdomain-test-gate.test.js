@@ -25,7 +25,7 @@ test("all five clinical subdomains expose deterministic local test gates", () =>
     ok: true,
     errors: [],
     subdomainCount: 5,
-    subdomainTestFileCount: 13,
+    subdomainTestFileCount: 15,
     sharedTestFileCount: 1,
     ci: {
       scriptName: "clinical-subdomains:test",
@@ -67,7 +67,7 @@ test("test gate inventory has one owner and all-mode includes shared governance 
   const allFiles = testFilesFor(registry, "all");
   const sharedFile = "test/clinical-subdomain-governance.test.js";
 
-  assert.equal(allFiles.length, 14);
+  assert.equal(allFiles.length, 16);
   assert.equal(allFiles.filter((file) => file === sharedFile).length, 1);
   assert.equal(new Set(allFiles).size, allFiles.length);
   registry.subdomains.forEach((subdomain) => {
@@ -270,7 +270,9 @@ test("runner propagates Node test failure and never treats a failed subdomain as
   assert.deepEqual(invocation.args.slice(0, 2), ["--test", "--test-concurrency=1"]);
   assert.deepEqual(invocation.args.slice(2), [
     "test/clinical-subdomain-governance.test.js",
-    "test/quality-safety-dashboard-query.test.js"
+    "test/quality-safety-dashboard-query.test.js",
+    "test/quality-safety-ai-cdss-governance-center.test.js",
+    "test/quality-safety-ai-cdss-governance-route.test.js"
   ]);
   assert.equal(invocation.options.cwd, ROOT);
 });

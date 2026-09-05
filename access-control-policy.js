@@ -74,6 +74,7 @@
     "maternal-child-about.html": entry("妇幼健康说明", ["commission", "institution", "citizen"], { nav: false, accountTypes: ["manager", "doctor", "nurse", "resident", "guardian"], capabilities: ["maternalChild"] }),
     "quality-safety.html": entry("质量安全", ["commission", "institution", "county"], { group: "监管治理", accountTypes: ["manager", "quality_officer"], capabilities: ["qualitySafety"] }),
     "quality-safety-about.html": entry("质量安全说明", ["commission", "institution", "county"], { nav: false, accountTypes: ["manager", "quality_officer"] }),
+    "clinical-ai-cdss.html": entry("临床决策支持安全", ["commission", "institution"], { group: "监管治理", parent: "quality-safety.html", accountTypes: ["manager", "doctor", "quality_officer"] }),
     "digital-hospital-standards.html": entry("数智医院标准", ["commission"], { group: "机构发展", accountTypes: manager }),
     "digital-hospital-self-assessment.html": entry("医院自评", ["commission", "institution"], { group: "机构发展", parent: "digital-hospital-standards.html", accountTypes: manager }),
     "digital-hospital-evaluation.html": entry("评价预评", ["commission", "institution"], { group: "机构发展", parent: "digital-hospital-standards.html", accountTypes: manager }),

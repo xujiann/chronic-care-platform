@@ -1,5 +1,11 @@
 # CURRENT ARCHITECTURE — 主线现状地图
 
+## 2026-09-05 T06 临床决策支持安全治理
+
+- `src/clinical-specialties/quality-safety/ai-cdss-governance-center.js` 只读取既有 `phase2ClinicalAssistRules/Alerts/Receipts/PluginContracts`，形成规则/模型卡、证据绑定、人工复核、漂移与事件信号的瞬时治理投影；不新增患者、模型或审计事实源。
+- `GET /api/quality-safety/ai-cdss/center` 位于 T06 既有 quality-safety route segment。主管部门仅查看跨机构治理元数据；机构医生按可信 `doctorId`、机构管理员按可信机构代码/名称精确收敛；机构缺少代码时失败关闭。
+- `clinical-ai-cdss.html` 进入分级左侧导航并只用 DOM/text 渲染。`J-CLIN-CDSS` 形成仓库证据，T01 所属 `L-GOV-AI` 仍为 declared-only；自动诊断、医嘱、处方和生产激活均禁用，生产固定 `NO-GO`。当前静态发布为 55 个入口、182 个显式资产，生产 API 为 632 项且写入口仍为 362 个。
+
 ## 2026-09-04 T08 区域医疗文书
 
 - `src/platform/integration/regional-clinical-document-service.js` 只读取既有 `integrationGatewayEvents` 与 `secureAttachments`，按 commission、institution 角色与可信机构代码生成最小投影；机构缺少组织绑定时失败关闭。
@@ -10,7 +16,7 @@
 
 - `src/insurance-payment/medical-payment-one-stop-service.js` 只读取既有 `integrationGatewayEvents`、`onlinePaymentRefunds` 和 `financialReconciliationRuns`，按 commission、institution、insurance 角色与可信机构代码生成最小投影；机构缺少组织绑定时失败关闭。
 - `GET /api/medical-payments/center` 位于 T07 既有 route segment，不改变路由顺序或组合根；`medical-payment.html` 复用现有支付发起、退款申请/双复核和日终对账入口，失败时不修改浏览器状态，静态发布只展示禁写的中性结构示例。
-- T07 与 T08 新页面均纳入分级左侧导航；全平台现为 54 个入口和 179 个显式发布资产，并保持两个页面自身 Inventory v2 P0/P1 finding 为 0。能力注册表与招标追踪已覆盖统一订单、支付、退费和标准文档集成，但真实 provider、正式回执、生产数据库和现场验收仍使 `productionReady=false`。
+- T07 与 T08 新页面均纳入分级左侧导航，并保持两个页面自身 Inventory v2 P0/P1 finding 为 0。能力注册表与招标追踪已覆盖统一订单、支付、退费和标准文档集成，但真实 provider、正式回执、生产数据库和现场验收仍使 `productionReady=false`。
 
 ## 2026-09-02 招标需求治理 v2
 
@@ -39,7 +45,7 @@
 ## 2026-08-31 当前架构事实机器对账
 
 - `scripts/documentation-fact-drift.js` 现以生产 API 目录、首批生产范围、SQLite migration、仓库 Markdown/PDF 闭集和 Accepted ADR 注册表为机器权威，对 ROADMAP、ARCHITECTURE、六张架构地图和 ADR 索引共 9 份当前文档失败关闭。
-- 当前对账值为 SQLite head v17/38 张非内部表、生产 API 631 项/362 个写入口/325 个行为证明缺口/327 个总复核项、首批范围 `FROZEN-NO-GO` 且范围内 API/集合复核与仓库迁移计划缺口均为 0、Markdown 275 份（206 current、68 snapshot、1 superseded）。
+- 当前对账值为 SQLite head v17/38 张非内部表、生产 API 632 项/362 个写入口/325 个行为证明缺口/327 个总复核项、首批范围 `FROZEN-NO-GO` 且范围内 API/集合复核与仓库迁移计划缺口均为 0、Markdown 275 份（206 current、68 snapshot、1 superseded）。
 - 该验证仅在内存 SQLite 中重放既有 migration 并读取仓库权威；不写 `data/db.json`、运行时 SQLite、生产证据、生成报告或归档产物，不改变任何运行时行为。
 
 ## 2026-08-31 首发数据迁移计划闭集
