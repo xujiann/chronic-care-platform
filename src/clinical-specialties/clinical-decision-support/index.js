@@ -39,7 +39,21 @@ function createClinicalDecisionSupport(ports = {}) {
     if (user.accountType === "doctor" && !user.doctorId) return false;
     return !user.doctorId || (typeof user.doctorId === "string" && alert.doctorId === user.doctorId);
   }
-  function projectAlert(alert, user) { return pick(alert, user.role === "commission" ? MANAGEMENT_ALERT_FIELDS : ALERT_FIELDS); }
+  function policyFor(data, alert) {
+    const rule = rows(data, "phase2ClinicalAssistRules", "rules").find((row) => row.id === alert.ruleId);
+    if (!rule) return { status: "missing", decisionAvailable: false };
+    if (!rule.governance) return { status: "legacy", decisionAvailable: true };
+    try {
+      const policy = typeof ports.rulePolicy === "function" ? ports.rulePolicy(rule) : null;
+      return { status: typeof policy?.status === "string" ? policy.status : "unverified", decisionAvailable: policy?.decisionAvailable === true };
+    } catch { return { status: "unverified", decisionAvailable: false }; }
+  }
+  function projectAlert(alert, user, data) {
+    const policy = policyFor(data, alert);
+    const projected = pick(alert, user.role === "commission" ? MANAGEMENT_ALERT_FIELDS : ALERT_FIELDS);
+    if (!policy.decisionAvailable && user.role !== "commission") projected.recommendation = "";
+    return { ...projected, governanceStatus: policy.status, decisionAvailable: policy.decisionAvailable };
+  }
   function projectReceipt(receipt, user) { return pick(receipt, user.role === "commission" ? MANAGEMENT_RECEIPT_FIELDS : RECEIPT_FIELDS); }
   function buildOverview(data, user) {
     requireActor(user);
@@ -70,7 +84,7 @@ function createClinicalDecisionSupport(ports = {}) {
       { id: "phase2ClinicalAssist:supervisionStats", passed: stats.length > 0, detail: `${stats.length} categories` },
       { id: "phase2ClinicalAssist:onsiteBoundary", passed: true, detail: "2 external evidence requirements" }
     ].map((row) => ({ ...row, passed: Boolean(row.passed) }));
-    return { ok: checks.every((row) => row.passed), contractVersion: CONTRACT_VERSION, productionReady: false, generatedAt: now(), summary: { rules: rules.length, alerts: alerts.length, scopedAlerts: alerts.length, pendingAlerts: alerts.filter(pending).length, acknowledged: alerts.filter(acknowledged).length, receipts: receipts.length, pluginContracts: contracts.length, categories: categories.length, onsiteBlockers: onsiteBlockers.length }, rules, alerts: alerts.map((row) => projectAlert(row, user)), receipts: receipts.map((row) => projectReceipt(row, user)), pluginContracts: contracts, ruleConfig: rules.map((row) => ({ ruleId: row.id, category: row.category, status: row.configStatus, severity: row.severity, owner: row.owner, requiredFields: row.requiredFields || [], defaultAction: row.defaultAction })), supervisionStats: stats, onsiteBlockers, checks };
+    return { ok: checks.every((row) => row.passed), contractVersion: CONTRACT_VERSION, productionReady: false, generatedAt: now(), summary: { rules: rules.length, alerts: alerts.length, scopedAlerts: alerts.length, pendingAlerts: alerts.filter(pending).length, acknowledged: alerts.filter(acknowledged).length, receipts: receipts.length, pluginContracts: contracts.length, categories: categories.length, onsiteBlockers: onsiteBlockers.length }, rules, alerts: alerts.map((row) => projectAlert(row, user, data)), receipts: receipts.map((row) => projectReceipt(row, user)), pluginContracts: contracts, ruleConfig: rules.map((row) => ({ ruleId: row.id, category: row.category, status: row.configStatus, severity: row.severity, owner: row.owner, requiredFields: row.requiredFields || [], defaultAction: row.defaultAction })), supervisionStats: stats, onsiteBlockers, checks };
   }
   async function commitReceipt({ alertId, payload = {}, user, idempotencyKey }) {
     requireActor(user);
@@ -101,20 +115,25 @@ function createClinicalDecisionSupport(ports = {}) {
       const replay = existing.find((row) => row.commandMetadata?.binding === binding);
       if (replay) {
         if (replay.commandMetadata.fingerprint !== fingerprint) fail(409, "CDSS_IDEMPOTENCY_CONFLICT");
-        const savedIds = replay.commandMetadata.response.overview.alerts.map((row) => row.id);
-        if (!savedIds.every((id) => alerts.some((row) => row.id === id && canAccessAlert(user, row, data)))) fail(403, "CDSS_SCOPE_DENIED");
+        const saved = replay.commandMetadata.response.overview.alerts;
+        if (!saved.every((snapshot) => alerts.some((row) => {
+          if (row.id !== snapshot.id || !canAccessAlert(user, row, data)) return false;
+          const policy = policyFor(data, row);
+          return policy.status === snapshot.governanceStatus && policy.decisionAvailable === snapshot.decisionAvailable;
+        }))) fail(409, "CDSS_REPLAY_SCOPE_CHANGED");
         return structuredClone(replay.commandMetadata.response);
       }
     }
     const version = alert.version === undefined ? 0 : alert.version;
     if (!Number.isSafeInteger(version) || version < 0 || version >= Number.MAX_SAFE_INTEGER) fail(409, "CDSS_INVALID_RESOURCE_VERSION");
     if (expectedVersion !== undefined && expectedVersion !== version) fail(409, "CDSS_VERSION_CONFLICT");
+    if (!policyFor(data, alert).decisionAvailable && !DISMISSALS.has(doctorAction) && receiptStatus !== "rejected") fail(409, "CDSS_RULE_UNAVAILABLE");
     const receivedAt = now();
     const receipt = { id: key === undefined ? `p2car-${alertId}` : `p2car-${binding}`, alertId, doctorId: alert.doctorId, doctorName: alert.doctorName || user.name || "", receiptStatus, doctorAction, actionDetail, receivedAt, messageChannel, receivedBy: actorId(user), auditHash: hash(`${alertId}/${doctorAction}/${receiptStatus}/${receivedAt}`) };
     alerts[index] = { ...alert, status: DISMISSALS.has(doctorAction) || receiptStatus === "rejected" ? "dismissed-with-reason" : "acknowledged", doctorAction, messageReceiptStatus: receiptStatus, receiptId: receipt.id, lastAction: actionDetail, lastReceiptAt: receivedAt, version: version + 1 };
     data.phase2ClinicalAssistAlerts = alerts;
     data.phase2ClinicalAssistReceipts = [...existing.filter((row) => row.id !== receipt.id), receipt];
-    const result = { alert: projectAlert(alerts[index], user), receipt: projectReceipt(receipt, user), overview: buildOverview(data, user), contractVersion: CONTRACT_VERSION, productionReady: false };
+    const result = { alert: projectAlert(alerts[index], user, data), receipt: projectReceipt(receipt, user), overview: buildOverview(data, user), contractVersion: CONTRACT_VERSION, productionReady: false };
     if (key !== undefined) receipt.commandMetadata = { contractVersion: CONTRACT_VERSION, binding, fingerprint, response: structuredClone(result) };
     try {
       const events = data.securityEvents === undefined ? [] : data.securityEvents;

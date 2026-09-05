@@ -132,3 +132,56 @@ test("invalid existing audit chains fail without resealing or persistence", asyn
   assert.equal(f.calls.audits, 0);
   assert.equal(f.calls.writes, 0);
 });
+
+test("governed rules default to unavailable, suppress recommendations and reject acceptance", async () => {
+  const f = fixture();
+  f.data.phase2ClinicalAssistRules[0].governance = { status: "approved" };
+  const alert = f.service.buildOverview(f.data, doctor).alerts[0];
+  assert.equal(alert.decisionAvailable, false);
+  assert.equal(alert.governanceStatus, "unverified");
+  assert.equal(alert.recommendation, "");
+  await assert.rejects(f.command({ doctorAction: "accepted-recommendation" }), { code: "CDSS_RULE_UNAVAILABLE" });
+  const rejected = await f.command({ doctorAction: "ignored", actionDetail: "Unavailable rule reviewed by doctor" });
+  assert.equal(rejected.alert.status, "dismissed-with-reason");
+  assert.equal(rejected.alert.decisionAvailable, false);
+});
+
+test("trusted policy controls governed decisions, including suspended and drifted rules", async () => {
+  const f = fixture({ rulePolicy: (rule) => ({ status: rule.governance.status, decisionAvailable: rule.governance.status === "approved" }) });
+  for (const status of ["draft", "submitted", "rejected", "suspended", "stale"]) {
+    f.data.phase2ClinicalAssistRules[0].governance = { status };
+    assert.equal(f.service.buildOverview(f.data, doctor).alerts[0].governanceStatus, status);
+    await assert.rejects(f.command(), { code: "CDSS_RULE_UNAVAILABLE" });
+  }
+  f.data.phase2ClinicalAssistRules[0].governance = { status: "approved" };
+  const result = await f.command();
+  assert.equal(result.alert.decisionAvailable, true);
+  assert.equal(result.alert.recommendation, "SYNTHETIC RECOMMENDATION");
+  assert.equal(result.productionReady, false);
+});
+
+test("missing rules and throwing policy fail closed", async () => {
+  const f = fixture({ rulePolicy: () => { throw new Error("policy unavailable"); } });
+  f.data.phase2ClinicalAssistRules[0].governance = {};
+  await assert.rejects(f.command(), { code: "CDSS_RULE_UNAVAILABLE" });
+  f.data.phase2ClinicalAssistRules = [];
+  assert.equal(f.service.buildOverview(f.data, doctor).alerts[0].governanceStatus, "missing");
+  await assert.rejects(f.command(), { code: "CDSS_RULE_UNAVAILABLE" });
+});
+
+test("replay rejects scope changes on any saved overview row", async () => {
+  const f = fixture();
+  await f.command({ idempotencyKey: "manager-key" }, manager);
+  f.data.phase2ClinicalAssistAlerts[1].orgCode = "ORG-B";
+  await assert.rejects(f.command({ idempotencyKey: "manager-key" }, manager), { statusCode: 409, code: "CDSS_REPLAY_SCOPE_CHANGED" });
+  assert.equal(f.calls.writes, 1);
+});
+
+test("replay rejects policy changes on any saved overview row", async () => {
+  const f = fixture({ rulePolicy: (rule) => ({ status: rule.governance.status, decisionAvailable: rule.governance.status === "approved" }) });
+  await f.command({ idempotencyKey: "manager-key" }, manager);
+  f.data.phase2ClinicalAssistRules.push({ id: "rule-other", governance: { status: "suspended" } });
+  f.data.phase2ClinicalAssistAlerts[1].ruleId = "rule-other";
+  await assert.rejects(f.command({ idempotencyKey: "manager-key" }, manager), { statusCode: 409, code: "CDSS_REPLAY_SCOPE_CHANGED" });
+  assert.equal(f.calls.writes, 1);
+});
