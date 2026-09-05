@@ -6,6 +6,8 @@ async function login(page, username = "health") {
   await page.locator("input[name='password']").fill("123456");
   await page.locator("#login-form button[type='submit']").click();
   await expect(page).toHaveURL(username === "health" ? /index\.html$/ : /institution\.html$/);
+  await expect(page.locator("html")).toHaveAttribute("data-auth-resolved", "allowed");
+  await expect(page.locator("html")).toHaveAttribute("data-navigation-shell", "ready");
 }
 
 const digest = "a".repeat(64);
@@ -24,9 +26,9 @@ function json(route, payload, status = 200) {
 }
 
 test("governance navigation and mobile hostile metadata rendering remain safe", async ({ page }) => {
-  await login(page);
   const hostile = '<img src=x onerror="globalThis.aiCompromised=true">';
   await page.route("**/api/ai-governance/center", (route) => json(route, center("draft", 2, hostile)));
+  await login(page);
   await expect(page.locator(".navigation-sidebar a[data-navigation-page='ai-governance.html']")).toHaveCount(1);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/ai-governance.html");
