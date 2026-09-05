@@ -2,7 +2,7 @@
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { buildAiGovernanceCenter, executeAiGovernanceAction, sourceDigest } = require("../src/identity-security/ai-governance");
+const { buildAiGovernanceCenter, evaluateAiRulePolicy, executeAiGovernanceAction, sourceDigest } = require("../src/identity-security/ai-governance");
 const { createRouteSegment } = require("../src/http/routes/identity-security/ai-governance");
 const { verifyAuditTrail, auditHashFor } = require("../src/identity-security/audit-chain");
 const author = { id: "author", role: "commission" };
@@ -117,4 +117,26 @@ test("actor organization change cannot replay another organization context recei
   const data = seed(); const p = payload(data);
   const result = executeAiGovernanceAction(data, "rule-1", p, { ...author, orgCode: "org-a" });
   assert.throws(() => executeAiGovernanceAction(result.state, "rule-1", p, { ...author, orgCode: "org-b" }), { code: "AI_GOVERNANCE_KEY_CONFLICT" });
+});
+test("read policy preserves legacy compatibility and gates governed decisions", () => {
+  let data = seed();
+  assert.deepEqual(evaluateAiRulePolicy(data.phase2ClinicalAssistRules[0]), { status: "unregistered", decisionAvailable: true, productionReady: false });
+  data = run(data, "register", 0).state;
+  assert.equal(evaluateAiRulePolicy(data.phase2ClinicalAssistRules[0]).decisionAvailable, false);
+  data = run(data, "submit", 1).state;
+  assert.equal(evaluateAiRulePolicy(data.phase2ClinicalAssistRules[0]).decisionAvailable, false);
+  data = run(data, "approve", 2, reviewer).state;
+  assert.equal(evaluateAiRulePolicy(data.phase2ClinicalAssistRules[0]).decisionAvailable, true);
+  data.phase2ClinicalAssistRules[0].threshold = 5;
+  assert.deepEqual(evaluateAiRulePolicy(data.phase2ClinicalAssistRules[0]), { status: "stale", decisionAvailable: false, productionReady: false });
+});
+test("HTTP rejects malformed resource encoding and invalid appended audit", async () => {
+  for (const malformed of [true, false]) {
+    const data = seed(); let response; let writes = 0; let reads = 0;
+    const segment = createRouteSegment({ verifyAuditTrail, collectJson: async () => payload(data), readDatabase: () => { reads++; return data; }, writeDatabase: () => { writes++; }, requireApiRole: () => author, sendJson: (_res, status, body) => { response = { status, body }; }, prependAuditTrailEntry: (_events, event) => [event], enforceSensitiveMutation: () => true });
+    await segment.handle({ method: "POST", headers: {} }, {}, new URL(`http://local/api/ai-governance/rules/${malformed ? "%XX" : "rule-1"}/actions`));
+    assert.equal(response.status, malformed ? 400 : 409); assert.equal(writes, 0);
+    if (malformed) assert.equal(reads, 0);
+    assert.equal(data.phase2ClinicalAssistRules[0].governance, undefined);
+  }
 });

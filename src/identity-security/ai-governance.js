@@ -36,6 +36,11 @@ function sourceIntegrity(rule) {
   if (!rule.governance?.card) return "unregistered";
   return rule.governance.card.sourceDigest === sourceDigest(rule) ? "matched" : "drifted";
 }
+function evaluateAiRulePolicy(rule) {
+  const integrity = sourceIntegrity(rule);
+  const status = integrity === "drifted" ? "stale" : rule.governance?.status || "unregistered";
+  return { status, decisionAvailable: !rule.governance || (status === "approved" && integrity === "matched"), productionReady: false };
+}
 function projectRule(rule) {
   const g = rule.governance || {};
   const integrity = sourceIntegrity(rule);
@@ -109,4 +114,4 @@ function executeAiGovernanceAction(data, id, payload, user, options = {}) {
   return { state, response, replayed: false, audit: { actor, role: user.role, action: `ai-governance:${payload.action}`, target: id, result: "allowed", detail: `version:${next.version};source:${sourceDigest(rule)}` } };
 }
 
-module.exports = { CONTRACT_VERSION, MAX_COMMANDS, AiGovernanceError, assertActor, buildAiGovernanceCenter, executeAiGovernanceAction, sourceDigest };
+module.exports = { CONTRACT_VERSION, MAX_COMMANDS, AiGovernanceError, assertActor, buildAiGovernanceCenter, evaluateAiRulePolicy, executeAiGovernanceAction, sourceDigest };

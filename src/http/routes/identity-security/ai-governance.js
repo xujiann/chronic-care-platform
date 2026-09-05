@@ -21,13 +21,16 @@ function createRouteSegment(ports) {
       if (isCenter) { sendJson(res, 200, buildAiGovernanceCenter(readDatabase(), user)); return true; }
       if (typeof enforceSensitiveMutation !== "function") throw new AiGovernanceError("AI_GOVERNANCE_GUARD_UNAVAILABLE", "mutation guard unavailable", 503);
       if (!enforceSensitiveMutation(req, res, { stepUp: true })) return true;
-      const id = decodeURIComponent(match[1]);
+      let id;
+      try { id = decodeURIComponent(match[1]); }
+      catch { throw new AiGovernanceError("AI_GOVERNANCE_RESOURCE_INVALID", "resource encoding invalid", 400); }
       const payload = await collectJson(req);
-      const result = await withLock("ai-governance:rules", async () => {
+      const result = await withLock("clinical-assist:state", async () => {
         const executed = executeAiGovernanceAction(readDatabase(), id, payload, user, { idempotencyKey: req.headers?.["idempotency-key"] });
         if (!executed.replayed) {
           if (verifyAuditTrail(executed.state.securityEvents).passed !== true) throw new AiGovernanceError("AI_GOVERNANCE_AUDIT_INVALID", "existing audit trail verification failed", 409);
           executed.state.securityEvents = prependAuditTrailEntry(executed.state.securityEvents || [], { id: randomUUID(), at: new Date().toISOString(), ...executed.audit });
+          if (verifyAuditTrail(executed.state.securityEvents).passed !== true) throw new AiGovernanceError("AI_GOVERNANCE_AUDIT_INVALID", "updated audit trail verification failed", 409);
           await writeDatabase(executed.state);
         }
         return executed;
