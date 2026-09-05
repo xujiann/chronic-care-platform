@@ -1,0 +1,12 @@
+.ai-governance-page { max-width: 1280px; }
+.ai-governance-page .panel { margin-top: 20px; padding: 22px; }
+.ai-governance-page p { line-height: 1.7; }
+.ai-rule-list { display: grid; gap: 16px; }
+.ai-rule-card { border: 1px solid #cbd5e1; border-radius: 12px; padding: 16px; min-width: 0; }
+.ai-rule-card p, .ai-rule-card h3, #ai-selected-rule { overflow-wrap: anywhere; }
+#ai-command-form { display: grid; gap: 14px; }
+#ai-command-form label { display: grid; gap: 6px; min-width: 0; }
+#ai-command-form input, #ai-command-form select { box-sizing: border-box; width: 100%; min-width: 0; padding: 10px; border: 1px solid #94a3b8; border-radius: 6px; font: inherit; }
+#ai-card-fields { display: grid; gap: 14px; min-width: 0; }
+#ai-card-fields[hidden], #ai-command-panel[hidden] { display: none; }
+@media (max-width: 600px) { .ai-governance-page .panel { padding: 14px; } .ai-governance-page .work-source-banner { flex-wrap: wrap; } }

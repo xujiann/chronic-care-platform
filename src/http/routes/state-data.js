@@ -1,6 +1,7 @@
 "use strict";
 
 const { isDeepStrictEqual } = require("node:util");
+const { withLock } = require("./identity-security/account-lifecycle");
 
 const {
   LEGACY_FULL_STATE_CONTRACT,
@@ -27,6 +28,17 @@ const AUTH_USER_READ_SECRET_FIELDS = Object.freeze([
   "password",
   "passwordHash"
 ]);
+
+const SERVER_MANAGED_CLINICAL_COLLECTIONS = Object.freeze([
+  "phase2ClinicalAssistRules", "phase2ClinicalAssistAlerts",
+  "phase2ClinicalAssistReceipts", "phase2ClinicalAssistPluginContracts"
+]);
+
+function projectClinicalForStateRead(state) {
+  const projected = { ...state };
+  SERVER_MANAGED_CLINICAL_COLLECTIONS.forEach((collection) => delete projected[collection]);
+  return projected;
+}
 
 function projectAuthUsersForStateRead(state = {}) {
   if (!Array.isArray(state.authUsers)) return state;
@@ -99,7 +111,7 @@ function createRouteSegments(runtime, options = {}) {
     if (req.method === "GET" && url.pathname === "/api/state") {
         const user = requireApiRole(req, res, ["commission", "institution", "insurance", "citizen", "county"], "/api/state");
         if (!user) return true;
-        const scopedState = projectProcurementForStateRead(scopeStateForUser(readDatabase(), user), user);
+        const scopedState = projectClinicalForStateRead(projectProcurementForStateRead(scopeStateForUser(readDatabase(), user), user));
         sendJson(res, 200, redactSensitiveResponse(projectAuthUsersForStateRead(scopedState), user));
         return true;
       }
@@ -114,7 +126,14 @@ function createRouteSegments(runtime, options = {}) {
         const user = requireApiRole(req, res, ["commission"], "/api/state");
         if (!user) return true;
         const payload = await collectJson(req);
+        return withLock("clinical-assist:state", async () => {
         const currentData = readDatabase();
+        const clinicalConflict = SERVER_MANAGED_CLINICAL_COLLECTIONS.find((collection) =>
+          Object.hasOwn(payload, collection) && !isDeepStrictEqual(payload[collection], currentData[collection]));
+        if (clinicalConflict) {
+          sendJson(res, 409, { code: "CDSS_SERVER_MANAGED_COLLECTION_CONFLICT", collection: clinicalConflict, message: "临床辅助集合必须通过专用命令修改" });
+          return true;
+        }
         const unregisteredKeys = Object.keys(payload).filter((collection) =>
           collection !== "storageMeta" && !Object.hasOwn(currentData, collection)
         );
@@ -149,6 +168,7 @@ function createRouteSegments(runtime, options = {}) {
         }
         const effectivePayload = {
           ...payload,
+          ...Object.fromEntries(SERVER_MANAGED_CLINICAL_COLLECTIONS.filter((collection) => Object.hasOwn(currentData, collection)).map((collection) => [collection, currentData[collection]])),
           ...serverManagedRegionalState(currentData),
           ...serverManagedProcurementState(currentData)
         };
@@ -220,14 +240,19 @@ function createRouteSegments(runtime, options = {}) {
         writeDatabase(data);
         const normalized = readDatabase();
         setLegacyWriteHeaders(res);
-        sendJson(res, 200, normalized);
+        sendJson(res, 200, projectClinicalForStateRead(normalized));
         return true;
+        });
       }
 
       if (req.method === "PUT" && url.pathname.startsWith("/api/state-collections/")) {
         const user = requireApiRole(req, res, ["commission"], "/api/state-collections/:collection");
         if (!user) return true;
         const collection = decodeURIComponent(url.pathname.replace("/api/state-collections/", "")).trim();
+        if (SERVER_MANAGED_CLINICAL_COLLECTIONS.includes(collection)) {
+          sendJson(res, 403, { code: "CDSS_SERVER_MANAGED_COLLECTION_WRITE_DENIED", collection, message: "临床辅助集合必须通过专用命令修改" });
+          return true;
+        }
         if (SERVER_MANAGED_REGIONAL_COLLECTIONS.includes(collection)) {
           sendJson(res, 403, {
             error: "Forbidden",
@@ -257,6 +282,7 @@ function createRouteSegments(runtime, options = {}) {
           sendJson(res, 400, { error: "Bad Request", message: "集合级保存必须提交数组 value" });
           return true;
         }
+        return withLock("clinical-assist:state", async () => {
         const data = readDatabase();
         data[collection] = value;
         data.storageMeta = {
@@ -282,6 +308,7 @@ function createRouteSegments(runtime, options = {}) {
         const versions = storageMeta().collectionVersions;
         sendJson(res, 200, { ok: true, collection, version: versions[collection] ?? null, count: value.length });
         return true;
+        });
       }
         return false;
       }
