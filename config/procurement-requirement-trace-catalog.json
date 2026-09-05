@@ -2,6 +2,19 @@
   "schemaVersion": "procurement-requirement-trace-catalog-v1",
   "capabilities": [
     {
+      "capabilityId": "L-GOV-AI",
+      "pages": ["ai-governance.html"],
+      "interfaces": [
+        "GET /api/runtime/ai-governance/center",
+        "GET /api/quality-safety/ai-cdss/center"
+      ],
+      "tests": [
+        "test/ai-governance-center.test.js",
+        "test/ai-governance-route.test.js",
+        "test/ai-governance-ui.test.js"
+      ]
+    },
+    {
       "capabilityId": "J-CLIN-CDSS",
       "pages": [
         "clinical-ai-cdss.html"

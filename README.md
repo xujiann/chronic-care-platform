@@ -96,6 +96,7 @@ JSON 数据目录启动隔离服务。`test:all` 保持原自动发现语义，�
 | `health-city.html` | 健康城市系统总览 |
 | `workbench.html` | 统一运营工作台、全流程审计矩阵、路线图、系统就绪报告 |
 | `platform.html` | 平台建设驾驶舱、应用目录、信用评价、科研专病库治理、移动无障碍治理、安全信创台账 |
+| `ai-governance.html` | 平台人工智能治理中心：场景目录、风险分级、控制矩阵、责任移交与上线阻断 |
 | `unified-work-center.html` | 按账号和组织范围聚合待办、消息、回执与任务动作 |
 | `account-lifecycle.html` | 账号申请、临时授权、冻结、解冻和双人复核治理 |
 | `maternal-child.html` | 妇幼健康业务任务工作台 |
@@ -188,6 +189,7 @@ SQLite 结构化镜像已覆盖居民、账户、主索引、个人健康档案�
 | `GET /api/tasks` / `POST /api/tasks/:id/actions` | 统一任务中心 |
 | `GET /api/messages` / `POST /api/messages/:id/receipt` | 站内消息与送达回执 |
 | `GET /api/work-center` / `POST /api/work-center/tasks/:id/actions` / `POST /api/work-center/tasks/:id/messages` / `POST /api/work-center/messages/:id/receipt` | 跨域统一待办、消息、回执及版本化处置动作 |
+| `GET /api/runtime/ai-governance/center` | commission-only 平台人工智能治理投影；只返回场景、来源授权、风险、控制与阻断元数据，禁止自动审批、激活和诊疗决策 |
 | `GET/POST /api/auth/account-lifecycle-requests` / `POST /api/auth/account-lifecycle-requests/conflicts` / `POST /api/auth/account-lifecycle-requests/:id/reviews` | 账号申请、职责冲突检查、双人复核与临时授权治理 |
 | `GET/POST /api/public-health/supervision/cases` / `POST /api/public-health/supervision/cases/:id/actions` | 卫生监督案件立案、调查、审核、处罚、整改、复查和结案闭环 |
 | `GET /api/data-quality/issues` / `GET /api/data-quality/scorecard` | 数据质量治理 |

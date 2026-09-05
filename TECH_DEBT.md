@@ -1,12 +1,20 @@
 # TECH DEBT — 主线技术债与风险台账
 
+## 2026-09-06 平台人工智能治理后的剩余债务
+
+| ID | 已完成的仓库能力 | 剩余风险/下一步 |
+|---|---|---|
+| AI-GOV-001 | 四类 AI 场景、风险分级、八类控制、责任移交和开放风险形成 commission-only 只读中心 | 公共卫生、慢病治理、基层辅助来源尚无明确数据 Owner/最小投影合同；当前严格不读记录，须由 T03/T04/T05/T09 分别完成授权接线 |
+| AI-GOV-002 | 中心只返回跨域治理元数据，禁止个人、机构、医生、临床正文和未授权源记录；所有场景强制人工监督 | 真实身份、电子签名、职责分离、跨实例回执、模型/规则制品签名和长期审计尚未闭合 |
+| AI-GOV-003 | 自动诊断、医嘱、处方、公共卫生决策、模型激活和生产放行全部禁用，`L-GOV-AI` 已形成仓库追踪 | 缺少独立验证、效果基线、漂移、偏差、公平性、不良事件、暂停召回、回滚复盘和多方现场签字，生产继续 `NO-GO` |
+
 ## 2026-09-05 临床决策支持安全治理后的剩余债务
 
 | ID | 已完成的仓库能力 | 剩余风险/下一步 |
 |---|---|---|
 | CDSS-GOV-001 | 既有临床规则、提醒、回执和插件合同形成按角色/机构/医生范围的只读安全治理中心 | 历史规则缺正式版本、适用人群、独立审批和临床验证；后续须经业务、质控、伦理和安全责任人签署，不能由仓库自动补全 |
 | CDSS-GOV-002 | 所有输出固定人工复核、禁止自动诊断/医嘱/处方，并展示证据绑定和回执状态 | 现有业务回执仍是单实例兼容路径；真实医生电子签名、HIS/EMR 上下文、跨实例幂等、生产数据库和联调回执尚未闭合 |
-| CDSS-GOV-003 | 页面和服务暴露规则治理缺口、复核积压及安全信号，`J-CLIN-CDSS` 已形成仓库追踪 | 缺少效果基线、分层漂移、偏差/公平性、不良事件和独立医学评估；T01 `L-GOV-AI` 仍 declared-only，生产继续 `NO-GO` |
+| CDSS-GOV-003 | 页面和服务暴露规则治理缺口、复核积压及安全信号，`J-CLIN-CDSS` 已形成仓库追踪并接入 T01 最小治理汇总 | 缺少效果基线、分层漂移、偏差/公平性、不良事件和独立医学评估；平台中心不能代替临床 Owner 与现场验证，生产继续 `NO-GO` |
 
 ## 2026-09-04 医疗付费一件事后的剩余债务
 
@@ -145,7 +153,7 @@ T00 机器登记完成后，`production-release-scope` 中 17 个仓库内 API �
 | SEC-010 | 2026-08-23 | strict production preflight 不再只能靠测试注入 externalTrustVerifier；可部署 provider 使用 pinned anchor bundle、Ed25519 双角色签名、撤销/时窗和 release/source/artifact/evidence/registry 精确绑定，默认仍 NO-GO | generic signed-envelope 负向矩阵、CLI 自动装配、synthetic fixture 不提升全局生产状态、deployment package/env/CI 合同与脱敏错误 |
 | DEPLOY-002 | 2026-08-23 | 切换行动定义升级为 definitions-only v2；14/14 effective status 仅由共享 Ed25519 provider 验证的当前 release/artifact 绑定决定派生，并接入 strict preflight 与 protected manual workflow；手改 `verified` 固定失败 | 缺 provider/记录、错签/撤销、异 release/digest、过期/未来时间、角色重合、重复 signer、缺转换历史/命令回执、symlink/超限、错误脱敏与 digest-only receipt 负向测试 |
 | TEST-007 | 2026-08-23 | 复用既有 T02 handoff harness，对 operations-command 32/32 路径建立数据驱动运行时矩阵；覆盖 19 条只读、13 条写入、三条签名集成入口及 institution 范围 | 闭集唯一性、role/deny-before-read、payload/400/403/404、响应/副作用、审计—写入顺序、审计和写入失败语义；governance-api 显式专项门禁 |
-| TEST-005 | 2026-08-27 | 本地/CI 统一 Playwright Chromium；在线根 40 项与居民 13 项继续阻止 Service Worker；PWA 3 项使用独立允许策略、动态端口和临时数据；Go/No-Go 同时覆盖四方业务责任属性与恶意响应可信渲染 | 56 项唯一并集/漂移测试、居民同文件 13/13、PWA 重复 9/9、完整标准 E2E；不得把仓库浏览器测试解释为真实 HTTPS、托管安全头或现场验收 |
+| TEST-005 | 2026-08-27 | 本地/CI 统一 Playwright Chromium；在线根 47 项与居民 13 项继续阻止 Service Worker；PWA 3 项使用独立允许策略、动态端口和临时数据；Go/No-Go 与治理中心覆盖责任属性和恶意响应可信渲染 | 63 项唯一并集/漂移测试、居民同文件 13/13、PWA 重复 9/9、完整标准 E2E；不得把仓库浏览器测试解释为真实 HTTPS、托管安全头或现场验收 |
 | TEST-008 | 2026-08-23 | 专用 PWA/Service Worker E2E 验证居民登录后安装、v60→v61 激活清理、受控 update、离线 mobile/citizen 回退、API/源快照 404 缓存边界与逐项注销/清缓存 | 真实 HTTPS 终止、OS 安装提示/策略、浏览器设备矩阵、外部 Origin、现场缓存升级与独立安全验收继续外置；仓库测试不产生生产 GO |
 | GOV-001 | 2026-08-23 | `main`/`origin/main` 成为唯一当前集成与默认开发基线；固定 governance tag 仅作可复现证据，旧日期化 workflow 原文冻结 | process plan/verify 默认值、manifest/AGENTS/iteration program 漂移和 CI 目标分支负向测试 |
 | DOC-001 | 2026-08-24 | 关闭时为 267 份；当前 275 份 Markdown 以路径和 ADR 台账唯一分类为 206 current、68 snapshot、1 superseded；不删除历史证据 | 闭集路径/分类摘要、规则重叠、ADR status、当前事实和 snapshot 内容聚合摘要失败关闭 |

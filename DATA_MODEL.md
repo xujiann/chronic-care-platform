@@ -1,10 +1,16 @@
 # DATA MODEL — 主线数据地图
 
+## 2026-09-06 平台人工智能治理数据边界
+
+本增量不新增模型、规则、建议、居民、事件或审计状态集合，不修改 JSON/SQLite/PostgreSQL schema、migration、索引、outbox 或数据 Owner。平台中心只读取 `phase2ClinicalAssistRules`、`phase2ClinicalAssistAlerts`、`phase2ClinicalAssistReceipts` 和 `diseaseRegistryModels` 的数量、版本/复核存在性等最小治理元数据；这些集合已在中央所有权合同中允许 `platform-governance` 读取。
+
+`chronicModelGovernance`、`publicHealthAiReviews` 和 `countyAiDiagnosisCases` 尚未完成明确的数据 Owner 与跨域最小投影合同，服务只登记集合名称和 `owner-handoff-required`，并由 Proxy 负向测试保证不读取记录。响应不包含个人、机构、医生、适用人群、临床建议、复核正文或模型源记录。能力注册表 `repository-verified` 只证明页面、API 与测试存在，不代表模型验证、生产数据授权或上线批准。
+
 ## 2026-09-05 临床决策支持安全治理数据边界
 
 本增量不新增患者、模型、建议、回执或审计集合，不修改 JSON/SQLite/PostgreSQL schema、migration、索引、outbox 或数据 Owner。中心只读既有 `phase2ClinicalAssistRules`、`phase2ClinicalAssistAlerts`、`phase2ClinicalAssistReceipts` 和 `phase2ClinicalAssistPluginContracts`，生成不持久化的规则/模型卡、授权建议、人工复核台账、治理信号和集成合同投影。
 
-主管部门投影不包含居民、医生、临床建议正文、机构名称或复核说明；机构投影只在可信机构/医生范围内返回脱敏居民引用和最小建议。缺少规则版本、审批、适用人群验证、效果漂移、不良事件和真实回执均表达为缺口，不能回写成完成状态。`J-CLIN-CDSS` 仓库证据不是临床事实或生产授权，`L-GOV-AI` 继续由 T01 独立建设。
+主管部门投影不包含居民、医生、临床建议正文、机构名称或复核说明；机构投影只在可信机构/医生范围内返回脱敏居民引用和最小建议。缺少规则版本、审批、适用人群验证、效果漂移、不良事件和真实回执均表达为缺口，不能回写成完成状态。`J-CLIN-CDSS` 仓库证据不是临床事实或生产授权；后续 T01 平台中心只消费其最小治理元数据。
 
 ## 2026-09-04 医疗付费一件事数据边界
 

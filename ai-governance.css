@@ -1,0 +1,35 @@
+.ai-governance-page { --ai-ink: #153554; --ai-accent: #3157a4; --ai-soft: #edf2ff; }
+.ai-governance-hero { display: grid; grid-template-columns: minmax(0, 1fr) 210px; gap: 22px; align-items: center; background: linear-gradient(135deg, #132f4c, #3157a4 68%, #5377c2); }
+.ai-governance-hero > div:first-child > span { display: inline-block; margin-bottom: 10px; color: #dbeafe; font-weight: 700; letter-spacing: .04em; }
+.ai-governance-decision { padding: 18px; border: 1px solid rgba(255,255,255,.28); border-radius: 16px; background: rgba(255,255,255,.1); text-align: center; }
+.ai-governance-decision span, .ai-governance-decision small, .ai-governance-decision strong { display: block; color: #fff; }
+.ai-governance-decision strong { margin: 7px 0; font-size: 31px; letter-spacing: .08em; }
+.ai-governance-kicker { display: block; color: var(--ai-accent); font-size: 12px; font-weight: 800; letter-spacing: .08em; }
+.ai-governance-filters { grid-template-columns: minmax(250px, 1.5fr) repeat(2, minmax(160px, .65fr)); margin-bottom: 14px; }
+.ai-governance-card-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.ai-governance-card { display: flex; flex-direction: column; gap: 12px; min-width: 0; padding: 16px; border: 1px solid var(--work-border); border-radius: 14px; background: linear-gradient(180deg, #fff, #f8fafc); }
+.ai-governance-card header, .ai-governance-risk header { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
+.ai-governance-card h3, .ai-governance-risk h3 { margin: 0; color: var(--ai-ink); font-size: 16px; }
+.ai-governance-meta, .ai-governance-card p, .ai-governance-risk p { margin: 5px 0 0; color: var(--muted); font-size: 13px; line-height: 1.6; }
+.ai-governance-source-list { display: grid; gap: 7px; }
+.ai-governance-source { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 9px; padding: 9px 10px; border-radius: 9px; background: var(--ai-soft); color: var(--ai-ink); font-size: 12px; }
+.ai-governance-source span { overflow-wrap: anywhere; }
+.ai-governance-findings { margin: 0; padding-left: 20px; color: #9a3412; font-size: 13px; line-height: 1.6; }
+.ai-governance-table { min-width: 850px; }
+.ai-governance-table strong, .ai-governance-table small { display: block; }
+.ai-governance-table small { margin-top: 4px; color: var(--muted); }
+.ai-governance-risk-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.ai-governance-risk { padding: 13px; border: 1px solid var(--work-border); border-left: 4px solid #d97706; border-radius: 11px; background: #fff; }
+.ai-governance-boundary-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+.ai-governance-boundary-grid h3 { margin: 0 0 8px; color: var(--ai-ink); font-size: 15px; }
+.ai-governance-boundary-grid ul { margin: 0; padding-left: 22px; color: var(--muted); line-height: 1.7; }
+.ai-governance-boundary-grid div:last-child ul { color: #9a3412; }
+@media (max-width: 780px) {
+  .ai-governance-hero, .ai-governance-card-grid, .ai-governance-risk-list, .ai-governance-boundary-grid { grid-template-columns: 1fr; }
+  .ai-governance-filters { grid-template-columns: 1fr 1fr; }
+  .ai-governance-filters label:first-child { grid-column: 1 / -1; }
+}
+@media (max-width: 520px) {
+  .ai-governance-filters { grid-template-columns: 1fr; }
+  .ai-governance-filters label:first-child { grid-column: auto; }
+}
