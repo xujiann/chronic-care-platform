@@ -151,6 +151,7 @@ function renderDoctorClinicalAssist() {
   count.textContent = `${alerts.length} 条 · ${pending.length} 条待回执`;
   doctorReplace(target, alerts.map((item) => {
     const pendingReceipt = /pending|待/i.test(`${item.status || ""} ${item.messageReceiptStatus || ""}`);
+    const decisionUnavailable = item.decisionAvailable === false;
     const actions = [
       doctorElement("span", {
         className: `badge ${doctorStatusClass(item.status)}`,
@@ -158,8 +159,10 @@ function renderDoctorClinicalAssist() {
       })
     ];
     if (pendingReceipt && doctorApiBase) {
+      const accept = doctorButton("采纳提醒", item.id, "accepted-recommendation");
+      accept.disabled = decisionUnavailable;
       actions.push(
-        doctorButton("采纳提醒", item.id, "accepted-recommendation"),
+        accept,
         doctorButton("保留并说明", item.id, "kept-order-with-reason")
       );
     }
@@ -167,7 +170,8 @@ function renderDoctorClinicalAssist() {
       doctorElement("div", {}, [
         doctorElement("h3", { text: `${item.alertTitle || item.category || "临床辅助提醒"} · ${item.residentName || item.residentId || ""}` }),
         doctorElement("p", { text: item.alertDetail || "" }),
-        doctorElement("p", { text: `建议：${item.recommendation || ""}` }),
+        doctorElement("p", { text: decisionUnavailable ? "当前规则未获有效治理批准，建议暂不可采纳；可保留原医嘱并说明原因。" : `建议：${item.recommendation || ""}` }),
+        decisionUnavailable ? doctorElement("p", { text: `治理状态：${item.governanceStatus || "待核验"} · decisionAvailable=false` }) : null,
         doctorElement("p", { text: `工作站：${item.pluginSurface || "doctor-workstation"} · 回执 ${item.messageReceiptStatus || "pending"} · ${item.lastAction || ""}` })
       ]),
       doctorElement("div", { className: "actions" }, actions)
@@ -177,6 +181,8 @@ function renderDoctorClinicalAssist() {
 
 async function submitDoctorClinicalAssistReceipt(alertId, doctorAction) {
   if (!doctorApiBase) return;
+  const alert = doctorRuntime.clinicalAssist?.alerts?.find((item) => item.id === alertId);
+  if (!alert || (doctorAction === "accepted-recommendation" && alert.decisionAvailable === false)) return;
   const request = window.HealthCityAuth?.authFetch || fetch;
   const response = await request(`${doctorApiBase}/phase2/clinical-assist/alerts/${encodeURIComponent(alertId)}/receipt`, {
     method: "POST",
