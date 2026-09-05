@@ -2,6 +2,7 @@
 
 const { createHash } = require("node:crypto");
 const CONTRACT_VERSION = "ai-governance.v1";
+const MAX_COMMANDS = 1000;
 class AiGovernanceError extends Error {
   constructor(code, message, statusCode = 400) { super(message); this.code = code; this.statusCode = statusCode; }
 }
@@ -31,14 +32,19 @@ function cardInput(card) {
   return structuredClone(card);
 }
 function sourceDigest(rule) { const source = { ...rule }; delete source.governance; return digest(source); }
+function sourceIntegrity(rule) {
+  if (!rule.governance?.card) return "unregistered";
+  return rule.governance.card.sourceDigest === sourceDigest(rule) ? "matched" : "drifted";
+}
 function projectRule(rule) {
   const g = rule.governance || {};
-  return { id: rule.id, governance: { version: g.version || 0, status: g.status || "unregistered", card: g.card ? structuredClone(g.card) : null, sourceDigest: sourceDigest(rule), submittedBy: g.submittedBy || null, reviewedBy: g.reviewedBy || null }, productionReady: false };
+  const integrity = sourceIntegrity(rule);
+  return { id: rule.id, governance: { version: g.version || 0, status: integrity === "drifted" ? "stale" : g.status || "unregistered", storedStatus: g.status || "unregistered", sourceIntegrity: integrity, card: g.card ? structuredClone(g.card) : null, sourceDigest: sourceDigest(rule), submittedBy: g.submittedBy || null, reviewedBy: g.reviewedBy || null }, productionReady: false };
 }
 function buildAiGovernanceCenter(data, user) {
   assertActor(user);
   const rules = (data.phase2ClinicalAssistRules || []).map(projectRule);
-  const summary = { total: rules.length, unregistered: 0, draft: 0, submitted: 0, approved: 0, rejected: 0, suspended: 0 };
+  const summary = { total: rules.length, unregistered: 0, draft: 0, submitted: 0, approved: 0, rejected: 0, suspended: 0, stale: 0 };
   for (const rule of rules) if (Object.hasOwn(summary, rule.governance.status)) summary[rule.governance.status] += 1;
   return { contractVersion: CONTRACT_VERSION, rules, summary, productionReady: false };
 }
@@ -56,15 +62,20 @@ function executeAiGovernanceAction(data, id, payload, user, options = {}) {
   if (!rule) fail("AI_GOVERNANCE_NOT_FOUND", 404);
   const g = rule.governance || { version: 0, status: "unregistered", history: [], receipts: [] };
   const keyHash = digest({ actor, id, key });
-  const requestDigest = digest({ ...payload, idempotencyKey: undefined });
+  const requestDigest = digest({ payload: { ...payload, idempotencyKey: undefined }, actorContext: { actor, role: user.role, orgCode: user.orgCode || "" } });
   const prior = (g.receipts || []).find((receipt) => receipt.keyHash === keyHash);
   if (prior) {
     if (prior.requestDigest !== requestDigest) fail("AI_GOVERNANCE_KEY_CONFLICT", 409);
     return { state: data, response: structuredClone(prior.response), replayed: true };
   }
   if (g.version !== payload.expectedVersion) fail("AI_GOVERNANCE_VERSION_CONFLICT", 409);
-  const allowed = { register: ["unregistered", "draft", "rejected", "suspended"], submit: ["draft"], approve: ["submitted"], reject: ["submitted"], suspend: ["approved"], rollback: ["suspended", "rejected"] };
-  if (!allowed[payload.action].includes(g.status)) fail("AI_GOVERNANCE_STATE_CONFLICT", 409);
+  if (g.version >= Number.MAX_SAFE_INTEGER) fail("AI_GOVERNANCE_VERSION_EXHAUSTED", 409);
+  // Preserve retained receipts: evicting them would allow an old key to execute again.
+  if ((g.receipts || []).length >= MAX_COMMANDS || (g.history || []).length >= MAX_COMMANDS) fail("AI_GOVERNANCE_CAPACITY_EXHAUSTED", 409);
+  if (sourceIntegrity(rule) === "drifted" && payload.action !== "register") fail("AI_GOVERNANCE_SOURCE_CHANGED", 409);
+  const status = sourceIntegrity(rule) === "drifted" ? "stale" : g.status;
+  const allowed = { register: ["unregistered", "draft", "rejected", "suspended", "stale"], submit: ["draft"], approve: ["submitted"], reject: ["submitted"], suspend: ["approved"], rollback: ["suspended", "rejected"] };
+  if (!allowed[payload.action].includes(status)) fail("AI_GOVERNANCE_STATE_CONFLICT", 409);
   if (payload.action !== "register" && Object.hasOwn(payload, "card")) fail("AI_GOVERNANCE_CARD_NOT_ALLOWED");
   if (["approve", "reject"].includes(payload.action) && [g.registeredBy, g.submittedBy].includes(actor)) fail("AI_GOVERNANCE_SELF_REVIEW", 403);
   const state = structuredClone(data);
@@ -98,4 +109,4 @@ function executeAiGovernanceAction(data, id, payload, user, options = {}) {
   return { state, response, replayed: false, audit: { actor, role: user.role, action: `ai-governance:${payload.action}`, target: id, result: "allowed", detail: `version:${next.version};source:${sourceDigest(rule)}` } };
 }
 
-module.exports = { CONTRACT_VERSION, AiGovernanceError, assertActor, buildAiGovernanceCenter, executeAiGovernanceAction, sourceDigest };
+module.exports = { CONTRACT_VERSION, MAX_COMMANDS, AiGovernanceError, assertActor, buildAiGovernanceCenter, executeAiGovernanceAction, sourceDigest };

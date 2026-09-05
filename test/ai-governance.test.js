@@ -84,3 +84,37 @@ test("tampered existing audit chain is rejected before reseal or write", async (
   await segment.handle({ method: "POST", headers: {} }, {}, new URL("http://local/api/ai-governance/rules/rule-1/actions"));
   assert.equal(status, 409); assert.equal(touched, 0); assert.equal(data.phase2ClinicalAssistRules[0].governance, undefined);
 });
+test("approved source drift becomes stale and requires a new registration and approval", () => {
+  let data = run(seed(), "register", 0).state;
+  data = run(data, "submit", 1).state;
+  data = run(data, "approve", 2, reviewer).state;
+  const originalRequest = payload(data, "approve", 2);
+  data.phase2ClinicalAssistRules[0].threshold = 10;
+  const center = buildAiGovernanceCenter(data, author);
+  assert.equal(center.summary.approved, 0); assert.equal(center.summary.stale, 1);
+  assert.equal(center.rules[0].governance.storedStatus, "approved");
+  assert.equal(center.rules[0].governance.sourceIntegrity, "drifted");
+  const replay = executeAiGovernanceAction(data, "rule-1", originalRequest, reviewer);
+  assert.equal(replay.replayed, true); assert.equal(replay.response.rule.governance.status, "approved");
+  assert.throws(() => run(data, "suspend", 3), { code: "AI_GOVERNANCE_SOURCE_CHANGED" });
+  const renewed = run(data, "register", 3);
+  assert.equal(renewed.response.rule.governance.status, "draft");
+  assert.equal(renewed.response.rule.governance.sourceIntegrity, "matched");
+});
+test("capacity and version exhaustion reject fresh commands without evicting replay receipts", () => {
+  const initial = seed(); const original = payload(initial);
+  const data = run(initial, "register", 0).state;
+  data.phase2ClinicalAssistRules[0].governance.version = Number.MAX_SAFE_INTEGER;
+  assert.throws(() => run(data, "register", Number.MAX_SAFE_INTEGER), { code: "AI_GOVERNANCE_VERSION_EXHAUSTED" });
+  data.phase2ClinicalAssistRules[0].governance.version = 1;
+  for (const field of ["history", "receipts"]) {
+    const saturated = structuredClone(data); saturated.phase2ClinicalAssistRules[0].governance[field] = Array(1000).fill(saturated.phase2ClinicalAssistRules[0].governance[field][0]);
+    assert.throws(() => run(saturated, "register", 1), { code: "AI_GOVERNANCE_CAPACITY_EXHAUSTED" });
+    assert.equal(executeAiGovernanceAction(saturated, "rule-1", original, author).replayed, true);
+  }
+});
+test("actor organization change cannot replay another organization context receipt", () => {
+  const data = seed(); const p = payload(data);
+  const result = executeAiGovernanceAction(data, "rule-1", p, { ...author, orgCode: "org-a" });
+  assert.throws(() => executeAiGovernanceAction(result.state, "rule-1", p, { ...author, orgCode: "org-b" }), { code: "AI_GOVERNANCE_KEY_CONFLICT" });
+});
