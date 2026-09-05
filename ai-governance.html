@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>平台人工智能治理中心</title>
+    <link rel="stylesheet" href="./portal.css" />
+    <link rel="stylesheet" href="./governance-workbench.css" />
+    <link rel="stylesheet" href="./ai-governance.css" />
+    <script src="./access-control-policy.js"></script>
+    <script src="./browser-safe-url.js"></script>
+    <script src="./auth.js"></script>
+    <script src="./page-auth-bootstrap.js" data-roles="commission"></script>
+  </head>
+  <body>
+    <main class="portal-shell governance-page ai-governance-page">
+      <header class="portal-header ai-governance-hero">
+        <div>
+          <span>场景清单 · 风险分级 · 人工监督 · 漂移与事件治理</span>
+          <h1>平台人工智能治理中心</h1>
+          <p>统一管理平台内人工智能与算法辅助场景的责任归属、数据来源、预期用途、控制证据和上线阻断。中心只展示治理元数据，不展示个人、机构或临床记录明细。</p>
+        </div>
+        <div class="ai-governance-decision" aria-label="生产决策">
+          <span>生产决策</span>
+          <strong id="ai-governance-decision">NO-GO</strong>
+          <small>仓库证据不等于生产授权</small>
+        </div>
+      </header>
+
+      <section id="ai-governance-source-banner" class="work-source-banner" data-tone="warning" role="status" aria-live="polite">
+        <div>
+          <strong id="ai-governance-source-title">正在读取平台治理数据</strong>
+          <p id="ai-governance-source-detail">正在校验账号、跨域来源和最小必要范围。</p>
+        </div>
+        <div class="work-source-actions">
+          <a class="secondary-work-button" href="./clinical-ai-cdss.html">查看临床侧治理</a>
+          <button id="ai-governance-refresh" class="secondary-work-button" type="button">刷新</button>
+        </div>
+      </section>
+
+      <section id="ai-governance-metrics" class="work-metric-grid" aria-label="人工智能治理指标"></section>
+
+      <section class="panel" aria-labelledby="ai-governance-use-cases-title">
+        <div class="panel-title">
+          <div><span class="ai-governance-kicker">全平台场景目录</span><h2 id="ai-governance-use-cases-title">人工智能应用场景</h2></div>
+          <span id="ai-governance-use-case-count">0 项</span>
+        </div>
+        <div class="work-filter-grid ai-governance-filters">
+          <label>搜索<input id="ai-governance-search" type="search" placeholder="场景、能力、责任域或用途" /></label>
+          <label>风险等级<select id="ai-governance-risk-filter"><option value="all">全部风险</option><option value="critical">重大风险</option><option value="high">高风险</option></select></label>
+          <label>生命周期<select id="ai-governance-status-filter"><option value="all">全部状态</option><option value="restricted-pilot">受限试点</option><option value="registry-only">仅登记</option><option value="source-binding-pending">来源待接线</option></select></label>
+        </div>
+        <div id="ai-governance-use-cases" class="ai-governance-card-grid"></div>
+      </section>
+
+      <section class="panel" aria-labelledby="ai-governance-controls-title">
+        <div class="panel-title"><h2 id="ai-governance-controls-title">控制矩阵</h2><span id="ai-governance-control-count">0 项</span></div>
+        <div class="table-wrap">
+          <table class="work-table ai-governance-table">
+            <thead><tr><th scope="col">控制域</th><th scope="col">当前状态</th><th scope="col">仓库证据</th><th scope="col">生产阻断</th></tr></thead>
+            <tbody id="ai-governance-controls"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel" aria-labelledby="ai-governance-risks-title">
+        <div class="panel-title"><h2 id="ai-governance-risks-title">开放风险与责任移交</h2><span id="ai-governance-risk-count">0 项</span></div>
+        <div id="ai-governance-risks" class="ai-governance-risk-list"></div>
+      </section>
+
+      <section class="panel ai-governance-boundary-panel" aria-labelledby="ai-governance-boundaries-title">
+        <div class="panel-title"><h2 id="ai-governance-boundaries-title">安全边界与上线阻断</h2><span>生产保持 NO-GO</span></div>
+        <div class="ai-governance-boundary-grid">
+          <div><h3>安全治理边界</h3><ul id="ai-governance-boundaries"></ul></div>
+          <div><h3>上线阻断项</h3><ul id="ai-governance-blockers"></ul></div>
+        </div>
+      </section>
+    </main>
+
+    <script src="./shared.js"></script>
+    <script src="./ai-governance.js"></script>
+  </body>
+</html>

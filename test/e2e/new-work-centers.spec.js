@@ -21,6 +21,7 @@ test("commission navigation exposes the new governed work centers and pages rema
     ["medical-payment.html", "医疗付费一件事"],
     ["regional-clinical-documents.html", "区域医疗文书中心"],
     ["clinical-ai-cdss.html", "临床决策支持安全治理中心"],
+    ["ai-governance.html", "平台人工智能治理中心"],
     ["research-sandbox.html", "科研数据集与安全沙箱工作台"],
     ["public-health-supervision-cases.html", "卫生监督案件协同工作台"]
   ];
@@ -49,6 +50,10 @@ test("commission navigation exposes the new governed work centers and pages rema
     if (target === "clinical-ai-cdss.html") {
       await expect(page.locator("#clinical-ai-source-title")).toHaveText("临床决策支持治理服务已连接");
       await expect(page.locator("#clinical-ai-decision")).toHaveText("NO-GO");
+    }
+    if (target === "ai-governance.html") {
+      await expect(page.locator("#ai-governance-source-title")).toHaveText("平台人工智能治理服务已连接");
+      await expect(page.locator("#ai-governance-decision")).toHaveText("NO-GO");
     }
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
     expect(overflow, `${target} must stay inside the mobile viewport`).toBe(false);
@@ -136,6 +141,35 @@ test("clinical AI CDSS center renders hostile governance text as inert content",
   await expect(page.locator("#clinical-ai-blockers")).toContainText(hostile);
   await expect(page.locator("#clinical-ai-rules img, #clinical-ai-signals img, #clinical-ai-blockers img")).toHaveCount(0);
   expect(await page.evaluate(() => globalThis.cdssCenterCompromised)).toBeUndefined();
+});
+
+test("platform AI governance center renders hostile cross-domain metadata as inert content", async ({ page }) => {
+  const hostile = '<img src=x onerror="globalThis.aiGovernanceCompromised=true">';
+  await loginCommission(page);
+  await page.route("**/api/runtime/ai-governance/center", (route) => route.fulfill({
+    status: 200,
+    contentType: "application/json",
+    body: JSON.stringify({
+      schemaVersion: "platform-ai-governance-center-v1",
+      capabilityId: "L-GOV-AI",
+      productionReady: false,
+      decision: "NO-GO",
+      scope: { role: "commission", personalDataVisible: false, clinicalContentVisible: false },
+      summary: { useCases: 1, highOrCriticalRiskUseCases: 1, authorizedSourceBindings: 0, pendingOwnerBindings: 1, controls: 1, blockedControls: 1, openRisks: 1, productionEligibleUseCases: 0 },
+      useCases: [{ id: hostile, title: hostile, capabilityId: hostile, ownerProcess: "T01", ownerDomain: hostile, riskLevel: "critical", lifecycleStatus: "source-binding-pending", intendedUse: hostile, decisionImpact: hostile, observedRecords: 0, sourceBindings: [{ collection: hostile, dataOwner: hostile, access: "owner-handoff-required", recordCount: null, status: "owner-handoff-required" }], governanceFindings: [hostile] }],
+      controls: [{ id: hostile, name: hostile, status: "blocked", evidence: hostile, blocker: hostile }],
+      risks: [{ id: hostile, useCaseId: hostile, title: hostile, severity: "critical", status: "open", responsibleProcess: hostile, nextAction: hostile }],
+      safetyBoundaries: [hostile],
+      blockers: [hostile]
+    })
+  }));
+  await page.goto("/ai-governance.html");
+  await expect(page.locator("#ai-governance-use-cases")).toContainText(hostile);
+  await expect(page.locator("#ai-governance-controls")).toContainText(hostile);
+  await expect(page.locator("#ai-governance-risks")).toContainText(hostile);
+  await expect(page.locator("#ai-governance-blockers")).toContainText(hostile);
+  await expect(page.locator("#ai-governance-use-cases img, #ai-governance-controls img, #ai-governance-risks img, #ai-governance-blockers img")).toHaveCount(0);
+  expect(await page.evaluate(() => globalThis.aiGovernanceCompromised)).toBeUndefined();
 });
 
 test("account lifecycle remains commission-manager only", async ({ page }) => {

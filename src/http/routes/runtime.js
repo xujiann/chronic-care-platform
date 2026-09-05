@@ -1,5 +1,7 @@
 "use strict";
 
+const AiGovernance = require("../../identity-security/ai-governance-center");
+
 function createRouteSegments(runtime) {
   const { BloodEventHub, PROJECT_VERSION, RUNTIME_STARTED_AT, appendSecurityEvent, buildHealthDashboardSummary, buildReleaseReport, buildRuntimeMetrics, buildSystemReadinessReport, collectJson, normalizeHealthStatisticsImportJob, prependAuditTrailEntry, probeSessionStoreStatus, randomUUID, readDatabase, renderPrometheusRuntimeMetrics, requireApiRole, seedHealthStatisticsIngestion, sendJson, sendText, sessionStoreHealthStatus, storageMeta, writeDatabase } = runtime;
   return [
@@ -165,6 +167,45 @@ function createRouteSegments(runtime) {
           releaseEvidence: indicatorCenter.releaseEvidence,
           boundary: indicatorCenter.boundary
         });
+        return true;
+      }
+
+      if (req.method === "GET" && url.pathname === "/api/runtime/ai-governance/center") {
+        const user = requireApiRole(req, res, ["commission"], "/api/runtime/ai-governance/center");
+        if (!user) return true;
+        try {
+          const center = AiGovernance.buildAiGovernanceCenter(readDatabase(), user);
+          appendSecurityEvent({
+            actor: user.name || user.username,
+            role: user.role,
+            action: "platform ai governance center read",
+            target: AiGovernance.CAPABILITY_ID,
+            result: "allowed",
+            detail: `${center.summary.useCases} use cases / ${center.summary.openRisks} open risks / ${center.summary.pendingOwnerBindings} owner bindings pending`
+          });
+          sendJson(res, 200, center);
+        } catch (error) {
+          const known = error instanceof AiGovernance.AiGovernanceCenterError;
+          try {
+            appendSecurityEvent({
+              actor: user.name || user.username,
+              role: user.role,
+              action: "platform ai governance center read",
+              target: AiGovernance.CAPABILITY_ID,
+              result: "denied",
+              detail: known ? error.code : "AI_GOVERNANCE_CENTER_FAILED"
+            });
+          } catch {
+            // The read remains fail-closed when the audit sink is unavailable.
+          }
+          sendJson(res, known ? error.statusCode : 503, {
+            ok: false,
+            code: known ? error.code : "AI_GOVERNANCE_CENTER_FAILED",
+            message: known ? error.message : "platform AI governance center is temporarily unavailable",
+            productionReady: false,
+            decision: "NO-GO"
+          });
+        }
         return true;
       }
         return false;

@@ -46,7 +46,9 @@ test("clinical decision support capability carries repository and procurement tr
   assert.equal(capability.coverage, "repository-verified");
   assert.equal(capability.evidence.length >= 7, true);
   assert.equal(capability.evidence.every((relative) => fs.existsSync(path.join(ROOT, relative))), true);
-  assert.equal(upstream.coverage, "declared-only");
+  assert.equal(upstream.coverage, "repository-verified");
+  assert.equal(upstream.evidence.includes("src/identity-security/ai-governance-center.js"), true);
+  assert.ok(trace.capabilities.find((item) => item.capabilityId === "L-GOV-AI"));
   assert.deepEqual(mapping.pages, ["clinical-ai-cdss.html"]);
   assert.equal(mapping.interfaces.includes("GET /api/quality-safety/ai-cdss/center"), true);
   assert.equal(mapping.interfaces.includes("POST /api/phase2/clinical-assist/alerts/:id/receipt"), true);
