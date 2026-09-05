@@ -1,0 +1,42 @@
+.audit-governance-page { --audit-ink: #173f3c; --audit-accent: #16766f; --audit-soft: #e8f6f3; }
+.audit-governance-hero { display: grid; grid-template-columns: minmax(0, 1fr) 220px; gap: 22px; align-items: center; background: linear-gradient(135deg, #123b3a, #16766f 68%, #2b9185); }
+.audit-governance-hero > div:first-child > span { display: inline-block; margin-bottom: 10px; color: #d7faf4; font-weight: 700; letter-spacing: .04em; }
+.audit-governance-decision { padding: 18px; border: 1px solid rgba(255,255,255,.3); border-radius: 16px; background: rgba(255,255,255,.1); text-align: center; }
+.audit-governance-decision span, .audit-governance-decision small, .audit-governance-decision strong { display: block; color: #fff; }
+.audit-governance-decision strong { margin: 7px 0; font-size: 31px; letter-spacing: .08em; }
+.audit-governance-source-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.audit-governance-source-card { min-width: 0; padding: 16px; border: 1px solid var(--work-border); border-radius: 14px; background: linear-gradient(180deg, #fff, #f7fbfa); }
+.audit-governance-source-card header, .audit-governance-risk header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.audit-governance-source-card h3, .audit-governance-risk h3 { margin: 0; color: var(--audit-ink); font-size: 16px; }
+.audit-governance-source-card p, .audit-governance-risk p { margin: 7px 0 0; color: var(--muted); font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
+.audit-governance-source-facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 12px; }
+.audit-governance-source-facts div { padding: 9px; border-radius: 9px; background: var(--audit-soft); }
+.audit-governance-source-facts span, .audit-governance-source-facts strong { display: block; }
+.audit-governance-source-facts span { color: var(--muted); font-size: 11px; }
+.audit-governance-source-facts strong { margin-top: 3px; color: var(--audit-ink); font-size: 13px; overflow-wrap: anywhere; }
+.audit-governance-distribution-layout { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.audit-governance-distribution-layout h3 { margin: 0 0 9px; color: var(--audit-ink); font-size: 15px; }
+.audit-governance-distribution { display: grid; gap: 7px; }
+.audit-governance-distribution-row { display: flex; justify-content: space-between; gap: 12px; padding: 9px 10px; border-radius: 9px; background: #f7faf9; color: var(--muted); font-size: 13px; }
+.audit-governance-distribution-row strong { color: var(--audit-ink); }
+.audit-governance-activity { display: flex; flex-wrap: wrap; gap: 8px; }
+.audit-governance-activity-item { min-width: 110px; padding: 10px 12px; border: 1px solid var(--work-border); border-radius: 10px; background: #fff; }
+.audit-governance-activity-item span, .audit-governance-activity-item strong { display: block; }
+.audit-governance-activity-item span { color: var(--muted); font-size: 12px; }
+.audit-governance-activity-item strong { margin-top: 4px; color: var(--audit-ink); }
+.audit-governance-table { min-width: 860px; }
+.audit-governance-table strong, .audit-governance-table small { display: block; }
+.audit-governance-table small { margin-top: 4px; color: var(--muted); }
+.audit-governance-risk-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.audit-governance-risk { padding: 13px; border: 1px solid var(--work-border); border-left: 4px solid #d97706; border-radius: 11px; background: #fff; }
+.audit-governance-boundary-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+.audit-governance-boundary-grid h3 { margin: 0 0 8px; color: var(--audit-ink); font-size: 15px; }
+.audit-governance-boundary-grid ul { margin: 0; padding-left: 22px; color: var(--muted); line-height: 1.7; }
+.audit-governance-boundary-grid div:last-child ul { color: #9a3412; }
+@media (max-width: 820px) {
+  .audit-governance-hero, .audit-governance-source-grid, .audit-governance-distribution-layout, .audit-governance-risk-grid, .audit-governance-boundary-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 520px) {
+  .audit-governance-source-facts { grid-template-columns: 1fr; }
+  .audit-governance-activity-item { flex: 1 1 120px; }
+}

@@ -2,6 +2,12 @@
 
 > 更新：2026-09-06。队列不是实施授权；只有 Accepted ADR/明确 owner 审批的范围可进入实现。
 
+## T01 平台审计治理首增量（2026-09-06）
+
+- 已复用 `securityEvents`、`dataAccessLogs`、严格 `audit-chain-v2` 与 `append-only-audit-source-v2`，新增 commission-only `GET /api/security/audit-governance/center` 和左侧导航工作台；没有创建第二审计事实源、migration、Worker 或写命令。
+- 中心只返回固定结果/事件/角色分类、数量、日期桶、配置布尔值和哈希摘要，禁止输出 actor、患者/居民、机构、访问目标、用途或事件正文；来源结构、链完整性或读取审计失败时接口失败关闭。
+- `L-GOV-AUDIT` 已形成仓库页面/API/测试追踪。真实 SIEM/WORM、可信回执、外部单调锚、留存与销毁策略、告警恢复、灾备演练及多方现场签字仍外置；链修复、原始导出、Worker 激活和生产放行均禁用，生产继续 `NO-GO`。
+
 ## T01 平台人工智能治理首增量（2026-09-06）
 
 - 已建立 commission-only `GET /api/runtime/ai-governance/center` 和分级左侧导航工作台，统一展示临床决策、科研模型、公共卫生研判和基层辅助四类场景的风险、责任、来源接线、控制与生产阻断。
@@ -36,7 +42,7 @@
 
 - T00 已把松江二期 19 项原始建设需求归一化为独立的 `regional-requirement-catalog-v1` 只读机器合同，并通过既有 commission-only 产品化中心 GET 与管理页面提供白名单摘要；运行期统一待办、地区部署验收和能力包交付状态没有被混用。
 - 19 项当前均为 `normalized`，不是 Owner 批准或能力实现。R009 已按原始 PDF 第 73–79 页完成视觉复核并标记 `source-verified`，其余采购文件页码待复核；平台继续 `productionReady=false`、生产 `NO-GO`。
-- 后续按 Owner 独立切片推进：T03 智慧卫监协管、T07 医疗付费一件事、T08 区域医疗文书、T06 临床决策支持安全治理和 T01 平台人工智能治理首批仓库闭环已完成；其余待办仍需独立 PLAN、领域测试、接口/数据 Owner 评审和 T00 集成。
+- 后续按 Owner 独立切片推进：T03 智慧卫监协管、T07 医疗付费一件事、T08 区域医疗文书、T06 临床决策支持安全治理以及 T01 平台人工智能与审计治理首批仓库闭环已完成；其余待办仍需独立 PLAN、领域测试、接口/数据 Owner 评审和 T00 集成。
 
 ## 已建立基线
 
@@ -64,11 +70,11 @@
 | 7 | 运行时上下文瘦身 | 候选 / P1 | 按领域子端口，逐块迁移，不重写 server |
 | 7A | 临床五个可治理子域 | 治理切片完成，急救/血液/影像/体检首个查询用例已迁移；影像 share/QC 与体检专项分流 action 三个写用例已接入目标命令端口并有单元、顺序/失败保护；operations dashboard 与 command 已由 T00 移交 T02，command 32/32 路径已完成 TEST-007 行为保护 / P1 | Accepted ADR；保持协议兼容，继续按五子域逐用例迁移并禁止已迁用例及 operations 回流 T06；专项分流幂等/CAS/事务、QC 幂等/CAS/机构范围及外调—本地写入核对需独立行为变更审批，当前保持 NO-GO；operations 后续拆分或 ARC-008 治理必须保持矩阵通过并另行审批 |
 | 7B | 健康驾驶舱版本化指标 | 首个 `population-service-visits.v1` 合同已建立 / P1 | 由 T03 确认来源版本与签名证据、由 T00 注入服务端 region scope；其余指标按 owner 逐项接入 |
-| 7C | 生产 API 机器目录 | v3 当前 633 项与 13 项认证合同。现有 39 份幂等行为合同：37 个完整 endpoint、2 个转诊 action-slice；招标需求复核、脱敏批次登记和交付治理入口均具备白名单稳定错误、冲突、审计失败和存储失败负证据，`reviewedProofRequired` 为 0。362 个写接口中 325 个仍缺 endpoint 级证明，通用 action remainder 使总复核为 327，全部 NO-GO / P1 | 继续按高风险与数据写入优先逐 owner 补证；现有合同只证明当前单实例/SQLite 兼容路径，不关闭真实 data owner、PG 多实例、长期留存/归档与现场证据，禁止把进程锁、SQLite CAS 或测试解释为 exactly-once/生产 GO |
+| 7C | 生产 API 机器目录 | v3 当前 634 项与 13 项认证合同。现有 39 份幂等行为合同：37 个完整 endpoint、2 个转诊 action-slice；招标需求复核、脱敏批次登记和交付治理入口均具备白名单稳定错误、冲突、审计失败和存储失败负证据，`reviewedProofRequired` 为 0。362 个写接口中 325 个仍缺 endpoint 级证明，通用 action remainder 使总复核为 327，全部 NO-GO / P1 | 继续按高风险与数据写入优先逐 owner 补证；现有合同只证明当前单实例/SQLite 兼容路径，不关闭真实 data owner、PG 多实例、长期留存/归档与现场证据，禁止把进程锁、SQLite CAS 或测试解释为 exactly-once/生产 GO |
 | 7D | 区域共享只读边界 | 两个 GET builder 已从组合根归位 `regional-sharing-read-model.v1`，shared runtime 以单一 capability 注入；行为/架构/API 特征测试锁定鉴权、范围、投影、排序、审计顺序与响应兼容 / P1 | 继续小步迁移 legacy normalize/seed/handoff evidence，最终源码 owner 移交需独立流程/ADR；`shared-05`、PostgreSQL atomic repository、数据回填、真实机构地区映射和现场验收仍未关闭 |
 | 8 | JSON/SQLite state collection 治理 | DATA-003 状态完整；首发 19 个 legacy 集合已按实际调用点关闭 owner review，当前 61 existing writable、19 owner-reviewed legacy、3 system、168 review-required、1 quarantined / P1 | 继续按 DATA-008 分 owner 确认、归档或 migration 晋升；19 个已审查集合固定生产不可写，process owner 证据不得自动变成 data owner |
 | 9 | 前端可信渲染与 CSP | Accepted ADR；生产 Go/No-Go 页面新增关闭 6 个 P0 HTML sink，并以恶意响应 E2E 锁定指标、检查、审批和决策。Inventory v2 锁定 793 个 DOM HTML、6 个动态 URL、42 个动态样式风险且禁止增加/替换 / P1 | 按高风险资产继续治理 793 个 HTML 与 42 个动态样式 sink；真实 OHIF exact-Origin 到位后迁移剩余 2 个导航；完成全角色恶意输入、真实托管头与独立安全评估后才移除兼容 `unsafe-inline` 并强制严格 CSP |
-| 10 | CI/worker/部署依赖治理 | CI 风险域拆分和 Action 完整 SHA 固定已建立；12 个 worker profile 的 v1 脱敏兼容观测、9 个部署入口漂移门禁与部署包闭包已完成；在线根 47 + 居民 13 项继续隔离 Worker，PWA 3 项已验证 v61 安装/更新/离线/缓存边界/清理，标准 E2E 共 63 项；Go/No-Go 四方角色与治理页面恶意响应均有回归 / P2 | 不降低 required checks；持续按官方 tag 升级并核验 commit SHA；新增 worker 必须登记并复用 v1；真实 HTTPS、设备/浏览器策略、外部 Origin、现场缓存升级、采集器/告警和上线验收继续外置 |
+| 10 | CI/worker/部署依赖治理 | CI 风险域拆分和 Action 完整 SHA 固定已建立；12 个 worker profile 的 v1 脱敏兼容观测、9 个部署入口漂移门禁与部署包闭包已完成；在线根 48 + 居民 13 项继续隔离 Worker，PWA 3 项已验证 v61 安装/更新/离线/缓存边界/清理，标准 E2E 共 64 项；Go/No-Go 四方角色与治理页面恶意响应均有回归 / P2 | 不降低 required checks；持续按官方 tag 升级并核验 commit SHA；新增 worker 必须登记并复用 v1；真实 HTTPS、设备/浏览器策略、外部 Origin、现场缓存升级、采集器/告警和上线验收继续外置 |
 | 11 | 居民小程序制品凭证扫描消除哈希误报 | 已完成 / P2 | JSON 仅扫描语义字符串值并精确跳过两个字段中的合法 SHA-256；非 JSON 保留文本扫描；真实演示凭证与伪造摘要负向测试已建立 |
 | 12 | 对象存储结构化元数据与耐久命令轨道 | Accepted OBJ-ADR-002；T08 data owner、T00 technical owner、v1/v2 兼容策略、SQLite v17、回填冻结、异步 API、fenced worker、keyset 分页和持久 reconcile 的仓库实现均已完成，production promotion=false / P1 | 真实 provider status/abort capability、KMS/WORM/扫描、容量、备份、监控和现场验收继续 NO-GO；不得把仓库实现完成解释为 worker 已现场激活或生产晋级 |
 | 13 | 严格生产预检证据信任装配 | Accepted ADR；T00 pinned-anchor/Ed25519 双角色 provider、CLI 自动装配、deployment package/env/CI 和负向矩阵已形成 / P0 | 真实 anchor/envelope、独立 signer、权限/轮换、外部 evidence 与现场执行继续由生产环境提供；provider 成功不替代完整 preflight 或最终人类授权 |

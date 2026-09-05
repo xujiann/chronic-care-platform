@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>平台审计治理中心</title>
+    <link rel="stylesheet" href="./portal.css" />
+    <link rel="stylesheet" href="./governance-workbench.css" />
+    <link rel="stylesheet" href="./audit-governance.css" />
+    <script src="./access-control-policy.js"></script>
+    <script src="./browser-safe-url.js"></script>
+    <script src="./auth.js"></script>
+    <script src="./page-auth-bootstrap.js" data-roles="commission"></script>
+  </head>
+  <body>
+    <main class="portal-shell governance-page audit-governance-page">
+      <header class="portal-header audit-governance-hero">
+        <div>
+          <span>完整性 · 最小化 · 连续投递 · 留存保全</span>
+          <h1>平台审计治理中心</h1>
+          <p>统一核验安全事件链与数据访问链，聚合高风险分类、投递和留存控制。中心不展示人员、患者、机构、访问目标、用途或事件正文。</p>
+        </div>
+        <div class="audit-governance-decision" aria-label="生产决策">
+          <span>生产决策</span>
+          <strong id="audit-governance-decision">NO-GO</strong>
+          <small>仓库完整性不等于外部保全</small>
+        </div>
+      </header>
+
+      <section id="audit-governance-source-banner" class="work-source-banner" data-tone="warning" role="status" aria-live="polite">
+        <div>
+          <strong id="audit-governance-source-title">正在校验审计治理数据</strong>
+          <p id="audit-governance-source-detail">正在执行身份、来源结构、严格哈希链和最小投影校验。</p>
+        </div>
+        <div class="work-source-actions">
+          <a class="secondary-work-button" href="./ai-governance.html">人工智能治理</a>
+          <button id="audit-governance-refresh" class="secondary-work-button" type="button">刷新</button>
+        </div>
+      </section>
+
+      <section id="audit-governance-metrics" class="work-metric-grid" aria-label="审计治理指标"></section>
+
+      <section class="panel" aria-labelledby="audit-governance-sources-title">
+        <div class="panel-title"><h2 id="audit-governance-sources-title">审计来源与完整性</h2><span id="audit-governance-source-count">0 条链</span></div>
+        <div id="audit-governance-sources" class="audit-governance-source-grid"></div>
+      </section>
+
+      <section class="panel" aria-labelledby="audit-governance-distributions-title">
+        <div class="panel-title"><h2 id="audit-governance-distributions-title">固定分类聚合</h2><span>不展示原始事件</span></div>
+        <div class="audit-governance-distribution-layout">
+          <div><h3>结果分类</h3><div id="audit-governance-results" class="audit-governance-distribution"></div></div>
+          <div><h3>事件分类</h3><div id="audit-governance-categories" class="audit-governance-distribution"></div></div>
+          <div><h3>角色分类</h3><div id="audit-governance-roles" class="audit-governance-distribution"></div></div>
+        </div>
+      </section>
+
+      <section class="panel" aria-labelledby="audit-governance-activity-title">
+        <div class="panel-title"><h2 id="audit-governance-activity-title">近期活动日汇总</h2><span>最多 14 个日期桶</span></div>
+        <div id="audit-governance-activity" class="audit-governance-activity"></div>
+      </section>
+
+      <section class="panel" aria-labelledby="audit-governance-controls-title">
+        <div class="panel-title"><h2 id="audit-governance-controls-title">审计控制矩阵</h2><span id="audit-governance-control-count">0 项</span></div>
+        <div class="table-wrap">
+          <table class="work-table audit-governance-table">
+            <thead><tr><th scope="col">控制域</th><th scope="col">状态</th><th scope="col">仓库证据</th><th scope="col">生产阻断</th></tr></thead>
+            <tbody id="audit-governance-controls"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel" aria-labelledby="audit-governance-risks-title">
+        <div class="panel-title"><h2 id="audit-governance-risks-title">开放风险与责任移交</h2><span id="audit-governance-risk-count">0 项</span></div>
+        <div id="audit-governance-risks" class="audit-governance-risk-grid"></div>
+      </section>
+
+      <section class="panel" aria-labelledby="audit-governance-boundaries-title">
+        <div class="panel-title"><h2 id="audit-governance-boundaries-title">安全边界与上线阻断</h2><span>生产保持 NO-GO</span></div>
+        <div class="audit-governance-boundary-grid">
+          <div><h3>安全治理边界</h3><ul id="audit-governance-boundaries"></ul></div>
+          <div><h3>上线阻断项</h3><ul id="audit-governance-blockers"></ul></div>
+        </div>
+      </section>
+    </main>
+
+    <script src="./shared.js"></script>
+    <script src="./audit-governance.js"></script>
+  </body>
+</html>

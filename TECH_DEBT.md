@@ -1,5 +1,13 @@
 # TECH DEBT — 主线技术债与风险台账
 
+## 2026-09-06 平台审计治理后的剩余债务
+
+| ID | 已完成的仓库能力 | 剩余风险/下一步 |
+|---|---|---|
+| AUDIT-GOV-001 | 两条既有审计链形成 commission-only 严格完整性、固定分类和日期聚合中心；链异常与来源异常失败关闭 | 当前展示链仍是有界兼容窗口；真实 append-only 来源、历史回填、PostgreSQL/WORM 连续性和恢复验证尚未形成现场证据 |
+| AUDIT-GOV-002 | 响应禁止人员、患者/居民、机构、访问目标、用途和事件正文，只保留计数、固定分类、配置布尔值和哈希摘要 | 生产数据 Owner、访问复核频率、告警阈值、处置 SLA、电子签字与独立隐私安全评估尚未闭合 |
+| AUDIT-GOV-003 | 链修复、重封、原始导出、投递 Worker 激活和生产放行全部禁用，`L-GOV-AUDIT` 已形成仓库追踪 | 真实 SIEM/WORM、可信接收回执、外部单调锚、留存/查询/归档/销毁策略、灾备演练和多方现场签字仍缺失，生产继续 `NO-GO` |
+
 ## 2026-09-06 平台人工智能治理后的剩余债务
 
 | ID | 已完成的仓库能力 | 剩余风险/下一步 |
@@ -153,7 +161,7 @@ T00 机器登记完成后，`production-release-scope` 中 17 个仓库内 API �
 | SEC-010 | 2026-08-23 | strict production preflight 不再只能靠测试注入 externalTrustVerifier；可部署 provider 使用 pinned anchor bundle、Ed25519 双角色签名、撤销/时窗和 release/source/artifact/evidence/registry 精确绑定，默认仍 NO-GO | generic signed-envelope 负向矩阵、CLI 自动装配、synthetic fixture 不提升全局生产状态、deployment package/env/CI 合同与脱敏错误 |
 | DEPLOY-002 | 2026-08-23 | 切换行动定义升级为 definitions-only v2；14/14 effective status 仅由共享 Ed25519 provider 验证的当前 release/artifact 绑定决定派生，并接入 strict preflight 与 protected manual workflow；手改 `verified` 固定失败 | 缺 provider/记录、错签/撤销、异 release/digest、过期/未来时间、角色重合、重复 signer、缺转换历史/命令回执、symlink/超限、错误脱敏与 digest-only receipt 负向测试 |
 | TEST-007 | 2026-08-23 | 复用既有 T02 handoff harness，对 operations-command 32/32 路径建立数据驱动运行时矩阵；覆盖 19 条只读、13 条写入、三条签名集成入口及 institution 范围 | 闭集唯一性、role/deny-before-read、payload/400/403/404、响应/副作用、审计—写入顺序、审计和写入失败语义；governance-api 显式专项门禁 |
-| TEST-005 | 2026-08-27 | 本地/CI 统一 Playwright Chromium；在线根 47 项与居民 13 项继续阻止 Service Worker；PWA 3 项使用独立允许策略、动态端口和临时数据；Go/No-Go 与治理中心覆盖责任属性和恶意响应可信渲染 | 63 项唯一并集/漂移测试、居民同文件 13/13、PWA 重复 9/9、完整标准 E2E；不得把仓库浏览器测试解释为真实 HTTPS、托管安全头或现场验收 |
+| TEST-005 | 2026-08-27 | 本地/CI 统一 Playwright Chromium；在线根 48 项与居民 13 项继续阻止 Service Worker；PWA 3 项使用独立允许策略、动态端口和临时数据；Go/No-Go 与治理中心覆盖责任属性和恶意响应可信渲染 | 64 项唯一并集/漂移测试、居民同文件 13/13、PWA 重复 9/9、完整标准 E2E；不得把仓库浏览器测试解释为真实 HTTPS、托管安全头或现场验收 |
 | TEST-008 | 2026-08-23 | 专用 PWA/Service Worker E2E 验证居民登录后安装、v60→v61 激活清理、受控 update、离线 mobile/citizen 回退、API/源快照 404 缓存边界与逐项注销/清缓存 | 真实 HTTPS 终止、OS 安装提示/策略、浏览器设备矩阵、外部 Origin、现场缓存升级与独立安全验收继续外置；仓库测试不产生生产 GO |
 | GOV-001 | 2026-08-23 | `main`/`origin/main` 成为唯一当前集成与默认开发基线；固定 governance tag 仅作可复现证据，旧日期化 workflow 原文冻结 | process plan/verify 默认值、manifest/AGENTS/iteration program 漂移和 CI 目标分支负向测试 |
 | DOC-001 | 2026-08-24 | 关闭时为 267 份；当前 275 份 Markdown 以路径和 ADR 台账唯一分类为 206 current、68 snapshot、1 superseded；不删除历史证据 | 闭集路径/分类摘要、规则重叠、ADR status、当前事实和 snapshot 内容聚合摘要失败关闭 |
