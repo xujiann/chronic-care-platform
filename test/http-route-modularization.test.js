@@ -28,7 +28,8 @@ const EXPECTED_DOMAINS = [
 ];
 
 test("platform routes have one explicit ordered manifest across domain modules", () => {
-  assert.equal(ROUTE_ORDER.length, 80);
+  assert.equal(ROUTE_ORDER.length, 81);
+  assert.equal(ROUTE_ORDER.some((item) => item.id === "identity-security-ai-governance" && item.domain === "identity-security"), true);
   assert.equal(new Set(ROUTE_ORDER.map((route) => route.id)).size, ROUTE_ORDER.length);
   assert.deepEqual([...new Set(ROUTE_ORDER.map((route) => route.domain))].sort(), EXPECTED_DOMAINS);
 

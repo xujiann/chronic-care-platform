@@ -4,6 +4,7 @@ const {
   createQualitySafetyDashboardQuery
 } = require("../../../clinical-specialties/quality-safety/dashboard-query");
 const ClinicalAiCdssGovernance = require("../../../clinical-specialties/quality-safety/ai-cdss-governance-center");
+const { createClinicalGovernancePorts } = require("../../clinical-assist-runtime");
 const {
   appendApiCommandReceipt,
   apiCommandHttpError,
@@ -29,7 +30,7 @@ function createRouteSegment(runtime) {
         const user = requireApiRole(req, res, ["commission", "institution"], "/api/quality-safety/ai-cdss/center");
         if (!user) return true;
         try {
-          const center = ClinicalAiCdssGovernance.buildClinicalAiCdssGovernanceCenter(readDatabase(), user);
+            const center = ClinicalAiCdssGovernance.buildClinicalAiCdssGovernanceCenter(readDatabase(), user, createClinicalGovernancePorts());
           appendSecurityEvent({
             actor: user.name || user.username,
             role: user.role,

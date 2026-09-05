@@ -1,5 +1,9 @@
 # DATA MODEL — 主线数据地图
 
+## AI/CDSS 主线整合（2026-09-06）
+
+既有 `phase2ClinicalAssistRules[].governance` 按显式命令保存规则卡、版本、独立审批、历史和内部重放快照；提醒增加命令版本，回执可保存内部幂等元数据。无新集合、表、DDL或启动回填。四个临床集合从通用 state 公共读取剔除并禁止直接写入；专用接口返回白名单范围投影。
+
 ## 2026-09-06 平台人工智能治理数据边界
 
 本增量不新增模型、规则、建议、居民、事件或审计状态集合，不修改 JSON/SQLite/PostgreSQL schema、migration、索引、outbox 或数据 Owner。平台中心只读取 `phase2ClinicalAssistRules`、`phase2ClinicalAssistAlerts`、`phase2ClinicalAssistReceipts` 和 `diseaseRegistryModels` 的数量、版本/复核存在性等最小治理元数据；这些集合已在中央所有权合同中允许 `platform-governance` 读取。

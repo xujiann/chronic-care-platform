@@ -1,10 +1,18 @@
 "use strict";
+const { withLock } = require("../identity-security/account-lifecycle");
 
 const ROUTE_SEGMENT_ID = "platform-governance-08";
 const SUBDOMAIN = "phase2-operations";
 
 function createRouteSegment(runtime) {
-  const { POSTGRES_PRIMARY_READ_MODE, POSTGRES_SYNC_MODE, SQLITE_FILE, allowedResidentIdsForUser, appendSecurityEvent, applyCommercialCryptoAction, applyPlatformCapabilityReviewAction, applyPlatformProductionBlockerAction, applyPostgresReconciliationCaseAction, applyProductionDatabaseCutoverAction, buildCommercialCryptoCenter, buildPhase2CatalogOverview, buildPhase2ClinicalAssistOverview, buildPhase2DiseaseReportingOverview, buildPhase2FamilyDoctorContractFromApplication, buildPhase2FamilyDoctorOverview, buildPhase2JointTestPilotOverview, buildPlatformCapabilityOperationsCenter, buildPostgresProductionAdapterConfig, buildProductionDatabaseCutoverCenter, canAccessPhase2ClinicalAssistAlert, canAccessPhase2FamilyDoctorRow, collectJson, createProductionDatabaseCutoverRun, fs, listPostgresReconciliationCases, listPostgresReconciliationHistory, mergeByKey, normalizePhase2ClinicalAssistReceipt, normalizePhase2DiseaseReportReceipt, normalizePhase2FamilyDoctorApplication, normalizeState, phase2EvidenceHash, randomUUID, readDatabase, readLatestPostgresReconciliation, readPostgresReconciliationCase, readPostgresReconciliationRun, requireApiRole, runPostgresPrimaryReadRehearsal, sealAuditTrail, seedCommercialCryptoCapabilities, seedCommercialCryptoEvidencePackets, seedPhase2ClinicalAssistAlerts, seedPhase2ClinicalAssistRules, seedPhase2DiseaseReportQueue, seedPhase2FamilyDoctorApplications, seedPhase2FamilyDoctorContracts, seedProductionDatabaseCutoverRuns, seedProductionDatabaseMigrationBatches, sendJson, shouldUseSqlite, todayOffset, writeDatabase } = runtime;
+  const { POSTGRES_PRIMARY_READ_MODE, POSTGRES_SYNC_MODE, SQLITE_FILE, allowedResidentIdsForUser, appendSecurityEvent, applyCommercialCryptoAction, applyPlatformCapabilityReviewAction, applyPlatformProductionBlockerAction, applyPostgresReconciliationCaseAction, applyProductionDatabaseCutoverAction, buildCommercialCryptoCenter, buildPhase2CatalogOverview, buildPhase2ClinicalAssistOverview, buildPhase2DiseaseReportingOverview, buildPhase2FamilyDoctorContractFromApplication, buildPhase2FamilyDoctorOverview, buildPhase2JointTestPilotOverview, buildPlatformCapabilityOperationsCenter, buildPostgresProductionAdapterConfig, buildProductionDatabaseCutoverCenter, canAccessPhase2FamilyDoctorRow, collectJson, executePhase2ClinicalAssistReceipt, prependAuditTrailEntry, verifyAuditTrail, createProductionDatabaseCutoverRun, fs, listPostgresReconciliationCases, listPostgresReconciliationHistory, mergeByKey, normalizePhase2DiseaseReportReceipt, normalizePhase2FamilyDoctorApplication, normalizeState, phase2EvidenceHash, randomUUID, readDatabase, readLatestPostgresReconciliation, readPostgresReconciliationCase, readPostgresReconciliationRun, requireApiRole, runPostgresPrimaryReadRehearsal, sealAuditTrail, seedCommercialCryptoCapabilities, seedCommercialCryptoEvidencePackets, seedPhase2ClinicalAssistRules, seedPhase2DiseaseReportQueue, seedPhase2FamilyDoctorApplications, seedPhase2FamilyDoctorContracts, seedProductionDatabaseCutoverRuns, seedProductionDatabaseMigrationBatches, sendJson, shouldUseSqlite, todayOffset, writeDatabase } = runtime;
+  function sendClinicalAssistError(res, error) {
+    const known = typeof error.code === "string" && error.code.startsWith("CDSS_");
+    sendJson(res, error instanceof URIError ? 400 : known ? error.statusCode || 500 : 500, {
+      code: error instanceof URIError ? "CDSS_INVALID_ID" : known ? error.code : "CDSS_OPERATION_FAILED",
+      message: "临床辅助操作未完成", productionReady: false
+    });
+  }
   return {
       id: "platform-governance-08",
       domain: "platform-governance",
@@ -502,7 +510,8 @@ function createRouteSegment(runtime) {
         const user = requireApiRole(req, res, ["commission", "institution"], "/api/phase2/clinical-assist");
         if (!user) return true;
         const data = readDatabase();
-        sendJson(res, 200, buildPhase2ClinicalAssistOverview(data, user));
+        try { sendJson(res, 200, buildPhase2ClinicalAssistOverview(data, user)); }
+        catch (error) { sendClinicalAssistError(res, error); }
         return true;
       }
 
@@ -689,88 +698,77 @@ function createRouteSegment(runtime) {
       if (req.method === "POST" && phase2ClinicalAssistReceiptMatch) {
         const user = requireApiRole(req, res, ["commission", "institution"], "/api/phase2/clinical-assist/alerts/:id/receipt");
         if (!user) return true;
-        const data = readDatabase();
-        const alertId = decodeURIComponent(phase2ClinicalAssistReceiptMatch[1]);
-        const alerts = Array.isArray(data.phase2ClinicalAssistAlerts) ? data.phase2ClinicalAssistAlerts : seedPhase2ClinicalAssistAlerts();
-        const index = alerts.findIndex((item) => item.id === alertId);
-        if (index < 0) {
-          sendJson(res, 404, { error: "Not Found", message: "未找到临床辅助提醒" });
-          return true;
+        try {
+          const alertId = decodeURIComponent(phase2ClinicalAssistReceiptMatch[1]);
+          const payload = await collectJson(req);
+          const result = await withLock("clinical-assist:state", () => executePhase2ClinicalAssistReceipt({ alertId, payload, user, idempotencyKey: req.headers?.["idempotency-key"] }));
+          sendJson(res, 200, result);
+        } catch (error) {
+          sendClinicalAssistError(res, error);
         }
-        if (!canAccessPhase2ClinicalAssistAlert(user, alerts[index])) {
-          appendSecurityEvent({ actor: user.name, role: user.role, action: "phase2-clinical-assist-receipt", target: alertId, result: "denied", detail: "超出医生工作站授权范围" });
-          sendJson(res, 403, { error: "Forbidden", message: "无权处理该临床辅助提醒" });
-          return true;
-        }
-        const payload = await collectJson(req);
-        const receipt = normalizePhase2ClinicalAssistReceipt(alerts[index], payload, user);
-        alerts[index] = {
-          ...alerts[index],
-          status: /dismiss|ignore|拒绝|忽略|保留/i.test(receipt.doctorAction) ? "dismissed-with-reason" : "acknowledged",
-          doctorAction: receipt.doctorAction,
-          messageReceiptStatus: receipt.receiptStatus,
-          receiptId: receipt.id,
-          lastAction: receipt.actionDetail,
-          lastReceiptAt: receipt.receivedAt
-        };
-        data.phase2ClinicalAssistAlerts = alerts;
-        data.phase2ClinicalAssistReceipts = mergeByKey(data.phase2ClinicalAssistReceipts, [receipt], "id");
-        data.securityEvents = [
-          {
-            id: randomUUID(),
-            at: new Date().toLocaleString("zh-CN", { hour12: false }),
-            actor: user.name,
-            role: user.role,
-            action: "phase2-clinical-assist-receipt",
-            target: alertId,
-            result: "allowed",
-            detail: `${receipt.doctorAction} · ${receipt.receiptStatus} · ${receipt.auditHash}`
-          },
-          ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
-        ].slice(0, 120);
-        writeDatabase(data);
-        sendJson(res, 200, { alert: alerts[index], receipt, overview: buildPhase2ClinicalAssistOverview(data, user) });
         return true;
       }
 
       const phase2ClinicalAssistRuleConfigMatch = url.pathname.match(/^\/api\/phase2\/clinical-assist\/rules\/([^/]+)\/config$/);
       if (req.method === "POST" && phase2ClinicalAssistRuleConfigMatch) {
-        const user = requireApiRole(req, res, ["commission", "institution"], "/api/phase2/clinical-assist/rules/:id/config");
+        const user = requireApiRole(req, res, ["commission"], "/api/phase2/clinical-assist/rules/:id/config");
         if (!user) return true;
-        const data = readDatabase();
-        const ruleId = decodeURIComponent(phase2ClinicalAssistRuleConfigMatch[1]);
-        const rules = Array.isArray(data.phase2ClinicalAssistRules) ? data.phase2ClinicalAssistRules : seedPhase2ClinicalAssistRules();
-        const index = rules.findIndex((item) => item.id === ruleId);
-        if (index < 0) {
-          sendJson(res, 404, { error: "Not Found", message: "未找到临床辅助规则" });
+        if (process.env.NODE_ENV === "production") {
+          sendJson(res, 403, { code: "CDSS_LEGACY_CONFIG_DISABLED", message: "生产环境必须使用规则治理入口" });
           return true;
         }
-        const payload = await collectJson(req);
-        rules[index] = {
-          ...rules[index],
-          configStatus: String(payload.configStatus || payload.status || rules[index].configStatus || "active").trim(),
-          severity: String(payload.severity || rules[index].severity || "medium").trim(),
-          defaultAction: String(payload.defaultAction || rules[index].defaultAction || "").trim(),
-          owner: String(payload.owner || rules[index].owner || user.orgName || "").trim(),
-          lastConfiguredBy: user.username || user.role,
-          lastConfiguredAt: new Date().toISOString()
-        };
-        data.phase2ClinicalAssistRules = rules;
-        data.securityEvents = [
-          {
-            id: randomUUID(),
-            at: new Date().toLocaleString("zh-CN", { hour12: false }),
-            actor: user.name,
-            role: user.role,
-            action: "phase2-clinical-assist-rule-config",
-            target: ruleId,
-            result: "allowed",
-            detail: `${rules[index].configStatus} · ${rules[index].severity}`
-          },
-          ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
-        ].slice(0, 120);
-        writeDatabase(data);
-        sendJson(res, 200, { rule: rules[index], overview: buildPhase2ClinicalAssistOverview(data, user) });
+        try {
+          const ruleId = decodeURIComponent(phase2ClinicalAssistRuleConfigMatch[1]);
+          const payload = await collectJson(req);
+          await withLock("clinical-assist:state", async () => {
+          const data = structuredClone(readDatabase());
+          const rules = Array.isArray(data.phase2ClinicalAssistRules) ? data.phase2ClinicalAssistRules : seedPhase2ClinicalAssistRules();
+          const index = rules.findIndex((item) => item.id === ruleId);
+          if (index < 0) {
+            sendJson(res, 404, { code: "CDSS_RULE_NOT_FOUND", message: "未找到临床辅助规则" });
+            return true;
+          }
+          if (rules[index].governance) {
+            sendJson(res, 409, { code: "CDSS_GOVERNED_RULE_REQUIRES_WORKFLOW", message: "已登记规则必须通过规则治理流程修改" });
+            return true;
+          }
+          if (!payload || typeof payload !== "object" || Array.isArray(payload)
+            || Object.keys(payload).some((key) => !["configStatus", "status", "severity", "defaultAction", "owner"].includes(key))
+            || Object.values(payload).some((value) => typeof value !== "string" || !value.trim() || value.length > 2000)) {
+            sendJson(res, 400, { code: "CDSS_INVALID_PAYLOAD", message: "规则配置字段无效" });
+            return true;
+          }
+          if ((payload.configStatus || payload.status) && !["active", "inactive", "disabled", "paused", "draft"].includes(payload.configStatus || payload.status)
+            || payload.severity && !["low", "medium", "high", "critical"].includes(payload.severity)) {
+            sendJson(res, 400, { code: "CDSS_INVALID_PAYLOAD", message: "规则状态或严重度无效" });
+            return true;
+          }
+          if (!verifyAuditTrail(data.securityEvents).passed) {
+            sendJson(res, 409, { code: "CDSS_AUDIT_INVALID", message: "审计链校验未通过" });
+            return true;
+          }
+          rules[index] = {
+            ...rules[index],
+            configStatus: String(payload.configStatus || payload.status || rules[index].configStatus || "active").trim(),
+            severity: String(payload.severity || rules[index].severity || "medium").trim(),
+            defaultAction: String(payload.defaultAction || rules[index].defaultAction || "").trim(),
+            owner: String(payload.owner || rules[index].owner || user.orgName || "").trim(),
+            lastConfiguredBy: user.id || user.username,
+            lastConfiguredAt: new Date().toISOString()
+          };
+          data.phase2ClinicalAssistRules = rules;
+          data.securityEvents = prependAuditTrailEntry(data.securityEvents, {
+            id: randomUUID(), at: new Date().toISOString(), actor: user.id || user.username,
+            role: user.role, action: "phase2-clinical-assist-rule-config",
+            target: ruleId, result: "allowed", detail: "legacy-rule-configuration"
+          });
+          if (!verifyAuditTrail(data.securityEvents).passed) throw new Error("CDSS_AUDIT_INVALID");
+          await writeDatabase(data);
+          sendJson(res, 200, { rule: rules[index], overview: buildPhase2ClinicalAssistOverview(data, user), productionReady: false });
+          });
+        } catch (error) {
+          sendClinicalAssistError(res, error);
+        }
         return true;
       }
 

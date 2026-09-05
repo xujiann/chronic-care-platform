@@ -1,5 +1,9 @@
 # 工程治理路线图
 
+## AI/CDSS 主线整合（2026-09-06）
+
+按用户确认方案，以 main@7de328e0 为基线选择迁入 #248 缺失保护，保留 #249/#250 中心。当前整合范围、验收及后续队列见 [执行计划](docs/ai-cdss-reconciliation-plan.md)；影像、体检和外部现场事项未因本增量标记完成。
+
 > 更新：2026-09-06。队列不是实施授权；只有 Accepted ADR/明确 owner 审批的范围可进入实现。
 
 ## T01 平台人工智能治理首增量（2026-09-06）
@@ -64,7 +68,7 @@
 | 7 | 运行时上下文瘦身 | 候选 / P1 | 按领域子端口，逐块迁移，不重写 server |
 | 7A | 临床五个可治理子域 | 治理切片完成，急救/血液/影像/体检首个查询用例已迁移；影像 share/QC 与体检专项分流 action 三个写用例已接入目标命令端口并有单元、顺序/失败保护；operations dashboard 与 command 已由 T00 移交 T02，command 32/32 路径已完成 TEST-007 行为保护 / P1 | Accepted ADR；保持协议兼容，继续按五子域逐用例迁移并禁止已迁用例及 operations 回流 T06；专项分流幂等/CAS/事务、QC 幂等/CAS/机构范围及外调—本地写入核对需独立行为变更审批，当前保持 NO-GO；operations 后续拆分或 ARC-008 治理必须保持矩阵通过并另行审批 |
 | 7B | 健康驾驶舱版本化指标 | 首个 `population-service-visits.v1` 合同已建立 / P1 | 由 T03 确认来源版本与签名证据、由 T00 注入服务端 region scope；其余指标按 owner 逐项接入 |
-| 7C | 生产 API 机器目录 | v3 当前 633 项与 13 项认证合同。现有 39 份幂等行为合同：37 个完整 endpoint、2 个转诊 action-slice；招标需求复核、脱敏批次登记和交付治理入口均具备白名单稳定错误、冲突、审计失败和存储失败负证据，`reviewedProofRequired` 为 0。362 个写接口中 325 个仍缺 endpoint 级证明，通用 action remainder 使总复核为 327，全部 NO-GO / P1 | 继续按高风险与数据写入优先逐 owner 补证；现有合同只证明当前单实例/SQLite 兼容路径，不关闭真实 data owner、PG 多实例、长期留存/归档与现场证据，禁止把进程锁、SQLite CAS 或测试解释为 exactly-once/生产 GO |
+| 7C | 生产 API 机器目录 | v3 当前 635 项与 13 项认证合同。现有 40 份幂等行为合同：38 个完整 endpoint、2 个转诊 action-slice；招标需求复核、脱敏批次登记和交付治理入口均具备白名单稳定错误、冲突、审计失败和存储失败负证据，`reviewedProofRequired` 为 0。363 个写接口中 325 个仍缺 endpoint 级证明，通用 action remainder 使总复核为 327，全部 NO-GO / P1 | 继续按高风险与数据写入优先逐 owner 补证；现有合同只证明当前单实例/SQLite 兼容路径，不关闭真实 data owner、PG 多实例、长期留存/归档与现场证据，禁止把进程锁、SQLite CAS 或测试解释为 exactly-once/生产 GO |
 | 7D | 区域共享只读边界 | 两个 GET builder 已从组合根归位 `regional-sharing-read-model.v1`，shared runtime 以单一 capability 注入；行为/架构/API 特征测试锁定鉴权、范围、投影、排序、审计顺序与响应兼容 / P1 | 继续小步迁移 legacy normalize/seed/handoff evidence，最终源码 owner 移交需独立流程/ADR；`shared-05`、PostgreSQL atomic repository、数据回填、真实机构地区映射和现场验收仍未关闭 |
 | 8 | JSON/SQLite state collection 治理 | DATA-003 状态完整；首发 19 个 legacy 集合已按实际调用点关闭 owner review，当前 61 existing writable、19 owner-reviewed legacy、3 system、168 review-required、1 quarantined / P1 | 继续按 DATA-008 分 owner 确认、归档或 migration 晋升；19 个已审查集合固定生产不可写，process owner 证据不得自动变成 data owner |
 | 9 | 前端可信渲染与 CSP | Accepted ADR；生产 Go/No-Go 页面新增关闭 6 个 P0 HTML sink，并以恶意响应 E2E 锁定指标、检查、审批和决策。Inventory v2 锁定 793 个 DOM HTML、6 个动态 URL、42 个动态样式风险且禁止增加/替换 / P1 | 按高风险资产继续治理 793 个 HTML 与 42 个动态样式 sink；真实 OHIF exact-Origin 到位后迁移剩余 2 个导航；完成全角色恶意输入、真实托管头与独立安全评估后才移除兼容 `unsafe-inline` 并强制严格 CSP |
@@ -73,7 +77,7 @@
 | 12 | 对象存储结构化元数据与耐久命令轨道 | Accepted OBJ-ADR-002；T08 data owner、T00 technical owner、v1/v2 兼容策略、SQLite v17、回填冻结、异步 API、fenced worker、keyset 分页和持久 reconcile 的仓库实现均已完成，production promotion=false / P1 | 真实 provider status/abort capability、KMS/WORM/扫描、容量、备份、监控和现场验收继续 NO-GO；不得把仓库实现完成解释为 worker 已现场激活或生产晋级 |
 | 13 | 严格生产预检证据信任装配 | Accepted ADR；T00 pinned-anchor/Ed25519 双角色 provider、CLI 自动装配、deployment package/env/CI 和负向矩阵已形成 / P0 | 真实 anchor/envelope、独立 signer、权限/轮换、外部 evidence 与现场执行继续由生产环境提供；provider 成功不替代完整 preflight 或最终人类授权 |
 | 14 | 生产切换行动证据与受保护晋级 | Accepted ADR；definitions-only v2、14/14 共享 Ed25519 验证、strict preflight 门禁、main/manual/production/self-hosted workflow 与 digest-only receipt 已形成 / P0 | GitHub production environment reviewers、专用 runner、真实 14 份 envelope、受控路径、外部审批和实际部署/现场签收继续 NO-GO；receipt 只证明预检资格 |
-| 15 | 当前工作流、Markdown 与跟踪 PDF 闭集治理 | GOV-001、DOC-001、REPO-001 仓库内缺口已关闭：开发默认 `origin/main`，固定 tag 仅作证据；275 份 Markdown 唯一分类；3 个 PDF 绑定来源与 digest / P2 | snapshot/superseded 保持只读；新增文档同步清单。两个历史 PDF 与一个现行校验 PDF 均无跟踪生成器，替换前必须先补可复现生成源，不得手工编辑 |
+| 15 | 当前工作流、Markdown 与跟踪 PDF 闭集治理 | GOV-001、DOC-001、REPO-001 仓库内缺口已关闭：开发默认 `origin/main`，固定 tag 仅作证据；277 份 Markdown 唯一分类；3 个 PDF 绑定来源与 digest / P2 | snapshot/superseded 保持只读；新增文档同步清单。两个历史 PDF 与一个现行校验 PDF 均无跟踪生成器，替换前必须先补可复现生成源，不得手工编辑 |
 | 16 | 首批生产范围机器冻结 | Accepted ADR；`priority-eight-applications-v1` 冻结 8 应用、9 页面、32 API、38 数据引用、7 worker、14 外部依赖、16 应用证据与 14 切换动作；API/Owner 复核归零。新增迁移闭集把 21 个受阻引用分为 20 个唯一持久化计划与 1 个派生读模型，`collectionRepositoryPlanMissing=0` / P0 | 仓库计划完整不代表迁移完成；21 个引用仍无生产写资格，全部 API/数据晋级、真实外部证据、worker 激活、PG 主切换和现场验收继续 NO-GO |
 | 17 | 招标需求治理 v2 | Accepted ADR；2 份中性样本文档、5 条候选、27 个能力 ID、受控 PDF 指纹导入、人工复核覆盖层、差距分析与产品化工作台已形成 / P0 | 原始文件、全文、浏览器上传、OCR/模型、自动改代码和生产授权均不在首批范围；复核写入口保持行为证据待补与生产 NO-GO |
 

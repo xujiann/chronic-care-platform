@@ -1,5 +1,9 @@
 # API MAP — 主线接口地图
 
+## AI/CDSS 主线整合（2026-09-06）
+
+新增 `GET /api/ai-governance/center`（仅规则元数据）与 `POST /api/ai-governance/rules/:id/actions`（commission manager、增强认证、幂等/CAS、独立审批、审计）。保留主线 `/api/runtime/ai-governance/center` 与 `/api/quality-safety/ai-cdss/center`。旧临床回执支持版本/稳定重放，旧 config 生产拒绝且非生产禁止改已治理规则。当前目录 635 项、363 写入口，40 份行为合同覆盖 38 个完整 endpoint 与 2 个 action slice；325 个写证明缺口和 327 个总复核项仍 NO-GO。
+
 ## 2026-09-06 平台人工智能治理 API
 
 | 接口 | 角色与范围 | 语义 |

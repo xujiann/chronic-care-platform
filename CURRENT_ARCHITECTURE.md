@@ -1,5 +1,9 @@
 # CURRENT ARCHITECTURE — 主线现状地图
 
+## AI/CDSS 主线整合（2026-09-06）
+
+保留 #249 临床中心与 #250 平台中心的页面和查询 schema；平台页内新增现有临床规则的审批命令区。T01 状态机、T06 范围/回执端口与 T00 装配复用同一规则集合，未新增页面、集合或生产激活。临床两种读取均抑制暂停/来源漂移建议，兼容 state/config 关闭绕过。
+
 ## 2026-09-06 T01 平台人工智能治理
 
 - `src/identity-security/ai-governance-center.js` 建立四类跨域 AI 场景、八类控制和开放风险的只读治理投影；只读取 `domain-data-ownership` 已允许 `platform-governance` 访问的临床规则/提醒/回执与科研模型集合。
@@ -337,7 +341,7 @@ Worker、外部数字医院注册及仍为 Proposed 的对象存储 v2 worker �
 `baseline/governance-20260817-enhancement-v1` 仅保留为可复现证据 tag。历史日期化路由/治理文档不再被
 `AGENTS.md` 作为当前工作流入口引用，原文和摘要保持不变。
 
-`repository-governance-v1` 从 Git 路径派生；当前闭集为 275 份 Markdown：206 份 `current`、68 份
+`repository-governance-v1` 从 Git 路径派生；当前闭集为 277 份 Markdown：208 份 `current`、68 份
 `snapshot`、1 份 `superseded`，每个路径必须唯一命中规则；snapshot 内容聚合摘要失败关闭。
 `output/pdf` 的 3 个 PDF 未修改，分别绑定 SHA-256、大小、页数、引入提交、来源与保留理由。现有仓库
 没有任何一个 PDF 的可复现生成器；医院运行脚本只是 verifier，不能被描述为 generator。机器门禁只读，

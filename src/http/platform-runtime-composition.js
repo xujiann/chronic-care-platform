@@ -1,4 +1,5 @@
 "use strict";
+const { createClinicalAssistRuntime } = require("./clinical-assist-runtime");
 
 const { createPlatformApiRouter } = require("./routes");
 const {
@@ -29,4 +30,4 @@ function createPlatformRuntimeComposition(options = {}) {
   });
 }
 
-module.exports = { createPlatformRuntimeComposition };
+module.exports = { createPlatformRuntimeComposition, createClinicalAssistRuntime };
