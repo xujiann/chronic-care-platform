@@ -51,6 +51,40 @@ test("formal login markup contains no visible shared password or demo verificati
   assert.match(read("login.js"), /演示账号统一密码为 123456/);
 });
 
+test("every native dialog has an explicit accessible name", () => {
+  const pages = Object.keys(policy.pageCatalog).filter((page) => !page.includes("/") && fs.existsSync(path.join(ROOT, page)));
+  let dialogCount = 0;
+  for (const page of pages) {
+    const source = read(page);
+    for (const match of source.matchAll(/<dialog\b([^>]*)>/g)) {
+      dialogCount += 1;
+      const labelledBy = match[1].match(/\baria-labelledby="([^"]+)"/)?.[1];
+      const labelled = /\baria-label="[^"]+"/.test(match[1]);
+      assert.ok(labelledBy || labelled, `${page} dialog must have aria-label or aria-labelledby`);
+      if (labelledBy) assert.match(source, new RegExp(`\\bid="${labelledBy.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}"`), `${page} dialog label target must exist`);
+    }
+  }
+  assert.equal(dialogCount, 22);
+});
+
+test("login tabs and legacy filters expose explicit accessible contracts", () => {
+  const login = read("login.html");
+  const loginClient = read("login.js");
+  assert.match(login, /id="login-method-account"[^>]+role="tab"[^>]+aria-controls="login-form"[^>]+tabindex="0"/);
+  assert.match(login, /id="login-method-phone"[^>]+role="tab"[^>]+aria-controls="phone-login-form"[^>]+tabindex="-1"/);
+  assert.match(login, /id="demo-accounts"[^>]+role="tabpanel"/);
+  assert.match(login, /id="identity-type-grid"[^>]+role="tablist"[^>]+aria-labelledby="identity-title"/);
+  assert.match(loginClient, /keyboardTabTarget/);
+  for (const key of ["ArrowRight", "ArrowDown", "ArrowLeft", "ArrowUp", "Home", "End"]) assert.match(loginClient, new RegExp(key));
+  assert.match(read("index.html"), /<label>居民检索<input id="resident-search"/);
+  assert.match(read("index.html"), /<label>管理机构筛选<select id="resident-org-filter"/);
+  const diseasePayment = read("disease-payment.html");
+  assert.match(diseasePayment, /<label><strong>支付模式<\/strong><select id="payment-mode"/);
+  assert.match(diseasePayment, /id="local-package-file"[^>]+aria-label="本地医保规则包 JSON 文件"/);
+  assert.match(diseasePayment, /<label>反馈类别<select name="category"/);
+  assert.match(diseasePayment, /<label>反馈内容<textarea name="content"/);
+});
+
 test("role menus expose only pages authorized for the exact account type", () => {
   const manager = { role: "institution", accountType: "manager", orgType: "medical_institution" };
   const doctor = { role: "institution", accountType: "doctor", orgType: "medical_institution" };

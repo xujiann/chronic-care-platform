@@ -1,5 +1,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const path = require("node:path");
 
 const {
   buildProductionSecurityAcceptanceCenter,
@@ -111,4 +113,18 @@ test("expired waiver reopens the release gate", () => {
   assert.equal(center.findings[0].open, true);
   assert.equal(center.summary.highOpen, 1);
   assert.equal(center.summary.releaseEligible, false);
+});
+
+test("production security workbench renders untrusted fields through explicit DOM nodes", () => {
+  const source = fs.readFileSync(path.join(__dirname, "..", "production-security.js"), "utf8");
+  assert.doesNotMatch(source, /\.innerHTML\s*=|insertAdjacentHTML\s*\(/);
+  assert.match(source, /textContent\s*=/);
+  assert.match(source, /replaceChildren\s*\(/);
+  assert.match(source, /dataset\[key\]\s*=/);
+  assert.match(source, /productionSecurityAction/);
+  assert.match(source, /productionSecurityApproval/);
+  assert.match(source, /#production-security-findings \[data-production-security-action\]/);
+  assert.match(source, /#production-security-approvals \[data-production-security-approval\]/);
+  assert.match(source, /findingActions\(finding\)\.some/);
+  assert.match(source, /expectedApprovalAction/);
 });

@@ -1,5 +1,16 @@
 # API MAP — 主线接口地图
 
+## 2026-09-06 遗留状态身份边界
+
+| API | 身份/范围 | 稳定失败与响应边界 |
+|---|---|---|
+| `GET /api/state` | 原五类角色不变；commission 追加 `accountType=manager` | 非管理 commission 在 read 前 `403 STATE_DATA_MANAGER_REQUIRED`；成功响应删除 `authUsers` 口令 |
+| `PUT /api/state` | commission manager | 在 body/read 前拒绝非 manager；身份集合公开字段差异 `409 IDENTITY_SERVER_MANAGED_COLLECTION_CONFLICT`、省略/安全投影保留权威值；成功响应递归删除凭据 |
+| `PUT /api/state-collections/:collection` | commission manager；既有集合 owner 约束不变 | 非 manager 在 collection decode/body/read 前 `403 STATE_DATA_MANAGER_REQUIRED`；`authUsers/authOrganizations` 对 manager 返回 `403 IDENTITY_SERVER_MANAGED_COLLECTION_WRITE_DENIED` |
+| `POST /api/reset` | commission manager、仅非生产 | 非 manager 在 seed 前失败；生产仍 `403 DEMO_RESET_DISABLED_IN_PRODUCTION`；成功响应删除口令 |
+
+四条均由 `config/high-risk-api-authorization.json` 唯一登记，授权矩阵现有 21 条高风险接口。未新增 method/path 或成功写语义，真实 provider/PostgreSQL/现场授权不在本切片。
+
 ## AI/CDSS 主线整合（2026-09-06）
 
 新增 `GET /api/ai-governance/center`（仅规则元数据）与 `POST /api/ai-governance/rules/:id/actions`（commission manager、增强认证、幂等/CAS、独立审批、审计）。保留主线 `/api/runtime/ai-governance/center`、`/api/quality-safety/ai-cdss/center` 与 `/api/security/audit-governance/center`。旧临床回执支持版本/稳定重放，旧 config 生产拒绝且非生产禁止改已治理规则。当前目录 636 项、363 写入口，40 份行为合同覆盖 38 个完整 endpoint 与 2 个 action slice；325 个写证明缺口和 327 个总复核项仍 NO-GO。
@@ -206,7 +217,7 @@ HTTP request
 - HTML、静态资源、JSON/API、下载与错误响应由集中端口下发 `nosniff`、frame、referrer、
   permissions 与 CSP。显式发布图的内联脚本/样式静态风险已归零，但兼容 CSP 仍含 `unsafe-inline`，
   严格目标只为 Report-Only；血液主工作台、急救生命链、医生工作台、血液上线看板、陪诊工作台、产品运行驾驶舱、产品区域运行驾驶舱、质量安全工作台、区域切换工作台、血液召回面板、血液创新指挥中心及体检工作台 API 字段已使用 DOM/text 节点，Inventory v2 已把
-  793 个 DOM HTML、6 个动态 URL 和 42 个动态样式
+  790 个 DOM HTML、6 个动态 URL 和 42 个动态样式
   sink 作为资产级治理事实锁定。`browser-safe-url-policy.v1` 将可证明的内部导航、对象存储、`tel:120`
   和 blob 下载迁入统一协议/无凭据/exact-Origin 检查；29 个原模板 occurrence 已由 28 个真实 DOM
   绑定迁移和 1 个扫描误报校正闭合，仅 2 个 OHIF 导航保持 `review-required`。该变化不改变任何
@@ -218,9 +229,9 @@ HTTP request
 - 审计追加点分散在组合根、路由和领域服务；统一审计契约尚未完全落地。
 - `GET /api/audit/verify` 继续返回 HTTP 200 的可解析业务结果，运行时与留存 CLI 共用 v2 严格验证器；合规报告和留存门禁按相同失败语义传播。
 - 所有既有状态写入在同一 SQLite 事务内核对并追加 v15 审计 source；该 hook 不暴露新 HTTP API，同 ID 异内容会使原请求整体失败回滚。
-- `PUT /api/state` 保持原路径和成功形状。审计数组以及四个 T02 区域共享集合均为服务端管理字段：省略时保留，提交时必须与当前值逐项深相等。区域集合的删除、修改、重排或伪造追加优先返回 `409 REGIONAL_SHARING_SERVER_MANAGED_COLLECTION_CONFLICT`；其他集合的乐观版本冲突仍返回 `409 STORAGE_CONFLICT`。集合级兼容入口对四个区域集合返回 `403 REGIONAL_SHARING_SERVER_MANAGED_COLLECTION_WRITE_DENIED`。
-- `GET /api/state` 保持 method/path、允许角色、状态码和顶层集合兼容。鉴权与既有角色范围投影完成后，`authUsers` 专用投影删除 `password`、`passwordHash`，保留账号、角色、机构、状态和 `externalSubject` 等管理字段；读取不修改权威快照。该增量只关闭认证口令泄露，commission 其余全状态最小权限债务仍为 `NO-GO`。
-- `npm run api:authorization-matrix` 从模块化路由源码生成/校验 owner、身份、角色、范围、用途和 18 条高风险接口唯一性。
+- `PUT /api/state` 保持原路径和成功形状。审计数组、四个 T02 区域共享集合及两个 T01 身份集合均为服务端管理字段：身份集合省略或回传同一安全投影时保留权威值，公开身份字段变化返回 `409 IDENTITY_SERVER_MANAGED_COLLECTION_CONFLICT`；区域集合的删除、修改、重排或伪造追加优先返回 `409 REGIONAL_SHARING_SERVER_MANAGED_COLLECTION_CONFLICT`；其他集合的乐观版本冲突仍返回 `409 STORAGE_CONFLICT`。集合级兼容入口对身份集合返回 `403 IDENTITY_SERVER_MANAGED_COLLECTION_WRITE_DENIED`。
+- `GET /api/state` 保持 method/path 与五类角色集合兼容；commission 仅 `accountType=manager` 可继续访问，其他角色仍使用既有范围投影。鉴权完成后，`authUsers` 专用投影递归删除 password/token/secret/session/private-key/api-key 等凭据键，保留账号、角色、机构、状态、`externalSubject` 与非凭据业务字段；读取不修改权威快照。commission manager 的其余全状态最小权限债务仍为 `NO-GO`。
+- `npm run api:authorization-matrix` 从模块化路由源码生成/校验 owner、身份、角色、范围、用途和 21 条高风险接口唯一性。
 - `npm run api:authentication-evidence` 校验 13 项认证合同的 owner、mechanism、credential source、required/optional/none、replay/CSRF、scope、实现锚点和可执行负向测试。其中 SMS callback 从现有幂等合同派生；原 13 个未分类 key 中 12 个真实入口已分类，T10 cutover pack 绑定 commission 直接拒绝证据，1 个公卫词法误配已从 inventory 删除，未分类认证为 0。
 - `npm run api:production-catalog` 合并上述授权矩阵与同一 route source inventory 的字面条件；当前 636 项全部 `NO-GO`。363 个写接口中 38 个完整 endpoint 有直接幂等行为合同，325 个仍缺 endpoint 级行为证明；2 个转诊 action-slice 不晋升通用 endpoint，退款 runtime-role variant 仍复核，因此总 `review-required` 为 327。
 - `npm run api:idempotency-evidence` 校验 40 份证据合同且显式待补证明为 0。招标需求复核、脱敏批次登记、交付治理和 AI 规则治理入口已绑定角色、操作者、幂等键和 CAS，将领域状态、回执与审计一次持久化，并以固定脱敏错误覆盖输入、冲突、审计和存储失败。其余完整合同绑定各入口的身份、职责/资源范围、原响应或精确结果回放、CAS、单次持久化与稳定错误负测。所有合同保持 `productionReady=false`，进程锁与 SQLite CAS 不等于跨实例 exactly-once。
@@ -408,7 +419,7 @@ profile、profile 替换、额外字段和生产授权扩张均失败关闭。�
 ## 20. Playwright E2E 隔离（无 HTTP 变化）
 
 TEST-005 只改变测试进程、浏览器与临时端口装配，不新增或改变任何 HTTP method/path、鉴权、角色、
-scope、错误、幂等或审计语义。根 40 项与居民 13 项继续调用现有接口；动态回环端口和临时数据只用于
+scope、错误、幂等或审计语义。根 58 项与居民 13 项继续调用现有接口，PWA 专项 3 项使三套共 74 项；动态回环端口和临时数据只用于
 自动化验证，不能登记为公开 API、生产 endpoint 或现场证据。
 
 PWA 专项增加 3 项独立浏览器行为测试，但不新增测试控制 HTTP API：仍由现有 `/api/health` 探活并使用

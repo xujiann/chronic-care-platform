@@ -49,17 +49,33 @@
     const roles = [...new Set(accounts.map((user) => user.role))];
     byId("identity-type-grid").innerHTML = roles.map((role) => {
       const count = accounts.filter((user) => user.role === role).length;
-      return `<button type="button" role="tab" data-identity-role="${escapeText(role)}" aria-selected="${role === selectedRole}"><strong>${escapeText(policy.roleLabels[role] || role)}</strong><span>${count} 个可用岗位</span></button>`;
+      return `<button id="identity-role-${escapeText(role)}" type="button" role="tab" data-identity-role="${escapeText(role)}" aria-selected="${role === selectedRole}" aria-controls="demo-accounts" tabindex="${role === selectedRole ? "0" : "-1"}"><strong>${escapeText(policy.roleLabels[role] || role)}</strong><span>${count} 个可用岗位</span></button>`;
     }).join("");
+    const selectedTab = document.querySelector(`[data-identity-role="${selectedRole}"]`);
+    if (selectedTab) byId("demo-accounts").setAttribute("aria-labelledby", selectedTab.id);
+    else byId("demo-accounts").removeAttribute("aria-labelledby");
     document.querySelectorAll("[data-identity-role]").forEach((button) => {
-      button.addEventListener("click", () => {
-        selectedRole = button.dataset.identityRole;
-        selectedUsername = accounts.find((user) => user.role === selectedRole)?.username || "";
-        renderIdentityTypes();
-        renderAccountCards();
-        selectAccount(selectedUsername);
-      });
+      button.addEventListener("click", () => activateIdentityRole(button.dataset.identityRole, true));
     });
+  }
+
+  function activateIdentityRole(role, focus = false) {
+    if (!accounts.some((user) => user.role === role)) return;
+    selectedRole = role;
+    selectedUsername = accounts.find((user) => user.role === selectedRole)?.username || "";
+    renderIdentityTypes();
+    renderAccountCards();
+    selectAccount(selectedUsername);
+    if (focus) document.querySelector(`[data-identity-role="${selectedRole}"]`)?.focus();
+  }
+
+  function keyboardTabTarget(tabs, active, key) {
+    const index = Math.max(0, tabs.indexOf(active));
+    if (key === "Home") return tabs[0];
+    if (key === "End") return tabs[tabs.length - 1];
+    if (["ArrowRight", "ArrowDown"].includes(key)) return tabs[(index + 1) % tabs.length];
+    if (["ArrowLeft", "ArrowUp"].includes(key)) return tabs[(index - 1 + tabs.length) % tabs.length];
+    return null;
   }
 
   function renderAccountCards() {
@@ -151,15 +167,35 @@
     phoneCodeTimer = setInterval(render, 1000);
   }
 
-  document.querySelectorAll("[data-login-method]").forEach((button) => button.addEventListener("click", () => {
+  function activateLoginMethod(button, focus = false) {
     const phone = button.dataset.loginMethod === "phone";
     document.querySelectorAll("[data-login-method]").forEach((item) => {
       item.classList.toggle("active", item === button);
       item.setAttribute("aria-selected", String(item === button));
+      item.tabIndex = item === button ? 0 : -1;
     });
     byId("login-form").hidden = phone;
     byId("phone-login-form").hidden = !phone;
-  }));
+    if (focus) button.focus();
+  }
+
+  document.querySelectorAll("[data-login-method]").forEach((button) => {
+    button.addEventListener("click", () => activateLoginMethod(button));
+  });
+  document.querySelector(".login-method-tabs").addEventListener("keydown", (event) => {
+    const tabs = [...document.querySelectorAll("[data-login-method]")];
+    const target = keyboardTabTarget(tabs, event.target.closest("[data-login-method]"), event.key);
+    if (!target) return;
+    event.preventDefault();
+    activateLoginMethod(target, true);
+  });
+  byId("identity-type-grid").addEventListener("keydown", (event) => {
+    const tabs = [...document.querySelectorAll("[data-identity-role]")];
+    const target = keyboardTabTarget(tabs, event.target.closest("[data-identity-role]"), event.key);
+    if (!target) return;
+    event.preventDefault();
+    activateIdentityRole(target.dataset.identityRole, true);
+  });
 
   byId("login-user").addEventListener("change", (event) => selectAccount(event.target.value));
   document.querySelector("[data-send-phone-code]").addEventListener("click", async () => {

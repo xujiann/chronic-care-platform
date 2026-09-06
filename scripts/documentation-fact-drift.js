@@ -3,6 +3,7 @@
 
 const fs = require("node:fs");
 const path = require("node:path");
+const { spawnSync } = require("node:child_process");
 const { DatabaseSync } = require("node:sqlite");
 const { buildProductionApiCatalog, validateProductionApiCatalog } = require("./production-api-catalog");
 const objectStorageGovernance = require("./object-storage-architecture-governance");
@@ -20,6 +21,7 @@ const {
 const ROOT = path.resolve(__dirname, "..");
 const DOCUMENT_PATHS = Object.freeze({
   roadmap: "ROADMAP.md",
+  engineeringGovernance: "ENGINEERING_GOVERNANCE.md",
   architecture: "ARCHITECTURE.md",
   currentArchitecture: "CURRENT_ARCHITECTURE.md",
   moduleMap: "MODULE_MAP.md",
@@ -27,7 +29,8 @@ const DOCUMENT_PATHS = Object.freeze({
   apiMap: "API_MAP.md",
   dependencyMap: "DEPENDENCY_MAP.md",
   techDebt: "TECH_DEBT.md",
-  adrIndex: "docs/adr/README.md"
+  adrIndex: "docs/adr/README.md",
+  e2eAdr: "docs/adr/2026-08-23-playwright-e2e-isolation-and-browser-policy.md"
 });
 
 function check(id, passed, detail) {
@@ -73,6 +76,34 @@ function buildSqliteSchemaFacts() {
   }
 }
 
+function listPlaywrightTests(configPath) {
+  const cli = path.join(ROOT, "node_modules", "@playwright", "test", "cli.js");
+  const result = spawnSync(process.execPath, [cli, "test", "--list", "--config", path.join(ROOT, configPath)], {
+    cwd: ROOT,
+    encoding: "utf8",
+    env: { ...process.env, FORCE_COLOR: "0", NO_COLOR: "1", PLAYWRIGHT_E2E_PORT: "42101" },
+    windowsHide: true
+  });
+  if (result.status !== 0) throw new Error(`Playwright inventory failed for ${configPath}: ${result.stderr || result.stdout}`);
+  return result.stdout.split(/\r?\n/).map((line) => line.trim()).filter((line) => /\.spec\.js:\d+:\d+ › /.test(line));
+}
+
+function buildE2eFacts() {
+  const directory = path.join(ROOT, "test", "e2e");
+  const files = fs.readdirSync(directory).filter((name) => name.endsWith(".spec.js")).sort();
+  const root = listPlaywrightTests("playwright.config.js").length;
+  const resident = listPlaywrightTests("test/e2e/resident-mini-program.playwright.config.js").length;
+  const pwa = listPlaywrightTests("test/e2e/pwa-service-worker.playwright.config.js").length;
+  const total = root + resident + pwa;
+  return Object.freeze({
+    root,
+    resident,
+    pwa,
+    total,
+    specFiles: files.length
+  });
+}
+
 function readRepositoryState(options = {}) {
   const documents = options.documents || Object.fromEntries(Object.entries(DOCUMENT_PATHS)
     .map(([id, relative]) => [id, fs.readFileSync(path.join(ROOT, relative), "utf8")]));
@@ -83,6 +114,7 @@ function readRepositoryState(options = {}) {
   const repositoryGovernanceReport = options.repositoryGovernanceReport || buildRepositoryGovernanceReport();
   const firstReleaseMigrationReport = options.firstReleaseMigrationReport || buildFirstReleaseMigrationPortfolioReadiness();
   const sqliteSchemaFacts = options.sqliteSchemaFacts || buildSqliteSchemaFacts();
+  const e2eFacts = options.e2eFacts || buildE2eFacts();
   const productionReleaseScopeReport = options.productionReleaseScopeReport
     || buildProductionReleaseScopeReport(loadDefaultAuthorities());
   return {
@@ -93,6 +125,7 @@ function readRepositoryState(options = {}) {
     repositoryGovernanceReport,
     firstReleaseMigrationReport,
     sqliteSchemaFacts,
+    e2eFacts,
     productionReleaseScopeReport
   };
 }
@@ -106,6 +139,7 @@ function buildReport(input) {
     repositoryGovernanceReport = {},
     firstReleaseMigrationReport = {},
     sqliteSchemaFacts = {},
+    e2eFacts = {},
     productionReleaseScopeReport = {}
   } = input || {};
   const entries = catalogSummary.entries;
@@ -118,6 +152,10 @@ function buildReport(input) {
   const markdownSuperseded = repositoryGovernanceReport.markdown?.byClassification?.superseded?.count;
   const sqliteHead = sqliteSchemaFacts.head;
   const sqliteTableCount = sqliteSchemaFacts.tableCount;
+  const e2eRoot = e2eFacts.root;
+  const e2eResident = e2eFacts.resident;
+  const e2ePwa = e2eFacts.pwa;
+  const e2eTotal = e2eFacts.total;
   const scopedApiReviewRequired = productionReleaseScopeReport.repositoryReview?.apiReviewRequired?.length;
   const scopedCollectionReviewRequired = productionReleaseScopeReport.repositoryReview?.collectionReviewRequired?.length;
   const scopedRepositoryPlanMissing = productionReleaseScopeReport.repositoryReview?.collectionRepositoryPlanMissing?.length;
@@ -125,12 +163,14 @@ function buildReport(input) {
   const roadmapRepository = uniqueLineContaining(documents.roadmap, "| 15 | 当前工作流、Markdown 与跟踪 PDF 闭集治理 |");
   const roadmapObjectStorage = uniqueLineContaining(documents.roadmap, "| 12 | 对象存储结构化元数据与耐久命令轨道 |");
   const roadmapReleaseScope = uniqueLineContaining(documents.roadmap, "| 16 | 首批生产范围机器冻结 |");
+  const roadmapE2e = uniqueLineContaining(documents.roadmap, "| 10 | CI/worker/部署依赖治理 |");
   const adrObjectStorage = uniqueLineContaining(documents.adrIndex, "[对象存储采用结构化元数据与耐久异步命令轨道 v2]");
   const moduleApi = uniqueLineContaining(documents.moduleMap, "| API 生产目录 |");
   const moduleObjectStoragePort = uniqueLineContaining(documents.moduleMap, "| 安全对象存储端口 |");
   const moduleObjectStorage = uniqueSection(documents.moduleMap, "## 17. 对象存储耐久 v2 模块", "## 18. Production evidence trust provider");
   const moduleObjectStorageDecision = uniqueLineContaining(moduleObjectStorage.text, "| `config/object-storage-architecture-decision.json` |");
   const moduleRepositoryGovernance = uniqueLineContaining(documents.moduleMap, "| `test/repository-governance.test.js` |");
+  const moduleE2e = uniqueLineContaining(documents.moduleMap, "| Playwright E2E 基础设施 |");
   const architectureObjectStorage = uniqueSection(documents.architecture, "## 已接受的对象存储 v2 方向", "## 首批生产范围合同");
   const currentArchitectureRepository = uniqueSection(documents.currentArchitecture, "## 2026-08-23 仓库文档与跟踪 PDF 治理", "## 2026-08-23 金融写入证据边界");
   const dataModelSchema = uniqueSection(documents.dataModel, "## 2. SQLite Schema", "### 关系主链");
@@ -139,6 +179,9 @@ function buildReport(input) {
   const apiMapReleaseScope = uniqueSection(documents.apiMap, "## 37. 首批生产范围（无 HTTP 变化）", "## 38. 血液 HTTP 实现归域（协议不变）");
   const dependencyObjectStorage = uniqueSection(documents.dependencyMap, "## 对象存储耐久 v2 依赖方向", "## Production evidence trust 依赖方向");
   const dependencyWorker = uniqueSection(documents.dependencyMap, "## Worker 共同观测依赖方向", "## 仓库文档与 PDF 治理依赖方向");
+  const apiMapE2e = uniqueSection(documents.apiMap, "## 20. Playwright E2E 隔离（无 HTTP 变化）", "## 21. 仓库文档与制品治理（无 HTTP 变化）");
+  const e2eAdrCurrent = uniqueSection(documents.e2eAdr, "## 2026-09-06 当前套件状态");
+  const adrIndexE2e = uniqueLineContaining(documents.adrIndex, "[Playwright E2E 采用统一浏览器策略与独占测试服务]");
   const techDebtRepositoryGovernance = uniqueLineContaining(documents.techDebt, "| DOC-001 |");
 
   const catalogFactsValid = [entries, writeRoutes, behaviorProofRequired, reviewRequired]
@@ -174,6 +217,10 @@ function buildReport(input) {
     check("authority:objectStorageDecision", objectStorageFactsValid, `${objectStorageReport.summary?.decisionStatus || "missing"}; implementation=${objectStorageReport.implementationAuthorized}; production=${objectStorageReport.productionReady}`),
     check("authority:repositoryGovernance", repositoryGovernanceReport.ok === true && Number.isSafeInteger(markdownTotal), `${markdownTotal} tracked Markdown files`),
     check("authority:sqliteSchema", sqliteFactsValid, `SQLite head v${sqliteHead}; ${sqliteTableCount} tables`),
+    check("authority:e2eInventory", [e2eRoot, e2eResident, e2ePwa, e2eTotal, e2eFacts.specFiles].every(Number.isSafeInteger)
+      && e2eRoot > 0 && e2eResident > 0 && e2ePwa > 0
+      && e2eRoot + e2eResident + e2ePwa === e2eTotal,
+    `root=${e2eRoot}; resident=${e2eResident}; PWA=${e2ePwa}; total=${e2eTotal}; spec files=${e2eFacts.specFiles}`),
     check("authority:firstReleaseScope", releaseScopeFactsValid, `${productionReleaseScopeReport.status || "missing"}; API reviews=${scopedApiReviewRequired}; collection reviews=${scopedCollectionReviewRequired}; plan gaps=${scopedRepositoryPlanMissing}`),
     check("roadmap:apiCatalogFacts", roadmapApi.count === 1
       && hasOneNumericFact(roadmapApi.text, /v3 当前 (\d+) 项/g, entries)
@@ -198,6 +245,11 @@ function buildReport(input) {
       && hasOneNumericFact(roadmapReleaseScope.text, /(\d+) 个派生读模型/g, firstReleaseMigrationReport.summary?.derivedReadModels)
       && hasOneNumericFact(roadmapReleaseScope.text, /collectionRepositoryPlanMissing=(\d+)/g, firstReleaseMigrationReport.repositoryCriticalGaps)
       && /21 个引用仍无生产写资格/.test(roadmapReleaseScope.text), roadmapReleaseScope.text || `roadmap release scope row count=${roadmapReleaseScope.count}`),
+    check("roadmap:e2eFacts", roadmapE2e.count === 1
+      && hasOneNumericFact(roadmapE2e.text, /在线根 (\d+) \+ 居民/g, e2eRoot)
+      && hasOneNumericFact(roadmapE2e.text, /居民 (\d+) 项/g, e2eResident)
+      && hasOneNumericFact(roadmapE2e.text, /PWA (\d+) 项/g, e2ePwa)
+      && hasOneNumericFact(roadmapE2e.text, /E2E 共 (\d+) 项/g, e2eTotal), roadmapE2e.text || `roadmap E2E row count=${roadmapE2e.count}`),
     check("adrIndex:objectStorageAcceptedNoGo", adrObjectStorage.count === 1
       && hasAcceptedWithoutProposed(adrObjectStorage.text)
       && /仓库实现/.test(adrObjectStorage.text)
@@ -229,6 +281,42 @@ function buildReport(input) {
       && hasOneNumericFact(currentArchitectureRepository.text, /(\d+) 份\s*`superseded`/g, markdownSuperseded), currentArchitectureRepository.text || `current architecture repository section count=${currentArchitectureRepository.count}`),
     check("moduleMap:repositoryGovernanceFacts", moduleRepositoryGovernance.count === 1
       && hasOneNumericFact(moduleRepositoryGovernance.text, /锁定当前 (\d+) 份 Markdown/g, markdownTotal), moduleRepositoryGovernance.text || `module map repository row count=${moduleRepositoryGovernance.count}`),
+    check("moduleMap:e2eFacts", moduleE2e.count === 1
+      && hasOneNumericFact(moduleE2e.text, /在线根 (\d+) 项/g, e2eRoot)
+      && hasOneNumericFact(moduleE2e.text, /居民 (\d+) 项/g, e2eResident)
+      && hasOneNumericFact(moduleE2e.text, /PWA (\d+) 项/g, e2ePwa)
+      && hasOneNumericFact(moduleE2e.text, /三套共 (\d+) 项/g, e2eTotal), moduleE2e.text || `module map E2E row count=${moduleE2e.count}`),
+    check("engineeringGovernance:e2eFacts", hasOneNumericFact(documents.engineeringGovernance, /在线根 (\d+) 项/g, e2eRoot)
+      && hasOneNumericFact(documents.engineeringGovernance, /居民 (\d+) 项/g, e2eResident)
+      && hasOneNumericFact(documents.engineeringGovernance, /PWA (\d+) 项/g, e2ePwa)
+      && hasOneNumericFact(documents.engineeringGovernance, /三套必须形成 (\d+) 项/g, e2eTotal), "current engineering E2E partition"),
+    check("currentArchitecture:e2eFacts", hasOneNumericFact(documents.currentArchitecture, /当前根 (\d+) \+ 居民/g, e2eRoot)
+      && hasOneNumericFact(documents.currentArchitecture, /当前根 \d+ \+ 居民 (\d+) \+ PWA/g, e2eResident)
+      && hasOneNumericFact(documents.currentArchitecture, /当前根 \d+ \+ 居民 \d+ \+ PWA (\d+) =/g, e2ePwa)
+      && hasOneNumericFact(documents.currentArchitecture, /当前根 \d+ \+ 居民 \d+ \+ PWA \d+ = (\d+) 项/g, e2eTotal), "current architecture E2E partition"),
+    check("dataModel:e2eFacts", hasOneNumericFact(documents.dataModel, /Playwright E2E[^\n]*根 (\d+) 项/g, e2eRoot)
+      && hasOneNumericFact(documents.dataModel, /根 \d+ 项和居民 (\d+) 项/g, e2eResident)
+      && hasOneNumericFact(documents.dataModel, /PWA 专项 (\d+) 项/g, e2ePwa)
+      && hasOneNumericFact(documents.dataModel, /三套共 (\d+) 项/g, e2eTotal), "current data-model E2E partition"),
+    check("apiMap:e2eFacts", apiMapE2e.count === 1
+      && hasOneNumericFact(apiMapE2e.text, /根 (\d+) 项与居民/g, e2eRoot)
+      && hasOneNumericFact(apiMapE2e.text, /居民 (\d+) 项/g, e2eResident)
+      && hasOneNumericFact(apiMapE2e.text, /PWA 专项 (\d+) 项/g, e2ePwa)
+      && hasOneNumericFact(apiMapE2e.text, /三套共 (\d+) 项/g, e2eTotal), apiMapE2e.text || `API map E2E section count=${apiMapE2e.count}`),
+    check("dependencyMap:e2eFacts", hasOneNumericFact(documents.dependencyMap, /root runner\((\d+)\)/g, e2eRoot)
+      && hasOneNumericFact(documents.dependencyMap, /resident owned runner\((\d+)\)/g, e2eResident)
+      && hasOneNumericFact(documents.dependencyMap, /PWA runner\((\d+)\)/g, e2ePwa)
+      && hasOneNumericFact(documents.dependencyMap, /共 (\d+) 项；三阶段/g, e2eTotal), "current dependency E2E partition"),
+    check("adrIndex:e2eFacts", adrIndexE2e.count === 1
+      && hasOneNumericFact(adrIndexE2e.text, /当前根 (\d+) \+/g, e2eRoot)
+      && hasOneNumericFact(adrIndexE2e.text, /居民 (\d+) \+/g, e2eResident)
+      && hasOneNumericFact(adrIndexE2e.text, /PWA (\d+) =/g, e2ePwa)
+      && hasOneNumericFact(adrIndexE2e.text, /= (\d+) 项套件/g, e2eTotal), adrIndexE2e.text || `ADR index E2E row count=${adrIndexE2e.count}`),
+    check("e2eAdr:currentFacts", e2eAdrCurrent.count === 1
+      && hasOneNumericFact(e2eAdrCurrent.text, /根 (\d+) 项/g, e2eRoot)
+      && hasOneNumericFact(e2eAdrCurrent.text, /居民 (\d+) 项/g, e2eResident)
+      && hasOneNumericFact(e2eAdrCurrent.text, /PWA (\d+) 项/g, e2ePwa)
+      && hasOneNumericFact(e2eAdrCurrent.text, /共 (\d+) 项/g, e2eTotal), e2eAdrCurrent.text || `E2E ADR current section count=${e2eAdrCurrent.count}`),
     check("dataModel:sqliteSchemaFacts", dataModelSchema.count === 1
       && hasOneNumericFact(dataModelSchema.text, /当前实际与公开 head 均为 v(\d+)/g, sqliteHead)
       && hasOneNumericFact(dataModelSchema.text, /创建 (\d+) 张表/g, sqliteTableCount), dataModelSchema.text || `data model schema section count=${dataModelSchema.count}`),
@@ -283,6 +371,13 @@ function buildReport(input) {
         head: sqliteHead,
         tables: sqliteTableCount
       },
+      e2e: {
+        root: e2eRoot,
+        resident: e2eResident,
+        pwa: e2ePwa,
+        total: e2eTotal,
+        specFiles: e2eFacts.specFiles
+      },
       firstReleaseScope: {
         status: productionReleaseScopeReport.status,
         apiReviewRequired: scopedApiReviewRequired,
@@ -318,6 +413,7 @@ if (require.main === module) {
 
 module.exports = {
   DOCUMENT_PATHS,
+  buildE2eFacts,
   buildSqliteSchemaFacts,
   buildReport,
   readRepositoryState,

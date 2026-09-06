@@ -1,5 +1,17 @@
 # CURRENT ARCHITECTURE — 主线现状地图
 
+## 2026-09-06 T00 遗留状态身份边界闭合
+
+- `src/http/routes/state-data.js` 在 `/api/state` 的 commission 读取/全量写入、通用 collection 写入和非生产 `/api/reset` 上增加 `accountType=manager` 边界；专科、审计等非管理 commission 在集合解码、数据库读取、请求体解析或 seed 加载前稳定返回 `403 STATE_DATA_MANAGER_REQUIRED`，institution/insurance/citizen/county 的 GET 既有范围读取保持兼容。
+- `authUsers`、`authOrganizations` 现作为 T01 身份安全服务端托管集合：legacy 全量写省略或回传同一安全投影时保留权威值，提交公开身份差异时返回 `409 IDENTITY_SERVER_MANAGED_COLLECTION_CONFLICT`，集合级写入在解析 body 前返回 `403 IDENTITY_SERVER_MANAGED_COLLECTION_WRITE_DENIED`。
+- GET、成功 PUT 与非生产 reset 的状态响应均通过递归认证凭据投影移除 password/token/secret/session/private-key/api-key 等受治理键，且保留非凭据业务字段；四条状态边界均进入高风险授权登记。该增量不新增 endpoint、集合、schema、migration、provider 或生产授权，生产继续 `NO-GO`。
+
+## 2026-09-06 生产安全工作台可信交互边界
+
+- `production-security.js` 的 3 个遗留 `innerHTML` sink 已迁为显式 DOM、`textContent`、闭集 class 与 dataset，恶意状态、发现、审批、证据和边界字段保持惰性文本。
+- 安全处置点击委托只接受两个受信容器内、且与当前 center 的 ID/允许 action 一致的控件；页面其他遗留 HTML sink 注入的伪造 `data-production-security-*` 按钮不能代发治理命令。
+- Inventory v2 当前为 838 项（796 P0、42 P1），其中 790 个 DOM HTML、6 个动态 URL 和 42 个动态样式风险；兼容 CSP 仍为 Report-Only，生产继续 `NO-GO`。
+
 ## AI/CDSS 主线整合（2026-09-06）
 
 保留 #249 临床中心、#250 平台中心与 #252 审计中心的页面和查询 schema；平台 AI 页内新增现有临床规则的审批命令区。T01 状态机、T06 范围/回执端口与 T00 装配复用同一规则集合，未新增页面、集合或生产激活。临床两种读取均抑制暂停/来源漂移建议，兼容 state/config 关闭绕过。
@@ -61,7 +73,7 @@
 ## 2026-08-31 当前架构事实机器对账
 
 - `scripts/documentation-fact-drift.js` 现以生产 API 目录、首批生产范围、SQLite migration、仓库 Markdown/PDF 闭集和 Accepted ADR 注册表为机器权威，对 ROADMAP、ARCHITECTURE、六张架构地图和 ADR 索引共 9 份当前文档失败关闭。
-- 当前对账值为 SQLite head v17/38 张非内部表、生产 API 636 项/363 个写入口/325 个行为证明缺口/327 个总复核项、首批范围 `FROZEN-NO-GO` 且范围内 API/集合复核与仓库迁移计划缺口均为 0、Markdown 277 份（208 current、68 snapshot、1 superseded）。
+- 当前对账值为 SQLite head v17/38 张非内部表、生产 API 636 项/363 个写入口/325 个行为证明缺口/327 个总复核项、首批范围 `FROZEN-NO-GO` 且范围内 API/集合复核与仓库迁移计划缺口均为 0、Markdown 278 份（208 current、68 snapshot、2 superseded）。
 - 该验证仅在内存 SQLite 中重放既有 migration 并读取仓库权威；不写 `data/db.json`、运行时 SQLite、生产证据、生成报告或归档产物，不改变任何运行时行为。
 
 ## 2026-08-31 首发数据迁移计划闭集
@@ -80,7 +92,7 @@
 
 - `production-go-no-go-ui.js` 的 4 个 `innerHTML` 与 2 个 `insertAdjacentHTML` 已迁为显式 DOM、`textContent`、闭集 class 和 dataset；指标、前置检查、四方审批及指挥决策的结构与交互保持兼容。
 - 恶意 API 字段 E2E 直接覆盖状态、指标、检查、审批、证据引用、决策和边界文本，证明载荷保持惰性文本且不执行事件处理器。
-- Inventory v2 当前锁定 793 个 DOM HTML sink、6 个动态 URL sink 与 42 个动态样式风险；严格 CSP、真实托管响应头、独立安全评估和现场验收仍未完成，生产状态保持 `NO-GO`。
+- Inventory v2 当前锁定 790 个 DOM HTML sink、6 个动态 URL sink 与 42 个动态样式风险；严格 CSP、真实托管响应头、独立安全评估和现场验收仍未完成，生产状态保持 `NO-GO`。
 
 ## 2026-08-26 T09 写接口行为增量
 
@@ -132,7 +144,7 @@ flowchart TB
 | `data/` | 被跟踪的 `db.json` 开发/迁移输入 | 浏览器只读取运行时或构建时生成的 `public-demo.json`；生成物不入库 |
 | `deploy/` | SQL、systemd、Compose、环境模板和现场验证 | 生产证据默认 NO-GO |
 | `scripts/` | 测试、readiness、报告、部署和后台 worker | 187 个根级文件，职责和产物较分散 |
-| `test/` | Node test 与 Playwright | 480 个 test/spec 文件（460 Node、20 个 Playwright E2E spec 文件，含居民与 PWA 专项） |
+| `test/` | Node test 与 Playwright | 545 个 test/spec 文件（521 Node、24 个 Playwright E2E spec 文件，含居民与 PWA 专项） |
 | `regions/` | 多地区部署配置 | 由区域清单和发布注册表控制 |
 | `digital-hospital-standard-platform/` | 内嵌数智医院展示前端 | 独立页面但仍共享主仓发布生命周期 |
 | `resident-mini-program-platform/` | 居民小程序适配前端 | 独立页面但仍共享主仓发布生命周期 |
@@ -175,12 +187,12 @@ flowchart TB
 5. SQLite v1–v14 已冻结内容指纹，v15 追加 append-only 连续审计 source，v16 追加慢病随访 durable outbox，v17 追加对象存储耐久元数据/命令轨道；`STORAGE_SCHEMA_VERSION`、部署检查和测试统一从注册表 head v17 派生。历史 ledger 的 v1–v14 checksum 保持兼容，v15 起写入内容 SHA-256。
 6. TEST-001 已建立统一的 `build`、`lint`、`typecheck`、`test:unit`、`test:integration`、`test:smoke` 入口；build 复用静态发布 allowlist 并默认输出到仓库外，unit/integration 完整分区根测试，smoke 独立启动临时 JSON 运行时。治理 CI 执行 `data:collection-governance:verify`，以源码、owner 和隔离清单漂移失败关闭；原 `server.js` c8 门禁保持 85/85/55，内部边界现以 10 个职责独立组锁定真实覆盖基线和直接负向矩阵：原 identity、audit、object storage、API governance 四组，加上 worker observability、区域共享命令、转诊 owner command、科研合规导出、浏览器响应头策略和 Safe URL 端口六组。所有报告只存在临时目录。TEST-006 已恢复全文件 `no-unreachable`；`internet-nursing.js` 与 `quality-safety.js` 的 16 个重复翻译键已按显式 shadow map 去重，保留原首次插入顺序和最终生效值，lint 不再有文件级规则例外。typecheck 去重后由 9 个唯一文件扩大到 13 个治理/安全边界文件。集成套件成员、顺序、断言和超时不变，但本机三次采样约 294–371 秒的 API 热点现在独立进程执行，并向 CI 日志输出无阈值的批次/套件耗时。
    TEST-006 care revalidation 已把这 3 段显式 skip 全部恢复为可执行断言，并新增陪诊 owner route、护理闭环、护士生命周期 3 个可独立运行的真实 HTTP 特征测试。测试只使用临时 JSON 副本和进程内 owner 证据签发能力；陪诊 handoff 现统一解释 `reject/return`，引用挂号单在补字段前先校验存在性与当前用户 scope。护理通知继续以 planned message + pending outbox 表达，仓库测试不伪造外部送达或现场证据。API 巨型测试的第一个可逆夹具切片已将临时 JSON seed、环境变量和同一 server 生命周期移入 `test/helpers/api-regression-runtime.js`；第二至第五个切片分别只将单个 HIS hospital adapter mock、单个 SIEM alert delivery mock、单个 financial gateway mock 与单个 object-storage gateway mock 的创建、动态回环监听、测试环境和关闭移入各自测试 helper。对象存储 helper 只额外暴露测试正文按原顺序驱动的 `setScanStatus` 控制口。43 个有序子测试、请求/响应与签名断言、告警失败/恢复顺序、金融 callback/reconciliation/retry、对象存储 clean/恶意 provider 文本与 quarantine 断言、超时、单进程执行和 integration 成员均保持不变，并由顺序摘要门禁锁定；synthetic HIS/SIEM/financial/storage 响应均不是外部回执或上线证据。
-   TEST-005 将浏览器 E2E 精确分为根 40 项与居民 13 项：两套配置统一使用 Playwright Chromium、
+   TEST-005 将浏览器 E2E 精确分为根 58 项与居民 13 项：两套配置统一使用 Playwright Chromium、
    `serviceWorkers=block` 和动态回环端口；居民套件复用独占 runner、独立临时数据目录并在结束后释放服务。
-   在线 53 项并集/唯一性、浏览器策略和 runner 生命周期由专项测试锁定。PWA 专项另以 3 项独占套件允许
+   在线 71 项并集/唯一性、浏览器策略和 runner 生命周期由专项测试锁定。PWA 专项另以 3 项独占套件允许
    Service Worker，验证居民登录后的 v61 安装、v60 清理、同源成功响应缓存边界、离线导航回退及最终
    unregister/Cache Storage 清理。SEC-004 另增加急救生命链、医生工作台、血液上线看板、陪诊工作台、产品运行驾驶舱、产品区域运行驾驶舱、质量安全工作台、区域切换工作台、血液召回面板、血液创新指挥中心及体检风险卡各 1 项恶意 API 载荷回归；Go/No-Go 回归锁定四方业务责任属性不再被登录角色过滤器误删。
-   当前根 40 + 居民 13 + PWA 3 = 56 项；标准在线 context 仍保持阻止 Service Worker。
+   当前根 58 + 居民 13 + PWA 3 = 74 项；标准在线 context 仍保持阻止 Service Worker。
 7. 审计验证已收敛到 `src/identity-security/audit-chain.js` 的 v2 严格端口；内容、链接、结构和重复 ID 任一异常均失败，验证 API/合规报告不再读取时重封。全量状态写入中的审计数组由服务端管理。
 8. 机器 API 授权矩阵现从路由扫描和小型认证证据合同派生 622 条声明；`production-api-catalog-v3` 与 377 个字面条件路由取并集，形成 615 个唯一接口条目（607 个字面路由、8 个运行时策略）。认证证据共 13 项且无未分类。幂等证据注册表现有 36 份直接行为合同：34 个完整 endpoint 与 2 个转诊 action-slice。招标需求人工复核入口保持高风险授权、幂等键和 CAS 失败关闭，复核状态、回执与安全审计已一次持久化，但稳定 HTTP 错误仍待直接证明；T03 卫生监督四个写入口已以直接测试绑定角色/资源范围、精确回放、冲突、CAS、单次持久化和审计行为。352 个写接口中 34 个 endpoint 为 `behavior-verified`，318 个仍为 `behavior-proof-required`；两个通用 action endpoint 使当前 320 项需复核，615 项全部 `NO-GO`。进程锁和 SQLite collection-version CAS 均不被解释为跨实例 exactly-once，`reviewedProofRequired` 当前为 1。
 9. P1 生产适配器增量保持现有 owner：T01 的 `production-adapters.js` 承担 JWKS/JWT 与 SMS 协议；OTP、发送/登录限流和失败锁定由共享 `auth-security-state-store` 承载，单主机 SQLite 复用 `state_collections`、生产多实例使用组合根长期 PostgreSQL pool；T00 的 PostgreSQL 组合保持 shadow/rehearsal 且 `productionPrimary=false`，受控迁移评估继续失败关闭。连续审计已使用 v15 同事务 append-only source、最小投影和 checkpoint v3，worker/preflight/systemd 已进入部署制品；未签名 receipt、外部单调 anchor、真实 WORM/KMS 与现场证据使 `productionReady=false` 继续失败关闭。
@@ -221,7 +233,7 @@ flowchart TB
     `browser-safe-url-policy.v1` 复用居民短时凭据/对象存储的 HTTPS、无凭据和 exact-Origin 语义，
     为 internal navigation、official source、object storage、`tel` 与 blob download 建立唯一公共端口。
     血液主工作台、急救生命链、医生工作台、血液上线看板、陪诊工作台、产品运行驾驶舱、产品区域运行驾驶舱、质量安全工作台、区域切换工作台、血液召回面板、血液创新指挥中心及体检工作台的可信 DOM/text 切片与 Safe URL 内部闭环后，机器基线锁定
-    793 个 DOM HTML sink（31 个资产）、6 个动态 URL sink（2 个资产）和 42 个动态样式/CSSOM/runtime style element
+    790 个 DOM HTML sink（30 个资产）、6 个动态 URL sink（2 个资产）和 42 个动态样式/CSSOM/runtime style element
     （13 个资产）；体检工作台自身已无 Inventory v2 P0/P1 finding。29 个原模板 occurrence 中 28 个真实 URL 已改为无 URL 模板加 DOM 绑定，另 1 个
     `item.action` 普通赋值已从扫描误报中排除。当前 4 项是公共端口内受控 mutation/navigation，只有
     2 个缺真实 OHIF exact-Origin allowlist 的导航继续 `review-required`。每个资产/类型同时绑定
@@ -347,8 +359,8 @@ Worker、外部数字医院注册及仍为 Proposed 的对象存储 v2 worker �
 `baseline/governance-20260817-enhancement-v1` 仅保留为可复现证据 tag。历史日期化路由/治理文档不再被
 `AGENTS.md` 作为当前工作流入口引用，原文和摘要保持不变。
 
-`repository-governance-v1` 从 Git 路径派生；当前闭集为 277 份 Markdown：208 份 `current`、68 份
-`snapshot`、1 份 `superseded`，每个路径必须唯一命中规则；snapshot 内容聚合摘要失败关闭。
+`repository-governance-v1` 从 Git 路径派生；当前闭集为 278 份 Markdown：208 份 `current`、68 份
+`snapshot`、2 份 `superseded`，每个路径必须唯一命中规则；snapshot 内容聚合摘要失败关闭。
 `output/pdf` 的 3 个 PDF 未修改，分别绑定 SHA-256、大小、页数、引入提交、来源与保留理由。现有仓库
 没有任何一个 PDF 的可复现生成器；医院运行脚本只是 verifier，不能被描述为 generator。机器门禁只读，
 不生成报告、PDF 或归档产物。

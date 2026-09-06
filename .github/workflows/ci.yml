@@ -408,6 +408,8 @@ jobs:
 
   test:
     needs:
+      - regional-foundation
+      - postgres-production-contract
       - governance-api
       - browser-e2e
       - release-readiness
@@ -417,14 +419,16 @@ jobs:
     steps:
       - name: Enforce all CI risk domains
         env:
+          REGIONAL_RESULT: ${{ needs.regional-foundation.result }}
+          POSTGRES_RESULT: ${{ needs.postgres-production-contract.result }}
           GOVERNANCE_RESULT: ${{ needs.governance-api.result }}
           BROWSER_RESULT: ${{ needs.browser-e2e.result }}
           RELEASE_RESULT: ${{ needs.release-readiness.result }}
         shell: bash
         run: |
-          printf 'governance-api=%s\nbrowser-e2e=%s\nrelease-readiness=%s\n' \
-            "$GOVERNANCE_RESULT" "$BROWSER_RESULT" "$RELEASE_RESULT"
-          for result in "$GOVERNANCE_RESULT" "$BROWSER_RESULT" "$RELEASE_RESULT"; do
+          printf 'regional-foundation=%s\npostgres-production-contract=%s\ngovernance-api=%s\nbrowser-e2e=%s\nrelease-readiness=%s\n' \
+            "$REGIONAL_RESULT" "$POSTGRES_RESULT" "$GOVERNANCE_RESULT" "$BROWSER_RESULT" "$RELEASE_RESULT"
+          for result in "$REGIONAL_RESULT" "$POSTGRES_RESULT" "$GOVERNANCE_RESULT" "$BROWSER_RESULT" "$RELEASE_RESULT"; do
             if [[ "$result" != "success" ]]; then
               echo "::error::At least one CI risk domain did not succeed."
               exit 1

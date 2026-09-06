@@ -195,13 +195,15 @@ test("CI isolates browser E2E and release readiness behind the required test agg
   );
   assert.doesNotMatch(releaseJob, /Install Chromium|npm run test:e2e/);
 
-  assert.match(requiredAggregate, /needs:\r?\n      - governance-api\r?\n      - browser-e2e\r?\n      - release-readiness/);
+  assert.match(requiredAggregate, /needs:\r?\n      - regional-foundation\r?\n      - postgres-production-contract\r?\n      - governance-api\r?\n      - browser-e2e\r?\n      - release-readiness/);
   assert.match(requiredAggregate, /if: \$\{\{ always\(\) \}\}/);
   assert.match(requiredAggregate, /timeout-minutes: 5/);
+  assert.match(requiredAggregate, /REGIONAL_RESULT: \$\{\{ needs\.regional-foundation\.result \}\}/);
+  assert.match(requiredAggregate, /POSTGRES_RESULT: \$\{\{ needs\.postgres-production-contract\.result \}\}/);
   assert.match(requiredAggregate, /GOVERNANCE_RESULT: \$\{\{ needs\.governance-api\.result \}\}/);
   assert.match(requiredAggregate, /BROWSER_RESULT: \$\{\{ needs\.browser-e2e\.result \}\}/);
   assert.match(requiredAggregate, /RELEASE_RESULT: \$\{\{ needs\.release-readiness\.result \}\}/);
-  assert.match(requiredAggregate, /for result in "\$GOVERNANCE_RESULT" "\$BROWSER_RESULT" "\$RELEASE_RESULT"; do/);
+  assert.match(requiredAggregate, /for result in "\$REGIONAL_RESULT" "\$POSTGRES_RESULT" "\$GOVERNANCE_RESULT" "\$BROWSER_RESULT" "\$RELEASE_RESULT"; do/);
   assert.match(requiredAggregate, /if \[\[ "\$result" != "success" \]\]; then/);
   assert.match(requiredAggregate, /exit 1/);
 });

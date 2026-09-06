@@ -40,9 +40,9 @@
           <div id="login-scope-note" class="login-scope-note" hidden></div>
           <section class="identity-selector" id="identity-selector" aria-labelledby="identity-title" hidden>
             <div class="login-step-title"><span>01</span><strong id="identity-title">选择身份类型</strong></div>
-            <div class="identity-type-grid" id="identity-type-grid" role="tablist"></div>
+            <div class="identity-type-grid" id="identity-type-grid" role="tablist" aria-labelledby="identity-title"></div>
             <div class="login-step-title"><span>02</span><strong>选择具体岗位</strong></div>
-            <div class="account-card-grid" id="demo-accounts"></div>
+            <div class="account-card-grid" id="demo-accounts" role="tabpanel" tabindex="0"></div>
           </section>
           <section class="login-access-preview" id="login-access-preview" hidden aria-live="polite">
             <div class="login-step-title"><span>03</span><strong>登录后权限预览</strong></div>
@@ -55,10 +55,10 @@
             <div class="access-preview-functions" id="access-preview-functions"></div>
           </section>
           <div class="login-method-tabs" role="tablist" aria-label="登录方式">
-            <button type="button" class="active" data-login-method="account" role="tab" aria-selected="true">账号密码</button>
-            <button type="button" data-login-method="phone" role="tab" aria-selected="false">居民手机号</button>
+            <button id="login-method-account" type="button" class="active" data-login-method="account" role="tab" aria-selected="true" aria-controls="login-form" tabindex="0">账号密码</button>
+            <button id="login-method-phone" type="button" data-login-method="phone" role="tab" aria-selected="false" aria-controls="phone-login-form" tabindex="-1">居民手机号</button>
           </div>
-          <form id="login-form" class="login-form">
+          <form id="login-form" class="login-form" role="tabpanel" aria-labelledby="login-method-account">
             <label id="demo-account-field" hidden>演示账号
               <select name="username" id="login-user"></select>
             </label>
@@ -72,7 +72,7 @@
             <p class="login-hint" id="account-login-hint">请使用所属机构分配的实名账号登录。</p>
             <p class="login-error" id="login-error" role="alert"></p>
           </form>
-          <form id="phone-login-form" class="login-form" hidden>
+          <form id="phone-login-form" class="login-form" role="tabpanel" aria-labelledby="login-method-phone" hidden>
             <label>已绑定手机号
               <input name="phone" id="login-phone" autocomplete="tel" required />
             </label>

@@ -66,9 +66,9 @@
       </section>
     </main>
 
-    <dialog id="payment-dialog" class="governance-dialog">
+    <dialog id="payment-dialog" class="governance-dialog" aria-labelledby="payment-dialog-title">
       <form id="payment-form" method="dialog">
-        <header><h2>发起医疗缴费</h2><button type="button" class="secondary-work-button" data-close-dialog>关闭</button></header>
+        <header><h2 id="payment-dialog-title">发起医疗缴费</h2><button type="button" class="secondary-work-button" data-close-dialog>关闭</button></header>
         <div class="governance-form">
           <label>医疗订单号<input name="orderNo" required maxlength="160" autocomplete="off" /></label>
           <label>金额（分）<input name="amountFen" required type="number" min="1" step="1" /></label>
@@ -81,9 +81,9 @@
       </form>
     </dialog>
 
-    <dialog id="refund-dialog" class="governance-dialog">
+    <dialog id="refund-dialog" class="governance-dialog" aria-labelledby="refund-dialog-title">
       <form id="refund-form" method="dialog">
-        <header><h2>申请医疗退费</h2><button type="button" class="secondary-work-button" data-close-dialog>关闭</button></header>
+        <header><h2 id="refund-dialog-title">申请医疗退费</h2><button type="button" class="secondary-work-button" data-close-dialog>关闭</button></header>
         <div class="governance-form">
           <input name="paymentEventId" type="hidden" />
           <input name="paymentTradeNo" type="hidden" />
@@ -99,9 +99,9 @@
       </form>
     </dialog>
 
-    <dialog id="review-dialog" class="governance-dialog">
+    <dialog id="review-dialog" class="governance-dialog" aria-labelledby="review-dialog-title">
       <form id="review-form" method="dialog">
-        <header><h2>退费独立复核</h2><button type="button" class="secondary-work-button" data-close-dialog>关闭</button></header>
+        <header><h2 id="review-dialog-title">退费独立复核</h2><button type="button" class="secondary-work-button" data-close-dialog>关闭</button></header>
         <div class="governance-form">
           <input name="refundId" type="hidden" />
           <label>复核域<select name="reviewDomain"><option value="business-review">业务复核</option><option value="finance-review">财务复核</option></select></label>
@@ -114,9 +114,9 @@
       </form>
     </dialog>
 
-    <dialog id="reconciliation-dialog" class="governance-dialog">
+    <dialog id="reconciliation-dialog" class="governance-dialog" aria-labelledby="reconciliation-dialog-title">
       <form id="reconciliation-form" method="dialog">
-        <header><h2>登记日终对账摘要</h2><button type="button" class="secondary-work-button" data-close-dialog>关闭</button></header>
+        <header><h2 id="reconciliation-dialog-title">登记日终对账摘要</h2><button type="button" class="secondary-work-button" data-close-dialog>关闭</button></header>
         <div class="governance-form">
           <label>通道<select name="gatewayType"><option value="PAYMENT">支付</option><option value="INSURANCE">医保</option></select></label>
           <label>业务日期<input name="businessDate" required type="date" /></label>

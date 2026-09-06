@@ -1,6 +1,7 @@
 # ADR：CI 按风险域拆分并保留聚合必需检查
 
-- 状态：Accepted
+- 状态：Superseded
+- 替代决策：`2026-09-06-ci-required-aggregate-fail-closed-expansion.md`
 - 日期：2026-08-19
 - Owner：T00
 - 影响范围：GitHub Actions、浏览器 E2E、发布就绪门禁、主线 required check
@@ -71,3 +72,8 @@ check 或以重复重跑代替修复。回滚为回退本切片提交并恢复�
 导出、浏览器响应头策略和 Safe URL 端口；API governance 原阈值同步提高到当前实测值。各组源码范围
 互不重叠，负向合同测试必须实际进入所属组，报告仍只写操作系统临时目录。浏览器端口的 Node 直接测试
 不能替代 Playwright、真实 OHIF Origin、托管响应头或现场安全评估。
+
+## 2026-09-06 决策替代
+
+三上游聚合拓扑由 `2026-09-06-ci-required-aggregate-fail-closed-expansion.md` 替代；风险域拆分、独立预算和
+保留 required `test` 名称的原则继续有效。

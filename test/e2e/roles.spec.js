@@ -65,6 +65,30 @@ test("five identity types receive only their policy menu and reject a forbidden 
 });
 
 test("specialist accounts see bounded functions and can search the unified sidebar", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/login.html");
+  const accountTab = page.locator("#login-method-account");
+  const phoneTab = page.locator("#login-method-phone");
+  await accountTab.focus();
+  await accountTab.press("ArrowRight");
+  await expect(phoneTab).toBeFocused();
+  await expect(phoneTab).toHaveAttribute("aria-selected", "true");
+  await expect(page.locator("#phone-login-form")).toBeVisible();
+  await phoneTab.press("Home");
+  await expect(accountTab).toBeFocused();
+  await expect(page.locator("#login-form")).toBeVisible();
+
+  const identityTabs = page.locator("#identity-type-grid [role='tab']");
+  await expect(identityTabs).toHaveCount(5);
+  await identityTabs.first().focus();
+  await identityTabs.first().press("End");
+  const citizenTab = page.locator("#identity-role-citizen");
+  await expect(citizenTab).toBeFocused();
+  await expect(citizenTab).toHaveAttribute("aria-selected", "true");
+  await expect(page.locator("#demo-accounts")).toHaveAttribute("aria-labelledby", "identity-role-citizen");
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)).toBe(false);
+
+  await page.setViewportSize({ width: 1280, height: 900 });
   await login(page, "nurse", "internet-nursing.html");
   await expect(page.locator(".navigation-identity")).toContainText("互联网护理岗位");
   await expect(page.locator(".navigation-identity")).toContainText("DEMO-NURSE");

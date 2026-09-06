@@ -1,5 +1,11 @@
 # DATA MODEL — 主线数据地图
 
+## 2026-09-06 遗留状态身份数据边界
+
+`authUsers` 与 `authOrganizations` 的数据 Owner 仍为 T01 identity-security，本切片不新增字段、集合、表、DDL、migration 或回填。T02 legacy 全量状态写只能省略这两个集合，或回传权威值/同一 `authUsers` 安全投影；省略及安全投影均由服务端恢复当前权威值，任一公开身份字段差异在 normalize/write 前失败关闭。集合级兼容写入口不接受两个身份集合。
+
+权威存储中的认证凭据不因本切片重写；仅 GET、成功 PUT 与非生产 reset 的 HTTP 响应建立递归安全投影，删除 `password/passwordHash`、精确 token/secret/session/private-key/api-key 键及以 password/credentialSecret/signingSecret/encryptionSecret 结尾的字段，同时保留非凭据业务字段。真实身份 provider、PostgreSQL、多实例状态与生产凭据迁移仍属外部/后续门禁，仓库状态保持 `NO-GO`。
+
 ## AI/CDSS 主线整合（2026-09-06）
 
 既有 `phase2ClinicalAssistRules[].governance` 按显式命令保存规则卡、版本、独立审批、历史和内部重放快照；提醒增加命令版本，回执可保存内部幂等元数据。无新集合、表、DDL或启动回填。四个临床集合从通用 state 公共读取剔除并禁止直接写入；专用接口返回白名单范围投影。
@@ -128,11 +134,11 @@ head、不新增表或 DDL。`wave-first-release-research` 允许后续建立 me
 是动态浏览器会话凭据；显式 bearer-only 兼容只在当前页面内存中短暂持有 token，页面重载不恢复，
 且生产始终保持 NO-GO。本切片不新增表、集合、字段或 migration。
 
-Playwright E2E 只在操作系统临时目录复制开发种子，根 40 项和居民 13 项由不同服务进程与不同
+Playwright E2E 只在操作系统临时目录复制开发种子，根 58 项和居民 13 项由不同服务进程与不同
 `DATA_DIR` 消费；每次标准运行还分配独立回环端口，不能连接其他 worktree 的测试服务。测试结束删除
 临时目录，既不写回 `data/db.json`，也不形成业务事实、迁移证据或生产验收证据。
 
-PWA 专项 3 项复用相同的仓库外临时数据和动态回环端口，只在独立浏览器 context 创建 v61 Cache Storage
+PWA 专项 3 项复用相同的仓库外临时数据和动态回环端口；三套共 74 项。PWA 只在独立浏览器 context 创建 v61 Cache Storage
 与 Service Worker registration；每项结束注销 registration 并删除所有测试 origin cache。缓存只接受同源
 成功响应，`/api/*` 与被拒绝的 `/data/db.json` 不进入缓存。Cache Storage 不是业务事实源或迁移证据。
 
@@ -365,7 +371,7 @@ T07 第二批审计的 3 条 `reviewedProofRequired` 已全部由直接 endpoint
 
 `internal-boundary-coverage-v1` 只登记测试文件、源码范围和当前覆盖率阈值，不新增集合、表、字段、DDL、migration、outbox 或生产事实源。c8 原始数据和报告只进入操作系统临时目录并在命令结束时删除，不得提交或归档为平台数据。
 
-当前 10 个组的新增范围只覆盖既有 Worker 脱敏投影、区域共享/转诊/科研命令逻辑和两个浏览器安全策略端口；它们不创建或修改任何业务数据。Safe URL 的 Node 直接测试可可信执行同一 UMD/CommonJS 端口，但其覆盖率不代表 44 个浏览器页面、793 个 HTML sink、42 个动态样式 sink 或真实 OHIF Origin 已被覆盖。急救生命链、医生工作台、血液上线看板、陪诊工作台、产品运行驾驶舱、产品区域运行驾驶舱、质量安全工作台、区域切换工作台、血液召回面板、血液创新指挥中心、体检工作台与生产 Go/No-Go 页面恶意响应 E2E 只验证临时测试数据的 DOM 表达，不创建业务事实或生产证据；血液接口/设备、要求、演练、迁移、审批、回滚、召回、创新、事件枢纽与数字孪生数据以及体检报告、居民解释、质检结论及其他领域元数据仍使用原 API/集合事实源，本切片没有修改 schema、migration 或持久状态。
+当前 10 个组的新增范围只覆盖既有 Worker 脱敏投影、区域共享/转诊/科研命令逻辑和两个浏览器安全策略端口；它们不创建或修改任何业务数据。Safe URL 的 Node 直接测试可可信执行同一 UMD/CommonJS 端口，但其覆盖率不代表 57 个浏览器页面、790 个 HTML sink、42 个动态样式 sink 或真实 OHIF Origin 已被覆盖。急救生命链、医生工作台、血液上线看板、陪诊工作台、产品运行驾驶舱、产品区域运行驾驶舱、质量安全工作台、区域切换工作台、血液召回面板、血液创新指挥中心、体检工作台、生产 Go/No-Go 页面与生产安全工作台恶意响应 E2E 只验证临时测试数据的 DOM 表达，不创建业务事实或生产证据；血液接口/设备、要求、演练、迁移、审批、回滚、召回、创新、事件枢纽与数字孪生数据以及体检报告、居民解释、质检结论及其他领域元数据仍使用原 API/集合事实源，本切片没有修改 schema、migration 或持久状态。
 
 覆盖百分比不是业务事实、发布凭证或现场验收证据；它不能晋升 API、身份、审计或对象存储的生产状态，所有相关生产边界继续 `NO-GO`。
 
