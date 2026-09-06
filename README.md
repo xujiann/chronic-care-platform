@@ -19,6 +19,8 @@ PLAN → 审批 → 实现 → 测试 → review → PR → merge 流程。
 
 区域医疗文书中心现通过 `regional-clinical-documents.html` 汇总电子病历卡与电子出院小结的采集校验、报送状态、异常补传、日志和医生工作站提醒，并复用既有集成事件与安全附件接口。主管部门只查看跨机构运行元数据，医疗机构按可信机构代码查看最小临床摘要并申请 PDF 短时调阅；真实机构文书接口、上级平台回执、生产对象存储与工作站嵌入验收完成前保持生产 `NO-GO`。
 
+平台审计治理中心通过 `audit-governance.html` 聚合既有安全事件链与数据访问链的严格完整性、固定事件分类、连续投递和留存控制。页面不展示人员、患者、机构、访问目标、用途或事件正文，也不提供链修复、原始导出、Worker 激活或生产放行；真实 SIEM/WORM、可信回执、外部单调锚、留存策略与现场签字完成前保持生产 `NO-GO`。
+
 居民健康档案公共接入可通过 `npm.cmd run citizen-records:check`、`npm.cmd run citizen-records:test` 和 `npm.cmd run citizen-records:readiness` 验证。T00 已接入授权策略、照护工作区路由和当前 PWA 缓存；真实身份与关系目录、HIS/EMR/LIS/PACS、对象存储、SIEM、法务同意版本、上线签字及公网 TLS 未提供前，`productionReady` 保持 `false`。
 
 挂号、双向转诊与家庭医生闭环可通过 `npm.cmd run registration-referral:check`、`npm.cmd run registration-referral:test` 和 `npm.cmd run registration-referral:acceptance` 验证。公共 API 使用服务端时间、`Idempotency-Key`、演员/机构范围及既有聚合 `expectedVersion` 执行 40 类命令，并持久化哈希链审计；真实 HIS、支付、医保、转诊和消息回调以及现场责任、SLA、切换和回滚签字未齐前，生产上线继续阻断。
@@ -97,6 +99,7 @@ JSON 数据目录启动隔离服务。`test:all` 保持原自动发现语义，�
 | `workbench.html` | 统一运营工作台、全流程审计矩阵、路线图、系统就绪报告 |
 | `platform.html` | 平台建设驾驶舱、应用目录、信用评价、科研专病库治理、移动无障碍治理、安全信创台账 |
 | `ai-governance.html` | 平台人工智能治理中心：场景目录、风险分级、控制矩阵、责任移交与上线阻断 |
+| `audit-governance.html` | 平台审计治理中心：严格链完整性、固定聚合、连续投递、留存控制与生产阻断 |
 | `unified-work-center.html` | 按账号和组织范围聚合待办、消息、回执与任务动作 |
 | `account-lifecycle.html` | 账号申请、临时授权、冻结、解冻和双人复核治理 |
 | `maternal-child.html` | 妇幼健康业务任务工作台 |
@@ -190,6 +193,7 @@ SQLite 结构化镜像已覆盖居民、账户、主索引、个人健康档案�
 | `GET /api/messages` / `POST /api/messages/:id/receipt` | 站内消息与送达回执 |
 | `GET /api/work-center` / `POST /api/work-center/tasks/:id/actions` / `POST /api/work-center/tasks/:id/messages` / `POST /api/work-center/messages/:id/receipt` | 跨域统一待办、消息、回执及版本化处置动作 |
 | `GET /api/runtime/ai-governance/center` | commission-only 平台人工智能治理投影；只返回场景、来源授权、风险、控制与阻断元数据，禁止自动审批、激活和诊疗决策 |
+| `GET /api/security/audit-governance/center` | commission-only 平台审计治理投影；只返回完整性、固定分类、数量、配置布尔状态和摘要，链异常或读取审计失败时失败关闭 |
 | `GET/POST /api/auth/account-lifecycle-requests` / `POST /api/auth/account-lifecycle-requests/conflicts` / `POST /api/auth/account-lifecycle-requests/:id/reviews` | 账号申请、职责冲突检查、双人复核与临时授权治理 |
 | `GET/POST /api/public-health/supervision/cases` / `POST /api/public-health/supervision/cases/:id/actions` | 卫生监督案件立案、调查、审核、处罚、整改、复查和结案闭环 |
 | `GET /api/data-quality/issues` / `GET /api/data-quality/scorecard` | 数据质量治理 |

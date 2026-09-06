@@ -15,6 +15,19 @@
       ]
     },
     {
+      "capabilityId": "L-GOV-AUDIT",
+      "pages": ["audit-governance.html"],
+      "interfaces": [
+        "GET /api/security/audit-governance/center",
+        "GET /api/audit/verify"
+      ],
+      "tests": [
+        "test/audit-governance-center.test.js",
+        "test/audit-governance-route.test.js",
+        "test/audit-governance-ui.test.js"
+      ]
+    },
+    {
       "capabilityId": "J-CLIN-CDSS",
       "pages": [
         "clinical-ai-cdss.html"

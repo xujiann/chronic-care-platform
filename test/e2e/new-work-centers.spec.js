@@ -22,6 +22,7 @@ test("commission navigation exposes the new governed work centers and pages rema
     ["regional-clinical-documents.html", "区域医疗文书中心"],
     ["clinical-ai-cdss.html", "临床决策支持安全治理中心"],
     ["ai-governance.html", "平台人工智能治理中心"],
+    ["audit-governance.html", "平台审计治理中心"],
     ["research-sandbox.html", "科研数据集与安全沙箱工作台"],
     ["public-health-supervision-cases.html", "卫生监督案件协同工作台"]
   ];
@@ -54,6 +55,10 @@ test("commission navigation exposes the new governed work centers and pages rema
     if (target === "ai-governance.html") {
       await expect(page.locator("#ai-governance-source-title")).toHaveText("平台人工智能治理服务已连接");
       await expect(page.locator("#ai-governance-decision")).toHaveText("NO-GO");
+    }
+    if (target === "audit-governance.html") {
+      await expect(page.locator("#audit-governance-source-title")).toHaveText("平台审计治理服务已连接");
+      await expect(page.locator("#audit-governance-decision")).toHaveText("NO-GO");
     }
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
     expect(overflow, `${target} must stay inside the mobile viewport`).toBe(false);
@@ -170,6 +175,38 @@ test("platform AI governance center renders hostile cross-domain metadata as ine
   await expect(page.locator("#ai-governance-blockers")).toContainText(hostile);
   await expect(page.locator("#ai-governance-use-cases img, #ai-governance-controls img, #ai-governance-risks img, #ai-governance-blockers img")).toHaveCount(0);
   expect(await page.evaluate(() => globalThis.aiGovernanceCompromised)).toBeUndefined();
+});
+
+test("platform audit governance center renders hostile metadata as inert content", async ({ page }) => {
+  const hostile = '<img src=x onerror="globalThis.auditGovernanceCompromised=true">';
+  await loginCommission(page);
+  await page.route("**/api/security/audit-governance/center", (route) => route.fulfill({
+    status: 200,
+    contentType: "application/json",
+    body: JSON.stringify({
+      schemaVersion: "platform-audit-governance-center-v1",
+      capabilityId: "L-GOV-AUDIT",
+      productionReady: false,
+      decision: "NO-GO",
+      scope: { role: "commission", actorDetailVisible: false, subjectDetailVisible: false, targetDetailVisible: false, purposeDetailVisible: false, rawExportAvailable: false },
+      summary: { sources: 1, totalRecords: 1, dataAccessRecords: 0, deniedEvents: 1, highRiskEvents: 1, controls: 1, blockedControls: 1, openRisks: 1, productionEligible: false },
+      sources: [{ collection: hostile, title: hostile, owner: hostile, classification: "restricted", recordCount: 1, chainVersion: hostile, integrityPassed: true, headDigest: hostile, detailVisible: false }],
+      distributions: { results: [{ id: hostile, count: 1 }], categories: [{ id: hostile, count: 1 }], roles: [{ id: hostile, count: 1 }], activityByDay: [{ day: hostile, count: 1 }] },
+      delivery: { appendOnlySourceContract: hostile, sourceContractConfigured: false, exactlyOneDeliveryTargetConfigured: false, retentionTargetConfigured: false, trustedExternalReceiptObserved: false, externalMonotonicAnchorObserved: false, workerActivationAuthorized: false, productionReady: false },
+      controls: [{ id: hostile, name: hostile, status: "blocked", evidence: hostile, blocker: hostile }],
+      risks: [{ id: hostile, title: hostile, severity: "critical", status: "open", owner: hostile, nextAction: hostile }],
+      safetyBoundaries: [hostile],
+      blockers: [hostile]
+    })
+  }));
+  await page.goto("/audit-governance.html");
+  await expect(page.locator("#audit-governance-sources")).toContainText(hostile);
+  await expect(page.locator("#audit-governance-results")).toContainText(hostile);
+  await expect(page.locator("#audit-governance-controls")).toContainText(hostile);
+  await expect(page.locator("#audit-governance-risks")).toContainText(hostile);
+  await expect(page.locator("#audit-governance-blockers")).toContainText(hostile);
+  await expect(page.locator("#audit-governance-sources img, #audit-governance-results img, #audit-governance-controls img, #audit-governance-risks img, #audit-governance-blockers img")).toHaveCount(0);
+  expect(await page.evaluate(() => globalThis.auditGovernanceCompromised)).toBeUndefined();
 });
 
 test("account lifecycle remains commission-manager only", async ({ page }) => {

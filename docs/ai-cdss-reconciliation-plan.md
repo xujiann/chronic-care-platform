@@ -22,9 +22,15 @@
 
 routes:check、architecture:test、process:test、platform:iterations:test、repository:governance:verify、process:verify 与 test:coverage:boundaries 均通过。完整浏览器 E2E 73 项全部通过（主应用 57、居民端 13、PWA 3）。旧分支及旧 main 的绿色 CI 不替代本分支远端 CI。
 
-提交前重新 fetch 确认 origin/main 仍为 `7de328e0`。本次仅提交整合分支并创建替代草稿 PR，不合并、不发布、不关闭 #248；生产继续 NO-GO。
+原替代草稿 PR 提交前确认 `origin/main` 为 `7de328e0`。本次重新批准后，已将最新 `main@f48684d9` 正常合并到同一整合分支；完成本轮标准门禁、远端 CI 与 Pages 验证后合并 #251，并仅在 #251 合并后关闭其来源 #248。生产继续 NO-GO。
 
 独立审阅补充：已关闭回执快照中的无可见提醒规则推荐旁路。返回历史快照前除范围/提醒策略外，还比较全部 rules/ruleConfig 当前公共投影；任一不一致返回稳定 409，不再次写入。专项 70 项及独立复核 33 项通过，审阅未发现本次范围内其他可复现高风险问题。
+
+## 最新主线收口（2026-09-06）
+
+最新主线以加法方式并入 #252 审计治理中心，保留 `/api/runtime/ai-governance/center`、`/api/quality-safety/ai-cdss/center` 与 `/api/security/audit-governance/center`，没有新增重复页面或规则事实源。机器目录当前为 636 项 API、363 个写入口、40 份行为合同（38 个完整 endpoint、2 个 action slice）；浏览器矩阵为主应用 58、居民端 13、PWA 3，共 74 项。该段记录最新合并后的验收基线，不改写前述原分支测试证据。
+
+本轮合并后重新执行标准七门，build、lint、typecheck、unit、integration、smoke、test:all 全部通过；`test:all` 完整发现并执行 520 个根测试文件，仍只有未配置真实 PostgreSQL 环境的既有条件项跳过。浏览器首次全量运行因长时 Node 回归后的资源压力在五类身份循环出现一次 30 秒超时；同一用例在全新隔离环境连续 3 次通过，随后完整重跑主应用 58/58、居民端 13/13、PWA 3/3 全部通过，因此未放宽断言或修改账号逻辑。
 
 ## 后续队列
 
