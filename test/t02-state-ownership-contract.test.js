@@ -114,7 +114,7 @@ test("legacy full-state route audits delegated owners and blocks new catch-all k
     randomUUID: () => "audit-id",
     readDatabase: () => structuredClone(state),
     redactSensitiveResponse: (value) => value,
-    requireApiRole: () => ({ name: "commissioner", role: "commission" }),
+    requireApiRole: () => ({ name: "commissioner", role: "commission", accountType: "manager" }),
     resealAuditTrail: (rows) => rows,
     scopeStateForUser: (value) => value,
     sealAuditTrail: (rows) => rows,
@@ -153,6 +153,124 @@ test("legacy full-state route audits delegated owners and blocks new catch-all k
   assert.equal(responseStatus, 400);
   assert.equal(responseBody.code, "UNREGISTERED_STATE_COLLECTION");
   assert.deepEqual(responseBody.collections, ["futureCatchAll"]);
+});
+
+test("legacy full-state write rejects identity mutations and preserves omitted identity collections", async () => {
+  const original = {
+    authUsers: [{ id: "u-manager", username: "manager", password: "plaintext-marker", passwordHash: "hash-marker" }],
+    authOrganizations: [{ orgCode: "ORG-HEALTH", status: "enabled" }],
+    residents: [{ id: "r1", name: "before" }],
+    securityEvents: [],
+    dataAccessLogs: [],
+    storageMeta: {}
+  };
+  let state = structuredClone(original);
+  let payload = structuredClone(original);
+  let writes = 0;
+  let responseStatus = null;
+  let responseBody = null;
+  const runtime = {
+    auditTrailRowsMatch: (left, right) => JSON.stringify(left) === JSON.stringify(right),
+    collectJson: async () => structuredClone(payload),
+    normalizeState: (value) => structuredClone(value),
+    prependAuditTrailEntry: (rows, entry) => [entry, ...rows],
+    randomUUID: () => "identity-boundary-audit-id",
+    readDatabase: () => structuredClone(state),
+    requireApiRole: () => ({ name: "manager", role: "commission", accountType: "manager" }),
+    sendJson: (_res, status, body) => {
+      responseStatus = status;
+      responseBody = body;
+    },
+    verifyAuditTrail: () => ({ passed: true }),
+    writeDatabase(data) {
+      writes += 1;
+      state = structuredClone(data);
+    }
+  };
+  const segment = stateDataRoutes.createRouteSegments(runtime)[1];
+
+  for (const collection of stateDataRoutes.SERVER_MANAGED_IDENTITY_COLLECTIONS) {
+    state = structuredClone(original);
+    payload = structuredClone(original);
+    payload[collection] = [];
+    await segment.handle({ method: "PUT", headers: {} }, responseDouble(), new URL("http://local/api/state"));
+    assert.equal(responseStatus, 409);
+    assert.equal(responseBody.code, "IDENTITY_SERVER_MANAGED_COLLECTION_CONFLICT");
+    assert.equal(responseBody.collection, collection);
+    assert.deepEqual(state, original);
+    assert.equal(writes, 0);
+  }
+
+  payload = {
+    residents: [{ id: "r1", name: "after" }],
+    securityEvents: [],
+    dataAccessLogs: [],
+    storageMeta: {}
+  };
+  await segment.handle({ method: "PUT", headers: {} }, responseDouble(), new URL("http://local/api/state"));
+  assert.equal(responseStatus, 200);
+  assert.equal(writes, 1);
+  assert.deepEqual(state.authUsers, original.authUsers);
+  assert.deepEqual(state.authOrganizations, original.authOrganizations);
+  assert.equal(responseBody.authUsers[0].password, undefined);
+  assert.equal(responseBody.authUsers[0].passwordHash, undefined);
+  assert.equal(state.authUsers[0].password, "plaintext-marker");
+  assert.equal(state.authUsers[0].passwordHash, "hash-marker");
+
+  payload = {
+    ...structuredClone(state),
+    authUsers: stateDataRoutes.projectAuthUsersForStateRead({ authUsers: state.authUsers }).authUsers
+  };
+  await segment.handle({ method: "PUT", headers: {} }, responseDouble(), new URL("http://local/api/state"));
+  assert.equal(responseStatus, 200);
+  assert.equal(writes, 2);
+  assert.equal(state.authUsers[0].password, "plaintext-marker");
+  assert.equal(state.authUsers[0].passwordHash, "hash-marker");
+});
+
+test("identity collection writes fail closed before body parsing or storage access", async () => {
+  for (const collection of stateDataRoutes.SERVER_MANAGED_IDENTITY_COLLECTIONS) {
+    const calls = [];
+    let responseStatus = null;
+    let responseBody = null;
+    const runtime = {
+      COLLECTION_WRITE_KEYS: new Set([collection]),
+      requireApiRole() {
+        calls.push("authorize");
+        return { name: "manager", role: "commission", accountType: "manager" };
+      },
+      collectJson() {
+        calls.push("body");
+        assert.fail("identity collection denial must precede request body parsing");
+      },
+      readDatabase() {
+        calls.push("read");
+        assert.fail("identity collection denial must precede database access");
+      },
+      writeDatabase() {
+        calls.push("write");
+        assert.fail("identity collection denial must never persist data");
+      },
+      sendJson(_res, status, body) {
+        calls.push("respond");
+        responseStatus = status;
+        responseBody = body;
+      }
+    };
+    const segment = stateDataRoutes.createRouteSegments(runtime)[1];
+
+    const handled = await segment.handle(
+      { method: "PUT", headers: {} },
+      responseDouble(),
+      new URL(`http://local/api/state-collections/${collection}`)
+    );
+
+    assert.equal(handled, true);
+    assert.equal(responseStatus, 403);
+    assert.equal(responseBody.code, "IDENTITY_SERVER_MANAGED_COLLECTION_WRITE_DENIED");
+    assert.equal(responseBody.collection, collection);
+    assert.deepEqual(calls, ["authorize", "respond"]);
+  }
 });
 
 test("collection diff ignores storage metadata and remains deterministic", () => {
@@ -213,7 +331,7 @@ test("legacy full-state conflicts prioritize registered collection owners", asyn
   const runtime = {
     collectJson: async () => structuredClone(payload),
     readDatabase: () => structuredClone(current),
-    requireApiRole: () => ({ name: "commissioner", role: "commission" }),
+    requireApiRole: () => ({ name: "commissioner", role: "commission", accountType: "manager" }),
     sendJson: (_res, status, body) => {
       responseStatus = status;
       responseBody = body;
@@ -236,7 +354,7 @@ test("production rejects demo reset before seed or storage access", async () => 
   let responseStatus = null;
   let responseBody = null;
   const runtime = {
-    requireApiRole: () => ({ name: "commissioner", role: "commission" }),
+    requireApiRole: () => ({ name: "commissioner", role: "commission", accountType: "manager" }),
     seedState: () => assert.fail("production reset must not read demo seed"),
     sendJson: (_res, status, body) => {
       responseStatus = status;

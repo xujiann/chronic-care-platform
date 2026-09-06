@@ -1,5 +1,16 @@
 # TECH DEBT — 主线技术债与风险台账
 
+## 2026-09-06 已关闭：遗留状态身份边界 P0
+
+| 已关闭缺口 | 仓库证据 | 保留边界 |
+|---|---|---|
+| 非管理 commission 可读取/写入聚合状态、集合或触发 demo reset | `state-data.js` 在 collection decode/read/body/seed 前执行 manager 门禁，unit 与真实登录 HTTP 回归覆盖 blood-quality/auditor 类账号及普通 collection 写入 | commission manager 仍使用遗留全状态兼容面，其余集合最小权限继续按 Owner 渐进治理；非 commission GET 保持既有 scoped read |
+| legacy writer 可覆盖身份用户/组织目录 | `authUsers/authOrganizations` 差异写 409、省略保留、集合级写 403，均有负向无写测试 | 身份变更只允许 T01 专用生命周期命令；真实 provider/生产目录同步仍待外部证据 |
+| PUT/reset 成功响应可带认证凭据 | GET/PUT/reset 递归删除受治理 password/token/secret/session/private-key/api-key 键，负测同时锁定嵌套字段、额外字段、非凭据业务字段保留及持久状态不被投影修改 | 存量演示凭据治理和生产密钥迁移不由响应投影替代 |
+| 三条状态边界未登记高风险授权 | GET/PUT state、collection PUT、reset 四条唯一登记；授权矩阵高风险计数 21 | 配置角色维度不替代运行时 accountType/resource 负向测试 |
+
+本闭合不改变 schema、数据文件、snapshot、外部事实或生产 `NO-GO`。
+
 ## AI/CDSS 主线整合（2026-09-06）
 
 关闭重复中心整合风险及临床中心医生编号绕过机构、暂停/漂移推荐旁路；保留 #249/#250 查询边界和原测试。未关闭多实例事务、幂等历史容量/归档、真实医学验证、生产签名与现场验收。影像质控外调一致性、体检幂等/CAS仍为后续独立切片。
@@ -117,7 +128,7 @@ T00 机器登记完成后，`production-release-scope` 中 17 个仓库内 API �
 | CHR-001 | 慢病随访事件投递 | 仓库内闭环已建立：SQLite v16 同事务 enqueue、专用 outbox、lease owner/token hash/version/expiry fencing、有界退避、死信、digest-only replay、独立 worker/CLI/systemd 合同与 Ed25519 activation provider；HTTP 请求路径不再同步外发 | 继续 NO-GO：真实 endpoint/凭据、外部签名 activation decision、可信签名回执、供应方幂等核对、PostgreSQL 多节点主存储、监控告警、服务启用和现场验收仍外置；只能承诺至少一次，不得宣称 exactly-once |
 | OBJ-001 | 对象存储生产闭环 | OBJ-ADR-002 已 Accepted；T08/T00 owner 固定，SQLite v17 完成结构化元数据/命令/回执/对账、无损回填与 legacy 写冻结；v2 202/status/replay、围栏 worker、退避/DLQ、scope-bound keyset 分页、部署/readiness 合同已建立 | 真实 provider status/abort capability、可信回执、KMS/WORM/扫描、容量/告警、备份恢复、PostgreSQL 多节点主存储和现场验收仍外置，production promotion=false；v1 调用方仍需按有界窗口迁移 |
 | OPS-001 | 连续审计耐久信任 | 仓库内来源缺口已关闭：v15 同事务 append-only source、最小投影、cursor 批次、target/source 绑定和 checkpoint v3 已有专项测试；已淘汰历史不可恢复，checkpoint/head 仍在同一本地信任域，SIEM receipt 未独立验签，filesystem 仅是 WORM rehearsal | 继续 NO-GO：需真实签名耐久 receipt、外部单调 anchor、WORM/KMS/保留与恢复能力、Data Owner 投影审批、专用账号及现场验收 |
-| SEC-004 | XSS / CSP 面 | 既有高风险页面按小切片迁为 DOM/text/class/dataset；生产 Go/No-Go 页面新增关闭 4 个 `innerHTML` 与 2 个 `insertAdjacentHTML`，新增卫生监督页同样只使用可信 DOM/text。Inventory v2 对 148 个发布资产锁定 793 个 DOM HTML、6 个动态 URL 和 42 个动态样式风险。Safe URL port 拒绝 javascript/data/userinfo/协议相对/未批准 Origin；兼容 CSP 仍含 `unsafe-inline`，严格策略仅 Report-Only | 2 个 OHIF 导航须在真实 exact-Origin 到位后复核；全清单仍有 793 个 HTML 与 42 个动态样式 sink。真实 OHIF/对象存储 Origin、托管头、严格 CSP 强制试点、独立扫描和渗透验收前继续 NO-GO |
+| SEC-004 | XSS / CSP 面 | 既有高风险页面按小切片迁为 DOM/text/class/dataset；生产 Go/No-Go 关闭 4 个 `innerHTML` 与 2 个 `insertAdjacentHTML`，生产安全工作台再关闭 3 个 `innerHTML` 并将处置委托收口到当前 center 的受信 ID/action。Inventory v2 对 188 个发布资产锁定 838 项（796 P0/42 P1），含 790 个 DOM HTML、6 个动态 URL 和 42 个动态样式风险。Safe URL port 拒绝 javascript/data/userinfo/协议相对/未批准 Origin；兼容 CSP 仍含 `unsafe-inline`，严格策略仅 Report-Only | 2 个 OHIF 导航须在真实 exact-Origin 到位后复核；全清单仍有 790 个 HTML 与 42 个动态样式 sink。真实 OHIF/对象存储 Origin、托管头、严格 CSP 强制试点、独立扫描和渗透验收前继续 NO-GO |
 | SEC-005 | 混合会话 | 服务端 token 已禁止写入 localStorage，Cookie/Authorization 并存时 Cookie 优先，旧凭据自动清理；生产 bearer/hybrid 需显式兼容门禁并保持 NO-GO，静态演示仅保存无凭据身份状态 | bearer-only 仍有页面内存凭据、刷新即失效和额外运维状态；XSS/CSP 风险及真实 Cookie/CSRF 现场验证尚未关闭 |
 | DATA-008 | 集合 owner 决策 | 252/252 已有机器状态；61 个命中既有可写 owner 合同，首发范围 19 个 legacy 集合已按实际读写调用点确认唯一业务 owner/readers/classification 并冻结摘要，168 个 `review-required` 与 1 个 `legacy-quarantined` 仍无可证明数据 owner | 继续按领域 owner 分批确认、归档或迁移；已确认的 19 个仍无版本化生产写合同/migration/现场证据，固定 `productionWriteAllowed=false`，不得把 owner 审查解释为晋升 |
 | TEST-002 | 覆盖率 | 原 `server.js` c8 门禁之外，内部边界已从 4 组扩展为 10 组；新增 worker observability、区域共享命令、转诊 owner command、科研合规导出、浏览器响应头和 Safe URL，并把 API governance 基线提高到最新主线实测 99.18/100/82.9 | 其余 `src/` 与页面控制器仍不在覆盖率结论中；Safe URL 的 Node 端口覆盖不等于页面/真实 Origin 覆盖，浏览器业务仍须 Playwright；按风险继续扩展且不得降低任何已合并阈值 |
@@ -142,7 +153,7 @@ T00 机器登记完成后，`production-release-scope` 中 17 个仓库内 API �
 |---|---|---|---|
 | SEC-001 | 2026-08-19 | Node 与 Pages 共用 45 入口显式资源图，未知、越界和敏感路径默认拒绝 | 静态清单构建、HTTP 负向矩阵、PR/main CI 与 Pages 构建 |
 | SEC-002 | 2026-08-19 | 浏览器和 Service Worker 只消费生成的 `public-demo.json`；凭据删除、身份联系字段掩码；v61 激活清理 v60 并拒绝缓存源快照 404 | 共享脱敏纯函数、源快照拒绝、Pages 仓库外构建和 PWA 缓存边界 E2E；仓库历史分类残余风险继续由 `DATA_MODEL.md` 的 DATA-006 跟踪 |
-| CI-001 | 2026-08-19 | 综合 CI 拆为 governance-api、browser-e2e、release-readiness，并保留 fail-closed 聚合 test | workflow 契约测试锁定步骤归属、预算、always 聚合和三个上游结果 |
+| CI-001 | 2026-09-06 | 综合 CI 拆为地区矩阵、真实 PostgreSQL、governance-api、browser-e2e、release-readiness 等独立任务；required `test` 以 `always()` 失败关闭其中五个风险上游，`complete-unit-test` 仍独立 required | workflow 契约测试锁定步骤归属、预算、五个上游结果以及失败、取消和跳过均不得误报成功 |
 | TEST-004 | 2026-08-19 | 居民小程序 JSON 制品改为递归扫描语义字符串值，仅跳过精确摘要字段中的合法 SHA-256；非 JSON 仍全文扫描 | 摘要命中放行，伪造摘要字段、`123456`、`888888`、`DEMO-MOBILE` 语义值和非 JSON 文本均拒绝 |
 | DATA-001 | 2026-08-26 | `STORAGE_SCHEMA_VERSION`、storageMeta、部署/readiness/release 门禁统一派生注册表 head v17 | 静态契约、storage、迁移指纹、部署、生产就绪与发布报告测试 |
 | DATA-002 | 2026-08-22 | v1–v14 独立注册并冻结内容指纹，v15+ ledger 写内容 SHA-256，runner 拒绝连续性/name/checksum 漂移 | 空库、v11/v15 升级、重跑、指纹/ledger 漂移、v15/v16 checksum、未来 v17 与失败回滚测试 |
@@ -168,7 +179,7 @@ T00 机器登记完成后，`production-release-scope` 中 17 个仓库内 API �
 | TEST-005 | 2026-08-27 | 本地/CI 统一 Playwright Chromium；在线根 58 项与居民 13 项继续阻止 Service Worker；PWA 3 项使用独立允许策略、动态端口和临时数据；Go/No-Go 与治理中心覆盖责任属性和恶意响应可信渲染 | 74 项唯一并集/漂移测试、居民同文件 13/13、PWA 重复 9/9、完整标准 E2E；不得把仓库浏览器测试解释为真实 HTTPS、托管安全头或现场验收 |
 | TEST-008 | 2026-08-23 | 专用 PWA/Service Worker E2E 验证居民登录后安装、v60→v61 激活清理、受控 update、离线 mobile/citizen 回退、API/源快照 404 缓存边界与逐项注销/清缓存 | 真实 HTTPS 终止、OS 安装提示/策略、浏览器设备矩阵、外部 Origin、现场缓存升级与独立安全验收继续外置；仓库测试不产生生产 GO |
 | GOV-001 | 2026-08-23 | `main`/`origin/main` 成为唯一当前集成与默认开发基线；固定 governance tag 仅作可复现证据，旧日期化 workflow 原文冻结 | process plan/verify 默认值、manifest/AGENTS/iteration program 漂移和 CI 目标分支负向测试 |
-| DOC-001 | 2026-08-24 | 关闭时为 267 份；当前 277 份 Markdown 以路径和 ADR 台账唯一分类为 208 current、68 snapshot、1 superseded；不删除历史证据 | 闭集路径/分类摘要、规则重叠、ADR status、当前事实和 snapshot 内容聚合摘要失败关闭 |
+| DOC-001 | 2026-08-24 | 关闭时为 267 份；当前 278 份 Markdown 以路径和 ADR 台账唯一分类为 208 current、68 snapshot、2 superseded；不删除历史证据 | 闭集路径/分类摘要、规则重叠、ADR status、当前事实和 snapshot 内容聚合摘要失败关闭 |
 | REPO-001 | 2026-08-23 | 3 个跟踪 PDF 均登记 SHA-256、大小、页数、引入提交、来源、保留理由和真实 generator 可用性；二进制本体未修改 | exact tracked inventory、digest/size/page/source 漂移负向测试；替换前必须补可复现生成源，禁止手工编辑 |
 
 ## 重复、死代码和命名结论

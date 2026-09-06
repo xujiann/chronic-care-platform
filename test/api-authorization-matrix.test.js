@@ -21,7 +21,7 @@ test("modular API authorization matrix covers owners roles scopes purposes and h
   assert.equal(matrix.summary.declarations >= 606, true);
   assert.equal(matrix.summary.customAuthenticationEvidence, 13);
   assert.equal(matrix.summary.protected >= 550, true);
-  assert.equal(matrix.summary.highRisk, 18);
+  assert.equal(matrix.summary.highRisk, 21);
   assert.equal(matrix.summary.residentScoped > 0, true);
   assert.equal(matrix.summary.institutionScoped > 0, true);
   assert.equal(matrix.routes.every((route) => route.owner && route.identity && route.dataScope && route.purpose), true);
@@ -43,6 +43,17 @@ test("modular API authorization matrix covers owners roles scopes purposes and h
   assert.equal(regionalAccess.owner, "T02");
   assert.equal(regionalAccess.highRisk, true);
   assert.deepEqual(regionalAccess.roles, ["commission", "institution"]);
+  for (const key of [
+    "GET /api/state",
+    "PUT /api/state",
+    "PUT /api/state-collections/:collection",
+    "POST /api/reset"
+  ]) {
+    const stateBoundary = matrix.routes.find((route) => route.key === key);
+    assert.equal(stateBoundary.owner, "T02");
+    assert.equal(stateBoundary.highRisk, true);
+  }
+  assert.deepEqual(matrix.routes.find((route) => route.key === "GET /api/state").roles, ["commission", "institution", "insurance", "citizen", "county"]);
   const procurementReview = matrix.routes.find((route) => route.key === "POST /api/platform/productization/requirements/:id/actions");
   assert.equal(procurementReview.owner, "T02");
   assert.equal(procurementReview.domain, "platform-governance");

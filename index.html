@@ -444,10 +444,10 @@
           <div class="panel-header">
             <h2>居民档案</h2>
             <div class="filters">
-              <input id="resident-search" type="search" placeholder="搜索姓名、身份证、电话" />
-              <select id="resident-org-filter">
+              <label>居民检索<input id="resident-search" type="search" placeholder="搜索姓名、身份证、电话" /></label>
+              <label>管理机构筛选<select id="resident-org-filter">
                 <option value="">全部机构</option>
-              </select>
+              </select></label>
             </div>
           </div>
           <div class="table-wrap">
@@ -623,10 +623,10 @@
       </section>
     </main>
 
-    <dialog id="resident-dialog">
+    <dialog id="resident-dialog" aria-labelledby="resident-dialog-title">
       <form method="dialog" class="dialog-form" id="resident-form">
         <header>
-          <h2>居民档案</h2>
+          <h2 id="resident-dialog-title">居民档案</h2>
           <button type="button" class="icon-button" data-close>×</button>
         </header>
         <input type="hidden" name="id" />
@@ -651,10 +651,10 @@
       </form>
     </dialog>
 
-    <dialog id="disease-dialog">
+    <dialog id="disease-dialog" aria-labelledby="disease-dialog-title">
       <form method="dialog" class="dialog-form" id="disease-form">
         <header>
-          <h2>慢病登记</h2>
+          <h2 id="disease-dialog-title">慢病登记</h2>
           <button type="button" class="icon-button" data-close>×</button>
         </header>
         <div class="form-grid">
@@ -672,10 +672,10 @@
       </form>
     </dialog>
 
-    <dialog id="followup-dialog">
+    <dialog id="followup-dialog" aria-labelledby="followup-dialog-title">
       <form method="dialog" class="dialog-form" id="followup-form">
         <header>
-          <h2>随访记录</h2>
+          <h2 id="followup-dialog-title">随访记录</h2>
           <button type="button" class="icon-button" data-close>×</button>
         </header>
         <input type="hidden" name="id" />
@@ -695,7 +695,7 @@
       </form>
     </dialog>
 
-    <dialog id="resident-detail-dialog">
+    <dialog id="resident-detail-dialog" aria-labelledby="detail-name">
       <section class="detail-panel">
         <header>
           <div>

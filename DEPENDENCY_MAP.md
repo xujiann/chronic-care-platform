@@ -1,5 +1,19 @@
 # DEPENDENCY MAP — 主线依赖地图
 
+## 2026-09-06 遗留状态身份边界依赖
+
+```text
+authenticated request
+  -> requireApiRole
+  -> commission accountType=manager guard (commission GET/PUT state, collection PUT, reset)
+  -> identity owner guard (authUsers/authOrganizations)
+  -> body / readDatabase / seedState / writeDatabase
+  -> auth-user secret projection
+  -> HTTP response
+```
+
+拒绝路径严格停在 body/read/seed 之前。身份集合依赖方向限定为 `T02 state-data compatibility adapter -> T01 identity-security owned current value`；legacy writer 只能保留，不能成为身份生命周期写端口。本切片不增加运行时模块、包、provider、schema 或部署依赖。
+
 ## AI/CDSS 主线整合（2026-09-06）
 
 既有中心与兼容 HTTP → T00 clinical-assist-runtime → T06 版本化 scope/receipt 端口及 T01 rule policy。规则审批、临床回执和兼容 state 写入共享现有锁端口；请求体不持锁，审计成功后一次持久化。复用 Node 内置 crypto，无新依赖、外部请求或部署单元。
@@ -244,8 +258,8 @@ TypeScript 与 Node 类型仅用于开发门禁；lockfile audit 已修复 c8 �
 - 动态浏览器凭据方向为 `HttpOnly Cookie → /api/auth/context → 脱敏身份投影`；`auth.js` 在
   任何普通 API 调用前清除旧 localStorage token，Cookie 与 Authorization 并存时服务端也选择
   Cookie。bearer-only 兼容 token 仅存在页面内存，不跨重载恢复。
-- Inventory v2 在显式发布图精确锁定 791 处 `innerHTML=` 与 2 处 `insertAdjacentHTML`（合计 793，
-  覆盖 32 个资产）；血液主工作台 25 处、急救生命链和医生工作台 controller 各 6 处、血液上线看板 8 处、陪诊工作台 7 处 `innerHTML` 加 1 处 `insertAdjacentHTML`、产品运行驾驶舱、产品区域运行驾驶舱与质量安全工作台各 1 处、区域切换工作台及血液召回面板各 2 处、血液创新指挥中心 10 处以及体检工作台全部 27 处 `innerHTML` 已迁到 DOM/text 节点；体检资产已无 Inventory P0/P1，最高仍为 citizen 94、
+- Inventory v2 在显式发布图精确锁定 788 处 `innerHTML=` 与 2 处 `insertAdjacentHTML`（合计 790，
+  覆盖 30 个资产）；生产安全工作台 3 处、血液主工作台 25 处、急救生命链和医生工作台 controller 各 6 处、血液上线看板 8 处、陪诊工作台 7 处 `innerHTML` 加 1 处 `insertAdjacentHTML`、产品运行驾驶舱、产品区域运行驾驶舱与质量安全工作台各 1 处、区域切换工作台及血液召回面板各 2 处、血液创新指挥中心 10 处以及体检工作台全部 27 处 `innerHTML` 已迁到 DOM/text 节点；体检与生产安全工作台资产已无 Inventory P0/P1，最高仍为 citizen 94、
   app 90、public-health 78、platform 72。
 - 同一清单现锁定 6 个动态 URL sink（公共 Safe URL port 内 2 个 DOM URL attribute 和 2 个导航调用、
   2 个 OHIF 导航）以及 42 个动态样式 sink（29 个模板 style 属性、
@@ -260,7 +274,7 @@ TypeScript 与 Node 类型仅用于开发门禁；lockfile audit 已修复 c8 �
 - 集中响应头端口暂保留兼容 CSP 的 `script/style 'unsafe-inline'`，并下发不含 `unsafe-inline`/`unsafe-eval`
   的严格 Report-Only 目标；动态 CSSOM、全角色浏览器回归和真实托管验证完成前不得描述为 CSP 已关闭。
 - Service Worker v61 缓存应用壳以及生成的 `data/public-demo.json`；激活时删除 v60 及其他旧缓存，只缓存同源成功响应，API、跨 Origin 与 404 拒绝响应不进入 Cache Storage。
-- E2E 依赖方向为 `npm test:e2e → root runner(40) / resident owned runner(13) / PWA runner(3) → 动态回环端口 + 独立临时
+- E2E 依赖方向为 `npm test:e2e → root runner(58) / resident owned runner(13) / PWA runner(3) → 动态回环端口 + 独立临时
   DATA_DIR → Playwright Chromium`。两套配置共用 `playwright-browser-policy.v1` 并设置
   `serviceWorkers=block`；系统 Chrome、固定 5210 端口和跨套件服务复用不再是标准测试依赖。
 
@@ -329,18 +343,19 @@ CORE_DATA_DEFINITIONS → collection-governance → CI/release 治理投影`。�
 
 ## 8. CI 与部署依赖
 
-- CI 分为区域矩阵、complete-unit-test、`governance-api`、`browser-e2e`、
+- CI 分为区域矩阵、真实 PostgreSQL 合同、complete-unit-test、`governance-api`、`browser-e2e`、
   `release-readiness` 和聚合 `test`。
 - `process/**` PR 的所有权门禁以 GitHub 提供的目标分支为比较基线；固定 `baselineTag` 只用于可复现工作树和发布证据。
-- 区域矩阵保持 5 分钟、complete-unit-test 与 governance-api 为 10 分钟；
-  browser-e2e 和 release-readiness 各为 15 分钟，聚合 test 为 5 分钟。
+- 区域矩阵与真实 PostgreSQL 合同保持 10 分钟，complete-unit-test 与 governance-api 为 20 分钟；
+  browser-e2e 为 15 分钟、release-readiness 为 25 分钟，聚合 test 为 5 分钟。
 - Chromium 安装和 Playwright E2E 独占 browser-e2e runner；发布、数据库、安全、报告和
   部署证据在 release-readiness 并行执行，不再共享浏览器外部依赖的时间预算。
-- browser-e2e 本地与 CI 均由标准 `test:e2e` 顺序执行在线根 40、居民 13、PWA 3 项；三阶段各自分配
+- browser-e2e 本地与 CI 均由标准 `test:e2e` 顺序执行在线根 58、居民 13、PWA 3 项，共 74 项；三阶段各自分配
   动态端口和临时数据。在线 context 阻止 Service Worker，PWA context 独立允许并逐项清理 registration/cache；
   Playwright 列表门禁拒绝遗漏、重复归属或浏览器/Service Worker 策略漂移。
 - complete-unit-test 依次运行标准 unit/integration，governance-api 运行 lint/typecheck/smoke，
-  release-readiness 和 Pages 运行标准 build；required check 名称和 fail-closed 聚合保持不变。
+  release-readiness 和 Pages 运行标准 build；required `test` 聚合检查区域矩阵、真实 PostgreSQL 合同、
+  governance-api、browser-e2e 与 release-readiness 五个上游，任一失败、取消或跳过均失败关闭。
 - TEST-006 保持上述 CI job 拓扑、预算和 required check 不变；标准 integration runner 依据同一
   suite 配置把 `test/api.test.js` 作为单文件热点批次，其余文件仍按既有 40 文件上限顺序分批。
   每个批次和整套测试向日志输出 `durationMs`，不设性能放行阈值，也不写仓库报告。
@@ -371,7 +386,8 @@ CORE_DATA_DEFINITIONS → collection-governance → CI/release 治理投影`。�
   挂号关联只通过组合根现有 `canAccessRegistrationOrder` 读取校验，不让 T05 写入 T07 挂号事实；独立测试
   通过同进程服务复用领域一次性派单证据 registry，避免跨进程伪造 capability，且没有新增反向依赖或静态环。
 - 主分支必需检查名称仍为 `complete-unit-test` 与 `test`。聚合 test 使用 `always()`
-  并要求三个风险域结果全部为 success，失败、取消和跳过均 fail-closed。
+  并要求地区矩阵、真实 PostgreSQL 合同、governance-api、browser-e2e 和 release-readiness
+  五个上游结果全部为 success，失败、取消和跳过均 fail-closed。
 - governance-api 先校验 custom auth 控制流/负向测试证据，再校验声明级授权矩阵、显式幂等行为证据合同和派生生产 API 目录；依赖方向为 `routeSourceFiles + authentication/idempotency 小型 evidence registry → authorization matrix v3 → production catalog v3`。只有显式标记的 SMS 外部 principal 从幂等合同派生 custom auth，平台 session/RBAC 合同继续复用授权矩阵。T04/T05 四条冻结首发写 API 的新增依赖固定为 `owner route → state-command-consistency → readDatabase/writeDatabase`；共享端口只提供摘要、actor scope、同资源进程尾和 collection CAS，不读取领域集合或拥有业务状态机。receipt 内嵌既有 owner aggregate/record，没有新集合、反向依赖、外部调用或并行写轨。T07 financial dispatch/formal grouping 依赖保持不变。T03 highlight signal 写入方向为 `session/RBAC → orgType/sourceOrgCode scope → strict body normalization → header/body/id/canonical key selection → actor organization namespace hash → per-key process tail → fresh snapshot → bounded publicHealthSignals + chained securityEvents → one state write/SQLite collection-version CAS`；读取方向为 `session/RBAC → orgType/orgCode fail-closed → readDatabase → build highlights → public signal projection → district organization/allowlist projection → projected-count audit → response`。POST、独立 GET 与 system 内嵌 highlights 复用同一纯投影；system 与 highlights 各自在读取前拒绝不支持的组织范围，system 的其余字段仍由原 builder 保持兼容。scope denial 单独走既有安全审计端口，精确重放锁内直接返回。没有增加集合、DDL、outbox、worker、PG adapter、跨域端口或外部依赖；200 条 ledger、单进程命令尾和 SQLite CAS 不等于分布式 exactly-once。招标需求人工复核已将状态、回执和安全审计合并为一次写入，仍缺稳定错误直接证据，`reviewedProofRequired` 为 1；证据门禁本身仍不写数据库、报告或发布制品。
 - T02/T06 首发行为补证的依赖方向固定为 `operations/quality route → api-command-behavior → existing state reader/writer + collection CAS`。共享端口只拥有 actor-scope 摘要、同资源进程尾、expectedVersion 与有界 receipt 语义，不读取领域集合、不替换既有状态机，也不新增反向依赖、数据库表或外部调用；operations 继续保留 `resourceDispatchRequests`/`taskMessages` 的 T05 owner 跨域债务，不能据本补证推导新的数据 owner。
 - governance-api 同时执行 `data:collection-governance:verify`；新集合、陈旧/重复状态、owner/reader
@@ -423,7 +439,7 @@ review allowlist、角色脱敏和 handoff 安全审计仍位于兼容 HTTP 边�
 
 数据依赖为 `T02 regionalSharingPackages/accessReviews → resident-authorization-decision.v1 → T04 personalRecords`。反向只允许 T04/identity-security 消费 `regional-sharing-access-receipt.v1`，不得由 T02 写授权事实。单进程 package queue 只保护当前兼容适配器，生产仍因 `productionCutoverAuthorized=false`、非 PostgreSQL 或 atomic repository 缺失而失败关闭；regional site evidence lifecycle 不进入授权决策。
 
-遗留状态写方向被限制为 `commission PUT /api/state → state-data guard → 非区域集合`：四个区域 owner 集合只能省略或深相等，不能流入 `normalizeState/writeDatabase`；`/api/state-collections/:collection` 同样拒绝它们。`POST /api/reset` 只在非生产到达 seed/write，production 在边界失败关闭。
+遗留状态写方向被限制为 `commission manager PUT /api/state → state-data guard → 非服务端托管集合`：四个区域 owner 集合及 `authUsers/authOrganizations` 只能省略或深相等，不能以客户端差异流入 `normalizeState/writeDatabase`；`/api/state-collections/:collection` 同样拒绝这些 owner 集合。`POST /api/reset` 只允许 commission manager 在非生产到达 seed/write，production 在边界失败关闭。
 ## 12. T05 转诊命令依赖约束
 
 转诊写依赖方向为 `shared.js / citizen.js → 三条兼容 HTTP 路径 → referral-command-service → DomainRepository → referrals + command inbox + outbox`。领域服务只依赖平台 contract、repository 和 event runtime，不导入 `server.js` 或其他子域内部；HTTP 层注入居民授权和 JSON 存储端口。兼容路由不得绕过 owner command，居民任务消息和安全审计在命令成功后由 HTTP 层保留。

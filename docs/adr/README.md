@@ -26,8 +26,9 @@
 | [招标需求采用受控导入、来源修订、人工复核与能力差距治理](./2026-09-02-procurement-requirement-governance-v2.md) | Accepted | 离线原子批次、真实路径边界、扫描证明、线性来源修订、候选复核与生产 NO-GO |
 | [招标需求治理中心完整闭环](./2026-09-02-procurement-requirement-governance-center-v3.md) | Accepted | 脱敏批次登记、证据绑定、产品规划、开发建议、独立仓库证据核验、安全导出与生产 NO-GO |
 | [综合 CI 采用 15 分钟有界时间预算](./2026-08-19-ci-comprehensive-test-time-budget.md) | Superseded | 综合 test job 的超时预算与回归约束 |
-| [CI 按风险域拆分并保留聚合必需检查](./2026-08-19-ci-risk-domain-job-split.md) | Accepted | 治理/API、浏览器 E2E、发布就绪与 required test 聚合 |
-| [Playwright E2E 采用统一浏览器策略与独占测试服务](./2026-08-23-playwright-e2e-isolation-and-browser-policy.md) | Accepted | Playwright Chromium、在线 Service Worker 隔离、PWA 专项、动态端口与当前 56 项套件分区 |
+| [CI 按风险域拆分并保留聚合必需检查](./2026-08-19-ci-risk-domain-job-split.md) | Superseded | 三风险域拆分原则保留，三上游聚合拓扑由 2026-09-06 决策替代 |
+| [required test 聚合覆盖全部独立高风险域](./2026-09-06-ci-required-aggregate-fail-closed-expansion.md) | Accepted | 地区矩阵、真实 PostgreSQL、治理/API、浏览器 E2E、发布就绪五个上游与 required test 失败关闭聚合 |
+| [Playwright E2E 采用统一浏览器策略与独占测试服务](./2026-08-23-playwright-e2e-isolation-and-browser-policy.md) | Accepted | Playwright Chromium、在线 Service Worker 隔离、PWA 专项、动态端口与当前根 58 + 居民 13 + PWA 3 = 74 项套件分区 |
 | [模块化单体与微服务提取标准](../ADR-模块化单体与微服务提取标准-2026-08-03.md) | Accepted | 模块边界和服务提取 |
 | [SQLite migration 与核心 schema 冻结](./2026-08-18-sqlite-migration-and-core-schema-freeze.md) | Accepted | 已合入 `main@026762f`（PR #129）；v1–v14 冻结，v15+ 内容指纹化 |
 | [核心数据 closed-world 定义](./2026-08-18-core-data-closed-world.md) | Accepted | 核心概念不可随意平行创建 |

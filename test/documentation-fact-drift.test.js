@@ -18,7 +18,7 @@ test("current documentation facts are derived from machine authorities", () => {
   const state = cloneRepositoryState();
   const report = governance.buildReport(state);
   assert.equal(report.ok, true);
-  assert.equal(report.summary.documents, 9);
+  assert.equal(report.summary.documents, 11);
   assert.deepEqual(report.summary.apiCatalog, {
     entries: state.catalogSummary.entries,
     writeRoutes: state.catalogSummary.writeRoutes,
@@ -40,6 +40,7 @@ test("current documentation facts are derived from machine authorities", () => {
     head: state.sqliteSchemaFacts.head,
     tables: state.sqliteSchemaFacts.tableCount
   });
+  assert.deepEqual(report.summary.e2e, state.e2eFacts);
   assert.deepEqual(report.summary.firstReleaseScope, {
     status: "FROZEN-NO-GO",
     apiReviewRequired: 0,
@@ -47,6 +48,27 @@ test("current documentation facts are derived from machine authorities", () => {
     repositoryPlanMissing: 0,
     productionReady: false
   });
+});
+
+test("current E2E partition facts fail closed against the declared Playwright inventory", () => {
+  const root = repositoryState.e2eFacts.root;
+  for (const [documentId, checkId, marker] of [
+    ["roadmap", "roadmap:e2eFacts", `在线根 ${root} + 居民`],
+    ["engineeringGovernance", "engineeringGovernance:e2eFacts", `在线根 ${root} 项`],
+    ["currentArchitecture", "currentArchitecture:e2eFacts", `当前根 ${root} + 居民`],
+    ["moduleMap", "moduleMap:e2eFacts", `在线根 ${root} 项`],
+    ["dataModel", "dataModel:e2eFacts", `根 ${root} 项和居民`],
+    ["apiMap", "apiMap:e2eFacts", `根 ${root} 项与居民`],
+    ["dependencyMap", "dependencyMap:e2eFacts", `root runner(${root})`],
+    ["adrIndex", "adrIndex:e2eFacts", `当前根 ${root} +`],
+    ["e2eAdr", "e2eAdr:currentFacts", `当前机器清单为根 ${root} 项`]
+  ]) {
+    const state = cloneRepositoryState();
+    state.documents[documentId] = state.documents[documentId].replace(marker, marker.replace(String(root), String(root - 1)));
+    const report = governance.buildReport(state);
+    assert.equal(report.ok, false, documentId);
+    assert.equal(failed(report, checkId), true, documentId);
+  }
 });
 
 test("API catalog count drift fails closed in every governed progress statement", () => {

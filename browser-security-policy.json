@@ -119,7 +119,7 @@
   },
   "riskBaseline": {
     "schemaVersion": 2,
-    "sourceRevision": "origin/main@6ebe3cb3 + process/t00-production-go-no-go-trusted-rendering-20260827",
+    "sourceRevision": "origin/main@a6974a27 + process/t00-platform-gap-closure-20260906",
     "failClosedPriorities": [
       "P0",
       "P1"
@@ -167,7 +167,6 @@
       {"asset":"platform-design-system.js","type":"runtime-style-element","priority":"P1","fingerprint":"7cf23475e4eb58f8d506b8dd381ba3d9e77d13f22f2bfec8bd84175d0eeb0408","count":1},
       {"asset":"platform-productization-ui.js","type":"dom-inner-html","priority":"P0","fingerprint":"a5dd42f808782351c20577a0338110c0bb0728aa49dcfd187bbd012d92f7ba73","count":3},
       {"asset":"platform.js","type":"dom-inner-html","priority":"P0","fingerprint":"320466cdfd5803d6650829ee476d0aaddf7c95259939723ea7393072781968e7","count":72},
-      {"asset":"production-security.js","type":"dom-inner-html","priority":"P0","fingerprint":"47990fb7aa85e8d34133dd4ed535a10751bbf524de2dd3c78e8cee293cb24c51","count":3},
       {"asset":"public-health-highlights.js","type":"dom-inner-html","priority":"P0","fingerprint":"f3c2e154b2ef114be6a3b5ae082f80d1c080a7ca349e9a577841adde3d2bc7c0","count":9},
       {"asset":"public-health-highlights.js","type":"dynamic-html-style-attribute","priority":"P1","fingerprint":"261a70157b72445431abc9cc45a216a4b98ac50d02d3174daf05c8f0523c4a9d","count":2},
       {"asset":"public-health.js","type":"dom-inner-html","priority":"P0","fingerprint":"01f32bea1d2b4ac357bfdae20514b6cf6358318c1957ea5d03de801a9e81557b","count":78},

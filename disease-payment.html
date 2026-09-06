@@ -20,7 +20,7 @@
     </header>
 
     <section class="payment-toolbar panel">
-      <div><strong>支付模式</strong><select id="payment-mode"><option value="DRG">DRG 按病组</option><option value="DIP">DIP 按病种分值</option></select></div>
+      <label><strong>支付模式</strong><select id="payment-mode"><option value="DRG">DRG 按病组</option><option value="DIP">DIP 按病种分值</option></select></label>
       <button id="calculate-all" type="button">执行清单质控、分组与测算</button>
       <button id="create-settlement" class="secondary" type="button">生成本月结算批次</button>
       <span id="action-message" role="status"></span>
@@ -51,7 +51,7 @@
       <div class="payment-toolbar">
         <button type="button" data-payment-action="choose-local-package">导入规则包JSON</button>
         <button type="button" class="secondary" data-payment-action="activate-due-local-packages">检查到期生效</button>
-        <input id="local-package-file" type="file" accept="application/json,.json" hidden>
+        <input id="local-package-file" type="file" accept="application/json,.json" aria-label="本地医保规则包 JSON 文件" hidden>
         <a href="./config/disease-payment/templates/local-drg-package.template.json" download>DRG模板</a>
         <a href="./config/disease-payment/templates/local-dip-package.template.json" download>DIP模板</a>
         <span>模板数据不具备结算效力；正式发布必须有来源摘要、影响试算和双人复核。</span>
@@ -119,7 +119,7 @@
     </section>
 
     <section class="payment-grid">
-      <article class="panel"><div class="panel-title"><h2>常态化意见反馈</h2></div><form id="feedback-form"><select name="category"><option>分组方案</option><option>权重费率</option><option>信息化建设</option><option>编码标准</option></select><textarea name="content" required placeholder="填写医疗机构或一线人员意见"></textarea><button type="submit">提交反馈</button></form><div id="feedback-list" class="list compact"></div></article>
+      <article class="panel"><div class="panel-title"><h2>常态化意见反馈</h2></div><form id="feedback-form"><label>反馈类别<select name="category"><option>分组方案</option><option>权重费率</option><option>信息化建设</option><option>编码标准</option></select></label><label>反馈内容<textarea name="content" required placeholder="填写医疗机构或一线人员意见"></textarea></label><button type="submit">提交反馈</button></form><div id="feedback-list" class="list compact"></div></article>
       <article class="panel"><div class="panel-title"><h2>操作审计</h2></div><div id="audit-list" class="list compact"></div></article>
     </section>
   </main>

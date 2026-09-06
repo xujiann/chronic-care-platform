@@ -41,6 +41,11 @@ test("commission navigation exposes the new governed work centers and pages rema
     }
     if (target === "account-lifecycle.html") {
       await expect(page.locator("#account-source-title")).toHaveText("账号治理数据已连接");
+      await page.locator("#new-account-request").click();
+      const accountDialog = page.getByRole("dialog", { name: "发起账号生命周期申请" });
+      await expect(accountDialog).toBeVisible();
+      expect(await accountDialog.evaluate((dialog) => dialog.contains(document.activeElement))).toBe(true);
+      await accountDialog.getByRole("button", { name: "关闭" }).click();
     }
     if (target === "medical-payment.html") {
       await expect(page.locator("#payment-source-title")).toHaveText("医疗付费业务服务已连接");
@@ -63,6 +68,72 @@ test("commission navigation exposes the new governed work centers and pages rema
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
     expect(overflow, `${target} must stay inside the mobile viewport`).toBe(false);
   }
+
+  const hostile = '<img data-production-security-xss src=x onerror="globalThis.productionSecurityCompromised=true">';
+  await page.route("**/api/production-security/center", (route) => route.fulfill({
+    status: 200,
+    contentType: "application/json",
+    body: JSON.stringify({
+      status: hostile,
+      summary: {
+        findings: 1,
+        openFindings: 1,
+        criticalOpen: 1,
+        highOpen: 0,
+        activeWaivers: 0,
+        approvedReleaseOpinions: 0,
+        releaseApprovals: 1,
+        releaseEligible: false
+      },
+      findings: [{
+        id: hostile,
+        severity: "critical",
+        source: hostile,
+        title: hostile,
+        asset: hostile,
+        status: "open",
+        owner: hostile,
+        dueAt: hostile,
+        overdue: true,
+        evidenceRefs: [hostile],
+        remediationEvidenceRefs: []
+      }],
+      approvals: [{
+        id: hostile,
+        title: hostile,
+        role: hostile,
+        status: "pending",
+        approvedBy: hostile,
+        approvedAt: hostile
+      }],
+      boundary: hostile
+    })
+  }));
+  await page.goto("/platform.html");
+  await expect(page.locator("#production-security-status")).toHaveText(hostile);
+  await expect(page.locator("#production-security-metrics")).toContainText("安全发现");
+  await expect(page.locator("#production-security-findings")).toContainText(hostile);
+  await expect(page.locator("#production-security-approvals")).toContainText(hostile);
+  await expect(page.locator("#production-security-boundary")).toHaveText(hostile);
+  await expect(page.locator("#production-security-findings [data-production-security-action]").first()).toHaveAttribute("data-id", hostile);
+  await expect(page.locator("#production-security-approvals [data-production-security-approval]")).toHaveAttribute("data-id", hostile);
+  await expect(page.locator("[data-production-security-xss]")).toHaveCount(0);
+  expect(await page.evaluate(() => globalThis.productionSecurityCompromised)).toBeUndefined();
+
+  const securityMutationRequests = [];
+  page.on("request", (request) => {
+    if (request.method() === "POST" && request.url().includes("/api/production-security/")) securityMutationRequests.push(request.url());
+  });
+  await page.evaluate(() => {
+    const fake = document.createElement("button");
+    fake.id = "untrusted-production-security-control";
+    fake.dataset.productionSecurityAction = "record-remediation";
+    fake.dataset.id = "forged-finding";
+    document.body.append(fake);
+    fake.click();
+  });
+  await expect(page.locator("#untrusted-production-security-control")).toBeEnabled();
+  expect(securityMutationRequests).toEqual([]);
 });
 
 test("medical payment center renders hostile provider text as inert content", async ({ page }) => {

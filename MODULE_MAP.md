@@ -1,5 +1,15 @@
 # MODULE MAP — 主线模块地图
 
+## 2026-09-06 T00 遗留状态身份边界模块
+
+| 模块 | Owner | 标签 | 当前边界 |
+|---|---|---|---|
+| `src/http/routes/state-data.js` | T02；身份集合 T01 | B KEEP + IMPROVE | commission 管理账号门禁先于 collection decode/read/body/seed；`authUsers/authOrganizations` 省略/安全投影保留、公开字段差异冲突、集合写拒绝；GET/PUT/reset 响应递归删除凭据键 |
+| `config/high-risk-api-authorization.json` | T00 | A KEEP | 唯一登记 GET/PUT state、collection PUT、demo reset 四条高风险授权事实 |
+| state-data 专项与 HTTP 回归测试 | T00 + T01/T02 | A KEEP | 锁定 manager 兼容、专科/审计账号早拒绝、身份 owner 边界、响应脱敏及真实登录会话行为 |
+
+本切片只收紧既有兼容路由，不新增 endpoint、集合、schema、migration、依赖或部署单元；身份生命周期仍由 T01 专用命令拥有。
+
 ## AI/CDSS 主线整合（2026-09-06）
 
 `src/identity-security/ai-governance.js` 负责规则治理命令；`src/clinical-specialties/clinical-decision-support` 负责可信范围与回执；`src/http/clinical-assist-runtime.js` 负责端口装配。主线两个原中心保持，临床中心通过统一 scope/policy 端口消费状态，不复制状态机。
@@ -180,7 +190,7 @@
 | 区域运行 | `src/platform/regional/`、`regions/` | 多地区清单、能力包、复制和发布注册 |
 | 领域实现 | `src/care-coordination/` 等与根目录服务 | 新旧实现并存，边界尚未完全迁移 |
 | 前端共享 | `auth.js`、`shared.js`、`platform-api-client.js`、`platform-shell.js` | 身份上下文、API 调用、壳和设计系统；服务端 token 不进入 localStorage，Cookie 上下文优先，陈旧凭据启动即清理 |
-| 静态发布与浏览器安全 | `src/http/static-asset-policy.js`、`src/http/static-content-runtime.js`、`src/http/browser-security-policy.js`、`src/http/browser-security-inventory.js`、`browser-safe-url.js`、`page-auth-bootstrap.js`、`scripts/static-publication.js` | 57 个入口、188 个显式发布资产、Pages 制品和服务端读取共用默认拒绝契约；既有高风险页面、生产 Go/No-Go 页面、卫生监督页、医疗付费页、区域医疗文书页、临床决策支持页、平台 AI 治理页及审计治理页均按可信 DOM/text 渲染，Safe URL port 按 internal/official/object-storage/tel/blob 能力在 mutation 前检查协议、凭据和 exact-Origin。Inventory v2 现锁定 793 个 DOM HTML、6 个动态 URL 和 42 个动态样式风险；新增页面自身 P0/P1 finding 为 0，2 个 OHIF URL occurrence 仍复核。严格 CSP 仍是 Report-Only，生产 NO-GO |
+| 静态发布与浏览器安全 | `src/http/static-asset-policy.js`、`src/http/static-content-runtime.js`、`src/http/browser-security-policy.js`、`src/http/browser-security-inventory.js`、`browser-safe-url.js`、`page-auth-bootstrap.js`、`scripts/static-publication.js` | 57 个入口、188 个显式发布资产、Pages 制品和服务端读取共用默认拒绝契约；既有高风险页面、生产 Go/No-Go 页面、生产安全工作台、卫生监督页、医疗付费页、区域医疗文书页、临床决策支持页、平台 AI 治理页及审计治理页均按可信 DOM/text 渲染，Safe URL port 按 internal/official/object-storage/tel/blob 能力在 mutation 前检查协议、凭据和 exact-Origin。Inventory v2 现锁定 790 个 DOM HTML、6 个动态 URL 和 42 个动态样式风险；新增页面自身 P0/P1 finding 为 0，2 个 OHIF URL occurrence 仍复核。严格 CSP 仍是 Report-Only，生产 NO-GO |
 | 演示脱敏 | `src/platform/data/public-demo-snapshot.js` | 服务端合成、Pages 构建和 storage-admin 共用纯函数，凭据字段删除、个人姓名/身份/联系字段稳定掩码 |
 | API 生产目录 | `routeSourceFiles` + `api-authentication-evidence` + `api-idempotency-evidence` → `api-authorization-matrix-v3` → `production-api-catalog-v3` | 当前目录 636 项，13 项认证证据保持未分类为 0。40 份幂等行为合同覆盖 38 个完整 endpoint 与 2 个转诊 action-slice；招标需求复核、脱敏批次登记和交付治理入口均已补齐稳定错误与失败负证据。363 个写接口中 325 个仍缺 endpoint 级行为证明，通用 action remainder 使 327 项保持复核，全部生产 NO-GO。`reviewedProofRequired` 为 0，有界 receipt、进程锁与 SQLite CAS 不是多实例生产证明 |
 | 内部边界覆盖治理 | `config/internal-boundary-coverage.json` → `scripts/internal-boundary-coverage.js` | 复用现有 c8/直接行为测试，以 10 个不重叠源码组锁定 identity、audit、object storage、API governance、worker observability、区域共享命令、转诊 owner command、科研合规导出、浏览器响应头与 Safe URL 真实基线；每组绑定至少一条实际执行的负向合同，报告仅写临时目录 |
@@ -324,7 +334,7 @@ QC 同样保留原 commission/institution、先查检查再读 body、FHIR 失�
 | `src/platform/governance/regional-sharing-read-model.js` | 机器 owner T00 integration；目标 platform-governance / T02 | `regional-sharing-read-model.v1` 两查询只读端口 | 构建共享视图和交接清单；只依赖组合根注入的 legacy normalize/seed/scope/handoff/UUID/clock 端口，不导入 `server.js` 或 HTTP 路由 |
 | `src/platform/governance/resident-authorization-decision-adapter.js` | 机器 owner T00 integration；目标 T02 consumer adapter | `resident-authorization-decision.v1` anti-corruption adapter | 唯一读取 T04 `personalRecords` meta 的边界；命令只消费结构化决策端口 |
 | `src/http/routes/shared.js` 的 `shared-05` | 兼容 HTTP 适配器 | 原 method/path/顺序 | 认证外层、读取/写入端口、兼容响应头；不再拥有旧 review 决策函数 |
-| `src/http/routes/state-data.js` | platform-state / T02；跨 owner 收口 T00 | legacy state 兼容边界 | 四个区域集合只能省略或深相等，拒绝全量/集合级客户端旁路；GET 的 `authUsers` 专用投影移除 `password/passwordHash` 且不修改底层快照 |
+| `src/http/routes/state-data.js` | platform-state / T02；跨 owner 收口 T00 | legacy state 兼容边界 | commission 管理账号门禁先于 collection decode/read/body/seed；区域及身份 owner 集合禁止客户端旁路；GET/PUT/reset 的 `authUsers` 投影递归移除凭据键且不修改底层快照 |
 | `citizen-records-v1/v2` | citizen-chronic / T04 | 授权事实端口 | 提供授权状态与 lifecycle；T02 只读消费，不复制授权模型 |
 | `config/regional-sharing-access-data-contract.json` | T00/T02 治理证据 | 数据晋升合同 | 锁定 owner、跨域合同、无 DDL 迁移理由、回滚和生产 NO-GO |
 
@@ -429,7 +439,7 @@ owner、文件引用和 closed-world 核心概念匹配只是证据，不能自�
 |---|---|---|---|
 | `config/repository-governance.json` | T00 | 当前 workflow、Markdown 分类规则/闭集摘要、3 个 PDF 来源与 digest 的机器合同 | 不定义业务 owner，不包含 PDF 正文 |
 | `scripts/repository-governance.js` | T00 | 只读枚举 Git 路径，拒绝漏分/重叠/快照改写/旧 baseline/PDF 漂移 | 不生成或修改文档、PDF、报告和归档 |
-| `test/repository-governance.test.js` | T00 / TEST-001 | 锁定当前 277 份 Markdown、三类边界、当前 main 流程和 3 个 PDF 负向漂移 | 不证明 PDF 内容正确或生产可用 |
+| `test/repository-governance.test.js` | T00 / TEST-001 | 锁定当前 278 份 Markdown、三类边界、当前 main 流程和 3 个 PDF 负向漂移 | 不证明 PDF 内容正确或生产可用 |
 
 依赖方向为 `Git 跟踪路径 + ADR 状态 + 当前进程清单 + PDF bytes/source paths → repository governance
 verifier → governance-api/architecture:test`。snapshot 与 superseded 只提供历史证据，不得反向覆盖 current

@@ -163,8 +163,8 @@
       </section>
     </main>
 
-    <dialog id="physical-exam-detail-dialog" class="report-dialog">
-      <div class="dialog-head"><h2>体检报告详情</h2><button type="button" data-close-report>×</button></div>
+    <dialog id="physical-exam-detail-dialog" class="report-dialog" aria-labelledby="physical-exam-detail-title">
+      <div class="dialog-head"><h2 id="physical-exam-detail-title">体检报告详情</h2><button type="button" data-close-report aria-label="关闭体检报告详情">×</button></div>
       <div id="physical-exam-detail"></div>
     </dialog>
     <div class="toast" id="physical-exam-toast" role="status"></div>

@@ -41,9 +41,9 @@
       </section>
     </main>
 
-    <dialog id="account-request-dialog" class="governance-dialog">
+    <dialog id="account-request-dialog" class="governance-dialog" aria-labelledby="account-request-title">
       <form id="account-request-form" method="dialog">
-        <header><h2>发起账号生命周期申请</h2><button class="secondary-work-button" type="button" data-close-dialog>关闭</button></header>
+        <header><h2 id="account-request-title">发起账号生命周期申请</h2><button class="secondary-work-button" type="button" data-close-dialog>关闭</button></header>
         <div class="governance-form">
           <label>申请类型<select name="type" required><option value="open">账号开通</option><option value="change">账号变更</option><option value="deactivate">账号停用</option><option value="restore">账号恢复</option><option value="temporaryGrant">临时授权</option></select></label>
           <label>目标账号<select name="accountId"><option value="">新账号或请选择</option></select></label>
@@ -63,15 +63,15 @@
       </form>
     </dialog>
 
-    <dialog id="account-review-dialog" class="governance-dialog">
+    <dialog id="account-review-dialog" class="governance-dialog" aria-labelledby="account-review-title">
       <form id="account-review-form" method="dialog">
-        <header><h2>账号申请独立复核</h2><button class="secondary-work-button" type="button" data-close-dialog>关闭</button></header>
+        <header><h2 id="account-review-title">账号申请独立复核</h2><button class="secondary-work-button" type="button" data-close-dialog>关闭</button></header>
         <div class="governance-form"><input name="requestId" type="hidden" /><label>复核结论<select name="decision"><option value="approve">批准</option><option value="reject">退回</option></select></label><label class="full">复核意见<textarea name="note" rows="4" required placeholder="至少 8 个字符"></textarea></label><p id="account-review-errors" class="form-errors" hidden></p></div>
         <footer><button class="secondary-work-button" type="button" data-close-dialog>取消</button><button id="account-review-submit" class="primary-work-button" value="submit">提交复核</button></footer>
       </form>
     </dialog>
 
-    <dialog id="directory-action-dialog" class="governance-dialog">
+    <dialog id="directory-action-dialog" class="governance-dialog" aria-labelledby="directory-action-title">
       <form id="directory-action-form" method="dialog">
         <header><h2 id="directory-action-title">身份目录受控操作</h2><button class="secondary-work-button" type="button" data-close-dialog>关闭</button></header>
         <div class="governance-form"><input name="action" type="hidden" /><input name="localUserId" type="hidden" /><input name="externalSubject" type="hidden" /><label class="full">审计说明<textarea name="note" rows="4" required placeholder="至少 8 个字符"></textarea></label><label class="full">确认短语<input name="confirmation" autocomplete="off" /></label><p id="directory-action-errors" class="form-errors" hidden></p></div>

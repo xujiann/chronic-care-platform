@@ -23,11 +23,26 @@ const SERVER_MANAGED_PROCUREMENT_COLLECTIONS = Object.freeze([
   "procurementRequirementGovernance",
   "procurementRequirementDelivery"
 ]);
+const SERVER_MANAGED_IDENTITY_COLLECTIONS = Object.freeze([
+  "authUsers",
+  "authOrganizations"
+]);
 
 const AUTH_USER_READ_SECRET_FIELDS = Object.freeze([
   "password",
-  "passwordHash"
+  "passwordHash",
+  "accessToken",
+  "refreshToken",
+  "token",
+  "secret",
+  "clientSecret",
+  "privateKey",
+  "apiKey",
+  "sessionId",
+  "csrfToken"
 ]);
+const AUTH_USER_READ_SECRET_FIELD_NAMES = new Set(AUTH_USER_READ_SECRET_FIELDS.map((field) => field.toLowerCase()));
+const AUTH_USER_READ_SECRET_FIELD_PATTERN = /(password|credentialSecret|signingSecret|encryptionSecret)$/i;
 
 const SERVER_MANAGED_CLINICAL_COLLECTIONS = Object.freeze([
   "phase2ClinicalAssistRules", "phase2ClinicalAssistAlerts",
@@ -40,14 +55,22 @@ function projectClinicalForStateRead(state) {
   return projected;
 }
 
+function isAuthUserReadSecretField(field) {
+  return AUTH_USER_READ_SECRET_FIELD_NAMES.has(String(field).toLowerCase())
+    || AUTH_USER_READ_SECRET_FIELD_PATTERN.test(String(field));
+}
+
+function projectAuthUserValueForStateRead(value) {
+  if (Array.isArray(value)) return value.map(projectAuthUserValueForStateRead);
+  if (!value || typeof value !== "object") return value;
+  return Object.fromEntries(Object.entries(value)
+    .filter(([field]) => !isAuthUserReadSecretField(field))
+    .map(([field, entryValue]) => [field, projectAuthUserValueForStateRead(entryValue)]));
+}
+
 function projectAuthUsersForStateRead(state = {}) {
   if (!Array.isArray(state.authUsers)) return state;
-  return {
-    ...state,
-    authUsers: state.authUsers.map((user) => Object.fromEntries(
-      Object.entries(user).filter(([field]) => !AUTH_USER_READ_SECRET_FIELDS.includes(field))
-    ))
-  };
+  return { ...state, authUsers: state.authUsers.map(projectAuthUserValueForStateRead) };
 }
 
 function serverManagedRegionalState(currentData = {}) {
@@ -81,6 +104,32 @@ function firstServerManagedProcurementConflict(currentData = {}, payload = {}) {
   ) || null;
 }
 
+function serverManagedIdentityState(currentData = {}) {
+  return Object.fromEntries(SERVER_MANAGED_IDENTITY_COLLECTIONS
+    .filter((collection) => Object.hasOwn(currentData, collection))
+    .map((collection) => [collection, currentData[collection]]));
+}
+
+function firstServerManagedIdentityConflict(currentData = {}, payload = {}) {
+  return SERVER_MANAGED_IDENTITY_COLLECTIONS.find((collection) => {
+    if (!Object.hasOwn(payload, collection)) return false;
+    if (isDeepStrictEqual(payload[collection], currentData[collection])) return false;
+    if (collection !== "authUsers") return true;
+    const safeCurrentUsers = projectAuthUsersForStateRead({ authUsers: currentData.authUsers }).authUsers;
+    return !isDeepStrictEqual(payload.authUsers, safeCurrentUsers);
+  }) || null;
+}
+
+function requireManagerForCommissionStateAccess(user, res, sendJson) {
+  if (user.role !== "commission" || user.accountType === "manager") return true;
+  sendJson(res, 403, {
+    error: "Forbidden",
+    code: "STATE_DATA_MANAGER_REQUIRED",
+    message: "卫健管理角色访问平台状态时必须使用管理账号。"
+  });
+  return false;
+}
+
 function firstVersionConflict(currentData, payload) {
   const expectedVersions = payload?.storageMeta?.collectionVersions || {};
   const currentVersions = currentData?.storageMeta?.collectionVersions || {};
@@ -111,6 +160,7 @@ function createRouteSegments(runtime, options = {}) {
     if (req.method === "GET" && url.pathname === "/api/state") {
         const user = requireApiRole(req, res, ["commission", "institution", "insurance", "citizen", "county"], "/api/state");
         if (!user) return true;
+        if (!requireManagerForCommissionStateAccess(user, res, sendJson)) return true;
         const scopedState = projectClinicalForStateRead(projectProcurementForStateRead(scopeStateForUser(readDatabase(), user), user));
         sendJson(res, 200, redactSensitiveResponse(projectAuthUsersForStateRead(scopedState), user));
         return true;
@@ -125,6 +175,7 @@ function createRouteSegments(runtime, options = {}) {
     if (req.method === "PUT" && url.pathname === "/api/state") {
         const user = requireApiRole(req, res, ["commission"], "/api/state");
         if (!user) return true;
+        if (!requireManagerForCommissionStateAccess(user, res, sendJson)) return true;
         const payload = await collectJson(req);
         return withLock("clinical-assist:state", async () => {
         const currentData = readDatabase();
@@ -166,11 +217,22 @@ function createRouteSegments(runtime, options = {}) {
           });
           return true;
         }
+        const identityConflict = firstServerManagedIdentityConflict(currentData, payload);
+        if (identityConflict) {
+          sendJson(res, 409, {
+            error: "Conflict",
+            code: "IDENTITY_SERVER_MANAGED_COLLECTION_CONFLICT",
+            message: "账号与组织目录由身份安全命令管理，提交值必须省略或与当前值完全一致。",
+            collection: identityConflict
+          });
+          return true;
+        }
         const effectivePayload = {
           ...payload,
           ...Object.fromEntries(SERVER_MANAGED_CLINICAL_COLLECTIONS.filter((collection) => Object.hasOwn(currentData, collection)).map((collection) => [collection, currentData[collection]])),
           ...serverManagedRegionalState(currentData),
-          ...serverManagedProcurementState(currentData)
+          ...serverManagedProcurementState(currentData),
+          ...serverManagedIdentityState(currentData)
         };
         const versionConflict = firstVersionConflict(currentData, effectivePayload);
         if (versionConflict) {
@@ -240,7 +302,7 @@ function createRouteSegments(runtime, options = {}) {
         writeDatabase(data);
         const normalized = readDatabase();
         setLegacyWriteHeaders(res);
-        sendJson(res, 200, projectClinicalForStateRead(normalized));
+        sendJson(res, 200, projectAuthUsersForStateRead(projectClinicalForStateRead(normalized)));
         return true;
         });
       }
@@ -248,7 +310,17 @@ function createRouteSegments(runtime, options = {}) {
       if (req.method === "PUT" && url.pathname.startsWith("/api/state-collections/")) {
         const user = requireApiRole(req, res, ["commission"], "/api/state-collections/:collection");
         if (!user) return true;
+        if (!requireManagerForCommissionStateAccess(user, res, sendJson)) return true;
         const collection = decodeURIComponent(url.pathname.replace("/api/state-collections/", "")).trim();
+        if (SERVER_MANAGED_IDENTITY_COLLECTIONS.includes(collection)) {
+          sendJson(res, 403, {
+            error: "Forbidden",
+            code: "IDENTITY_SERVER_MANAGED_COLLECTION_WRITE_DENIED",
+            message: "账号与组织目录只能通过身份安全命令写入。",
+            collection
+          });
+          return true;
+        }
         if (SERVER_MANAGED_CLINICAL_COLLECTIONS.includes(collection)) {
           sendJson(res, 403, { code: "CDSS_SERVER_MANAGED_COLLECTION_WRITE_DENIED", collection, message: "临床辅助集合必须通过专用命令修改" });
           return true;
@@ -320,6 +392,7 @@ function createRouteSegments(runtime, options = {}) {
     if (req.method === "POST" && url.pathname === "/api/reset") {
         const user = requireApiRole(req, res, ["commission"], "/api/reset");
         if (!user) return true;
+        if (!requireManagerForCommissionStateAccess(user, res, sendJson)) return true;
         if (String(options.environment?.NODE_ENV || "").toLowerCase() === "production") {
           sendJson(res, 403, {
             error: "Forbidden",
@@ -351,7 +424,7 @@ function createRouteSegments(runtime, options = {}) {
           }
         });
         writeDatabase(data);
-        sendJson(res, 200, data);
+        sendJson(res, 200, projectAuthUsersForStateRead(data));
         return true;
       }
 
@@ -369,13 +442,20 @@ function createRouteSegments(runtime, options = {}) {
 
 module.exports = {
   AUTH_USER_READ_SECRET_FIELDS,
+  AUTH_USER_READ_SECRET_FIELD_PATTERN,
+  SERVER_MANAGED_IDENTITY_COLLECTIONS,
   SERVER_MANAGED_PROCUREMENT_COLLECTIONS,
   SERVER_MANAGED_REGIONAL_COLLECTIONS,
   createRouteSegments,
+  firstServerManagedIdentityConflict,
   firstServerManagedRegionalConflict,
   firstServerManagedProcurementConflict,
+  isAuthUserReadSecretField,
   projectProcurementForStateRead,
   projectAuthUsersForStateRead,
+  projectAuthUserValueForStateRead,
+  requireManagerForCommissionStateAccess,
+  serverManagedIdentityState,
   serverManagedRegionalState,
   serverManagedProcurementState
 };

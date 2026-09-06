@@ -29,7 +29,7 @@ function fixture() {
   };
   return { ports, get state() { return state; }, get writes() { return writes; } };
 }
-const actor = { id: "reviewer", role: "commission" };
+const actor = { id: "reviewer", role: "commission", accountType: "manager" };
 const url = (path) => new URL(path, "http://local");
 
 test("clinical receipt and AI registration share the same state mutation lock", async () => {

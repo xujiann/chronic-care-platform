@@ -4,17 +4,29 @@
   const API = "/api/production-security";
   let center = null;
 
-  function escapeHtml(value) {
-    return String(value ?? "").replace(/[&<>'"]/g, (character) => ({
-      "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;"
-    })[character]);
+  function element(tagName, options = {}) {
+    const node = document.createElement(tagName);
+    if (options.className) node.className = options.className;
+    if (options.text !== undefined) node.textContent = String(options.text ?? "");
+    if (options.dataset) {
+      Object.entries(options.dataset).forEach(([key, value]) => {
+        node.dataset[key] = String(value ?? "");
+      });
+    }
+    return node;
   }
 
   function metric(label, value, detail) {
-    return `<article class="metric-card"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong><small>${escapeHtml(detail)}</small></article>`;
+    const card = element("article", { className: "metric-card" });
+    card.append(
+      element("span", { text: label }),
+      element("strong", { text: value }),
+      element("small", { text: detail })
+    );
+    return card;
   }
 
-  function actionButtons(item) {
+  function findingActions(item) {
     const buttons = [];
     if (["closed", "waived"].includes(item.status)) buttons.push(["reopen", "重新打开"]);
     else {
@@ -27,7 +39,38 @@
       if (item.status === "pending-waiver") buttons.push(["approve-waiver", "批准豁免"], ["reject-waiver", "拒绝豁免"]);
       else if (item.severity !== "critical") buttons.push(["request-waiver", "申请豁免"]);
     }
-    return buttons.map(([action, label]) => `<button class="inline-action" type="button" data-production-security-action="${action}" data-id="${escapeHtml(item.id)}">${label}</button>`).join(" ");
+    return buttons;
+  }
+
+  function actionButtons(item) {
+    const fragment = document.createDocumentFragment();
+    const buttons = findingActions(item);
+    buttons.forEach(([action, label], index) => {
+      if (index) fragment.append(document.createTextNode(" "));
+      const button = element("button", {
+        className: "inline-action",
+        text: label,
+        dataset: { productionSecurityAction: action, id: item.id }
+      });
+      button.type = "button";
+      fragment.append(button);
+    });
+    return fragment;
+  }
+
+  function appendTextWithBreak(cell, primary, secondary) {
+    cell.append(document.createTextNode(String(primary ?? "")), element("br"), element("small", { text: secondary }));
+  }
+
+  function table(headers) {
+    const tableNode = element("table");
+    const headerRow = element("tr");
+    headers.forEach((header) => headerRow.append(element("th", { text: header })));
+    const head = element("thead");
+    head.append(headerRow);
+    const body = element("tbody");
+    tableNode.append(head, body);
+    return { tableNode, body };
   }
 
   function render() {
@@ -42,25 +85,60 @@
       status.textContent = center.status || "待核验";
       status.className = `badge ${summary.releaseEligible ? "ok" : "danger"}`;
     }
-    if (metrics) metrics.innerHTML = [
+    if (metrics) metrics.replaceChildren(
       metric("安全发现", summary.findings || 0, `${summary.openFindings || 0} 项未关闭`),
       metric("高危阻断", (summary.criticalOpen || 0) + (summary.highOpen || 0), `${summary.criticalOpen || 0} 严重 / ${summary.highOpen || 0} 高危`),
       metric("有效豁免", summary.activeWaivers || 0, "到期自动恢复阻断"),
       metric("独立放行意见", `${summary.approvedReleaseOpinions || 0}/${summary.releaseApprovals || 0}`, summary.releaseEligible ? "可提交" : "整改未完成")
-    ].join("");
-    if (findings) findings.innerHTML = `<table><thead><tr><th>等级/来源</th><th>发现与资产</th><th>状态/责任</th><th>证据</th><th>操作</th></tr></thead><tbody>${(center.findings || []).map((item) => `<tr>
-      <td><span class="badge ${item.severity === "critical" || item.severity === "high" ? "danger" : "warn"}">${escapeHtml(item.severity)}</span><br><small>${escapeHtml(item.source)}</small></td>
-      <td><strong>${escapeHtml(item.title)}</strong><br><small>${escapeHtml(item.asset)}</small></td>
-      <td>${escapeHtml(item.status)}<br><small>${escapeHtml(item.owner || "未分派")} · ${escapeHtml(item.dueAt || "无期限")}${item.overdue ? " · 已逾期" : ""}</small></td>
-      <td>${escapeHtml([...(item.evidenceRefs || []), ...(item.remediationEvidenceRefs || [])].join("；") || "待登记")}</td>
-      <td>${actionButtons(item)}</td>
-    </tr>`).join("")}</tbody></table>`;
-    if (approvals) approvals.innerHTML = `<table><thead><tr><th>放行角色</th><th>状态</th><th>签署人</th><th>操作</th></tr></thead><tbody>${(center.approvals || []).map((item) => `<tr>
-      <td><strong>${escapeHtml(item.title)}</strong><br><small>${escapeHtml(item.role)}</small></td>
-      <td><span class="badge ${item.status === "approved" ? "ok" : "warn"}">${escapeHtml(item.status)}</span></td>
-      <td>${escapeHtml(item.approvedBy || "-")}<br><small>${escapeHtml(item.approvedAt || "")}</small></td>
-      <td><button class="inline-action" type="button" data-production-security-approval="${item.status === "approved" ? "revoke-release" : "approve-release"}" data-id="${escapeHtml(item.id)}">${item.status === "approved" ? "撤销意见" : "记录意见"}</button></td>
-    </tr>`).join("")}</tbody></table>`;
+    );
+    if (findings) {
+      const findingsTable = table(["等级/来源", "发现与资产", "状态/责任", "证据", "操作"]);
+      (center.findings || []).forEach((item) => {
+        const row = element("tr");
+        const severity = element("td");
+        severity.append(
+          element("span", { className: `badge ${item.severity === "critical" || item.severity === "high" ? "danger" : "warn"}`, text: item.severity }),
+          element("br"),
+          element("small", { text: item.source })
+        );
+        const description = element("td");
+        description.append(element("strong", { text: item.title }), element("br"), element("small", { text: item.asset }));
+        const ownership = element("td");
+        appendTextWithBreak(ownership, item.status, `${item.owner || "未分派"} · ${item.dueAt || "无期限"}${item.overdue ? " · 已逾期" : ""}`);
+        const evidence = element("td", { text: [...(item.evidenceRefs || []), ...(item.remediationEvidenceRefs || [])].join("；") || "待登记" });
+        const actions = element("td");
+        actions.append(actionButtons(item));
+        row.append(severity, description, ownership, evidence, actions);
+        findingsTable.body.append(row);
+      });
+      findings.replaceChildren(findingsTable.tableNode);
+    }
+    if (approvals) {
+      const approvalsTable = table(["放行角色", "状态", "签署人", "操作"]);
+      (center.approvals || []).forEach((item) => {
+        const row = element("tr");
+        const role = element("td");
+        role.append(element("strong", { text: item.title }), element("br"), element("small", { text: item.role }));
+        const state = element("td");
+        state.append(element("span", { className: `badge ${item.status === "approved" ? "ok" : "warn"}`, text: item.status }));
+        const signer = element("td");
+        appendTextWithBreak(signer, item.approvedBy || "-", item.approvedAt || "");
+        const actionCell = element("td");
+        const button = element("button", {
+          className: "inline-action",
+          text: item.status === "approved" ? "撤销意见" : "记录意见",
+          dataset: {
+            productionSecurityApproval: item.status === "approved" ? "revoke-release" : "approve-release",
+            id: item.id
+          }
+        });
+        button.type = "button";
+        actionCell.append(button);
+        row.append(role, state, signer, actionCell);
+        approvalsTable.body.append(row);
+      });
+      approvals.replaceChildren(approvalsTable.tableNode);
+    }
     if (boundary) boundary.textContent = center.boundary || "";
   }
 
@@ -123,9 +201,14 @@
   }
 
   document.addEventListener("click", async (event) => {
-    const findingButton = event.target.closest("[data-production-security-action]");
-    const approvalButton = event.target.closest("[data-production-security-approval]");
+    const findingButton = event.target.closest("#production-security-findings [data-production-security-action]");
+    const approvalButton = event.target.closest("#production-security-approvals [data-production-security-approval]");
     if (!findingButton && !approvalButton) return;
+    const finding = findingButton && (center?.findings || []).find((item) => String(item.id) === findingButton.dataset.id);
+    const approval = approvalButton && (center?.approvals || []).find((item) => String(item.id) === approvalButton.dataset.id);
+    if (findingButton && (!finding || !findingActions(finding).some(([action]) => action === findingButton.dataset.productionSecurityAction))) return;
+    const expectedApprovalAction = approval?.status === "approved" ? "revoke-release" : "approve-release";
+    if (approvalButton && (!approval || approvalButton.dataset.productionSecurityApproval !== expectedApprovalAction)) return;
     const button = findingButton || approvalButton;
     button.disabled = true;
     try {

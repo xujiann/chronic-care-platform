@@ -815,10 +815,10 @@
 
     <nav class="mobile-service-nav" id="mobile-service-nav" aria-label="手机服务导航"></nav>
 
-    <dialog id="upload-dialog">
+    <dialog id="upload-dialog" aria-labelledby="upload-dialog-title">
       <form method="dialog" class="dialog-form" id="upload-form">
         <header>
-          <h2>补充个人健康资料</h2>
+          <h2 id="upload-dialog-title">补充个人健康资料</h2>
           <button type="button" class="close-button" data-close>×</button>
         </header>
         <div class="form-grid">
@@ -847,7 +847,7 @@
       </form>
     </dialog>
 
-    <dialog id="auth-dialog">
+    <dialog id="auth-dialog" aria-labelledby="auth-dialog-title">
       <form method="dialog" class="dialog-form" id="auth-form">
         <input type="hidden" name="previousAuthorizationId" value="" />
         <header>
