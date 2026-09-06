@@ -1,5 +1,9 @@
 # DATA MODEL — 主线数据地图
 
+## AI/CDSS 主线整合（2026-09-06）
+
+既有 `phase2ClinicalAssistRules[].governance` 按显式命令保存规则卡、版本、独立审批、历史和内部重放快照；提醒增加命令版本，回执可保存内部幂等元数据。无新集合、表、DDL或启动回填。四个临床集合从通用 state 公共读取剔除并禁止直接写入；专用接口返回白名单范围投影。
+
 ## 2026-09-06 平台审计治理数据边界
 
 本增量不新增安全事件、数据访问、投递、留存或风险集合，不修改 JSON/SQLite/PostgreSQL schema、migration、索引、outbox、Worker 或数据 Owner。中心只读 T01 已拥有的 `securityEvents` 与 `dataAccessLogs`，并复用 `audit-chain-v2` 与 `append-only-audit-source-v2` 合同生成不持久化的治理投影。

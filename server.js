@@ -2,7 +2,7 @@ const http = require("http");
 const fs = require("fs");
 const path = require("path");
 const LEGACY_REGIONAL_STATS_KEY = "da" + "lianHealthStatistics2025";
-const { createPlatformRuntimeComposition } = require("./src/http/platform-runtime-composition");
+const { createPlatformRuntimeComposition, createClinicalAssistRuntime } = require("./src/http/platform-runtime-composition");
 const {
   createBrowserSecurityHeaders,
   createPlatformRequestHandler,
@@ -4730,111 +4730,27 @@ function seedPhase2ClinicalAssistPluginContracts() {
   ];
 }
 
-function canAccessPhase2ClinicalAssistAlert(user = {}, alert = {}) {
-  if (user.role === "commission") return true;
-  if (user.role !== "institution") return false;
-  if (user.doctorId) return alert.doctorId === user.doctorId;
-  return !user.orgName || alert.institution === user.orgName || alert.sourceInstitution === user.orgName;
-}
-
-function normalizePhase2ClinicalAssistReceipt(alert, payload = {}, user = {}) {
-  const now = new Date().toISOString();
-  const doctorAction = String(payload.doctorAction || payload.action || "acknowledged").trim();
-  const receiptStatus = String(payload.receiptStatus || payload.status || "received").trim();
-  return {
-    id: `p2car-${alert.id}`,
-    alertId: alert.id,
-    doctorId: alert.doctorId,
-    doctorName: alert.doctorName || user.name || "",
-    receiptStatus,
-    doctorAction,
-    actionDetail: String(payload.actionDetail || payload.detail || "医生工作站提醒回执已登记。").trim(),
-    receivedAt: now,
-    messageChannel: String(payload.messageChannel || alert.pluginSurface || "doctor-workstation").trim(),
-    receivedBy: user.username || user.role || "institution",
-    auditHash: phase2EvidenceHash(`${alert.id}/${doctorAction}/${receiptStatus}/${now}`)
-  };
-}
-
-function buildPhase2ClinicalAssistOverview(data, user = { role: "commission" }) {
-  const rules = Array.isArray(data.phase2ClinicalAssistRules) ? data.phase2ClinicalAssistRules : seedPhase2ClinicalAssistRules();
-  const allAlerts = Array.isArray(data.phase2ClinicalAssistAlerts) ? data.phase2ClinicalAssistAlerts : seedPhase2ClinicalAssistAlerts();
-  const alerts = allAlerts.filter((item) => canAccessPhase2ClinicalAssistAlert(user, item));
-  const allReceipts = Array.isArray(data.phase2ClinicalAssistReceipts) ? data.phase2ClinicalAssistReceipts : seedPhase2ClinicalAssistReceipts();
-  const receipts = allReceipts
-    .filter((item) => alerts.some((alert) => alert.id === item.alertId) || user.role === "commission");
-  const contracts = Array.isArray(data.phase2ClinicalAssistPluginContracts) ? data.phase2ClinicalAssistPluginContracts : seedPhase2ClinicalAssistPluginContracts();
-  const ruleIds = new Set(rules.map((item) => item.id));
-  const alertIds = new Set(allAlerts.map((item) => item.id));
-  const categories = [...new Set(rules.map((item) => item.category))];
-  const pendingAlerts = alerts.filter((item) => /pending|待/i.test(`${item.status || ""} ${item.messageReceiptStatus || ""}`));
-  const acknowledged = alerts.filter((item) => /acknowledged|received|已/i.test(`${item.status || ""} ${item.messageReceiptStatus || ""}`));
-  const doctorWorkstations = [...new Set(alerts.map((item) => item.doctorId).filter(Boolean))];
-  const messageReceipts = allReceipts.filter((item) => /received|sent|已|投递/i.test(String(item.receiptStatus || "")));
-  const ruleConfig = rules.map((item) => ({
-    ruleId: item.id,
-    category: item.category,
-    status: item.configStatus,
-    severity: item.severity,
-    owner: item.owner,
-    requiredFields: item.requiredFields || [],
-    defaultAction: item.defaultAction
-  }));
-  const supervisionStats = categories.map((category) => {
-    const rows = alerts.filter((item) => item.category === category);
-    return {
-      category,
-      alerts: rows.length,
-      pending: rows.filter((item) => /pending|待/i.test(`${item.status || ""} ${item.messageReceiptStatus || ""}`)).length,
-      acknowledged: rows.filter((item) => /acknowledged|received|已/i.test(`${item.status || ""} ${item.messageReceiptStatus || ""}`)).length,
-      doctors: [...new Set(rows.map((item) => item.doctorName).filter(Boolean))]
-    };
-  });
-  const allSupervisionStats = categories.map((category) => {
-    const rows = allAlerts.filter((item) => item.category === category);
-    return {
-      category,
-      alerts: rows.length,
-      pending: rows.filter((item) => /pending|待/i.test(`${item.status || ""} ${item.messageReceiptStatus || ""}`)).length,
-      acknowledged: rows.filter((item) => /acknowledged|received|已/i.test(`${item.status || ""} ${item.messageReceiptStatus || ""}`)).length
-    };
-  });
-  const onsiteBlockers = [
-    { id: "phase2-clinical-assist-his-plugin", owner: "hospital-integration", status: "onsite-blocked", blocker: "医生工作站菜单、单点登录、医嘱入口和院内消息中心字段仍需真实 HIS/EMR 厂商联调。" },
-    { id: "phase2-clinical-assist-rule-signoff", owner: "medical-quality-center", status: "onsite-blocked", blocker: "重复诊断、检查、检验和用药规则需质控中心审批、灰度范围和医生签名留痕。" }
-  ];
-  const checks = [
-    { id: "phase2ClinicalAssist:ruleConfig", passed: ["duplicate-diagnosis", "duplicate-check", "duplicate-lab", "duplicate-medication"].every((category) => categories.includes(category)) && rules.every((item) => item.requiredFields?.length && item.defaultAction && item.configStatus), detail: `${rules.length} rule configs across ${categories.length} categories` },
-    { id: "phase2ClinicalAssist:alertQueue", passed: allAlerts.length >= 4 && allAlerts.every((item) => ruleIds.has(item.ruleId) && item.residentId && item.doctorId && item.pluginSurface), detail: `${allAlerts.length} clinical assist alerts` },
-    { id: "phase2ClinicalAssist:doctorWorkstation", passed: doctorWorkstations.length >= 1 && alerts.every((item) => item.serviceIntegrationStatus && item.recommendation), detail: `${doctorWorkstations.length} doctor workstation scopes` },
-    { id: "phase2ClinicalAssist:messageReceipts", passed: allReceipts.length >= 3 && messageReceipts.length >= 3 && allReceipts.every((item) => alertIds.has(item.alertId) && item.auditHash), detail: `${allReceipts.length} receipts / ${messageReceipts.length} delivered or received` },
-    { id: "phase2ClinicalAssist:pluginContracts", passed: contracts.length >= 3 && contracts.every((item) => item.endpoint && item.payloadFields?.length && item.status), detail: `${contracts.length} plugin and service contracts` },
-    { id: "phase2ClinicalAssist:supervisionStats", passed: allSupervisionStats.length >= 4 && allSupervisionStats.every((item) => item.alerts >= 1), detail: `${allSupervisionStats.length} supervision categories` },
-    { id: "phase2ClinicalAssist:onsiteBoundary", passed: onsiteBlockers.length >= 2, detail: `${onsiteBlockers.length} onsite blockers surfaced` }
-  ];
-  return {
-    ok: checks.every((item) => item.passed),
-    generatedAt: new Date().toISOString(),
-    summary: {
-      rules: rules.length,
-      alerts: allAlerts.length,
-      scopedAlerts: alerts.length,
-      pendingAlerts: pendingAlerts.length,
-      acknowledged: acknowledged.length,
-      receipts: allReceipts.length,
-      pluginContracts: contracts.length,
-      categories: categories.length,
-      onsiteBlockers: onsiteBlockers.length
+let clinicalAssistRuntime;
+function getClinicalAssistRuntime() {
+  clinicalAssistRuntime ||= createClinicalAssistRuntime({
+    seeds: {
+      rules: seedPhase2ClinicalAssistRules,
+      alerts: seedPhase2ClinicalAssistAlerts,
+      receipts: seedPhase2ClinicalAssistReceipts,
+      pluginContracts: seedPhase2ClinicalAssistPluginContracts
     },
-    rules,
-    alerts,
-    receipts,
-    pluginContracts: contracts,
-    ruleConfig,
-    supervisionStats,
-    onsiteBlockers,
-    checks
-  };
+    readDatabase, writeDatabase, verifyAuditTrail, prependAuditTrailEntry,
+    hash: phase2EvidenceHash, randomUUID
+  });
+  return clinicalAssistRuntime;
+}
+
+function buildPhase2ClinicalAssistOverview(data, user = { id: "clinical-assist-readiness", role: "commission" }) {
+  return getClinicalAssistRuntime().buildOverview(data, user);
+}
+
+function executePhase2ClinicalAssistReceipt(command) {
+  return getClinicalAssistRuntime().executeReceipt(command);
 }
 
 function seedPhase2FamilyDoctorTemplates() {
@@ -28152,7 +28068,7 @@ function createRuntimeCapabilitySource() {
   canAccessEscortOrder,
   canAccessInternetNursingOrder,
   canAccessMultiPracticeApplication,
-  canAccessPhase2ClinicalAssistAlert,
+  executePhase2ClinicalAssistReceipt,
   canAccessPhase2FamilyDoctorRow,
   canAccessReferralTeleconsultation,
   canAccessRegistrationOrder,
@@ -28281,7 +28197,6 @@ function createRuntimeCapabilitySource() {
   normalizeMultiPracticeApplication,
   normalizeOperationSnapshot,
   normalizePersonalRecord,
-  normalizePhase2ClinicalAssistReceipt,
   normalizePhase2DiseaseReportReceipt,
   normalizePhase2FamilyDoctorApplication,
   normalizePhone,

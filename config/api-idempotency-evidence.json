@@ -8,6 +8,155 @@
   "reviewedProofRequired": [],
   "contracts": [
     {
+      "contractId": "identity-security.ai-governance-command.v1",
+      "key": "POST /api/ai-governance/rules/:id/actions",
+      "method": "POST",
+      "path": "/api/ai-governance/rules/:id/actions",
+      "owner": "T01",
+      "domain": "identity-security",
+      "purpose": "govern-existing-clinical-rule-version",
+      "customAuthenticationEvidence": false,
+      "authentication": {
+        "required": true,
+        "mechanism": "bearer-or-cookie-session",
+        "principalType": "platform-user",
+        "credentialSource": [
+          "header:authorization",
+          "cookie:session"
+        ],
+        "replayCsrf": {
+          "replayProtection": "actor-organization-resource-key-payload-binding",
+          "csrf": "production-session-csrf-and-step-up"
+        }
+      },
+      "authorization": {
+        "model": "commission-manager-plus-independent-review",
+        "roles": [
+          "commission"
+        ],
+        "dataScope": "clinical rule metadata; no patient data"
+      },
+      "coverage": {
+        "level": "endpoint",
+        "selector": "entire-route",
+        "actions": [
+          "register",
+          "submit",
+          "approve",
+          "reject",
+          "suspend",
+          "rollback"
+        ],
+        "unverifiedRemainder": false
+      },
+      "idempotency": {
+        "key": "header:Idempotency-Key or body:idempotencyKey",
+        "payloadBinding": [
+          "actor",
+          "orgCode",
+          "ruleId",
+          "action",
+          "expectedVersion",
+          "card"
+        ],
+        "exactReplay": "persisted metadata response snapshot with idempotentReplay=true and no audit or state write, up to 1000 non-evicted receipts",
+        "conflictingReuse": "AI_GOVERNANCE_KEY_CONFLICT",
+        "persistenceScope": "rule governance, history, receipts and verified audit in one state write",
+        "distributedExactlyOnceClaimed": false
+      },
+      "concurrency": {
+        "cas": {
+          "required": true,
+          "field": "expectedVersion",
+          "conflictCodes": [
+            "AI_GOVERNANCE_VERSION_CONFLICT"
+          ]
+        }
+      },
+      "errors": [
+        {
+          "code": "AI_GOVERNANCE_INPUT_INVALID",
+          "status": 400
+        },
+        {
+          "code": "AI_GOVERNANCE_SELF_REVIEW",
+          "status": 403
+        },
+        {
+          "code": "AI_GOVERNANCE_SOURCE_CHANGED",
+          "status": 409
+        },
+        {
+          "code": "AI_GOVERNANCE_KEY_CONFLICT",
+          "status": 409
+        },
+        {
+          "code": "AI_GOVERNANCE_VERSION_CONFLICT",
+          "status": 409
+        },
+        {
+          "code": "AI_GOVERNANCE_CAPACITY_EXHAUSTED",
+          "status": 409
+        },
+        {
+          "code": "AI_GOVERNANCE_AUDIT_INVALID",
+          "status": 409
+        },
+        {
+          "code": "AI_GOVERNANCE_PERSISTENCE_FAILED",
+          "status": 500
+        }
+      ],
+      "audit": {
+        "accepted": "verify current chain, append metadata, verify resulting chain, persist cloned state once",
+        "replay": "no additional state or audit write",
+        "rejected": "authorization before payload; self-review, conflicts, invalid audit or failed persistence cannot change original state"
+      },
+      "implementationEvidence": [
+        {
+          "file": "src/identity-security/ai-governance.js",
+          "anchors": [
+            "executeAiGovernanceAction",
+            "AI_GOVERNANCE_SELF_REVIEW",
+            "AI_GOVERNANCE_KEY_CONFLICT"
+          ]
+        },
+        {
+          "file": "src/http/routes/identity-security/ai-governance.js",
+          "anchors": [
+            "clinical-assist:state",
+            "verifyAuditTrail",
+            "/api/ai-governance/rules/:id/actions"
+          ]
+        }
+      ],
+      "testEvidence": [
+        {
+          "file": "test/ai-governance.test.js",
+          "anchors": [
+            "receipt replays exact snapshot",
+            "tampered existing audit chain",
+            "approved source drift"
+          ]
+        },
+        {
+          "file": "test/ai-governance-runtime-api.test.js",
+          "anchors": [
+            "real governance HTTP commands persist",
+            "CDSS_SERVER_MANAGED_COLLECTION_CONFLICT"
+          ]
+        },
+        {
+          "file": "test/ai-cdss-integration-boundary.test.js",
+          "anchors": [
+            "clinical receipt and AI registration share the same state mutation lock"
+          ]
+        }
+      ],
+      "productionReady": false,
+      "externalEvidenceRequired": true
+    },
+    {
       "contractId": "platform-governance.procurement-import-registration-command.v1",
       "key": "POST /api/platform/productization/requirement-batches",
       "method": "POST",

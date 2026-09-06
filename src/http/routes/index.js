@@ -322,6 +322,10 @@ const ROUTE_ORDER = Object.freeze([
   },
   {
     "domain": "identity-security",
+    "id": "identity-security-ai-governance"
+  },
+  {
+    "domain": "identity-security",
     "id": "identity-security-03"
   },
   {

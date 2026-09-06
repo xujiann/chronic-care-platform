@@ -2911,7 +2911,9 @@ test("phase 2 clinical assist MVP exposes doctor workstation alerts receipts plu
   assert.match(server, /seedPhase2ClinicalAssistPluginContracts/);
   assert.match(server, /buildPhase2ClinicalAssistOverview/);
   assert.match(server, /\/api\/phase2\/clinical-assist/);
-  assert.match(server, /phase2-clinical-assist-receipt/);
+  assert.match(server, /executePhase2ClinicalAssistReceipt/);
+  assert.match(read("src/http/clinical-assist-runtime.js"), /createClinicalDecisionSupport/);
+  assert.match(read("src/clinical-specialties/clinical-decision-support/index.js"), /phase2-clinical-assist-receipt/);
   assert.match(server, /phase2-clinical-assist-rule-config/);
   assert.match(read("doctor.html"), /doctor-clinical-assist/);
   assert.match(read("doctor.js"), /renderDoctorClinicalAssist/);

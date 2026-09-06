@@ -123,7 +123,7 @@
         definition("规则版本", rule.version), definition("配置状态", label(rule.configurationStatus)),
         definition("来源系统", rule.sourceSystem), definition("人工复核", rule.humanReviewRequired ? "强制" : "未要求")
       ]),
-      element("p", { className: "clinical-ai-rule-use", text: `建议复核：${rule.recommendedReview}` }),
+      element("p", { className: "clinical-ai-rule-use", text: rule.decisionAvailable === false ? "治理未批准或来源漂移：建议不可采纳" : `建议复核：${rule.recommendedReview}` }),
       element("ul", {}, (rule.governanceFindings || []).map((item) => element("li", { text: item })))
     ])), "暂无授权规则/模型卡。");
   }
@@ -144,7 +144,7 @@
       element("td", {}, [element("strong", { text: item.institutionReference }), element("small", { text: [item.residentReference, item.practitionerReference].filter(Boolean).join(" · ") || "治理汇总不展示个人引用" })]),
       element("td", {}, [element("strong", { text: item.evidenceBound ? "已绑定规则证据" : "证据待补" }), element("small", { text: item.evidenceReference || "当前范围不展示证据引用" })]),
       element("td", {}, [badge(item.reviewStatus), element("small", { text: item.doctorActionLabel })]),
-      element("td", {}, [badge(item.riskLevel), element("small", { text: "禁止自动执行" })])
+      element("td", {}, [badge(item.riskLevel), element("small", { text: item.decisionAvailable === false ? "建议不可采纳；可登记保留理由" : "禁止自动执行" })])
     ])), "当前筛选条件下暂无临床建议。");
   }
 

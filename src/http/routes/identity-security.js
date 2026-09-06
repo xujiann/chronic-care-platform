@@ -2,6 +2,7 @@
 
 const { buildAuthorizationContext } = require("./authorization-context");
 const accountLifecycle = require("./identity-security/account-lifecycle");
+const aiGovernance = require("./identity-security/ai-governance");
 const AuditGovernance = require("../../identity-security/audit-governance-center");
 
 const {
@@ -99,6 +100,8 @@ function createRouteSegments(runtime, options = {}) {
   const accountLifecycleReady = accountLifecycle.REQUIRED_DEPENDENCIES
     .every((dependency) => typeof runtime?.[dependency] === "function");
   return [
+    ...(aiGovernance.REQUIRED_DEPENDENCIES.every((dependency) => typeof runtime?.[dependency] === "function")
+      ? [aiGovernance.createRouteSegment({ ...runtime, enforceSensitiveMutation: enforceMutationSecurity })] : []),
     ...(accountLifecycleReady
       ? [accountLifecycle.createRouteSegment({ ...runtime, enforceSensitiveMutation: enforceMutationSecurity })]
       : []),

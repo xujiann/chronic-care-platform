@@ -1,5 +1,9 @@
 # DEPENDENCY MAP — 主线依赖地图
 
+## AI/CDSS 主线整合（2026-09-06）
+
+既有中心与兼容 HTTP → T00 clinical-assist-runtime → T06 版本化 scope/receipt 端口及 T01 rule policy。规则审批、临床回执和兼容 state 写入共享现有锁端口；请求体不持锁，审计成功后一次持久化。复用 Node 内置 crypto，无新依赖、外部请求或部署单元。
+
 ## 2026-09-05 临床决策支持安全治理依赖方向
 
 ```text

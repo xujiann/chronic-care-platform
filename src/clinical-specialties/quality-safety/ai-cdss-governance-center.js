@@ -1,5 +1,7 @@
 "use strict";
 
+const { createClinicalDecisionSupport } = require("../clinical-decision-support");
+
 const CENTER_SCHEMA_VERSION = "clinical-ai-cdss-governance-center-v1";
 const CAPABILITY_ID = "J-CLIN-CDSS";
 const UPSTREAM_GOVERNANCE_CAPABILITY_ID = "L-GOV-AI";
@@ -31,7 +33,8 @@ const HUMAN_DECISION_ACTIONS = new Set([
   "adjusted-prescription",
   "cited-existing-diagnosis",
   "acknowledged",
-  "rejected"
+  "rejected", "cited-existing-report", "dismissed-with-reason", "dismissed", "ignored",
+  "retained-with-reason", "keep-with-reason", "kept-order-with-reason"
 ]);
 
 class ClinicalAiCdssGovernanceError extends Error {
@@ -109,7 +112,17 @@ function publicResidentReference(value) {
   return `居民引用末${visible.length}位 ${visible}`;
 }
 
-function projectRule(rule = {}) {
+function rulePolicy(rule, ports = {}) {
+  if (!rule) return { status: "missing", decisionAvailable: false };
+  if (!rule.governance) return { status: "legacy", decisionAvailable: true };
+  try {
+    const policy = ports.rulePolicy?.(rule);
+    return { status: policy?.status || "unverified", decisionAvailable: policy?.decisionAvailable === true };
+  } catch { return { status: "unverified", decisionAvailable: false }; }
+}
+
+function projectRule(rule = {}, ports = {}) {
+  const policy = rulePolicy(rule, ports);
   const category = boundedText(rule.category, 80);
   const status = boundedText(rule.configStatus, 80).toLowerCase() || "unconfigured";
   const version = firstText(rule.version, rule.ruleVersion);
@@ -119,6 +132,7 @@ function projectRule(rule = {}) {
   if (!firstText(rule.approvedAt, rule.approvalEvidenceRef)) findings.push("缺少独立审批证据");
   if (!firstText(rule.validationEvidenceRef, rule.validatedPopulation)) findings.push("缺少临床验证与适用人群证据");
   if (status !== "active") findings.push("规则未处于受控启用状态");
+  if (!policy.decisionAvailable) findings.push("规则治理未批准或来源已漂移，建议不可采纳");
   return Object.freeze({
     id: boundedText(rule.id, 160),
     name: firstText(rule.name, CATEGORY_LABELS[category], "未命名临床规则"),
@@ -131,7 +145,9 @@ function projectRule(rule = {}) {
     configurationStatus: status,
     riskLevel,
     intendedUse: firstText(rule.triggerCondition, "在诊疗工作流中向临床人员提示需要复核的风险"),
-    recommendedReview: firstText(rule.defaultAction, "由临床人员核对证据并作出独立判断"),
+    recommendedReview: policy.decisionAvailable ? firstText(rule.defaultAction, "由临床人员核对证据并作出独立判断") : "",
+    governanceStatus: policy.status,
+    decisionAvailable: policy.decisionAvailable,
     requiredEvidenceFields: Object.freeze(asArray(rule.requiredFields).map((item) => boundedText(item, 80)).filter(Boolean)),
     accountableRole: "临床业务与医疗质量联合责任人",
     humanReviewRequired: true,
@@ -146,7 +162,7 @@ function projectRule(rule = {}) {
   });
 }
 
-function projectSuggestion(alert = {}, scope = {}) {
+function projectSuggestion(alert = {}, scope = {}, policy = { status: "unverified", decisionAvailable: false }) {
   const category = boundedText(alert.category, 80);
   const doctorAction = boundedText(alert.doctorAction, 100).toLowerCase() || "pending";
   const reviewStatus = humanDecisionValue(doctorAction) ? "reviewed" : "pending-human-review";
@@ -162,7 +178,10 @@ function projectSuggestion(alert = {}, scope = {}) {
     practitionerReference: scope.clinicalDetailVisible ? boundedText(alert.doctorId, 120) : "",
     evidenceBound: Boolean(firstText(alert.linkedEvidenceId)),
     evidenceReference: scope.clinicalDetailVisible ? boundedText(alert.linkedEvidenceId, 160) : "",
-    recommendation: scope.clinicalDetailVisible ? boundedText(alert.recommendation, 400) : "",
+    recommendation: scope.clinicalDetailVisible && policy.decisionAvailable ? boundedText(alert.recommendation, 400) : "",
+    governanceStatus: policy.status,
+    decisionAvailable: policy.decisionAvailable,
+    version: Number.isSafeInteger(alert.version) ? alert.version : 0,
     pluginSurface: boundedText(alert.pluginSurface, 120),
     dueAt: boundedText(alert.dueAt, 80),
     reviewStatus,
@@ -251,16 +270,20 @@ function buildMonitoring(ruleCards, suggestions, reviews, source) {
   });
 }
 
-function buildClinicalAiCdssGovernanceCenter(data = {}, actor = {}) {
+function buildClinicalAiCdssGovernanceCenter(data = {}, actor = {}, ports = {}) {
   const scope = actorScope(actor);
+  const canAccess = ports.canAccessAlert || createClinicalDecisionSupport({}).canAccessAlert;
+  if (scope.role === "institution" && !canAccess(actor, { orgCode: actor.orgCode || actor.institutionCode, doctorId: actor.doctorId }, data)) {
+    throw new ClinicalAiCdssGovernanceError("CLINICAL_AI_CDSS_SCOPE_REQUIRED", "可信机构或医生范围无效", 403);
+  }
   const source = {
     rules: asArray(data.phase2ClinicalAssistRules),
-    alerts: asArray(data.phase2ClinicalAssistAlerts).filter((item) => alertMatchesScope(item, scope)),
+    alerts: asArray(data.phase2ClinicalAssistAlerts).filter((item) => canAccess(actor, item, data)),
     receipts: asArray(data.phase2ClinicalAssistReceipts),
     contracts: asArray(data.phase2ClinicalAssistPluginContracts)
   };
-  const ruleCards = Object.freeze(source.rules.map(projectRule));
-  const suggestions = Object.freeze(source.alerts.map((item) => projectSuggestion(item, scope)));
+  const ruleCards = Object.freeze(source.rules.map((rule) => projectRule(rule, ports)));
+  const suggestions = Object.freeze(source.alerts.map((item) => projectSuggestion(item, scope, rulePolicy(source.rules.find((rule) => rule.id === item.ruleId), ports))));
   const suggestionById = new Map(suggestions.map((item) => [item.id, item]));
   const visibleReceipts = source.receipts.filter((item) => suggestionById.has(boundedText(item.alertId, 160)));
   const reviewLedger = Object.freeze(visibleReceipts.map((item) => projectReview(item, suggestionById, scope)));
