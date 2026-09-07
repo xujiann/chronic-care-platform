@@ -28,7 +28,7 @@ routes:check、architecture:test、process:test、platform:iterations:test、rep
 
 ## 最新主线收口（2026-09-06）
 
-最新主线以加法方式并入 #252 审计治理中心，保留 `/api/runtime/ai-governance/center`、`/api/quality-safety/ai-cdss/center` 与 `/api/security/audit-governance/center`，没有新增重复页面或规则事实源。机器目录当前为 636 项 API、363 个写入口、40 份行为合同（38 个完整 endpoint、2 个 action slice）；浏览器矩阵为主应用 58、居民端 13、PWA 3，共 74 项。该段记录最新合并后的验收基线，不改写前述原分支测试证据。
+最新主线以加法方式并入 #252 审计治理中心，保留 `/api/runtime/ai-governance/center`、`/api/quality-safety/ai-cdss/center` 与 `/api/security/audit-governance/center`，没有新增重复页面或规则事实源。机器目录当前为 636 项 API、363 个写入口、40 份行为合同（38 个完整 endpoint、2 个 action slice）；浏览器矩阵为主应用 59、居民端 13、PWA 3，共 75 项。该段记录最新合并后的验收基线，不改写前述原分支测试证据。
 
 本轮合并后重新执行标准七门，build、lint、typecheck、unit、integration、smoke、test:all 全部通过；`test:all` 完整发现并执行 520 个根测试文件，仍只有未配置真实 PostgreSQL 环境的既有条件项跳过。浏览器首次全量运行因长时 Node 回归后的资源压力在五类身份循环出现一次 30 秒超时；同一用例在全新隔离环境连续 3 次通过，随后完整重跑主应用 58/58、居民端 13/13、PWA 3/3 全部通过，因此未放宽断言或修改账号逻辑。
 

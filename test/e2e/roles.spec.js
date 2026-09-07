@@ -111,6 +111,41 @@ test("specialist accounts see bounded functions and can search the unified sideb
   await expect(page.locator(".navigation-primary a[data-navigation-page]")).toHaveCount(7);
   await expect(page.locator(".navigation-primary a[data-navigation-page='index.html']")).toHaveCount(0);
   await expect(page.locator(".navigation-primary a[data-navigation-page='blood.html']")).toHaveAttribute("aria-current", "page");
+
+  const accountTypeMatrix = await page.evaluate(() => {
+    const cases = [
+      { id: "guardian", user: { role: "citizen", accountType: "guardian", orgType: "citizen", home: "citizen.html" }, allowed: ["citizen.html", "immunization.html"], denied: ["institution.html", "platform.html"] },
+      { id: "pharmacist", user: { role: "institution", accountType: "pharmacist", orgType: "medical_institution", home: "drug-consumable.html" }, allowed: ["drug-consumable.html"], denied: ["doctor.html", "institution.html"] },
+      { id: "commission-quality", user: { role: "commission", accountType: "quality_officer", orgType: "health_admin", home: "quality-safety.html" }, allowed: ["quality-safety.html", "clinical-ai-cdss.html"], denied: ["index.html", "blood.html"] },
+      { id: "institution-quality", user: { role: "institution", accountType: "quality_officer", orgType: "medical_institution", home: "quality-safety.html" }, allowed: ["quality-safety.html", "clinical-ai-cdss.html"], denied: ["doctor.html", "institution.html"] },
+      { id: "settlement", user: { role: "insurance", accountType: "settlement", orgType: "insurance_center", home: "insurance.html" }, allowed: ["insurance.html", "medical-payment.html", "disease-payment.html"], denied: ["doctor.html", "platform.html"] },
+      { id: "county-coordinator", user: { role: "county", accountType: "coordinator", orgType: "county_consortium", home: "county.html" }, allowed: ["county.html", "referral-teleconsultation.html", "imaging-cloud.html"], denied: ["insurance.html", "quality-safety.html"] },
+      { id: "county-clinician", user: { role: "county", accountType: "clinician", orgType: "county_consortium", home: "county.html" }, allowed: ["county.html", "referral-teleconsultation.html", "imaging-cloud.html"], denied: ["insurance.html", "quality-safety.html"] }
+    ];
+
+    return cases.map((item) => {
+      const menuPages = window.HealthAccessPolicy.pagesForUser(item.user, {}, { includeHome: true }).map((entry) => entry.page);
+      return {
+        id: item.id,
+        home: window.HealthAccessPolicy.homeForUser(item.user),
+        allowed: item.allowed.map((target) => ({ target, decision: window.HealthAccessPolicy.accessDecision(target, item.user), inMenu: menuPages.includes(target) })),
+        denied: item.denied.map((target) => ({ target, decision: window.HealthAccessPolicy.accessDecision(target, item.user), inMenu: menuPages.includes(target) }))
+      };
+    });
+  });
+
+  for (const item of accountTypeMatrix) {
+    expect(item.home, `${item.id} must keep its reviewed home`).toBe(item.id === "guardian" ? "citizen.html" : item.id === "pharmacist" ? "drug-consumable.html" : item.id.includes("quality") ? "quality-safety.html" : item.id === "settlement" ? "insurance.html" : "county.html");
+    for (const entry of item.allowed) {
+      expect(entry.decision.allowed, `${item.id} must access ${entry.target}`).toBe(true);
+      expect(entry.decision.reason).toBe("AUTHORIZED");
+      expect(entry.inMenu, `${item.id} must receive ${entry.target} in navigation`).toBe(true);
+    }
+    for (const entry of item.denied) {
+      expect(entry.decision.allowed, `${item.id} must reject ${entry.target}`).toBe(false);
+      expect(entry.inMenu, `${item.id} must not receive ${entry.target} in navigation`).toBe(false);
+    }
+  }
 });
 
 test("commission user reaches the governance dashboard and opens maintenance", async ({ page }) => {
@@ -377,7 +412,7 @@ test("about page explains runnable platform capabilities", async ({ page }) => {
   await expect(page.locator("[data-dashboard-about-section='api-evidence']")).toContainText("摘要接口");
   await expect(page.locator("[data-dashboard-about-section='site-cutover']")).toBeVisible();
   await expect(page.locator("[data-dashboard-about-section='production-launch-requirements']")).toContainText("productionReady");
-  await expect(page.locator("[data-dashboard-launch-requirements-link]")).toHaveAttribute("href", "./docs/health-dashboard-production-launch-requirements.md");
+  await expect(page.locator("[data-dashboard-launch-requirements-link]")).toHaveAttribute("href", "#dashboard-production-requirements");
   await expect(page.locator("[data-dashboard-about-section='implementation-plan']")).toContainText("已实现功能");
   await expect(page.locator("[data-dashboard-about-section='implementation-plan'] [data-dashboard-implemented]")).toHaveCount(6);
   await expect(page.locator("[data-dashboard-next-plan='prod-identity-audit']")).toContainText("真实身份");

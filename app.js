@@ -276,12 +276,20 @@ function bindForms() {
 }
 
 function populateSelects() {
-  const residentOptions = state.residents.map((item) => `<option value="${item.id}">${item.name}</option>`).join("");
+  const optionFor = (value, label) => {
+    const option = document.createElement("option");
+    option.value = String(value);
+    option.textContent = String(label);
+    return option;
+  };
   document.querySelectorAll('select[name="residentId"]').forEach((select) => {
-    select.innerHTML = residentOptions;
+    select.replaceChildren(...state.residents.map((item) => optionFor(item.id, item.name)));
   });
-  document.querySelector('select[name="organization"]').innerHTML = organizations.map((org) => `<option>${org}</option>`).join("");
-  document.querySelector("#resident-org-filter").innerHTML = `<option value="">全部机构</option>${organizations.map((org) => `<option>${org}</option>`).join("")}`;
+  document.querySelector('select[name="organization"]').replaceChildren(...organizations.map((org) => optionFor(org, org)));
+  document.querySelector("#resident-org-filter").replaceChildren(
+    optionFor("", "全部机构"),
+    ...organizations.map((org) => optionFor(org, org))
+  );
 }
 
 function showView(view) {

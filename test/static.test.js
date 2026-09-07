@@ -685,8 +685,10 @@ test("health dashboard exposes the aggregate application entry and API contract"
   assert.match(html, /data-dashboard-review-action="production-requirements"/);
   assert.match(html, /data-dashboard-review-action="function-roadmap-report"/);
   assert.match(html, /data-dashboard-review-action="backend-go-live-checklist"/);
-  assert.match(html, /health-dashboard-function-roadmap-report\.md/);
-  assert.match(html, /health-dashboard-backend-go-live-checklist\.md/);
+  assert.match(html, /health-dashboard-about\.html#dashboard-about-runtime/);
+  assert.match(html, /health-dashboard-about\.html#dashboard-site-cutover/);
+  assert.match(html, /health-dashboard-about\.html#dashboard-production-requirements/);
+  assert.doesNotMatch(html, /href="\.\/docs\//);
   assert.match(html, /health-dashboard-about\.html#dashboard-implementation-plan/);
   assert.match(html, /dashboard-jurisdiction-board/);
   assert.match(html, /jurisdiction-level-controls/);
@@ -733,7 +735,7 @@ test("health dashboard exposes the aggregate application entry and API contract"
   assert.match(html, /production-backend-go-live-list/);
   assert.match(html, /生产后端上线准备/);
   assert.match(html, /data-production-requirements-link/);
-  assert.match(html, /health-dashboard-production-launch-requirements\.md/);
+  assert.match(html, /health-dashboard-about\.html#dashboard-production-requirements/);
   assert.match(html, /site-issue-ledger-board/);
   assert.match(html, /site-issue-ledger-status-controls/);
   assert.match(html, /site-issue-owner-filter/);
@@ -902,8 +904,11 @@ test("health dashboard about page documents policies data boundary and site cuto
   assert.match(html, /data-dashboard-about-section="api-evidence"/);
   assert.match(html, /data-dashboard-about-section="site-cutover"/);
   assert.match(html, /data-dashboard-about-section="production-launch-requirements"/);
+  assert.match(html, /id="dashboard-about-runtime"/);
+  assert.match(html, /id="dashboard-site-cutover"/);
+  assert.match(html, /id="dashboard-production-requirements"/);
   assert.match(html, /data-dashboard-launch-requirements-link/);
-  assert.match(html, /health-dashboard-production-launch-requirements\.md/);
+  assert.match(html, /href="#dashboard-production-requirements"/);
   assert.match(html, /data-dashboard-about-section="implementation-plan"/);
   assert.match(html, /data-dashboard-about-section="next-plan"/);
   assert.match(html, /data-dashboard-template-function="aggregate-entry"/);

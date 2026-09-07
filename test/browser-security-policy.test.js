@@ -65,8 +65,8 @@ test("published browser assets match the exact Inventory v2 fail-closed baseline
   assert.equal(inventory.schemaVersion, 2);
   assert.equal(inventory.contractId, "browser-security-risk-inventory.v2");
   assert.equal(inventory.assetsScanned, 188);
-  assert.equal(inventory.summary.total, 838);
-  assert.equal(inventory.summary.byPriority.P0, 796);
+  assert.equal(inventory.summary.total, 835);
+  assert.equal(inventory.summary.byPriority.P0, 793);
   assert.equal(inventory.summary.byPriority.P1, 42);
   assert.equal(inventory.summary.byPriority.P2, 0);
   assert.equal(inventory.findings.length, 50);
@@ -75,7 +75,7 @@ test("published browser assets match the exact Inventory v2 fail-closed baseline
   assert.equal(inventory.summary.byType["style-attribute"], 0);
   assert.equal(inventory.summary.byType["event-handler"], 0);
   assert.equal(inventory.summary.byType["eval-call"], 0);
-  assert.equal(inventory.summary.byType["dom-inner-html"], 788);
+  assert.equal(inventory.summary.byType["dom-inner-html"], 785);
   assert.equal(inventory.summary.byType["dom-insert-adjacent-html"], 2);
   assert.equal(inventory.summary.byType["dynamic-html-url-attribute"], 0);
   assert.equal(inventory.summary.byType["dom-url-property"], 0);
@@ -89,7 +89,7 @@ test("published browser assets match the exact Inventory v2 fail-closed baseline
   assert.equal(new Set(inventory.findings.filter((item) => ["dynamic-html-style-attribute", "cssom-property-mutation", "cssom-set-property", "runtime-style-element"].includes(item.type)).map((item) => item.asset)).size, 13);
   assert.equal(new Set(inventory.findings.filter((item) => ["dynamic-html-url-attribute", "dom-url-property", "dom-url-attribute", "navigation-call"].includes(item.type)).map((item) => item.asset)).size, 2);
   assert.equal(policy.riskBaseline.schemaVersion, 2);
-  assert.equal(policy.riskBaseline.findings.reduce((sum, item) => sum + item.count, 0), 838);
+  assert.equal(policy.riskBaseline.findings.reduce((sum, item) => sum + item.count, 0), 835);
   assert.equal(policy.riskBaseline.findings.some((item) => item.asset === "physical-examination.js" && ["dom-inner-html", "dom-insert-adjacent-html", "dom-outer-html"].includes(item.type)), false);
   assert.equal(policy.riskBaseline.findings.some((item) => item.asset === "physical-examination.js"), false);
   assert.equal(policy.riskBaseline.findings.some((item) => item.asset === "blood.js"), false);
