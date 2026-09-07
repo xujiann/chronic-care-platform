@@ -10,7 +10,7 @@
 
 - `production-security.js` 的 3 个遗留 `innerHTML` sink 已迁为显式 DOM、`textContent`、闭集 class 与 dataset，恶意状态、发现、审批、证据和边界字段保持惰性文本。
 - 安全处置点击委托只接受两个受信容器内、且与当前 center 的 ID/允许 action 一致的控件；页面其他遗留 HTML sink 注入的伪造 `data-production-security-*` 按钮不能代发治理命令。
-- 管理端居民与机构选择器新增显式 option/textContent/replaceChildren 边界，关闭 3 个 P0 HTML sink。Inventory v2 当前为 835 项（793 P0、42 P1），其中 787 个 DOM HTML、6 个动态 URL 和 42 个动态样式风险；兼容 CSP 仍为 Report-Only，生产继续 `NO-GO`。
+- 管理端居民与机构选择器新增显式 option/textContent/replaceChildren 边界，关闭 3 个 P0 HTML sink；平台说明页以 `replaceChildren` 关闭 4 个清空型 P0 HTML sink，并以恶意字段与空态回归锁定文本/dataset 边界。Inventory v2 当前为 831 项（789 P0、42 P1），其中 783 个 DOM HTML、6 个动态 URL 和 42 个动态样式风险；兼容 CSP 仍为 Report-Only，生产继续 `NO-GO`。
 
 ## AI/CDSS 主线整合（2026-09-06）
 
@@ -92,7 +92,7 @@
 
 - `production-go-no-go-ui.js` 的 4 个 `innerHTML` 与 2 个 `insertAdjacentHTML` 已迁为显式 DOM、`textContent`、闭集 class 和 dataset；指标、前置检查、四方审批及指挥决策的结构与交互保持兼容。
 - 恶意 API 字段 E2E 直接覆盖状态、指标、检查、审批、证据引用、决策和边界文本，证明载荷保持惰性文本且不执行事件处理器。
-- Inventory v2 当前锁定 787 个 DOM HTML sink、6 个动态 URL sink 与 42 个动态样式风险；严格 CSP、真实托管响应头、独立安全评估和现场验收仍未完成，生产状态保持 `NO-GO`。
+- Inventory v2 后续经生产安全工作台、管理端选择器与平台说明页增量收敛，当前锁定 783 个 DOM HTML sink、6 个动态 URL sink 与 42 个动态样式风险；严格 CSP、真实托管响应头、独立安全评估和现场验收仍未完成，生产状态保持 `NO-GO`。
 
 ## 2026-08-26 T09 写接口行为增量
 
@@ -233,7 +233,7 @@ flowchart TB
     `browser-safe-url-policy.v1` 复用居民短时凭据/对象存储的 HTTPS、无凭据和 exact-Origin 语义，
     为 internal navigation、official source、object storage、`tel` 与 blob download 建立唯一公共端口。
     血液主工作台、急救生命链、医生工作台、血液上线看板、陪诊工作台、产品运行驾驶舱、产品区域运行驾驶舱、质量安全工作台、区域切换工作台、血液召回面板、血液创新指挥中心及体检工作台的可信 DOM/text 切片与 Safe URL 内部闭环后，机器基线锁定
-    787 个 DOM HTML sink（30 个资产）、6 个动态 URL sink（2 个资产）和 42 个动态样式/CSSOM/runtime style element
+    783 个 DOM HTML sink（29 个资产）、6 个动态 URL sink（2 个资产）和 42 个动态样式/CSSOM/runtime style element
     （13 个资产）；体检工作台自身已无 Inventory v2 P0/P1 finding。29 个原模板 occurrence 中 28 个真实 URL 已改为无 URL 模板加 DOM 绑定，另 1 个
     `item.action` 普通赋值已从扫描误报中排除。当前 4 项是公共端口内受控 mutation/navigation，只有
     2 个缺真实 OHIF exact-Origin allowlist 的导航继续 `review-required`。每个资产/类型同时绑定

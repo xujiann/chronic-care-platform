@@ -217,7 +217,7 @@ HTTP request
 - HTML、静态资源、JSON/API、下载与错误响应由集中端口下发 `nosniff`、frame、referrer、
   permissions 与 CSP。显式发布图的内联脚本/样式静态风险已归零，但兼容 CSP 仍含 `unsafe-inline`，
   严格目标只为 Report-Only；血液主工作台、急救生命链、医生工作台、血液上线看板、陪诊工作台、产品运行驾驶舱、产品区域运行驾驶舱、质量安全工作台、区域切换工作台、血液召回面板、血液创新指挥中心及体检工作台 API 字段已使用 DOM/text 节点，Inventory v2 已把
-  787 个 DOM HTML、6 个动态 URL 和 42 个动态样式
+  783 个 DOM HTML、6 个动态 URL 和 42 个动态样式
   sink 作为资产级治理事实锁定。`browser-safe-url-policy.v1` 将可证明的内部导航、对象存储、`tel:120`
   和 blob 下载迁入统一协议/无凭据/exact-Origin 检查；29 个原模板 occurrence 已由 28 个真实 DOM
   绑定迁移和 1 个扫描误报校正闭合，仅 2 个 OHIF 导航保持 `review-required`。该变化不改变任何
