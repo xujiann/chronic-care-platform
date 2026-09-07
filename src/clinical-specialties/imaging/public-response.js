@@ -68,12 +68,15 @@ function projectImagingViewerResponse(value) {
 
 function projectImagingErrorResponse(value) {
   const source = value && typeof value === "object" ? value : {};
-  return projectPublicImagingResponse({
+  const response = {
     error: source.error || "Imaging Request Failed",
     code: source.code,
     message: source.message || "The imaging request could not be completed.",
     productionReady: source.productionReady
-  });
+  };
+  if (typeof source.retryable === "boolean") response.retryable = source.retryable;
+  if (typeof source.reconciliationRequired === "boolean") response.reconciliationRequired = source.reconciliationRequired;
+  return projectPublicImagingResponse(response);
 }
 
 module.exports = {

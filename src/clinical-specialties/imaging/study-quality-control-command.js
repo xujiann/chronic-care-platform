@@ -1,17 +1,37 @@
 "use strict";
 
+function qualityControlInputError(message) {
+  const error = new Error(message);
+  error.code = "IMAGING_QC_INPUT_INVALID";
+  error.statusCode = 400;
+  return error;
+}
+
+function normalizeScore(value, fallback, label) {
+  const score = value === undefined || value === null || String(value).trim() === ""
+    ? fallback
+    : Number(value);
+  if (!Number.isFinite(score) || score < 0 || score > 100) {
+    throw qualityControlInputError(`${label}必须是 0 至 100 之间的数字`);
+  }
+  return score;
+}
+
 function createImagingStudyQualityControlCommand(user, study, payload, ports) {
+  const input = payload && typeof payload === "object" ? payload : {};
   const { randomUUID } = ports;
+  const scanScore = normalizeScore(input.scanScore, 90, "扫描评分");
+  const reportScore = normalizeScore(input.reportScore, 90, "报告评分");
   const review = {
     id: `icq-${randomUUID()}`,
     studyId: study.id,
-    group: String(payload.group || "影像云抽样质控").trim(),
-    scanScore: Number(payload.scanScore || 90),
-    reportScore: Number(payload.reportScore || 90),
+    group: String(input.group || "影像云抽样质控").trim(),
+    scanScore,
+    reportScore,
     reviewer: user.name,
-    result: String(payload.result || "质控通过").trim(),
+    result: String(input.result || "质控通过").trim(),
     sampledAt: new Date().toISOString(),
-    comment: String(payload.comment || "质控记录已回写影像云。").trim()
+    comment: String(input.comment || "质控记录已回写影像云。").trim()
   };
   const updatedStudy = {
     ...study,
@@ -24,9 +44,21 @@ function createImagingStudyQualityControlCommand(user, study, payload, ports) {
   return { review, updatedStudy };
 }
 
+function validateImagingStudyQualityControlReceipt(receipt) {
+  const diagnosticReport = receipt?.diagnosticReport;
+  if (!diagnosticReport || typeof diagnosticReport !== "object" || !String(diagnosticReport.id || "").trim()) {
+    const error = new Error("FHIR DiagnosticReport 回执缺少已确认的资源标识");
+    error.code = "IMAGING_QC_FHIR_RECEIPT_INVALID";
+    error.providerOutcome = "unknown";
+    throw error;
+  }
+  return receipt;
+}
+
 function commitImagingStudyQualityControl(data, studyIndex, command, fhirReportSync) {
   const { review, updatedStudy } = command;
-  updatedStudy.fhirDiagnosticReportId = fhirReportSync.diagnosticReport.id;
+  const verifiedReceipt = validateImagingStudyQualityControlReceipt(fhirReportSync);
+  updatedStudy.fhirDiagnosticReportId = verifiedReceipt.diagnosticReport.id;
   updatedStudy.fhirReportSyncStatus = "synced";
   updatedStudy.fhirReportSyncedAt = new Date().toISOString();
   data.imageCloudStudies[studyIndex] = updatedStudy;
@@ -34,10 +66,11 @@ function commitImagingStudyQualityControl(data, studyIndex, command, fhirReportS
     review,
     ...(Array.isArray(data.imageCloudQualityReviews) ? data.imageCloudQualityReviews : [])
   ].slice(0, 300);
-  return { study: data.imageCloudStudies[studyIndex], review, fhirReportSync };
+  return { study: data.imageCloudStudies[studyIndex], review, fhirReportSync: verifiedReceipt };
 }
 
 module.exports = {
   commitImagingStudyQualityControl,
-  createImagingStudyQualityControlCommand
+  createImagingStudyQualityControlCommand,
+  validateImagingStudyQualityControlReceipt
 };

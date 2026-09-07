@@ -10,7 +10,9 @@ test("solution A exposes safe default local endpoints", () => {
 
 test("publishes a quality review as a linked FHIR DiagnosticReport", async () => {
   let written;
+  let requestOptions;
   const fetchImpl = async (_url, options) => {
+    requestOptions = options;
     written = JSON.parse(options.body);
     return { ok: true, status: 200, text: async () => JSON.stringify({ ...written, meta: { versionId: "3" } }) };
   };
@@ -22,7 +24,52 @@ test("publishes a quality review as a linked FHIR DiagnosticReport", async () =>
   assert.equal(written.status, "final");
   assert.equal(written.subject.reference, "Patient/platform-patient-1");
   assert.equal(written.imagingStudy[0].reference, "ImagingStudy/imaging-study-1");
+  assert.equal(requestOptions.headers.Prefer, "return=representation");
+  assert.ok(requestOptions.signal instanceof AbortSignal);
   assert.equal(result.diagnosticReport.versionId, "3");
+});
+test("rejects a successful FHIR response whose DiagnosticReport linkage does not match the request", async () => {
+  await assert.rejects(
+    () => publishDiagnosticReportToFhir({
+      studyInstanceUID: "1.2.3.4", studyDate: "20260713",
+      fhirPatientId: "platform-patient-1", fhirImagingStudyId: "imaging-study-1"
+    }, { result: "质控通过" }, {
+      env: {},
+      fetchImpl: async (_url, options) => {
+        const report = JSON.parse(options.body);
+        return {
+          ok: true,
+          status: 200,
+          text: async () => JSON.stringify({ ...report, subject: { reference: "Patient/wrong-patient" } })
+        };
+      }
+    }),
+    (error) => error.code === "FHIR_DIAGNOSTIC_REPORT_RECEIPT_MISMATCH"
+      && error.providerOutcome === "unknown"
+      && error.retryable === false
+  );
+});
+test("classifies a retryable explicit FHIR rejection without exposing it as an unknown outcome", async () => {
+  await assert.rejects(
+    () => upsertFhirResource({ resourceType: "DiagnosticReport", id: "report-1" }, {
+      env: {},
+      fetchImpl: async () => ({ ok: false, status: 429, text: async () => JSON.stringify({ message: "busy" }) })
+    }),
+    (error) => error.code === "FHIR_DIAGNOSTIC_REPORT_REJECTED"
+      && error.providerOutcome === "rejected"
+      && error.retryable === true
+  );
+});
+test("classifies a FHIR server failure as an unknown outcome that must not be blindly retried", async () => {
+  await assert.rejects(
+    () => upsertFhirResource({ resourceType: "DiagnosticReport", id: "report-1" }, {
+      env: {},
+      fetchImpl: async () => ({ ok: false, status: 503, text: async () => JSON.stringify({ message: "down" }) })
+    }),
+    (error) => error.code === "FHIR_DIAGNOSTIC_REPORT_OUTCOME_UNKNOWN"
+      && error.providerOutcome === "unknown"
+      && error.retryable === false
+  );
 });
 test("OHIF study URL validates DICOM UID", () => {
   assert.match(buildOhifStudyUrl("1.2.840.113619.2.55.3"), /StudyInstanceUIDs=1.2.840/);

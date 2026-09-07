@@ -57,11 +57,15 @@ test("dashboard and error projections preserve business identifiers without expo
     error: "FHIR Sync Failed",
     code: "FHIR_UNAVAILABLE",
     message: "Bearer abc.secret failed for https://user:pass@internal.local/fhir?access_token=secret",
+    retryable: false,
+    reconciliationRequired: true,
     objectPath: "/var/lib/imaging/study-1"
   });
   assert.equal(error.error, "FHIR Sync Failed");
   assert.equal(error.code, "FHIR_UNAVAILABLE");
   assert.equal(error.message, "[redacted-sensitive-detail]");
+  assert.equal(error.retryable, false);
+  assert.equal(error.reconciliationRequired, true);
   assertPublicBoundary(error);
 });
 

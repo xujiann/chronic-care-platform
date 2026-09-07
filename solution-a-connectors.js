@@ -70,9 +70,24 @@ async function upsertFhirResource(resource, options = {}) {
   if (!WRITABLE_FHIR_RESOURCES.has(type)) throw new Error(`FHIR ${type || "resource"} is not allowed for solution A write`);
   if (!/^[A-Za-z0-9\-.]{1,64}$/.test(id)) throw new Error(`FHIR ${type}.id is invalid`);
   const config = solutionAConfiguration(options.env).hapiFhir;
-  const response = await (options.fetchImpl || globalThis.fetch)(`${config.baseUrl}/${type}/${encodeURIComponent(id)}`, { method: "PUT", headers: { Accept: "application/fhir+json", "Content-Type": "application/fhir+json" }, body: JSON.stringify(resource) });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), config.timeoutMs);
+  let response;
+  try {
+    response = await (options.fetchImpl || globalThis.fetch)(`${config.baseUrl}/${type}/${encodeURIComponent(id)}`, { method: "PUT", headers: { Accept: "application/fhir+json", "Content-Type": "application/fhir+json", Prefer: "return=representation" }, body: JSON.stringify(resource), signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
   const body = await readResponseJson(response, "HAPI FHIR");
-  if (!response.ok) throw new Error(`HAPI FHIR ${type} upsert failed (${response.status}): ${body.issue?.map((item) => item.diagnostics || item.details?.text).filter(Boolean).join("; ") || body.message || "validation error"}`);
+  if (!response.ok) {
+    const error = new Error(`HAPI FHIR ${type} upsert failed (${response.status}): ${body.issue?.map((item) => item.diagnostics || item.details?.text).filter(Boolean).join("; ") || body.message || "validation error"}`);
+    const resourceCode = type.replace(/([a-z])([A-Z])/g, "$1_$2").toUpperCase();
+    const providerRejected = response.status >= 400 && response.status < 500 && response.status !== 408;
+    error.code = `FHIR_${resourceCode}_${providerRejected ? "REJECTED" : "OUTCOME_UNKNOWN"}`;
+    error.providerOutcome = providerRejected ? "rejected" : "unknown";
+    error.retryable = providerRejected && response.status === 429;
+    throw error;
+  }
   return { ok: true, status: response.status, resource: body };
 }
 
@@ -123,6 +138,22 @@ async function publishDiagnosticReportToFhir(study, review, options = {}) {
     meta: { tag: [{ system: "urn:chronic-care-platform:source", code: "solution-a-quality-review" }] }
   };
   const receipt = await upsertFhirResource(report, options);
+  const acknowledged = receipt.resource;
+  const expectedImagingReference = report.imagingStudy[0].reference;
+  const acknowledgedImagingReferences = Array.isArray(acknowledged?.imagingStudy)
+    ? acknowledged.imagingStudy.map((item) => String(item?.reference || ""))
+    : [];
+  if (acknowledged?.resourceType !== report.resourceType
+    || acknowledged?.id !== report.id
+    || acknowledged?.subject?.reference !== report.subject.reference
+    || !acknowledgedImagingReferences.includes(expectedImagingReference)
+    || acknowledged?.status !== report.status) {
+    const error = new Error("HAPI FHIR DiagnosticReport acknowledgement did not match the requested resource");
+    error.code = "FHIR_DIAGNOSTIC_REPORT_RECEIPT_MISMATCH";
+    error.providerOutcome = "unknown";
+    error.retryable = false;
+    throw error;
+  }
   return { ok: true, diagnosticReport: { id: reportId, status: receipt.status, versionId: receipt.resource.meta?.versionId || "", reportStatus: receipt.resource.status } };
 }
 
