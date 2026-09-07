@@ -8,13 +8,13 @@ const {
   createPhysicalExaminationDashboardQuery
 } = require("../../../clinical-specialties/physical-examination/dashboard-query");
 const {
-  createPhysicalExaminationSpecializedIntakeActionCommand
+  createPhysicalExaminationSpecializedIntakeActionCommand,
+  physicalExaminationSpecializedIntakeHttpError
 } = require("../../../clinical-specialties/physical-examination/specialized-intake-action-command");
-
-
+const { withApiCommandResourceLock } = require("../../api-command-behavior");
 
 function createRouteSegment(runtime) {
-  const { BloodEventHub, BloodGoLiveService, BloodInnovationService, PhysicalExaminationService, allowedResidentIdsForUser, appendDataAccessLog, appendSecurityEvent, buildPhysicalExamProductionReadiness, canAccessResident, canAccessSecureAttachment, collectJson, isProductionRuntime, normalizeState, randomUUID, readDatabase, redactSensitiveResponse, requireApiRole, rowMatchesOrganizationScope, sendJson, writeDatabase } = runtime;
+  const { BloodEventHub, BloodGoLiveService, BloodInnovationService, PhysicalExaminationService, allowedResidentIdsForUser, appendDataAccessLog, appendSecurityEvent, buildPhysicalExamProductionReadiness, canAccessResident, canAccessSecureAttachment, collectJson, isProductionRuntime, normalizeState, prependAuditTrailEntry, randomUUID, readDatabase, redactSensitiveResponse, requireApiRole, rowMatchesOrganizationScope, sendJson, writeDatabase } = runtime;
   const bloodOperationsHttpHandler = createBloodOperationsHttpHandler({
     BloodEventHub,
     BloodGoLiveService,
@@ -142,27 +142,48 @@ function createRouteSegment(runtime) {
         const user = requireApiRole(req, res, ["institution", "commission"], "/api/physical-exams/specialized-intakes/:id/actions");
         if (!user) return true;
         const payload = await collectJson(req);
-        const data = readDatabase();
         const intakeId = decodeURIComponent(physicalExamSpecializedActionMatch[1]);
-        const current = (data.physicalExamSpecializedIntakes || []).find((item) => item.id === intakeId);
-        if (current && !canAccessResident(user, current.residentId, data)) {
-          sendJson(res, 403, { error: "Forbidden", message: "无权处置该专项体检分流记录" });
-          return true;
-        }
         try {
           const physicalExaminationSpecializedIntakeActionCommand = createPhysicalExaminationSpecializedIntakeActionCommand({
             applySpecializedIntakeAction: (...args) => PhysicalExaminationService.applySpecializedIntakeAction(...args),
             appendDataAccessLog,
-            appendSecurityEvent,
+            appendSecurityAuditToState: (data, event) => {
+              data.securityEvents = prependAuditTrailEntry(data.securityEvents, {
+                id: randomUUID(),
+                at: new Date().toLocaleString("zh-CN", { hour12: false }),
+                ...event
+              });
+            },
             normalizeState,
             now: () => new Date().toISOString(),
             writeDatabase
           });
-          const intake = physicalExaminationSpecializedIntakeActionCommand.execute({ data, intakeId, payload, user });
-          sendJson(res, 200, { ok: true, intake });
+          const result = await withApiCommandResourceLock(`physical-exam-specialized-intake:${intakeId}`, () => {
+            const data = readDatabase();
+            const current = (data.physicalExamSpecializedIntakes || []).find((item) => item.id === intakeId);
+            if (current && !canAccessResident(user, current.residentId, data)) {
+              return {
+                status: 403,
+                body: {
+                  error: "Forbidden",
+                  code: "PHYSICAL_EXAM_SPECIALIZED_INTAKE_SCOPE_FORBIDDEN",
+                  message: "无权处置该专项体检分流记录"
+                }
+              };
+            }
+            const executed = physicalExaminationSpecializedIntakeActionCommand.execute({
+              data,
+              idempotencyKey: req.headers?.["idempotency-key"],
+              intakeId,
+              payload,
+              user
+            });
+            return { status: 200, body: { ok: true, ...executed } };
+          });
+          sendJson(res, result.status, result.body);
         } catch (error) {
-          const status = Number(error?.statusCode || 400);
-          sendJson(res, status, { error: status === 404 ? "Not Found" : status === 409 ? "Conflict" : "Bad Request", message: error.message });
+          const mapped = physicalExaminationSpecializedIntakeHttpError(error);
+          sendJson(res, mapped.status, mapped.body);
         }
         return true;
       }

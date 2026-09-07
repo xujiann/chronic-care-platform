@@ -68,6 +68,27 @@ test("physical examination dashboard query builds readiness before projecting a 
   });
 });
 
+test("physical examination dashboard never exposes internal specialized command receipts", () => {
+  const query = createPhysicalExaminationDashboardQuery({
+    buildPhysicalExamOverview() {
+      return { specializedIntakes: [{
+        id: "specialized-001",
+        version: 2,
+        _apiCommandReceipts: [{ commandKeyHash: "private-command-hash", requestDigest: "private-request-hash" }]
+      }] };
+    },
+    buildPhysicalExamReadiness() {
+      return { blockers: [] };
+    }
+  });
+
+  const result = query.execute({ data: {}, user: { role: "institution" } });
+
+  assert.equal(result.specializedIntakes[0].id, "specialized-001");
+  assert.equal(result.specializedIntakes[0].version, 2);
+  assert.equal(Object.hasOwn(result.specializedIntakes[0], "_apiCommandReceipts"), false);
+});
+
 test("physical examination dashboard query preserves the management projection", () => {
   for (const role of ["institution", "commission"]) {
     const result = createQuery([]).execute({ data: {}, user: { role } });

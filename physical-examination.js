@@ -1,5 +1,11 @@
 const PHYSICAL_EXAM_API = location.protocol === "file:" ? "" : `${location.origin}/api`;
-const physicalExamState = { overview: null, residentId: "", year: "", user: null };
+const physicalExamState = {
+  overview: null,
+  residentId: "",
+  year: "",
+  user: null,
+  specializedPendingCommands: new Map()
+};
 const PHYSICAL_EXAM_OFFICIAL_SOURCE_ORIGINS = Object.freeze([
   "https://flk.npc.gov.cn",
   "https://std.samr.gov.cn",
@@ -79,7 +85,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   renderPhysicalExamSystem();
 });
 
-async function loadPhysicalExams() {
+async function loadPhysicalExams({ fallbackOnFailure = true } = {}) {
   const params = new URLSearchParams();
   if (physicalExamState.residentId) params.set("residentId", physicalExamState.residentId);
   if (PHYSICAL_EXAM_API) {
@@ -88,13 +94,15 @@ async function loadPhysicalExams() {
       const response = await request(`${PHYSICAL_EXAM_API}/physical-exams${params.toString() ? `?${params}` : ""}`);
       if (response.ok) {
         physicalExamState.overview = await response.json();
-        return;
+        return physicalExamState.overview;
       }
+      throw new Error(`体检工作台刷新失败：${response.status}`);
     } catch (error) {
-      // Static/demo fallback remains available.
+      if (!fallbackOnFailure) throw error;
     }
   }
   physicalExamState.overview = buildFallbackOverview();
+  return physicalExamState.overview;
 }
 
 function buildFallbackOverview() {
@@ -465,7 +473,12 @@ function renderSpecializedIntakes(rows, programs) {
   }
   target.replaceChildren(...rows.map((item) => createPhysicalExamElement("article", {
     className: "workflow-card",
-    dataset: { specializedIntake: item.id }
+    dataset: {
+      specializedIntake: item.id,
+      specializedVersion: Number.isSafeInteger(item.version)
+        ? item.version
+        : (item.actionHistory || []).filter((entry) => entry?.action && entry.action !== "routed").length
+    }
   }, [
     createPhysicalExamElement("header", {}, [
       createPhysicalExamElement("strong", { text: item.examProgramName }),
@@ -603,25 +616,79 @@ async function handleSpecializedIntakeAction(event) {
   const button = event.target.closest("[data-specialized-action]");
   const card = event.target.closest("[data-specialized-intake]");
   if (!button || !card) return;
-  const evidenceRef = card.querySelector("[data-specialized-evidence]")?.value.trim();
-  if (!evidenceRef) {
-    showPhysicalExamToast("专项体检分流必须填写证据编号");
+  const intakeId = card.dataset.specializedIntake;
+  const action = button.dataset.specializedAction;
+  let pending = physicalExamState.specializedPendingCommands.get(intakeId);
+  if (pending && pending.action !== action) {
+    showPhysicalExamToast("该分流记录仍有结果待确认的操作，请先重试原操作");
     return;
   }
-  const payload = { action: button.dataset.specializedAction, evidenceRef, note: "专项体检隔离分流处置" };
-  if (payload.action === "assign-profile") {
-    payload.targetSystem = card.querySelector("[data-specialized-target]")?.value.trim();
-    payload.profileId = card.querySelector("[data-specialized-profile]")?.value.trim();
+  if (!pending) {
+    const evidenceRef = card.querySelector("[data-specialized-evidence]")?.value.trim();
+    if (!evidenceRef) {
+      showPhysicalExamToast("专项体检分流必须填写证据编号");
+      return;
+    }
+    const expectedVersion = Number(card.dataset.specializedVersion || 0);
+    const idempotencyKey = createPhysicalExamSpecializedCommandKey(intakeId);
+    const payload = {
+      action,
+      evidenceRef,
+      note: "专项体检隔离分流处置",
+      expectedVersion,
+      idempotencyKey
+    };
+    if (payload.action === "assign-profile") {
+      payload.targetSystem = card.querySelector("[data-specialized-target]")?.value.trim();
+      payload.profileId = card.querySelector("[data-specialized-profile]")?.value.trim();
+    }
+    pending = { action, idempotencyKey, payload };
+    physicalExamState.specializedPendingCommands.set(intakeId, pending);
   }
-  button.disabled = true;
+  setPhysicalExamSpecializedCardBusy(card, true);
   try {
-    await postPhysicalExamAction(`/physical-exams/specialized-intakes/${encodeURIComponent(card.dataset.specializedIntake)}/actions`, payload);
-    await refreshPhysicalExamWorkbench("专项体检分流状态已更新");
+    const result = await postPhysicalExamAction(
+      `/physical-exams/specialized-intakes/${encodeURIComponent(intakeId)}/actions`,
+      pending.payload,
+      { idempotencyKey: pending.idempotencyKey }
+    );
+    physicalExamState.specializedPendingCommands.delete(intakeId);
+    await refreshPhysicalExamWorkbench(result.idempotentReplay ? "已确认此前专项分流操作成功" : "专项体检分流状态已更新");
   } catch (error) {
-    showPhysicalExamToast(error.message);
+    const deterministicFailure = Number.isInteger(error.status) && error.status < 500;
+    if (deterministicFailure) physicalExamState.specializedPendingCommands.delete(intakeId);
+    let refreshed = false;
+    try {
+      await loadPhysicalExams({ fallbackOnFailure: false });
+      renderPhysicalExamSystem();
+      refreshed = true;
+    } catch {
+      // Keep the original command key so an unknown result can be retried safely.
+    }
+    if (error.status === 409) {
+      showPhysicalExamToast(refreshed ? "分流记录已被更新，请核对最新状态后重新提交" : "分流记录版本冲突，且最新状态刷新失败");
+    } else if (deterministicFailure) {
+      showPhysicalExamToast(error.message);
+    } else {
+      showPhysicalExamToast(refreshed
+        ? "操作结果暂未确认；再次点击原操作将使用同一重试凭据"
+        : "操作结果和最新状态均未确认；网络恢复后请重试原操作");
+    }
   } finally {
-    button.disabled = false;
+    setPhysicalExamSpecializedCardBusy(card, false);
   }
+}
+
+function createPhysicalExamSpecializedCommandKey(intakeId) {
+  const randomPart = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  return `physical-exam-specialized:${String(intakeId).slice(0, 72)}:${randomPart}`;
+}
+
+function setPhysicalExamSpecializedCardBusy(card, busy) {
+  card.setAttribute("aria-busy", String(busy));
+  card.querySelectorAll("button[data-specialized-action]").forEach((candidate) => {
+    candidate.disabled = busy;
+  });
 }
 
 async function handleAbnormalCaseAction(event) {
@@ -703,12 +770,30 @@ async function handleAttachmentLink(event) {
   }
 }
 
-async function postPhysicalExamAction(path, payload) {
+async function postPhysicalExamAction(path, payload, { idempotencyKey = "" } = {}) {
   if (!PHYSICAL_EXAM_API) throw new Error("静态预览不执行写入操作");
   const request = window.HealthCityAuth?.authFetch || fetch;
-  const response = await request(`${PHYSICAL_EXAM_API}${path}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
-  const result = await response.json();
-  if (!response.ok) throw new Error(result.message || `操作失败：${response.status}`);
+  const response = await request(`${PHYSICAL_EXAM_API}${path}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(idempotencyKey ? { "Idempotency-Key": idempotencyKey } : {})
+    },
+    body: JSON.stringify(payload)
+  });
+  let result = {};
+  try {
+    result = await response.json();
+  } catch {
+    // Preserve the HTTP status even when a proxy returns a non-JSON failure.
+  }
+  if (!response.ok) {
+    const error = new Error(result.message || `操作失败：${response.status}`);
+    error.status = response.status;
+    error.code = result.code || "";
+    error.response = result;
+    throw error;
+  }
   return result;
 }
 

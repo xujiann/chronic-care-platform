@@ -1,5 +1,7 @@
 "use strict";
 
+const { projectIntake } = require("./specialized-intake-action-command");
+
 const OWNER = "T06/physical-examination";
 const USE_CASE = "physical-examination-dashboard-query.v1";
 
@@ -31,6 +33,9 @@ function createPhysicalExaminationDashboardQuery({
         excludeDemoData
       });
       overview.readiness = buildReadiness(data, overview);
+      if (Array.isArray(overview.specializedIntakes)) {
+        overview.specializedIntakes = overview.specializedIntakes.map(projectIntake);
+      }
       if (!["commission", "institution"].includes(user.role)) {
         delete overview.jointTests;
         delete overview.gatewayEvents;
