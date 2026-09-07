@@ -35,14 +35,14 @@ test("clinical specialty governance defines exactly five bounded subdomains", ()
     [
       "imaging-dashboard-query.v1",
       "imaging-study-share-command.v1",
-      "imaging-study-quality-control-command.v1"
+      "imaging-study-quality-control-command.v2"
     ]
   );
   assert.deepEqual(
     registry.subdomains[3].implementedUseCases.map((useCase) => useCase.id),
     [
       "physical-examination-dashboard-query.v1",
-      "physical-examination-specialized-intake-action-command.v1"
+      "physical-examination-specialized-intake-action-command.v2"
     ]
   );
   assert.deepEqual(

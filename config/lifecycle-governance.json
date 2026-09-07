@@ -49,6 +49,39 @@
         "任务、地图、测试和生产准入使用同一机器追踪链",
         "仓库交付和生产投产状态不可混用"
       ]
+    },
+    {
+      "id": "REQ-OPS-015",
+      "title": "影像质控外部回写失败必须可判定和可恢复",
+      "sourceType": "approved-user-requirement",
+      "sourceRef": "USER-APPROVED-2026-09-07",
+      "acceptance": [
+        "无有效 FHIR 资源回执不得提交本地质控状态",
+        "未知外部结果和外部成功后本地失败必须明确要求对账",
+        "失败路径不得把暂存修改泄漏到已加载状态"
+      ]
+    },
+    {
+      "id": "REQ-OPS-016",
+      "title": "体检专项动作必须具备可恢复并发与重复提交控制",
+      "sourceType": "approved-user-requirement",
+      "sourceRef": "USER-APPROVED-2026-09-07",
+      "acceptance": [
+        "显式命令键与 actor、资源和 payload 绑定",
+        "业务变更、版本、回执和审计必须原子提交",
+        "旧客户端兼容但不得被误报为幂等"
+      ]
+    },
+    {
+      "id": "REQ-OPS-017",
+      "title": "居民已完成护理和陪诊服务必须可评价并发起投诉跟进",
+      "sourceType": "approved-user-requirement",
+      "sourceRef": "USER-APPROVED-2026-09-07",
+      "acceptance": [
+        "仅本人已完成的护理或陪诊服务可提交一次评价",
+        "投诉必须生成机构待跟进消息",
+        "浏览器提交失败必须保留居民草稿"
+      ]
     }
   ],
   "regulatoryControls": [
@@ -68,6 +101,33 @@
       "mitigation": "用状态生命周期、证据门禁和生产准入矩阵失败关闭",
       "status": "mitigated",
       "evidenceIds": ["EVD-GOV-001"]
+    },
+    {
+      "id": "RISK-OPS-015",
+      "level": "高",
+      "title": "影像质控跨系统双写结果不一致",
+      "owner": "T06",
+      "mitigation": "验证 FHIR 回执并对未知或部分提交结果失败关闭为人工对账",
+      "status": "open",
+      "evidenceIds": ["EVD-OPS-015"]
+    },
+    {
+      "id": "RISK-OPS-016",
+      "level": "高",
+      "title": "体检专项动作重复执行或并发覆盖",
+      "owner": "T06",
+      "mitigation": "显式幂等回执、乐观版本和锁内范围校验；分布式 exactly-once 仍未关闭",
+      "status": "open",
+      "evidenceIds": ["EVD-OPS-016"]
+    },
+    {
+      "id": "RISK-OPS-017",
+      "level": "中",
+      "title": "居民评价越权、重复或投诉丢失",
+      "owner": "T04",
+      "mitigation": "复用居民范围门禁，限制完成态和一次提交，并为 open 投诉生成机构消息",
+      "status": "open",
+      "evidenceIds": ["EVD-OPS-017"]
     }
   ],
   "decisions": [
@@ -78,6 +138,14 @@
       "effectiveScope": "portfolio-planning-traceability-gates-production-admission",
       "reviewDue": "2027-03-07",
       "supersedes": []
+    },
+    {
+      "id": "ADR-CLINICAL-001",
+      "status": "Accepted",
+      "path": "docs/adr/2026-08-18-clinical-five-governed-subdomains.md",
+      "effectiveScope": "clinical-specialty-bounded-contexts-and-command-recovery",
+      "reviewDue": "2027-02-18",
+      "supersedes": []
     }
   ],
   "tests": [
@@ -86,6 +154,30 @@
       "kind": "governance-contract",
       "path": "test/lifecycle-governance.test.js",
       "command": "node --test test/lifecycle-governance.test.js"
+    },
+    {
+      "id": "TEST-OPS-015",
+      "kind": "runtime-recovery-contract",
+      "path": "test/imaging-study-quality-control-command.test.js",
+      "command": "node scripts/clinical-subdomain-test-gate.js --subdomain imaging"
+    },
+    {
+      "id": "TEST-OPS-015B",
+      "kind": "runtime-recovery-ui-and-connector-contract",
+      "path": "test/imaging-dashboard-route-characterization.test.js",
+      "command": "node scripts/clinical-subdomain-test-gate.js --subdomain imaging"
+    },
+    {
+      "id": "TEST-OPS-016",
+      "kind": "runtime-idempotency-and-recovery-contract",
+      "path": "test/physical-examination-specialized-intake-action-command.test.js",
+      "command": "node scripts/clinical-subdomain-test-gate.js --subdomain physical-examination"
+    },
+    {
+      "id": "TEST-OPS-017",
+      "kind": "resident-service-feedback-contract",
+      "path": "test/citizen-service-feedback.test.js",
+      "command": "node --test test/citizen-service-feedback.test.js test/escort-owner-route-characterization.test.js test/internet-nursing-closed-loop-characterization.test.js"
     }
   ],
   "evidence": [
@@ -96,6 +188,46 @@
       "ref": "npm run governance:lifecycle",
       "testIds": ["TEST-GOV-001"],
       "productionEvidence": false
+    },
+    {
+      "id": "EVD-GOV-002",
+      "scope": "repository-integration",
+      "type": "pull-request-ci",
+      "ref": "https://github.com/xujiann/chronic-care-platform/actions/runs/34091091690",
+      "testIds": ["TEST-GOV-001"],
+      "productionEvidence": false
+    },
+    {
+      "id": "EVD-OPS-015",
+      "scope": "repository-integration",
+      "type": "pull-request-ci",
+      "ref": "https://github.com/xujiann/chronic-care-platform/actions/runs/34100854551",
+      "testIds": ["TEST-OPS-015"],
+      "productionEvidence": false
+    },
+    {
+      "id": "EVD-OPS-015B",
+      "scope": "repository-integration",
+      "type": "pull-request-ci",
+      "ref": "https://github.com/xujiann/chronic-care-platform/actions/runs/34102900625",
+      "testIds": ["TEST-OPS-015B"],
+      "productionEvidence": false
+    },
+    {
+      "id": "EVD-OPS-016",
+      "scope": "repository-integration",
+      "type": "pull-request-ci",
+      "ref": "https://github.com/xujiann/chronic-care-platform/actions/runs/34101751863",
+      "testIds": ["TEST-OPS-016"],
+      "productionEvidence": false
+    },
+    {
+      "id": "EVD-OPS-017",
+      "scope": "repository-integration",
+      "type": "pull-request-ci",
+      "ref": "https://github.com/xujiann/chronic-care-platform/actions/runs/34104462467",
+      "testIds": ["TEST-OPS-017"],
+      "productionEvidence": false
     }
   ],
   "maps": [
@@ -104,54 +236,54 @@
       "path": "CURRENT_ARCHITECTURE.md",
       "baseline": "主线模块化单体及其现有运行、存储和发布边界",
       "target": "边界、状态和生产资格均可由控制塔追踪",
-      "status": "已实现",
-      "gapTaskIds": ["GOV-002"],
-      "evidenceIds": ["EVD-GOV-001"]
+      "status": "已集成",
+      "gapTaskIds": [],
+      "evidenceIds": ["EVD-GOV-001", "EVD-GOV-002"]
     },
     {
       "id": "MAP-MODULE",
       "path": "MODULE_MAP.md",
       "baseline": "T00至T09及临床子域已建立模块所有权",
       "target": "模块写入冲突和跨任务依赖自动失败关闭",
-      "status": "已实现",
-      "gapTaskIds": ["GOV-002"],
-      "evidenceIds": ["EVD-GOV-001"]
+      "status": "已集成",
+      "gapTaskIds": [],
+      "evidenceIds": ["EVD-GOV-001", "EVD-GOV-002"]
     },
     {
       "id": "MAP-DATA",
       "path": "DATA_MODEL.md",
       "baseline": "数据事实源、迁移和生产写资格已有独立治理",
       "target": "数据敏感级别和迁移证据进入每项任务追踪链",
-      "status": "已实现",
-      "gapTaskIds": ["GOV-002"],
-      "evidenceIds": ["EVD-GOV-001"]
+      "status": "已集成",
+      "gapTaskIds": [],
+      "evidenceIds": ["EVD-GOV-001", "EVD-GOV-002"]
     },
     {
       "id": "MAP-API",
       "path": "API_MAP.md",
       "baseline": "生产API目录及认证、授权、幂等证据独立存在",
       "target": "接口变更由任务风险和影响范围选择门禁",
-      "status": "已实现",
-      "gapTaskIds": ["GOV-002"],
-      "evidenceIds": ["EVD-GOV-001"]
+      "status": "已集成",
+      "gapTaskIds": [],
+      "evidenceIds": ["EVD-GOV-001", "EVD-GOV-002"]
     },
     {
       "id": "MAP-DEPENDENCY",
       "path": "DEPENDENCY_MAP.md",
       "baseline": "代码、运行时和外部依赖边界已有事实地图",
       "target": "任务前置关系、WIP和核心写范围形成可检查依赖图",
-      "status": "已实现",
-      "gapTaskIds": ["GOV-002"],
-      "evidenceIds": ["EVD-GOV-001"]
+      "status": "已集成",
+      "gapTaskIds": [],
+      "evidenceIds": ["EVD-GOV-001", "EVD-GOV-002"]
     },
     {
       "id": "MAP-DEBT",
       "path": "TECH_DEBT.md",
       "baseline": "技术债以稳定编号记录仓库及现场缺口",
       "target": "风险、差距任务、退出条件和关闭证据双向可追踪",
-      "status": "已实现",
-      "gapTaskIds": ["GOV-002"],
-      "evidenceIds": ["EVD-GOV-001"]
+      "status": "已集成",
+      "gapTaskIds": [],
+      "evidenceIds": ["EVD-GOV-001", "EVD-GOV-002"]
     }
   ],
   "tasks": [
@@ -159,8 +291,8 @@
       "id": "GOV-002",
       "title": "建立平台全生命周期治理控制塔",
       "ownerProcess": "T00",
-      "taskStatus": "待集成",
-      "capabilityStatus": "已验证",
+      "taskStatus": "已关闭",
+      "capabilityStatus": "已集成",
       "riskLevel": "高",
       "approval": {
         "state": "approved",
@@ -182,7 +314,7 @@
         "四级门禁和十条系统级黄金场景存在唯一登记"
       ],
       "testIds": ["TEST-GOV-001"],
-      "evidenceIds": ["EVD-GOV-001"],
+      "evidenceIds": ["EVD-GOV-001", "EVD-GOV-002"],
       "rollback": "回退本任务提交即可恢复原流程；不涉及业务数据迁移",
       "unresolved": [
         "GitHub分支保护需在PR合并后确认新治理命令为required链的一部分",
@@ -191,8 +323,8 @@
       "worktree": ".codex-platform-worktrees/process-v2/t00-lifecycle-governance-20260907",
       "branch": "process/t00-lifecycle-governance-20260907",
       "planRef": "REQ-GOV-001",
-      "pullRequestRef": "",
-      "ciRef": "",
+      "pullRequestRef": "https://github.com/xujiann/chronic-care-platform/pull/256",
+      "ciRef": "https://github.com/xujiann/chronic-care-platform/actions/runs/34091091690",
       "writeScopes": [
         "config/lifecycle-governance.json",
         "scripts/lifecycle-governance.js",
@@ -206,6 +338,153 @@
         "reason": "本任务只建立仓库治理合同，不新增生产运行时能力"
       },
       "runtimeCapability": false
+    },
+    {
+      "id": "OPS-015",
+      "title": "影像质控跨系统恢复语义加固",
+      "ownerProcess": "T06",
+      "taskStatus": "已阻塞",
+      "capabilityStatus": "已实现",
+      "riskLevel": "高",
+      "approval": {
+        "state": "approved",
+        "mode": "accepted-adr-human-review-special-validation",
+        "ref": "USER-APPROVED-2026-09-07",
+        "approvedScope": "imaging-quality-control-recovery"
+      },
+      "requirementIds": ["REQ-OPS-015"],
+      "regulatoryControlIds": ["REG-GOV-001"],
+      "riskIds": ["RISK-OPS-015"],
+      "decisionIds": ["ADR-CLINICAL-001"],
+      "dependencies": ["GOV-002"],
+      "affectedModules": ["clinical-imaging", "fhir-integration", "security-audit"],
+      "dataSensitivity": "居民影像检查与质控信息-敏感健康数据",
+      "acceptanceCriteria": [
+        "评分在调用 provider 前完成校验",
+        "无有效 DiagnosticReport 资源标识不得提交本地状态",
+        "未知结果或本地提交失败返回不可盲重试的对账指引"
+      ],
+      "testIds": ["TEST-OPS-015", "TEST-OPS-015B"],
+      "evidenceIds": ["EVD-OPS-015", "EVD-OPS-015B"],
+      "rollback": "回退 PR #257；不迁移 schema，回退前需核对已产生的 FHIR 回执",
+      "unresolved": [
+        "缺少 durable outbox、幂等键和机构范围约束",
+        "结构化指标、追踪、SLO、告警、手册、降级和补偿尚未完整交付"
+      ],
+      "worktree": ".codex-platform-worktrees/process-v2/t06-imaging-quality-control-recovery-20260907",
+      "branch": "process/t06-imaging-quality-control-recovery-20260907",
+      "planRef": "REQ-OPS-015",
+      "pullRequestRef": "https://github.com/xujiann/chronic-care-platform/pull/257; https://github.com/xujiann/chronic-care-platform/pull/259",
+      "ciRef": "https://github.com/xujiann/chronic-care-platform/actions/runs/34100854551; https://github.com/xujiann/chronic-care-platform/actions/runs/34102900625",
+      "writeScopes": [
+        "src/clinical-specialties/imaging/study-quality-control-command.js",
+        "src/http/routes/clinical-specialties/imaging-cloud.js",
+        "test/imaging-study-quality-control-command.test.js"
+      ],
+      "observability": {
+        "applicable": true,
+        "gaps": "尚未完整交付专用指标告警、分布式追踪、健康检查、SLO错误预算、处置手册、降级与补偿方案"
+      },
+      "runtimeCapability": true
+    },
+    {
+      "id": "OPS-016",
+      "title": "体检专项动作并发与重复提交治理",
+      "ownerProcess": "T06",
+      "taskStatus": "已阻塞",
+      "capabilityStatus": "已实现",
+      "riskLevel": "高",
+      "approval": {
+        "state": "approved",
+        "mode": "accepted-adr-human-review-special-validation",
+        "ref": "USER-APPROVED-2026-09-07",
+        "approvedScope": "physical-examination-specialized-action-recovery"
+      },
+      "requirementIds": ["REQ-OPS-016"],
+      "regulatoryControlIds": ["REG-GOV-001"],
+      "riskIds": ["RISK-OPS-016"],
+      "decisionIds": ["ADR-CLINICAL-001"],
+      "dependencies": ["GOV-002"],
+      "affectedModules": ["clinical-physical-examination", "persistence", "security-audit"],
+      "dataSensitivity": "居民体检分流与审计信息-敏感健康数据",
+      "acceptanceCriteria": [
+        "显式命令键必须要求 expectedVersion 并绑定 actor、资源和 payload",
+        "重放、键冲突、版本冲突和容量耗尽稳定失败关闭",
+        "业务状态、版本、回执和两类审计单次写入且失败不污染快照"
+      ],
+      "testIds": ["TEST-OPS-016"],
+      "evidenceIds": ["EVD-OPS-016"],
+      "rollback": "回退 PR #258；内部回执字段由公开投影剔除，回退前保留审计证据",
+      "unresolved": [
+        "return-source 和 close 动作缺少 HTTP 级幂等行为证据，端点不得进入中央白名单",
+        "进程锁和 JSON 存储不提供分布式 exactly-once",
+        "结构化指标、追踪、SLO、告警、手册、降级和补偿尚未完整交付"
+      ],
+      "worktree": ".codex-platform-worktrees/process-v2/t06-physical-examination-recovery-20260907",
+      "branch": "process/t06-physical-examination-recovery-20260907",
+      "planRef": "REQ-OPS-016",
+      "pullRequestRef": "https://github.com/xujiann/chronic-care-platform/pull/258",
+      "ciRef": "https://github.com/xujiann/chronic-care-platform/actions/runs/34101751863",
+      "writeScopes": [
+        "src/clinical-specialties/physical-examination/specialized-intake-action-command.js",
+        "src/http/routes/clinical-specialties/blood-innovation.js",
+        "test/physical-examination-specialized-intake-action-command.test.js"
+      ],
+      "observability": {
+        "applicable": true,
+        "gaps": "尚未完整交付专用指标告警、分布式追踪、健康检查、SLO错误预算、处置手册、降级与补偿方案"
+      },
+      "runtimeCapability": true
+    },
+    {
+      "id": "OPS-017",
+      "title": "居民护理与陪诊服务评价投诉闭环",
+      "ownerProcess": "T04",
+      "taskStatus": "已阻塞",
+      "capabilityStatus": "已实现",
+      "riskLevel": "中",
+      "approval": {
+        "state": "approved",
+        "mode": "T00-plan-approval",
+        "ref": "USER-APPROVED-2026-09-07",
+        "approvedScope": "resident-service-feedback-and-complaint-follow-up"
+      },
+      "requirementIds": ["REQ-OPS-017"],
+      "regulatoryControlIds": ["REG-GOV-001"],
+      "riskIds": ["RISK-OPS-017"],
+      "decisionIds": [],
+      "dependencies": ["GOV-002"],
+      "affectedModules": ["citizen-portal", "service-task-actions", "escort", "internet-nursing"],
+      "dataSensitivity": "居民服务评价与投诉信息-个人敏感信息",
+      "acceptanceCriteria": [
+        "非护理陪诊、服务未完成、越权、重复和非法评价均失败关闭",
+        "open 投诉生成机构待跟进消息",
+        "浏览器失败保留草稿且成功后移除重复入口"
+      ],
+      "testIds": ["TEST-OPS-017"],
+      "evidenceIds": ["EVD-OPS-017"],
+      "rollback": "回退 PR #260；无 schema 迁移，既有评价与投诉记录必须继续按原任务记录保留",
+      "unresolved": [
+        "投诉目前复用站内消息，尚无独立工单、SLA、升级和结案模型",
+        "结构化指标、追踪、SLO、告警、手册、降级和补偿尚未完整交付"
+      ],
+      "worktree": ".codex-platform-worktrees/process-v2/t00-health-dashboard-about-trusted-rendering-20260907",
+      "branch": "process/t00-citizen-service-feedback-20260907",
+      "planRef": "REQ-OPS-017",
+      "pullRequestRef": "https://github.com/xujiann/chronic-care-platform/pull/260",
+      "ciRef": "https://github.com/xujiann/chronic-care-platform/actions/runs/34104462467",
+      "writeScopes": [
+        "citizen-service-feedback.js",
+        "citizen.js",
+        "citizen.html",
+        "src/http/shared-task-actions",
+        "test/citizen-service-feedback.test.js"
+      ],
+      "observability": {
+        "applicable": true,
+        "gaps": "尚未完整交付评价投诉专用指标告警、分布式追踪、健康检查、SLO错误预算、处置手册、降级与补偿方案"
+      },
+      "runtimeCapability": true
     }
   ],
   "gateTiers": [

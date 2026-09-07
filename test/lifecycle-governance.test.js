@@ -9,6 +9,14 @@ function copy() {
   return structuredClone(config);
 }
 
+function activeControlTowerFixture() {
+  const fixture = copy();
+  fixture.tasks = fixture.tasks.filter((task) => task.id === "GOV-002");
+  fixture.tasks[0].taskStatus = "待集成";
+  fixture.tasks[0].capabilityStatus = "已验证";
+  return fixture;
+}
+
 test("the lifecycle control tower validates the governed portfolio", () => {
   const report = validateLifecycleGovernance(copy());
   assert.equal(report.ok, true);
@@ -20,7 +28,7 @@ test("the lifecycle control tower validates the governed portfolio", () => {
 });
 
 test("WIP and concurrent core writers fail closed", () => {
-  const duplicate = copy();
+  const duplicate = activeControlTowerFixture();
   for (let index = 0; index < 5; index += 1) {
     const task = structuredClone(duplicate.tasks[0]);
     task.id = `OPS-${String(index + 100).padStart(3, "0")}`;
@@ -29,7 +37,7 @@ test("WIP and concurrent core writers fail closed", () => {
   }
   assert.throws(() => validateLifecycleGovernance(duplicate), /WIP limit exceeded/);
 
-  const collision = copy();
+  const collision = activeControlTowerFixture();
   const second = structuredClone(collision.tasks[0]);
   second.id = "ARCH-012";
   collision.tasks.push(second);
@@ -37,7 +45,7 @@ test("WIP and concurrent core writers fail closed", () => {
 });
 
 test("task dependency cycles and broken trace links fail closed", () => {
-  const cyclic = copy();
+  const cyclic = activeControlTowerFixture();
   const second = structuredClone(cyclic.tasks[0]);
   second.id = "DATA-021";
   second.dependencies = ["GOV-002"];
@@ -46,33 +54,33 @@ test("task dependency cycles and broken trace links fail closed", () => {
   cyclic.tasks.push(second);
   assert.throws(() => validateLifecycleGovernance(cyclic), /dependency cycle/);
 
-  const missingRequirement = copy();
+  const missingRequirement = activeControlTowerFixture();
   missingRequirement.tasks[0].requirementIds = ["REQ-MISSING"];
   assert.throws(() => validateLifecycleGovernance(missingRequirement), /unknown id REQ-MISSING/);
 });
 
 test("high-risk work cannot advance without approval, ADR, tests and evidence", () => {
-  const noApproval = copy();
+  const noApproval = activeControlTowerFixture();
   noApproval.tasks[0].approval.state = "pending";
   assert.throws(() => validateLifecycleGovernance(noApproval), /risk-appropriate approval/);
 
-  const proposed = copy();
+  const proposed = activeControlTowerFixture();
   proposed.decisions[0].status = "Proposed";
   assert.throws(() => validateLifecycleGovernance(proposed), /requires an Accepted ADR/);
 
-  const noEvidence = copy();
+  const noEvidence = activeControlTowerFixture();
   noEvidence.tasks[0].evidenceIds = [];
   assert.throws(() => validateLifecycleGovernance(noEvidence), /verified without evidence/);
 });
 
 test("risk-tier approvals allow intake but fail closed before implementation", () => {
-  const candidate = copy();
+  const candidate = activeControlTowerFixture();
   candidate.tasks[0].taskStatus = "待批准";
   candidate.tasks[0].approval = { state: "pending" };
   candidate.decisions[0].status = "Proposed";
   assert.equal(validateLifecycleGovernance(candidate).ok, true);
 
-  const lowRisk = copy();
+  const lowRisk = activeControlTowerFixture();
   lowRisk.tasks[0].riskLevel = "低";
   lowRisk.tasks[0].approval.mode = "T00-plan-approval";
   assert.throws(() => validateLifecycleGovernance(lowRisk), /risk-appropriate approval/);
@@ -100,15 +108,18 @@ test("every golden scenario retains normal, failure, unauthorized and recovery p
   assert.throws(() => validateLifecycleGovernance(invalid), /must cover normal, failure, unauthorized and recovery paths/);
 });
 
-test("runtime capability completion requires the full observability delivery", () => {
-  const runtimeTask = copy();
+test("implemented runtime work can expose observability gaps without claiming capability completion", () => {
+  const runtimeTask = activeControlTowerFixture();
   runtimeTask.tasks[0].runtimeCapability = true;
+  runtimeTask.tasks[0].capabilityStatus = "已实现";
   runtimeTask.tasks[0].observability = { applicable: true, structuredLogs: "logs" };
-  assert.throws(() => validateLifecycleGovernance(runtimeTask), /lacks complete observability delivery/);
+  assert.doesNotThrow(() => validateLifecycleGovernance(runtimeTask));
+  runtimeTask.tasks[0].capabilityStatus = "已验证";
+  assert.throws(() => validateLifecycleGovernance(runtimeTask), /verified runtime capability lacks complete observability delivery/);
 });
 
 test("open high-risk work cannot fan out to a downstream task", () => {
-  const expanded = copy();
+  const expanded = activeControlTowerFixture();
   const downstream = structuredClone(expanded.tasks[0]);
   downstream.id = "OPS-014";
   downstream.riskLevel = "低";

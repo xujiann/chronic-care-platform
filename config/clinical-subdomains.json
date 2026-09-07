@@ -194,7 +194,7 @@
           ]
         },
         {
-          "id": "imaging-study-quality-control-command.v1",
+          "id": "imaging-study-quality-control-command.v2",
           "source": "src/clinical-specialties/imaging/study-quality-control-command.js",
           "route": "POST /api/imaging-cloud/studies/:id/qc",
           "ports": ["publishDiagnosticReportToFhir", "randomUUID"],
@@ -202,7 +202,8 @@
           "sideEffects": [
             "imageCloudStudies-state-mutation",
             "imageCloudQualityReviews-state-mutation",
-            "external-fhir-diagnostic-report-publish-before-local-persistence"
+            "verified-external-fhir-diagnostic-report-publish-before-local-persistence",
+            "unknown-provider-or-local-commit-outcome-reconciliation-required"
           ]
         }
       ]
@@ -256,13 +257,13 @@
           "sideEffects": ["resident-data-access-audit-persisted-by-http-adapter"]
         },
         {
-          "id": "physical-examination-specialized-intake-action-command.v1",
+          "id": "physical-examination-specialized-intake-action-command.v2",
           "source": "src/clinical-specialties/physical-examination/specialized-intake-action-command.js",
           "route": "POST /api/physical-exams/specialized-intakes/:id/actions",
           "ports": [
             "applySpecializedIntakeAction",
             "appendDataAccessLog",
-            "appendSecurityEvent",
+            "appendSecurityAuditToState",
             "normalizeState",
             "now",
             "writeDatabase"
@@ -271,8 +272,9 @@
           "sideEffects": [
             "physicalExamSpecializedIntakes-state-mutation",
             "resident-data-access-audit",
-            "security-event-audit",
-            "legacy-database-persistence"
+            "security-audit-in-same-database-write",
+            "explicit-idempotency-receipt-and-optimistic-version-in-same-database-write",
+            "failed-persistence-does-not-mutate-loaded-state"
           ]
         }
       ]

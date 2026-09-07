@@ -279,15 +279,17 @@ HTTP request
 `POST /api/imaging-cloud/studies/:id/share` 已从混合 `clinical-blood` 路由迁入 `imaging-cloud` 路由并接入 `imaging-study-share-command.v1`。角色仍为 citizen、institution、commission；鉴权后读取状态，404/居民范围 403 均在读取 body 前返回，成功继续限制 1–90 天、写入既有 share 与数据访问审计、单次持久化并返回 201。公开响应继续移除内部 token；本切片不增加幂等语义或生产批准。
 
 `POST /api/imaging-cloud/studies/:id/qc` 已从混合 `clinical-blood` 路由迁入 `imaging-cloud` 路由并接入
-`imaging-study-quality-control-command.v1`。角色仍为 commission、institution；鉴权后读取状态，检查不存在
+`imaging-study-quality-control-command.v2`。角色仍为 commission、institution；鉴权后读取状态，检查不存在
 仍在读取 body 和调用 FHIR 前返回 404。成功继续使用原默认值、更新检查及最多 300 条质控记录、调用
-DiagnosticReport provider 后单次持久化并返回 200；provider 失败仍追加一次安全事件、返回 502 且不写本地
-业务状态。公开投影继续剔除敏感 provider 字段。本切片不新增幂等、CAS、机构范围、错误标准化或生产批准，
+DiagnosticReport provider 后校验资源标识、单次持久化并返回 200。provider 明确拒绝与结果未知均追加一次安全事件并返回 502，
+但仅明确拒绝且 provider 标记可重试时允许重试；结果未知要求先对账。FHIR 已确认而本地提交失败返回 503 和
+`reconciliationRequired: true`，且不会污染已加载状态。公开投影继续剔除敏感 provider 字段。本切片不新增幂等、
+CAS、机构范围、outbox 或生产批准。浏览器会在请求进行中或需对账时锁定同一质控动作，只有成功或 provider 明确给出安全重试合同才释放；
 该接口仍为 `behavior-proof-required` 和 `NO-GO`。
 
 `GET /api/physical-exams` 已通过兼容委托接入 `physical-examination-dashboard-query.v1`。允许角色仍为 citizen、institution、commission；显式 `residentId` 继续按 `allowedResidentIdsForUser` 拒绝越权并记录安全事件。citizen 仍不接收联调、网关和专项分流明细，readiness 只暴露代码状态、质量和阻断数量；管理角色保留完整投影。成功响应继续在既有访问审计持久化之后执行最终脱敏。
 
-`POST /api/physical-exams/specialized-intakes/:id/actions` 已通过兼容委托接入 `physical-examination-specialized-intake-action-command.v1`。允许角色仍为 institution、commission；调用顺序仍为鉴权 → body → 数据读取/记录定位 → 居民范围 → 业务动作 → 访问审计 → 安全审计 → 规范化写入 → `200 { ok, intake }`。范围拒绝仍为 403，领域错误仍映射 404/409/400；method、path、请求/响应、路由插槽、幂等和并发语义均未改变。
+`POST /api/physical-exams/specialized-intakes/:id/actions` 已通过兼容委托接入 `physical-examination-specialized-intake-action-command.v2`。允许角色仍为 institution、commission；居民范围在进程锁内重新校验。携带显式 `Idempotency-Key`（或同值 body 字段）的请求必须同时携带 `expectedVersion`，命令键绑定角色、机构、主体、资源和 payload 摘要；相同请求精确重放，键复用或版本冲突稳定返回 409。业务变更、版本、最多 50 条非淘汰回执、访问审计和安全审计在同一次数据库写入中提交，写入失败不污染调用方快照，公开响应不暴露内部回执。未携带显式键的旧客户端继续兼容，但不获得幂等保证；JSON/进程锁也不构成分布式 exactly-once。本接口尚未具备三类动作的完整 HTTP 行为证据，因此不进入中央 API 幂等证据白名单。
 
 TEST-007 已把 T02 `operations-command` 的 32 条路径全部纳入运行时行为矩阵：每条路径验证声明角色和
 deny-before-read，19 条 GET 验证只读响应，13 条 POST 验证 payload/错误、响应、状态副作用及审计—写入

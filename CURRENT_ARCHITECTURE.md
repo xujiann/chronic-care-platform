@@ -260,12 +260,13 @@ flowchart TB
 影像首个写边界切片将 `POST /api/imaging-cloud/studies/:id/share` 从 `clinical-blood` 路由迁入既有 `imaging-cloud` 路由，并由 `imaging-study-share-command.v1` 负责既有 share 状态构造和数据访问审计。中央路由段顺序、method/path、角色、居民范围、先范围后 body、单次状态写入、201/403/404 响应及公开响应去密保持不变；其余影像写命令仍在混合路由。
 
 影像第二个写边界切片将 `POST /api/imaging-cloud/studies/:id/qc` 从 `clinical-blood` 路由迁入既有
-`imaging-cloud` 路由，并由 `imaging-study-quality-control-command.v1` 构造原质控记录、调用既有
+`imaging-cloud` 路由，并由 `imaging-study-quality-control-command.v2` 构造原质控记录、调用既有
 FHIR DiagnosticReport provider，再在成功后更新检查与最多 300 条质控记录。角色、鉴权—读取—404—body
-顺序、默认值、FHIR 失败审计、502、单次本地写入、200 响应与公开投影保持不变；没有新增幂等、CAS、机构
-范围、schema、worker 或生产授权。外部调用仍先于本地提交，因此该接口和全平台继续 `NO-GO`。
+顺序、默认值、FHIR 失败审计、单次本地写入、200 响应与公开投影保持不变；新增评分校验和 FHIR 回执确认，
+并把未知外部结果或外部成功后本地失败明确归入人工对账；浏览器对进行中或需对账动作阻止重复触发，FHIR 超时覆盖至响应体读取完成。没有新增幂等、CAS、机构范围、schema、outbox、worker
+或生产授权。外部调用仍先于本地提交，因此该接口和全平台继续 `NO-GO`。
 
-体检第五切片将 `GET /api/physical-exams` 的 Overview 构建、生产 readiness 组合和角色投影移入 `src/clinical-specialties/physical-examination/dashboard-query.js`。后续专项分流切片将 `POST /api/physical-exams/specialized-intakes/:id/actions` 的业务动作、访问审计、安全审计和规范化持久化委托给 `physical-examination-specialized-intake-action-command.v1`；混合 HTTP 路由继续负责鉴权、body、读取/定位、居民范围、错误映射和响应，公开顺序与协议不变。其余体检写命令仍留在 `blood-innovation`，该路由仍是 blood/physical-examination 的遗留混合边界。
+体检第五切片将 `GET /api/physical-exams` 的 Overview 构建、生产 readiness 组合和角色投影移入 `src/clinical-specialties/physical-examination/dashboard-query.js`。后续专项分流切片将 `POST /api/physical-exams/specialized-intakes/:id/actions` 的业务动作、访问审计、安全审计和规范化持久化委托给 `physical-examination-specialized-intake-action-command.v2`；显式命令键同时要求乐观版本，并把版本、回执和审计纳入同一次数据库写入。混合 HTTP 路由继续负责鉴权、body、读取/定位、进程锁和锁内居民范围；旧客户端仍兼容但不具备幂等保证，且进程锁不等于分布式 exactly-once。其余体检写命令仍留在 `blood-innovation`，该路由仍是 blood/physical-examination 的遗留混合边界。
 
 ## 7. REG-01A 区域共享调阅现状
 
