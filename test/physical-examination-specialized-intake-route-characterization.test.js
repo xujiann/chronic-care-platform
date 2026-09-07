@@ -40,6 +40,7 @@ function createRuntime({
     actionHistory: [{ action: "routed", at: "2026-09-07T00:00:00.000Z" }]
   };
   const data = { physicalExamSpecializedIntakes: [current], dataAccessLogs: [], securityEvents: [] };
+  let persistedData = structuredClone(data);
   const runtime = {
     PhysicalExaminationService: {
       applySpecializedIntakeAction(input, intakeId, body, context) {
@@ -76,8 +77,9 @@ function createRuntime({
       return "security-event-001";
     },
     readDatabase() {
-      calls.push(["read-database"]);
-      return data;
+      const snapshot = structuredClone(persistedData);
+      calls.push(["read-database", snapshot]);
+      return snapshot;
     },
     requireApiRole(_req, _res, roles, route) {
       calls.push(["authorize", roles, route]);
@@ -90,9 +92,10 @@ function createRuntime({
     writeDatabase(input) {
       calls.push(["write-database", input]);
       if (writeError) throw writeError;
+      persistedData = structuredClone(input);
     }
   };
-  return { calls, current, data, payload, responses, runtime, user };
+  return { calls, current, data, getPersistedData: () => persistedData, payload, responses, runtime, user };
 }
 
 async function handleAction(runtime, encodedId = "intake%252F001", headers = { "idempotency-key": "specialized-route-command-001" }) {
@@ -104,7 +107,7 @@ async function handleAction(runtime, encodedId = "intake%252F001", headers = { "
 }
 
 test("specialized intake action locks, rechecks scope and commits state with both audits once", async () => {
-  const { calls, current, data, payload, responses, runtime, user } = createRuntime();
+  const { calls, current, data, getPersistedData, payload, responses, runtime, user } = createRuntime();
 
   assert.equal(await handleAction(runtime), true);
   assert.deepEqual(calls.map(([name]) => name), [
@@ -120,13 +123,17 @@ test("specialized intake action locks, rechecks scope and commits state with bot
     "send"
   ]);
   assert.deepEqual(calls[0].slice(1), [["institution", "commission"], ROUTE]);
-  assert.deepEqual(calls[3].slice(1), [user, "resident-001", data]);
+  assert.deepEqual(calls[3].slice(1), [user, "resident-001", calls[2][1]]);
   assert.equal(calls[4][2], "intake%2F001");
   assert.equal(calls[4][3], payload);
-  assert.equal(current.version, 1);
-  assert.equal(current._apiCommandReceipts.length, 1);
-  assert.equal(data.dataAccessLogs.length, 1);
-  assert.equal(data.securityEvents.length, 1);
+  const persisted = getPersistedData();
+  assert.equal(persisted.physicalExamSpecializedIntakes[0].version, 1);
+  assert.equal(persisted.physicalExamSpecializedIntakes[0]._apiCommandReceipts.length, 1);
+  assert.equal(persisted.dataAccessLogs.length, 1);
+  assert.equal(persisted.securityEvents.length, 1);
+  assert.equal(current.version, undefined);
+  assert.deepEqual(data.dataAccessLogs, []);
+  assert.deepEqual(data.securityEvents, []);
   assert.equal(Object.hasOwn(responses[0].body.intake, "_apiCommandReceipts"), false);
   assert.deepEqual(responses, [{
     status: 200,
@@ -135,18 +142,21 @@ test("specialized intake action locks, rechecks scope and commits state with bot
 });
 
 test("exact replay returns the first snapshot with zero additional mutation, audit or write", async () => {
-  const { calls, current, data, responses, runtime } = createRuntime();
+  const { calls, current, data, getPersistedData, responses, runtime } = createRuntime();
   await handleAction(runtime);
   const firstResponse = structuredClone(responses[0].body);
-  const firstHistoryLength = current.actionHistory.length;
+  const firstHistoryLength = getPersistedData().physicalExamSpecializedIntakes[0].actionHistory.length;
   await handleAction(runtime);
 
   assert.equal(responses[1].status, 200);
   assert.deepEqual(responses[1].body.intake, firstResponse.intake);
   assert.equal(responses[1].body.idempotentReplay, true);
-  assert.equal(current.actionHistory.length, firstHistoryLength);
-  assert.equal(data.dataAccessLogs.length, 1);
-  assert.equal(data.securityEvents.length, 1);
+  assert.equal(getPersistedData().physicalExamSpecializedIntakes[0].actionHistory.length, firstHistoryLength);
+  assert.equal(getPersistedData().dataAccessLogs.length, 1);
+  assert.equal(getPersistedData().securityEvents.length, 1);
+  assert.equal(current.actionHistory.length, 1);
+  assert.deepEqual(data.dataAccessLogs, []);
+  assert.deepEqual(data.securityEvents, []);
   assert.equal(calls.filter(([name]) => name === "write-database").length, 1);
   assert.equal(calls.filter(([name]) => name === "apply-action").length, 1);
 });
@@ -172,6 +182,25 @@ test("specialized intake action stops before body collection when authorization 
   assert.equal(await handleAction(runtime), true);
   assert.deepEqual(calls.map(([name]) => name), ["authorize"]);
   assert.deepEqual(responses, []);
+});
+
+test("legacy clients without command headers keep the established write path", async () => {
+  const harness = createRuntime({
+    payload: {
+      action: "assign-profile",
+      evidenceRef: "legacy-evidence-001",
+      targetSystem: "SPECIALIZED",
+      profileId: "legacy-profile-001"
+    }
+  });
+  await handleAction(harness.runtime, "intake%252F001", {});
+  const persisted = harness.getPersistedData();
+  const intake = persisted.physicalExamSpecializedIntakes[0];
+  assert.equal(harness.responses[0].status, 200);
+  assert.equal(harness.responses[0].body.idempotentReplay, false);
+  assert.equal(intake.version, 1);
+  assert.equal(Object.hasOwn(intake, "_apiCommandReceipts"), false);
+  assert.equal(harness.calls.filter(([name]) => name === "write-database").length, 1);
 });
 
 test("scope is rechecked before an idempotent replay", async () => {
@@ -204,7 +233,8 @@ test("unknown ids and domain conflicts expose stable errors without side effects
 });
 
 test("persistence failure emits one stable failure and never a success response", async () => {
-  const { calls, responses, runtime } = createRuntime({ writeError: new Error("private disk detail") });
+  const { calls, data, getPersistedData, responses, runtime } = createRuntime({ writeError: new Error("private disk detail") });
+  const before = structuredClone(data);
   assert.equal(await handleAction(runtime), true);
   assert.equal(calls.filter(([name]) => name === "write-database").length, 1);
   assert.deepEqual(responses, [{
@@ -215,6 +245,8 @@ test("persistence failure emits one stable failure and never a success response"
       message: "specialized intake command persistence failed"
     }
   }]);
+  assert.deepEqual(data, before);
+  assert.deepEqual(getPersistedData(), before);
 });
 
 test("SQLite collection CAS conflicts map to a recoverable 409", async () => {
