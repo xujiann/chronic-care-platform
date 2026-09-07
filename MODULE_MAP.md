@@ -274,13 +274,12 @@ scripts/platform-cutover-alert-worker.js
 血液首个标准接口为 `blood-dashboard-query.v1`：通过 `normalizeTransactionState` 和 `buildBloodDashboard` 两个注入端口保留遗留组装顺序，并在用例内统一 commission 全域、institution 机构范围投影。HTTP 层未新增数据写入；混合路由内的影像、血液写命令和集成接口尚未迁移。
 
 影像标准接口现包含 `imaging-dashboard-query.v1`、`imaging-study-share-command.v1` 和
-`imaging-study-quality-control-command.v1`。share 由既有 `imaging-cloud` HTTP 适配器保留鉴权、居民范围、
+`imaging-study-quality-control-command.v2`。share 由既有 `imaging-cloud` HTTP 适配器保留鉴权、居民范围、
 body 顺序、持久化和公开响应投影，目标模块构造既有 share 状态并调用注入的数据访问审计/UUID 端口。
 QC 同样保留原 commission/institution、先查检查再读 body、FHIR 失败审计、单次状态写和公开投影；目标命令
-只消费 `publishDiagnosticReportToFhir` 与 UUID 端口。两个写用例均已离开 `clinical-blood`，其余影像写命令
-与互认流程仍在混合路由。QC 的外部调用先于本地提交、无幂等/CAS/机构范围等既有债务未被本切片关闭。
+增加 0–100 评分校验、FHIR DiagnosticReport 资源关联与质控结论确认和准备/提交分离，适配器区分明确拒绝、未知结果及外部成功后本地失败，并对后二者要求对账；浏览器对进行中/需对账动作保持锁定。两个写用例均已离开 `clinical-blood`，其余影像写命令与互认流程仍在混合路由。QC 的外部调用先于本地提交，幂等/CAS/机构范围/outbox 等既有债务未被关闭。
 
-体检标准接口现包括 `physical-examination-dashboard-query.v1` 和 `physical-examination-specialized-intake-action-command.v1`。前者通过两个注入端口生成查询视图并统一角色投影；后者通过显式业务、审计、时钟、规范化和持久化端口执行专项分流动作。HTTP 适配器继续执行鉴权、请求解析、记录定位、居民范围、错误映射及响应；体检导入、异常处置、联调等命令尚未迁移。
+体检标准接口现包括 `physical-examination-dashboard-query.v1` 和 `physical-examination-specialized-intake-action-command.v2`。前者通过两个注入端口生成查询视图并统一角色投影；后者通过显式业务、访问审计、安全审计、时钟、规范化和持久化端口执行专项分流动作，并为显式命令键提供 actor/resource/payload 绑定、乐观版本、精确重放及非淘汰回执容量控制。HTTP 适配器继续执行鉴权、请求解析、记录定位、锁内居民范围、错误映射及响应；旧客户端仍为非幂等，且体检导入、异常处置、联调等命令尚未迁移。
 
 ## 9. SQLite migration 模块
 

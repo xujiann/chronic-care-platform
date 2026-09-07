@@ -151,7 +151,10 @@ function validateLifecycleGovernance(config, options = {}) {
     if (capabilityIndex >= capabilityStatuses.indexOf("已集成") && (!task.pullRequestRef || !task.ciRef)) throw new Error(`${task.id} is marked integrated without PR and CI evidence`);
     if (capabilityIndex >= capabilityStatuses.indexOf("准生产") && admissions.size !== [...admissions.values()].filter((item) => item.status === "GO").length) throw new Error(`${task.id} cannot be production-ready while admission domains remain NO-GO`);
     if (task.runtimeCapability === true) {
-      if (task.observability?.applicable !== true || REQUIRED_OBSERVABILITY.some((field) => !String(task.observability[field] || "").trim())) throw new Error(`${task.id} runtime capability lacks complete observability delivery`);
+      if (task.observability?.applicable !== true) throw new Error(`${task.id} runtime capability must declare observability applicable`);
+      if (capabilityIndex >= capabilityStatuses.indexOf("已验证") && REQUIRED_OBSERVABILITY.some((field) => !String(task.observability[field] || "").trim())) {
+        throw new Error(`${task.id} verified runtime capability lacks complete observability delivery`);
+      }
     } else if (task.observability?.applicable !== false || !task.observability.reason) {
       throw new Error(`${task.id} must declare observability applicability`);
     }
