@@ -1,5 +1,7 @@
 # DEPENDENCY MAP — 主线依赖地图
 
+> 状态层权威：当前基线、目标状态、差距任务和验收证据统一登记在 `config/lifecycle-governance.json#maps`；正文继续只陈述 AS-IS 事实。
+
 ## 2026-09-06 遗留状态身份边界依赖
 
 ```text

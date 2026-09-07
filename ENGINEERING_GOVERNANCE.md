@@ -1,5 +1,17 @@
 # 工程治理体系 v1
 
+## 2026-09-07 全生命周期控制塔
+
+工程治理从单项变更闭环升级为组合治理。`config/lifecycle-governance.json` 是 T00 任务总账、六图状态层、追踪链、门禁层级、黄金场景和生产准入的机器事实源，`docs/lifecycle-governance.md` 是操作规范。
+
+- T00 只承担需求接入、依赖/WIP、风险、证据和放行控制，不以长期大任务承载领域实施。
+- 领域工作使用独立编号、PLAN、process worktree、分支、PR 和验收记录；同一核心写范围只允许一个在制任务。
+- 状态统一为“未建设—已实现—已验证—已集成—准生产—已投产”，不得用代码存在替代能力完成。
+- 门禁分为 quick、PR、nightly 和 release；生产准入六域缺任一真实外部证据即保持 `NO-GO`。
+- 新运行时能力缺少日志、指标、追踪、健康检查、SLO、故障手册、降级和补偿时，任务不得完成。
+
+可执行入口为 `npm run governance:lifecycle`，其失败必须阻断 PR 治理链。原有 process 所有权、架构适应性检查和受保护 production promotion 继续有效。
+
 > 适用基线：`main@b1e4898` 及其后续短生命周期 `process/*` 分支。
 > 本文件补充而不替代 `AGENTS.md`、`config/process-workstreams.json`、分支保护和 Accepted ADR。
 

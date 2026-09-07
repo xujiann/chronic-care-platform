@@ -1,0 +1,50 @@
+name: Lifecycle gates
+
+on:
+  schedule:
+    - cron: "20 17 * * *"
+  workflow_dispatch:
+    inputs:
+      tier:
+        description: Gate tier to execute
+        required: true
+        default: nightly
+        type: choice
+        options:
+          - quick
+          - pr
+          - nightly
+          - release
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lifecycle-gates-${{ github.ref }}-${{ inputs.tier || 'nightly' }}
+  cancel-in-progress: false
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Execute selected lifecycle gate
+        env:
+          REQUESTED_TIER: ${{ inputs.tier || 'nightly' }}
+        shell: bash
+        run: |
+          case "$REQUESTED_TIER" in
+            quick|pr|nightly|release) npm run "gate:$REQUESTED_TIER" ;;
+            *) echo "::error::Unsupported gate tier: $REQUESTED_TIER"; exit 2 ;;
+          esac

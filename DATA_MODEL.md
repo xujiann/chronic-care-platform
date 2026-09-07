@@ -1,5 +1,7 @@
 # DATA MODEL — 主线数据地图
 
+> 状态层权威：当前基线、目标状态、差距任务和验收证据统一登记在 `config/lifecycle-governance.json#maps`；正文继续只陈述 AS-IS 事实。
+
 ## 2026-09-06 遗留状态身份数据边界
 
 `authUsers` 与 `authOrganizations` 的数据 Owner 仍为 T01 identity-security，本切片不新增字段、集合、表、DDL、migration 或回填。T02 legacy 全量状态写只能省略这两个集合，或回传权威值/同一 `authUsers` 安全投影；省略及安全投影均由服务端恢复当前权威值，任一公开身份字段差异在 normalize/write 前失败关闭。集合级兼容写入口不接受两个身份集合。

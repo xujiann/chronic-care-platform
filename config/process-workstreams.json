@@ -359,6 +359,11 @@
     { "pattern": "src/http/routes/research.js", "owner": "T09" },
     { "pattern": "src/http/routes/shared.js", "owner": "T09" },
     { "pattern": "src/http/runtime-contexts/research.js", "owner": "T09" },
-    { "pattern": "src/http/runtime-contexts/shared.js", "owner": "T09" }
+    { "pattern": "src/http/runtime-contexts/shared.js", "owner": "T09" },
+    { "pattern": "config/lifecycle-governance.json", "owner": "T00" },
+    { "pattern": "scripts/lifecycle-governance.js", "owner": "T00" },
+    { "pattern": "test/lifecycle-governance.test.js", "owner": "T00" },
+    { "pattern": "docs/lifecycle-governance.md", "owner": "T00" },
+    { "pattern": "docs/adr/2026-09-07-platform-lifecycle-governance-control-tower.md", "owner": "T00" }
   ]
 }

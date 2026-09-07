@@ -1,0 +1,306 @@
+{
+  "schemaVersion": "platform-lifecycle-governance-v1",
+  "authority": {
+    "controlTower": "T00",
+    "integrationBranch": "main",
+    "developmentBase": "origin/main",
+    "taskLedger": "config/lifecycle-governance.json#tasks",
+    "productionDecision": "config/lifecycle-governance.json#productionAdmission"
+  },
+  "capabilityStatusLifecycle": [
+    "未建设",
+    "已实现",
+    "已验证",
+    "已集成",
+    "准生产",
+    "已投产"
+  ],
+  "taskStatusLifecycle": [
+    "候选",
+    "待批准",
+    "已批准",
+    "实施中",
+    "验证中",
+    "待集成",
+    "已关闭",
+    "已阻塞"
+  ],
+  "portfolioPolicy": {
+    "wipStatuses": ["已批准", "实施中", "验证中", "待集成"],
+    "maximumWip": 5,
+    "recommendedWip": { "minimum": 3, "maximum": 5 },
+    "oneWriterPerCoreScope": true,
+    "highRiskDownstreamExpansionAllowed": false,
+    "productionDefault": "NO-GO"
+  },
+  "riskApprovalPolicy": {
+    "低": "approved-task-package",
+    "中": "T00-plan-approval",
+    "高": "accepted-adr-human-review-special-validation"
+  },
+  "requirements": [
+    {
+      "id": "REQ-GOV-001",
+      "title": "建立超大型平台全生命周期治理工作流",
+      "sourceType": "approved-user-requirement",
+      "sourceRef": "USER-APPROVED-2026-09-07",
+      "acceptance": [
+        "T00仅承担组合控制、风险汇总和放行结论",
+        "任务、地图、测试和生产准入使用同一机器追踪链",
+        "仓库交付和生产投产状态不可混用"
+      ]
+    }
+  ],
+  "regulatoryControls": [
+    {
+      "id": "REG-GOV-001",
+      "title": "生产准入必须基于真实外部证据和责任方签署",
+      "sourceType": "repository-production-safety-control",
+      "sourceRef": "AGENTS.md#production-safety"
+    }
+  ],
+  "risks": [
+    {
+      "id": "RISK-GOV-001",
+      "level": "高",
+      "title": "局部代码完成被误报为平台能力或生产完成",
+      "owner": "T00",
+      "mitigation": "用状态生命周期、证据门禁和生产准入矩阵失败关闭",
+      "status": "mitigated",
+      "evidenceIds": ["EVD-GOV-001"]
+    }
+  ],
+  "decisions": [
+    {
+      "id": "ADR-GOV-001",
+      "status": "Accepted",
+      "path": "docs/adr/2026-09-07-platform-lifecycle-governance-control-tower.md",
+      "effectiveScope": "portfolio-planning-traceability-gates-production-admission",
+      "reviewDue": "2027-03-07",
+      "supersedes": []
+    }
+  ],
+  "tests": [
+    {
+      "id": "TEST-GOV-001",
+      "kind": "governance-contract",
+      "path": "test/lifecycle-governance.test.js",
+      "command": "node --test test/lifecycle-governance.test.js"
+    }
+  ],
+  "evidence": [
+    {
+      "id": "EVD-GOV-001",
+      "scope": "repository",
+      "type": "executable-contract",
+      "ref": "npm run governance:lifecycle",
+      "testIds": ["TEST-GOV-001"],
+      "productionEvidence": false
+    }
+  ],
+  "maps": [
+    {
+      "id": "MAP-ARCH",
+      "path": "CURRENT_ARCHITECTURE.md",
+      "baseline": "主线模块化单体及其现有运行、存储和发布边界",
+      "target": "边界、状态和生产资格均可由控制塔追踪",
+      "status": "已实现",
+      "gapTaskIds": ["GOV-002"],
+      "evidenceIds": ["EVD-GOV-001"]
+    },
+    {
+      "id": "MAP-MODULE",
+      "path": "MODULE_MAP.md",
+      "baseline": "T00至T09及临床子域已建立模块所有权",
+      "target": "模块写入冲突和跨任务依赖自动失败关闭",
+      "status": "已实现",
+      "gapTaskIds": ["GOV-002"],
+      "evidenceIds": ["EVD-GOV-001"]
+    },
+    {
+      "id": "MAP-DATA",
+      "path": "DATA_MODEL.md",
+      "baseline": "数据事实源、迁移和生产写资格已有独立治理",
+      "target": "数据敏感级别和迁移证据进入每项任务追踪链",
+      "status": "已实现",
+      "gapTaskIds": ["GOV-002"],
+      "evidenceIds": ["EVD-GOV-001"]
+    },
+    {
+      "id": "MAP-API",
+      "path": "API_MAP.md",
+      "baseline": "生产API目录及认证、授权、幂等证据独立存在",
+      "target": "接口变更由任务风险和影响范围选择门禁",
+      "status": "已实现",
+      "gapTaskIds": ["GOV-002"],
+      "evidenceIds": ["EVD-GOV-001"]
+    },
+    {
+      "id": "MAP-DEPENDENCY",
+      "path": "DEPENDENCY_MAP.md",
+      "baseline": "代码、运行时和外部依赖边界已有事实地图",
+      "target": "任务前置关系、WIP和核心写范围形成可检查依赖图",
+      "status": "已实现",
+      "gapTaskIds": ["GOV-002"],
+      "evidenceIds": ["EVD-GOV-001"]
+    },
+    {
+      "id": "MAP-DEBT",
+      "path": "TECH_DEBT.md",
+      "baseline": "技术债以稳定编号记录仓库及现场缺口",
+      "target": "风险、差距任务、退出条件和关闭证据双向可追踪",
+      "status": "已实现",
+      "gapTaskIds": ["GOV-002"],
+      "evidenceIds": ["EVD-GOV-001"]
+    }
+  ],
+  "tasks": [
+    {
+      "id": "GOV-002",
+      "title": "建立平台全生命周期治理控制塔",
+      "ownerProcess": "T00",
+      "taskStatus": "待集成",
+      "capabilityStatus": "已验证",
+      "riskLevel": "高",
+      "approval": {
+        "state": "approved",
+        "mode": "accepted-adr-human-review-special-validation",
+        "ref": "USER-APPROVED-2026-09-07",
+        "approvedScope": "control-tower-ledger-traceability-tiered-gates-production-admission"
+      },
+      "requirementIds": ["REQ-GOV-001"],
+      "regulatoryControlIds": ["REG-GOV-001"],
+      "riskIds": ["RISK-GOV-001"],
+      "decisionIds": ["ADR-GOV-001"],
+      "dependencies": [],
+      "affectedModules": ["integration-governance", "ci", "documentation-governance"],
+      "dataSensitivity": "治理元数据-不含居民或生产凭据",
+      "acceptanceCriteria": [
+        "WIP、循环依赖和同一核心范围多写任务失败关闭",
+        "高风险任务缺审批、测试或证据时失败关闭",
+        "生产GO缺真实外部证据时失败关闭",
+        "四级门禁和十条系统级黄金场景存在唯一登记"
+      ],
+      "testIds": ["TEST-GOV-001"],
+      "evidenceIds": ["EVD-GOV-001"],
+      "rollback": "回退本任务提交即可恢复原流程；不涉及业务数据迁移",
+      "unresolved": [
+        "GitHub分支保护需在PR合并后确认新治理命令为required链的一部分",
+        "黄金场景需要各领域Owner逐项补实现和现场证据"
+      ],
+      "worktree": ".codex-platform-worktrees/process-v2/t00-lifecycle-governance-20260907",
+      "branch": "process/t00-lifecycle-governance-20260907",
+      "planRef": "REQ-GOV-001",
+      "pullRequestRef": "",
+      "ciRef": "",
+      "writeScopes": [
+        "config/lifecycle-governance.json",
+        "scripts/lifecycle-governance.js",
+        "test/lifecycle-governance.test.js",
+        ".github/workflows",
+        "package.json",
+        "docs/lifecycle-governance.md"
+      ],
+      "observability": {
+        "applicable": false,
+        "reason": "本任务只建立仓库治理合同，不新增生产运行时能力"
+      },
+      "runtimeCapability": false
+    }
+  ],
+  "gateTiers": [
+    {
+      "id": "quick",
+      "trigger": "every-commit",
+      "command": "npm run gate:quick",
+      "contents": ["change-impact", "governance-contract", "lint", "typecheck", "unit"]
+    },
+    {
+      "id": "pr",
+      "trigger": "pull-request",
+      "command": "npm run gate:pr",
+      "contents": ["quick", "build", "architecture", "integration", "smoke", "security"]
+    },
+    {
+      "id": "nightly",
+      "trigger": "daily-schedule",
+      "command": "npm run gate:nightly",
+      "contents": ["full-discovery", "cross-module-regression", "e2e", "coverage-trend"]
+    },
+    {
+      "id": "release",
+      "trigger": "release-candidate",
+      "command": "npm run gate:release",
+      "contents": ["production-scope", "migration", "rollback", "security", "audit", "disaster-recovery", "signed-evidence"]
+    }
+  ],
+  "impactRules": [
+    {
+      "id": "governance-control-plane",
+      "patterns": ["config/lifecycle-governance.json", "scripts/lifecycle-governance.js", "test/lifecycle-governance.test.js", ".github/", "package.json"],
+      "modules": ["integration-governance", "ci"],
+      "requiredTiers": ["quick", "pr", "release"],
+      "quickTests": ["test/lifecycle-governance.test.js", "test/process-worktree.test.js", "test/repository-governance.test.js", "test/standard-engineering-gates.test.js", "test/github-actions-runtime.test.js"]
+    },
+    {
+      "id": "runtime-api-security",
+      "patterns": ["server.js", "src/http/", "src/identity-security/", "auth"],
+      "modules": ["runtime", "api", "security"],
+      "requiredTiers": ["quick", "pr", "nightly", "release"],
+      "quickTests": ["test/api-authorization-matrix.test.js", "test/api-authentication-evidence.test.js", "test/authorization-runtime.test.js", "test/authorization-runtime-api.test.js"]
+    },
+    {
+      "id": "data-and-migration",
+      "patterns": ["database/", "src/platform/data/", "DATA_MODEL.md", "DATABASE_SCHEMA.md"],
+      "modules": ["data", "migration"],
+      "requiredTiers": ["quick", "pr", "nightly", "release"],
+      "quickTests": ["test/sqlite-migration-governance.test.js", "test/first-release-migration-portfolio.test.js", "test/data-migration-control-center.test.js"]
+    },
+    {
+      "id": "documentation-only",
+      "patterns": [".md"],
+      "modules": ["documentation"],
+      "requiredTiers": ["quick"],
+      "quickTests": ["test/repository-governance.test.js", "test/documentation-fact-drift.test.js"]
+    }
+  ],
+  "fitnessFunctions": [
+    { "id": "FIT-MODULE-OWNERSHIP", "rule": "禁止跨领域写受保护源码", "command": "npm run process:verify" },
+    { "id": "FIT-DEPENDENCY-DIRECTION", "rule": "禁止循环依赖和未批准的反向依赖", "command": "npm run architecture:test" },
+    { "id": "FIT-AUTHORIZATION", "rule": "禁止绕过统一鉴权和数据范围", "command": "npm run api:authorization-matrix" },
+    { "id": "FIT-VENDOR-PORT", "rule": "业务模块不得绕过端口直接依赖供应商实现", "command": "npm run architecture:test" },
+    { "id": "FIT-API-COMPATIBILITY", "rule": "生产API变更必须保留兼容和行为证据", "command": "npm run api:production-catalog" },
+    { "id": "FIT-MIGRATION-REGISTRY", "rule": "数据变更必须进入版本化迁移与首发组合", "command": "npm run first-release:migration-portfolio:verify" },
+    { "id": "FIT-AUDIT-FAIL-CLOSED", "rule": "审计链与投递不得由业务逻辑关闭", "command": "npm run audit:delivery:test" },
+    { "id": "FIT-SENSITIVE-OUTPUT", "rule": "敏感字段不得进入普通日志或静态发布面", "command": "npm run security:browser:verify" }
+  ],
+  "testOperations": {
+    "failureOutput": "summary-and-evidence-location-only",
+    "durationMetrics": "standard-test-metrics",
+    "cachePolicy": "cache-only-when-input-and-contract-digests-match",
+    "flakyPolicy": {
+      "retryDoesNotConvertFailureToPass": true,
+      "entries": []
+    }
+  },
+  "goldenScenarios": [
+    { "id": "GS-01", "title": "居民身份建立、授权、查询与撤销", "ownerProcesses": ["T01", "T04"], "status": "未建设", "pathTypes": ["正常", "失败", "越权", "恢复"] },
+    { "id": "GS-02", "title": "医疗机构数据上报、校验、治理与共享", "ownerProcesses": ["T02", "T08"], "status": "未建设", "pathTypes": ["正常", "失败", "越权", "恢复"] },
+    { "id": "GS-03", "title": "跨机构业务协同", "ownerProcesses": ["T05", "T08"], "status": "未建设", "pathTypes": ["正常", "失败", "越权", "恢复"] },
+    { "id": "GS-04", "title": "权限变更即时生效", "ownerProcesses": ["T01"], "status": "未建设", "pathTypes": ["正常", "失败", "越权", "恢复"] },
+    { "id": "GS-05", "title": "异常数据追溯与安全审计", "ownerProcesses": ["T01", "T02"], "status": "未建设", "pathTypes": ["正常", "失败", "越权", "恢复"] },
+    { "id": "GS-06", "title": "外部系统超时、重复提交与补偿", "ownerProcesses": ["T08", "T09"], "status": "未建设", "pathTypes": ["正常", "失败", "越权", "恢复"] },
+    { "id": "GS-07", "title": "数据库迁移后兼容运行", "ownerProcesses": ["T02", "T00"], "status": "未建设", "pathTypes": ["正常", "失败", "越权", "恢复"] },
+    { "id": "GS-08", "title": "节点故障后后台任务恢复", "ownerProcesses": ["T09", "T00"], "status": "未建设", "pathTypes": ["正常", "失败", "越权", "恢复"] },
+    { "id": "GS-09", "title": "医保支付、回调、对账与退款", "ownerProcesses": ["T07"], "status": "未建设", "pathTypes": ["正常", "失败", "越权", "恢复"] },
+    { "id": "GS-10", "title": "公共卫生事件发现、上报、处置与关闭", "ownerProcesses": ["T03", "T08"], "status": "未建设", "pathTypes": ["正常", "失败", "越权", "恢复"] }
+  ],
+  "productionAdmission": [
+    { "id": "PA-FUNCTION", "domain": "功能完整性", "status": "NO-GO", "repositoryStatus": "仓库证据待聚合", "unblockCondition": "核心黄金场景全部验收", "requiredEvidence": ["产品与业务验收签署"], "responsibleParty": "产品与业务" },
+    { "id": "PA-DATA", "domain": "数据迁移", "status": "NO-GO", "repositoryStatus": "迁移计划不等于现场迁移", "unblockCondition": "完成影子迁移、逐项核对和回滚演练", "requiredEvidence": ["数据Owner和数据库Owner签署"], "responsibleParty": "数据组" },
+    { "id": "PA-SECURITY", "domain": "安全合规", "status": "NO-GO", "repositoryStatus": "仓库安全门禁不等于外部测评", "unblockCondition": "权限、审计、渗透和合规测评通过", "requiredEvidence": ["独立安全测评和责任方签署"], "responsibleParty": "安全组" },
+    { "id": "PA-CAPACITY", "domain": "性能容量", "status": "NO-GO", "repositoryStatus": "尚无目标环境容量证据", "unblockCondition": "达到目标容量并保留批准余量", "requiredEvidence": ["目标环境压测和容量评审"], "responsibleParty": "架构组" },
+    { "id": "PA-DR", "domain": "灾备恢复", "status": "NO-GO", "repositoryStatus": "脚本和测试不等于真实演练", "unblockCondition": "完成真实故障与恢复演练并签署", "requiredEvidence": ["灾备演练记录和运维签署"], "responsibleParty": "运维组" },
+    { "id": "PA-VENDOR", "domain": "供应商联调", "status": "NO-GO", "repositoryStatus": "模拟适配器不等于联合验收", "unblockCondition": "外部系统联合测试全部验收", "requiredEvidence": ["供应商与项目责任方联合签署"], "responsibleParty": "项目组" }
+  ]
+}

@@ -107,6 +107,11 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm ci
+      - name: Verify lifecycle control tower and traceability
+        run: npm run governance:lifecycle
+      - name: Classify change impact
+        shell: bash
+        run: node scripts/lifecycle-governance.js impact --base="origin/${GITHUB_BASE_REF:-main}"
       - name: Verify process ownership boundary
         shell: bash
         run: |
