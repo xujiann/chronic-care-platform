@@ -2,8 +2,8 @@
 
 const { expect, test } = require("@playwright/test");
 
-const CURRENT_CACHE = "chronic-care-citizen-v61-public-demo-boundary";
-const LEGACY_CACHE = "chronic-care-citizen-v60-public-demo-boundary";
+const CURRENT_CACHE = "chronic-care-citizen-v62-service-feedback";
+const LEGACY_CACHE = "chronic-care-citizen-v61-public-demo-boundary";
 
 async function clearPwaState(page) {
   if (!/^https?:\/\/127\.0\.0\.1:\d+\//.test(page.url())) await page.goto("/login.html");
@@ -54,7 +54,7 @@ test("PWA installs the current worker and activation removes the legacy cache", 
   const state = await page.evaluate(async () => {
     const [registration] = await navigator.serviceWorker.getRegistrations();
     await registration.update();
-    const cache = await caches.open("chronic-care-citizen-v61-public-demo-boundary");
+    const cache = await caches.open("chronic-care-citizen-v62-service-feedback");
     return {
       scriptURL: registration.active?.scriptURL || "",
       installing: Boolean(registration.installing),

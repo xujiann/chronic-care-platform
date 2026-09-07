@@ -3212,7 +3212,8 @@ dialog::backdrop {
 }
 
 .form-grid input,
-.form-grid select {
+.form-grid select,
+.form-grid textarea {
   min-height: 40px;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -3220,6 +3221,33 @@ dialog::backdrop {
   background: #fff;
   color: var(--ink);
   font: inherit;
+}
+
+.form-grid textarea {
+  resize: vertical;
+}
+
+.service-feedback-complaint {
+  grid-template-columns: auto 1fr;
+  align-items: start;
+  padding: 12px;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  background: #eff6ff;
+  color: var(--ink) !important;
+}
+
+.service-feedback-complaint input {
+  width: 20px;
+  min-height: 20px;
+  margin: 0;
+}
+
+.service-feedback-error {
+  min-height: 20px;
+  color: var(--red);
+  font-size: 13px;
+  font-weight: 700;
 }
 
 .form-grid .full {

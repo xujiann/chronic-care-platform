@@ -136,11 +136,11 @@ head、不新增表或 DDL。`wave-first-release-research` 允许后续建立 me
 是动态浏览器会话凭据；显式 bearer-only 兼容只在当前页面内存中短暂持有 token，页面重载不恢复，
 且生产始终保持 NO-GO。本切片不新增表、集合、字段或 migration。
 
-Playwright E2E 只在操作系统临时目录复制开发种子，根 59 项和居民 13 项由不同服务进程与不同
+Playwright E2E 只在操作系统临时目录复制开发种子，根 60 项和居民 13 项由不同服务进程与不同
 `DATA_DIR` 消费；每次标准运行还分配独立回环端口，不能连接其他 worktree 的测试服务。测试结束删除
 临时目录，既不写回 `data/db.json`，也不形成业务事实、迁移证据或生产验收证据。
 
-PWA 专项 3 项复用相同的仓库外临时数据和动态回环端口；三套共 75 项。PWA 只在独立浏览器 context 创建 v61 Cache Storage
+PWA 专项 3 项复用相同的仓库外临时数据和动态回环端口；三套共 76 项。PWA 只在独立浏览器 context 创建 v62 Cache Storage
 与 Service Worker registration；每项结束注销 registration 并删除所有测试 origin cache。缓存只接受同源
 成功响应，`/api/*` 与被拒绝的 `/data/db.json` 不进入缓存。Cache Storage 不是业务事实源或迁移证据。
 
@@ -203,7 +203,7 @@ erDiagram
 - readiness、报告和部署检查输入；
 - 本地兼容快照与回退读取。
 
-静态页面不再直接读取该文件。Node 静态服务按源文件 mtime/size 合成 `data/public-demo.json`；Pages 在仓库外临时目录生成同名制品，Service Worker v61 只缓存同源成功响应中的该脱敏结果，不缓存源快照的 404 拒绝响应。
+静态页面不再直接读取该文件。Node 静态服务按源文件 mtime/size 合成 `data/public-demo.json`；Pages 在仓库外临时目录生成同名制品，Service Worker v62 只缓存同源成功响应中的该脱敏结果，不缓存源快照的 404 拒绝响应。
 
 `config/domain-data-ownership.json` 当前登记 111 个 owner 合同，其中 61 个集合沿用既有版本化写
 合同，19 个首发 legacy 集合仅完成唯一业务 owner、reader、classification 与实际源码证据审查，

@@ -62,7 +62,7 @@ trace 显示受控首请求中止后，500ms 重试仍可能与同一浏览器�
 
 在线根 27 项与居民 13 项继续使用 `serviceWorkers=block`。新增的 PWA 3 项通过同一 Chromium、动态端口和
 临时数据装配，在独立 `playwright-pwa-browser-policy.v1` context 中允许 Worker；三套测试形成 43 项唯一
-并集。专项使用正式 `service-worker.js` 验证居民登录后安装、受控 update、v60→v61 清理、离线回退、
+并集。专项使用正式 `service-worker.js` 验证居民登录后安装、受控 update、v61→v62 清理、离线回退、
 API/404 缓存边界以及每项 unregister/Cache Storage 清理。该事实补完方案 3 预留的仓库内专项，不改变
 真实 HTTPS、OS 安装策略、外部 Origin 和现场浏览器验收仍外置的结论。
 
@@ -73,7 +73,7 @@ API/404 缓存边界以及每项 unregister/Cache Storage 清理。该事实补�
 ## 2026-09-06 当前套件状态
 
 后续治理中心与安全回归继续只向既有根套件增量加入用例，隔离策略、浏览器与服务生命周期未改变。
-当前机器清单为根 59 项、居民 13 项、PWA 3 项，共 75 项唯一并集；该仓库事实仍不能替代真实 HTTPS、
+当前机器清单为根 60 项、居民 13 项、PWA 3 项，共 76 项唯一并集；该仓库事实仍不能替代真实 HTTPS、
 托管安全头、外部 Origin、设备矩阵、渗透或现场验收证据。
 
 同日实施状态：生产安全工作台的 3 个遗留 `innerHTML` 已改为显式 DOM/text，处置事件只接受受信容器中

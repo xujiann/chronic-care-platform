@@ -923,6 +923,40 @@
       </form>
     </dialog>
 
+    <dialog id="service-quality-feedback-dialog" aria-labelledby="service-quality-feedback-title" aria-describedby="service-quality-feedback-boundary">
+      <form method="dialog" class="dialog-form" id="service-quality-feedback-form">
+        <header>
+          <h2 id="service-quality-feedback-title">服务评价</h2>
+          <button type="button" class="close-button" data-quality-feedback-cancel aria-label="关闭服务评价">×</button>
+        </header>
+        <div class="form-grid">
+          <label class="full">总体满意度
+            <select name="satisfaction" required>
+              <option value="">请选择</option>
+              <option value="非常满意">非常满意</option>
+              <option value="满意">满意</option>
+              <option value="一般">一般</option>
+              <option value="不满意">不满意</option>
+              <option value="非常不满意">非常不满意</option>
+            </select>
+          </label>
+          <label class="full">评价内容
+            <textarea name="comment" rows="4" minlength="2" maxlength="500" placeholder="请描述本次服务体验" required></textarea>
+          </label>
+          <label class="service-feedback-complaint full">
+            <input type="checkbox" name="complaintRequested" value="open" />
+            <span>需要服务机构联系处理，并作为投诉待办跟进</span>
+          </label>
+          <p class="form-boundary full" id="service-quality-feedback-boundary">仅在服务完成后开放评价。勾选需要处理后，机构端将收到待跟进状态；请勿填写身份证号、病历原文等敏感信息。</p>
+          <output class="service-feedback-error full" id="service-quality-feedback-error" role="alert" aria-live="assertive"></output>
+        </div>
+        <footer>
+          <button type="button" class="ghost-link" data-quality-feedback-cancel>取消</button>
+          <button type="submit" class="small-button primary">提交评价</button>
+        </footer>
+      </form>
+    </dialog>
+
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
     <script src="./health-archive-standard.js"></script>
     <script src="./physical-examination-standards.js"></script>
@@ -933,6 +967,7 @@
     <script src="./citizen-records-v2.js?v=20260725care16"></script>
     <script src="./citizen-records-v3.js?v=20260728next6"></script>
     <script src="./structured-dialog.js"></script>
+    <script src="./citizen-service-feedback.js"></script>
     <script src="./citizen.js?v=20260728next4"></script>
     <script src="./citizen-ui-zh.js?v=20260725zh4"></script>
     <script src="./service-worker-registration.js"></script>

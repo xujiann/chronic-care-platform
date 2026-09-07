@@ -21413,15 +21413,23 @@ function applyCitizenTaskAction(item, payload, collection, user) {
     updates.satisfaction = String(payload.satisfaction || item.satisfaction || "需要协助").trim();
   }
   if (action === "quality-feedback") {
+    if (!["escortServiceOrders", "internetNursingOrders"].includes(collection)) throw new Error("当前任务不支持服务评价");
+    if (!["completed", "quality-review", "closed"].includes(String(item.status || "").trim())) throw new Error("服务完成后才可提交评价");
+    if (item.taskAction === "quality-feedback" || item.qualityReview === "citizen-feedback" || item.qualityCallback === "citizen-feedback") throw new Error("该服务已提交评价，请勿重复提交");
+    if (comment.length < 2 || comment.length > 500) throw new Error("服务评价内容须为 2 至 500 个字符");
+    const satisfaction = String(payload.satisfaction || "").trim();
+    if (!["非常满意", "满意", "一般", "不满意", "非常不满意"].includes(satisfaction)) throw new Error("请选择有效的总体满意度");
+    const complaintStatus = String(payload.complaintStatus || "none").trim();
+    if (!["none", "open"].includes(complaintStatus)) throw new Error("投诉跟进状态无效");
     updates.residentFeedback = comment || "居民已提交服务评价";
-    updates.satisfaction = String(payload.satisfaction || "满意").trim();
+    updates.satisfaction = satisfaction;
     if (collection === "escortServiceOrders") {
       updates.qualityReview = "citizen-feedback";
-      updates.complaintStatus = String(payload.complaintStatus || "none").trim();
+      updates.complaintStatus = complaintStatus;
     }
     if (collection === "internetNursingOrders") {
       updates.qualityCallback = "citizen-feedback";
-      updates.complaintStatus = String(payload.complaintStatus || "none").trim();
+      updates.complaintStatus = complaintStatus;
     }
   }
   return {
@@ -21461,8 +21469,10 @@ function buildCitizenTaskActionMessage(item, collection, payload, user) {
     residentId: item.residentId || item.maternalResidentId || "",
     targetRole: "institution",
     channel: "in_app",
-    title: `${serviceLabels[collection] || "居民服务"}：${actionLabels[action] || "居民动作"}`,
-    body: `${user.name || user.username || "居民"} 已在居民端提交：${String(payload.comment || payload.note || actionLabels[action] || "").trim() || "请处理服务待办"}`,
+    title: payload.complaintStatus === "open"
+      ? `${serviceLabels[collection] || "居民服务"}：服务投诉待跟进`
+      : `${serviceLabels[collection] || "居民服务"}：${actionLabels[action] || "居民动作"}`,
+    body: `${user.name || user.username || "居民"} 已在居民端提交：${String(payload.comment || payload.note || actionLabels[action] || "").trim() || "请处理服务待办"}${payload.complaintStatus === "open" ? "；居民申请服务机构联系处理。" : ""}`,
     status: "sent",
     receipts: [],
     createdAt: now,

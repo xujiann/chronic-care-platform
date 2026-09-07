@@ -4424,7 +4424,46 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(confirmed.body.familyContactStatus, "confirmed");
     assert.equal(confirmed.body.taskAction, "resident-confirm");
 
-    const reviewed = await api(baseUrl, `/api/tasks/${encodeURIComponent(`escortServiceOrders:${created.body.id}`)}/actions`, authorized(citizenToken, {
+    const escortStartEvidence = NursingEscortDomain.buildServiceStartEvidence("escort", handoff.body, {
+      lat: 38.92,
+      lng: 121.62,
+      source: "escort-mobile",
+      verified: true,
+      identityMatched: true,
+      readinessVerified: true,
+      equipmentItems: ["wheelchair", "mobile service recorder"],
+      equipmentVerified: true,
+      emergencyReady: true,
+      emergencyContactId: "escort-duty-api",
+      hospitalRouteConfirmed: true,
+      coordinationConfirmed: true,
+      hospitalContactId: "outpatient-guide-api",
+      supportContactId: "family-r1"
+    });
+    const escortStarted = await api(baseUrl, `/api/escort-services/orders/${handoffCandidate.body.id}/actions`, authorized(hospitalToken, {
+      method: "POST",
+      body: JSON.stringify({ status: "in-service", ...escortStartEvidence })
+    }));
+    assert.equal(escortStarted.response.status, 200, JSON.stringify(escortStarted.body));
+    const escortCompletionEvidence = NursingEscortDomain.buildServiceCompletionEvidence("escort", escortStarted.body, {
+      lat: 38.921,
+      lng: 121.621,
+      source: "escort-mobile",
+      verified: true,
+      actions: handoffCandidate.body.serviceItems,
+      residentConfirmed: true,
+      signerName: "API resident",
+      exceptionReport: { status: "none" },
+      archiveAccepted: true,
+      archiveTarget: "HIS"
+    });
+    const escortCompleted = await api(baseUrl, `/api/escort-services/orders/${handoffCandidate.body.id}/actions`, authorized(hospitalToken, {
+      method: "POST",
+      body: JSON.stringify({ status: "completed", ...escortCompletionEvidence })
+    }));
+    assert.equal(escortCompleted.response.status, 200, JSON.stringify(escortCompleted.body));
+
+    const reviewed = await api(baseUrl, `/api/tasks/${encodeURIComponent(`escortServiceOrders:${handoffCandidate.body.id}`)}/actions`, authorized(citizenToken, {
       method: "POST",
       body: JSON.stringify({ action: "quality-feedback", comment: "陪诊服务满意", satisfaction: "满意", complaintStatus: "none" })
     }));
@@ -5151,6 +5190,52 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     }));
     assert.equal(residentConfirmation.response.status, 200);
     assert.equal(residentConfirmation.body.residentServiceConfirmation, "confirmed");
+
+    const nursingStartEvidence = NursingEscortDomain.buildServiceStartEvidence("nursing", nurseAccepted.body, {
+      lat: 38.915,
+      lng: 121.616,
+      source: "nurse-mobile",
+      verified: true,
+      identityMatched: true,
+      readinessVerified: true,
+      equipmentItems: ["sterile wound-care kit", "service recorder"],
+      equipmentVerified: true,
+      emergencyReady: true,
+      emergencyContactId: "nursing-duty-feedback-api",
+      oneClickAlertTested: true,
+      coordinationConfirmed: true,
+      hospitalContactId: "wound-center-feedback-api",
+      supportContactId: "family-r1",
+      communityContactId: "community-team-feedback-api"
+    });
+    const nursingStarted = await api(baseUrl, `/api/internet-nursing/orders/${created.body.id}/actions`, authorized(nurseLoginForClosedLoop.body.token, {
+      method: "POST",
+      body: JSON.stringify({ action: "service-start", status: "in-service", ...nursingStartEvidence })
+    }));
+    assert.equal(nursingStarted.response.status, 200, JSON.stringify(nursingStarted.body));
+    const nursingCompletionEvidence = NursingEscortDomain.buildServiceCompletionEvidence("nursing", nursingStarted.body, {
+      lat: 38.916,
+      lng: 121.617,
+      source: "nurse-mobile",
+      verified: true,
+      actions: ["核对身份与医嘱", "完成伤口护理", "居民状态复核"],
+      residentConfirmed: true,
+      signerName: "API resident",
+      exceptionReport: { status: "none" },
+      archiveAccepted: true,
+      archiveTarget: "EMR",
+      medicalWaste: {
+        received: true,
+        wasteTypes: ["used dressing", "disposable gloves"],
+        containerSealId: "seal-feedback-api",
+        receiverId: "hospital-waste-center-feedback-api"
+      }
+    });
+    const nursingCompleted = await api(baseUrl, `/api/internet-nursing/orders/${created.body.id}/actions`, authorized(nurseLoginForClosedLoop.body.token, {
+      method: "POST",
+      body: JSON.stringify({ action: "service-complete", status: "completed", ...nursingCompletionEvidence })
+    }));
+    assert.equal(nursingCompleted.response.status, 200, JSON.stringify(nursingCompleted.body));
 
     const nursingQuality = await api(baseUrl, `/api/tasks/${encodeURIComponent(`internetNursingOrders:${created.body.id}`)}/actions`, authorized(citizenToken, {
       method: "POST",
