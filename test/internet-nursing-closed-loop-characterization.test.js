@@ -132,18 +132,109 @@ test("internet nursing owner route preserves closed-loop scope idempotency audit
   );
   assert.equal(confirmation.response.status, 200);
   assert.equal(confirmation.body.residentServiceConfirmation, "confirmed");
+  const earlyQuality = await runtime.request(
+    `/api/tasks/${encodeURIComponent(`internetNursingOrders:${created.body.id}`)}/actions`,
+    citizenToken,
+    jsonCommand(citizenToken, "test006-nursing-quality-early", {
+      action: "quality-feedback",
+      comment: "护理服务尚未完成",
+      satisfaction: "满意"
+    })
+  );
+  assert.equal(earlyQuality.response.status, 400);
+  assert.match(earlyQuality.body.message, /服务完成后/);
+  const crossResident = await runtime.request(
+    `/api/tasks/${encodeURIComponent("internetNursingOrders:ino-002")}/actions`,
+    citizenToken,
+    jsonCommand(citizenToken, "test006-nursing-cross-resident", {
+      action: "quality-feedback",
+      comment: "越权评价护理服务",
+      satisfaction: "满意"
+    })
+  );
+  assert.equal(crossResident.response.status, 403);
+  const startEvidence = NursingEscortDomain.buildServiceStartEvidence("nursing", accepted.body, {
+    lat: 38.915,
+    lng: 121.616,
+    source: "nurse-mobile",
+    verified: true,
+    identityMatched: true,
+    readinessVerified: true,
+    equipmentItems: ["sterile wound-care kit", "service recorder"],
+    equipmentVerified: true,
+    emergencyReady: true,
+    emergencyContactId: "nursing-duty-test006",
+    oneClickAlertTested: true,
+    coordinationConfirmed: true,
+    hospitalContactId: "wound-center-test006",
+    supportContactId: "family-r1",
+    communityContactId: "community-team-test006"
+  });
+  const started = await runtime.request(
+    `/api/internet-nursing/orders/${created.body.id}/actions`,
+    nurseToken,
+    jsonCommand(nurseToken, "test006-nursing-service-start", {
+      action: "service-start",
+      status: "in-service",
+      nurseId: "inn-001",
+      ...startEvidence
+    })
+  );
+  assert.equal(started.response.status, 200, JSON.stringify(started.body));
+  const completionEvidence = NursingEscortDomain.buildServiceCompletionEvidence("nursing", started.body, {
+    lat: 38.916,
+    lng: 121.617,
+    source: "nurse-mobile",
+    verified: true,
+    actions: ["核对身份与医嘱", "完成伤口护理", "居民状态复核"],
+    residentConfirmed: true,
+    signerName: "TEST-006 resident",
+    exceptionReport: { status: "none" },
+    archiveAccepted: true,
+    archiveTarget: "EMR",
+    medicalWaste: {
+      received: true,
+      wasteTypes: ["used dressing", "disposable gloves"],
+      containerSealId: "seal-test006-feedback",
+      receiverId: "hospital-waste-center-test006"
+    }
+  });
+  const completed = await runtime.request(
+    `/api/internet-nursing/orders/${created.body.id}/actions`,
+    nurseToken,
+    jsonCommand(nurseToken, "test006-nursing-service-complete", {
+      action: "service-complete",
+      status: "completed",
+      nurseId: "inn-001",
+      ...completionEvidence
+    })
+  );
+  assert.equal(completed.response.status, 200, JSON.stringify(completed.body));
   const quality = await runtime.request(
     `/api/tasks/${encodeURIComponent(`internetNursingOrders:${created.body.id}`)}/actions`,
     citizenToken,
     jsonCommand(citizenToken, "test006-nursing-quality", {
       action: "quality-feedback",
       comment: "护理服务已评价",
-      satisfaction: "满意"
+      satisfaction: "不满意",
+      complaintStatus: "open"
     })
   );
   assert.equal(quality.response.status, 200);
   assert.equal(quality.body.qualityCallback, "citizen-feedback");
-  assert.equal(quality.body.satisfaction, "满意");
+  assert.equal(quality.body.satisfaction, "不满意");
+  assert.equal(quality.body.complaintStatus, "open");
+  const repeatedQuality = await runtime.request(
+    `/api/tasks/${encodeURIComponent(`internetNursingOrders:${created.body.id}`)}/actions`,
+    citizenToken,
+    jsonCommand(citizenToken, "test006-nursing-quality-repeat", {
+      action: "quality-feedback",
+      comment: "重复提交护理评价",
+      satisfaction: "一般"
+    })
+  );
+  assert.equal(repeatedQuality.response.status, 400);
+  assert.match(repeatedQuality.body.message, /请勿重复提交/);
 
   const unsupported = await runtime.request(
     "/api/internet-nursing/orders",

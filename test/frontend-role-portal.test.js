@@ -64,7 +64,7 @@ test("every native dialog has an explicit accessible name", () => {
       if (labelledBy) assert.match(source, new RegExp(`\\bid="${labelledBy.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}"`), `${page} dialog label target must exist`);
     }
   }
-  assert.equal(dialogCount, 22);
+  assert.equal(dialogCount, 23);
 });
 
 test("login tabs and legacy filters expose explicit accessible contracts", () => {

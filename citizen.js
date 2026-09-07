@@ -1659,7 +1659,7 @@ function buildResidentServiceTasks(residentId) {
       page: "registration",
       action: "查看挂号"
     })),
-    ...getEscortOrders(residentId).filter(isResidentServiceTaskOpen).map((item) => ({
+    ...getEscortOrders(residentId).filter(window.CitizenServiceFeedback.shouldIncludeEscortOrder).map((item) => ({
       taskId: `escortServiceOrders:${item.id}`,
       collection: "escortServiceOrders",
       service: "助医陪诊",
@@ -1676,7 +1676,7 @@ function buildResidentServiceTasks(residentId) {
       qualityReview: item.qualityReview,
       priority: item.priority === "high" || item.riskLevel === "high" ? "high" : "normal"
     })),
-    ...(state.internetNursingOrders || []).filter((item) => item.residentId === residentId && !["completed", "closed"].includes(item.status)).map((item) => ({
+    ...(state.internetNursingOrders || []).filter((item) => item.residentId === residentId && window.CitizenServiceFeedback.shouldIncludeNursingOrder(item)).map((item) => ({
       taskId: `internetNursingOrders:${item.id}`,
       collection: "internetNursingOrders",
       service: "互联网护理",
@@ -2150,6 +2150,7 @@ function renderServiceTaskButtons(item) {
 }
 
 function shouldShowResidentConfirm(item) {
+  if (window.CitizenServiceFeedback?.isCompletedService(item)) return false;
   return ![
     item.residentConfirmation,
     item.familyContactStatus,
@@ -2160,34 +2161,31 @@ function shouldShowResidentConfirm(item) {
 
 function shouldShowCancelRequest(item) {
   const status = String(item.rawStatus || item.status || "").trim();
-  return !RESIDENT_TASK_CLOSED_STATUSES.has(status) && item.taskAction !== "cancel-request";
+  return !RESIDENT_TASK_CLOSED_STATUSES.has(status) && status !== "quality-review" && item.taskAction !== "cancel-request";
 }
 
 function shouldShowQualityFeedback(item) {
-  if (!["escortServiceOrders", "internetNursingOrders"].includes(item.collection)) return false;
-  return ![
-    item.qualityReview,
-    item.qualityCallback,
-    item.taskAction
-  ].includes("citizen-feedback") && item.taskAction !== "quality-feedback";
+  return window.CitizenServiceFeedback?.isFeedbackEligible(item) === true;
 }
-
 function bindResidentTaskActions() {
   const target = document.querySelector("#reminder-cards");
   if (!target) return;
+  const feedback = window.CitizenServiceFeedback.createDialogController(document, submitResidentTaskAction, showToast, () => renderCitizen(currentResidentId));
   target.addEventListener("click", async (event) => {
     const button = event.target.closest("[data-resident-task-action]");
     if (!button) return;
     const action = button.dataset.residentTaskAction;
+    if (action === "quality-feedback") {
+      if (!feedback?.open(button)) showToast("评价暂不可用");
+      return;
+    }
     const comment = action === "resident-confirm" ? "居民端确认服务安排" : await window.HealthStructuredDialog.prompt({ title: "服务待办处理说明", defaultValue: defaultResidentTaskComment(action), minLength: 2 });
     if (comment === null) return;
     button.disabled = true;
     try {
       await submitResidentTaskAction(button.dataset.taskId, button.dataset.taskCollection, {
         action,
-        comment,
-        satisfaction: action === "quality-feedback" ? "满意" : "",
-        complaintStatus: action === "quality-feedback" ? "none" : ""
+        comment
       });
       showToast("服务待办已更新");
       renderCitizen(currentResidentId);
@@ -2249,7 +2247,8 @@ function applyLocalResidentTaskAction(taskId, collection, payload) {
     handledAt: now,
     residentActionAt: now,
     residentFeedback: payload.comment || rows[index].residentFeedback,
-    satisfaction: payload.satisfaction || rows[index].satisfaction
+    satisfaction: payload.satisfaction || rows[index].satisfaction,
+    complaintStatus: payload.complaintStatus || rows[index].complaintStatus
   };
   if (payload.action === "cancel-request") {
     rows[index].status = "cancel-requested";
@@ -2263,9 +2262,7 @@ function applyLocalResidentTaskAction(taskId, collection, payload) {
 }
 
 function replaceResidentTaskItem(collection, updated) {
-  const rows = findResidentTaskRows(collection);
-  const index = rows.findIndex((item) => item.id === updated.id);
-  if (index >= 0) rows[index] = updated;
+  window.CitizenServiceFeedback.replaceTaskItem(findResidentTaskRows(collection), collection === "escortServiceOrders" ? escortDashboard?.orders : null, updated);
 }
 
 function findResidentTaskRows(collection) {

@@ -172,6 +172,58 @@ test("escort owner route preserves validation idempotency handoff scope audit an
   );
   assert.equal(residentConfirmation.response.status, 200);
   assert.equal(residentConfirmation.body.familyContactStatus, "confirmed");
+  const earlyQuality = await runtime.request(
+    `/api/tasks/${encodeURIComponent(`escortServiceOrders:${created.body.id}`)}/actions`,
+    citizenToken,
+    jsonCommand(citizenToken, "test006-escort-quality-early", {
+      action: "quality-feedback",
+      comment: "服务尚未完成",
+      satisfaction: "满意",
+      complaintStatus: "none"
+    })
+  );
+  assert.equal(earlyQuality.response.status, 400);
+  assert.match(earlyQuality.body.message, /服务完成后/);
+  const startEvidence = NursingEscortDomain.buildServiceStartEvidence("escort", confirmed.body, {
+    lat: 38.92,
+    lng: 121.62,
+    source: "escort-mobile",
+    verified: true,
+    identityMatched: true,
+    readinessVerified: true,
+    equipmentItems: ["wheelchair", "mobile service recorder"],
+    equipmentVerified: true,
+    emergencyReady: true,
+    emergencyContactId: "escort-duty-test006",
+    hospitalRouteConfirmed: true,
+    coordinationConfirmed: true,
+    hospitalContactId: "outpatient-guide-test006",
+    supportContactId: "family-r1"
+  });
+  const started = await runtime.request(
+    `/api/escort-services/orders/${created.body.id}/actions`,
+    hospitalToken,
+    jsonCommand(hospitalToken, "test006-escort-in-service", { status: "in-service", ...startEvidence })
+  );
+  assert.equal(started.response.status, 200, JSON.stringify(started.body));
+  const completionEvidence = NursingEscortDomain.buildServiceCompletionEvidence("escort", started.body, {
+    lat: 38.921,
+    lng: 121.621,
+    source: "escort-mobile",
+    verified: true,
+    actions: created.body.serviceItems,
+    residentConfirmed: true,
+    signerName: "TEST-006 resident",
+    exceptionReport: { status: "none" },
+    archiveAccepted: true,
+    archiveTarget: "HIS"
+  });
+  const completed = await runtime.request(
+    `/api/escort-services/orders/${created.body.id}/actions`,
+    hospitalToken,
+    jsonCommand(hospitalToken, "test006-escort-completed", { status: "completed", ...completionEvidence })
+  );
+  assert.equal(completed.response.status, 200, JSON.stringify(completed.body));
   const quality = await runtime.request(
     `/api/tasks/${encodeURIComponent(`escortServiceOrders:${created.body.id}`)}/actions`,
     citizenToken,
@@ -179,11 +231,24 @@ test("escort owner route preserves validation idempotency handoff scope audit an
       action: "quality-feedback",
       comment: "陪诊服务满意",
       satisfaction: "满意",
-      complaintStatus: "none"
+      complaintStatus: "open"
     })
   );
   assert.equal(quality.response.status, 200);
   assert.equal(quality.body.qualityReview, "citizen-feedback");
+  assert.equal(quality.body.complaintStatus, "open");
+  const repeatedQuality = await runtime.request(
+    `/api/tasks/${encodeURIComponent(`escortServiceOrders:${created.body.id}`)}/actions`,
+    citizenToken,
+    jsonCommand(citizenToken, "test006-escort-quality-repeat", {
+      action: "quality-feedback",
+      comment: "重复评价",
+      satisfaction: "一般",
+      complaintStatus: "none"
+    })
+  );
+  assert.equal(repeatedQuality.response.status, 400);
+  assert.match(repeatedQuality.body.message, /请勿重复提交/);
 
   const returnPayload = { ...payload, residentId: "r4", appointmentAt: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString() };
   const returnCandidate = await runtime.request(
@@ -217,5 +282,6 @@ test("escort owner route preserves validation idempotency handoff scope audit an
   assert.equal(state.body.escortServiceOrders.filter((item) => item.id === created.body.id).length, 1);
   assert.equal(state.body.escortServiceOutbox.some((item) => item.aggregateId === created.body.id && item.status === "pending"), true);
   assert.equal(state.body.taskMessages.some((item) => item.sourceId === created.body.id), true);
+  assert.equal(state.body.taskMessages.some((item) => item.sourceId === created.body.id && item.title.includes("投诉待跟进")), true);
   assert.equal(state.body.securityEvents.some((item) => item.target === `escortServiceOrders:${created.body.id}` && item.result === "allowed"), true);
 });

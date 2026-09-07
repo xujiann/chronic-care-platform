@@ -64,7 +64,7 @@ test("published browser assets match the exact Inventory v2 fail-closed baseline
   assert.equal(verification.ok, true);
   assert.equal(inventory.schemaVersion, 2);
   assert.equal(inventory.contractId, "browser-security-risk-inventory.v2");
-  assert.equal(inventory.assetsScanned, 188);
+  assert.equal(inventory.assetsScanned, 189);
   assert.equal(inventory.summary.total, 831);
   assert.equal(inventory.summary.byPriority.P0, 789);
   assert.equal(inventory.summary.byPriority.P1, 42);
