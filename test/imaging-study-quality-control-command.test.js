@@ -101,7 +101,7 @@ test("imaging quality control accepts zero scores and rejects non-finite or out-
   );
   assert.equal(command.review.scanScore, 0);
   assert.equal(command.review.reportScore, 0);
-  for (const payload of [{ scanScore: "NaN" }, { scanScore: -1 }, { reportScore: 101 }]) {
+  for (const payload of [{ scanScore: "NaN" }, { scanScore: -1 }, { reportScore: 101 }, { scanScore: false }, { reportScore: [] }]) {
     assert.throws(
       () => createImagingStudyQualityControlCommand({ name: "复核员" }, study, payload, { randomUUID: () => "unused" }),
       (error) => error.code === "IMAGING_QC_INPUT_INVALID" && error.statusCode === 400

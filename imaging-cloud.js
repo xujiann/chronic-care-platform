@@ -7,6 +7,7 @@ const imagingState = {
   selectedInstitutionCode: "",
   selectedStudyId: ""
 };
+const imagingQualityControlActionState = new Map();
 
 const IMAGING_API_BASE = location.protocol === "file:" ? "" : `${location.origin}/api`;
 
@@ -310,7 +311,7 @@ function renderStudyTable(studies) {
         <button class="inline-action" type="button" data-view-study="${escapeHtml(item.id)}">手机查看</button>
         <button class="inline-action primary" type="button" data-open-ohif="${escapeHtml(item.id)}">OHIF调阅</button>
         <button class="inline-action" type="button" data-share-study="${escapeHtml(item.id)}">分享</button>
-        ${canManageQualityControl() ? `<button class="inline-action" type="button" data-qc-study="${escapeHtml(item.id)}">质控回写</button>` : ""}
+        ${renderQualityControlAction(item.id)}
         ${canManageMutualRecognition() && !item.mutualRecognitionRecordId ? `<button class="inline-action" type="button" data-start-recognition="${escapeHtml(item.id)}">纳入互认</button>` : ""}
       </td>
     </tr>`).join("") || `<tr><td colspan="7">暂无影像云检查。</td></tr>`}</tbody>
@@ -356,6 +357,17 @@ function canManageMutualRecognition() {
 
 function canManageQualityControl() {
   return ["commission", "institution"].includes(window.HealthCityAuth?.getUser?.()?.role);
+}
+
+function renderQualityControlAction(studyId) {
+  if (!canManageQualityControl()) return "";
+  const actionState = imagingQualityControlActionState.get(studyId);
+  const reconciliationRequired = actionState === "reconciliation-required";
+  const label = reconciliationRequired ? "需对账" : actionState ? "处理中..." : "质控回写";
+  const unavailable = actionState
+    ? ` disabled aria-disabled="true" title="${reconciliationRequired ? "结果未确认；完成外部与本地对账后重新加载页面" : "该检查的质控操作正在进行"}"`
+    : "";
+  return `<button class="inline-action" type="button" data-qc-study="${escapeHtml(studyId)}"${unavailable}>${label}</button>`;
 }
 
 function canDecideMutualRecognition() {
@@ -721,37 +733,48 @@ async function shareStudy(studyId, button) {
 
 async function qualityControlStudy(studyId, button) {
   if (!IMAGING_API_BASE || !canManageQualityControl()) return;
-  const result = await window.HealthStructuredDialog.prompt({
-    title: "影像质控结论",
-    defaultValue: "质控通过",
-    minLength: 2
-  });
-  if (result === null) return;
-  const scanScore = await window.HealthStructuredDialog.prompt({
-    title: "扫描评分",
-    defaultValue: "90",
-    multiline: false,
-    pattern: "^(?:100(?:\\.0+)?|[0-9]{1,2}(?:\\.[0-9]+)?)$",
-    patternMessage: "扫描评分必须是 0 至 100 之间的数字。"
-  });
-  if (scanScore === null) return;
-  const reportScore = await window.HealthStructuredDialog.prompt({
-    title: "报告评分",
-    defaultValue: "90",
-    multiline: false,
-    pattern: "^(?:100(?:\\.0+)?|[0-9]{1,2}(?:\\.[0-9]+)?)$",
-    patternMessage: "报告评分必须是 0 至 100 之间的数字。"
-  });
-  if (reportScore === null) return;
-  const comment = await window.HealthStructuredDialog.prompt({
-    title: "质控复核意见",
-    defaultValue: /通过|合格|passed/i.test(result) ? "影像与报告质控通过。" : "请按质控结论完成整改并复核。",
-    minLength: 2
-  });
-  if (comment === null) return;
-
-  setImagingActionBusy(button, true, "正在回写...");
+  const existingState = imagingQualityControlActionState.get(studyId);
+  if (existingState) {
+    window.alert(existingState === "reconciliation-required"
+      ? "该检查的质控结果尚未确认，本页已阻止重复提交；请完成外部与本地对账后重新加载页面。"
+      : "该检查的质控操作正在进行，请勿重复提交。");
+    return;
+  }
+  imagingQualityControlActionState.set(studyId, "editing");
+  setImagingActionBusy(button, true, "正在填写...");
+  let retainReconciliationLock = false;
   try {
+    const result = await window.HealthStructuredDialog.prompt({
+      title: "影像质控结论",
+      defaultValue: "质控通过",
+      minLength: 2
+    });
+    if (result === null) return;
+    const scanScore = await window.HealthStructuredDialog.prompt({
+      title: "扫描评分",
+      defaultValue: "90",
+      multiline: false,
+      pattern: "^(?:100(?:\\.0+)?|[0-9]{1,2}(?:\\.[0-9]+)?)$",
+      patternMessage: "扫描评分必须是 0 至 100 之间的数字。"
+    });
+    if (scanScore === null) return;
+    const reportScore = await window.HealthStructuredDialog.prompt({
+      title: "报告评分",
+      defaultValue: "90",
+      multiline: false,
+      pattern: "^(?:100(?:\\.0+)?|[0-9]{1,2}(?:\\.[0-9]+)?)$",
+      patternMessage: "报告评分必须是 0 至 100 之间的数字。"
+    });
+    if (reportScore === null) return;
+    const comment = await window.HealthStructuredDialog.prompt({
+      title: "质控复核意见",
+      defaultValue: /通过|合格|passed/i.test(result) ? "影像与报告质控通过。" : "请按质控结论完成整改并复核。",
+      minLength: 2
+    });
+    if (comment === null) return;
+
+    imagingQualityControlActionState.set(studyId, "submitting");
+    if (button) button.textContent = "正在回写...";
     const request = window.HealthCityAuth?.authFetch || fetch;
     const response = await request(`${IMAGING_API_BASE}/imaging-cloud/studies/${encodeURIComponent(studyId)}/qc`, {
       method: "POST",
@@ -766,7 +789,13 @@ async function qualityControlStudy(studyId, button) {
     });
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) {
-      const guidance = payload.reconciliationRequired
+      const reconciliationRequired = payload.reconciliationRequired === true
+        || (typeof payload.reconciliationRequired !== "boolean" && response.status >= 500 && payload.retryable !== true);
+      if (reconciliationRequired) {
+        imagingQualityControlActionState.set(studyId, "reconciliation-required");
+        retainReconciliationLock = true;
+      }
+      const guidance = reconciliationRequired
         ? "外部与本地结果可能不一致，请先完成对账，不要直接重复提交。"
         : payload.retryable
           ? "本地未提交，可在问题恢复后重试。"
@@ -774,13 +803,29 @@ async function qualityControlStudy(studyId, button) {
       window.alert(`${payload.message || `质控回写失败（HTTP ${response.status}）`} ${guidance}`);
       return;
     }
+    imagingQualityControlActionState.delete(studyId);
     await loadImagingCloud();
     renderImagingCloud();
     window.alert("质控结果已由 FHIR 回执确认并保存到本地影像记录。");
   } catch (error) {
-    window.alert(`质控请求结果未知：${error.message}。请先刷新并核对本地与 FHIR 结果，不要直接重复提交。`);
+    imagingQualityControlActionState.set(studyId, "reconciliation-required");
+    retainReconciliationLock = true;
+    window.alert(`质控请求结果未知：${error.message}。本页已阻止重复提交；请完成本地与 FHIR 对账后重新加载页面。`);
   } finally {
-    setImagingActionBusy(button, false, "");
+    if (retainReconciliationLock) {
+      if (button) {
+        button.textContent = "需对账";
+        button.disabled = true;
+        button.removeAttribute("aria-busy");
+        button.setAttribute("aria-disabled", "true");
+        button.setAttribute("title", "结果未确认；完成外部与本地对账后重新加载页面");
+        delete button.dataset.idleLabel;
+      }
+    } else {
+      imagingQualityControlActionState.delete(studyId);
+      setImagingActionBusy(button, false, "");
+    }
+    if (Array.isArray(imagingState.payload?.studies)) renderStudyTable(imagingState.payload.studies);
   }
 }
 

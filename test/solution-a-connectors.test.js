@@ -14,7 +14,7 @@ test("publishes a quality review as a linked FHIR DiagnosticReport", async () =>
   const fetchImpl = async (_url, options) => {
     requestOptions = options;
     written = JSON.parse(options.body);
-    return { ok: true, status: 200, text: async () => JSON.stringify({ ...written, meta: { versionId: "3" } }) };
+    return { ok: true, status: 200, text: async () => JSON.stringify({ ...written, effectiveDateTime: "2026-07-12T16:00:00.000Z", meta: { versionId: "3" } }) };
   };
   const result = await publishDiagnosticReportToFhir({
     studyInstanceUID: "1.2.3.4", studyDate: "20260713",
@@ -48,6 +48,48 @@ test("rejects a successful FHIR response whose DiagnosticReport linkage does not
       && error.providerOutcome === "unknown"
       && error.retryable === false
   );
+});
+test("rejects a successful FHIR response whose quality conclusion does not match the request", async () => {
+  await assert.rejects(
+    () => publishDiagnosticReportToFhir({
+      studyInstanceUID: "1.2.3.4", studyDate: "20260713",
+      fhirPatientId: "platform-patient-1", fhirImagingStudyId: "imaging-study-1"
+    }, { result: "质控通过", comment: "影像与报告质控通过" }, {
+      env: {},
+      fetchImpl: async (_url, options) => {
+        const report = JSON.parse(options.body);
+        return {
+          ok: true,
+          status: 200,
+          text: async () => JSON.stringify({ ...report, conclusion: "陈旧的质控结论" })
+        };
+      }
+    }),
+    (error) => error.code === "FHIR_DIAGNOSTIC_REPORT_RECEIPT_MISMATCH"
+      && error.providerOutcome === "unknown"
+      && error.retryable === false
+  );
+});
+test("keeps the FHIR write timeout active while the response body is read", async () => {
+  const startedAt = Date.now();
+  await assert.rejects(
+    () => upsertFhirResource({ resourceType: "DiagnosticReport", id: "report-timeout" }, {
+      env: { SOLUTION_A_TIMEOUT_MS: "1000" },
+      fetchImpl: async (_url, options) => ({
+        ok: true,
+        status: 200,
+        text: () => new Promise((_resolve, reject) => {
+          options.signal.addEventListener("abort", () => {
+            const error = new Error("response body timed out");
+            error.name = "AbortError";
+            reject(error);
+          }, { once: true });
+        })
+      })
+    }),
+    (error) => error.name === "AbortError"
+  );
+  assert.ok(Date.now() - startedAt >= 900);
 });
 test("classifies a retryable explicit FHIR rejection without exposing it as an unknown outcome", async () => {
   await assert.rejects(
