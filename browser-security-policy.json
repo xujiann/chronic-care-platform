@@ -119,13 +119,13 @@
   },
   "riskBaseline": {
     "schemaVersion": 2,
-    "sourceRevision": "origin/main@a6974a27 + process/t00-platform-gap-closure-20260906",
+    "sourceRevision": "origin/main@bb3c32fc + process/t00-daily-workflow-20260907",
     "failClosedPriorities": [
       "P0",
       "P1"
     ],
     "findings": [
-      {"asset":"app.js","type":"dom-inner-html","priority":"P0","fingerprint":"52707ab72a320041ce1ff8ed89e3688e04df27f1d51f35b82777cc719bfa2a9f","count":90},
+      {"asset":"app.js","type":"dom-inner-html","priority":"P0","fingerprint":"a7de8e1d6ae4369a403020e0f0b7ca104776a501b8e5f069023ccb4a32127d40","count":87},
       {"asset":"app.js","type":"dynamic-html-style-attribute","priority":"P1","fingerprint":"1c197bca44696e43b5c52bd566a7d26acaa41cfdd5100863e5d5cd04b8cd042d","count":5},
       {"asset":"blood-business.js","type":"cssom-property-mutation","priority":"P1","fingerprint":"07621fb509bcd1e37bd551cf34202ac0f1e61e53d4aabc183721b8342379b682","count":2},
       {"asset":"blood-business.js","type":"dom-inner-html","priority":"P0","fingerprint":"a102eb6a5d5f5ce86ec763e501b59594156e6fce591e98e3b17bf258825cddae","count":4},

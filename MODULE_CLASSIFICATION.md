@@ -63,7 +63,7 @@
 | 模块 | 标签 | 依据 |
 |---|---|---|
 | platform shell / API client / design system | B | 已有共享壳，仍与全局脚本并存 |
-| `app.js` 管理端 | C | 2k+ 行、90 个 HTML sink |
+| `app.js` 管理端 | C | 2k+ 行、87 个 HTML sink |
 | `citizen.js` | C | 6k 行、94 个 HTML sink |
 | `public-health.js` | C | 4.4k 行、78 个 HTML sink |
 | `platform.js` / `operations.js` | C | 3.7k+ 行、全局状态和渲染耦合 |

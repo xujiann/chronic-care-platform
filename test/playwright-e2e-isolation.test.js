@@ -63,7 +63,7 @@ test("local and CI E2E use the same isolated Playwright Chromium policy", () => 
   assert.match(read("test/e2e/pwa-service-worker.playwright.config.js"), /createPwaBrowserUse/);
 });
 
-test("online, resident and PWA Playwright suites form an exact disjoint partition of all 74 tests", () => {
+test("online, resident and PWA Playwright suites form an exact disjoint partition of all 75 tests", () => {
   const rootTests = listTests("playwright.config.js");
   const residentTests = listTests("test/e2e/resident-mini-program.playwright.config.js");
   const pwaTests = listTests("test/e2e/pwa-service-worker.playwright.config.js");
@@ -73,11 +73,11 @@ test("online, resident and PWA Playwright suites form an exact disjoint partitio
     return total + (read(`test/e2e/${name}`).match(/^test\(/gm) || []).length;
   }, 0);
 
-  assert.equal(rootTests.length, 58);
+  assert.equal(rootTests.length, 59);
   assert.equal(residentTests.length, 13);
   assert.equal(pwaTests.length, 3);
-  assert.equal(declared, 74);
-  assert.equal(union.size, 74);
+  assert.equal(declared, 75);
+  assert.equal(union.size, 75);
   assert.equal(rootTests.some((entry) => entry.startsWith("resident-mini-program.spec.js:")), false);
   assert.equal(rootTests.some((entry) => entry.startsWith("pwa-service-worker.spec.js:")), false);
   assert.equal(residentTests.every((entry) => entry.startsWith("resident-mini-program.spec.js:")), true);
@@ -95,6 +95,7 @@ test("the standard E2E command keeps PWA isolated and forwards repeat filters", 
   const sharedRunner = read("scripts/playwright-e2e-runtime.js");
   const rootServer = read("test/e2e/test-server.js");
   const residentServer = read("test/e2e/resident-mini-program-test-server.js");
+  const publishedEntrypoints = read("test/e2e/published-entrypoints.spec.js");
 
   assert.equal(pkg.scripts["test:e2e"], "npm run test:e2e:root && npm run test:e2e:resident && npm run test:e2e:pwa");
   assert.equal(pkg.scripts["test:e2e:root"], "node scripts/playwright-e2e.js");
@@ -115,4 +116,13 @@ test("the standard E2E command keeps PWA isolated and forwards repeat filters", 
   assert.doesNotMatch(`${rootServer}\n${residentServer}`, /5210/);
   assert.match(read("test/e2e/pwa-service-worker.spec.js"), /getRegistrations\(\)/);
   assert.match(read("test/e2e/pwa-service-worker.spec.js"), /caches\.delete/);
+  assert.match(publishedEntrypoints, /buildStaticPublication/);
+  assert.match(publishedEntrypoints, /mkdtempSync\([\s\S]*health-platform-pages-e2e-/);
+  assert.match(publishedEntrypoints, /health-platform-preview\.github\.io/);
+  assert.match(publishedEntrypoints, /\/chronic-care-platform\//);
+  assert.match(publishedEntrypoints, /missing-entrypoint\.html/);
+  assert.match(publishedEntrypoints, /data\/db\.json/);
+  assert.match(publishedEntrypoints, /authMode[\s\S]*local/);
+  assert.match(publishedEntrypoints, /rmSync\([\s\S]*recursive:\s*true[\s\S]*force:\s*true/);
+  assert.doesNotMatch(publishedEntrypoints, /page\.goto\(["'`]\/(?:login|health-city)/);
 });
