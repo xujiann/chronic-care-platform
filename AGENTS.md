@@ -13,10 +13,13 @@ Before changing a protected runtime file, identify the process from the current
 
 ## Mandatory rules
 
-1. T00 exclusively owns `server.js`, the router, route order, runtime-source
-   composition, workflow/ownership configuration, CI, and deployment packaging.
-   T00 is the integration governance unit and is not counted as one of the nine
-   primary development domains defined by `DEVELOPMENT_ORGANIZATION.md`.
+1. T00 is the lifecycle control tower and exclusively owns `server.js`, the router,
+   route order, runtime-source composition, workflow/ownership configuration, CI,
+   and deployment packaging. It manages portfolio intake, dependencies, WIP, risk,
+   evidence and release decisions; domain implementation must remain in independently
+   numbered tasks and owned process worktrees. T00 is not a catch-all implementation
+   task and is not counted as one of the nine primary development domains defined by
+   `DEVELOPMENT_ORGANIZATION.md`.
 2. T01-T09 may edit only their owned route modules among protected files.
 3. Domain code, tests, and documentation may be changed by the responsible
    process, but cross-domain protocol or route-order changes must be handed to T00.
@@ -114,7 +117,9 @@ At the start of each development day:
    maps and relevant ADRs.
 4. Search existing implementations and produce a PLAN with goal, scope,
    non-goals, owner, options, risk, migration/rollback, tests and completion.
-5. Do not code before the user or designated owner approves the direction.
+5. Register the task, dependencies, affected modules, write scopes and trace links in
+   `config/lifecycle-governance.json`; respect its WIP and one-writer rules.
+6. Do not code before the user or designated owner approves the direction.
 
 ```text
 PLAN
