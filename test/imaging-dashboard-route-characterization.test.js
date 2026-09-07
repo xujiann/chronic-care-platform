@@ -1,6 +1,8 @@
 "use strict";
 
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const path = require("node:path");
 const test = require("node:test");
 const {
   createRouteSegment: createClinicalBloodRouteSegment
@@ -287,6 +289,7 @@ test("imaging study share preserves authorization, scope, body, audit and respon
 test("imaging quality control preserves authorization, lookup, FHIR publish and one local write", async () => {
   const sequence = [];
   const responses = [];
+  let persistedData;
   const user = { name: "影像质控员", role: "institution" };
   const study = {
     id: "study/quality-001",
@@ -335,7 +338,8 @@ test("imaging quality control preserves authorization, lookup, FHIR publish and 
     },
     writeDatabase(input) {
       sequence.push("write");
-      assert.equal(input, data);
+      assert.notEqual(input, data);
+      persistedData = input;
     }
   };
   const segment = createImagingRouteSegment(new Proxy(runtime, { get: (target, key) => target[key] || (() => undefined) }));
@@ -356,15 +360,17 @@ test("imaging quality control preserves authorization, lookup, FHIR publish and 
     "write",
     "response"
   ]);
-  assert.equal(data.imageCloudQualityReviews.length, 1);
-  assert.equal(data.imageCloudQualityReviews[0].id, "icq-quality-review-001");
-  assert.equal(data.imageCloudStudies[0].fhirDiagnosticReportId, "diagnostic-report-quality-001");
+  assert.equal(data.imageCloudQualityReviews.length, 0);
+  assert.equal(data.imageCloudStudies[0], study);
+  assert.equal(persistedData.imageCloudQualityReviews.length, 1);
+  assert.equal(persistedData.imageCloudQualityReviews[0].id, "icq-quality-review-001");
+  assert.equal(persistedData.imageCloudStudies[0].fhirDiagnosticReportId, "diagnostic-report-quality-001");
   assert.equal(responses[0].status, 200);
   assert.equal(responses[0].body.review.id, "icq-quality-review-001");
   assert.equal(responses[0].body.fhirReportSync.endpoint, undefined);
 });
 
-test("imaging quality control does not misreport a local write failure as a FHIR failure", async () => {
+test("imaging quality control reports reconciliation required after FHIR succeeds and local persistence fails", async () => {
   const responses = [];
   const securityEvents = [];
   const data = {
@@ -399,82 +405,77 @@ test("imaging quality control does not misreport a local write failure as a FHIR
   };
   const segment = createImagingRouteSegment(new Proxy(runtime, { get: (target, key) => target[key] || (() => undefined) }));
 
-  await assert.rejects(
-    segment.handle(
-      { method: "POST" },
-      {},
-      new URL("http://platform.test/api/imaging-cloud/studies/study-001/qc")
-    ),
-    /local persistence failed/
+  const handled = await segment.handle(
+    { method: "POST" },
+    {},
+    new URL("http://platform.test/api/imaging-cloud/studies/study-001/qc")
   );
+  assert.equal(handled, true);
+  assert.equal(data.imageCloudStudies[0].qcStatus, "待质控");
+  assert.deepEqual(data.imageCloudQualityReviews, []);
   assert.deepEqual(securityEvents, []);
-  assert.deepEqual(responses, []);
+  assert.deepEqual(responses, [{
+    status: 503,
+    body: {
+      error: "Imaging QC Local Commit Failed",
+      code: "IMAGING_QC_RECONCILIATION_REQUIRED",
+      message: "FHIR 已确认接收质控报告，但本地保存未完成；请勿重复提交，需先完成跨系统对账。",
+      retryable: false,
+      reconciliationRequired: true,
+      productionReady: undefined
+    }
+  }]);
 });
 
-test("imaging quality control maps only provider rejection to the legacy FHIR failure response", async () => {
-  const cases = [
-    {
-      expected: /uuid failed/,
-      randomUUID() {
-        throw new Error("uuid failed");
-      },
-      async publishDiagnosticReportToFhir() {
-        throw new Error("provider must not run");
-      }
-    },
-    {
-      expected: /reading 'id'/,
-      randomUUID() {
-        return "review-001";
-      },
-      async publishDiagnosticReportToFhir() {
-        return {};
-      }
+test("imaging quality control keeps preparation failures outside the provider failure mapping", async () => {
+  const sequence = [];
+  const runtime = {
+    async collectJson() { return {}; },
+    async publishDiagnosticReportToFhir() { sequence.push("unexpected-provider"); },
+    randomUUID() { throw new Error("uuid failed"); },
+    readDatabase() { return { imageCloudStudies: [{ id: "study-001" }], imageCloudQualityReviews: [] }; },
+    requireApiRole() { return { name: "影像质控员", role: "institution" }; },
+    sendJson() { sequence.push("unexpected-response"); },
+    writeDatabase() { sequence.push("unexpected-write"); }
+  };
+  const segment = createImagingRouteSegment(new Proxy(runtime, { get: (target, key) => target[key] || (() => undefined) }));
+  await assert.rejects(
+    segment.handle({ method: "POST" }, {}, new URL("http://platform.test/api/imaging-cloud/studies/study-001/qc")),
+    /uuid failed/
+  );
+  assert.deepEqual(sequence, []);
+});
+
+test("imaging quality control maps a malformed successful provider receipt to an unknown outcome", async () => {
+  const responses = [];
+  const securityEvents = [];
+  const data = { imageCloudStudies: [{ id: "study-001" }], imageCloudQualityReviews: [] };
+  const runtime = {
+    appendSecurityEvent(event) { securityEvents.push(event); },
+    async collectJson() { return {}; },
+    async publishDiagnosticReportToFhir() { return {}; },
+    randomUUID() { return "review-001"; },
+    readDatabase() { return data; },
+    requireApiRole() { return { name: "影像质控员", role: "institution" }; },
+    sendJson(_res, status, body) { responses.push({ status, body }); },
+    writeDatabase() { throw new Error("write must not run"); }
+  };
+  const segment = createImagingRouteSegment(new Proxy(runtime, { get: (target, key) => target[key] || (() => undefined) }));
+  const handled = await segment.handle({ method: "POST" }, {}, new URL("http://platform.test/api/imaging-cloud/studies/study-001/qc"));
+  assert.equal(handled, true);
+  assert.deepEqual(data.imageCloudQualityReviews, []);
+  assert.equal(securityEvents[0].detail, "IMAGING_QC_FHIR_RECEIPT_INVALID");
+  assert.deepEqual(responses, [{
+    status: 502,
+    body: {
+      error: "FHIR DiagnosticReport Sync Failed",
+      code: "IMAGING_QC_FHIR_RECEIPT_INVALID",
+      message: "FHIR 回写结果无法确认，本地质控记录未保存；请先核对外部结果，不要直接重复提交。",
+      retryable: false,
+      reconciliationRequired: true,
+      productionReady: undefined
     }
-  ];
-
-  for (const current of cases) {
-    const responses = [];
-    const securityEvents = [];
-    const data = {
-      imageCloudStudies: [{ id: "study-001", qcStatus: "待质控", emrSyncStatus: "待写入" }],
-      imageCloudQualityReviews: []
-    };
-    const runtime = {
-      appendSecurityEvent(event) {
-        securityEvents.push(event);
-      },
-      async collectJson() {
-        return {};
-      },
-      publishDiagnosticReportToFhir: current.publishDiagnosticReportToFhir,
-      randomUUID: current.randomUUID,
-      readDatabase() {
-        return data;
-      },
-      requireApiRole() {
-        return { name: "影像质控员", role: "institution" };
-      },
-      sendJson(_res, status, body) {
-        responses.push({ status, body });
-      },
-      writeDatabase() {
-        throw new Error("write must not run");
-      }
-    };
-    const segment = createImagingRouteSegment(new Proxy(runtime, { get: (target, key) => target[key] || (() => undefined) }));
-
-    await assert.rejects(
-      segment.handle(
-        { method: "POST" },
-        {},
-        new URL("http://platform.test/api/imaging-cloud/studies/study-001/qc")
-      ),
-      current.expected
-    );
-    assert.deepEqual(securityEvents, []);
-    assert.deepEqual(responses, []);
-  }
+  }]);
 });
 
 test("imaging quality control returns not found before body, provider and local write", async () => {
@@ -607,15 +608,27 @@ test("imaging quality control audits one provider failure and performs no local 
     action: "sync DiagnosticReport to FHIR",
     target: "study-001",
     result: "failed",
-    detail: "FHIR provider unavailable"
+    detail: "IMAGING_QC_FHIR_OUTCOME_UNKNOWN"
   }]);
   assert.deepEqual(responses, [{
     status: 502,
     body: {
       error: "FHIR DiagnosticReport Sync Failed",
-      code: undefined,
-      message: "FHIR provider unavailable",
+      code: "IMAGING_QC_FHIR_OUTCOME_UNKNOWN",
+      message: "FHIR 回写结果无法确认，本地质控记录未保存；请先核对外部结果，不要直接重复提交。",
+      retryable: false,
+      reconciliationRequired: true,
       productionReady: undefined
     }
   }]);
+});
+
+test("imaging workbench exposes role-scoped QC and explicit non-blind retry guidance", () => {
+  const source = fs.readFileSync(path.join(__dirname, "..", "imaging-cloud.js"), "utf8");
+  assert.match(source, /function canManageQualityControl\(\)[\s\S]*\["commission", "institution"\]/);
+  assert.match(source, /data-qc-study=/);
+  assert.match(source, /\/imaging-cloud\/studies\/\$\{encodeURIComponent\(studyId\)\}\/qc/);
+  assert.match(source, /payload\.reconciliationRequired/);
+  assert.match(source, /请先刷新列表核对后再决定是否重试/);
+  assert.match(source, /请先刷新并核对本地与 FHIR 结果，不要直接重复提交/);
 });

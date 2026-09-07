@@ -4,7 +4,8 @@ const assert = require("node:assert/strict");
 const test = require("node:test");
 const {
   commitImagingStudyQualityControl,
-  createImagingStudyQualityControlCommand
+  createImagingStudyQualityControlCommand,
+  validateImagingStudyQualityControlReceipt
 } = require("../src/clinical-specialties/imaging/study-quality-control-command");
 
 test("imaging quality control builds the legacy review and persists the FHIR projection after publish", () => {
@@ -88,4 +89,40 @@ test("imaging quality control preparation leaves local state untouched until a r
   assert.equal(data.imageCloudStudies[0], study);
   assert.equal(data.imageCloudQualityReviews, existingReviews);
   assert.equal(data.imageCloudQualityReviews.length, 1);
+});
+
+test("imaging quality control accepts zero scores and rejects non-finite or out-of-range scores before provider work", () => {
+  const study = { id: "study-score", qcStatus: "待质控", emrSyncStatus: "待写入" };
+  const command = createImagingStudyQualityControlCommand(
+    { name: "复核员" },
+    study,
+    { scanScore: 0, reportScore: "0" },
+    { randomUUID: () => "review-score" }
+  );
+  assert.equal(command.review.scanScore, 0);
+  assert.equal(command.review.reportScore, 0);
+  for (const payload of [{ scanScore: "NaN" }, { scanScore: -1 }, { reportScore: 101 }]) {
+    assert.throws(
+      () => createImagingStudyQualityControlCommand({ name: "复核员" }, study, payload, { randomUUID: () => "unused" }),
+      (error) => error.code === "IMAGING_QC_INPUT_INVALID" && error.statusCode === 400
+    );
+  }
+});
+
+test("imaging quality control rejects an unverified provider receipt before local mutation", () => {
+  const study = { id: "study-receipt", qcStatus: "待质控", emrSyncStatus: "待写入" };
+  const data = { imageCloudStudies: [study], imageCloudQualityReviews: [] };
+  const command = createImagingStudyQualityControlCommand(
+    { name: "复核员" },
+    study,
+    {},
+    { randomUUID: () => "review-receipt" }
+  );
+  assert.throws(
+    () => validateImagingStudyQualityControlReceipt({}),
+    (error) => error.code === "IMAGING_QC_FHIR_RECEIPT_INVALID" && error.providerOutcome === "unknown"
+  );
+  assert.throws(() => commitImagingStudyQualityControl(data, 0, command, {}), /FHIR DiagnosticReport 回执/);
+  assert.equal(data.imageCloudStudies[0], study);
+  assert.deepEqual(data.imageCloudQualityReviews, []);
 });

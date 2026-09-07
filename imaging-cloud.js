@@ -310,6 +310,7 @@ function renderStudyTable(studies) {
         <button class="inline-action" type="button" data-view-study="${escapeHtml(item.id)}">手机查看</button>
         <button class="inline-action primary" type="button" data-open-ohif="${escapeHtml(item.id)}">OHIF调阅</button>
         <button class="inline-action" type="button" data-share-study="${escapeHtml(item.id)}">分享</button>
+        ${canManageQualityControl() ? `<button class="inline-action" type="button" data-qc-study="${escapeHtml(item.id)}">质控回写</button>` : ""}
         ${canManageMutualRecognition() && !item.mutualRecognitionRecordId ? `<button class="inline-action" type="button" data-start-recognition="${escapeHtml(item.id)}">纳入互认</button>` : ""}
       </td>
     </tr>`).join("") || `<tr><td colspan="7">暂无影像云检查。</td></tr>`}</tbody>
@@ -351,6 +352,10 @@ function renderMutualRecognition(records) {
 
 function canManageMutualRecognition() {
   return ["commission", "institution", "county"].includes(window.HealthCityAuth?.getUser?.()?.role);
+}
+
+function canManageQualityControl() {
+  return ["commission", "institution"].includes(window.HealthCityAuth?.getUser?.()?.role);
 }
 
 function canDecideMutualRecognition() {
@@ -556,6 +561,7 @@ async function handleImagingAction(event) {
   const ohifButton = event.target.closest("[data-open-ohif]");
   const viewButton = event.target.closest("[data-view-study]");
   const shareButton = event.target.closest("[data-share-study]");
+  const qualityControlButton = event.target.closest("[data-qc-study]");
   const startRecognitionButton = event.target.closest("[data-start-recognition]");
   const decideRecognitionButton = event.target.closest("[data-decide-recognition]");
   const appealRecognitionButton = event.target.closest("[data-appeal-recognition]");
@@ -578,7 +584,11 @@ async function handleImagingAction(event) {
     document.querySelector(".phone-shell")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
   if (shareButton) {
-    await shareStudy(shareButton.dataset.shareStudy);
+    await shareStudy(shareButton.dataset.shareStudy, shareButton);
+    return;
+  }
+  if (qualityControlButton) {
+    await qualityControlStudy(qualityControlButton.dataset.qcStudy, qualityControlButton);
     return;
   }
   if (startRecognitionButton) {
@@ -659,7 +669,22 @@ async function loadSolutionAStudies() {
   } finally { target.removeAttribute("aria-busy"); }
 }
 
-async function shareStudy(studyId) {
+function setImagingActionBusy(button, busy, busyLabel) {
+  if (!button) return;
+  if (busy) {
+    button.dataset.idleLabel = button.textContent;
+    button.textContent = busyLabel;
+    button.disabled = true;
+    button.setAttribute("aria-busy", "true");
+    return;
+  }
+  button.textContent = button.dataset.idleLabel || button.textContent;
+  button.disabled = false;
+  button.removeAttribute("aria-busy");
+  delete button.dataset.idleLabel;
+}
+
+async function shareStudy(studyId, button) {
   if (!IMAGING_API_BASE) {
     const study = (imagingState.payload.studies || []).find((item) => item.id === studyId);
     imagingState.payload.shares = [{
@@ -674,15 +699,88 @@ async function shareStudy(studyId) {
     renderImagingCloud();
     return;
   }
-  const request = window.HealthCityAuth?.authFetch || fetch;
-  const response = await request(`${IMAGING_API_BASE}/imaging-cloud/studies/${encodeURIComponent(studyId)}/share`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ validDays: 7, channel: "二维码/短信链接" })
-  });
-  if (response.ok) {
+  setImagingActionBusy(button, true, "正在创建...");
+  try {
+    const request = window.HealthCityAuth?.authFetch || fetch;
+    const response = await request(`${IMAGING_API_BASE}/imaging-cloud/studies/${encodeURIComponent(studyId)}/share`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ validDays: 7, channel: "二维码/短信链接" })
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.message || `分享创建失败（HTTP ${response.status}）`);
     await loadImagingCloud();
     renderImagingCloud();
+    window.alert("分享已创建；请在手机查看区核对有效期和分享状态。");
+  } catch (error) {
+    window.alert(`分享请求未确认：${error.message}。由于当前接口没有幂等键，请先刷新列表核对后再决定是否重试。`);
+  } finally {
+    setImagingActionBusy(button, false, "");
+  }
+}
+
+async function qualityControlStudy(studyId, button) {
+  if (!IMAGING_API_BASE || !canManageQualityControl()) return;
+  const result = await window.HealthStructuredDialog.prompt({
+    title: "影像质控结论",
+    defaultValue: "质控通过",
+    minLength: 2
+  });
+  if (result === null) return;
+  const scanScore = await window.HealthStructuredDialog.prompt({
+    title: "扫描评分",
+    defaultValue: "90",
+    multiline: false,
+    pattern: "^(?:100(?:\\.0+)?|[0-9]{1,2}(?:\\.[0-9]+)?)$",
+    patternMessage: "扫描评分必须是 0 至 100 之间的数字。"
+  });
+  if (scanScore === null) return;
+  const reportScore = await window.HealthStructuredDialog.prompt({
+    title: "报告评分",
+    defaultValue: "90",
+    multiline: false,
+    pattern: "^(?:100(?:\\.0+)?|[0-9]{1,2}(?:\\.[0-9]+)?)$",
+    patternMessage: "报告评分必须是 0 至 100 之间的数字。"
+  });
+  if (reportScore === null) return;
+  const comment = await window.HealthStructuredDialog.prompt({
+    title: "质控复核意见",
+    defaultValue: /通过|合格|passed/i.test(result) ? "影像与报告质控通过。" : "请按质控结论完成整改并复核。",
+    minLength: 2
+  });
+  if (comment === null) return;
+
+  setImagingActionBusy(button, true, "正在回写...");
+  try {
+    const request = window.HealthCityAuth?.authFetch || fetch;
+    const response = await request(`${IMAGING_API_BASE}/imaging-cloud/studies/${encodeURIComponent(studyId)}/qc`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        group: "影像云抽样质控",
+        scanScore: Number(scanScore),
+        reportScore: Number(reportScore),
+        result,
+        comment
+      })
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const guidance = payload.reconciliationRequired
+        ? "外部与本地结果可能不一致，请先完成对账，不要直接重复提交。"
+        : payload.retryable
+          ? "本地未提交，可在问题恢复后重试。"
+          : "请核对质控数据或联系平台运维处理。";
+      window.alert(`${payload.message || `质控回写失败（HTTP ${response.status}）`} ${guidance}`);
+      return;
+    }
+    await loadImagingCloud();
+    renderImagingCloud();
+    window.alert("质控结果已由 FHIR 回执确认并保存到本地影像记录。");
+  } catch (error) {
+    window.alert(`质控请求结果未知：${error.message}。请先刷新并核对本地与 FHIR 结果，不要直接重复提交。`);
+  } finally {
+    setImagingActionBusy(button, false, "");
   }
 }
 

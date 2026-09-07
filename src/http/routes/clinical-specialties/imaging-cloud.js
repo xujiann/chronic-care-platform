@@ -9,7 +9,8 @@ const {
 } = require("../../../clinical-specialties/imaging/study-share-command");
 const {
   commitImagingStudyQualityControl,
-  createImagingStudyQualityControlCommand
+  createImagingStudyQualityControlCommand,
+  validateImagingStudyQualityControlReceipt
 } = require("../../../clinical-specialties/imaging/study-quality-control-command");
 
 function createRouteSegment(runtime) {
@@ -91,22 +92,64 @@ function createRouteSegment(runtime) {
           return true;
         }
         const payload = await collectJson(req);
-        const command = createImagingStudyQualityControlCommand(
-          user,
-          data.imageCloudStudies[studyIndex],
-          payload,
-          { randomUUID }
-        );
+        let command;
+        try {
+          command = createImagingStudyQualityControlCommand(
+            user,
+            data.imageCloudStudies[studyIndex],
+            payload,
+            { randomUUID }
+          );
+        } catch (error) {
+          if (error?.code !== "IMAGING_QC_INPUT_INVALID") throw error;
+          sendImagingJson(res, 400, {
+            error: "Imaging QC Input Invalid",
+            code: error.code,
+            message: error.message,
+            retryable: true,
+            reconciliationRequired: false
+          });
+          return true;
+        }
         let fhirReportSync;
         try {
           fhirReportSync = await publishDiagnosticReportToFhir(command.updatedStudy, command.review);
+          validateImagingStudyQualityControlReceipt(fhirReportSync);
         } catch (error) {
-          appendSecurityEvent({ actor: user.name, role: user.role, action: "sync DiagnosticReport to FHIR", target: studyId, result: "failed", detail: error.message });
-          sendImagingJson(res, 502, { error: "FHIR DiagnosticReport Sync Failed", message: error.message });
+          const providerRejected = error?.providerOutcome === "rejected";
+          const code = String(error?.code || "IMAGING_QC_FHIR_OUTCOME_UNKNOWN");
+          appendSecurityEvent({ actor: user.name, role: user.role, action: "sync DiagnosticReport to FHIR", target: studyId, result: "failed", detail: code });
+          sendImagingJson(res, 502, {
+            error: "FHIR DiagnosticReport Sync Failed",
+            code,
+            message: providerRejected
+              ? "FHIR 拒绝质控报告，本地质控记录未保存；请处理拒绝原因后再重试。"
+              : "FHIR 回写结果无法确认，本地质控记录未保存；请先核对外部结果，不要直接重复提交。",
+            retryable: providerRejected && error?.retryable === true,
+            reconciliationRequired: !providerRejected
+          });
           return true;
         }
-        const result = commitImagingStudyQualityControl(data, studyIndex, command, fhirReportSync);
-        writeDatabase(data);
+        const stagedData = {
+          ...data,
+          imageCloudStudies: [...data.imageCloudStudies],
+          imageCloudQualityReviews: Array.isArray(data.imageCloudQualityReviews)
+            ? [...data.imageCloudQualityReviews]
+            : []
+        };
+        const result = commitImagingStudyQualityControl(stagedData, studyIndex, command, fhirReportSync);
+        try {
+          writeDatabase(stagedData);
+        } catch {
+          sendImagingJson(res, 503, {
+            error: "Imaging QC Local Commit Failed",
+            code: "IMAGING_QC_RECONCILIATION_REQUIRED",
+            message: "FHIR 已确认接收质控报告，但本地保存未完成；请勿重复提交，需先完成跨系统对账。",
+            retryable: false,
+            reconciliationRequired: true
+          });
+          return true;
+        }
         sendImagingJson(res, 200, result);
         return true;
       }
