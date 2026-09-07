@@ -13,6 +13,7 @@ const {
 
 function createPorts({ applyError, writeError } = {}) {
   const calls = [];
+  let committedData = null;
   const intake = {
     id: "intake-001",
     residentId: "resident-001",
@@ -50,9 +51,10 @@ function createPorts({ applyError, writeError } = {}) {
     writeDatabase(input) {
       calls.push(["write", input]);
       if (writeError) throw writeError;
+      committedData = structuredClone(input);
     }
   };
-  return { calls, data, intake, ports };
+  return { calls, data, getCommittedData: () => committedData, intake, ports };
 }
 
 function governedPayload(overrides = {}) {
@@ -85,7 +87,7 @@ test("specialized intake action command publishes a stable owner and upgraded us
 });
 
 test("governed command persists mutation, receipt and both audits in one write", () => {
-  const { calls, data, intake, ports } = createPorts();
+  const { calls, data, getCommittedData, intake, ports } = createPorts();
   const command = createPhysicalExaminationSpecializedIntakeActionCommand(ports);
   const payload = governedPayload();
   const actor = user();
@@ -101,41 +103,50 @@ test("governed command persists mutation, receipt and both audits in one write",
   assert.equal(result.idempotentReplay, false);
   assert.equal(result.intake.version, 1);
   assert.equal(Object.hasOwn(result.intake, RECEIPT_FIELD), false);
-  assert.equal(intake[RECEIPT_FIELD].length, 1);
-  assert.equal(intake[RECEIPT_FIELD][0].schemaVersion, "physical-exam-specialized-intake-command-receipt.v1");
+  const committed = getCommittedData();
+  const committedIntake = committed.physicalExamSpecializedIntakes[0];
+  assert.equal(committedIntake[RECEIPT_FIELD].length, 1);
+  assert.equal(committedIntake[RECEIPT_FIELD][0].schemaVersion, "physical-exam-specialized-intake-command-receipt.v1");
   assert.deepEqual(calls.map(([name]) => name), ["now", "apply", "access-audit", "security-audit", "normalize", "write"]);
-  assert.equal(data.dataAccessLogs.length, 1);
-  assert.equal(data.securityEvents.length, 1);
+  assert.equal(committed.dataAccessLogs.length, 1);
+  assert.equal(committed.securityEvents.length, 1);
   assert.equal(calls.filter(([name]) => name === "write").length, 1);
+  assert.equal(intake.actionHistory.length, 1);
+  assert.equal(Object.hasOwn(intake, RECEIPT_FIELD), false);
+  assert.deepEqual(data.dataAccessLogs, []);
+  assert.deepEqual(data.securityEvents, []);
 });
 
 test("exact replay returns the first public snapshot without mutation, audit or write", () => {
-  const { calls, data, intake, ports } = createPorts();
+  const { calls, data, getCommittedData, intake, ports } = createPorts();
   const command = createPhysicalExaminationSpecializedIntakeActionCommand(ports);
   const payload = governedPayload();
   const input = { data, idempotencyKey: payload.idempotencyKey, intakeId: intake.id, payload, user: user() };
   const first = command.execute(input);
+  const committed = getCommittedData();
   const callCount = calls.length;
-  const replay = command.execute(input);
+  const replay = command.execute({ ...input, data: committed });
 
   assert.equal(replay.idempotentReplay, true);
   assert.deepEqual(replay.intake, first.intake);
   assert.equal(calls.length, callCount);
-  assert.equal(intake.actionHistory.length, 2);
-  assert.equal(data.dataAccessLogs.length, 1);
-  assert.equal(data.securityEvents.length, 1);
+  assert.equal(committed.physicalExamSpecializedIntakes[0].actionHistory.length, 2);
+  assert.equal(committed.dataAccessLogs.length, 1);
+  assert.equal(committed.securityEvents.length, 1);
+  assert.equal(intake.actionHistory.length, 1);
 });
 
 test("same key with changed payload and stale versions fail closed before side effects", () => {
-  const { calls, data, intake, ports } = createPorts();
+  const { calls, data, getCommittedData, intake, ports } = createPorts();
   const command = createPhysicalExaminationSpecializedIntakeActionCommand(ports);
   const firstPayload = governedPayload();
   command.execute({ data, idempotencyKey: firstPayload.idempotencyKey, intakeId: intake.id, payload: firstPayload, user: user() });
+  const committed = getCommittedData();
   const callCount = calls.length;
 
   assert.throws(
     () => command.execute({
-      data,
+      data: committed,
       idempotencyKey: firstPayload.idempotencyKey,
       intakeId: intake.id,
       payload: governedPayload({ profileId: "profile-changed" }),
@@ -145,7 +156,7 @@ test("same key with changed payload and stale versions fail closed before side e
   );
   assert.throws(
     () => command.execute({
-      data,
+      data: committed,
       idempotencyKey: "specialized-command-002",
       intakeId: intake.id,
       payload: governedPayload({ idempotencyKey: "specialized-command-002" }),
@@ -154,6 +165,43 @@ test("same key with changed payload and stale versions fail closed before side e
     { code: "PHYSICAL_EXAM_SPECIALIZED_INTAKE_VERSION_CONFLICT", statusCode: 409 }
   );
   assert.equal(calls.length, callCount);
+});
+
+test("raw idempotency keys are independently bound to actor and resource scope", () => {
+  const { data, getCommittedData, intake, ports } = createPorts();
+  const command = createPhysicalExaminationSpecializedIntakeActionCommand(ports);
+  const payload = governedPayload();
+  command.execute({ data, idempotencyKey: payload.idempotencyKey, intakeId: intake.id, payload, user: user() });
+  const committed = getCommittedData();
+  const firstReceipt = committed.physicalExamSpecializedIntakes[0][RECEIPT_FIELD][0];
+
+  assert.throws(
+    () => command.execute({
+      data: committed,
+      idempotencyKey: payload.idempotencyKey,
+      intakeId: intake.id,
+      payload,
+      user: user({ id: "operator-002", username: "operator-002" })
+    }),
+    { code: "PHYSICAL_EXAM_SPECIALIZED_INTAKE_VERSION_CONFLICT", statusCode: 409 }
+  );
+
+  const secondIntake = {
+    ...structuredClone(intake),
+    id: "intake-002"
+  };
+  committed.physicalExamSpecializedIntakes.push(secondIntake);
+  const second = command.execute({
+    data: committed,
+    idempotencyKey: payload.idempotencyKey,
+    intakeId: secondIntake.id,
+    payload,
+    user: user()
+  });
+  const secondReceipt = getCommittedData().physicalExamSpecializedIntakes[1][RECEIPT_FIELD][0];
+  assert.equal(second.idempotentReplay, false);
+  assert.notEqual(secondReceipt.commandKeyHash, firstReceipt.commandKeyHash);
+  assert.notEqual(secondReceipt.requestDigest, firstReceipt.requestDigest);
 });
 
 test("governed contract validates keys and versions while legacy clients remain compatible", () => {
@@ -199,6 +247,7 @@ test("domain and persistence failures never produce an additional write", () => 
   const domainError = Object.assign(new Error("record invalid"), { statusCode: 400 });
   const domain = createPorts({ applyError: domainError });
   const payload = governedPayload();
+  const domainBefore = structuredClone(domain.data);
   assert.throws(
     () => createPhysicalExaminationSpecializedIntakeActionCommand(domain.ports).execute({
       data: domain.data,
@@ -210,8 +259,10 @@ test("domain and persistence failures never produce an additional write", () => 
     (error) => error === domainError
   );
   assert.deepEqual(domain.calls.map(([name]) => name), ["now", "apply"]);
+  assert.deepEqual(domain.data, domainBefore);
 
   const storage = createPorts({ writeError: new Error("write-failed") });
+  const storageBefore = structuredClone(storage.data);
   assert.throws(() => createPhysicalExaminationSpecializedIntakeActionCommand(storage.ports).execute({
     data: storage.data,
     idempotencyKey: payload.idempotencyKey,
@@ -220,6 +271,8 @@ test("domain and persistence failures never produce an additional write", () => 
     user: user()
   }), /write-failed/);
   assert.equal(storage.calls.filter(([name]) => name === "write").length, 1);
+  assert.deepEqual(storage.data, storageBefore);
+  assert.equal(storage.getCommittedData(), null);
 });
 
 test("HTTP error projection exposes stable conflict and storage recovery codes", () => {

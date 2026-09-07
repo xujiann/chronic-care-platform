@@ -181,20 +181,21 @@ function createPhysicalExaminationSpecializedIntakeActionCommand({
           409
         );
       }
+      const workingData = structuredClone(data);
       const committedAt = currentTime();
-      const updated = applyAction(data, intakeId, payload, {
+      const updated = applyAction(workingData, intakeId, payload, {
         actor: user.username || user.role,
         now: committedAt
       });
       updated.version = version + 1;
       appendAccessAudit(
-        data,
+        workingData,
         user,
         updated.residentId,
         "专项体检分流处置",
         `${updated.examProgramName} · ${payload.action}`
       );
-      appendSecurityAudit(data, {
+      appendSecurityAudit(workingData, {
         actor: user.name,
         role: user.role,
         action: "专项体检分流处置",
@@ -204,7 +205,7 @@ function createPhysicalExaminationSpecializedIntakeActionCommand({
       });
       const publicIntake = projectIntake(updated);
       if (command.explicitContract) appendReceipt(updated, command, { intake: publicIntake }, committedAt);
-      persist(normalize(data));
+      persist(normalize(workingData));
       return { intake: publicIntake, idempotentReplay: false };
     }
   });
