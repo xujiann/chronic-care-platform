@@ -79,3 +79,7 @@ API/404 缓存边界以及每项 unregister/Cache Storage 清理。该事实补�
 同日实施状态：生产安全工作台的 3 个遗留 `innerHTML` 已改为显式 DOM/text，处置事件只接受受信容器中
 与当前 center 的 ID/允许 action 一致的控件。管理端选择器在本次增量中再关闭 3 个 HTML sink，Inventory v2 降至 835 项（793 P0、42 P1），其中 DOM HTML
 为 787 项；真实托管头、严格 CSP、外部 Origin、独立扫描与现场验收仍未闭合。
+
+## 2026-09-07 平台说明页后续状态
+
+平台说明页 4 个清空型 `innerHTML` 已改为 `replaceChildren`，恶意字段与空态由不启动浏览器服务的 Node DOM 行为回归覆盖，不改变既有 Playwright 三套隔离策略。Inventory v2 当前为 831 项（789 P0、42 P1），其中 DOM HTML 为 783 项；真实托管头、严格 CSP、外部 Origin、独立扫描与现场验收仍未闭合。

@@ -55,7 +55,7 @@ function renderAboutRuntime(report, sourceMode) {
 function renderAboutFunctionCards(items, sourceMode) {
   const target = document.querySelector("#dashboard-about-function-report");
   if (!target) return;
-  target.innerHTML = "";
+  target.replaceChildren();
   if (!items.length) {
     target.appendChild(aboutCard({
       id: "empty-runtime-report",
@@ -88,7 +88,7 @@ function aboutCard(item) {
 function renderAboutMatrix(selector, items, type) {
   const target = document.querySelector(selector);
   if (!target) return;
-  target.innerHTML = "";
+  target.replaceChildren();
   if (!items.length) {
     const empty = document.createElement("article");
     empty.className = "function-matrix-card empty";
@@ -124,7 +124,7 @@ function aboutMatrixCard(item, type) {
 function renderAboutReleaseEvidence(items) {
   const target = document.querySelector("#dashboard-about-release-evidence");
   if (!target) return;
-  target.innerHTML = "";
+  target.replaceChildren();
   items.forEach((item) => {
     const chip = document.createElement("span");
     chip.dataset.aboutRuntimeEvidence = item.id || "evidence";
@@ -136,7 +136,7 @@ function renderAboutReleaseEvidence(items) {
 function renderAboutOnsiteBoundaries(items) {
   const target = document.querySelector("#dashboard-about-onsite-boundaries");
   if (!target) return;
-  target.innerHTML = "";
+  target.replaceChildren();
   items.forEach((text, index) => {
     const row = document.createElement("div");
     const title = document.createElement("strong");

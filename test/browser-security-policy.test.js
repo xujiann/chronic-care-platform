@@ -65,17 +65,17 @@ test("published browser assets match the exact Inventory v2 fail-closed baseline
   assert.equal(inventory.schemaVersion, 2);
   assert.equal(inventory.contractId, "browser-security-risk-inventory.v2");
   assert.equal(inventory.assetsScanned, 188);
-  assert.equal(inventory.summary.total, 835);
-  assert.equal(inventory.summary.byPriority.P0, 793);
+  assert.equal(inventory.summary.total, 831);
+  assert.equal(inventory.summary.byPriority.P0, 789);
   assert.equal(inventory.summary.byPriority.P1, 42);
   assert.equal(inventory.summary.byPriority.P2, 0);
-  assert.equal(inventory.findings.length, 50);
+  assert.equal(inventory.findings.length, 49);
   assert.equal(inventory.summary.byType["inline-script"], 0);
   assert.equal(inventory.summary.byType["inline-style-block"], 0);
   assert.equal(inventory.summary.byType["style-attribute"], 0);
   assert.equal(inventory.summary.byType["event-handler"], 0);
   assert.equal(inventory.summary.byType["eval-call"], 0);
-  assert.equal(inventory.summary.byType["dom-inner-html"], 785);
+  assert.equal(inventory.summary.byType["dom-inner-html"], 781);
   assert.equal(inventory.summary.byType["dom-insert-adjacent-html"], 2);
   assert.equal(inventory.summary.byType["dynamic-html-url-attribute"], 0);
   assert.equal(inventory.summary.byType["dom-url-property"], 0);
@@ -85,11 +85,17 @@ test("published browser assets match the exact Inventory v2 fail-closed baseline
   assert.equal(inventory.summary.byType["cssom-property-mutation"], 10);
   assert.equal(inventory.summary.byType["cssom-set-property"], 2);
   assert.equal(inventory.summary.byType["runtime-style-element"], 1);
-  assert.equal(new Set(inventory.findings.filter((item) => ["dom-inner-html", "dom-insert-adjacent-html"].includes(item.type)).map((item) => item.asset)).size, 30);
+  assert.equal(new Set(inventory.findings.filter((item) => ["dom-inner-html", "dom-insert-adjacent-html"].includes(item.type)).map((item) => item.asset)).size, 29);
   assert.equal(new Set(inventory.findings.filter((item) => ["dynamic-html-style-attribute", "cssom-property-mutation", "cssom-set-property", "runtime-style-element"].includes(item.type)).map((item) => item.asset)).size, 13);
   assert.equal(new Set(inventory.findings.filter((item) => ["dynamic-html-url-attribute", "dom-url-property", "dom-url-attribute", "navigation-call"].includes(item.type)).map((item) => item.asset)).size, 2);
   assert.equal(policy.riskBaseline.schemaVersion, 2);
-  assert.equal(policy.riskBaseline.findings.reduce((sum, item) => sum + item.count, 0), 835);
+  assert.equal(policy.riskBaseline.findings.reduce((sum, item) => sum + item.count, 0), 831);
+  assert.equal(
+    inventory.findings.some(
+      (item) => item.asset === "health-dashboard-about.js" && ["P0", "P1"].includes(item.priority),
+    ),
+    false,
+  );
   assert.equal(policy.riskBaseline.findings.some((item) => item.asset === "physical-examination.js" && ["dom-inner-html", "dom-insert-adjacent-html", "dom-outer-html"].includes(item.type)), false);
   assert.equal(policy.riskBaseline.findings.some((item) => item.asset === "physical-examination.js"), false);
   assert.equal(policy.riskBaseline.findings.some((item) => item.asset === "blood.js"), false);

@@ -190,3 +190,7 @@ enforcement；真实血液系统、设备、跨模块消费方、外部回执、
 4. 第四阶段：全发布图归零后移除兼容 `unsafe-inline`，在真实动态入口和静态托管/CDN 验证响应头与报告接收，再提交安全评估和上线审批。
 
 回滚仅允许恢复上一份已验证的兼容 CSP/资产基线，不得删除 `nosniff`、frame、referrer、permissions 或生产 HSTS，也不得通过扩大来源、加入 `unsafe-eval` 或放宽 CI 基线解决页面故障。
+
+### 平台说明页可信清空边界（2026-09-07）
+
+`health-dashboard-about.js` 的 4 个清空型 `innerHTML` 已改为 `replaceChildren`，函数、发布信息与两个矩阵继续以显式节点、`textContent` 和 dataset 表达。Node DOM 行为回归使用含事件属性的恶意字段验证其保持惰性文本，并同时锁定有数据、空数据与重复渲染行为。Inventory v2 因真实减少由 835 降至 831 项，P0 由 793 降至 789，DOM HTML 由 787 降至 783，P1 仍为 42；该切片不改变 API、鉴权、数据库、CSP enforcement 或 `productionReady=false`。

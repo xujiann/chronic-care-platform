@@ -258,8 +258,8 @@ TypeScript 与 Node 类型仅用于开发门禁；lockfile audit 已修复 c8 �
 - 动态浏览器凭据方向为 `HttpOnly Cookie → /api/auth/context → 脱敏身份投影`；`auth.js` 在
   任何普通 API 调用前清除旧 localStorage token，Cookie 与 Authorization 并存时服务端也选择
   Cookie。bearer-only 兼容 token 仅存在页面内存，不跨重载恢复。
-- Inventory v2 在显式发布图精确锁定 785 处 `innerHTML=` 与 2 处 `insertAdjacentHTML`（合计 787，
-  覆盖 30 个资产）；生产安全工作台 3 处、血液主工作台 25 处、急救生命链和医生工作台 controller 各 6 处、血液上线看板 8 处、陪诊工作台 7 处 `innerHTML` 加 1 处 `insertAdjacentHTML`、产品运行驾驶舱、产品区域运行驾驶舱与质量安全工作台各 1 处、区域切换工作台及血液召回面板各 2 处、血液创新指挥中心 10 处以及体检工作台全部 27 处 `innerHTML` 已迁到 DOM/text 节点；体检与生产安全工作台资产已无 Inventory P0/P1，最高仍为 citizen 94、
+- Inventory v2 在显式发布图精确锁定 781 处 `innerHTML=` 与 2 处 `insertAdjacentHTML`（合计 783，
+  覆盖 29 个资产）；生产安全工作台 3 处、平台说明页 4 处、血液主工作台 25 处、急救生命链和医生工作台 controller 各 6 处、血液上线看板 8 处、陪诊工作台 7 处 `innerHTML` 加 1 处 `insertAdjacentHTML`、产品运行驾驶舱、产品区域运行驾驶舱与质量安全工作台各 1 处、区域切换工作台及血液召回面板各 2 处、血液创新指挥中心 10 处以及体检工作台全部 27 处 `innerHTML` 已迁到 DOM/text 节点；平台说明页、体检与生产安全工作台资产已无 Inventory P0/P1，最高仍为 citizen 94、
   app 87、public-health 78、platform 72。
 - 同一清单现锁定 6 个动态 URL sink（公共 Safe URL port 内 2 个 DOM URL attribute 和 2 个导航调用、
   2 个 OHIF 导航）以及 42 个动态样式 sink（29 个模板 style 属性、
