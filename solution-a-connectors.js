@@ -69,16 +69,18 @@ async function upsertFhirResource(resource, options = {}) {
   const id = String(resource?.id || "").trim();
   if (!WRITABLE_FHIR_RESOURCES.has(type)) throw new Error(`FHIR ${type || "resource"} is not allowed for solution A write`);
   if (!/^[A-Za-z0-9\-.]{1,64}$/.test(id)) throw new Error(`FHIR ${type}.id is invalid`);
-  const config = solutionAConfiguration(options.env).hapiFhir;
+  const solutionConfig = solutionAConfiguration(options.env);
+  const config = solutionConfig.hapiFhir;
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), config.timeoutMs);
+  const timer = setTimeout(() => controller.abort(), solutionConfig.timeoutMs);
   let response;
+  let body;
   try {
     response = await (options.fetchImpl || globalThis.fetch)(`${config.baseUrl}/${type}/${encodeURIComponent(id)}`, { method: "PUT", headers: { Accept: "application/fhir+json", "Content-Type": "application/fhir+json", Prefer: "return=representation" }, body: JSON.stringify(resource), signal: controller.signal });
+    body = await readResponseJson(response, "HAPI FHIR");
   } finally {
     clearTimeout(timer);
   }
-  const body = await readResponseJson(response, "HAPI FHIR");
   if (!response.ok) {
     const error = new Error(`HAPI FHIR ${type} upsert failed (${response.status}): ${body.issue?.map((item) => item.diagnostics || item.details?.text).filter(Boolean).join("; ") || body.message || "validation error"}`);
     const resourceCode = type.replace(/([a-z])([A-Z])/g, "$1_$2").toUpperCase();
@@ -97,6 +99,11 @@ function fhirDate(value) {
   if (/^\d{8}$/.test(compact)) return `${compact.slice(0, 4)}-${compact.slice(4, 6)}-${compact.slice(6, 8)}`;
   if (/^\d{4}-\d{2}-\d{2}$/.test(compact)) return compact;
   return new Date().toISOString().slice(0, 10);
+}
+function sameFhirInstant(left, right) {
+  const leftTime = Date.parse(String(left || ""));
+  const rightTime = Date.parse(String(right || ""));
+  return Number.isFinite(leftTime) && Number.isFinite(rightTime) && leftTime === rightTime;
 }
 async function publishImagingStudyToFhir(study, resident, options = {}) {
   if (!study?.studyInstanceUID || !resident?.id) throw new Error("studyInstanceUID and resident are required for FHIR imaging sync");
@@ -143,11 +150,19 @@ async function publishDiagnosticReportToFhir(study, review, options = {}) {
   const acknowledgedImagingReferences = Array.isArray(acknowledged?.imagingStudy)
     ? acknowledged.imagingStudy.map((item) => String(item?.reference || ""))
     : [];
+  const acknowledgedIdentifiers = Array.isArray(acknowledged?.identifier) ? acknowledged.identifier : [];
+  const acknowledgedCodings = Array.isArray(acknowledged?.code?.coding) ? acknowledged.code.coding : [];
+  const acknowledgedConclusionCodes = Array.isArray(acknowledged?.conclusionCode) ? acknowledged.conclusionCode : [];
   if (acknowledged?.resourceType !== report.resourceType
     || acknowledged?.id !== report.id
     || acknowledged?.subject?.reference !== report.subject.reference
     || !acknowledgedImagingReferences.includes(expectedImagingReference)
-    || acknowledged?.status !== report.status) {
+    || acknowledged?.status !== report.status
+    || !sameFhirInstant(acknowledged?.effectiveDateTime, report.effectiveDateTime)
+    || acknowledged?.conclusion !== report.conclusion
+    || !acknowledgedIdentifiers.some((item) => item?.system === report.identifier[0].system && item?.value === report.identifier[0].value)
+    || !acknowledgedCodings.some((item) => item?.system === report.code.coding[0].system && item?.code === report.code.coding[0].code)
+    || !acknowledgedConclusionCodes.some((item) => item?.text === report.conclusionCode[0].text)) {
     const error = new Error("HAPI FHIR DiagnosticReport acknowledgement did not match the requested resource");
     error.code = "FHIR_DIAGNOSTIC_REPORT_RECEIPT_MISMATCH";
     error.providerOutcome = "unknown";

@@ -8,6 +8,9 @@ function qualityControlInputError(message) {
 }
 
 function normalizeScore(value, fallback, label) {
+  if (value !== undefined && value !== null && typeof value !== "string" && typeof value !== "number") {
+    throw qualityControlInputError(`${label}必须是 0 至 100 之间的数字`);
+  }
   const score = value === undefined || value === null || String(value).trim() === ""
     ? fallback
     : Number(value);

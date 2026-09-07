@@ -4,6 +4,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const test = require("node:test");
+const vm = require("node:vm");
 const {
   createRouteSegment: createClinicalBloodRouteSegment
 } = require("../src/http/routes/clinical-specialties/clinical-blood");
@@ -630,5 +631,77 @@ test("imaging workbench exposes role-scoped QC and explicit non-blind retry guid
   assert.match(source, /\/imaging-cloud\/studies\/\$\{encodeURIComponent\(studyId\)\}\/qc/);
   assert.match(source, /payload\.reconciliationRequired/);
   assert.match(source, /请先刷新列表核对后再决定是否重试/);
-  assert.match(source, /请先刷新并核对本地与 FHIR 结果，不要直接重复提交/);
+  assert.match(source, /本页已阻止重复提交/);
+});
+
+test("imaging browser flow locks an uncertain QC result and releases an explicitly retryable rejection", async () => {
+  const source = fs.readFileSync(path.join(__dirname, "..", "imaging-cloud.js"), "utf8");
+
+  function createHarness(response) {
+    const alerts = [];
+    const prompts = ["质控通过", "90", "91", "影像与报告质控通过"];
+    const table = { innerHTML: "" };
+    let requestCount = 0;
+    const document = {
+      addEventListener() {},
+      querySelector(selector) { return selector === "#study-table" ? table : null; }
+    };
+    const window = {
+      alert(message) { alerts.push(message); },
+      HealthCityAuth: {
+        getUser() { return { role: "institution" }; },
+        async authFetch() {
+          requestCount += 1;
+          return response;
+        }
+      },
+      HealthStructuredDialog: {
+        async prompt() { return prompts.shift(); }
+      }
+    };
+    const context = { console, document, fetch: window.HealthCityAuth.authFetch, location: { origin: "http://platform.test", protocol: "http:" }, URL, URLSearchParams, window };
+    vm.runInNewContext(`${source}\n;globalThis.__imagingTest = { imagingQualityControlActionState, imagingState, qualityControlStudy, renderStudyTable };`, context);
+    const attributes = new Map();
+    const button = {
+      dataset: {},
+      disabled: false,
+      textContent: "质控回写",
+      removeAttribute(name) { attributes.delete(name); },
+      setAttribute(name, value) { attributes.set(name, value); }
+    };
+    return { alerts, attributes, button, context, getRequestCount: () => requestCount, table };
+  }
+
+  const uncertain = createHarness({
+    ok: false,
+    status: 503,
+    async json() { return { message: "FHIR 已确认但本地保存失败", retryable: false, reconciliationRequired: true }; }
+  });
+  uncertain.context.__imagingTest.imagingState.payload = { studies: [{ id: "study-001", qcStatus: "待质控" }] };
+  await uncertain.context.__imagingTest.qualityControlStudy("study-001", uncertain.button);
+  assert.equal(uncertain.getRequestCount(), 1);
+  assert.equal(uncertain.context.__imagingTest.imagingQualityControlActionState.get("study-001"), "reconciliation-required");
+  assert.equal(uncertain.button.disabled, true);
+  assert.equal(uncertain.button.textContent, "需对账");
+  assert.match(uncertain.alerts[0], /不要直接重复提交/);
+  await uncertain.context.__imagingTest.qualityControlStudy("study-001", uncertain.button);
+  assert.equal(uncertain.getRequestCount(), 1);
+  assert.match(uncertain.alerts[1], /已阻止重复提交/);
+  assert.match(uncertain.table.innerHTML, /data-qc-study="study-001" disabled aria-disabled="true"/);
+  assert.match(uncertain.table.innerHTML, />需对账<\/button>/);
+
+  const retryable = createHarness({
+    ok: false,
+    status: 502,
+    async json() { return { message: "FHIR 明确拒绝", retryable: true, reconciliationRequired: false }; }
+  });
+  retryable.context.__imagingTest.imagingState.payload = { studies: [{ id: "study-002", qcStatus: "待质控" }] };
+  await retryable.context.__imagingTest.qualityControlStudy("study-002", retryable.button);
+  assert.equal(retryable.getRequestCount(), 1);
+  assert.equal(retryable.context.__imagingTest.imagingQualityControlActionState.has("study-002"), false);
+  assert.equal(retryable.button.disabled, false);
+  assert.equal(retryable.button.textContent, "质控回写");
+  assert.match(retryable.alerts[0], /问题恢复后重试/);
+  assert.match(retryable.table.innerHTML, /data-qc-study="study-002">质控回写<\/button>/);
+  assert.doesNotMatch(retryable.table.innerHTML, /data-qc-study="study-002" disabled/);
 });
