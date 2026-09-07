@@ -17,7 +17,7 @@ const EXPECTED_COUNTS = {
   "mutual-recognition-ingest": 9,
   "mutual-recognition-review": 8,
   "emergency-signals": 8,
-  "blood-innovation": 20
+  "blood-innovation": 21
 };
 
 test("clinical specialty subdomains declare distinct least-privilege contexts", () => {

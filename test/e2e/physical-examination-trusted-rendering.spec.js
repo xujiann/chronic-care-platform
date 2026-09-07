@@ -13,11 +13,50 @@ async function loginCommission(page) {
 
 test("physical examination workbench keeps hostile API fields inert across all legacy render regions", async ({ page }) => {
   const pageErrors = [];
+  const specializedCommands = [];
+  let releaseFirstSpecializedAttempt;
+  const firstSpecializedAttempt = new Promise((resolve) => {
+    releaseFirstSpecializedAttempt = resolve;
+  });
   page.on("pageerror", (error) => pageErrors.push(error.message));
   await page.addInitScript(() => {
     window.__physicalExamXss = false;
   });
   await loginCommission(page);
+
+  await page.route("**/api/physical-exams/specialized-intakes/**/actions", async (route) => {
+    const request = route.request();
+    specializedCommands.push({ body: request.postDataJSON(), key: request.headers()["idempotency-key"] });
+    if (specializedCommands.length === 1) {
+      await firstSpecializedAttempt;
+      await route.fulfill({
+        status: 500,
+        contentType: "application/json",
+        body: JSON.stringify({ code: "PHYSICAL_EXAM_SPECIALIZED_INTAKE_STORAGE_FAILED", message: "temporarily unavailable" })
+      });
+      return;
+    }
+    if (specializedCommands.length === 3) {
+      await route.fulfill({
+        status: 409,
+        contentType: "application/json",
+        body: JSON.stringify({
+          code: "PHYSICAL_EXAM_SPECIALIZED_INTAKE_VERSION_CONFLICT",
+          message: "resource version changed; refresh and retry"
+        })
+      });
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        ok: true,
+        idempotentReplay: true,
+        intake: { id: "specialized-safe", status: "routed-to-specialized-system", version: 4 }
+      })
+    });
+  });
 
   await page.route("**/api/physical-exams", async (route) => {
     const response = await route.fetch();
@@ -32,7 +71,8 @@ test("physical examination workbench keeps hostile API fields inert across all l
       years: [HOSTILE_TEXT],
       sourceContracts: [{ name: HOSTILE_TEXT, systems: [HOSTILE_TEXT], transport: HOSTILE_TEXT, identity: HOSTILE_TEXT, required: [HOSTILE_TEXT] }],
       specializedIntakes: [{
-        id: HOSTILE_TEXT,
+        id: "specialized-safe",
+        version: 3,
         examProgramName: HOSTILE_TEXT,
         status: HOSTILE_CLASS,
         institutionName: HOSTILE_TEXT,
@@ -136,6 +176,28 @@ test("physical examination workbench keeps hostile API fields inert across all l
   await expect(hostileQualityReview.locator(".issue")).toHaveAttribute("class", "issue");
   await expect(translations.locator(".translation-card.high-risk")).toContainText("高危解释");
   await expect(qualityReviews.locator(".quality-review-card.passed .issue.blocking")).toHaveText("阻断项");
+  const specializedCard = page.locator("[data-specialized-intake='specialized-safe']");
+  await specializedCard.locator("[data-specialized-evidence]").fill("evidence-retry-001");
+  await specializedCard.locator("[data-specialized-action='assign-profile']").click();
+  await expect.poll(() => specializedCard.locator("[data-specialized-action]").evaluateAll((buttons) => buttons.every((button) => button.disabled))).toBe(true);
+  releaseFirstSpecializedAttempt();
+  await expect(page.locator("#physical-exam-toast")).toContainText("操作结果暂未确认");
+  await page.locator("[data-specialized-intake='specialized-safe'] [data-specialized-action='assign-profile']").click();
+  await expect.poll(() => specializedCommands.length).toBe(2);
+  expect(specializedCommands[0].key).toBeTruthy();
+  expect(specializedCommands[1].key).toBe(specializedCommands[0].key);
+  expect(specializedCommands[0].body).toEqual(specializedCommands[1].body);
+  expect(specializedCommands[0].body.expectedVersion).toBe(3);
+  expect(specializedCommands[0].body.idempotencyKey).toBe(specializedCommands[0].key);
+  await expect(page.locator("#physical-exam-toast")).toHaveText("已确认此前专项分流操作成功");
+  const refreshedSpecializedCard = page.locator("[data-specialized-intake='specialized-safe']");
+  await refreshedSpecializedCard.locator("[data-specialized-evidence]").fill("evidence-conflict-001");
+  await refreshedSpecializedCard.locator("[data-specialized-action='return-source']").click();
+  await expect.poll(() => specializedCommands.length).toBe(3);
+  expect(specializedCommands[2].key).toBeTruthy();
+  expect(specializedCommands[2].key).not.toBe(specializedCommands[0].key);
+  expect(specializedCommands[2].body.expectedVersion).toBe(3);
+  await expect(page.locator("#physical-exam-toast")).toHaveText("分流记录已被更新，请核对最新状态后重新提交");
   await page.locator("[data-report-id='report-hostile']").click();
   await expect(page.locator("#physical-exam-detail")).toContainText(HOSTILE_TEXT);
   await page.locator("#physical-exam-detail-dialog [data-close-report]").click();

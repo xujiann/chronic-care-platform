@@ -137,9 +137,63 @@ test("体检 API 完成机构接入、幂等归档和居民历史报告授权查
   assert.equal(routedOverview.body.specializedIntakes.some((item) => item.id === specializedId), true);
   const citizenOverview = await request(baseUrl, "/api/physical-exams?residentId=r1", citizenLogin.body.token);
   assert.equal(Object.prototype.hasOwnProperty.call(citizenOverview.body, "specializedIntakes"), false);
-  const assigned = await request(baseUrl, `/api/physical-exams/specialized-intakes/${specializedId}/actions`, institutionLogin.body.token, { method: "POST", body: JSON.stringify({ action: "assign-profile", targetSystem: "occupational-health-system", profileId: "occupation-v1", evidenceRef: "ROUTE-API-001" }) });
+  const specializedCommandKey = "physical-exam-specialized-api-001";
+  const specializedCommand = {
+    action: "assign-profile",
+    targetSystem: "specialized-profile-system",
+    profileId: "specialized-profile-v1",
+    evidenceRef: "ROUTE-API-001",
+    expectedVersion: 0,
+    idempotencyKey: specializedCommandKey
+  };
+  const assigned = await request(baseUrl, `/api/physical-exams/specialized-intakes/${specializedId}/actions`, institutionLogin.body.token, {
+    method: "POST",
+    headers: { "Idempotency-Key": specializedCommandKey },
+    body: JSON.stringify(specializedCommand)
+  });
   assert.equal(assigned.status, 200);
   assert.equal(assigned.body.intake.status, "routed-to-specialized-system");
+  assert.equal(assigned.body.intake.version, 1);
+  assert.equal(assigned.body.idempotentReplay, false);
+  assert.equal(Object.hasOwn(assigned.body.intake, "_apiCommandReceipts"), false);
+  const assignedHistoryLength = assigned.body.intake.actionHistory.length;
+
+  const assignedReplay = await request(baseUrl, `/api/physical-exams/specialized-intakes/${specializedId}/actions`, institutionLogin.body.token, {
+    method: "POST",
+    headers: { "Idempotency-Key": specializedCommandKey },
+    body: JSON.stringify(specializedCommand)
+  });
+  assert.equal(assignedReplay.status, 200);
+  assert.equal(assignedReplay.body.idempotentReplay, true);
+  assert.equal(assignedReplay.body.intake.actionHistory.length, assignedHistoryLength);
+
+  const changedReplay = await request(baseUrl, `/api/physical-exams/specialized-intakes/${specializedId}/actions`, institutionLogin.body.token, {
+    method: "POST",
+    headers: { "Idempotency-Key": specializedCommandKey },
+    body: JSON.stringify({ ...specializedCommand, profileId: "changed-profile" })
+  });
+  assert.equal(changedReplay.status, 409);
+  assert.equal(changedReplay.body.code, "PHYSICAL_EXAM_SPECIALIZED_INTAKE_IDEMPOTENCY_CONFLICT");
+
+  const staleCommandKey = "physical-exam-specialized-api-stale-001";
+  const staleCommand = await request(baseUrl, `/api/physical-exams/specialized-intakes/${specializedId}/actions`, institutionLogin.body.token, {
+    method: "POST",
+    headers: { "Idempotency-Key": staleCommandKey },
+    body: JSON.stringify({ ...specializedCommand, idempotencyKey: staleCommandKey })
+  });
+  assert.equal(staleCommand.status, 409);
+  assert.equal(staleCommand.body.code, "PHYSICAL_EXAM_SPECIALIZED_INTAKE_VERSION_CONFLICT");
+
+  const persistedSpecializedState = JSON.parse(fs.readFileSync(path.join(dataDir, "db.json"), "utf8"));
+  const persistedSpecialized = persistedSpecializedState.physicalExamSpecializedIntakes.find((item) => item.id === specializedId);
+  assert.equal(persistedSpecialized.actionHistory.length, assignedHistoryLength);
+  assert.equal(persistedSpecialized._apiCommandReceipts.length, 1);
+  assert.equal(persistedSpecializedState.dataAccessLogs.filter((item) => item.purpose?.includes("assign-profile")).length, 1);
+  assert.equal(persistedSpecializedState.securityEvents.filter((item) => item.target === specializedId && item.action === "专项体检分流处置").length, 1);
+  const managedSpecializedOverview = await request(baseUrl, "/api/physical-exams?residentId=r1", institutionLogin.body.token);
+  const managedSpecialized = managedSpecializedOverview.body.specializedIntakes.find((item) => item.id === specializedId);
+  assert.equal(managedSpecialized.version, 1);
+  assert.equal(Object.hasOwn(managedSpecialized, "_apiCommandReceipts"), false);
 
   const after = await request(baseUrl, "/api/physical-exams?residentId=r1", citizenLogin.body.token);
   assert.equal(after.status, 200);
