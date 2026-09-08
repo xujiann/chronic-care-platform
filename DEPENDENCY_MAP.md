@@ -275,7 +275,7 @@ TypeScript 与 Node 类型仅用于开发门禁；lockfile audit 已修复 c8 �
   Inventory v2 的资产/类型 occurrence 与聚合指纹失败关闭。
 - 集中响应头端口暂保留兼容 CSP 的 `script/style 'unsafe-inline'`，并下发不含 `unsafe-inline`/`unsafe-eval`
   的严格 Report-Only 目标；动态 CSSOM、全角色浏览器回归和真实托管验证完成前不得描述为 CSP 已关闭。
-- Service Worker v62 缓存应用壳以及生成的 `data/public-demo.json`；激活时删除 v61 及其他旧缓存，只缓存同源成功响应，API、跨 Origin 与 404 拒绝响应不进入 Cache Storage。
+- Service Worker v63 缓存应用壳以及生成的 `data/public-demo.json`；激活时删除 v62 及其他旧缓存，只缓存同源成功响应，API、跨 Origin 与 404 拒绝响应不进入 Cache Storage。
 - E2E 依赖方向为 `npm test:e2e → root runner(60) / resident owned runner(13) / PWA runner(3) → 动态回环端口 + 独立临时
   DATA_DIR → Playwright Chromium`。两套配置共用 `playwright-browser-policy.v1` 并设置
   `serviceWorkers=block`；系统 Chrome、固定 5210 端口和跨套件服务复用不再是标准测试依赖。
@@ -289,7 +289,7 @@ data/db.json
   └─ public-demo-snapshot 纯函数
        ├─ Node /data/public-demo.json
        ├─ Pages 临时构建制品
-       └─ Service Worker v62 同源成功响应缓存
+       └─ Service Worker v63 同源成功响应缓存
 
 SQLite commit
   → transactional outbox

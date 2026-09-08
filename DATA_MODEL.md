@@ -140,7 +140,7 @@ Playwright E2E 只在操作系统临时目录复制开发种子，根 60 项和�
 `DATA_DIR` 消费；每次标准运行还分配独立回环端口，不能连接其他 worktree 的测试服务。测试结束删除
 临时目录，既不写回 `data/db.json`，也不形成业务事实、迁移证据或生产验收证据。
 
-PWA 专项 3 项复用相同的仓库外临时数据和动态回环端口；三套共 76 项。PWA 只在独立浏览器 context 创建 v62 Cache Storage
+PWA 专项 3 项复用相同的仓库外临时数据和动态回环端口；三套共 76 项。PWA 只在独立浏览器 context 创建 v63 Cache Storage
 与 Service Worker registration；每项结束注销 registration 并删除所有测试 origin cache。缓存只接受同源
 成功响应，`/api/*` 与被拒绝的 `/data/db.json` 不进入缓存。Cache Storage 不是业务事实源或迁移证据。
 
@@ -203,7 +203,7 @@ erDiagram
 - readiness、报告和部署检查输入；
 - 本地兼容快照与回退读取。
 
-静态页面不再直接读取该文件。Node 静态服务按源文件 mtime/size 合成 `data/public-demo.json`；Pages 在仓库外临时目录生成同名制品，Service Worker v62 只缓存同源成功响应中的该脱敏结果，不缓存源快照的 404 拒绝响应。
+静态页面不再直接读取该文件。Node 静态服务按源文件 mtime/size 合成 `data/public-demo.json`；Pages 在仓库外临时目录生成同名制品，Service Worker v63 只缓存同源成功响应中的该脱敏结果，不缓存源快照的 404 拒绝响应。
 
 `config/domain-data-ownership.json` 当前登记 111 个 owner 合同，其中 61 个集合沿用既有版本化写
 合同，19 个首发 legacy 集合仅完成唯一业务 owner、reader、classification 与实际源码证据审查，

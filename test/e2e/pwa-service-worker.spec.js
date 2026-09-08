@@ -2,8 +2,9 @@
 
 const { expect, test } = require("@playwright/test");
 
-const CURRENT_CACHE = "chronic-care-citizen-v62-service-feedback";
-const LEGACY_CACHE = "chronic-care-citizen-v61-public-demo-boundary";
+const CURRENT_CACHE = "chronic-care-citizen-v63-service-feedback";
+const LEGACY_CACHE = "chronic-care-citizen-v62-service-feedback";
+const OLDER_CACHE = "chronic-care-citizen-v61-public-demo-boundary";
 
 async function clearPwaState(page) {
   if (!/^https?:\/\/127\.0\.0\.1:\d+\//.test(page.url())) await page.goto("/login.html");
@@ -43,18 +44,20 @@ test.afterEach(async ({ context, page }) => {
   expect(await clearPwaState(page)).toEqual({ registrations: 0, caches: [] });
 });
 
-test("PWA installs the current worker and activation removes the legacy cache", async ({ page }) => {
-  await page.evaluate(async (legacyCache) => {
-    const cache = await caches.open(legacyCache);
-    await cache.put("/legacy-shell.txt", new Response("legacy"));
-  }, LEGACY_CACHE);
+test("PWA installs the current worker and activation removes every legacy cache", async ({ page }) => {
+  await page.evaluate(async ([legacyCache, olderCache]) => {
+    const legacy = await caches.open(legacyCache);
+    await legacy.put("/legacy-shell.txt", new Response("legacy"));
+    const older = await caches.open(olderCache);
+    await older.put("/older-shell.txt", new Response("older"));
+  }, [LEGACY_CACHE, OLDER_CACHE]);
 
   await installCurrentServiceWorker(page);
 
   const state = await page.evaluate(async () => {
     const [registration] = await navigator.serviceWorker.getRegistrations();
     await registration.update();
-    const cache = await caches.open("chronic-care-citizen-v62-service-feedback");
+    const cache = await caches.open("chronic-care-citizen-v63-service-feedback");
     return {
       scriptURL: registration.active?.scriptURL || "",
       installing: Boolean(registration.installing),
@@ -70,6 +73,7 @@ test("PWA installs the current worker and activation removes the legacy cache", 
   expect(state.caches).toEqual([CURRENT_CACHE]);
   expect(state.shell).toEqual(expect.arrayContaining([
     "/citizen.html",
+    "/citizen-service-feedback.js",
     "/data/public-demo.json",
     "/manifest.webmanifest",
     "/mobile-preview.html"
