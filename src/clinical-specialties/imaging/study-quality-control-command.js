@@ -1,5 +1,7 @@
 "use strict";
 
+const FHIR_RESOURCE_ID = /^[A-Za-z0-9.-]{1,64}$/;
+
 function qualityControlInputError(message) {
   const error = new Error(message);
   error.code = "IMAGING_QC_INPUT_INVALID";
@@ -49,13 +51,20 @@ function createImagingStudyQualityControlCommand(user, study, payload, ports) {
 
 function validateImagingStudyQualityControlReceipt(receipt) {
   const diagnosticReport = receipt?.diagnosticReport;
-  if (!diagnosticReport || typeof diagnosticReport !== "object" || !String(diagnosticReport.id || "").trim()) {
+  const resourceId = typeof diagnosticReport?.id === "string" ? diagnosticReport.id.trim() : "";
+  if (!diagnosticReport || typeof diagnosticReport !== "object" || !FHIR_RESOURCE_ID.test(resourceId)) {
     const error = new Error("FHIR DiagnosticReport 回执缺少已确认的资源标识");
     error.code = "IMAGING_QC_FHIR_RECEIPT_INVALID";
     error.providerOutcome = "unknown";
     throw error;
   }
-  return receipt;
+  return {
+    ...receipt,
+    diagnosticReport: {
+      ...diagnosticReport,
+      id: resourceId
+    }
+  };
 }
 
 function commitImagingStudyQualityControl(data, studyIndex, command, fhirReportSync) {

@@ -8,6 +8,7 @@ const imagingState = {
   selectedStudyId: ""
 };
 const imagingQualityControlActionState = new Map();
+const imagingQualityControlRecovery = new Map();
 
 const IMAGING_API_BASE = location.protocol === "file:" ? "" : `${location.origin}/api`;
 
@@ -367,7 +368,10 @@ function renderQualityControlAction(studyId) {
   const unavailable = actionState
     ? ` disabled aria-disabled="true" title="${reconciliationRequired ? "结果未确认；完成外部与本地对账后重新加载页面" : "该检查的质控操作正在进行"}"`
     : "";
-  return `<button class="inline-action" type="button" data-qc-study="${escapeHtml(studyId)}"${unavailable}>${label}</button>`;
+  const inspectAction = reconciliationRequired
+    ? ` <button class="inline-action" type="button" data-qc-status="${escapeHtml(studyId)}">查看状态</button>`
+    : "";
+  return `<button class="inline-action" type="button" data-qc-study="${escapeHtml(studyId)}"${unavailable}>${label}</button>${inspectAction}`;
 }
 
 function canDecideMutualRecognition() {
@@ -574,6 +578,7 @@ async function handleImagingAction(event) {
   const viewButton = event.target.closest("[data-view-study]");
   const shareButton = event.target.closest("[data-share-study]");
   const qualityControlButton = event.target.closest("[data-qc-study]");
+  const qualityControlStatusButton = event.target.closest("[data-qc-status]");
   const startRecognitionButton = event.target.closest("[data-start-recognition]");
   const decideRecognitionButton = event.target.closest("[data-decide-recognition]");
   const appealRecognitionButton = event.target.closest("[data-appeal-recognition]");
@@ -597,6 +602,10 @@ async function handleImagingAction(event) {
   }
   if (shareButton) {
     await shareStudy(shareButton.dataset.shareStudy, shareButton);
+    return;
+  }
+  if (qualityControlStatusButton) {
+    await inspectQualityControlStatus(qualityControlStatusButton.dataset.qcStatus);
     return;
   }
   if (qualityControlButton) {
@@ -793,6 +802,26 @@ async function qualityControlStudy(studyId, button) {
         || (typeof payload.reconciliationRequired !== "boolean" && response.status >= 500 && payload.retryable !== true);
       if (reconciliationRequired) {
         imagingQualityControlActionState.set(studyId, "reconciliation-required");
+        const receivedRecovery = payload.reconciliation && typeof payload.reconciliation === "object"
+          ? payload.reconciliation
+          : {};
+        const receivedResourceId = typeof receivedRecovery.resourceId === "string"
+          ? receivedRecovery.resourceId.trim()
+          : "";
+        const externalConfirmed = receivedRecovery.studyId === studyId
+          && receivedRecovery.localOutcome === "not-committed"
+          && receivedRecovery.externalOutcome === "confirmed"
+          && receivedRecovery.resourceType === "DiagnosticReport"
+          && /^[A-Za-z0-9.-]{1,64}$/.test(receivedResourceId);
+        imagingQualityControlRecovery.set(studyId, {
+          studyId,
+          externalOutcome: externalConfirmed ? "confirmed" : "unknown",
+          localOutcome: "not-committed",
+          ...(externalConfirmed ? {
+            resourceType: "DiagnosticReport",
+            resourceId: receivedResourceId
+          } : {})
+        });
         retainReconciliationLock = true;
       }
       const guidance = reconciliationRequired
@@ -804,11 +833,17 @@ async function qualityControlStudy(studyId, button) {
       return;
     }
     imagingQualityControlActionState.delete(studyId);
+    imagingQualityControlRecovery.delete(studyId);
     await loadImagingCloud();
     renderImagingCloud();
     window.alert("质控结果已由 FHIR 回执确认并保存到本地影像记录。");
   } catch (error) {
     imagingQualityControlActionState.set(studyId, "reconciliation-required");
+    imagingQualityControlRecovery.set(studyId, {
+      studyId,
+      externalOutcome: "unknown",
+      localOutcome: "not-committed"
+    });
     retainReconciliationLock = true;
     window.alert(`质控请求结果未知：${error.message}。本页已阻止重复提交；请完成本地与 FHIR 对账后重新加载页面。`);
   } finally {
@@ -826,6 +861,54 @@ async function qualityControlStudy(studyId, button) {
       setImagingActionBusy(button, false, "");
     }
     if (Array.isArray(imagingState.payload?.studies)) renderStudyTable(imagingState.payload.studies);
+  }
+}
+
+async function inspectQualityControlStatus(studyId) {
+  if (!IMAGING_API_BASE || !canManageQualityControl()) return;
+  if (imagingQualityControlActionState.get(studyId) !== "reconciliation-required") {
+    window.alert("该检查当前没有本页待核对的质控请求。");
+    return;
+  }
+  const recovery = imagingQualityControlRecovery.get(studyId) || {
+    studyId,
+    externalOutcome: "unknown",
+    localOutcome: "not-committed"
+  };
+  const params = new URLSearchParams();
+  if (imagingState.selectedResidentId) params.set("residentId", imagingState.selectedResidentId);
+  if (imagingState.selectedInstitutionCode) params.set("institutionCode", imagingState.selectedInstitutionCode);
+  try {
+    const request = window.HealthCityAuth?.authFetch || fetch;
+    const response = await request(`${IMAGING_API_BASE}/imaging-cloud${params.toString() ? `?${params}` : ""}`);
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload.message || `HTTP ${response.status}`);
+    if (!Array.isArray(payload.studies)) throw new Error("影像云响应缺少检查列表");
+
+    const study = payload.studies.find((item) => item.id === studyId);
+    const latestReview = Array.isArray(payload.qualityReviews)
+      ? payload.qualityReviews.find((item) => item.studyId === studyId)
+      : null;
+    imagingState.payload = payload;
+    renderImagingCloud();
+
+    const externalObservation = recovery.externalOutcome === "confirmed"
+      ? `本页外部回执：DiagnosticReport ${recovery.resourceId} 已被写接口确认接收。`
+      : "本页外部回执：结果未知；当前没有可信 DiagnosticReport 回读证据。";
+    const localObservation = study
+      ? `本地当前状态：${study.qcStatus || "未标记"}；FHIR 同步：${study.fhirReportSyncStatus || "未记录"}；资源标识：${study.fhirDiagnosticReportId || "未记录"}。`
+      : "本地当前状态：在当前授权与筛选范围内未找到该检查。";
+    const reviewObservation = latestReview
+      ? `本地最新质控记录：${latestReview.result || "未标记"}（${latestReview.sampledAt || "时间未记录"}）。`
+      : "本地最新质控记录：未观察到。";
+    const comparison = recovery.externalOutcome === "confirmed" && study?.fhirDiagnosticReportId === recovery.resourceId
+      ? "本地快照观察到相同资源标识，但这不能替代耐久命令或人工对账完成证明。"
+      : recovery.externalOutcome === "confirmed"
+        ? "本地快照尚未观察到本页外部回执对应的资源标识。"
+        : "外部结果仍未知，不能据本地字段推断外部成功或失败。";
+    window.alert(`${externalObservation}\n${localObservation}\n${reviewObservation}\n${comparison}\n写操作仍保持锁定；请按运维对账流程核验，系统不会自动重发。`);
+  } catch (error) {
+    window.alert(`未能读取当前本地状态：${error.message}。未使用演示数据替代，本页写操作仍保持锁定。`);
   }
 }
 

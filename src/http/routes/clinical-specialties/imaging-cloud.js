@@ -114,7 +114,7 @@ function createRouteSegment(runtime) {
         let fhirReportSync;
         try {
           fhirReportSync = await publishDiagnosticReportToFhir(command.updatedStudy, command.review);
-          validateImagingStudyQualityControlReceipt(fhirReportSync);
+          fhirReportSync = validateImagingStudyQualityControlReceipt(fhirReportSync);
         } catch (error) {
           const providerRejected = error?.providerOutcome === "rejected";
           const code = String(error?.code || "IMAGING_QC_FHIR_OUTCOME_UNKNOWN");
@@ -126,7 +126,14 @@ function createRouteSegment(runtime) {
               ? "FHIR 拒绝质控报告，本地质控记录未保存；请处理拒绝原因后再重试。"
               : "FHIR 回写结果无法确认，本地质控记录未保存；请先核对外部结果，不要直接重复提交。",
             retryable: providerRejected && error?.retryable === true,
-            reconciliationRequired: !providerRejected
+            reconciliationRequired: !providerRejected,
+            ...(!providerRejected ? {
+              reconciliation: {
+                studyId,
+                externalOutcome: "unknown",
+                localOutcome: "not-committed"
+              }
+            } : {})
           });
           return true;
         }
@@ -146,7 +153,14 @@ function createRouteSegment(runtime) {
             code: "IMAGING_QC_RECONCILIATION_REQUIRED",
             message: "FHIR 已确认接收质控报告，但本地保存未完成；请勿重复提交，需先完成跨系统对账。",
             retryable: false,
-            reconciliationRequired: true
+            reconciliationRequired: true,
+            reconciliation: {
+              studyId,
+              externalOutcome: "confirmed",
+              localOutcome: "not-committed",
+              resourceType: "DiagnosticReport",
+              resourceId: String(fhirReportSync.diagnosticReport.id)
+            }
           });
           return true;
         }

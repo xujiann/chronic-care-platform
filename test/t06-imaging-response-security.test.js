@@ -59,6 +59,15 @@ test("dashboard and error projections preserve business identifiers without expo
     message: "Bearer abc.secret failed for https://user:pass@internal.local/fhir?access_token=secret",
     retryable: false,
     reconciliationRequired: true,
+    reconciliation: {
+      studyId: "study-1",
+      externalOutcome: "confirmed",
+      localOutcome: "not-committed",
+      resourceType: "DiagnosticReport",
+      resourceId: "report-1",
+      endpoint: "https://internal.test/fhir/DiagnosticReport/report-1?token=secret",
+      token: "IMG-SECRET"
+    },
     objectPath: "/var/lib/imaging/study-1"
   });
   assert.equal(error.error, "FHIR Sync Failed");
@@ -66,7 +75,31 @@ test("dashboard and error projections preserve business identifiers without expo
   assert.equal(error.message, "[redacted-sensitive-detail]");
   assert.equal(error.retryable, false);
   assert.equal(error.reconciliationRequired, true);
+  assert.deepEqual(error.reconciliation, {
+    studyId: "study-1",
+    externalOutcome: "confirmed",
+    localOutcome: "not-committed",
+    resourceType: "DiagnosticReport",
+    resourceId: "report-1"
+  });
   assertPublicBoundary(error);
+
+  const unknown = projectImagingErrorResponse({
+    reconciliationRequired: true,
+    reconciliation: {
+      studyId: "study-1",
+      externalOutcome: "unknown",
+      localOutcome: "not-committed",
+      resourceType: "DiagnosticReport",
+      resourceId: "must-not-cross-for-an-unknown-outcome",
+      endpoint: "https://internal.test/fhir?token=secret"
+    }
+  });
+  assert.deepEqual(unknown.reconciliation, {
+    studyId: "study-1",
+    externalOutcome: "unknown",
+    localOutcome: "not-committed"
+  });
 });
 
 test("viewer response uses a fixed allowlist and strips URL credentials and signing parameters", () => {

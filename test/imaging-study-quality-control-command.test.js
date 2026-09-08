@@ -122,6 +122,12 @@ test("imaging quality control rejects an unverified provider receipt before loca
     () => validateImagingStudyQualityControlReceipt({}),
     (error) => error.code === "IMAGING_QC_FHIR_RECEIPT_INVALID" && error.providerOutcome === "unknown"
   );
+  for (const invalidId of [123, true, { value: "report-1" }, "DiagnosticReport/report-1", "report id", "a".repeat(65)]) {
+    assert.throws(
+      () => validateImagingStudyQualityControlReceipt({ diagnosticReport: { id: invalidId } }),
+      (error) => error.code === "IMAGING_QC_FHIR_RECEIPT_INVALID" && error.providerOutcome === "unknown"
+    );
+  }
   assert.throws(() => commitImagingStudyQualityControl(data, 0, command, {}), /FHIR DiagnosticReport 回执/);
   assert.equal(data.imageCloudStudies[0], study);
   assert.deepEqual(data.imageCloudQualityReviews, []);
