@@ -1,4 +1,6 @@
 const { expect, test } = require("@playwright/test");
+const path = require("node:path");
+const { pathToFileURL } = require("node:url");
 
 const HOSTILE_TEXT = '<img data-physical-exam-text-xss src="x" onerror="window.__physicalExamXss=true">';
 const HOSTILE_CLASS = '"><img data-physical-exam-class-xss src="x" onerror="window.__physicalExamXss=true">';
@@ -11,7 +13,119 @@ async function loginCommission(page) {
   await expect(page).toHaveURL(/index\.html$/);
 }
 
+async function fulfillPhysicalExamOverview(route, resident) {
+  const response = await route.fetch();
+  const overview = await response.json();
+  overview.residents = [resident];
+  overview.reports = [];
+  overview.years = [];
+  overview.summary = { ...overview.summary, reports: 0, residents: 1 };
+  await route.fulfill({ response, contentType: "application/json", body: JSON.stringify(overview) });
+}
+
+async function verifyInitialLoadFailureAndRecovery(page) {
+  let requestCount = 0;
+  const malformedOverviews = [null, {}, [], "secret-internal-detail"];
+  await loginCommission(page);
+  await page.route("**/api/physical-exams", async (route) => {
+    requestCount += 1;
+    if (requestCount <= malformedOverviews.length) {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(malformedOverviews[requestCount - 1])
+      });
+      return;
+    }
+    await fulfillPhysicalExamOverview(route, { id: "resident-recovered", name: "恢复后的居民" });
+  });
+
+  for (const _malformedOverview of malformedOverviews) {
+    await page.goto("/physical-examination.html");
+    await expect(page.locator("#physical-exam-report-summary")).toHaveText("体检数据暂不可用，请重试。");
+    await expect(page.locator("#physical-exam-report-list")).toContainText("体检数据暂不可用，请重试。");
+    await expect(page.locator("body")).not.toContainText("演示居民");
+    await expect(page.locator("body")).not.toContainText("secret-internal-detail");
+  }
+
+  await page.locator("#physical-exam-refresh").click();
+  await expect(page.locator("#physical-exam-toast")).toHaveText("体检报告已与健康档案重新同步");
+  await expect(page.locator("#physical-exam-resident-filter")).toContainText("恢复后的居民");
+  await page.unrouteAll({ behavior: "wait" });
+}
+
+async function verifyRefreshSnapshotAndRecovery(page) {
+  let requestCount = 0;
+  await page.route("**/api/physical-exams", async (route) => {
+    requestCount += 1;
+    if (requestCount === 2) {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ summary: {}, residents: [], reports: "invalid", years: [] })
+      });
+      return;
+    }
+    if (requestCount === 3) {
+      await route.fulfill({
+        status: 502,
+        contentType: "application/json",
+        body: JSON.stringify({ message: "upstream credential secret-internal-detail" })
+      });
+      return;
+    }
+    const resident = requestCount === 1
+      ? { id: "resident-snapshot", name: "最后成功快照居民" }
+      : { id: "resident-current", name: "重试恢复居民" };
+    await fulfillPhysicalExamOverview(route, resident);
+  });
+
+  await page.goto("/physical-examination.html");
+  await expect(page.locator("#physical-exam-resident-filter")).toContainText("最后成功快照居民");
+
+  await page.locator("#physical-exam-refresh").click();
+  await expect(page.locator("#physical-exam-toast")).toHaveText("体检数据刷新失败，请重试。");
+  await expect(page.locator("#physical-exam-resident-filter")).toContainText("最后成功快照居民");
+  await expect(page.locator("#physical-exam-resident-filter")).not.toContainText("重试恢复居民");
+  await expect(page.locator("body")).not.toContainText("演示居民");
+  await expect(page.locator("body")).not.toContainText("secret-internal-detail");
+
+  await page.locator("#physical-exam-refresh").click();
+  await expect(page.locator("#physical-exam-toast")).toHaveText("体检数据刷新失败，请重试。");
+  await expect(page.locator("#physical-exam-resident-filter")).toContainText("最后成功快照居民");
+  await expect(page.locator("body")).not.toContainText("secret-internal-detail");
+
+  await page.locator("#physical-exam-refresh").click();
+  await expect(page.locator("#physical-exam-toast")).toHaveText("体检报告已与健康档案重新同步");
+  await expect(page.locator("#physical-exam-resident-filter")).toContainText("重试恢复居民");
+  await expect(page.locator("#physical-exam-resident-filter")).not.toContainText("最后成功快照居民");
+  await page.unrouteAll({ behavior: "wait" });
+}
+
+async function verifyFilePreviewFallback(page) {
+  const loginUrl = new URL(pathToFileURL(path.resolve(__dirname, "../../login.html")).href);
+  loginUrl.searchParams.set("redirect", "physical-examination.html");
+  await page.goto(loginUrl.href);
+  await page.locator("#login-user").selectOption("health");
+  await page.locator("input[name='password']").fill("123456");
+  await page.locator("#login-form button[type='submit']").click();
+  await expect(page).toHaveURL(/physical-examination\.html$/);
+  await expect(page.locator("#physical-exam-resident-filter")).toContainText("演示居民A");
+  await expect(page.locator("#physical-exam-report-summary")).not.toHaveText("体检数据暂不可用，请重试。");
+}
+
 test("physical examination workbench keeps hostile API fields inert across all legacy render regions", async ({ page }) => {
+  test.setTimeout(90_000);
+  await test.step("initial HTTP failure fails closed and a retry recovers", async () => {
+    await verifyInitialLoadFailureAndRecovery(page);
+  });
+  await test.step("refresh failure preserves the last successful snapshot", async () => {
+    await verifyRefreshSnapshotAndRecovery(page);
+  });
+  await test.step("file preview retains the bounded demonstration fallback", async () => {
+    await verifyFilePreviewFallback(page);
+  });
+
   const pageErrors = [];
   const specializedCommands = [];
   let releaseFirstSpecializedAttempt;
@@ -22,7 +136,6 @@ test("physical examination workbench keeps hostile API fields inert across all l
   await page.addInitScript(() => {
     window.__physicalExamXss = false;
   });
-  await loginCommission(page);
 
   await page.route("**/api/physical-exams/specialized-intakes/**/actions", async (route) => {
     const request = route.request();
