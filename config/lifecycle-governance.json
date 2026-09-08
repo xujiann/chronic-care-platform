@@ -44,7 +44,7 @@
       "title": "六图差距必须与未完全闭合任务双向一致且技术债编号唯一",
       "sourceType": "approved-user-requirement",
       "sourceRef": "USER-APPROVED-GOV-005-2026-09-08",
-      "acceptance": ["未完全闭合任务至少映射一张 AS-IS 地图", "完全闭合任务不得残留 gapTaskIds", "TECH_DEBT 表 ID 唯一且不与生命周期任务 ID 冲突"]
+      "acceptance": ["未完全闭合任务至少映射一张 AS-IS 地图", "完全闭合任务不得残留 gapTaskIds", "TECH_DEBT 表 ID 唯一且不与生命周期任务或受管文档中的其他治理 ID 冲突"]
     },
     {
       "id": "REQ-GOV-004",
@@ -178,7 +178,7 @@
       "level": "中",
       "title": "六图遗漏真实缺口或技术债编号重用导致错误追踪",
       "owner": "T00",
-      "mitigation": "以任务最新状态反向校验地图覆盖并对技术债表 ID 做闭集唯一性与命名空间检查",
+      "mitigation": "以任务最新状态反向校验地图覆盖，并对技术债表 ID 做闭集唯一性、生命周期任务及受管 Markdown 治理定义命名空间检查",
       "status": "open",
       "evidenceIds": []
     },
@@ -610,7 +610,7 @@
       "acceptanceCriteria": [
         "所有未完全闭合任务至少由一张地图 gapTaskIds 反向覆盖",
         "完全闭合任务的陈旧地图引用失败关闭",
-        "TECH_DEBT 表 ID 重复或与生命周期任务 ID 冲突时文档门禁失败"
+        "TECH_DEBT 表 ID 重复、与生命周期任务或受管文档中的其他治理 ID 冲突时文档门禁失败"
       ],
       "testIds": ["TEST-GOV-005"],
       "evidenceIds": [],

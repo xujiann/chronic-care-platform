@@ -32,6 +32,14 @@ const DOCUMENT_PATHS = Object.freeze({
   adrIndex: "docs/adr/README.md",
   e2eAdr: "docs/adr/2026-08-23-playwright-e2e-isolation-and-browser-policy.md"
 });
+const ALLOWED_TECH_DEBT_GOVERNANCE_REFERENCES = new Set([
+  "DATA-003:DATABASE_SCHEMA.md",
+  "TEST-006:DEPENDENCY_MAP.md",
+  "ARC-002:DEPENDENCY_MAP.md",
+  "TEST-007:docs/adr/2026-08-18-clinical-five-governed-subdomains.md",
+  "TEST-007:docs/operations-command-behavior-matrix.md",
+  "TEST-001:docs/internal-boundary-coverage-governance.md"
+]);
 
 function check(id, passed, detail) {
   return { id, passed: Boolean(passed), detail: String(detail || "") };
@@ -65,6 +73,15 @@ function hasAcceptedWithoutProposed(source) {
 
 function techDebtTableIds(source) {
   return [...String(source || "").matchAll(/^\|\s*([A-Z][A-Z0-9-]*-\d{3})\s*\|/gm)].map((match) => match[1]);
+}
+
+function governedMarkdownIdDefinitions(source, documentPath) {
+  const definitions = [];
+  for (const line of String(source || "").split(/\r?\n/)) {
+    const match = line.match(/^(?:\|\s*|[-*]\s+|#{1,6}\s+)([A-Z][A-Z0-9-]*-\d{3})(?:\s*\||\s*[：:]|\s+)/);
+    if (match) definitions.push({ id: match[1], path: documentPath });
+  }
+  return definitions;
 }
 
 function buildSqliteSchemaFacts() {
@@ -124,6 +141,9 @@ function readRepositoryState(options = {}) {
   const lifecycleTaskIds = options.lifecycleTaskIds || JSON.parse(fs.readFileSync(
     path.join(ROOT, "config", "lifecycle-governance.json"), "utf8"
   )).tasks.map((task) => task.id);
+  const governedMarkdownDefinitions = options.governedMarkdownDefinitions || repositoryGovernanceReport.markdown.entries
+    .filter((entry) => entry.classification === "current" && entry.path !== DOCUMENT_PATHS.techDebt)
+    .flatMap((entry) => governedMarkdownIdDefinitions(fs.readFileSync(path.join(ROOT, entry.path), "utf8"), entry.path));
   return {
     documents,
     catalogSummary,
@@ -134,7 +154,8 @@ function readRepositoryState(options = {}) {
     sqliteSchemaFacts,
     e2eFacts,
     productionReleaseScopeReport,
-    lifecycleTaskIds
+    lifecycleTaskIds,
+    governedMarkdownDefinitions
   };
 }
 
@@ -149,7 +170,8 @@ function buildReport(input) {
     sqliteSchemaFacts = {},
     e2eFacts = {},
     productionReleaseScopeReport = {},
-    lifecycleTaskIds = []
+    lifecycleTaskIds = [],
+    governedMarkdownDefinitions = []
   } = input || {};
   const entries = catalogSummary.entries;
   const writeRoutes = catalogSummary.writeRoutes;
@@ -196,6 +218,9 @@ function buildReport(input) {
   const duplicateTechDebtIds = [...new Set(techDebtIds.filter((id, index) => techDebtIds.indexOf(id) !== index))];
   const lifecycleTaskIdSet = new Set(lifecycleTaskIds);
   const lifecycleIdConflicts = [...new Set(techDebtIds.filter((id) => lifecycleTaskIdSet.has(id)))];
+  const techDebtIdSet = new Set(techDebtIds);
+  const governedDocumentIdConflicts = governedMarkdownDefinitions.filter(({ id, path: documentPath }) =>
+    techDebtIdSet.has(id) && !ALLOWED_TECH_DEBT_GOVERNANCE_REFERENCES.has(`${id}:${documentPath}`));
 
   const catalogFactsValid = [entries, writeRoutes, behaviorProofRequired, reviewRequired]
     .every(Number.isSafeInteger)
@@ -238,6 +263,10 @@ function buildReport(input) {
       duplicateTechDebtIds.length ? `duplicate ids: ${duplicateTechDebtIds.join(", ")}` : `${techDebtIds.length} unique table ids`),
     check("techDebt:lifecycleTaskIdNamespace", lifecycleIdConflicts.length === 0,
       lifecycleIdConflicts.length ? `conflicting lifecycle task ids: ${lifecycleIdConflicts.join(", ")}` : "no lifecycle task id conflicts"),
+    check("techDebt:governedDocumentIdNamespace", governedDocumentIdConflicts.length === 0,
+      governedDocumentIdConflicts.length
+        ? `conflicting governed document ids: ${governedDocumentIdConflicts.map(({ id, path: documentPath }) => `${id}@${documentPath}`).join(", ")}`
+        : "no conflicting governed document ids"),
     check("authority:firstReleaseScope", releaseScopeFactsValid, `${productionReleaseScopeReport.status || "missing"}; API reviews=${scopedApiReviewRequired}; collection reviews=${scopedCollectionReviewRequired}; plan gaps=${scopedRepositoryPlanMissing}`),
     check("roadmap:apiCatalogFacts", roadmapApi.count === 1
       && hasOneNumericFact(roadmapApi.text, /v3 当前 (\d+) 项/g, entries)
@@ -387,7 +416,8 @@ function buildReport(input) {
       techDebt: {
         tableIds: techDebtIds.length,
         duplicateIds: duplicateTechDebtIds,
-        lifecycleTaskIdConflicts: lifecycleIdConflicts
+        lifecycleTaskIdConflicts: lifecycleIdConflicts,
+        governedDocumentIdConflicts
       },
       sqliteSchema: {
         head: sqliteHead,
@@ -439,6 +469,7 @@ module.exports = {
   buildSqliteSchemaFacts,
   buildReport,
   readRepositoryState,
+  governedMarkdownIdDefinitions,
   techDebtTableIds,
   verifyRepository
 };

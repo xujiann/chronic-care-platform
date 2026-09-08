@@ -51,7 +51,8 @@ test("current documentation facts are derived from machine authorities", () => {
   assert.deepEqual(report.summary.techDebt, {
     tableIds: governance.techDebtTableIds(state.documents.techDebt).length,
     duplicateIds: [],
-    lifecycleTaskIdConflicts: []
+    lifecycleTaskIdConflicts: [],
+    governedDocumentIdConflicts: []
   });
 });
 
@@ -67,6 +68,15 @@ test("TECH_DEBT table ids remain unique and separate from lifecycle task ids", (
   report = governance.buildReport(conflict);
   assert.equal(report.ok, false);
   assert.equal(failed(report, "techDebt:lifecycleTaskIdNamespace"), true);
+
+  const governedDocumentConflict = cloneRepositoryState();
+  governedDocumentConflict.governedMarkdownDefinitions.push({
+    id: "TEST-COVERAGE-001",
+    path: "docs/another-governance-plan.md"
+  });
+  report = governance.buildReport(governedDocumentConflict);
+  assert.equal(report.ok, false);
+  assert.equal(failed(report, "techDebt:governedDocumentIdNamespace"), true);
 });
 
 test("current E2E partition facts fail closed against the declared Playwright inventory", () => {
