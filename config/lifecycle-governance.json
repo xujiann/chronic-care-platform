@@ -228,8 +228,8 @@
       "title": "局部或不完整证据被误登记为整端点行为验证",
       "owner": "T00",
       "mitigation": "严格登记三动作无余项合同并由目录测试拒绝 action-slice 冒充、生产晋级和漂移",
-      "status": "open",
-      "evidenceIds": []
+      "status": "mitigated",
+      "evidenceIds": ["EVD-GOV-003"]
     },
     {
       "id": "RISK-TEST-019",
@@ -431,6 +431,14 @@
       "type": "pull-request-ci",
       "ref": "https://github.com/xujiann/chronic-care-platform/actions/runs/34182070276",
       "testIds": ["TEST-CI-020"],
+      "productionEvidence": false
+    },
+    {
+      "id": "EVD-GOV-003",
+      "scope": "repository-integration",
+      "type": "pull-request-ci",
+      "ref": "https://github.com/xujiann/chronic-care-platform/actions/runs/34187771255",
+      "testIds": ["TEST-GOV-003", "TEST-OPS-016B"],
       "productionEvidence": false
     }
   ],
@@ -645,8 +653,8 @@
       "id": "GOV-003",
       "title": "登记体检专项分流动作整端点幂等行为合同",
       "ownerProcess": "T00",
-      "taskStatus": "已批准",
-      "capabilityStatus": "未建设",
+      "taskStatus": "已关闭",
+      "capabilityStatus": "已集成",
       "riskLevel": "中",
       "approval": {
         "state": "approved",
@@ -667,14 +675,14 @@
         "目录 review-required 仅减少一项且所有 API productionReady 继续为 false"
       ],
       "testIds": ["TEST-GOV-003"],
-      "evidenceIds": [],
+      "evidenceIds": ["EVD-GOV-003"],
       "rollback": "回退注册表、断言和事实文档；不修改运行时、数据库或业务数据",
       "unresolved": [],
       "worktree": ".codex-platform-worktrees/process-v2/t00-api-003-physical-exam-endpoint-evidence-20260908",
       "branch": "process/t00-api-003-physical-exam-endpoint-evidence-20260908",
       "planRef": "T00-PLAN-API-003-ENDPOINT-EVIDENCE-2026-09-08",
-      "pullRequestRef": "",
-      "ciRef": "",
+      "pullRequestRef": "https://github.com/xujiann/chronic-care-platform/pull/269",
+      "ciRef": "https://github.com/xujiann/chronic-care-platform/actions/runs/34187771255",
       "writeScopes": [
         "config/lifecycle-governance.json",
         "config/api-idempotency-evidence.json",
