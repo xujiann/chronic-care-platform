@@ -231,3 +231,5 @@ PLAN 前不得编码；批准只覆盖明示范围。任何阶段失败都回到
 reviewer、变更审批、现场签收或回滚指令。
 
 开发组织的唯一组合合同是 `config/development-organization.json`。它只引用现有 Owner 权威：T00 是不计入九域的集成治理单元，T01–T09 是九个一级开发域，五个临床子域嵌套在 T06。任何团队拆仓、独立运行时或独立部署仍须通过服务提取评分和独立 ADR。
+
+GOV-003 在既有 Accepted API 幂等证据机制内登记 `POST /api/physical-exams/specialized-intakes/:id/actions`。唯一 endpoint 合同必须同时覆盖 `assign-profile`、`return-source`、`close`，并绑定真实 HTTP 身份/范围拒绝、header/body 键一致性、精确回放、异载荷与版本冲突、资源锁、SQLite collection CAS、一次业务/私有回执/访问审计/安全审计持久化和失败零污染证据。合同只把仓库行为状态改为 `behavior-verified`；`productionReady=false`、外部证据要求、生产 `NO-GO` 和不宣称 distributed exactly-once 的约束保持不变。
