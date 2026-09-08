@@ -8199,7 +8199,10 @@ function verifySqliteCollectionVersions(db, keys, expectedVersions) {
       throw new Error(`SQLite expected version is invalid for ${key}`);
     }
     if (currentVersion !== expectedVersion) {
-      throw new Error(`SQLite optimistic lock conflict on ${key}: expected ${expectedVersion}, current ${currentVersion}`);
+      const error = new Error(`SQLite optimistic lock conflict on ${key}: expected ${expectedVersion}, current ${currentVersion}`);
+      error.name = "StorageConflictError"; error.code = "STORAGE_CONFLICT";
+      error.collection = key; error.expectedVersion = expectedVersion; error.currentVersion = currentVersion;
+      throw error;
     }
   });
 }
@@ -21468,7 +21471,11 @@ function applyCitizenTaskAction(item, payload, collection, user) {
   if (action === "quality-feedback") {
     if (!["escortServiceOrders", "internetNursingOrders"].includes(collection)) throw new Error("当前任务不支持服务评价");
     if (!["completed", "quality-review", "closed"].includes(String(item.status || "").trim())) throw new Error("服务完成后才可提交评价");
-    if (item.taskAction === "quality-feedback" || item.qualityReview === "citizen-feedback" || item.qualityCallback === "citizen-feedback") throw new Error("该服务已提交评价，请勿重复提交");
+    if (item.taskAction === "quality-feedback" || item.qualityReview === "citizen-feedback" || item.qualityCallback === "citizen-feedback") {
+      const error = new Error("该服务已提交评价，请勿重复提交");
+      error.code = "CITIZEN_SERVICE_FEEDBACK_ALREADY_SUBMITTED";
+      throw error;
+    }
     if (comment.length < 2 || comment.length > 500) throw new Error("服务评价内容须为 2 至 500 个字符");
     const satisfaction = String(payload.satisfaction || "").trim();
     if (!["非常满意", "满意", "一般", "不满意", "非常不满意"].includes(satisfaction)) throw new Error("请选择有效的总体满意度");

@@ -864,7 +864,7 @@
         {
           "file": "src/http/routes/care-coordination.js",
           "anchors": [
-            "const [collection, id] = taskId.split(\":\")",
+            "const canonicalTaskId = `${collection}:${id}`",
             "if (collection === \"referrals\")",
             "source: \"task\""
           ]

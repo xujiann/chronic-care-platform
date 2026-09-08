@@ -224,6 +224,20 @@ test("escort owner route preserves validation idempotency handoff scope audit an
     jsonCommand(hospitalToken, "test006-escort-completed", { status: "completed", ...completionEvidence })
   );
   assert.equal(completed.response.status, 200, JSON.stringify(completed.body));
+  const beforeRejectedQuality = await runtime.request("/api/state", commissionToken);
+  const complaintMessagesBefore = beforeRejectedQuality.body.taskMessages.filter((item) => item.sourceId === created.body.id && item.title.includes("投诉待跟进")).length;
+  const rejectedQuality = await runtime.request(
+    `/api/tasks/${encodeURIComponent(`escortServiceOrders:${created.body.id}`)}/actions`,
+    citizenToken,
+    jsonCommand(citizenToken, "test006-escort-quality-rejected", {
+      action: "quality-feedback", comment: "首次写入失败后保留", satisfaction: "无效满意度", complaintStatus: "open"
+    })
+  );
+  assert.equal(rejectedQuality.response.status, 400);
+  const afterRejectedQuality = await runtime.request("/api/state", commissionToken);
+  const unchangedOrder = afterRejectedQuality.body.escortServiceOrders.find((item) => item.id === created.body.id);
+  assert.notEqual(unchangedOrder.taskAction, "quality-feedback");
+  assert.equal(afterRejectedQuality.body.taskMessages.filter((item) => item.sourceId === created.body.id && item.title.includes("投诉待跟进")).length, complaintMessagesBefore);
   const quality = await runtime.request(
     `/api/tasks/${encodeURIComponent(`escortServiceOrders:${created.body.id}`)}/actions`,
     citizenToken,
@@ -249,6 +263,13 @@ test("escort owner route preserves validation idempotency handoff scope audit an
   );
   assert.equal(repeatedQuality.response.status, 400);
   assert.match(repeatedQuality.body.message, /请勿重复提交/);
+
+  const institutionMessages = await runtime.request("/api/messages", hospitalToken);
+  assert.equal(institutionMessages.body.messages.some((item) => item.sourceId === created.body.id && item.title.includes("投诉待跟进")), false);
+  const oversightMessages = await runtime.request("/api/messages", commissionToken);
+  const complaintMessage = oversightMessages.body.messages.find((item) => item.sourceId === created.body.id && item.title.includes("投诉待跟进"));
+  assert.ok(complaintMessage);
+  assert.equal(complaintMessage.targetOrgCode, "ORG-HOSPITAL");
 
   const returnPayload = { ...payload, residentId: "r4", appointmentAt: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString() };
   const returnCandidate = await runtime.request(
@@ -280,8 +301,14 @@ test("escort owner route preserves validation idempotency handoff scope audit an
   const state = await runtime.request("/api/state", commissionToken);
   assert.equal(state.response.status, 200);
   assert.equal(state.body.escortServiceOrders.filter((item) => item.id === created.body.id).length, 1);
+  const persistedFeedbackOrder = state.body.escortServiceOrders.find((item) => item.id === created.body.id);
+  assert.equal(persistedFeedbackOrder.complaintStatus, "open");
+  assert.equal(persistedFeedbackOrder.residentFeedback, "陪诊服务满意");
+  assert.equal(persistedFeedbackOrder.satisfaction, "满意");
   assert.equal(state.body.escortServiceOutbox.some((item) => item.aggregateId === created.body.id && item.status === "pending"), true);
   assert.equal(state.body.taskMessages.some((item) => item.sourceId === created.body.id), true);
   assert.equal(state.body.taskMessages.some((item) => item.sourceId === created.body.id && item.title.includes("投诉待跟进")), true);
+  assert.equal(state.body.taskMessages.filter((item) => item.sourceId === created.body.id && item.title.includes("投诉待跟进")).length, 1);
+  assert.equal(state.body.taskMessages.find((item) => item.id === complaintMessage.id).status, "sent");
   assert.equal(state.body.securityEvents.some((item) => item.target === `escortServiceOrders:${created.body.id}` && item.result === "allowed"), true);
 });

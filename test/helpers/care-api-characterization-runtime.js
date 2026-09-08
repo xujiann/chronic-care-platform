@@ -42,7 +42,7 @@ function jsonCommand(token, commandId, body) {
   };
 }
 
-async function startCareApiCharacterization(name, configureFixture) {
+async function startCareApiCharacterization(name, configureFixture, { storageEngine = "json" } = {}) {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), `${name}-`));
   const databasePath = path.join(dataDir, "db.json");
   fs.copyFileSync(path.join(ROOT, "data", "db.json"), databasePath);
@@ -63,7 +63,7 @@ async function startCareApiCharacterization(name, configureFixture) {
     NODE_ENV: "test",
     PORT: "0",
     DATA_DIR: dataDir,
-    STORAGE_ENGINE: "json",
+    STORAGE_ENGINE: storageEngine,
     SESSION_STORE: "memory",
     SESSION_SECRETS: "test006-care-characterization-session-secret-2026"
   });

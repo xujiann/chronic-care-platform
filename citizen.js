@@ -10,6 +10,7 @@ const API_BASE = location.protocol === "file:" ? "" : "/api";
 const RESIDENT_TASK_CLOSED_STATUSES = new Set(["closed", "completed", "cancel-requested", "cancelled", "canceled"]);
 const CITIZEN_SERVICE_SWIPE_THRESHOLD = 54;
 const CITIZEN_SERVICE_SWIPE_VERTICAL_LIMIT = 48;
+const CSF = window.CitizenServiceFeedback;
 
 const fallbackState = {
   accounts: [
@@ -1267,12 +1268,12 @@ async function fetchCitizenMessages() {
     try {
       const request = window.HealthCityAuth?.authFetch || fetch;
       const response = await request(`${API_BASE}/messages`);
-      if (response.ok) return (await response.json()).messages || [];
+      if (response.ok) return ((await response.json()).messages || []).filter(CSF.isCitizenVisibleMessage);
     } catch (error) {
       // Static and offline previews use the scoped state already loaded.
     }
   }
-  return Array.isArray(state.taskMessages) ? state.taskMessages : [];
+  return Array.isArray(state.taskMessages) ? state.taskMessages.filter(CSF.isCitizenVisibleMessage) : [];
 }
 
 async function fetchCitizenImagingDashboard() {
@@ -1659,7 +1660,7 @@ function buildResidentServiceTasks(residentId) {
       page: "registration",
       action: "查看挂号"
     })),
-    ...getEscortOrders(residentId).filter(window.CitizenServiceFeedback.shouldIncludeEscortOrder).map((item) => ({
+    ...getEscortOrders(residentId).filter(CSF.shouldIncludeEscortOrder).map((item) => ({
       taskId: `escortServiceOrders:${item.id}`,
       collection: "escortServiceOrders",
       service: "助医陪诊",
@@ -1676,7 +1677,7 @@ function buildResidentServiceTasks(residentId) {
       qualityReview: item.qualityReview,
       priority: item.priority === "high" || item.riskLevel === "high" ? "high" : "normal"
     })),
-    ...(state.internetNursingOrders || []).filter((item) => item.residentId === residentId && window.CitizenServiceFeedback.shouldIncludeNursingOrder(item)).map((item) => ({
+    ...(state.internetNursingOrders || []).filter((item) => item.residentId === residentId && CSF.shouldIncludeNursingOrder(item)).map((item) => ({
       taskId: `internetNursingOrders:${item.id}`,
       collection: "internetNursingOrders",
       service: "互联网护理",
@@ -1798,37 +1799,19 @@ async function performPhysicalExamHighlightAction(payload, successMessage) {
   }
 }
 
-function serviceOrderStatusClass(status = "") {
-  const value = String(status).toLowerCase();
-  if (/cancel|reject|failed|异常|取消|拒绝|失败/.test(value)) return "danger";
-  if (/pending|wait|待|审核|处理中|requested|submitted/.test(value)) return "warn";
-  return "";
+function normalizeServiceOrder(row) {
+  return CSF.normalizeServiceOrder(row, {
+    internetNursingOrders: state.internetNursingOrders || [],
+    escortServiceOrders: state.escortServiceOrders || []
+  }, row.residentId || currentResidentId);
 }
 
 function serviceOrderLifecycle(status = "") {
-  const value = String(status).toLowerCase();
-  if (/completed|closed|done|已完成|已关闭|完诊|履约/.test(value)) return "已完成";
-  if (/cancel|reject|failed|取消|拒绝|失败/.test(value)) return "已终止";
-  if (/pending|wait|submitted|requested|待|审核|处理中/.test(value)) return "待处理";
-  return "进行中";
+  return CSF.serviceOrderLifecycle(status);
 }
 
-function normalizeServiceOrder(row) {
-  return {
-    ...row,
-    lifecycle: serviceOrderLifecycle(row.status),
-    statusClass: serviceOrderStatusClass(row.status)
-  };
-}
-
-function serviceOrderTypeLabel(type = "") {
-  return {
-    nursing: "护理",
-    escort: "陪诊",
-    registration: "挂号",
-    "physical-exam": "体检",
-    "family-doctor": "家医"
-  }[String(type || "").trim()] || String(type || "服务");
+function serviceOrderStatusClass(status = "") {
+  return CSF.serviceOrderStatusClass(status);
 }
 
 function serviceOrderTypePage(type = "") {
@@ -1858,7 +1841,7 @@ function officialServiceOrdersForResident(residentId) {
     .map((item) => normalizeServiceOrder({
       id: item.serviceOrderId || item.id,
       collection: item.sourceCollection || "serviceOrders",
-      service: serviceOrderTypeLabel(item.serviceType || item.serviceName),
+      service: CSF.serviceOrderTypeLabel(item.serviceType || item.serviceName),
       title: item.title || "服务订单",
       status: item.status || item.lifecycle || "pending",
       date: item.scheduledAt || item.updatedAt || item.createdAt || "",
@@ -1957,12 +1940,12 @@ function renderServiceOrderCenter(residentId) {
   if (!summary || !metrics || !cards) return;
   const orders = buildUnifiedServiceOrders(residentId);
   const services = ["护理", "陪诊", "挂号", "体检", "家医"];
-  const openCount = orders.filter((item) => !["已完成", "已终止"].includes(item.lifecycle)).length;
-  summary.textContent = `${orders.length} 个服务订单 · ${openCount} 个进行中/待处理 · 统一字段：服务、状态、时间、来源模型`;
+  const openCount = orders.filter(CSF.serviceOrderNeedsAttention).length;
+  summary.textContent = `${orders.length} 个服务订单 · ${openCount} 个进行中/投诉待处理 · 统一字段：服务、状态、时间、来源模型`;
   metrics.innerHTML = services.map((service) => {
     const rows = orders.filter((item) => item.service === service);
-    const open = rows.filter((item) => !["已完成", "已终止"].includes(item.lifecycle)).length;
-    return `<article><strong>${rows.length}</strong><span>${service}</span><small>${open} 个未完成</small></article>`;
+    const open = rows.filter(CSF.serviceOrderNeedsAttention).length;
+    return `<article><strong>${rows.length}</strong><span>${service}</span><small>${open} 个需关注</small></article>`;
   }).join("");
   cards.innerHTML = orders.slice(0, 12).map((item) => `<article class="service-order-card">
     <div>
@@ -1972,6 +1955,7 @@ function renderServiceOrderCenter(residentId) {
     <h3>${escapeHtml(item.title)}</h3>
     <p>${escapeHtml(item.institution || "服务机构待确认")}</p>
     <p class="muted">${escapeHtml(item.date || "时间待确认")} · ${escapeHtml(item.sourceModel)}</p>
+    ${CSF.renderComplaintStatus(item, escapeHtml)}
     <div class="service-task-meta">
       <small>${escapeHtml(item.collection)}</small>
       <span class="status ${item.statusClass}">${escapeHtml(item.lifecycle)} · ${escapeHtml(item.status)}</span>
@@ -1993,7 +1977,7 @@ function buildCitizenHighlightItems(resident, diseases = [], followups = [], rec
   const account = getCurrentAccount();
   const familyMembers = (account?.members || []).filter((item) => item.residentId !== residentId);
   const launchChannel = citizenClientChannels.find((item) => item.key === activeClientChannel) || citizenClientChannels[0];
-  const openOrders = orders.filter((item) => !["已完成", "已终止", "completed", "closed"].includes(item.lifecycle));
+  const openOrders = orders.filter(CSF.serviceOrderNeedsAttention);
   const vaultData = collectVaultData(resident, diseases, followups, records);
   const healthEvents = vaultData.timeline.slice(0, 5);
   const urgentReminders = reminders.filter((item) => item.priority === "high" || serviceTaskStatusClass(item.status, item.due) === "danger");
@@ -2011,17 +1995,7 @@ function buildCitizenHighlightItems(resident, diseases = [], followups = [], rec
       evidence: "健康档案、电子病历、体检、检查检验和用药记录统一排序。",
       ready: Boolean(healthEvents.length)
     },
-    {
-      id: "service-order-center-plus",
-      title: "统一服务订单中心深化",
-      status: `${orders.length} 单 / ${openOrders.length} 未完成`,
-      metric: openOrders.length,
-      action: "查看订单",
-      href: citizenPageHref("health-record"),
-      detail: orders.slice(0, 4).map((item) => `${item.service}:${item.lifecycle}`).join("；") || "护理、陪诊、挂号、体检、家医提交后统一进入 serviceOrders。",
-      evidence: "/api/service-orders 正式接口优先，保留本地聚合回退。",
-      ready: true
-    },
+    CSF.buildServiceOrderHighlight(orders, openOrders, citizenPageHref("health-record"), "统一服务订单中心深化"),
     {
       id: "privacy-control-deck",
       title: "居民授权与隐私驾驶舱",
@@ -2150,7 +2124,7 @@ function renderServiceTaskButtons(item) {
 }
 
 function shouldShowResidentConfirm(item) {
-  if (window.CitizenServiceFeedback?.isCompletedService(item)) return false;
+  if (CSF?.isCompletedService(item)) return false;
   return ![
     item.residentConfirmation,
     item.familyContactStatus,
@@ -2165,12 +2139,13 @@ function shouldShowCancelRequest(item) {
 }
 
 function shouldShowQualityFeedback(item) {
-  return window.CitizenServiceFeedback?.isFeedbackEligible(item) === true;
+  return CSF?.isFeedbackEligible(item) === true;
 }
 function bindResidentTaskActions() {
   const target = document.querySelector("#reminder-cards");
   if (!target) return;
-  const feedback = window.CitizenServiceFeedback.createDialogController(document, submitResidentTaskAction, showToast, () => renderCitizen(currentResidentId));
+  const feedback = CSF.createDialogController(document, submitResidentTaskAction, showToast, () => renderCitizen(currentResidentId),
+    (button) => CSF.createCommand(state.storageMeta?.collectionVersions, button.dataset.taskCollection));
   target.addEventListener("click", async (event) => {
     const button = event.target.closest("[data-resident-task-action]");
     if (!button) return;
@@ -2205,23 +2180,23 @@ function defaultResidentTaskComment(action) {
   }[action] || "居民端确认服务安排";
 }
 
-async function submitResidentTaskAction(taskId, collection, payload) {
+async function submitResidentTaskAction(taskId, collection, payload, command = {}) {
   if (API_BASE) {
     const itemId = String(taskId || "").split(":")[1];
     const current = collection === "referrals"
       ? findResidentTaskRows(collection).find((item) => item.id === itemId)
       : null;
     const referralCommandId = collection === "referrals" ? citizenCareRequestNonce() : "";
-    const commandPayload = collection === "referrals"
-      ? { ...payload, expectedVersion: Number(current?.version || 1) }
-      : payload;
+    const expectedVersion = current?.version;
+    const commandRequest = CSF.taskActionRequest(payload, command, referralCommandId, expectedVersion);
     const request = window.HealthCityAuth?.authFetch || fetch;
     const response = await request(`${API_BASE}/tasks/${encodeURIComponent(taskId)}/actions`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", ...(referralCommandId ? { "Idempotency-Key": referralCommandId } : {}) },
-      body: JSON.stringify(commandPayload)
+      ...commandRequest
     });
-    if (!response.ok) throw new Error(`服务待办更新失败：${response.status}`);
+    if (!response.ok) return CSF.handleFailedSubmission(
+      response, payload.action, () => recoverSubmittedServiceFeedback(taskId, collection, payload)
+    );
     const updated = await response.json();
     replaceResidentTaskItem(collection, updated);
     citizenMessages = await fetchCitizenMessages();
@@ -2232,6 +2207,20 @@ async function submitResidentTaskAction(taskId, collection, payload) {
   citizenMessages.unshift(buildLocalCitizenMessage(updated, collection, payload));
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   return updated;
+}
+
+async function recoverSubmittedServiceFeedback(taskId, collection, payload) {
+  if (!API_BASE) return null;
+  const request = window.HealthCityAuth?.authFetch || fetch;
+  return CSF.recoverSubmittedFeedback({ taskId, collection, payload, residentId: currentResidentId,
+    fetchState: async () => { const response = await request(`${API_BASE}/state`); return response.ok ? response.json() : null; },
+    onRecovered: async (refreshed) => {
+      state = refreshed;
+      [escortDashboard, citizenMessages, serviceOrderCenter] = await Promise.all([
+        fetchCitizenEscortDashboard(), fetchCitizenMessages(), fetchCitizenServiceOrders(currentResidentId)
+      ]);
+    }
+  });
 }
 
 function applyLocalResidentTaskAction(taskId, collection, payload) {
@@ -2262,7 +2251,7 @@ function applyLocalResidentTaskAction(taskId, collection, payload) {
 }
 
 function replaceResidentTaskItem(collection, updated) {
-  window.CitizenServiceFeedback.replaceTaskItem(findResidentTaskRows(collection), collection === "escortServiceOrders" ? escortDashboard?.orders : null, updated);
+  CSF.replaceTaskItem(findResidentTaskRows(collection), collection === "escortServiceOrders" ? escortDashboard?.orders : null, updated);
 }
 
 function findResidentTaskRows(collection) {
@@ -2295,18 +2284,18 @@ function renderCitizenNotifications(residentId) {
   const cards = document.querySelector("#citizen-notification-cards");
   if (!summary || !cards) return;
   const messages = citizenMessages
-    .filter((item) => !item.residentId || item.residentId === residentId)
+    .filter((item) => CSF.isCitizenVisibleMessage(item) && (!item.residentId || item.residentId === residentId))
     .sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")))
     .slice(0, 6);
   summary.textContent = `${messages.length} 条消息`;
   cards.innerHTML = messages.map((item) => `<article class="mini-card citizen-notification-card">
     <div class="service-task-head">
-      <span>${item.channel || "in_app"}</span>
-      <button type="button" data-message-receipt="${item.id}" ${item.status === "read" ? "disabled" : ""}>${item.status === "read" ? "已读" : "标记已读"}</button>
+      <span>${escapeHtml(item.channel || "in_app")}</span>
+      <button type="button" data-message-receipt="${escapeHtml(item.id)}" ${item.status === "read" ? "disabled" : ""}>${item.status === "read" ? "已读" : "标记已读"}</button>
     </div>
-    <h3>${item.title || "服务通知"}</h3>
-    <p class="muted">${item.body || "暂无消息内容"}</p>
-    <small>${item.createdAt || "时间待确认"}</small>
+    <h3>${escapeHtml(item.title || "服务通知")}</h3>
+    <p class="muted">${escapeHtml(item.body || "暂无消息内容")}</p>
+    <small>${escapeHtml(item.createdAt || "时间待确认")}</small>
   </article>`).join("") || `<p class="muted">暂无居民通知。预约变更、护士接单、陪诊师匹配和授权到期会在这里展示。</p>`;
 }
 
@@ -4313,6 +4302,7 @@ function renderEscortAppointments(residentId) {
       <p>${formatEscortItems(item.serviceItems)} · ${formatSubsidy(item.subsidyType)} · 预估 ${item.feeEstimate || 0} 元</p>
       <p>合同 ${formatEscortStatus(item.contractStatus)} · 保障 ${formatEscortStatus(item.insuranceStatus)} · 回访 ${formatEscortStatus(item.qualityReview)}</p>
       <p>${formatEscortHospitalHandoff(item)}</p>
+      ${CSF.renderComplaintStatus({ ...item, sourceCollection: "escortServiceOrders" }, escapeHtml)}
       ${renderEscortOrderProgress(item)}
       <span class="status ${item.priority === "high" || item.riskLevel === "high" ? "danger" : String(item.status || "").includes("requested") ? "warn" : ""}">${formatEscortStatus(item.status)}</span>
     </article>`)
