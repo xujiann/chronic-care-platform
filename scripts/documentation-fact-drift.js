@@ -63,6 +63,10 @@ function hasAcceptedWithoutProposed(source) {
   return statuses.length === 1 && statuses[0] === "Accepted";
 }
 
+function techDebtTableIds(source) {
+  return [...String(source || "").matchAll(/^\|\s*([A-Z][A-Z0-9-]*-\d{3})\s*\|/gm)].map((match) => match[1]);
+}
+
 function buildSqliteSchemaFacts() {
   const database = new DatabaseSync(":memory:");
   try {
@@ -117,6 +121,9 @@ function readRepositoryState(options = {}) {
   const e2eFacts = options.e2eFacts || buildE2eFacts();
   const productionReleaseScopeReport = options.productionReleaseScopeReport
     || buildProductionReleaseScopeReport(loadDefaultAuthorities());
+  const lifecycleTaskIds = options.lifecycleTaskIds || JSON.parse(fs.readFileSync(
+    path.join(ROOT, "config", "lifecycle-governance.json"), "utf8"
+  )).tasks.map((task) => task.id);
   return {
     documents,
     catalogSummary,
@@ -126,7 +133,8 @@ function readRepositoryState(options = {}) {
     firstReleaseMigrationReport,
     sqliteSchemaFacts,
     e2eFacts,
-    productionReleaseScopeReport
+    productionReleaseScopeReport,
+    lifecycleTaskIds
   };
 }
 
@@ -140,7 +148,8 @@ function buildReport(input) {
     firstReleaseMigrationReport = {},
     sqliteSchemaFacts = {},
     e2eFacts = {},
-    productionReleaseScopeReport = {}
+    productionReleaseScopeReport = {},
+    lifecycleTaskIds = []
   } = input || {};
   const entries = catalogSummary.entries;
   const writeRoutes = catalogSummary.writeRoutes;
@@ -183,6 +192,10 @@ function buildReport(input) {
   const e2eAdrCurrent = uniqueSection(documents.e2eAdr, "## 2026-09-06 当前套件状态");
   const adrIndexE2e = uniqueLineContaining(documents.adrIndex, "[Playwright E2E 采用统一浏览器策略与独占测试服务]");
   const techDebtRepositoryGovernance = uniqueLineContaining(documents.techDebt, "| DOC-001 |");
+  const techDebtIds = techDebtTableIds(documents.techDebt);
+  const duplicateTechDebtIds = [...new Set(techDebtIds.filter((id, index) => techDebtIds.indexOf(id) !== index))];
+  const lifecycleTaskIdSet = new Set(lifecycleTaskIds);
+  const lifecycleIdConflicts = [...new Set(techDebtIds.filter((id) => lifecycleTaskIdSet.has(id)))];
 
   const catalogFactsValid = [entries, writeRoutes, behaviorProofRequired, reviewRequired]
     .every(Number.isSafeInteger)
@@ -221,6 +234,10 @@ function buildReport(input) {
       && e2eRoot > 0 && e2eResident > 0 && e2ePwa > 0
       && e2eRoot + e2eResident + e2ePwa === e2eTotal,
     `root=${e2eRoot}; resident=${e2eResident}; PWA=${e2ePwa}; total=${e2eTotal}; spec files=${e2eFacts.specFiles}`),
+    check("techDebt:uniqueTableIds", techDebtIds.length > 0 && duplicateTechDebtIds.length === 0,
+      duplicateTechDebtIds.length ? `duplicate ids: ${duplicateTechDebtIds.join(", ")}` : `${techDebtIds.length} unique table ids`),
+    check("techDebt:lifecycleTaskIdNamespace", lifecycleIdConflicts.length === 0,
+      lifecycleIdConflicts.length ? `conflicting lifecycle task ids: ${lifecycleIdConflicts.join(", ")}` : "no lifecycle task id conflicts"),
     check("authority:firstReleaseScope", releaseScopeFactsValid, `${productionReleaseScopeReport.status || "missing"}; API reviews=${scopedApiReviewRequired}; collection reviews=${scopedCollectionReviewRequired}; plan gaps=${scopedRepositoryPlanMissing}`),
     check("roadmap:apiCatalogFacts", roadmapApi.count === 1
       && hasOneNumericFact(roadmapApi.text, /v3 当前 (\d+) 项/g, entries)
@@ -367,6 +384,11 @@ function buildReport(input) {
         markdownSuperseded,
         pdfArtifacts: repositoryGovernanceReport.pdf?.entries?.length
       },
+      techDebt: {
+        tableIds: techDebtIds.length,
+        duplicateIds: duplicateTechDebtIds,
+        lifecycleTaskIdConflicts: lifecycleIdConflicts
+      },
       sqliteSchema: {
         head: sqliteHead,
         tables: sqliteTableCount
@@ -417,5 +439,6 @@ module.exports = {
   buildSqliteSchemaFacts,
   buildReport,
   readRepositoryState,
+  techDebtTableIds,
   verifyRepository
 };
