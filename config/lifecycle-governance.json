@@ -187,7 +187,7 @@
       "owner": "T00",
       "mitigation": "通过当前 npm Node 入口启动固定脚本并保留未知变更全量回退",
       "status": "mitigated",
-      "evidenceIds": ["EVD-TEST-020"]
+      "evidenceIds": ["EVD-TEST-020", "EVD-TEST-020-CI"]
     }
   ],
   "decisions": [
@@ -314,6 +314,14 @@
       "scope": "repository",
       "type": "executable-contract",
       "ref": "node --test test/lifecycle-governance.test.js",
+      "testIds": ["TEST-CI-020"],
+      "productionEvidence": false
+    },
+    {
+      "id": "EVD-TEST-020-CI",
+      "scope": "repository-integration",
+      "type": "pull-request-ci",
+      "ref": "https://github.com/xujiann/chronic-care-platform/actions/runs/34182070276",
       "testIds": ["TEST-CI-020"],
       "productionEvidence": false
     }
@@ -633,8 +641,8 @@
       "id": "TEST-019",
       "title": "修复夜间生命周期门禁浏览器运行时装配",
       "ownerProcess": "T00",
-      "taskStatus": "待集成",
-      "capabilityStatus": "已验证",
+      "taskStatus": "已关闭",
+      "capabilityStatus": "已集成",
       "riskLevel": "低",
       "approval": {
         "state": "approved",
@@ -657,9 +665,7 @@
       "testIds": ["TEST-CI-019"],
       "evidenceIds": ["EVD-TEST-019"],
       "rollback": "回退本任务提交可恢复旧工作流；不会修改业务数据",
-      "unresolved": [
-        "等待 PR #262 必需检查完成并合入主线"
-      ],
+      "unresolved": [],
       "worktree": ".codex-platform-worktrees/process-v2/t00-lifecycle-governance-20260907",
       "branch": "process/t00-next-batch-control-20260907",
       "planRef": "T00-PLAN-TEST-019-NIGHTLY-BROWSER-2026-09-07",
@@ -679,8 +685,8 @@
       "id": "TEST-020",
       "title": "修复 Windows 全量单元回退调度",
       "ownerProcess": "T00",
-      "taskStatus": "待集成",
-      "capabilityStatus": "已验证",
+      "taskStatus": "已关闭",
+      "capabilityStatus": "已集成",
       "riskLevel": "低",
       "approval": {
         "state": "approved",
@@ -701,16 +707,14 @@
         "非 Windows 平台调用语义保持兼容且启动错误明确传播稳定错误码"
       ],
       "testIds": ["TEST-CI-020"],
-      "evidenceIds": ["EVD-TEST-020"],
+      "evidenceIds": ["EVD-TEST-020", "EVD-TEST-020-CI"],
       "rollback": "回退本任务脚本与测试；不会修改业务数据或生产运行时",
-      "unresolved": [
-        "等待 PR #262 必需检查完成并合入主线"
-      ],
+      "unresolved": [],
       "worktree": ".codex-platform-worktrees/process-v2/t00-lifecycle-governance-20260907",
       "branch": "process/t00-next-batch-control-20260907",
       "planRef": "T00-PLAN-TEST-020-WINDOWS-FALLBACK-2026-09-08",
       "pullRequestRef": "https://github.com/xujiann/chronic-care-platform/pull/262",
-      "ciRef": "",
+      "ciRef": "https://github.com/xujiann/chronic-care-platform/actions/runs/34182070276",
       "writeScopes": [
         "scripts/lifecycle-governance.js",
         "test/lifecycle-governance.test.js"
