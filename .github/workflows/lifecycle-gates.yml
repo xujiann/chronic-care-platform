@@ -39,6 +39,9 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm ci
+      - name: Install Playwright Chromium for nightly gate
+        if: ${{ github.event_name == 'schedule' || inputs.tier == 'nightly' }}
+        run: npx playwright install --with-deps chromium
       - name: Execute selected lifecycle gate
         env:
           REQUESTED_TIER: ${{ inputs.tier || 'nightly' }}

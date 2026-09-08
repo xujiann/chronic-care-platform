@@ -30,12 +30,13 @@ function actionReferences(source) {
 
 test("repository workflows pin official action versions to audited commit SHAs", () => {
   const ci = workflow("ci.yml");
+  const lifecycle = workflow("lifecycle-gates.yml");
   const pages = workflow("pages.yml");
   const promotion = workflow("production-promotion.yml");
-  const allWorkflows = `${ci}\n${pages}\n${promotion}`;
+  const allWorkflows = `${ci}\n${lifecycle}\n${pages}\n${promotion}`;
   const references = actionReferences(allWorkflows);
 
-  assert.equal(references.length, 21);
+  assert.equal(references.length, 23);
   assert.doesNotMatch(allWorkflows, /^\s*uses:\s+actions\/[^@\s]+@v\d+(?:\s+#.*)?$/gm);
   references.forEach(({ action, reference, version }) => {
     assert.ok(PINNED_ACTIONS[action], `unexpected GitHub Action: ${action}`);
@@ -48,6 +49,8 @@ test("repository workflows pin official action versions to audited commit SHAs",
   assert.match(ci, /regional-foundation:/);
   assert.match(ci, /npm run regional:status -- --region=template/);
   assert.match(ci, /npm run regional:status -- --region=210200/);
+  assert.match(lifecycle, /node-version:\s*24/);
+  assert.match(lifecycle, /name:\s*Install Playwright Chromium for nightly gate[\s\S]*github\.event_name == 'schedule' \|\| inputs\.tier == 'nightly'[\s\S]*npx playwright install --with-deps chromium/);
   assert.match(promotion, /node-version:\s*24/);
 });
 

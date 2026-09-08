@@ -275,19 +275,51 @@ function analyzeImpact(config, files) {
   };
 }
 
-function runChangedUnitTests(config, files) {
+function npmRunInvocation(script, options = {}) {
+  const platform = options.platform || process.platform;
+  const npmExecPath = options.npmExecPath === undefined ? process.env.npm_execpath : options.npmExecPath;
+  if (npmExecPath) {
+    return {
+      command: process.execPath,
+      args: [npmExecPath, "run", script],
+      shell: false
+    };
+  }
+  return {
+    command: platform === "win32" ? "npm.cmd" : "npm",
+    args: ["run", script],
+    shell: platform === "win32"
+  };
+}
+
+function assertSpawnSucceeded(result, message) {
+  if (result?.error) {
+    const code = String(result.error.code || "SPAWN_FAILED").replace(/[^A-Z0-9_-]/gi, "") || "SPAWN_FAILED";
+    throw new Error(`${message}: ${code}`);
+  }
+  if (result?.status !== 0) throw new Error(message);
+}
+
+function runChangedUnitTests(config, files, options = {}) {
   const impact = analyzeImpact(config, files);
+  const spawn = options.spawnSync || spawnSync;
+  const root = options.root || ROOT;
   if (impact.fullUnitFallback) {
-    const npm = process.platform === "win32" ? "npm.cmd" : "npm";
-    const result = spawnSync(npm, ["run", "test:unit"], { cwd: ROOT, stdio: "inherit", windowsHide: true });
-    if (result.status !== 0) throw new Error("unclassified change full unit fallback failed");
+    const invocation = npmRunInvocation("test:unit", options);
+    const result = spawn(invocation.command, invocation.args, {
+      cwd: root,
+      stdio: "inherit",
+      windowsHide: true,
+      shell: invocation.shell
+    });
+    assertSpawnSucceeded(result, "unclassified change full unit fallback failed");
   } else {
     const tests = impact.quickTests.length > 0 ? impact.quickTests : ["test/lifecycle-governance.test.js"];
     for (const testPath of tests) {
-      if (!fs.existsSync(path.join(ROOT, testPath))) throw new Error(`quick test does not exist: ${testPath}`);
+      if (!fs.existsSync(path.join(root, testPath))) throw new Error(`quick test does not exist: ${testPath}`);
     }
-    const result = spawnSync(process.execPath, ["--test", ...tests], { cwd: ROOT, stdio: "inherit", windowsHide: true });
-    if (result.status !== 0) throw new Error("changed unit tests failed");
+    const result = spawn(process.execPath, ["--test", ...tests], { cwd: root, stdio: "inherit", windowsHide: true });
+    assertSpawnSucceeded(result, "changed unit tests failed");
   }
   return { ...impact, executed: impact.fullUnitFallback ? "full-unit-fallback" : "affected-unit-tests" };
 }
@@ -318,4 +350,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { analyzeImpact, assertNoDependencyCycle, changedFiles, readJson, runChangedUnitTests, validateLifecycleGovernance };
+module.exports = { analyzeImpact, assertNoDependencyCycle, assertSpawnSucceeded, changedFiles, npmRunInvocation, readJson, runChangedUnitTests, validateLifecycleGovernance };

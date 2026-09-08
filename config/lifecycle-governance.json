@@ -82,6 +82,39 @@
         "投诉必须生成机构待跟进消息",
         "浏览器提交失败必须保留居民草稿"
       ]
+    },
+    {
+      "id": "REQ-OPS-018",
+      "title": "影像质控未知或部分提交结果必须可安全查看和人工核对",
+      "sourceType": "approved-user-requirement",
+      "sourceRef": "USER-APPROVED-2026-09-07-BATCH-2",
+      "acceptance": [
+        "未知外部结果不得被显示为已确认或自动重试",
+        "外部已确认但本地未提交时只暴露最小白名单回执并保持写操作锁定",
+        "状态查看必须严格读取真实本地接口且读取失败不得回退演示事实"
+      ]
+    },
+    {
+      "id": "REQ-TEST-019",
+      "title": "夜间生命周期门禁必须安装其声明使用的浏览器运行时",
+      "sourceType": "observed-ci-failure",
+      "sourceRef": "https://github.com/xujiann/chronic-care-platform/actions/runs/34160212594",
+      "acceptance": [
+        "定时和手工 nightly 执行前安装 Playwright Chromium 及系统依赖",
+        "quick、pr 和 release 调度不承担无关浏览器安装成本",
+        "生命周期工作流的官方 Action SHA 纳入机器漂移测试"
+      ]
+    },
+    {
+      "id": "REQ-TEST-020",
+      "title": "变更影响分析的全量单元回退必须在 Windows 可靠启动",
+      "sourceType": "observed-gate-failure",
+      "sourceRef": "OPS-016-2026-09-08-TEST-CHANGED-DIAGNOSIS",
+      "acceptance": [
+        "Windows 优先使用当前 npm 的 Node 入口而不是直接启动批处理文件",
+        "未知变更仍执行完整 test:unit 且失败语义不放宽",
+        "跨平台调用选择具备可执行单元合同且启动错误以稳定错误码传播"
+      ]
     }
   ],
   "regulatoryControls": [
@@ -128,6 +161,33 @@
       "mitigation": "复用居民范围门禁，限制完成态和一次提交，并为 open 投诉生成机构消息",
       "status": "open",
       "evidenceIds": ["EVD-OPS-017"]
+    },
+    {
+      "id": "RISK-OPS-018",
+      "level": "中",
+      "title": "影像质控未知结果被误报成功或触发重复外部副作用",
+      "owner": "T06",
+      "mitigation": "只读核对、最小回执白名单和需对账状态持续锁定；耐久补偿另行高风险决策",
+      "status": "open",
+      "evidenceIds": ["EVD-OPS-015", "EVD-OPS-015B"]
+    },
+    {
+      "id": "RISK-TEST-019",
+      "level": "低",
+      "title": "夜间门禁因缺少浏览器运行时产生全量伪失败",
+      "owner": "T00",
+      "mitigation": "仅在 schedule 或 nightly 输入时显式安装 Chromium 并锁定工作流合同",
+      "status": "mitigated",
+      "evidenceIds": ["EVD-TEST-019"]
+    },
+    {
+      "id": "RISK-TEST-020",
+      "level": "低",
+      "title": "Windows 门禁调度错误把已通过的全量测试报告为失败",
+      "owner": "T00",
+      "mitigation": "通过当前 npm Node 入口启动固定脚本并保留未知变更全量回退",
+      "status": "mitigated",
+      "evidenceIds": ["EVD-TEST-020"]
     }
   ],
   "decisions": [
@@ -178,6 +238,18 @@
       "kind": "resident-service-feedback-contract",
       "path": "test/citizen-service-feedback.test.js",
       "command": "node --test test/citizen-service-feedback.test.js test/escort-owner-route-characterization.test.js test/internet-nursing-closed-loop-characterization.test.js"
+    },
+    {
+      "id": "TEST-CI-019",
+      "kind": "github-actions-runtime-contract",
+      "path": "test/github-actions-runtime.test.js",
+      "command": "node --test test/github-actions-runtime.test.js"
+    },
+    {
+      "id": "TEST-CI-020",
+      "kind": "cross-platform-gate-runner-contract",
+      "path": "test/lifecycle-governance.test.js",
+      "command": "node --test test/lifecycle-governance.test.js"
     }
   ],
   "evidence": [
@@ -227,6 +299,22 @@
       "type": "pull-request-ci",
       "ref": "https://github.com/xujiann/chronic-care-platform/actions/runs/34104462467",
       "testIds": ["TEST-OPS-017"],
+      "productionEvidence": false
+    },
+    {
+      "id": "EVD-TEST-019",
+      "scope": "repository-integration",
+      "type": "nightly-ci",
+      "ref": "https://github.com/xujiann/chronic-care-platform/actions/runs/34176711788",
+      "testIds": ["TEST-CI-019"],
+      "productionEvidence": false
+    },
+    {
+      "id": "EVD-TEST-020",
+      "scope": "repository",
+      "type": "executable-contract",
+      "ref": "node --test test/lifecycle-governance.test.js",
+      "testIds": ["TEST-CI-020"],
       "productionEvidence": false
     }
   ],
@@ -391,7 +479,7 @@
       "id": "OPS-016",
       "title": "体检专项动作并发与重复提交治理",
       "ownerProcess": "T06",
-      "taskStatus": "已阻塞",
+      "taskStatus": "实施中",
       "capabilityStatus": "已实现",
       "riskLevel": "高",
       "approval": {
@@ -420,9 +508,9 @@
         "进程锁和 JSON 存储不提供分布式 exactly-once",
         "结构化指标、追踪、SLO、告警、手册、降级和补偿尚未完整交付"
       ],
-      "worktree": ".codex-platform-worktrees/process-v2/t06-physical-examination-recovery-20260907",
-      "branch": "process/t06-physical-examination-recovery-20260907",
-      "planRef": "REQ-OPS-016",
+      "worktree": ".codex-platform-worktrees/process-v2/t06-physical-exam-action-http-evidence-20260907",
+      "branch": "process/t06-physical-exam-action-http-evidence-20260907",
+      "planRef": "T00-PLAN-OPS-016-HTTP-EVIDENCE-2026-09-07",
       "pullRequestRef": "https://github.com/xujiann/chronic-care-platform/pull/258",
       "ciRef": "https://github.com/xujiann/chronic-care-platform/actions/runs/34101751863",
       "writeScopes": [
@@ -440,7 +528,7 @@
       "id": "OPS-017",
       "title": "居民护理与陪诊服务评价投诉闭环",
       "ownerProcess": "T04",
-      "taskStatus": "已阻塞",
+      "taskStatus": "实施中",
       "capabilityStatus": "已实现",
       "riskLevel": "中",
       "approval": {
@@ -468,9 +556,9 @@
         "投诉目前复用站内消息，尚无独立工单、SLA、升级和结案模型",
         "结构化指标、追踪、SLO、告警、手册、降级和补偿尚未完整交付"
       ],
-      "worktree": ".codex-platform-worktrees/process-v2/t00-health-dashboard-about-trusted-rendering-20260907",
-      "branch": "process/t00-citizen-service-feedback-20260907",
-      "planRef": "REQ-OPS-017",
+      "worktree": ".codex-platform-worktrees/process-v2/t04-citizen-complaint-followup-20260907",
+      "branch": "process/t04-citizen-complaint-followup-20260907",
+      "planRef": "T00-PLAN-OPS-017-COMPLAINT-FOLLOWUP-2026-09-07",
       "pullRequestRef": "https://github.com/xujiann/chronic-care-platform/pull/260",
       "ciRef": "https://github.com/xujiann/chronic-care-platform/actions/runs/34104462467",
       "writeScopes": [
@@ -485,6 +573,153 @@
         "gaps": "尚未完整交付评价投诉专用指标告警、分布式追踪、健康检查、SLO错误预算、处置手册、降级与补偿方案"
       },
       "runtimeCapability": true
+    },
+    {
+      "id": "OPS-018",
+      "title": "影像质控需对账状态只读核对体验",
+      "ownerProcess": "T06",
+      "taskStatus": "实施中",
+      "capabilityStatus": "已实现",
+      "riskLevel": "中",
+      "approval": {
+        "state": "approved",
+        "mode": "T00-plan-approval",
+        "ref": "T00-PLAN-APPROVED-2026-09-07-BATCH-2",
+        "approvedScope": "imaging-qc-minimized-reconciliation-projection-strict-read-only-status-and-browser-lock"
+      },
+      "requirementIds": ["REQ-OPS-018"],
+      "regulatoryControlIds": ["REG-GOV-001"],
+      "riskIds": ["RISK-OPS-015", "RISK-OPS-018"],
+      "decisionIds": [],
+      "dependencies": ["GOV-002"],
+      "affectedModules": ["clinical-imaging", "fhir-integration", "imaging-browser"],
+      "dataSensitivity": "影像质控最小回执与本地状态-敏感健康业务元数据",
+      "acceptanceCriteria": [
+        "unknown 与 confirmed 外部结果严格区分且不得自动重发",
+        "公共错误投影仅允许最小对账字段并递归剔除传输秘密",
+        "严格只读状态查看失败时不使用演示数据且查看后保持写动作锁定",
+        "durable outbox、幂等协议、机构范围和权威状态机只形成 Proposed 方案"
+      ],
+      "testIds": ["TEST-OPS-015", "TEST-OPS-015B"],
+      "evidenceIds": ["EVD-OPS-015", "EVD-OPS-015B"],
+      "rollback": "回退本任务单一 PR；无 schema 或数据迁移，不改变既有 FHIR 与本地事实",
+      "unresolved": [
+        "durable outbox、command idempotency、机构范围、CAS、worker 与 FHIR readback 等待独立高风险决策",
+        "完整指标、追踪、SLO、告警、手册、降级和耐久补偿尚未交付"
+      ],
+      "worktree": ".codex-platform-worktrees/process-v2/t06-imaging-qc-reconciliation-ux-20260907",
+      "branch": "process/t06-imaging-qc-reconciliation-ux-20260907",
+      "planRef": "T00-PLAN-OPS-018-READONLY-RECONCILIATION-2026-09-07",
+      "pullRequestRef": "",
+      "ciRef": "",
+    "writeScopes": [
+      "src/http/routes/clinical-specialties/imaging-cloud.js",
+      "src/clinical-specialties/imaging/public-response.js",
+      "src/clinical-specialties/imaging/study-quality-control-command.js",
+      "imaging-cloud.js",
+      "test/imaging-dashboard-route-characterization.test.js",
+      "test/imaging-study-quality-control-command.test.js",
+      "test/t06-imaging-response-security.test.js",
+      "docs/imaging-quality-control-reconciliation-plan.md",
+      "docs/adr/2026-09-07-imaging-quality-control-durable-reconciliation.md"
+    ],
+      "observability": {
+        "applicable": true,
+        "gaps": "只交付用户可见核对上下文；专用指标告警、追踪、健康检查、SLO错误预算、处置手册、降级与耐久补偿仍缺失"
+      },
+      "runtimeCapability": true
+    },
+    {
+      "id": "TEST-019",
+      "title": "修复夜间生命周期门禁浏览器运行时装配",
+      "ownerProcess": "T00",
+      "taskStatus": "待集成",
+      "capabilityStatus": "已验证",
+      "riskLevel": "低",
+      "approval": {
+        "state": "approved",
+        "mode": "approved-task-package",
+        "ref": "USER-APPROVED-2026-09-07-BATCH-2",
+        "approvedScope": "lifecycle-nightly-playwright-runtime-setup"
+      },
+      "requirementIds": ["REQ-TEST-019"],
+      "regulatoryControlIds": ["REG-GOV-001"],
+      "riskIds": ["RISK-TEST-019"],
+      "decisionIds": [],
+      "dependencies": ["GOV-002"],
+      "affectedModules": ["ci", "browser-e2e", "lifecycle-gates"],
+      "dataSensitivity": "CI 运行元数据-不含居民或生产凭据",
+      "acceptanceCriteria": [
+        "schedule 与 nightly 输入执行浏览器安装",
+        "非 nightly 输入不执行浏览器安装",
+        "生命周期工作流 Action 固定 SHA 由测试覆盖"
+      ],
+      "testIds": ["TEST-CI-019"],
+      "evidenceIds": ["EVD-TEST-019"],
+      "rollback": "回退本任务提交可恢复旧工作流；不会修改业务数据",
+      "unresolved": [
+        "等待 PR #262 必需检查完成并合入主线"
+      ],
+      "worktree": ".codex-platform-worktrees/process-v2/t00-lifecycle-governance-20260907",
+      "branch": "process/t00-next-batch-control-20260907",
+      "planRef": "T00-PLAN-TEST-019-NIGHTLY-BROWSER-2026-09-07",
+      "pullRequestRef": "https://github.com/xujiann/chronic-care-platform/pull/262",
+      "ciRef": "https://github.com/xujiann/chronic-care-platform/actions/runs/34176711788",
+      "writeScopes": [
+        ".github/workflows/lifecycle-gates.yml",
+        "test/github-actions-runtime.test.js"
+      ],
+      "observability": {
+        "applicable": false,
+        "reason": "本任务修复 CI 测试运行时装配，不新增生产运行时能力"
+      },
+      "runtimeCapability": false
+    },
+    {
+      "id": "TEST-020",
+      "title": "修复 Windows 全量单元回退调度",
+      "ownerProcess": "T00",
+      "taskStatus": "待集成",
+      "capabilityStatus": "已验证",
+      "riskLevel": "低",
+      "approval": {
+        "state": "approved",
+        "mode": "approved-task-package",
+        "ref": "USER-APPROVED-2026-09-08-FOUR-LANE",
+        "approvedScope": "t00-windows-unclassified-full-unit-fallback-runner"
+      },
+      "requirementIds": ["REQ-TEST-020"],
+      "regulatoryControlIds": ["REG-GOV-001"],
+      "riskIds": ["RISK-TEST-020"],
+      "decisionIds": [],
+      "dependencies": ["GOV-002"],
+      "affectedModules": ["ci", "change-impact", "lifecycle-gates"],
+      "dataSensitivity": "本地测试进程元数据-不含居民或生产凭据",
+      "acceptanceCriteria": [
+        "Windows 使用当前 npm Node 入口执行 test:unit",
+        "未知变更继续触发全量单元测试且失败关闭",
+        "非 Windows 平台调用语义保持兼容且启动错误明确传播稳定错误码"
+      ],
+      "testIds": ["TEST-CI-020"],
+      "evidenceIds": ["EVD-TEST-020"],
+      "rollback": "回退本任务脚本与测试；不会修改业务数据或生产运行时",
+      "unresolved": [
+        "等待 PR #262 必需检查完成并合入主线"
+      ],
+      "worktree": ".codex-platform-worktrees/process-v2/t00-lifecycle-governance-20260907",
+      "branch": "process/t00-next-batch-control-20260907",
+      "planRef": "T00-PLAN-TEST-020-WINDOWS-FALLBACK-2026-09-08",
+      "pullRequestRef": "https://github.com/xujiann/chronic-care-platform/pull/262",
+      "ciRef": "",
+      "writeScopes": [
+        "scripts/lifecycle-governance.js",
+        "test/lifecycle-governance.test.js"
+      ],
+      "observability": {
+        "applicable": false,
+        "reason": "本任务修复本地与 CI 测试调度，不新增生产运行时能力"
+      },
+      "runtimeCapability": false
     }
   ],
   "gateTiers": [
