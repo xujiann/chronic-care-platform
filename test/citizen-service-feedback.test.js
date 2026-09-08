@@ -144,6 +144,15 @@ test("ambiguous feedback recovery requires the exact persisted evaluation", () =
   assert.equal(feedback.isCitizenVisibleMessage({ targetRole: "citizen" }), true);
   assert.equal(feedback.isCitizenVisibleMessage({}), false);
   assert.equal(feedback.isCitizenVisibleMessage({ targetRole: "institution" }), false);
+
+  const request = feedback.taskActionRequest(
+    { action: "quality-feedback", comment: "服务迟到" },
+    { idempotencyKey: "feedback-command-1", expectedVersion: 7 }
+  );
+  assert.equal(request.headers["Idempotency-Key"], "feedback-command-1");
+  assert.deepEqual(JSON.parse(request.body), {
+    action: "quality-feedback", comment: "服务迟到", idempotencyKey: "feedback-command-1", expectedVersion: 7
+  });
 });
 
 test("resident portal wires a structured feedback dialog without changing the task API", () => {

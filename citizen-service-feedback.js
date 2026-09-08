@@ -349,10 +349,33 @@
     });
   }
 
+  function createCommand(collectionVersions, collection) {
+    const expectedVersion = collectionVersions?.[collection];
+    return {
+      idempotencyKey: crypto.randomUUID(),
+      ...(Number.isSafeInteger(expectedVersion) && expectedVersion >= 0 ? { expectedVersion } : {})
+    };
+  }
+
+  function taskActionRequest(payload, command = {}, referralCommandId = "", referralVersion = 1) {
+    const feedbackCommandId = payload.action === "quality-feedback" ? String(command.idempotencyKey || "").trim() : "";
+    const idempotencyKey = referralCommandId || feedbackCommandId;
+    const commandPayload = referralCommandId
+      ? { ...payload, expectedVersion: Number(referralVersion || 1) }
+      : feedbackCommandId
+        ? { ...payload, idempotencyKey: feedbackCommandId, ...(command.expectedVersion === undefined ? {} : { expectedVersion: command.expectedVersion }) }
+        : payload;
+    return {
+      headers: { "Content-Type": "application/json", ...(idempotencyKey ? { "Idempotency-Key": idempotencyKey } : {}) },
+      body: JSON.stringify(commandPayload)
+    };
+  }
+
   return {
     buildPayload,
     buildServiceOrderHighlight,
     complaintStatusView,
+    createCommand,
     createDialogController,
     enrichServiceOrder,
     hasComplaintClosureEvidence,
@@ -376,6 +399,7 @@
     shouldIncludeEscortOrder,
     shouldIncludeNursingOrder,
     shouldIncludeOrder,
+    taskActionRequest,
     taskStatus
   };
 });
