@@ -4679,6 +4679,174 @@
       ],
       "productionReady": false,
       "externalEvidenceRequired": true
+    },
+    {
+      "contractId": "physical-examination.specialized-intake-action-command.v2",
+      "key": "POST /api/physical-exams/specialized-intakes/:id/actions",
+      "method": "POST",
+      "path": "/api/physical-exams/specialized-intakes/:id/actions",
+      "owner": "T06",
+      "domain": "clinical-specialties",
+      "purpose": "transition-scoped-specialized-examination-intake",
+      "customAuthenticationEvidence": false,
+      "authentication": {
+        "required": true,
+        "mechanism": "bearer-or-cookie-session",
+        "principalType": "platform-user",
+        "credentialSource": [
+          "header:authorization",
+          "cookie:session"
+        ],
+        "replayCsrf": {
+          "replayProtection": "actor-and-resource-scoped-idempotency-key-hash-plus-intake-resource-lock",
+          "csrf": "platform-session-transport-policy"
+        }
+      },
+      "authorization": {
+        "model": "platform-rbac-plus-fail-closed-current-resident-and-institution-resource-scope",
+        "roles": [
+          "commission",
+          "institution"
+        ],
+        "dataScope": "commission permitted resident scope or institution own resident and specialized intake"
+      },
+      "coverage": {
+        "level": "endpoint",
+        "selector": "entire-route",
+        "actions": [
+          "assign-profile",
+          "return-source",
+          "close"
+        ],
+        "unverifiedRemainder": false
+      },
+      "idempotency": {
+        "key": "header:Idempotency-Key-or-body:idempotencyKey-with-equality-when-both-present",
+        "payloadBinding": [
+          "actorRole",
+          "actorOrganizationType",
+          "actorOrganizationCode",
+          "actorPrincipal",
+          "intakeId",
+          "action",
+          "expectedVersion",
+          "evidenceRef",
+          "note",
+          "targetSystem",
+          "profileId"
+        ],
+        "exactReplay": "rechecks current resident and intake scope and returns the persisted public intake response with status 200 and idempotentReplay=true without another business, receipt or audit write",
+        "conflictingReuse": "PHYSICAL_EXAM_SPECIALIZED_INTAKE_IDEMPOTENCY_CONFLICT",
+        "persistenceScope": "specialized intake transition, version, bounded private receipt, evidence link, data-access audit and security audit in one platform state write",
+        "distributedExactlyOnceClaimed": false
+      },
+      "concurrency": {
+        "cas": {
+          "required": true,
+          "field": "per-intake resource lock plus aggregate expectedVersion and physicalExamSpecializedIntakes collection version",
+          "conflictCodes": [
+            "PHYSICAL_EXAM_SPECIALIZED_INTAKE_VERSION_CONFLICT"
+          ]
+        }
+      },
+      "errors": [
+        {
+          "code": "PHYSICAL_EXAM_SPECIALIZED_INTAKE_INVALID",
+          "status": 400
+        },
+        {
+          "code": "PHYSICAL_EXAM_SPECIALIZED_INTAKE_EXPECTED_VERSION_REQUIRED",
+          "status": 400
+        },
+        {
+          "code": "PHYSICAL_EXAM_SPECIALIZED_INTAKE_SCOPE_FORBIDDEN",
+          "status": 403
+        },
+        {
+          "code": "PHYSICAL_EXAM_SPECIALIZED_INTAKE_NOT_FOUND",
+          "status": 404
+        },
+        {
+          "code": "PHYSICAL_EXAM_SPECIALIZED_INTAKE_IDEMPOTENCY_CONFLICT",
+          "status": 409
+        },
+        {
+          "code": "PHYSICAL_EXAM_SPECIALIZED_INTAKE_VERSION_CONFLICT",
+          "status": 409
+        },
+        {
+          "code": "PHYSICAL_EXAM_SPECIALIZED_INTAKE_STATE_CONFLICT",
+          "status": 409
+        },
+        {
+          "code": "PHYSICAL_EXAM_SPECIALIZED_INTAKE_RECEIPT_CAPACITY_REACHED",
+          "status": 409
+        },
+        {
+          "code": "PHYSICAL_EXAM_SPECIALIZED_INTAKE_STORAGE_FAILED",
+          "status": 500
+        }
+      ],
+      "audit": {
+        "accepted": "commits one specialized intake transition, evidence link, version, bounded private receipt, data-access audit and security audit in one platform state write",
+        "replay": "returns the original public intake response without another transition, evidence link, receipt, access audit, security audit or state write",
+        "rejected": "identity and current resident or institution scope precede replay; key mismatch, payload reuse, stale version, invalid state and receipt capacity fail without business write; storage failure leaves the complete state unchanged"
+      },
+      "implementationEvidence": [
+        {
+          "file": "src/http/routes/clinical-specialties/blood-innovation.js",
+          "anchors": [
+            "physical-exam-specialized-intake:${intakeId}",
+            "if (current && !canAccessResident(user, current.residentId, data))",
+            "physicalExaminationSpecializedIntakeActionCommand.execute"
+          ]
+        },
+        {
+          "file": "src/clinical-specialties/physical-examination/specialized-intake-action-command.js",
+          "anchors": [
+            "function createCommandIdentity",
+            "function findReplay",
+            "function createPhysicalExaminationSpecializedIntakeActionCommand"
+          ]
+        },
+        {
+          "file": "physical-examination-service.js",
+          "anchors": [
+            "function applySpecializedIntakeAction",
+            "assign-profile",
+            "return-source",
+            "close"
+          ]
+        }
+      ],
+      "testEvidence": [
+        {
+          "file": "test/physical-examination-specialized-intake-http-behavior.test.js",
+          "anchors": [
+            "assign-profile, return-source and close have complete real HTTP command evidence",
+            "one private receipt",
+            "failed commit is fully atomic and immutable"
+          ]
+        },
+        {
+          "file": "test/physical-examination-specialized-intake-route-characterization.test.js",
+          "anchors": [
+            "specialized intake action locks, rechecks scope and commits state with both audits once",
+            "scope is rechecked before an idempotent replay",
+            "SQLite collection CAS conflicts map to a recoverable 409"
+          ]
+        },
+        {
+          "file": "test/physical-examination-specialized-intake-action-command.test.js",
+          "anchors": [
+            "same key with changed payload and stale versions fail closed before side effects",
+            "receipt capacity rejects new governed commands without evicting recovery evidence",
+            "domain and persistence failures never produce an additional write"
+          ]
+        }
+      ],
+      "productionReady": false,
+      "externalEvidenceRequired": true
     }
   ]
 }

@@ -676,9 +676,12 @@
       "pullRequestRef": "",
       "ciRef": "",
       "writeScopes": [
+        "config/lifecycle-governance.json",
         "config/api-idempotency-evidence.json",
         "test/api-idempotency-evidence.test.js",
         "test/production-api-catalog.test.js",
+        "ROADMAP.md",
+        "MODULE_MAP.md",
         "API_MAP.md",
         "CURRENT_ARCHITECTURE.md",
         "ENGINEERING_GOVERNANCE.md",

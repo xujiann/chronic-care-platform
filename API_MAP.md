@@ -15,7 +15,7 @@
 
 ## AI/CDSS 主线整合（2026-09-06）
 
-新增 `GET /api/ai-governance/center`（仅规则元数据）与 `POST /api/ai-governance/rules/:id/actions`（commission manager、增强认证、幂等/CAS、独立审批、审计）。保留主线 `/api/runtime/ai-governance/center`、`/api/quality-safety/ai-cdss/center` 与 `/api/security/audit-governance/center`。旧临床回执支持版本/稳定重放，旧 config 生产拒绝且非生产禁止改已治理规则。当前目录 636 项、363 写入口，40 份行为合同覆盖 38 个完整 endpoint 与 2 个 action slice；325 个写证明缺口和 327 个总复核项仍 NO-GO。
+新增 `GET /api/ai-governance/center`（仅规则元数据）与 `POST /api/ai-governance/rules/:id/actions`（commission manager、增强认证、幂等/CAS、独立审批、审计）。保留主线 `/api/runtime/ai-governance/center`、`/api/quality-safety/ai-cdss/center` 与 `/api/security/audit-governance/center`。旧临床回执支持版本/稳定重放，旧 config 生产拒绝且非生产禁止改已治理规则。当前目录 636 项、363 写入口，41 份行为合同覆盖 39 个完整 endpoint 与 2 个 action slice；324 个写证明缺口和 326 个总复核项仍 NO-GO。
 
 ## 2026-09-06 平台审计治理 API
 
@@ -103,7 +103,7 @@
 
 ## 2026-08-31 API 当前事实机器对账
 
-生产 API 目录当前为 636 项，其中 363 个写入口、325 个 endpoint 仍缺直接行为证明、总 `review-required` 为 327；首批生产范围的 `apiReviewRequired` 已为 0，但整体仍为 `FROZEN-NO-GO`。招标需求复核、脱敏批次登记和交付治理入口均保持 `productionReady=false`，不改变首批冻结范围。
+生产 API 目录当前为 636 项，其中 363 个写入口、324 个 endpoint 仍缺直接行为证明、总 `review-required` 为 326；首批生产范围的 `apiReviewRequired` 已为 0，但整体仍为 `FROZEN-NO-GO`。体检专项分流动作的仓库行为证据已登记，但保持 `productionReady=false`，不改变首批冻结范围。
 
 ## 2026-08-31 首发迁移计划不改变 API
 
@@ -235,8 +235,8 @@ HTTP request
 - `GET /api/state` 保持 method/path 与五类角色集合兼容；commission 仅 `accountType=manager` 可继续访问，其他角色仍使用既有范围投影。鉴权完成后，`authUsers` 专用投影递归删除 password/token/secret/session/private-key/api-key 等凭据键，保留账号、角色、机构、状态、`externalSubject` 与非凭据业务字段；读取不修改权威快照。commission manager 的其余全状态最小权限债务仍为 `NO-GO`。
 - `npm run api:authorization-matrix` 从模块化路由源码生成/校验 owner、身份、角色、范围、用途和 21 条高风险接口唯一性。
 - `npm run api:authentication-evidence` 校验 13 项认证合同的 owner、mechanism、credential source、required/optional/none、replay/CSRF、scope、实现锚点和可执行负向测试。其中 SMS callback 从现有幂等合同派生；原 13 个未分类 key 中 12 个真实入口已分类，T10 cutover pack 绑定 commission 直接拒绝证据，1 个公卫词法误配已从 inventory 删除，未分类认证为 0。
-- `npm run api:production-catalog` 合并上述授权矩阵与同一 route source inventory 的字面条件；当前 636 项全部 `NO-GO`。363 个写接口中 38 个完整 endpoint 有直接幂等行为合同，325 个仍缺 endpoint 级行为证明；2 个转诊 action-slice 不晋升通用 endpoint，退款 runtime-role variant 仍复核，因此总 `review-required` 为 327。
-- `npm run api:idempotency-evidence` 校验 40 份证据合同且显式待补证明为 0。招标需求复核、脱敏批次登记、交付治理和 AI 规则治理入口已绑定角色、操作者、幂等键和 CAS，将领域状态、回执与审计一次持久化，并以固定脱敏错误覆盖输入、冲突、审计和存储失败。其余完整合同绑定各入口的身份、职责/资源范围、原响应或精确结果回放、CAS、单次持久化与稳定错误负测。所有合同保持 `productionReady=false`，进程锁与 SQLite CAS 不等于跨实例 exactly-once。
+- `npm run api:production-catalog` 合并上述授权矩阵与同一 route source inventory 的字面条件；当前 636 项全部 `NO-GO`。363 个写接口中 39 个完整 endpoint 有直接幂等行为合同，324 个仍缺 endpoint 级行为证明；2 个转诊 action-slice 不晋升通用 endpoint，退款 runtime-role variant 仍复核，因此总 `review-required` 为 326。
+- `npm run api:idempotency-evidence` 校验 41 份证据合同且显式待补证明为 0。体检专项分流合同绑定三种允许动作、身份与当前居民/机构范围、header/body 键一致性、精确回放、CAS、一次业务/回执/双审计提交及稳定错误负测。所有合同保持 `productionReady=false`，进程锁与 SQLite CAS 不等于跨实例 exactly-once。
 - 身份/SMS HTTP 路径保持不变；组合根已为短信发送生成随机 request ID，适配器现在拒绝缺失幂等 ID，OIDC refresh 返回的 ID token 必须通过 JWKS/claims 验证后才暴露脱敏 claims。
 - `POST /api/attachments/upload-intents` 在完成身份和居民范围校验后检查服务端元数据容量；已有
   500 条或更多记录时返回 `507 SECURE_ATTACHMENT_METADATA_CAPACITY_EXCEEDED`，且不调用对象
@@ -289,7 +289,7 @@ CAS、机构范围、outbox 或生产批准。浏览器会在请求进行中或�
 
 `GET /api/physical-exams` 已通过兼容委托接入 `physical-examination-dashboard-query.v1`。允许角色仍为 citizen、institution、commission；显式 `residentId` 继续按 `allowedResidentIdsForUser` 拒绝越权并记录安全事件。citizen 仍不接收联调、网关和专项分流明细，readiness 只暴露代码状态、质量和阻断数量；管理角色保留完整投影。成功响应继续在既有访问审计持久化之后执行最终脱敏。
 
-`POST /api/physical-exams/specialized-intakes/:id/actions` 已通过兼容委托接入 `physical-examination-specialized-intake-action-command.v2`。允许角色仍为 institution、commission；居民范围在进程锁内重新校验。携带显式 `Idempotency-Key`（或同值 body 字段）的请求必须同时携带 `expectedVersion`，命令键绑定角色、机构、主体、资源和 payload 摘要；相同请求精确重放，键复用或版本冲突稳定返回 409。业务变更、版本、最多 50 条非淘汰回执、访问审计和安全审计在同一次数据库写入中提交，写入失败不污染调用方快照，公开响应不暴露内部回执。未携带显式键的旧客户端继续兼容，但不获得幂等保证；JSON/进程锁也不构成分布式 exactly-once。本接口尚未具备三类动作的完整 HTTP 行为证据，因此不进入中央 API 幂等证据白名单。
+`POST /api/physical-exams/specialized-intakes/:id/actions` 已通过兼容委托接入 `physical-examination-specialized-intake-action-command.v2`。允许角色仍为 institution、commission；居民范围在进程锁内重新校验。携带显式 `Idempotency-Key`（或同值 body 字段）的请求必须同时携带 `expectedVersion`，命令键绑定角色、机构、主体、资源和 payload 摘要；相同请求精确重放，键复用或版本冲突稳定返回 409。业务变更、版本、最多 50 条非淘汰回执、访问审计和安全审计在同一次数据库写入中提交，写入失败不污染调用方快照，公开响应不暴露内部回执。`assign-profile`、`return-source`、`close` 三类允许动作现由真实 HTTP、命令与路由测试共同证明且无未验证余项，已登记为唯一完整 endpoint 合同。未携带显式键的旧客户端继续兼容但不获得幂等保证；JSON/进程锁不构成分布式 exactly-once，合同仍为 `productionReady=false`。
 
 TEST-007 已把 T02 `operations-command` 的 32 条路径全部纳入运行时行为矩阵：每条路径验证声明角色和
 deny-before-read，19 条 GET 验证只读响应，13 条 POST 验证 payload/错误、响应、状态副作用及审计—写入

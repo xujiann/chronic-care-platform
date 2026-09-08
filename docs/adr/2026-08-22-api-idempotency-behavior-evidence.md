@@ -143,3 +143,9 @@ T02/T06 复用新的轻量 `api-command-behavior` 端口，只提供 actor-scope
 T06 运行时切片合并并通过 CI 后，T00 以 `clinical-specialties.emergency-signal-update-command.v1` 登记整个 `PATCH /api/emergency-signals/:id` endpoint。合同直接绑定 session/RBAC、institution/county/commission 当前资源范围、body 前拒绝、聚合锁内 receipt 前重验、受保护归属字段、原聚合与领域事件精确回放、同键异载荷 `EMERGENCY_SIGNAL_IDEMPOTENCY_CONFLICT`、并发相同命令只写一次，以及 aggregate/inbox/outbox/成功审计的一次本地状态提交。scope 拒绝审计继续被准确描述为独立安全写，不被宣称与业务状态原子提交。
 
 注册表现有 32 份合同：30 个完整 endpoint、2 个 action-slice；347 个写接口中 317 个仍为 `behavior-proof-required`，两个通用 action remainder 使总 `review-required` 为 319。登记未修改任何 HTTP、运行时代码、数据字段、DDL、migration、依赖、worker 或部署配置；`productionReady=false`、`externalEvidenceRequired=true`、`distributedExactlyOnceClaimed=false` 保持不变。历史无归属数据、真实 PostgreSQL 多实例串行、长期 receipt/审计留存、组织主数据核对和现场验收仍为生产阻断项。
+
+## 2026-09-08 T00 体检专项分流整端点证据登记
+
+T06 的两个独立 HTTP 证据切片合并后，`assign-profile`、`return-source`、`close` 三类允许动作均已通过真实登录与请求路径证明身份和当前居民/机构范围拒绝、header/body 幂等键绑定、精确回放、异载荷冲突、旧版本冲突、一次业务/证据/私有回执/访问审计/安全审计提交，以及 JSON 持久化失败时完整状态不变。既有命令测试继续覆盖 receipt 容量、legacy 非幂等兼容和稳定错误，路由测试覆盖资源锁、重放前范围复核与 SQLite collection CAS 映射。
+
+T00 因此新增 `physical-examination.specialized-intake-action-command.v2` 唯一完整 endpoint 合同，不登记 action-slice，也不改变运行时。注册表现为 41 份合同，其中 39 个完整 endpoint、2 个 action-slice；636 项目录的 363 个写接口中 324 个仍为 `behavior-proof-required`，通用 action remainder 使总 `review-required` 为 326。该登记只证明仓库内当前单实例/SQLite 兼容路径；有界 receipt、进程资源锁和 SQLite CAS 都不构成 PostgreSQL 多实例 exactly-once。合同继续 `productionReady=false`、`externalEvidenceRequired=true`，636 项全部 `NO-GO`。

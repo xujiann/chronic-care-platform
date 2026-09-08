@@ -34,8 +34,8 @@ function formalGroupingReviewFixture() {
 
 test("idempotency evidence registry validates only directly proven endpoint and action-slice contracts", () => {
   assert.deepEqual(validateEvidenceRegistry(), []);
-  assert.equal(DEFAULT_REGISTRY.contracts.length, 40);
-  assert.equal(endpointEvidenceContracts().length, 38);
+  assert.equal(DEFAULT_REGISTRY.contracts.length, 41);
+  assert.equal(endpointEvidenceContracts().length, 39);
   assert.equal(actionSliceEvidenceContracts().length, 2);
   assert.equal(proofRequiredReviews().length, 0);
   const smsContract = DEFAULT_REGISTRY.contracts.find((contract) => contract.key === "POST /api/auth/sms-delivery-callback");
@@ -85,8 +85,25 @@ test("idempotency evidence registry validates only directly proven endpoint and 
     "POST /api/public-health/supervision/subjects",
     "POST /api/public-health/supervision/inspection-tasks",
     "POST /api/public-health/supervision/inspection-tasks/:id/actions",
-    "POST /api/public-health/supervision/findings/:id/actions"
+    "POST /api/public-health/supervision/findings/:id/actions",
+    "POST /api/physical-exams/specialized-intakes/:id/actions"
   ]);
+});
+
+test("specialized examination intake actions are promoted only as one complete three-action endpoint", () => {
+  const key = "POST /api/physical-exams/specialized-intakes/:id/actions";
+  const contract = DEFAULT_REGISTRY.contracts.find((candidate) => candidate.key === key);
+  const entry = buildProductionApiCatalog().entries.find((candidate) => candidate.key === key);
+  assert.equal(contract.contractId, "physical-examination.specialized-intake-action-command.v2");
+  assert.deepEqual(contract.coverage.actions, ["assign-profile", "return-source", "close"]);
+  assert.equal(contract.coverage.level, "endpoint");
+  assert.equal(contract.coverage.unverifiedRemainder, false);
+  assert.equal(contract.idempotency.distributedExactlyOnceClaimed, false);
+  assert.equal(contract.productionReady, false);
+  assert.equal(entry.idempotency.behaviorEvidence.status, "behavior-verified");
+  assert.equal(entry.production.repositoryReview, "catalogued");
+  assert.equal(entry.production.productionReady, false);
+  assert.equal(entry.production.status, "NO-GO");
 });
 
 test("formal grouping create replaces the final reviewed T07 proof gap with endpoint evidence", () => {
@@ -116,7 +133,7 @@ test("procurement requirement review is promoted by stable endpoint behavior evi
 
 test("catalog promotes only whole endpoints and retains generic action routes as review-required", () => {
   const catalog = buildProductionApiCatalog();
-  assert.equal(catalog.summary.writeIdempotencyBehaviorVerified, 38);
+  assert.equal(catalog.summary.writeIdempotencyBehaviorVerified, 39);
   assert.equal(catalog.summary.writeIdempotencyActionSlicesVerified, 2);
   assert.equal(catalog.summary.writeIdempotencyBehaviorProofRequired,
     catalog.summary.writeRoutes - catalog.summary.writeIdempotencyBehaviorVerified);
