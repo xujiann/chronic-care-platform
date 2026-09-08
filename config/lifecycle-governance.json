@@ -546,7 +546,7 @@
       "baseline": "T00至T09及临床子域已建立模块所有权",
       "target": "模块写入冲突和跨任务依赖自动失败关闭",
       "status": "已集成",
-      "gapTaskIds": ["OPS-015", "OPS-016", "OPS-018", "GOV-005"],
+      "gapTaskIds": ["OPS-017"],
       "evidenceIds": ["EVD-GOV-001", "EVD-GOV-002"]
     },
     {
@@ -564,7 +564,7 @@
       "baseline": "生产API目录及认证、授权、幂等证据独立存在",
       "target": "接口变更由任务风险和影响范围选择门禁",
       "status": "已集成",
-      "gapTaskIds": ["OPS-015", "OPS-016", "OPS-017", "OPS-018", "SEC-011"],
+      "gapTaskIds": ["OPS-015", "OPS-016", "OPS-018", "SEC-011"],
       "evidenceIds": ["EVD-GOV-001", "EVD-GOV-002"]
     },
     {
@@ -573,7 +573,7 @@
       "baseline": "代码、运行时和外部依赖边界已有事实地图",
       "target": "任务前置关系、WIP和核心写范围形成可检查依赖图",
       "status": "已集成",
-      "gapTaskIds": ["GOV-002", "OPS-015", "OPS-016", "OPS-017", "OPS-018", "SEC-011", "GOV-005"],
+      "gapTaskIds": ["GOV-002", "OPS-015", "OPS-017", "OPS-018", "GOV-005"],
       "evidenceIds": ["EVD-GOV-001", "EVD-GOV-002"]
     },
     {
@@ -619,7 +619,7 @@
       "worktree": ".codex-platform-worktrees/process-v2/t00-governance-gap-coverage-20260908",
       "branch": "process/t00-governance-gap-coverage-20260908",
       "planRef": "docs/lifecycle-governance.md#gov-005-生命周期地图反向覆盖与技术债编号治理-plan",
-      "pullRequestRef": "",
+      "pullRequestRef": "https://github.com/xujiann/chronic-care-platform/pull/277",
       "ciRef": "",
       "writeScopes": [
         "config/lifecycle-governance.json",
