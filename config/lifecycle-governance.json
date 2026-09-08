@@ -95,6 +95,39 @@
       ]
     },
     {
+      "id": "REQ-OPS-019",
+      "title": "居民评价投诉前端变更必须使已安装 PWA 客户端获取新资产",
+      "sourceType": "integration-dependency",
+      "sourceRef": "OPS-017-PR-264-REVIEW-2026-09-08",
+      "acceptance": [
+        "Service Worker 缓存版本必须在评价投诉资产变更后递增",
+        "激活新版本时必须清理旧缓存且仅保留当前缓存",
+        "PWA 浏览器测试必须证明当前缓存、旧缓存清理和离线边界"
+      ]
+    },
+    {
+      "id": "REQ-SEC-009",
+      "title": "投诉跟进站内消息必须按目标角色和目标机构严格授权",
+      "sourceType": "security-review-finding",
+      "sourceRef": "OPS-017-PR-264-REVIEW-2026-09-08",
+      "acceptance": [
+        "居民不得读取或回执机构目标消息",
+        "机构用户仅可读取和回执绑定其机构且角色匹配的消息",
+        "角色、机构、居民和回执状态的越权矩阵必须通过真实 HTTP 负向测试"
+      ]
+    },
+    {
+      "id": "REQ-GOV-003",
+      "title": "体检专项分流动作整端点行为证据必须进入中央幂等注册表",
+      "sourceType": "integrated-evidence-gap",
+      "sourceRef": "OPS-016-PR-263-PR-268-2026-09-08",
+      "acceptance": [
+        "唯一 endpoint 合同覆盖 assign-profile、return-source 和 close 且无未验证余项",
+        "合同绑定真实 HTTP、命令、路由、范围、CAS、审计和稳定错误证据",
+        "目录只允许 repository behavior-verified，productionReady 与外部证据门禁保持失败关闭"
+      ]
+    },
+    {
       "id": "REQ-TEST-019",
       "title": "夜间生命周期门禁必须安装其声明使用的浏览器运行时",
       "sourceType": "observed-ci-failure",
@@ -151,7 +184,7 @@
       "owner": "T06",
       "mitigation": "显式幂等回执、乐观版本和锁内范围校验；分布式 exactly-once 仍未关闭",
       "status": "open",
-      "evidenceIds": ["EVD-OPS-016"]
+      "evidenceIds": ["EVD-OPS-016", "EVD-OPS-016B"]
     },
     {
       "id": "RISK-OPS-017",
@@ -168,8 +201,35 @@
       "title": "影像质控未知结果被误报成功或触发重复外部副作用",
       "owner": "T06",
       "mitigation": "只读核对、最小回执白名单和需对账状态持续锁定；耐久补偿另行高风险决策",
+      "status": "mitigated",
+      "evidenceIds": ["EVD-OPS-015", "EVD-OPS-015B", "EVD-OPS-018"]
+    },
+    {
+      "id": "RISK-OPS-019",
+      "level": "低",
+      "title": "已安装 PWA 继续使用评价投诉变更前的旧资产",
+      "owner": "T04",
+      "mitigation": "递增缓存命名并以浏览器测试证明安装、激活、旧缓存清理和离线边界",
       "status": "open",
-      "evidenceIds": ["EVD-OPS-015", "EVD-OPS-015B"]
+      "evidenceIds": []
+    },
+    {
+      "id": "RISK-SEC-009",
+      "level": "高",
+      "title": "机构目标投诉消息被居民或错误机构读取和回执",
+      "owner": "T05",
+      "mitigation": "在实施前完成 Accepted ADR、人工评审和专项授权矩阵，再绑定目标角色、目标机构与回执状态",
+      "status": "open",
+      "evidenceIds": []
+    },
+    {
+      "id": "RISK-GOV-003",
+      "level": "中",
+      "title": "局部或不完整证据被误登记为整端点行为验证",
+      "owner": "T00",
+      "mitigation": "严格登记三动作无余项合同并由目录测试拒绝 action-slice 冒充、生产晋级和漂移",
+      "status": "open",
+      "evidenceIds": []
     },
     {
       "id": "RISK-TEST-019",
@@ -234,10 +294,34 @@
       "command": "node scripts/clinical-subdomain-test-gate.js --subdomain physical-examination"
     },
     {
+      "id": "TEST-OPS-016B",
+      "kind": "real-http-idempotency-and-atomicity-contract",
+      "path": "test/physical-examination-specialized-intake-http-behavior.test.js",
+      "command": "node --test test/physical-examination-specialized-intake-http-behavior.test.js"
+    },
+    {
+      "id": "TEST-OPS-018",
+      "kind": "read-only-reconciliation-projection-security-contract",
+      "path": "test/t06-imaging-response-security.test.js",
+      "command": "node scripts/clinical-subdomain-test-gate.js --subdomain imaging"
+    },
+    {
       "id": "TEST-OPS-017",
       "kind": "resident-service-feedback-contract",
       "path": "test/citizen-service-feedback.test.js",
       "command": "node --test test/citizen-service-feedback.test.js test/escort-owner-route-characterization.test.js test/internet-nursing-closed-loop-characterization.test.js"
+    },
+    {
+      "id": "TEST-OPS-019",
+      "kind": "pwa-cache-invalidation-contract",
+      "path": "test/e2e/pwa-service-worker.spec.js",
+      "command": "npm run test:e2e:pwa"
+    },
+    {
+      "id": "TEST-GOV-003",
+      "kind": "endpoint-idempotency-evidence-and-catalog-contract",
+      "path": "test/api-idempotency-evidence.test.js",
+      "command": "node --test test/api-idempotency-evidence.test.js test/production-api-catalog.test.js"
     },
     {
       "id": "TEST-CI-019",
@@ -291,6 +375,30 @@
       "type": "pull-request-ci",
       "ref": "https://github.com/xujiann/chronic-care-platform/actions/runs/34101751863",
       "testIds": ["TEST-OPS-016"],
+      "productionEvidence": false
+    },
+    {
+      "id": "EVD-OPS-016B",
+      "scope": "repository-integration",
+      "type": "pull-request-ci",
+      "ref": "https://github.com/xujiann/chronic-care-platform/actions/runs/34183706992",
+      "testIds": ["TEST-OPS-016B"],
+      "productionEvidence": false
+    },
+    {
+      "id": "EVD-OPS-016C",
+      "scope": "repository-integration",
+      "type": "pull-request-ci",
+      "ref": "https://github.com/xujiann/chronic-care-platform/actions/runs/34185200792",
+      "testIds": ["TEST-OPS-016B"],
+      "productionEvidence": false
+    },
+    {
+      "id": "EVD-OPS-018",
+      "scope": "repository-integration",
+      "type": "pull-request-ci",
+      "ref": "https://github.com/xujiann/chronic-care-platform/actions/runs/34184430660",
+      "testIds": ["TEST-OPS-015", "TEST-OPS-015B", "TEST-OPS-018"],
       "productionEvidence": false
     },
     {
@@ -487,7 +595,7 @@
       "id": "OPS-016",
       "title": "体检专项动作并发与重复提交治理",
       "ownerProcess": "T06",
-      "taskStatus": "实施中",
+      "taskStatus": "已关闭",
       "capabilityStatus": "已实现",
       "riskLevel": "高",
       "approval": {
@@ -508,29 +616,80 @@
         "重放、键冲突、版本冲突和容量耗尽稳定失败关闭",
         "业务状态、版本、回执和两类审计单次写入且失败不污染快照"
       ],
-      "testIds": ["TEST-OPS-016"],
-      "evidenceIds": ["EVD-OPS-016"],
+      "testIds": ["TEST-OPS-016", "TEST-OPS-016B"],
+      "evidenceIds": ["EVD-OPS-016", "EVD-OPS-016B", "EVD-OPS-016C"],
       "rollback": "回退 PR #258；内部回执字段由公开投影剔除，回退前保留审计证据",
       "unresolved": [
-        "return-source 和 close 动作缺少 HTTP 级幂等行为证据，端点不得进入中央白名单",
+        "三类动作 HTTP 行为证据已集成；中央 endpoint 合同登记与目录晋级由 GOV-003 独立治理",
         "进程锁和 JSON 存储不提供分布式 exactly-once",
         "结构化指标、追踪、SLO、告警、手册、降级和补偿尚未完整交付"
       ],
       "worktree": ".codex-platform-worktrees/process-v2/t06-physical-exam-action-http-evidence-20260907",
       "branch": "process/t06-physical-exam-action-http-evidence-20260907",
       "planRef": "T00-PLAN-OPS-016-HTTP-EVIDENCE-2026-09-07",
-      "pullRequestRef": "https://github.com/xujiann/chronic-care-platform/pull/258",
-      "ciRef": "https://github.com/xujiann/chronic-care-platform/actions/runs/34101751863",
+      "pullRequestRef": "https://github.com/xujiann/chronic-care-platform/pull/268",
+      "ciRef": "https://github.com/xujiann/chronic-care-platform/actions/runs/34185200792",
       "writeScopes": [
         "src/clinical-specialties/physical-examination/specialized-intake-action-command.js",
         "src/http/routes/clinical-specialties/blood-innovation.js",
-        "test/physical-examination-specialized-intake-action-command.test.js"
+        "test/physical-examination-specialized-intake-action-command.test.js",
+        "test/physical-examination-specialized-intake-http-behavior.test.js"
       ],
       "observability": {
         "applicable": true,
         "gaps": "尚未完整交付专用指标告警、分布式追踪、健康检查、SLO错误预算、处置手册、降级与补偿方案"
       },
       "runtimeCapability": true
+    },
+    {
+      "id": "GOV-003",
+      "title": "登记体检专项分流动作整端点幂等行为合同",
+      "ownerProcess": "T00",
+      "taskStatus": "已批准",
+      "capabilityStatus": "未建设",
+      "riskLevel": "中",
+      "approval": {
+        "state": "approved",
+        "mode": "T00-plan-approval",
+        "ref": "USER-APPROVED-2026-09-08-FOUR-LANE",
+        "approvedScope": "physical-examination-specialized-intakes-endpoint-evidence-registration"
+      },
+      "requirementIds": ["REQ-GOV-003"],
+      "regulatoryControlIds": ["REG-GOV-001"],
+      "riskIds": ["RISK-GOV-003"],
+      "decisionIds": [],
+      "dependencies": ["GOV-002", "OPS-016"],
+      "affectedModules": ["api-idempotency-evidence", "production-api-catalog", "physical-examination"],
+      "dataSensitivity": "接口治理元数据-不含居民数据或生产凭据",
+      "acceptanceCriteria": [
+        "中央合同精确覆盖唯一 POST endpoint 与三种允许动作",
+        "行为、并发、审计、错误和实现测试锚点均可执行且无未验证余项",
+        "目录 review-required 仅减少一项且所有 API productionReady 继续为 false"
+      ],
+      "testIds": ["TEST-GOV-003"],
+      "evidenceIds": [],
+      "rollback": "回退注册表、断言和事实文档；不修改运行时、数据库或业务数据",
+      "unresolved": [],
+      "worktree": ".codex-platform-worktrees/process-v2/t00-api-003-physical-exam-endpoint-evidence-20260908",
+      "branch": "process/t00-api-003-physical-exam-endpoint-evidence-20260908",
+      "planRef": "T00-PLAN-API-003-ENDPOINT-EVIDENCE-2026-09-08",
+      "pullRequestRef": "",
+      "ciRef": "",
+      "writeScopes": [
+        "config/api-idempotency-evidence.json",
+        "test/api-idempotency-evidence.test.js",
+        "test/production-api-catalog.test.js",
+        "API_MAP.md",
+        "CURRENT_ARCHITECTURE.md",
+        "ENGINEERING_GOVERNANCE.md",
+        "TECH_DEBT.md",
+        "docs/adr/2026-08-22-api-idempotency-behavior-evidence.md"
+      ],
+      "observability": {
+        "applicable": false,
+        "reason": "本任务登记既有可执行行为证据，不新增或修改生产运行时能力"
+      },
+      "runtimeCapability": false
     },
     {
       "id": "OPS-017",
@@ -562,6 +721,8 @@
       "rollback": "回退 PR #260；无 schema 迁移，既有评价与投诉记录必须继续按原任务记录保留",
       "unresolved": [
         "投诉目前复用站内消息，尚无独立工单、SLA、升级和结案模型",
+        "机构目标消息的服务端角色与机构授权等待 SEC-009 完成高风险审批和专项验证",
+        "已安装客户端资产刷新等待 OPS-019 完成 PWA 缓存版本闭环",
         "结构化指标、追踪、SLO、告警、手册、降级和补偿尚未完整交付"
       ],
       "worktree": ".codex-platform-worktrees/process-v2/t04-citizen-complaint-followup-20260907",
@@ -571,10 +732,13 @@
       "ciRef": "https://github.com/xujiann/chronic-care-platform/actions/runs/34104462467",
       "writeScopes": [
         "citizen-service-feedback.js",
+        "citizen.css",
         "citizen.js",
         "citizen.html",
         "src/http/shared-task-actions",
-        "test/citizen-service-feedback.test.js"
+        "test/citizen-service-feedback.test.js",
+        "test/e2e/citizen-service-feedback.spec.js",
+        "test/escort-owner-route-characterization.test.js"
       ],
       "observability": {
         "applicable": true,
@@ -586,7 +750,7 @@
       "id": "OPS-018",
       "title": "影像质控需对账状态只读核对体验",
       "ownerProcess": "T06",
-      "taskStatus": "实施中",
+      "taskStatus": "已关闭",
       "capabilityStatus": "已实现",
       "riskLevel": "中",
       "approval": {
@@ -608,8 +772,8 @@
         "严格只读状态查看失败时不使用演示数据且查看后保持写动作锁定",
         "durable outbox、幂等协议、机构范围和权威状态机只形成 Proposed 方案"
       ],
-      "testIds": ["TEST-OPS-015", "TEST-OPS-015B"],
-      "evidenceIds": ["EVD-OPS-015", "EVD-OPS-015B"],
+      "testIds": ["TEST-OPS-015", "TEST-OPS-015B", "TEST-OPS-018"],
+      "evidenceIds": ["EVD-OPS-015", "EVD-OPS-015B", "EVD-OPS-018"],
       "rollback": "回退本任务单一 PR；无 schema 或数据迁移，不改变既有 FHIR 与本地事实",
       "unresolved": [
         "durable outbox、command idempotency、机构范围、CAS、worker 与 FHIR readback 等待独立高风险决策",
@@ -618,22 +782,113 @@
       "worktree": ".codex-platform-worktrees/process-v2/t06-imaging-qc-reconciliation-ux-20260907",
       "branch": "process/t06-imaging-qc-reconciliation-ux-20260907",
       "planRef": "T00-PLAN-OPS-018-READONLY-RECONCILIATION-2026-09-07",
-      "pullRequestRef": "",
-      "ciRef": "",
-    "writeScopes": [
-      "src/http/routes/clinical-specialties/imaging-cloud.js",
-      "src/clinical-specialties/imaging/public-response.js",
-      "src/clinical-specialties/imaging/study-quality-control-command.js",
-      "imaging-cloud.js",
-      "test/imaging-dashboard-route-characterization.test.js",
-      "test/imaging-study-quality-control-command.test.js",
-      "test/t06-imaging-response-security.test.js",
-      "docs/imaging-quality-control-reconciliation-plan.md",
-      "docs/adr/2026-09-07-imaging-quality-control-durable-reconciliation.md"
-    ],
+      "pullRequestRef": "https://github.com/xujiann/chronic-care-platform/pull/266",
+      "ciRef": "https://github.com/xujiann/chronic-care-platform/actions/runs/34184430660",
+      "writeScopes": [
+        "src/http/routes/clinical-specialties/imaging-cloud.js",
+        "src/clinical-specialties/imaging/public-response.js",
+        "src/clinical-specialties/imaging/study-quality-control-command.js",
+        "imaging-cloud.js",
+        "test/imaging-dashboard-route-characterization.test.js",
+        "test/imaging-study-quality-control-command.test.js",
+        "test/t06-imaging-response-security.test.js"
+      ],
       "observability": {
         "applicable": true,
         "gaps": "只交付用户可见核对上下文；专用指标告警、追踪、健康检查、SLO错误预算、处置手册、降级与耐久补偿仍缺失"
+      },
+      "runtimeCapability": true
+    },
+    {
+      "id": "OPS-019",
+      "title": "居民评价投诉 PWA 缓存失效闭环",
+      "ownerProcess": "T04",
+      "taskStatus": "已阻塞",
+      "capabilityStatus": "未建设",
+      "riskLevel": "低",
+      "approval": {
+        "state": "approved",
+        "mode": "approved-task-package",
+        "ref": "USER-APPROVED-2026-09-08-FOUR-LANE",
+        "approvedScope": "resident-feedback-pwa-cache-version-invalidation"
+      },
+      "requirementIds": ["REQ-OPS-019"],
+      "regulatoryControlIds": ["REG-GOV-001"],
+      "riskIds": ["RISK-OPS-019"],
+      "decisionIds": [],
+      "dependencies": ["GOV-002", "OPS-017"],
+      "affectedModules": ["citizen-pwa", "service-worker", "browser-e2e"],
+      "dataSensitivity": "静态发布资产与缓存元数据-不含居民业务数据",
+      "acceptanceCriteria": [
+        "缓存版本由 v62 递增且不改变 API 或业务状态机",
+        "新 Service Worker 激活后删除旧缓存并只保留当前缓存",
+        "PWA 三条浏览器场景和静态契约通过"
+      ],
+      "testIds": ["TEST-OPS-019"],
+      "evidenceIds": [],
+      "rollback": "回退缓存版本与对应测试；不修改业务数据或数据库 schema",
+      "unresolved": [
+        "OPS-017 仍占用 test/citizen-service-feedback.test.js；其集成关闭前不得创建实施分支"
+      ],
+      "worktree": ".codex-platform-worktrees/process-v2/t04-resident-feedback-pwa-cache-20260908",
+      "branch": "process/t04-resident-feedback-pwa-cache-20260908",
+      "planRef": "T00-PLAN-OPS-019-PWA-CACHE-2026-09-08",
+      "pullRequestRef": "",
+      "ciRef": "",
+      "writeScopes": [
+        "service-worker.js",
+        "test/e2e/pwa-service-worker.spec.js",
+        "test/citizen-service-feedback.test.js",
+        "test/static.test.js"
+      ],
+      "observability": {
+        "applicable": false,
+        "reason": "本任务仅使既有静态资产缓存失效并更新浏览器契约，不新增生产业务运行时能力"
+      },
+      "runtimeCapability": false
+    },
+    {
+      "id": "SEC-009",
+      "title": "投诉跟进消息角色与机构范围授权",
+      "ownerProcess": "T05",
+      "taskStatus": "待批准",
+      "capabilityStatus": "未建设",
+      "riskLevel": "高",
+      "approval": {
+        "state": "pending"
+      },
+      "requirementIds": ["REQ-SEC-009"],
+      "regulatoryControlIds": ["REG-GOV-001"],
+      "riskIds": ["RISK-SEC-009"],
+      "decisionIds": [],
+      "dependencies": ["GOV-002", "OPS-017"],
+      "affectedModules": ["task-messages", "api-authorization", "complaint-follow-up"],
+      "dataSensitivity": "居民投诉跟进消息-个人敏感信息与机构内部处置信息",
+      "acceptanceCriteria": [
+        "目标角色与目标机构共同约束消息列表和回执",
+        "居民、错误角色和错误机构访问均失败关闭",
+        "真实 HTTP 授权矩阵覆盖读取、回执和角色专用回执状态"
+      ],
+      "testIds": [],
+      "evidenceIds": [],
+      "rollback": "高风险方案批准后单独定义；当前候选任务不得创建实施分支或改动运行时代码",
+      "unresolved": [
+        "需要独立 ADR 明确订单机构绑定、目标角色语义和历史消息兼容策略",
+        "需要人工安全评审与专项负向 HTTP 验证后才能进入 WIP"
+      ],
+      "worktree": ".codex-platform-worktrees/process-v2/sec-009-message-authorization-pending",
+      "branch": "pending/sec-009-message-authorization",
+      "planRef": "T00-PLAN-SEC-009-PENDING-ADR-2026-09-08",
+      "pullRequestRef": "",
+      "ciRef": "",
+      "writeScopes": [
+        "server.js",
+        "src/http/shared-task-actions",
+        "test/task-message-authorization-http.test.js"
+      ],
+      "observability": {
+        "applicable": true,
+        "gaps": "待 ADR 定义拒绝审计、授权失败指标、告警和处置手册"
       },
       "runtimeCapability": true
     },
