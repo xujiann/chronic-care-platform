@@ -40,6 +40,13 @@
   },
   "requirements": [
     {
+      "id": "REQ-GOV-004",
+      "title": "开发流程应明确集成收尾和依赖交接并完整选择测试",
+      "sourceType": "approved-user-requirement",
+      "sourceRef": "USER-FLOW-OPTIMIZATION-2026-09-08",
+      "acceptance": ["交接报告只读且逐项显示阻断", "目录与子文件不能并行写入", "混合变更中未分类文件不能漏测"]
+    },
+    {
       "id": "REQ-GOV-001",
       "title": "建立超大型平台全生命周期治理工作流",
       "sourceType": "approved-user-requirement",
@@ -160,6 +167,15 @@
   ],
   "risks": [
     {
+      "id": "RISK-GOV-004",
+      "level": "中",
+      "title": "交接遗漏、父子写范围冲突或混合变更漏测",
+      "owner": "T00",
+      "mitigation": "只读派生队列、路径重叠检测和逐文件未分类回退",
+      "status": "open",
+      "evidenceIds": []
+    },
+    {
       "id": "RISK-GOV-001",
       "level": "高",
       "title": "局部代码完成被误报为平台能力或生产完成",
@@ -278,6 +294,12 @@
   ],
   "tests": [
     {
+      "id": "TEST-GOV-004",
+      "kind": "lifecycle-handoff-and-impact-regression",
+      "path": "test/lifecycle-governance.test.js",
+      "command": "node --test test/lifecycle-governance.test.js"
+    },
+    {
       "id": "TEST-GOV-001",
       "kind": "governance-contract",
       "path": "test/lifecycle-governance.test.js",
@@ -358,6 +380,14 @@
   ],
   "evidence": [
     {
+      "id": "EVD-GOV-004",
+      "scope": "repository",
+      "type": "executable-contract",
+      "ref": "node --test test/lifecycle-governance.test.js",
+      "testIds": ["TEST-GOV-004"],
+      "productionEvidence": false
+    },
+    {
       "id": "EVD-GOV-001",
       "scope": "repository",
       "type": "executable-contract",
@@ -423,9 +453,9 @@
     },
     {
       "id": "EVD-OPS-017",
-      "scope": "repository-candidate",
-      "type": "draft-pull-request",
-      "ref": "https://github.com/xujiann/chronic-care-platform/pull/272",
+      "scope": "repository-integration",
+      "type": "pull-request-ci",
+      "ref": "https://github.com/xujiann/chronic-care-platform/actions/runs/34197549239",
       "testIds": ["TEST-OPS-017", "TEST-OPS-017-E2E"],
       "productionEvidence": false
     },
@@ -527,6 +557,40 @@
     }
   ],
   "tasks": [
+    {
+      "id": "GOV-004",
+      "title": "优化集成收尾、依赖交接与变更测试选择",
+      "ownerProcess": "T00",
+      "taskStatus": "待集成",
+      "capabilityStatus": "已验证",
+      "riskLevel": "中",
+      "approval": {
+        "state": "approved",
+        "mode": "T00-plan-approval",
+        "ref": "USER-FLOW-OPTIMIZATION-2026-09-08",
+        "approvedScope": "lifecycle-handoff-scope-collision-and-mixed-impact"
+      },
+      "requirementIds": ["REQ-GOV-004"],
+      "regulatoryControlIds": ["REG-GOV-001"],
+      "riskIds": ["RISK-GOV-004"],
+      "decisionIds": [],
+      "dependencies": ["GOV-002"],
+      "affectedModules": ["integration-governance", "change-impact"],
+      "dataSensitivity": "研发治理元数据",
+      "acceptanceCriteria": ["只读报告区分集成核对、依赖交接和能力跟进", "父子写范围冲突失败关闭", "任一未分类变更触发完整单元回退"],
+      "testIds": ["TEST-GOV-004"],
+      "evidenceIds": ["EVD-GOV-004"],
+      "rollback": "回退本次四文件治理补丁，不修改业务数据或生产证据",
+      "unresolved": [],
+      "worktree": ".codex-platform-worktrees/process-v2/t00-lifecycle-handoff-optimization-20260908",
+      "branch": "process/t00-lifecycle-handoff-optimization-20260908",
+      "planRef": "docs/lifecycle-governance.md#gov-004-流程优化-plan",
+      "pullRequestRef": "https://github.com/xujiann/chronic-care-platform/pull/273",
+      "ciRef": "",
+      "writeScopes": ["scripts/lifecycle-governance.js", "test/lifecycle-governance.test.js", "config/lifecycle-governance.json", "docs/lifecycle-governance.md"],
+      "observability": {"applicable": false, "reason": "仅修复研发治理检查并输出只读交接队列，不增加生产运行时"},
+      "runtimeCapability": false
+    },
     {
       "id": "GOV-002",
       "title": "建立平台全生命周期治理控制塔",
@@ -735,7 +799,7 @@
       "title": "居民护理与陪诊服务评价投诉闭环",
       "ownerProcess": "T04",
       "integrationOwner": "T00",
-      "taskStatus": "实施中",
+      "taskStatus": "已关闭",
       "capabilityStatus": "已实现",
       "riskLevel": "中",
       "approval": {
@@ -771,7 +835,7 @@
       "planRef": "docs/resident-service-feedback-idempotency-plan.md",
       "pullRequestRef": "https://github.com/xujiann/chronic-care-platform/pull/272",
       "supersedesPullRequestRef": "https://github.com/xujiann/chronic-care-platform/pull/264",
-      "ciRef": "",
+      "ciRef": "https://github.com/xujiann/chronic-care-platform/actions/runs/34197549239",
       "writeScopes": [
         "citizen-service-feedback.js",
         "citizen.css",
@@ -857,7 +921,7 @@
       "id": "OPS-019",
       "title": "居民评价投诉 PWA 缓存失效闭环",
       "ownerProcess": "T04",
-      "taskStatus": "已阻塞",
+      "taskStatus": "已批准",
       "capabilityStatus": "未建设",
       "riskLevel": "低",
       "approval": {
@@ -881,9 +945,7 @@
       "testIds": ["TEST-OPS-019"],
       "evidenceIds": [],
       "rollback": "回退缓存版本与对应测试；不修改业务数据或数据库 schema",
-      "unresolved": [
-        "OPS-017 仍占用 test/citizen-service-feedback.test.js；其集成关闭前不得创建实施分支"
-      ],
+      "unresolved": [],
       "worktree": ".codex-platform-worktrees/process-v2/t04-resident-feedback-pwa-cache-20260908",
       "branch": "process/t04-resident-feedback-pwa-cache-20260908",
       "planRef": "T00-PLAN-OPS-019-PWA-CACHE-2026-09-08",

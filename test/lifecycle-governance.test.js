@@ -2,8 +2,11 @@
 
 const assert = require("node:assert/strict");
 const test = require("node:test");
+const fs = require("node:fs");
+const path = require("node:path");
+const { spawnSync } = require("node:child_process");
 const config = require("../config/lifecycle-governance.json");
-const { analyzeImpact, npmRunInvocation, runChangedUnitTests, validateLifecycleGovernance } = require("../scripts/lifecycle-governance");
+const { analyzeImpact, buildHandoffReport, npmRunInvocation, runChangedUnitTests, validateLifecycleGovernance } = require("../scripts/lifecycle-governance");
 
 function copy() {
   return structuredClone(config);
@@ -16,6 +19,147 @@ function activeControlTowerFixture() {
   fixture.tasks[0].capabilityStatus = "已验证";
   return fixture;
 }
+
+test("parent and child write scopes collide while sibling directories remain independent", () => {
+  for (const childScope of ["src/runtime/task.js", "src\\runtime\\task.js", "SRC/RUNTIME/task.js", "src/runtime/**"]) {
+    const fixture = activeControlTowerFixture();
+    fixture.tasks[0].writeScopes = ["src/runtime/"];
+    const other = structuredClone(fixture.tasks[0]);
+    other.id = "OPS-100";
+    other.writeScopes = [childScope];
+    fixture.tasks.push(other);
+    assert.throws(() => validateLifecycleGovernance(fixture), /concurrent writers/);
+    other.writeScopes = ["src/runtime-peer/task.js"];
+    assert.doesNotThrow(() => validateLifecycleGovernance(fixture));
+  }
+  for (const scope of ["../src", "/src", "C:/src", "src/../runtime", "src//runtime", "src/*/file.js", "", "src/."]) {
+    const fixture = activeControlTowerFixture();
+    fixture.tasks[0].writeScopes = [scope];
+    assert.throws(() => validateLifecycleGovernance(fixture), /invalid write scope/);
+  }
+});
+
+test("a known documentation change cannot hide an unknown runtime change", () => {
+  const report = analyzeImpact(copy(), ["docs/lifecycle-governance.md", "tools/new-runtime.js"]);
+  assert.equal(report.fullUnitFallback, true);
+  assert.deepEqual(report.unclassifiedFiles, ["tools/new-runtime.js"]);
+  assert.deepEqual(report.requiredTiers, ["quick", "pr"]);
+  assert.ok(report.quickTests.includes("test/documentation-fact-drift.test.js"));
+  const calls = [];
+  runChangedUnitTests(copy(), report.files, {
+    npmExecPath: "C:/npm/npm-cli.js",
+    spawnSync(command, args) { calls.push(args); return { status: 0 }; }
+  });
+  assert.deepEqual(calls, [["C:/npm/npm-cli.js", "run", "test:unit"]]);
+  assert.deepEqual(analyzeImpact(copy(), []).unclassifiedFiles, []);
+  const similar = analyzeImpact(copy(), ["scripts/lifecycle-governance.js.backup", "nested/scripts/lifecycle-governance.js"]);
+  assert.equal(similar.fullUnitFallback, true);
+  assert.equal(similar.unclassifiedFiles.length, 2);
+});
+
+test("handoff CLI returns review queues while preserving the ledger bytes", () => {
+  const root = path.resolve(__dirname, "..");
+  const ledger = path.join(root, "config/lifecycle-governance.json");
+  const before = fs.readFileSync(ledger);
+  const result = spawnSync(process.execPath, ["scripts/lifecycle-governance.js", "handoff"], { cwd: root, encoding: "utf8", windowsHide: true });
+  assert.equal(result.status, 0, result.stderr);
+  const report = JSON.parse(result.stdout);
+  assert.equal(report.schemaVersion, "platform-lifecycle-handoff-v1");
+  assert.equal(report.automaticActionsAllowed, false);
+  assert.deepEqual(fs.readFileSync(ledger), before);
+});
+
+function handoffFixture() {
+  const fixture = activeControlTowerFixture();
+  const parent = fixture.tasks[0];
+  parent.riskLevel = "低";
+  parent.approval.mode = "approved-task-package";
+  parent.taskStatus = "已关闭";
+  parent.capabilityStatus = "已实现";
+  const child = structuredClone(parent);
+  child.id = "OPS-100";
+  child.taskStatus = "已阻塞";
+  child.dependencies = [parent.id];
+  child.writeScopes = ["src/next-task"];
+  child.pullRequestRef = "";
+  child.ciRef = "";
+  child.unresolved = [];
+  fixture.tasks.push(child);
+  return fixture;
+}
+
+test("mixed changes retain selected integration tests outside the full unit partition", () => {
+  const fixture = copy();
+  fixture.impactRules = [{ id: "selected-api", patterns: ["known.js"], modules: ["api"], requiredTiers: ["quick", "pr"],
+    quickTests: ["test/api.test.js", "test/lifecycle-governance.test.js"] }];
+  const calls = [];
+  const report = runChangedUnitTests(fixture, ["known.js", "unknown.js"], {
+    npmExecPath: "C:/npm/npm-cli.js",
+    spawnSync(command, args) { calls.push(args); return { status: 0 }; }
+  });
+  assert.deepEqual(report.supplementalTests, ["test/api.test.js"]);
+  assert.deepEqual(calls, [["C:/npm/npm-cli.js", "run", "test:unit"], ["--test", "test/api.test.js"]]);
+  let count = 0;
+  assert.throws(() => runChangedUnitTests(fixture, ["known.js", "unknown.js"], {
+    npmExecPath: "C:/npm/npm-cli.js",
+    spawnSync() { return { status: ++count === 1 ? 0 : 1 }; }
+  }), /supplemental affected tests failed/);
+});
+
+test("handoff candidates require dependency, approval, scope and WIP review without changing state", () => {
+  const fixture = handoffFixture();
+  const before = structuredClone(fixture);
+  let report = buildHandoffReport(fixture);
+  assert.deepEqual(fixture, before);
+  assert.equal(report.automaticActionsAllowed, false);
+  assert.equal(report.productionDecision, "NO-GO");
+  assert.equal(report.dependencyReview[0].nextAction, "review-dependency-release");
+  fixture.tasks[1].unresolved = ["外部条件尚未满足"];
+  assert.equal(buildHandoffReport(fixture).dependencyReview[0].nextAction, "review-unresolved-blockers");
+  fixture.tasks[1].unresolved = [];
+
+  fixture.tasks[0].taskStatus = "实施中";
+  report = buildHandoffReport(fixture);
+  assert.deepEqual(report.dependencyReview[0].blockingDependencies, ["GOV-002"]);
+  fixture.tasks[0].taskStatus = "已关闭";
+  fixture.tasks[1].approval = { state: "pending" };
+  assert.equal(buildHandoffReport(fixture).dependencyReview[0].approvalReady, false);
+  fixture.tasks[1].approval = { ...before.tasks[1].approval, mode: "T00-plan-approval" };
+  assert.equal(buildHandoffReport(fixture).dependencyReview[0].approvalReady, false);
+  fixture.tasks[1].approval = before.tasks[1].approval;
+  const writer = structuredClone(fixture.tasks[0]);
+  writer.id = "OPS-101";
+  writer.taskStatus = "实施中";
+  writer.writeScopes = ["src/next-task/child.js"];
+  fixture.tasks.push(writer);
+  assert.deepEqual(buildHandoffReport(fixture).dependencyReview[0].conflictingTaskIds, ["OPS-101"]);
+  writer.writeScopes = ["src/other"];
+  fixture.portfolioPolicy.maximumWip = 1;
+  assert.equal(buildHandoffReport(fixture).dependencyReview[0].wipAvailable, false);
+});
+
+test("handoff reports PRs as evidence to inspect and retains closed-task capability gaps", () => {
+  const fixture = handoffFixture();
+  const parent = fixture.tasks[0];
+  parent.taskStatus = "待集成";
+  parent.pullRequestRef = "https://github.com/example/platform/pull/1";
+  parent.ciRef = "";
+  let report = buildHandoffReport(fixture);
+  assert.equal(report.integrationReview[0].taskId, "GOV-002");
+  assert.equal(report.integrationReview[0].nextAction, "verify-merge-and-ci");
+  parent.taskStatus = "已关闭";
+  parent.runtimeCapability = true;
+  parent.observability = { applicable: true, structuredLogs: "existing-logs" };
+  parent.unresolved = ["现场告警尚未验收"];
+  report = buildHandoffReport(fixture);
+  assert.equal(report.integrationReview.length, 0);
+  assert.equal(report.capabilityFollowups[0].taskId, "GOV-002");
+  assert.equal(report.capabilityFollowups[0].capabilityStatus, "已实现");
+  assert.ok(report.capabilityFollowups[0].missingObservability.includes("metricsAndAlerts"));
+  assert.deepEqual(report.capabilityFollowups[0].unresolved, parent.unresolved);
+  fixture.tasks[1].dependencies = ["OPS-999"];
+  assert.throws(() => buildHandoffReport(fixture), /unknown id/);
+});
 
 test("the lifecycle control tower validates the governed portfolio", () => {
   const report = validateLifecycleGovernance(copy());
@@ -96,9 +240,10 @@ test("repository evidence can never manufacture production GO", () => {
   assert.throws(() => validateLifecycleGovernance(falseGo), /external production evidence/);
 
   const premature = copy();
-  premature.tasks[0].capabilityStatus = "准生产";
-  premature.tasks[0].pullRequestRef = "PR-TEST-ONLY";
-  premature.tasks[0].ciRef = "CI-TEST-ONLY";
+  const task = premature.tasks.find((item) => item.id === "GOV-002");
+  task.capabilityStatus = "准生产";
+  task.pullRequestRef = "PR-TEST-ONLY";
+  task.ciRef = "CI-TEST-ONLY";
   assert.throws(() => validateLifecycleGovernance(premature), /admission domains remain NO-GO/);
 });
 
