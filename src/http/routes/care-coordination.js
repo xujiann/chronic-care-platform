@@ -30,6 +30,19 @@ function publicTeleconsultation(item) {
   return projected;
 }
 
+function citizenTaskActionCommandPayload(taskId, payload = {}) {
+  const canonical = { ...payload };
+  delete canonical.idempotencyKey;
+  delete canonical.commandId;
+  return { taskId, ...canonical };
+}
+
+function publicCitizenTaskAction(item) {
+  const projected = structuredClone(item);
+  delete projected._writeCommandReceipts;
+  return projected;
+}
+
 function teleconsultationCommandError(res, sendJson, error, codes) {
   if (error instanceof StateCommandError) {
     sendJson(res, error.statusCode, { error: error.statusCode === 409 ? "Conflict" : "Bad Request", code: error.code, ...(codes.collection ? { collection: codes.collection } : {}), message: error.message });
@@ -44,6 +57,26 @@ function teleconsultationCommandError(res, sendJson, error, codes) {
     return;
   }
   sendJson(res, 400, { error: "Bad Request", message: error?.message || "invalid state command" });
+}
+
+function citizenTaskActionCommandError(res, sendJson, error) {
+  if (error instanceof StateCommandError) {
+    sendJson(res, error.statusCode, {
+      error: error.statusCode === 409 ? "Conflict" : "Bad Request",
+      code: error.code,
+      message: error.message
+    });
+    return;
+  }
+  if (isStorageConflict(error)) {
+    sendJson(res, 409, { error: "Conflict", code: "CITIZEN_SERVICE_FEEDBACK_VERSION_CONFLICT", message: "state version conflict" });
+    return;
+  }
+  if (error?.stateCommandPersistenceFailure) {
+    sendJson(res, 500, { error: "Internal Server Error", code: "CITIZEN_SERVICE_FEEDBACK_STORAGE_FAILED", message: "state command persistence failed" });
+    return;
+  }
+  sendJson(res, 400, { error: "Bad Request", code: error?.code || "TASK_ACTION_INVALID", message: error?.message || "invalid resident service feedback command" });
 }
 
 function createRouteSegments(runtime) {
@@ -1578,6 +1611,96 @@ function createRouteSegments(runtime) {
           });
           return true;
         }
+        const payload = await collectJson(req);
+        const residentServiceFeedback = user.role === "citizen"
+          && payload.action === "quality-feedback"
+          && ["escortServiceOrders", "internetNursingOrders"].includes(collection);
+        if (residentServiceFeedback) {
+          try {
+            const canonicalPayload = citizenTaskActionCommandPayload(taskId, payload);
+            const command = buildStateCommand({
+              req,
+              payload,
+              user,
+              endpoint: `POST /api/tasks/${taskId}/actions`,
+              naturalKey: `${taskId}:quality-feedback:${sha256(canonicalPayload)}`,
+              canonicalPayload
+            });
+            const result = await withStateCommandLock(`resident-service-feedback:${collection}:${id}`, () => {
+              const lockedData = readDatabase();
+              const lockedRows = findWorkflowCollection(lockedData, collection);
+              const lockedIndex = Array.isArray(lockedRows) ? lockedRows.findIndex((item) => item.id === id) : -1;
+              if (lockedIndex < 0) return { status: 404, body: { error: "Not Found", message: "未找到任务" } };
+              if (collection === "escortServiceOrders" && !canAccessEscortOrder(user, lockedRows[lockedIndex], lockedData)) {
+                return { status: 403, body: { error: "Forbidden", message: "No access to this escort service task" } };
+              }
+              if (collection === "internetNursingOrders" && !canAccessInternetNursingOrder(user, lockedRows[lockedIndex], lockedData)) {
+                return { status: 403, body: { error: "Forbidden", message: "No access to this internet nursing task" } };
+              }
+              const priorReceipt = (Array.isArray(lockedRows[lockedIndex]._writeCommandReceipts)
+                ? lockedRows[lockedIndex]._writeCommandReceipts
+                : []).find((item) => item.commandKeyHash === command.commandKeyHash);
+              if (priorReceipt) {
+                if (priorReceipt.requestDigest !== command.requestDigest) {
+                  return {
+                    status: 409,
+                    body: {
+                      error: "Conflict",
+                      code: "CITIZEN_SERVICE_FEEDBACK_IDEMPOTENCY_CONFLICT",
+                      message: "idempotency key was already used for another resident service feedback payload"
+                    }
+                  };
+                }
+                return { status: 200, body: structuredClone(priorReceipt.response), replayed: true };
+              }
+              let updated;
+              let citizenMessage;
+              try {
+                updated = applyCitizenTaskAction(lockedRows[lockedIndex], payload, collection, user);
+                citizenMessage = buildCitizenTaskActionMessage(updated, collection, payload, user, lockedData);
+              } catch (error) {
+                return { status: 400, body: { error: "Bad Request", code: error.code || "TASK_ACTION_INVALID", message: error.message } };
+              }
+              prepareCollectionCas(
+                lockedData,
+                [collection, "taskMessages", "securityEvents"],
+                collection,
+                payload.expectedVersion,
+                "CITIZEN_SERVICE_FEEDBACK_VERSION_CONFLICT"
+              );
+              const response = publicCitizenTaskAction(updated);
+              updated._writeCommandReceipts = [{
+                commandKeyHash: command.commandKeyHash,
+                requestDigest: command.requestDigest,
+                response: structuredClone(response),
+                recordedAt: updated.handledAt
+              }, ...(Array.isArray(updated._writeCommandReceipts) ? updated._writeCommandReceipts : [])].slice(0, 20);
+              lockedRows[lockedIndex] = updated;
+              lockedData.taskMessages = [citizenMessage, ...(Array.isArray(lockedData.taskMessages) ? lockedData.taskMessages : [])].slice(0, 300);
+              lockedData.securityEvents = [{
+                id: randomUUID(),
+                at: new Date().toLocaleString("zh-CN", { hour12: false }),
+                actor: user.name,
+                role: user.role,
+                action: "handle unified task",
+                target: taskId,
+                result: "allowed",
+                detail: updated.status
+              }, ...(Array.isArray(lockedData.securityEvents) ? lockedData.securityEvents : [])].slice(0, 120);
+              try {
+                writeDatabase(lockedData);
+              } catch (error) {
+                error.stateCommandPersistenceFailure = true;
+                throw error;
+              }
+              return { status: 200, body: response, replayed: false };
+            });
+            sendJson(res, result.status, result.body);
+          } catch (error) {
+            citizenTaskActionCommandError(res, sendJson, error);
+          }
+          return true;
+        }
         const data = readDatabase();
         if (collection === "citizenLifecycleActions") {
           const task = buildUnifiedTasks(data, user).find((item) => item.id === taskId);
@@ -1589,7 +1712,6 @@ function createRouteSegments(runtime) {
             sendJson(res, 403, { error: "Forbidden", message: "无权处理该居民生命周期任务" });
             return true;
           }
-          const payload = await collectJson(req);
           const message = buildLifecycleActionClosureMessage(task, payload, user);
           data.taskMessages = [message, ...(Array.isArray(data.taskMessages) ? data.taskMessages : [])].slice(0, 300);
           data.securityEvents = [
@@ -1640,7 +1762,6 @@ function createRouteSegments(runtime) {
           sendJson(res, 403, { error: "Forbidden", message: "无权处理该居民任务" });
           return true;
         }
-        const payload = await collectJson(req);
         let citizenMessage = null;
         try {
           rows[index] = user.role === "citizen"

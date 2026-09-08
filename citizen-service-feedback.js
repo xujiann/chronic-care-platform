@@ -185,7 +185,8 @@
 
   function isRecoverableDuplicateFeedback(error) {
     return Number(error?.status) === 400
-      && /已提交评价|重复提交/.test(String(error?.message || ""));
+      && (error?.code === "CITIZEN_SERVICE_FEEDBACK_ALREADY_SUBMITTED"
+        || /已提交评价|重复提交/.test(String(error?.message || "")));
   }
 
   function isCitizenVisibleMessage(item) {
@@ -206,6 +207,7 @@
     const errorBody = await response.json().catch(() => ({}));
     const error = new Error(errorBody.message || `服务待办更新失败：${response.status}`);
     error.status = response.status;
+    error.code = errorBody.code;
     if (action === "quality-feedback" && isRecoverableDuplicateFeedback(error)) {
       const recovered = await recover();
       if (recovered) return { ...recovered, recoveredFromDuplicate: true };
@@ -258,17 +260,19 @@
     }
   }
 
-  function createDialogController(document, submitTaskAction, showToast = () => {}, render = () => {}) {
+  function createDialogController(document, submitTaskAction, showToast = () => {}, render = () => {}, commandContext = () => ({})) {
     const dialog = document?.querySelector("#service-quality-feedback-dialog");
     const form = document?.querySelector("#service-quality-feedback-form");
     const error = document?.querySelector("#service-quality-feedback-error");
     const title = document?.querySelector("#service-quality-feedback-title");
     if (!dialog || !form || !error || typeof submitTaskAction !== "function") return null;
     let activeButton = null;
+    let activeCommand = null;
 
     function reset() {
       form.reset();
       delete form.dataset.taskKey;
+      activeCommand = null;
       error.textContent = "";
     }
 
@@ -309,7 +313,7 @@
       if (submit) submit.disabled = true;
       error.textContent = "正在提交评价…";
       try {
-        const result = await submitTaskAction(sourceButton.dataset.taskId, sourceButton.dataset.taskCollection, payload);
+        const result = await submitTaskAction(sourceButton.dataset.taskId, sourceButton.dataset.taskCollection, payload, activeCommand || {});
         close();
         showToast(result?.recoveredFromDuplicate
           ? "评价与投诉已登记，已同步最新状态"
@@ -333,6 +337,7 @@
         if (form.dataset.taskKey !== taskKey) {
           form.reset();
           form.dataset.taskKey = taskKey;
+          activeCommand = commandContext(button) || {};
         }
         activeButton = button;
         if (title) title.textContent = `${button.dataset.taskCollection === "internetNursingOrders" ? "互联网护理" : "助医陪诊"}服务评价`;

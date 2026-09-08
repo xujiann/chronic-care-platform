@@ -139,6 +139,7 @@ test("ambiguous feedback recovery requires the exact persisted evaluation", () =
   assert.equal(feedback.matchesSubmittedFeedback({ ...persisted, satisfaction: { score: 2, status: "submitted" } }, payload), false);
   assert.equal(feedback.satisfactionLabel({ score: 5, status: "submitted" }), "5 分");
   assert.equal(feedback.isRecoverableDuplicateFeedback({ status: 400, message: "该服务已提交评价，请勿重复提交" }), true);
+  assert.equal(feedback.isRecoverableDuplicateFeedback({ status: 400, code: "CITIZEN_SERVICE_FEEDBACK_ALREADY_SUBMITTED", message: "already submitted" }), true);
   assert.equal(feedback.isRecoverableDuplicateFeedback({ status: 500, message: "该服务已提交评价" }), false);
   assert.equal(feedback.isCitizenVisibleMessage({ targetRole: "citizen" }), true);
   assert.equal(feedback.isCitizenVisibleMessage({}), false);

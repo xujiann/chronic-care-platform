@@ -2144,7 +2144,13 @@ function shouldShowQualityFeedback(item) {
 function bindResidentTaskActions() {
   const target = document.querySelector("#reminder-cards");
   if (!target) return;
-  const feedback = CSF.createDialogController(document, submitResidentTaskAction, showToast, () => renderCitizen(currentResidentId));
+  const feedback = CSF.createDialogController(
+    document,
+    submitResidentTaskAction,
+    showToast,
+    () => renderCitizen(currentResidentId),
+    (button) => residentServiceFeedbackCommand(button.dataset.taskCollection)
+  );
   target.addEventListener("click", async (event) => {
     const button = event.target.closest("[data-resident-task-action]");
     if (!button) return;
@@ -2171,6 +2177,14 @@ function bindResidentTaskActions() {
   });
 }
 
+function residentServiceFeedbackCommand(collection) {
+  const version = state.storageMeta?.collectionVersions?.[collection];
+  return {
+    idempotencyKey: crypto.randomUUID(),
+    ...(Number.isSafeInteger(version) && version >= 0 ? { expectedVersion: version } : {})
+  };
+}
+
 function defaultResidentTaskComment(action) {
   return {
     "cancel-request": "居民端申请取消，请服务团队确认",
@@ -2179,20 +2193,23 @@ function defaultResidentTaskComment(action) {
   }[action] || "居民端确认服务安排";
 }
 
-async function submitResidentTaskAction(taskId, collection, payload) {
+async function submitResidentTaskAction(taskId, collection, payload, command = {}) {
   if (API_BASE) {
     const itemId = String(taskId || "").split(":")[1];
     const current = collection === "referrals"
       ? findResidentTaskRows(collection).find((item) => item.id === itemId)
       : null;
     const referralCommandId = collection === "referrals" ? citizenCareRequestNonce() : "";
+    const feedbackCommandId = payload.action === "quality-feedback" ? String(command.idempotencyKey || "").trim() : "";
     const commandPayload = collection === "referrals"
       ? { ...payload, expectedVersion: Number(current?.version || 1) }
-      : payload;
+      : feedbackCommandId
+        ? { ...payload, idempotencyKey: feedbackCommandId, ...(command.expectedVersion === undefined ? {} : { expectedVersion: command.expectedVersion }) }
+        : payload;
     const request = window.HealthCityAuth?.authFetch || fetch;
     const response = await request(`${API_BASE}/tasks/${encodeURIComponent(taskId)}/actions`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", ...(referralCommandId ? { "Idempotency-Key": referralCommandId } : {}) },
+      headers: { "Content-Type": "application/json", ...((referralCommandId || feedbackCommandId) ? { "Idempotency-Key": referralCommandId || feedbackCommandId } : {}) },
       body: JSON.stringify(commandPayload)
     });
     if (!response.ok) return CSF.handleFailedSubmission(

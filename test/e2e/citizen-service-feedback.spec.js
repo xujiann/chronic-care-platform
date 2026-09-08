@@ -10,12 +10,14 @@ async function loginCitizen(page) {
 
 test("resident UI keeps a failed draft, recovers an ambiguous submission, and scopes family complaints", async ({ page }) => {
   const payloads = [];
+  const idempotencyHeaders = [];
   let attempts = 0;
   let committedOrder = null;
   await page.route("**/api/tasks/**/actions", async (route) => {
     attempts += 1;
     const payload = route.request().postDataJSON();
     payloads.push(payload);
+    idempotencyHeaders.push(route.request().headers()["idempotency-key"]);
     if (attempts === 1) {
       committedOrder = {
         id: "eso-feedback-e2e",
@@ -143,10 +145,13 @@ test("resident UI keeps a failed draft, recovers an ambiguous submission, and sc
   await expect(order.getByRole("status", { name: "投诉跟进状态" })).toContainText("投诉已登记");
   await expect(order.getByRole("status", { name: "投诉跟进状态" })).toContainText("机构消息已读不代表投诉结案");
   await expect(page.locator("#citizen-notification-cards .citizen-notification-card").filter({ hasText: "服务投诉待跟进" })).toHaveCount(0);
-  expect(payloads).toEqual([
+  expect(payloads.map(({ idempotencyKey, ...payload }) => payload)).toEqual([
     { action: "quality-feedback", comment: "服务迟到，希望机构联系说明", satisfaction: "不满意", complaintStatus: "open" },
     { action: "quality-feedback", comment: "服务迟到，希望机构联系说明", satisfaction: "不满意", complaintStatus: "open" }
   ]);
+  expect(payloads[0].idempotencyKey).toMatch(/^[0-9a-f-]{36}$/);
+  expect(payloads[1].idempotencyKey).toBe(payloads[0].idempotencyKey);
+  expect(idempotencyHeaders).toEqual([payloads[0].idempotencyKey, payloads[0].idempotencyKey]);
 
   await page.evaluate(() => {
     const account = state.accounts.find((item) => item.id === currentAccountId);

@@ -265,15 +265,11 @@ test("escort owner route preserves validation idempotency handoff scope audit an
   assert.match(repeatedQuality.body.message, /请勿重复提交/);
 
   const institutionMessages = await runtime.request("/api/messages", hospitalToken);
-  const complaintMessage = institutionMessages.body.messages.find((item) => item.sourceId === created.body.id && item.title.includes("投诉待跟进"));
+  assert.equal(institutionMessages.body.messages.some((item) => item.sourceId === created.body.id && item.title.includes("投诉待跟进")), false);
+  const oversightMessages = await runtime.request("/api/messages", commissionToken);
+  const complaintMessage = oversightMessages.body.messages.find((item) => item.sourceId === created.body.id && item.title.includes("投诉待跟进"));
   assert.ok(complaintMessage);
-  const handledMessage = await runtime.request(
-    `/api/messages/${encodeURIComponent(complaintMessage.id)}/receipt`,
-    hospitalToken,
-    jsonCommand(hospitalToken, "test006-escort-complaint-message", { status: "handled" })
-  );
-  assert.equal(handledMessage.response.status, 200);
-  assert.equal(handledMessage.body.status, "handled");
+  assert.equal(complaintMessage.targetOrgCode, "ORG-HOSPITAL");
 
   const returnPayload = { ...payload, residentId: "r4", appointmentAt: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString() };
   const returnCandidate = await runtime.request(
@@ -313,6 +309,6 @@ test("escort owner route preserves validation idempotency handoff scope audit an
   assert.equal(state.body.taskMessages.some((item) => item.sourceId === created.body.id), true);
   assert.equal(state.body.taskMessages.some((item) => item.sourceId === created.body.id && item.title.includes("投诉待跟进")), true);
   assert.equal(state.body.taskMessages.filter((item) => item.sourceId === created.body.id && item.title.includes("投诉待跟进")).length, 1);
-  assert.equal(state.body.taskMessages.find((item) => item.id === complaintMessage.id).status, "handled");
+  assert.equal(state.body.taskMessages.find((item) => item.id === complaintMessage.id).status, "sent");
   assert.equal(state.body.securityEvents.some((item) => item.target === `escortServiceOrders:${created.body.id}` && item.result === "allowed"), true);
 });
