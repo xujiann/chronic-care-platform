@@ -21323,11 +21323,64 @@ function buildUnifiedTasks(data, user) {
 }
 
 function canAccessTaskMessage(user, message, data) {
+  if (isResidentServiceFeedbackMessage(message, data)) {
+    const order = residentServiceMessageOrder(message, data);
+    if (!order) return false;
+    if (user.role === "commission") return true;
+    if (message.targetRole !== user.role || user.role !== "institution") return false;
+    const targetOrgCode = residentServiceMessageTargetOrgCode(message, data);
+    if (!targetOrgCode || targetOrgCode !== String(user.orgCode || "").trim()) return false;
+    return true;
+  }
   if (user.role === "commission") return true;
   if (message.collection === "multiPracticeApplications") return canAccessMultiPracticeMessage(user, message, data);
   if (message.targetRole === user.role) return true;
   if (message.residentId && canAccessResident(user, message.residentId, data)) return true;
   return message.createdBy === user.username;
+}
+
+function residentServiceMessageOrder(message, data) {
+  if (!message || !["escortServiceOrders", "internetNursingOrders"].includes(message.collection)) return null;
+  const rows = Array.isArray(data?.[message.collection]) ? data[message.collection] : [];
+  const order = rows.find((item) => item.id === message.sourceId) || null;
+  if (!order) return null;
+  if (message.taskId !== `${message.collection}:${message.sourceId}`) return null;
+  if (!message.residentId || message.residentId !== order.residentId) return null;
+  return order;
+}
+
+function isResidentServiceFeedbackMessage(message, data) {
+  if (message?.messageType === "resident-service-quality-feedback") return true;
+  if (message?.messageType) return false;
+  const legacyTitles = {
+    escortServiceOrders: "助医陪诊：服务投诉待跟进",
+    internetNursingOrders: "互联网护理：服务投诉待跟进"
+  };
+  return message?.targetRole === "institution"
+    && message?.title === legacyTitles[message?.collection];
+}
+
+function residentServiceMessageTargetOrgCode(message, data) {
+  const explicit = String(message?.targetOrgCode || "").trim();
+  const order = residentServiceMessageOrder(message, data);
+  if (!order) return "";
+  const uniqueCode = (values) => {
+    const codes = [...new Set(values.map((value) => String(value || "").trim()).filter(Boolean))];
+    return codes.length === 1 ? codes[0] : "";
+  };
+  let derived = "";
+  if (message.collection === "escortServiceOrders") {
+    const provider = (Array.isArray(data?.escortServiceProviders) ? data.escortServiceProviders : [])
+      .find((item) => item.id === order.providerId);
+    // The provider owns service-quality complaints. hospitalCode is the visit
+    // location and remains part of order visibility, but never grants complaint
+    // ownership. Conflicting provider identities fail closed.
+    derived = uniqueCode([order.institutionCode, provider?.institutionCode]);
+  } else {
+    const institution = institutionForNursingOrder(data, order);
+    derived = uniqueCode([order.institutionCode, institution?.institutionCode]);
+  }
+  return derived && (!explicit || explicit === derived) ? derived : "";
 }
 
 function buildMultiPracticeTaskMessage(application, payload = {}, user = {}) {
@@ -21442,7 +21495,7 @@ function applyCitizenTaskAction(item, payload, collection, user) {
   };
 }
 
-function buildCitizenTaskActionMessage(item, collection, payload, user) {
+function buildCitizenTaskActionMessage(item, collection, payload, user, data) {
   const now = new Date().toISOString();
   const action = String(payload.action || "resident-confirm").trim();
   const actionLabels = {
@@ -21461,6 +21514,20 @@ function buildCitizenTaskActionMessage(item, collection, payload, user) {
     escortServiceOrders: "助医陪诊",
     internetNursingOrders: "互联网护理"
   };
+  const qualityFeedback = action === "quality-feedback" && ["escortServiceOrders", "internetNursingOrders"].includes(collection);
+  const targetOrgCode = qualityFeedback
+    ? residentServiceMessageTargetOrgCode({
+        taskId: `${collection}:${item.id}`,
+        collection,
+        sourceId: item.id,
+        residentId: item.residentId || item.maternalResidentId || ""
+      }, data)
+    : "";
+  if (qualityFeedback && !targetOrgCode) {
+    const error = new Error("resident service feedback owner is unresolved");
+    error.code = "RESIDENT_SERVICE_FEEDBACK_OWNER_UNRESOLVED";
+    throw error;
+  }
   return {
     id: `msg-${randomUUID()}`,
     taskId: `${collection}:${item.id}`,
@@ -21468,6 +21535,7 @@ function buildCitizenTaskActionMessage(item, collection, payload, user) {
     sourceId: item.id,
     residentId: item.residentId || item.maternalResidentId || "",
     targetRole: "institution",
+    ...(qualityFeedback ? { messageType: "resident-service-quality-feedback", targetOrgCode } : {}),
     channel: "in_app",
     title: payload.complaintStatus === "open"
       ? `${serviceLabels[collection] || "居民服务"}：服务投诉待跟进`
@@ -28088,6 +28156,8 @@ function createRuntimeCapabilitySource() {
   canAccessSecureAttachment,
   canAccessServiceOrder,
   canAccessTaskMessage,
+  isResidentServiceFeedbackMessage,
+  residentServiceMessageTargetOrgCode,
   canManageAppointmentIntegrationEvent,
   canManageResidentProfile,
   canReadT10InstitutionModules,
@@ -28653,6 +28723,7 @@ module.exports = {
   pilotCutoverControlPlaneReadiness,
   pilotCutoverControlHealthReadiness,
   readDatabase,
+  residentServiceMessageTargetOrgCode,
   requireApiAccess,
   requireDigitalHospitalExecutionWorker,
   server,

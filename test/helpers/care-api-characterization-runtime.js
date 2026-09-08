@@ -42,9 +42,15 @@ function jsonCommand(token, commandId, body) {
   };
 }
 
-async function startCareApiCharacterization(name) {
+async function startCareApiCharacterization(name, configureFixture) {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), `${name}-`));
-  fs.copyFileSync(path.join(ROOT, "data", "db.json"), path.join(dataDir, "db.json"));
+  const databasePath = path.join(dataDir, "db.json");
+  fs.copyFileSync(path.join(ROOT, "data", "db.json"), databasePath);
+  if (typeof configureFixture === "function") {
+    const fixture = JSON.parse(fs.readFileSync(databasePath, "utf8"));
+    configureFixture(fixture);
+    fs.writeFileSync(databasePath, `${JSON.stringify(fixture, null, 2)}\n`);
+  }
   const environment = {
     NODE_ENV: process.env.NODE_ENV,
     PORT: process.env.PORT,
