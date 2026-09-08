@@ -324,9 +324,9 @@ QC 同样保留原 commission/institution、先查检查再读 body、FHIR 失�
 - `test/operations-command-handoff.test.js` 复用原 T02 handoff harness，把 32 条 operations command
   路径登记为唯一数据驱动行为矩阵；`operations-command:behavior-test` 在 governance-api 显式运行，
   同时仍由标准 unit 补集覆盖。矩阵保护遗留 handler，不是新路由注册表或拆分授权。
-- 根、居民和 PWA 三套 Playwright 配置共用 Chromium、动态端口与 runner 端口装配；在线 40 + 13 项
+- 根、居民和 PWA 三套 Playwright 配置共用 Chromium、动态端口与 runner 端口装配；在线 60 + 13 项
   固定 `serviceWorkers=block`，只有 PWA 3 项使用 `playwright-pwa-browser-policy.v1` 允许 Worker。
-  Playwright 列表门禁锁定 40 + 13 + 3 = 56 且无重复，固定端口、系统 Chrome 或 PWA 测试混入在线套件会失败。
+  Playwright 列表门禁锁定 60 + 13 + 3 = 76 且无重复，固定端口、系统 Chrome 或 PWA 测试混入在线套件会失败。
 
 ## 11. 区域共享调阅命令
 

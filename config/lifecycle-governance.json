@@ -956,10 +956,13 @@
         "service-worker.js",
         "test/e2e/pwa-service-worker.spec.js",
         "test/citizen-service-feedback.test.js",
+        "test/static.test.js",
         "CURRENT_ARCHITECTURE.md",
+        "MODULE_MAP.md",
         "DATA_MODEL.md",
         "DEPENDENCY_MAP.md",
         "ROADMAP.md",
+        "TECH_DEBT.md",
         "config/lifecycle-governance.json",
         "docs/lifecycle-governance.md"
       ],
