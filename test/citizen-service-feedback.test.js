@@ -173,6 +173,6 @@ test("resident portal wires a structured feedback dialog without changing the ta
   assert.match(js, /recoverSubmittedServiceFeedback/);
   assert.match(js, /\/tasks\/\$\{encodeURIComponent\(taskId\)\}\/actions/);
   assert.doesNotMatch(js, /satisfaction:\s*action === "quality-feedback" \? "满意"/);
-  assert.match(serviceWorker, /chronic-care-citizen-v62-service-feedback/);
+  assert.match(serviceWorker, /chronic-care-citizen-v63-service-feedback/);
   assert.match(serviceWorker, /citizen-service-feedback\.js/);
 });

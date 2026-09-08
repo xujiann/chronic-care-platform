@@ -172,8 +172,8 @@
       "title": "交接遗漏、父子写范围冲突或混合变更漏测",
       "owner": "T00",
       "mitigation": "只读派生队列、路径重叠检测和逐文件未分类回退",
-      "status": "open",
-      "evidenceIds": []
+      "status": "mitigated",
+      "evidenceIds": ["EVD-GOV-004"]
     },
     {
       "id": "RISK-GOV-001",
@@ -381,9 +381,9 @@
   "evidence": [
     {
       "id": "EVD-GOV-004",
-      "scope": "repository",
-      "type": "executable-contract",
-      "ref": "node --test test/lifecycle-governance.test.js",
+      "scope": "repository-integration",
+      "type": "pull-request-ci",
+      "ref": "https://github.com/xujiann/chronic-care-platform/actions/runs/34212125495",
       "testIds": ["TEST-GOV-004"],
       "productionEvidence": false
     },
@@ -561,8 +561,8 @@
       "id": "GOV-004",
       "title": "优化集成收尾、依赖交接与变更测试选择",
       "ownerProcess": "T00",
-      "taskStatus": "待集成",
-      "capabilityStatus": "已验证",
+      "taskStatus": "已关闭",
+      "capabilityStatus": "已集成",
       "riskLevel": "中",
       "approval": {
         "state": "approved",
@@ -586,7 +586,7 @@
       "branch": "process/t00-lifecycle-handoff-optimization-20260908",
       "planRef": "docs/lifecycle-governance.md#gov-004-流程优化-plan",
       "pullRequestRef": "https://github.com/xujiann/chronic-care-platform/pull/273",
-      "ciRef": "",
+      "ciRef": "https://github.com/xujiann/chronic-care-platform/actions/runs/34212125495",
       "writeScopes": ["scripts/lifecycle-governance.js", "test/lifecycle-governance.test.js", "config/lifecycle-governance.json", "docs/lifecycle-governance.md"],
       "observability": {"applicable": false, "reason": "仅修复研发治理检查并输出只读交接队列，不增加生产运行时"},
       "runtimeCapability": false
@@ -921,8 +921,9 @@
       "id": "OPS-019",
       "title": "居民评价投诉 PWA 缓存失效闭环",
       "ownerProcess": "T04",
-      "taskStatus": "已批准",
-      "capabilityStatus": "未建设",
+      "integrationOwner": "T00",
+      "taskStatus": "实施中",
+      "capabilityStatus": "已实现",
       "riskLevel": "低",
       "approval": {
         "state": "approved",
@@ -938,7 +939,7 @@
       "affectedModules": ["citizen-pwa", "service-worker", "browser-e2e"],
       "dataSensitivity": "静态发布资产与缓存元数据-不含居民业务数据",
       "acceptanceCriteria": [
-        "缓存版本由 v62 递增且不改变 API 或业务状态机",
+        "缓存版本由 v62 递增至 v63 且不改变 API 或业务状态机",
         "新 Service Worker 激活后删除旧缓存并只保留当前缓存",
         "PWA 三条浏览器场景和静态契约通过"
       ],
@@ -946,16 +947,24 @@
       "evidenceIds": [],
       "rollback": "回退缓存版本与对应测试；不修改业务数据或数据库 schema",
       "unresolved": [],
-      "worktree": ".codex-platform-worktrees/process-v2/t04-resident-feedback-pwa-cache-20260908",
-      "branch": "process/t04-resident-feedback-pwa-cache-20260908",
-      "planRef": "T00-PLAN-OPS-019-PWA-CACHE-2026-09-08",
-      "pullRequestRef": "",
+      "worktree": ".codex-platform-worktrees/process-v2/t00-resident-feedback-pwa-v63-20260908",
+      "branch": "process/t00-resident-feedback-pwa-v63-20260908",
+      "planRef": "docs/lifecycle-governance.md#ops-019-pwa-v63-缓存失效-plan",
+      "pullRequestRef": "https://github.com/xujiann/chronic-care-platform/pull/275",
       "ciRef": "",
       "writeScopes": [
         "service-worker.js",
         "test/e2e/pwa-service-worker.spec.js",
         "test/citizen-service-feedback.test.js",
-        "test/static.test.js"
+        "test/static.test.js",
+        "CURRENT_ARCHITECTURE.md",
+        "MODULE_MAP.md",
+        "DATA_MODEL.md",
+        "DEPENDENCY_MAP.md",
+        "ROADMAP.md",
+        "TECH_DEBT.md",
+        "config/lifecycle-governance.json",
+        "docs/lifecycle-governance.md"
       ],
       "observability": {
         "applicable": false,
