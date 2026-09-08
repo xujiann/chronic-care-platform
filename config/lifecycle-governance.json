@@ -418,8 +418,8 @@
     {
       "id": "EVD-OPS-017",
       "scope": "repository-integration",
-      "type": "executable-contract",
-      "ref": "node --test --test-concurrency=1 test/resident-service-feedback-idempotency-http.test.js test/citizen-service-feedback.test.js test/escort-owner-route-characterization.test.js test/internet-nursing-closed-loop-characterization.test.js",
+      "type": "pull-request-evidence",
+      "ref": "https://github.com/xujiann/chronic-care-platform/pull/272",
       "testIds": ["TEST-OPS-017"],
       "productionEvidence": false
     },
@@ -752,7 +752,7 @@
       ],
       "testIds": ["TEST-OPS-017"],
       "evidenceIds": ["EVD-OPS-017"],
-      "rollback": "回退 T00 居民服务反馈集成 PR；无 schema 迁移，既有评价、命令回执与投诉记录必须继续保留",
+      "rollback": "回退 PR #272；无 schema 迁移，既有评价、命令回执与投诉记录必须继续保留",
       "unresolved": [
         "投诉目前复用站内消息，尚无独立工单、SLA、升级和结案模型",
         "已安装客户端资产刷新等待 OPS-019 完成 PWA 缓存版本闭环",
@@ -761,7 +761,7 @@
       "worktree": ".codex-platform-worktrees/process-v2/t04-citizen-complaint-followup-20260907",
       "branch": "process/t00-resident-feedback-integration-20260908",
       "planRef": "T00-PLAN-OPS-017-IDEMPOTENCY-2026-09-08",
-      "pullRequestRef": "",
+      "pullRequestRef": "https://github.com/xujiann/chronic-care-platform/pull/272",
       "ciRef": "",
       "writeScopes": [
         "citizen-service-feedback.js",
