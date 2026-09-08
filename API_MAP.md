@@ -430,6 +430,15 @@ PWA 专项增加 3 项独立浏览器行为测试，但不新增测试控制 HTT
 正式 `service-worker.js`。Worker 明确旁路 `/api/*`，缓存拒绝非同源和非成功响应；测试中的 offline 模式、
 Cache Storage 与 registration 清理不构成真实 HTTPS、生产 endpoint、现场浏览器策略或外部 Origin 证据。
 
+### 20A. 居民服务评价投诉消息授权
+
+既有 `GET /api/messages` 与 `POST /api/messages/:id/receipt` 的 method/path 和成功响应形状不变。护理与陪诊
+评价消息新增 `messageType`、`targetOrgCode` 加法字段；非主管部门读取同时要求目标角色、目标机构代码和
+权威订单范围匹配。历史消息缺少机构字段时只从精确来源订单及机构目录唯一派生，缺失、孤儿或陪诊服务商/
+订单/就诊机构代码冲突均失败关闭。主管部门保留列表监督可见性，但不是目标角色时不得提交回执；机构回执
+仅允许 `read`、`acknowledged`、`handled`，且回执不修改订单投诉状态。拒绝路径进入既有安全审计且不记录
+投诉正文。该仓库边界不证明外部身份、持续告警或现场安全验收，生产继续 `NO-GO`。
+
 ## 21. 仓库文档与制品治理（无 HTTP 变化）
 
 本切片不新增或改变任何 HTTP method/path、身份、角色、scope、错误、幂等或审计语义。

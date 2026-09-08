@@ -106,7 +106,7 @@
       ]
     },
     {
-      "id": "REQ-SEC-009",
+      "id": "REQ-SEC-011",
       "title": "投诉跟进站内消息必须按目标角色和目标机构严格授权",
       "sourceType": "security-review-finding",
       "sourceRef": "OPS-017-PR-264-REVIEW-2026-09-08",
@@ -214,7 +214,7 @@
       "evidenceIds": []
     },
     {
-      "id": "RISK-SEC-009",
+      "id": "RISK-SEC-011",
       "level": "高",
       "title": "机构目标投诉消息被居民或错误机构读取和回执",
       "owner": "T05",
@@ -265,6 +265,14 @@
       "path": "docs/adr/2026-08-18-clinical-five-governed-subdomains.md",
       "effectiveScope": "clinical-specialty-bounded-contexts-and-command-recovery",
       "reviewDue": "2027-02-18",
+      "supersedes": []
+    },
+    {
+      "id": "ADR-SEC-011",
+      "status": "Accepted",
+      "path": "docs/adr/2026-09-08-resident-service-message-authorization.md",
+      "effectiveScope": "resident-service-message-role-organization-and-receipt-authorization",
+      "reviewDue": "2027-03-08",
       "supersedes": []
     }
   ],
@@ -334,6 +342,12 @@
       "kind": "cross-platform-gate-runner-contract",
       "path": "test/lifecycle-governance.test.js",
       "command": "node --test test/lifecycle-governance.test.js"
+    },
+    {
+      "id": "TEST-SEC-011",
+      "kind": "real-http-role-organization-and-receipt-authorization-contract",
+      "path": "test/task-message-authorization-http.test.js",
+      "command": "node --test --test-concurrency=1 test/task-message-authorization-http.test.js"
     }
   ],
   "evidence": [
@@ -732,7 +746,7 @@
       "rollback": "回退 PR #260；无 schema 迁移，既有评价与投诉记录必须继续按原任务记录保留",
       "unresolved": [
         "投诉目前复用站内消息，尚无独立工单、SLA、升级和结案模型",
-        "机构目标消息的服务端角色与机构授权等待 SEC-009 完成高风险审批和专项验证",
+        "机构目标消息的服务端角色与机构授权等待 SEC-011 完成专项验证与主线集成",
         "已安装客户端资产刷新等待 OPS-019 完成 PWA 缓存版本闭环",
         "结构化指标、追踪、SLO、告警、手册、降级和补偿尚未完整交付"
       ],
@@ -859,20 +873,23 @@
       "runtimeCapability": false
     },
     {
-      "id": "SEC-009",
+      "id": "SEC-011",
       "title": "投诉跟进消息角色与机构范围授权",
       "ownerProcess": "T05",
-      "taskStatus": "待批准",
-      "capabilityStatus": "未建设",
+      "taskStatus": "实施中",
+      "capabilityStatus": "已实现",
       "riskLevel": "高",
       "approval": {
-        "state": "pending"
+        "state": "approved",
+        "mode": "accepted-adr-human-review-special-validation",
+        "ref": "USER-APPROVED-CLOSE-THREAD-GAPS-2026-09-08",
+        "approvedScope": "resident-service-message-role-organization-and-receipt-authorization"
       },
-      "requirementIds": ["REQ-SEC-009"],
+      "requirementIds": ["REQ-SEC-011"],
       "regulatoryControlIds": ["REG-GOV-001"],
-      "riskIds": ["RISK-SEC-009"],
-      "decisionIds": [],
-      "dependencies": ["GOV-002", "OPS-017"],
+      "riskIds": ["RISK-SEC-011"],
+      "decisionIds": ["ADR-SEC-011"],
+      "dependencies": ["GOV-002"],
       "affectedModules": ["task-messages", "api-authorization", "complaint-follow-up"],
       "dataSensitivity": "居民投诉跟进消息-个人敏感信息与机构内部处置信息",
       "acceptanceCriteria": [
@@ -880,26 +897,36 @@
         "居民、错误角色和错误机构访问均失败关闭",
         "真实 HTTP 授权矩阵覆盖读取、回执和角色专用回执状态"
       ],
-      "testIds": [],
+      "testIds": ["TEST-SEC-011"],
       "evidenceIds": [],
-      "rollback": "高风险方案批准后单独定义；当前候选任务不得创建实施分支或改动运行时代码",
+      "rollback": "回退 SEC-011 单一提交，恢复原消息筛选和回执兼容行为；不修改 schema，已写 targetOrgCode 为加法字段且可由旧读取忽略",
       "unresolved": [
-        "需要独立 ADR 明确订单机构绑定、目标角色语义和历史消息兼容策略",
-        "需要人工安全评审与专项负向 HTTP 验证后才能进入 WIP"
+        "等待独立 PR required CI 与 T00 主线集成",
+        "授权拒绝指标、告警和处置手册仍需后续运行治理任务"
       ],
-      "worktree": ".codex-platform-worktrees/process-v2/sec-009-message-authorization-pending",
-      "branch": "pending/sec-009-message-authorization",
-      "planRef": "T00-PLAN-SEC-009-PENDING-ADR-2026-09-08",
+      "worktree": ".codex-platform-worktrees/process-v2/t00-sec011-complaint-message-authorization-20260908",
+      "branch": "process/t00-sec-011-complaint-message-authorization-20260908",
+      "planRef": "ADR-SEC-011#implementation-plan",
       "pullRequestRef": "",
       "ciRef": "",
       "writeScopes": [
         "server.js",
-        "src/http/shared-task-actions",
-        "test/task-message-authorization-http.test.js"
+        "src/http/routes/care-coordination.js",
+        "src/http/runtime-contexts/care-coordination.js",
+        "test/task-message-authorization-http.test.js",
+        "config/lifecycle-governance.json",
+        "config/repository-governance.json",
+        "API_MAP.md",
+        "ROADMAP.md",
+        "MODULE_MAP.md",
+        "CURRENT_ARCHITECTURE.md",
+        "TECH_DEBT.md",
+        "docs/adr/2026-09-08-resident-service-message-authorization.md",
+        "docs/adr/README.md"
       ],
       "observability": {
         "applicable": true,
-        "gaps": "待 ADR 定义拒绝审计、授权失败指标、告警和处置手册"
+        "gaps": "拒绝审计已交付；授权失败指标、告警和处置手册仍需后续运行治理任务"
       },
       "runtimeCapability": true
     },

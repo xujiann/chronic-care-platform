@@ -20,7 +20,7 @@ const DEPENDENCIES = Object.freeze([
   "buildRegistrationWaitlistCenter", "buildRegistrationWaitlistDeliveries", "buildRegistrationWaitlistTaskMessage",
   "buildUnifiedTasks", "canAccessEscortOrder", "canAccessInternetNursingOrder", "canAccessMultiPracticeApplication",
   "canAccessReferralTeleconsultation", "canAccessRegistrationOrder", "canAccessRegistrationSchedule",
-  "canAccessRegistrationWaitlistEntry", "canAccessResident", "canAccessTaskMessage", "canManageAppointmentIntegrationEvent",
+  "canAccessRegistrationWaitlistEntry", "canAccessResident", "canAccessTaskMessage", "isResidentServiceFeedbackMessage", "canManageAppointmentIntegrationEvent",
   "careServiceActor", "careServiceCommandId", "careServiceCreatePayload", "careServicePlatformAdapter",
   "careServiceReadinessPublicSummary", "careServiceTransitionInput", "cleanMultiPracticePatch", "cleanWorkflowUpdates",
   "collectJson", "completeReferralTeleconsultationJointTestTask", "createReferralTeleconsultationEscalationMessage",

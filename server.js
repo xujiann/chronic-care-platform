@@ -21325,9 +21325,50 @@ function buildUnifiedTasks(data, user) {
 function canAccessTaskMessage(user, message, data) {
   if (user.role === "commission") return true;
   if (message.collection === "multiPracticeApplications") return canAccessMultiPracticeMessage(user, message, data);
+  if (isResidentServiceFeedbackMessage(message, data)) {
+    if (message.targetRole !== user.role || user.role !== "institution") return false;
+    const targetOrgCode = residentServiceMessageTargetOrgCode(message, data);
+    if (!targetOrgCode || targetOrgCode !== String(user.orgCode || "").trim()) return false;
+    const order = residentServiceMessageOrder(message, data);
+    return message.collection === "escortServiceOrders"
+      ? canAccessEscortOrder(user, order, data)
+      : canAccessInternetNursingOrder(user, order, data);
+  }
   if (message.targetRole === user.role) return true;
   if (message.residentId && canAccessResident(user, message.residentId, data)) return true;
   return message.createdBy === user.username;
+}
+
+function residentServiceMessageOrder(message, data) {
+  if (!message || !["escortServiceOrders", "internetNursingOrders"].includes(message.collection)) return null;
+  const rows = Array.isArray(data?.[message.collection]) ? data[message.collection] : [];
+  return rows.find((item) => item.id === message.sourceId) || null;
+}
+
+function isResidentServiceFeedbackMessage(message, data) {
+  if (message?.messageType === "resident-service-quality-feedback") return true;
+  const order = residentServiceMessageOrder(message, data);
+  return Boolean(order && order.taskAction === "quality-feedback");
+}
+
+function residentServiceMessageTargetOrgCode(message, data) {
+  const explicit = String(message?.targetOrgCode || "").trim();
+  const order = residentServiceMessageOrder(message, data);
+  if (!order) return "";
+  const uniqueCode = (values) => {
+    const codes = [...new Set(values.map((value) => String(value || "").trim()).filter(Boolean))];
+    return codes.length === 1 ? codes[0] : "";
+  };
+  let derived = "";
+  if (message.collection === "escortServiceOrders") {
+    const provider = (Array.isArray(data?.escortServiceProviders) ? data.escortServiceProviders : [])
+      .find((item) => item.id === order.providerId);
+    derived = uniqueCode([order.institutionCode, provider?.institutionCode, order.hospitalCode]);
+  } else {
+    const institution = institutionForNursingOrder(data, order);
+    derived = uniqueCode([order.institutionCode, institution?.institutionCode]);
+  }
+  return derived && (!explicit || explicit === derived) ? derived : "";
 }
 
 function buildMultiPracticeTaskMessage(application, payload = {}, user = {}) {
@@ -21442,7 +21483,7 @@ function applyCitizenTaskAction(item, payload, collection, user) {
   };
 }
 
-function buildCitizenTaskActionMessage(item, collection, payload, user) {
+function buildCitizenTaskActionMessage(item, collection, payload, user, data) {
   const now = new Date().toISOString();
   const action = String(payload.action || "resident-confirm").trim();
   const actionLabels = {
@@ -21461,6 +21502,10 @@ function buildCitizenTaskActionMessage(item, collection, payload, user) {
     escortServiceOrders: "助医陪诊",
     internetNursingOrders: "互联网护理"
   };
+  const qualityFeedback = action === "quality-feedback" && ["escortServiceOrders", "internetNursingOrders"].includes(collection);
+  const targetOrgCode = qualityFeedback
+    ? residentServiceMessageTargetOrgCode({ collection, sourceId: item.id }, data)
+    : "";
   return {
     id: `msg-${randomUUID()}`,
     taskId: `${collection}:${item.id}`,
@@ -21468,6 +21513,7 @@ function buildCitizenTaskActionMessage(item, collection, payload, user) {
     sourceId: item.id,
     residentId: item.residentId || item.maternalResidentId || "",
     targetRole: "institution",
+    ...(qualityFeedback ? { messageType: "resident-service-quality-feedback", targetOrgCode } : {}),
     channel: "in_app",
     title: payload.complaintStatus === "open"
       ? `${serviceLabels[collection] || "居民服务"}：服务投诉待跟进`
@@ -28088,6 +28134,8 @@ function createRuntimeCapabilitySource() {
   canAccessSecureAttachment,
   canAccessServiceOrder,
   canAccessTaskMessage,
+  isResidentServiceFeedbackMessage,
+  residentServiceMessageTargetOrgCode,
   canManageAppointmentIntegrationEvent,
   canManageResidentProfile,
   canReadT10InstitutionModules,
@@ -28653,6 +28701,7 @@ module.exports = {
   pilotCutoverControlPlaneReadiness,
   pilotCutoverControlHealthReadiness,
   readDatabase,
+  residentServiceMessageTargetOrgCode,
   requireApiAccess,
   requireDigitalHospitalExecutionWorker,
   server,

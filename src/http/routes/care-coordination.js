@@ -47,7 +47,7 @@ function teleconsultationCommandError(res, sendJson, error, codes) {
 }
 
 function createRouteSegments(runtime) {
-  const { APPOINTMENT_CONTRACT_ID, CareServiceRuntime, RegistrationReferralService, WORKFLOW_COLLECTIONS, WORKFLOW_ROLE_COLLECTIONS, acknowledgeReferralTeleconsultationEscalation, appendDataAccessLog, appendDrugConsumableAuditTrail, appendReferralTeleconsultationNotifications, appendSecurityEvent, applyAppointmentIntegrationReconciliationAction, applyCitizenTaskAction, applyInternetNursingOrderAction, applyReferralTeleconsultationAction, applyRegistrationCancel, applyRegistrationDisruptionAction, applyRegistrationJourneyAction, applyRegistrationWaitlistAction, assertReferralCallbackResident, buildCareServiceProductionReadiness, buildCitizenTaskActionMessage, buildCountyAcceptanceLedger, buildEscortServiceDashboard, buildInternetNursingActionMessage, buildInternetNursingDashboard, buildLifecycleActionClosureMessage, buildMultiPracticeRegistry, buildMultiPracticeTaskMessage, buildPrimaryPracticeConfirmation, buildReferralConsortiumClosedLoopMetrics, buildReferralInsurancePerformancePolicy, buildReferralTeleconsultationEscalations, buildReferralTeleconsultationJointTestLedger, buildReferralTeleconsultationJointTestPack, buildReferralTeleconsultationPersonalRecord, buildReferralTeleconsultationSignoffSummary, buildRegistrationDashboard, buildRegistrationIntegrationCenter, buildRegistrationJourneyTaskMessage, buildRegistrationNotificationDeliveries, buildRegistrationTaskMessage, buildRegistrationWaitlistCenter, buildRegistrationWaitlistDeliveries, buildRegistrationWaitlistTaskMessage, buildUnifiedTasks, canAccessEscortOrder, canAccessInternetNursingOrder, canAccessMultiPracticeApplication, canAccessReferralTeleconsultation, canAccessRegistrationOrder, canAccessRegistrationSchedule, canAccessRegistrationWaitlistEntry, canAccessResident, canAccessTaskMessage, canManageAppointmentIntegrationEvent, careServiceActor, careServiceCommandId, careServiceCreatePayload, careServicePlatformAdapter, careServiceReadinessPublicSummary, careServiceTransitionInput, cleanMultiPracticePatch, cleanWorkflowUpdates, collectJson, completeReferralTeleconsultationJointTestTask, createReferralTeleconsultationEscalationMessage, createReferralTeleconsultationJointTestTasks, createTaskMessage, findWorkflowCollection, isClosedTaskStatus, landAppointmentIntegrationEvent, normalizeInternetNursingOrder, normalizeMultiPracticeApplication, normalizeReferralTeleconsultation, normalizeReferralTeleconsultationCallback, normalizeReferralTeleconsultationFeedbackCallback, normalizeReferralTeleconsultationScheduleCallback, normalizeReferralTeleconsultationStatus, normalizeRegistrationOrder, normalizeRegistrationWaitlistEntry, normalizeState, patchBusinessCollectionItem, prependAuditTrailEntry, promoteNextRegistrationWaitlist, randomUUID, readDatabase, redactSensitiveResponse, refreshBirthStatistics, refreshMultiPracticeReviewState, requireApiRole, resealAuditTrail, resolveMultiPracticeLifecyclePatch, sealAuditTrail, seedRegistrationSchedules, sendCareServiceError, sendJson, updateIntegrationEvent, upsertReferralTeleconsultationSignoff, verifyDoctorElectronicRegistration, verifyIntegrationSignature, workflowStateCollectionKey, writeDatabase } = runtime;
+  const { APPOINTMENT_CONTRACT_ID, CareServiceRuntime, RegistrationReferralService, WORKFLOW_COLLECTIONS, WORKFLOW_ROLE_COLLECTIONS, acknowledgeReferralTeleconsultationEscalation, appendDataAccessLog, appendDrugConsumableAuditTrail, appendReferralTeleconsultationNotifications, appendSecurityEvent, applyAppointmentIntegrationReconciliationAction, applyCitizenTaskAction, applyInternetNursingOrderAction, applyReferralTeleconsultationAction, applyRegistrationCancel, applyRegistrationDisruptionAction, applyRegistrationJourneyAction, applyRegistrationWaitlistAction, assertReferralCallbackResident, buildCareServiceProductionReadiness, buildCitizenTaskActionMessage, buildCountyAcceptanceLedger, buildEscortServiceDashboard, buildInternetNursingActionMessage, buildInternetNursingDashboard, buildLifecycleActionClosureMessage, buildMultiPracticeRegistry, buildMultiPracticeTaskMessage, buildPrimaryPracticeConfirmation, buildReferralConsortiumClosedLoopMetrics, buildReferralInsurancePerformancePolicy, buildReferralTeleconsultationEscalations, buildReferralTeleconsultationJointTestLedger, buildReferralTeleconsultationJointTestPack, buildReferralTeleconsultationPersonalRecord, buildReferralTeleconsultationSignoffSummary, buildRegistrationDashboard, buildRegistrationIntegrationCenter, buildRegistrationJourneyTaskMessage, buildRegistrationNotificationDeliveries, buildRegistrationTaskMessage, buildRegistrationWaitlistCenter, buildRegistrationWaitlistDeliveries, buildRegistrationWaitlistTaskMessage, buildUnifiedTasks, canAccessEscortOrder, canAccessInternetNursingOrder, canAccessMultiPracticeApplication, canAccessReferralTeleconsultation, canAccessRegistrationOrder, canAccessRegistrationSchedule, canAccessRegistrationWaitlistEntry, canAccessResident, canAccessTaskMessage, isResidentServiceFeedbackMessage, canManageAppointmentIntegrationEvent, careServiceActor, careServiceCommandId, careServiceCreatePayload, careServicePlatformAdapter, careServiceReadinessPublicSummary, careServiceTransitionInput, cleanMultiPracticePatch, cleanWorkflowUpdates, collectJson, completeReferralTeleconsultationJointTestTask, createReferralTeleconsultationEscalationMessage, createReferralTeleconsultationJointTestTasks, createTaskMessage, findWorkflowCollection, isClosedTaskStatus, landAppointmentIntegrationEvent, normalizeInternetNursingOrder, normalizeMultiPracticeApplication, normalizeReferralTeleconsultation, normalizeReferralTeleconsultationCallback, normalizeReferralTeleconsultationFeedbackCallback, normalizeReferralTeleconsultationScheduleCallback, normalizeReferralTeleconsultationStatus, normalizeRegistrationOrder, normalizeRegistrationWaitlistEntry, normalizeState, patchBusinessCollectionItem, prependAuditTrailEntry, promoteNextRegistrationWaitlist, randomUUID, readDatabase, redactSensitiveResponse, refreshBirthStatistics, refreshMultiPracticeReviewState, requireApiRole, resealAuditTrail, resolveMultiPracticeLifecyclePatch, sealAuditTrail, seedRegistrationSchedules, sendCareServiceError, sendJson, updateIntegrationEvent, upsertReferralTeleconsultationSignoff, verifyDoctorElectronicRegistration, verifyIntegrationSignature, workflowStateCollectionKey, writeDatabase } = runtime;
 
   function referralCommandInput(payload, source) {
     if (source !== "workflow") return payload;
@@ -1514,16 +1514,33 @@ function createRouteSegments(runtime) {
           sendJson(res, 404, { error: "Not Found", message: "未找到消息" });
           return true;
         }
-        if (!canAccessTaskMessage(user, messages[index], data)) {
+        const residentServiceFeedback = isResidentServiceFeedbackMessage(messages[index], data);
+        if ((residentServiceFeedback && user.role !== messages[index].targetRole) || !canAccessTaskMessage(user, messages[index], data)) {
+          data.securityEvents = prependAuditTrailEntry(data.securityEvents, {
+            id: randomUUID(),
+            at: new Date().toLocaleString("zh-CN", { hour12: false }),
+            actor: user.name,
+            role: user.role,
+            action: "acknowledge task message",
+            target: `taskMessages/${messages[index].id}`,
+            result: "拒绝",
+            detail: "角色或机构范围不匹配"
+          });
+          writeDatabase(data);
           sendJson(res, 403, { error: "Forbidden", message: "无权回执该消息" });
           return true;
         }
         const payload = await collectJson(req);
+        const receiptStatus = String(payload.status || "read").trim();
+        if (residentServiceFeedback && !["read", "acknowledged", "handled"].includes(receiptStatus)) {
+          sendJson(res, 400, { error: "Bad Request", message: "投诉跟进消息回执状态无效" });
+          return true;
+        }
         const receipt = {
           at: new Date().toISOString(),
           by: user.username || user.role,
           byName: user.name,
-          status: String(payload.status || "read").trim()
+          status: receiptStatus
         };
         messages[index] = {
           ...messages[index],
@@ -1641,7 +1658,7 @@ function createRouteSegments(runtime) {
           return true;
         }
         if (user.role === "citizen") {
-          data.taskMessages = [buildCitizenTaskActionMessage(rows[index], collection, payload, user), ...(Array.isArray(data.taskMessages) ? data.taskMessages : [])].slice(0, 300);
+          data.taskMessages = [buildCitizenTaskActionMessage(rows[index], collection, payload, user, data), ...(Array.isArray(data.taskMessages) ? data.taskMessages : [])].slice(0, 300);
         }
         if (collection === "drugConsumableSupervisions") {
           appendDrugConsumableAuditTrail(rows[index], user, "unified-task-action", payload.comment || payload.action);
