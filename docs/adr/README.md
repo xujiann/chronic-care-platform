@@ -29,6 +29,7 @@
 | [CI 按风险域拆分并保留聚合必需检查](./2026-08-19-ci-risk-domain-job-split.md) | Superseded | 三风险域拆分原则保留，三上游聚合拓扑由 2026-09-06 决策替代 |
 | [required test 聚合覆盖全部独立高风险域](./2026-09-06-ci-required-aggregate-fail-closed-expansion.md) | Accepted | 地区矩阵、真实 PostgreSQL、治理/API、浏览器 E2E、发布就绪五个上游与 required test 失败关闭聚合 |
 | [平台全生命周期治理控制塔](./2026-09-07-platform-lifecycle-governance-control-tower.md) | Accepted | T00 任务组合、六图状态层、需求到证据追踪、四级门禁、黄金场景与生产准入 |
+| [影像质控采用耐久命令与异步对账闭环](./2026-09-07-imaging-quality-control-durable-reconciliation.md) | Proposed | 耐久 QC command/outbox、worker、FHIR 回读、人工对账与生产门禁；当前不得实施 |
 | [Playwright E2E 采用统一浏览器策略与独占测试服务](./2026-08-23-playwright-e2e-isolation-and-browser-policy.md) | Accepted | Playwright Chromium、在线 Service Worker 隔离、PWA 专项、动态端口与当前根 60 + 居民 13 + PWA 3 = 76 项套件分区 |
 | [模块化单体与微服务提取标准](../ADR-模块化单体与微服务提取标准-2026-08-03.md) | Accepted | 模块边界和服务提取 |
 | [SQLite migration 与核心 schema 冻结](./2026-08-18-sqlite-migration-and-core-schema-freeze.md) | Accepted | 已合入 `main@026762f`（PR #129）；v1–v14 冻结，v15+ 内容指纹化 |

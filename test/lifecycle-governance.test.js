@@ -3,7 +3,7 @@
 const assert = require("node:assert/strict");
 const test = require("node:test");
 const config = require("../config/lifecycle-governance.json");
-const { analyzeImpact, validateLifecycleGovernance } = require("../scripts/lifecycle-governance");
+const { analyzeImpact, npmRunInvocation, runChangedUnitTests, validateLifecycleGovernance } = require("../scripts/lifecycle-governance");
 
 function copy() {
   return structuredClone(config);
@@ -147,4 +147,37 @@ test("change impact selects risk tiers without treating documentation as runtime
   const unknown = analyzeImpact(copy(), ["tools/new-unclassified-file.xyz"]);
   assert.equal(unknown.fullUnitFallback, true);
   assert.deepEqual(unknown.requiredTiers, ["quick", "pr"]);
+});
+
+test("Windows full-unit fallback uses the active npm Node entry instead of spawning a batch file directly", () => {
+  const invocation = npmRunInvocation("test:unit", {
+    platform: "win32",
+    npmExecPath: "C:/npm/npm-cli.js"
+  });
+  assert.equal(invocation.command, process.execPath);
+  assert.deepEqual(invocation.args, ["C:/npm/npm-cli.js", "run", "test:unit"]);
+  assert.equal(invocation.shell, false);
+
+  const calls = [];
+  const impact = runChangedUnitTests(copy(), ["tools/unclassified.xyz"], {
+    platform: "win32",
+    npmExecPath: "C:/npm/npm-cli.js",
+    spawnSync(command, args, options) {
+      calls.push({ command, args, options });
+      return { status: 0 };
+    }
+  });
+  assert.equal(impact.executed, "full-unit-fallback");
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].command, process.execPath);
+  assert.deepEqual(calls[0].args, ["C:/npm/npm-cli.js", "run", "test:unit"]);
+  assert.equal(calls[0].options.shell, false);
+
+  assert.throws(() => runChangedUnitTests(copy(), ["tools/unclassified.xyz"], {
+    platform: "win32",
+    npmExecPath: "",
+    spawnSync() {
+      return { status: null, error: { code: "EINVAL", message: "private process detail" } };
+    }
+  }), /unclassified change full unit fallback failed: EINVAL/);
 });
