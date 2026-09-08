@@ -315,9 +315,15 @@
     },
     {
       "id": "TEST-OPS-017",
-      "kind": "resident-service-feedback-idempotency-and-browser-contract",
+      "kind": "resident-service-feedback-idempotency-contract",
       "path": "test/resident-service-feedback-idempotency-http.test.js",
       "command": "node --test --test-concurrency=1 test/resident-service-feedback-idempotency-http.test.js test/citizen-service-feedback.test.js test/escort-owner-route-characterization.test.js test/internet-nursing-closed-loop-characterization.test.js"
+    },
+    {
+      "id": "TEST-OPS-017-E2E",
+      "kind": "resident-service-feedback-browser-contract",
+      "path": "test/e2e/citizen-service-feedback.spec.js",
+      "command": "npx playwright test test/e2e/citizen-service-feedback.spec.js --reporter=line"
     },
     {
       "id": "TEST-OPS-019",
@@ -417,10 +423,10 @@
     },
     {
       "id": "EVD-OPS-017",
-      "scope": "repository-integration",
-      "type": "pull-request-evidence",
+      "scope": "repository-candidate",
+      "type": "draft-pull-request",
       "ref": "https://github.com/xujiann/chronic-care-platform/pull/272",
-      "testIds": ["TEST-OPS-017"],
+      "testIds": ["TEST-OPS-017", "TEST-OPS-017-E2E"],
       "productionEvidence": false
     },
     {
@@ -727,7 +733,8 @@
     {
       "id": "OPS-017",
       "title": "居民护理与陪诊服务评价投诉闭环",
-      "ownerProcess": "T00",
+      "ownerProcess": "T04",
+      "integrationOwner": "T00",
       "taskStatus": "实施中",
       "capabilityStatus": "已实现",
       "riskLevel": "中",
@@ -750,18 +757,20 @@
         "浏览器失败保留草稿且成功后移除重复入口",
         "同键精确重放、同键异载荷冲突和不同键真实并发只产生一次订单、消息与审计写入"
       ],
-      "testIds": ["TEST-OPS-017"],
+      "testIds": ["TEST-OPS-017", "TEST-OPS-017-E2E"],
       "evidenceIds": ["EVD-OPS-017"],
-      "rollback": "回退 PR #272；无 schema 迁移，既有评价、命令回执与投诉记录必须继续保留",
+      "rollback": "合并前关闭 PR #272；合并后 git revert PR #272 的 merge commit 并重跑 required CI；不得删除既有评价、投诉、_writeCommandReceipts、消息或审计",
       "unresolved": [
         "投诉目前复用站内消息，尚无独立工单、SLA、升级和结案模型",
+        "并发证据覆盖单进程命令锁、真实 SQLite CAS 与注入持久层冲突，尚未证明多实例 exactly-once",
         "已安装客户端资产刷新等待 OPS-019 完成 PWA 缓存版本闭环",
         "结构化指标、追踪、SLO、告警、手册、降级和补偿尚未完整交付"
       ],
       "worktree": ".codex-platform-worktrees/process-v2/t04-citizen-complaint-followup-20260907",
       "branch": "process/t00-resident-feedback-integration-20260908",
-      "planRef": "T00-PLAN-OPS-017-IDEMPOTENCY-2026-09-08",
+      "planRef": "docs/resident-service-feedback-idempotency-plan.md",
       "pullRequestRef": "https://github.com/xujiann/chronic-care-platform/pull/272",
+      "supersedesPullRequestRef": "https://github.com/xujiann/chronic-care-platform/pull/264",
       "ciRef": "",
       "writeScopes": [
         "citizen-service-feedback.js",
@@ -770,11 +779,20 @@
         "citizen.html",
         "server.js",
         "src/http/routes/care-coordination.js",
+        "src/platform/storage/state-command-consistency.js",
+        "config/api-idempotency-evidence.json",
         "config/lifecycle-governance.json",
+        "config/repository-governance.json",
+        "ROADMAP.md",
+        "CURRENT_ARCHITECTURE.md",
+        "MODULE_MAP.md",
+        "TECH_DEBT.md",
+        "docs/resident-service-feedback-idempotency-plan.md",
         "test/citizen-service-feedback.test.js",
         "test/e2e/citizen-service-feedback.spec.js",
         "test/escort-owner-route-characterization.test.js",
-        "test/resident-service-feedback-idempotency-http.test.js"
+        "test/resident-service-feedback-idempotency-http.test.js",
+        "test/helpers/care-api-characterization-runtime.js"
       ],
       "observability": {
         "applicable": true,

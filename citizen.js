@@ -2187,7 +2187,8 @@ async function submitResidentTaskAction(taskId, collection, payload, command = {
       ? findResidentTaskRows(collection).find((item) => item.id === itemId)
       : null;
     const referralCommandId = collection === "referrals" ? citizenCareRequestNonce() : "";
-    const commandRequest = CSF.taskActionRequest(payload, command, referralCommandId, current?.version);
+    const expectedVersion = current?.version;
+    const commandRequest = CSF.taskActionRequest(payload, command, referralCommandId, expectedVersion);
     const request = window.HealthCityAuth?.authFetch || fetch;
     const response = await request(`${API_BASE}/tasks/${encodeURIComponent(taskId)}/actions`, {
       method: "POST",

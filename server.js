@@ -8199,7 +8199,10 @@ function verifySqliteCollectionVersions(db, keys, expectedVersions) {
       throw new Error(`SQLite expected version is invalid for ${key}`);
     }
     if (currentVersion !== expectedVersion) {
-      throw new Error(`SQLite optimistic lock conflict on ${key}: expected ${expectedVersion}, current ${currentVersion}`);
+      const error = new Error(`SQLite optimistic lock conflict on ${key}: expected ${expectedVersion}, current ${currentVersion}`);
+      error.name = "StorageConflictError"; error.code = "STORAGE_CONFLICT";
+      error.collection = key; error.expectedVersion = expectedVersion; error.currentVersion = currentVersion;
+      throw error;
     }
   });
 }

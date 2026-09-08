@@ -84,7 +84,7 @@ function assertExpectedVersion(data, collection, expectedVersion, code) {
 }
 
 function prepareCollectionCas(data, collections, primaryCollection, expectedVersion, conflictCode) {
-  const versions = {};
+  const versions = { ...(data?.storageMeta?.collectionVersions || {}) };
   for (const collection of collections) versions[collection] = collectionVersion(data, collection);
   versions[primaryCollection] = assertExpectedVersion(data, primaryCollection, expectedVersion, conflictCode);
   data.storageMeta = {

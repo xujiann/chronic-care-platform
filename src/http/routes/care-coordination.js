@@ -34,7 +34,8 @@ function citizenTaskActionCommandPayload(taskId, payload = {}) {
   const canonical = { ...payload };
   delete canonical.idempotencyKey;
   delete canonical.commandId;
-  return { taskId, ...canonical };
+  delete canonical.taskId;
+  return { ...canonical, taskId };
 }
 
 function publicCitizenTaskAction(item) {
@@ -1590,8 +1591,13 @@ function createRouteSegments(runtime) {
       if (req.method === "POST" && taskActionMatch) {
         const user = requireApiRole(req, res, ["commission", "institution", "insurance", "county", "citizen"], "/api/tasks/:id/actions");
         if (!user) return true;
-        const taskId = decodeURIComponent(taskActionMatch[1]);
-        const [collection, id] = taskId.split(":");
+        const taskIdParts = decodeURIComponent(taskActionMatch[1]).split(":").map((part) => part.trim());
+        if (taskIdParts.length !== 2 || taskIdParts.some((part) => !part)) {
+          sendJson(res, 400, { error: "Bad Request", code: "TASK_ID_INVALID", message: "task id must contain exactly one collection and one id" });
+          return true;
+        }
+        const [collection, id] = taskIdParts;
+        const canonicalTaskId = `${collection}:${id}`;
         if (!WORKFLOW_COLLECTIONS.has(collection)) {
           sendJson(res, 400, { error: "Bad Request", message: "不支持的任务来源" });
           return true;
@@ -1617,16 +1623,16 @@ function createRouteSegments(runtime) {
           && ["escortServiceOrders", "internetNursingOrders"].includes(collection);
         if (residentServiceFeedback) {
           try {
-            const canonicalPayload = citizenTaskActionCommandPayload(taskId, payload);
+            const canonicalPayload = citizenTaskActionCommandPayload(canonicalTaskId, payload);
             const command = buildStateCommand({
               req,
               payload,
               user,
-              endpoint: `POST /api/tasks/${taskId}/actions`,
-              naturalKey: `${taskId}:quality-feedback:${sha256(canonicalPayload)}`,
+              endpoint: `POST /api/tasks/${canonicalTaskId}/actions`,
+              naturalKey: `${canonicalTaskId}:quality-feedback:${sha256(canonicalPayload)}`,
               canonicalPayload
             });
-            const result = await withStateCommandLock(`resident-service-feedback:${collection}:${id}`, () => {
+            const result = await withStateCommandLock(`resident-service-feedback:${canonicalTaskId}`, () => {
               const lockedData = readDatabase();
               const lockedRows = findWorkflowCollection(lockedData, collection);
               const lockedIndex = Array.isArray(lockedRows) ? lockedRows.findIndex((item) => item.id === id) : -1;
@@ -1683,7 +1689,7 @@ function createRouteSegments(runtime) {
                 actor: user.name,
                 role: user.role,
                 action: "handle unified task",
-                target: taskId,
+                target: canonicalTaskId,
                 result: "allowed",
                 detail: updated.status
               }, ...(Array.isArray(lockedData.securityEvents) ? lockedData.securityEvents : [])].slice(0, 120);
@@ -1703,7 +1709,7 @@ function createRouteSegments(runtime) {
         }
         const data = readDatabase();
         if (collection === "citizenLifecycleActions") {
-          const task = buildUnifiedTasks(data, user).find((item) => item.id === taskId);
+          const task = buildUnifiedTasks(data, user).find((item) => item.id === canonicalTaskId);
           if (!task) {
             sendJson(res, 404, { error: "Not Found", message: "未找到生命周期健康管理任务" });
             return true;
@@ -1721,7 +1727,7 @@ function createRouteSegments(runtime) {
               actor: user.name,
               role: user.role,
               action: "handle citizen lifecycle task",
-              target: taskId,
+              target: canonicalTaskId,
               result: "allowed",
               detail: `${payload.status || "handled"} · ${task.sourceCollection || "derived"}`
             },
@@ -1795,7 +1801,7 @@ function createRouteSegments(runtime) {
             actor: user.name,
             role: user.role,
             action: "handle unified task",
-            target: taskId,
+            target: canonicalTaskId,
             result: "allowed",
             detail: rows[index].status
           },
