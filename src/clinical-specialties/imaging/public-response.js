@@ -5,6 +5,7 @@ const SENSITIVE_QUERY_PARAMETER = /^(?:token|access_?token|refresh_?token|signat
 const PHYSICAL_LOCATION = /(?:\b(?:s3|oss|cos|obs|file):\/\/|(?:^|[\s"'(])[A-Za-z]:\\|(?:^|[\s"'(])\/(?:var|srv|opt|run|mnt|data|tmp)\/)/i;
 const AUTHORIZATION_VALUE = /\b(?:bearer|basic)\s+[A-Za-z0-9+/=_\-.]+/i;
 const URL_VALUE = /https?:\/\/[^\s"'<>]+/gi;
+const FHIR_RESOURCE_ID = /^[A-Za-z0-9.-]{1,64}$/;
 
 function sanitizeUrl(value, { allowViewerUrl = false } = {}) {
   try {
@@ -76,6 +77,31 @@ function projectImagingErrorResponse(value) {
   };
   if (typeof source.retryable === "boolean") response.retryable = source.retryable;
   if (typeof source.reconciliationRequired === "boolean") response.reconciliationRequired = source.reconciliationRequired;
+  if (source.reconciliation && typeof source.reconciliation === "object") {
+    const sourceReconciliation = source.reconciliation;
+    const studyId = typeof sourceReconciliation.studyId === "string" ? sourceReconciliation.studyId.trim() : "";
+    const resourceId = typeof sourceReconciliation.resourceId === "string" ? sourceReconciliation.resourceId.trim() : "";
+    const commonShapeValid = Boolean(studyId)
+      && sourceReconciliation.localOutcome === "not-committed";
+    if (commonShapeValid && sourceReconciliation.externalOutcome === "unknown") {
+      response.reconciliation = {
+        studyId,
+        externalOutcome: "unknown",
+        localOutcome: "not-committed"
+      };
+    } else if (commonShapeValid
+      && sourceReconciliation.externalOutcome === "confirmed"
+      && sourceReconciliation.resourceType === "DiagnosticReport"
+      && FHIR_RESOURCE_ID.test(resourceId)) {
+      response.reconciliation = {
+        studyId,
+        externalOutcome: "confirmed",
+        localOutcome: "not-committed",
+        resourceType: "DiagnosticReport",
+        resourceId
+      };
+    }
+  }
   return projectPublicImagingResponse(response);
 }
 

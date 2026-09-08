@@ -423,6 +423,13 @@ test("imaging quality control reports reconciliation required after FHIR succeed
       message: "FHIR 已确认接收质控报告，但本地保存未完成；请勿重复提交，需先完成跨系统对账。",
       retryable: false,
       reconciliationRequired: true,
+      reconciliation: {
+        studyId: "study-001",
+        externalOutcome: "confirmed",
+        localOutcome: "not-committed",
+        resourceType: "DiagnosticReport",
+        resourceId: "diagnostic-report-001"
+      },
       productionReady: undefined
     }
   }]);
@@ -474,6 +481,11 @@ test("imaging quality control maps a malformed successful provider receipt to an
       message: "FHIR 回写结果无法确认，本地质控记录未保存；请先核对外部结果，不要直接重复提交。",
       retryable: false,
       reconciliationRequired: true,
+      reconciliation: {
+        studyId: "study-001",
+        externalOutcome: "unknown",
+        localOutcome: "not-committed"
+      },
       productionReady: undefined
     }
   }]);
@@ -619,6 +631,11 @@ test("imaging quality control audits one provider failure and performs no local 
       message: "FHIR 回写结果无法确认，本地质控记录未保存；请先核对外部结果，不要直接重复提交。",
       retryable: false,
       reconciliationRequired: true,
+      reconciliation: {
+        studyId: "study-001",
+        externalOutcome: "unknown",
+        localOutcome: "not-committed"
+      },
       productionReady: undefined
     }
   }]);
@@ -632,6 +649,122 @@ test("imaging workbench exposes role-scoped QC and explicit non-blind retry guid
   assert.match(source, /payload\.reconciliationRequired/);
   assert.match(source, /请先刷新列表核对后再决定是否重试/);
   assert.match(source, /本页已阻止重复提交/);
+  assert.match(source, /data-qc-status=/);
+  assert.match(source, /function inspectQualityControlStatus/);
+});
+
+test("imaging browser recovery view performs one strict GET and keeps the QC write locked", async () => {
+  const source = fs.readFileSync(path.join(__dirname, "..", "imaging-cloud.js"), "utf8");
+  const alerts = [];
+  const prompts = ["质控通过", "90", "91", "影像与报告质控通过"];
+  const calls = [];
+  const responses = [{
+    ok: false,
+    status: 503,
+    async json() {
+      return {
+        message: "FHIR 已确认但本地保存失败",
+        retryable: false,
+        reconciliationRequired: true,
+        reconciliation: {
+          studyId: "study-001",
+          externalOutcome: "confirmed",
+          localOutcome: "not-committed",
+          resourceType: "DiagnosticReport",
+          resourceId: "diagnostic-report-001"
+        }
+      };
+    }
+  }, {
+    ok: true,
+    status: 200,
+    async json() {
+      return {
+        summary: { studies: 1 },
+        studies: [{
+          id: "study-001",
+          qcStatus: "待质控",
+          emrSyncStatus: "待写入",
+          fhirReportSyncStatus: "pending"
+        }],
+        qualityReviews: []
+      };
+    }
+  }];
+  const table = { innerHTML: "" };
+  const document = {
+    addEventListener() {},
+    querySelector(selector) { return selector === "#study-table" ? table : null; }
+  };
+  const window = {
+    alert(message) { alerts.push(message); },
+    HealthCityAuth: {
+      getUser() { return { role: "institution" }; },
+      async authFetch(url, options = {}) {
+        calls.push({ method: options.method || "GET", url });
+        return responses.shift();
+      }
+    },
+    HealthStructuredDialog: {
+      async prompt() { return prompts.shift(); }
+    }
+  };
+  const context = { console, document, fetch: window.HealthCityAuth.authFetch, location: { origin: "http://platform.test", protocol: "http:" }, URL, URLSearchParams, window };
+  vm.runInNewContext(`${source}\n;globalThis.__imagingRecoveryTest = { imagingQualityControlActionState, imagingQualityControlRecovery, imagingState, inspectQualityControlStatus, qualityControlStudy, renderStudyTable };`, context);
+  context.__imagingRecoveryTest.imagingState.payload = { studies: [{ id: "study-001", qcStatus: "待质控" }] };
+  const button = {
+    dataset: {},
+    disabled: false,
+    textContent: "质控回写",
+    removeAttribute() {},
+    setAttribute() {}
+  };
+
+  await context.__imagingRecoveryTest.qualityControlStudy("study-001", button);
+  await context.__imagingRecoveryTest.inspectQualityControlStatus("study-001");
+
+  assert.deepEqual(calls.map((item) => item.method), ["POST", "GET"]);
+  assert.equal(context.__imagingRecoveryTest.imagingQualityControlActionState.get("study-001"), "reconciliation-required");
+  assert.equal(context.__imagingRecoveryTest.imagingState.payload.studies[0].qcStatus, "待质控");
+  assert.match(alerts.at(-1), /diagnostic-report-001/);
+  assert.match(alerts.at(-1), /本地当前状态：待质控/);
+  assert.match(alerts.at(-1), /仍保持锁定/);
+  assert.match(table.innerHTML, /data-qc-status="study-001"/);
+});
+
+test("imaging browser recovery view never replaces a failed strict read with fallback data", async () => {
+  const source = fs.readFileSync(path.join(__dirname, "..", "imaging-cloud.js"), "utf8");
+  const alerts = [];
+  let requestCount = 0;
+  const document = { addEventListener() {}, querySelector() { return null; } };
+  const window = {
+    alert(message) { alerts.push(message); },
+    HealthCityAuth: {
+      getUser() { return { role: "institution" }; },
+      async authFetch() {
+        requestCount += 1;
+        return { ok: false, status: 503, async json() { return { message: "dashboard unavailable" }; } };
+      }
+    }
+  };
+  const context = { console, document, fetch: window.HealthCityAuth.authFetch, location: { origin: "http://platform.test", protocol: "http:" }, URL, URLSearchParams, window };
+  vm.runInNewContext(`${source}\n;globalThis.__imagingRecoveryFailureTest = { imagingQualityControlActionState, imagingQualityControlRecovery, imagingState, inspectQualityControlStatus };`, context);
+  const originalPayload = { studies: [{ id: "study-001", qcStatus: "待质控" }] };
+  context.__imagingRecoveryFailureTest.imagingState.payload = originalPayload;
+  context.__imagingRecoveryFailureTest.imagingQualityControlActionState.set("study-001", "reconciliation-required");
+  context.__imagingRecoveryFailureTest.imagingQualityControlRecovery.set("study-001", {
+    studyId: "study-001",
+    externalOutcome: "unknown",
+    localOutcome: "not-committed"
+  });
+
+  await context.__imagingRecoveryFailureTest.inspectQualityControlStatus("study-001");
+
+  assert.equal(requestCount, 1);
+  assert.equal(context.__imagingRecoveryFailureTest.imagingState.payload, originalPayload);
+  assert.equal(context.__imagingRecoveryFailureTest.imagingQualityControlActionState.get("study-001"), "reconciliation-required");
+  assert.match(alerts[0], /未能读取当前本地状态/);
+  assert.doesNotMatch(alerts[0], /已完成|已确认并保存/);
 });
 
 test("imaging browser flow locks an uncertain QC result and releases an explicitly retryable rejection", async () => {
@@ -660,7 +793,7 @@ test("imaging browser flow locks an uncertain QC result and releases an explicit
       }
     };
     const context = { console, document, fetch: window.HealthCityAuth.authFetch, location: { origin: "http://platform.test", protocol: "http:" }, URL, URLSearchParams, window };
-    vm.runInNewContext(`${source}\n;globalThis.__imagingTest = { imagingQualityControlActionState, imagingState, qualityControlStudy, renderStudyTable };`, context);
+    vm.runInNewContext(`${source}\n;globalThis.__imagingTest = { imagingQualityControlActionState, imagingQualityControlRecovery, imagingState, qualityControlStudy, renderStudyTable };`, context);
     const attributes = new Map();
     const button = {
       dataset: {},
@@ -689,6 +822,29 @@ test("imaging browser flow locks an uncertain QC result and releases an explicit
   assert.match(uncertain.alerts[1], /已阻止重复提交/);
   assert.match(uncertain.table.innerHTML, /data-qc-study="study-001" disabled aria-disabled="true"/);
   assert.match(uncertain.table.innerHTML, />需对账<\/button>/);
+
+  const malformedConfirmed = createHarness({
+    ok: false,
+    status: 503,
+    async json() {
+      return {
+        message: "malformed receipt",
+        retryable: false,
+        reconciliationRequired: true,
+        reconciliation: {
+          studyId: "study-003",
+          externalOutcome: "confirmed",
+          localOutcome: "not-committed",
+          resourceType: "DiagnosticReport",
+          resourceId: 123
+        }
+      };
+    }
+  });
+  malformedConfirmed.context.__imagingTest.imagingState.payload = { studies: [{ id: "study-003", qcStatus: "待质控" }] };
+  await malformedConfirmed.context.__imagingTest.qualityControlStudy("study-003", malformedConfirmed.button);
+  assert.equal(malformedConfirmed.context.__imagingTest.imagingQualityControlRecovery.get("study-003").externalOutcome, "unknown");
+  assert.equal(malformedConfirmed.context.__imagingTest.imagingQualityControlRecovery.get("study-003").resourceId, undefined);
 
   const retryable = createHarness({
     ok: false,
