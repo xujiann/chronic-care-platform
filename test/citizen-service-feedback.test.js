@@ -90,6 +90,7 @@ test("complaint status stays tied to the scoped source order and never treats a 
   assert.equal(feedback.complaintStatusView(resolvedOrder).terminal, true);
   assert.equal(feedback.hasComplaintClosureEvidence({ ...resolvedOrder, complaint: { ...resolvedOrder.complaint, residentNotifiedAt: "" } }), false);
   assert.equal(feedback.hasComplaintClosureEvidence({ ...resolvedOrder, complaint: { ...resolvedOrder.complaint, resolution: "" } }), false);
+  assert.equal(feedback.hasComplaintClosureEvidence({ ...resolvedOrder, complaint: { ...resolvedOrder.complaint, acknowledgedAt: "2026-09-07T11:00:00.000Z" } }), false);
   assert.equal(feedback.complaintStatusView({ ...resolvedOrder, complaint: { ...resolvedOrder.complaint, status: "open" } }).terminal, false);
   assert.equal(feedback.hasComplaintClosureEvidence({ ...resolvedOrder, complaint: { ...resolvedOrder.complaint, severity: "unknown" } }), false);
   assert.equal(feedback.hasComplaintClosureEvidence({ ...resolvedOrder, sourceCollection: "internetNursingOrders" }), false);
