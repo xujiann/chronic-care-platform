@@ -1641,6 +1641,7 @@ function createRouteSegments(runtime) {
           return true;
         }
         const payload = await collectJson(req);
+        let citizenMessage = null;
         try {
           rows[index] = user.role === "citizen"
             ? applyCitizenTaskAction(rows[index], payload, collection, user)
@@ -1653,12 +1654,15 @@ function createRouteSegments(runtime) {
                 handledBy: user.username || user.role,
                 handledByName: user.name
               };
+          if (user.role === "citizen") {
+            citizenMessage = buildCitizenTaskActionMessage(rows[index], collection, payload, user, data);
+          }
         } catch (error) {
-          sendJson(res, 400, { error: "Bad Request", message: error.message });
+          sendJson(res, 400, { error: "Bad Request", code: error.code || "TASK_ACTION_INVALID", message: error.message });
           return true;
         }
         if (user.role === "citizen") {
-          data.taskMessages = [buildCitizenTaskActionMessage(rows[index], collection, payload, user, data), ...(Array.isArray(data.taskMessages) ? data.taskMessages : [])].slice(0, 300);
+          data.taskMessages = [citizenMessage, ...(Array.isArray(data.taskMessages) ? data.taskMessages : [])].slice(0, 300);
         }
         if (collection === "drugConsumableSupervisions") {
           appendDrugConsumableAuditTrail(rows[index], user, "unified-task-action", payload.comment || payload.action);

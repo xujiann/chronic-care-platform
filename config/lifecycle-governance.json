@@ -914,6 +914,7 @@
         "src/http/routes/care-coordination.js",
         "src/http/runtime-contexts/care-coordination.js",
         "test/task-message-authorization-http.test.js",
+        "test/helpers/care-api-characterization-runtime.js",
         "config/lifecycle-governance.json",
         "config/repository-governance.json",
         "API_MAP.md",

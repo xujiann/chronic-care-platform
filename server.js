@@ -21323,17 +21323,17 @@ function buildUnifiedTasks(data, user) {
 }
 
 function canAccessTaskMessage(user, message, data) {
-  if (user.role === "commission") return true;
-  if (message.collection === "multiPracticeApplications") return canAccessMultiPracticeMessage(user, message, data);
   if (isResidentServiceFeedbackMessage(message, data)) {
+    const order = residentServiceMessageOrder(message, data);
+    if (!order) return false;
+    if (user.role === "commission") return true;
     if (message.targetRole !== user.role || user.role !== "institution") return false;
     const targetOrgCode = residentServiceMessageTargetOrgCode(message, data);
     if (!targetOrgCode || targetOrgCode !== String(user.orgCode || "").trim()) return false;
-    const order = residentServiceMessageOrder(message, data);
-    return message.collection === "escortServiceOrders"
-      ? canAccessEscortOrder(user, order, data)
-      : canAccessInternetNursingOrder(user, order, data);
+    return true;
   }
+  if (user.role === "commission") return true;
+  if (message.collection === "multiPracticeApplications") return canAccessMultiPracticeMessage(user, message, data);
   if (message.targetRole === user.role) return true;
   if (message.residentId && canAccessResident(user, message.residentId, data)) return true;
   return message.createdBy === user.username;
@@ -21342,13 +21342,22 @@ function canAccessTaskMessage(user, message, data) {
 function residentServiceMessageOrder(message, data) {
   if (!message || !["escortServiceOrders", "internetNursingOrders"].includes(message.collection)) return null;
   const rows = Array.isArray(data?.[message.collection]) ? data[message.collection] : [];
-  return rows.find((item) => item.id === message.sourceId) || null;
+  const order = rows.find((item) => item.id === message.sourceId) || null;
+  if (!order) return null;
+  if (message.taskId !== `${message.collection}:${message.sourceId}`) return null;
+  if (!message.residentId || message.residentId !== order.residentId) return null;
+  return order;
 }
 
 function isResidentServiceFeedbackMessage(message, data) {
   if (message?.messageType === "resident-service-quality-feedback") return true;
-  const order = residentServiceMessageOrder(message, data);
-  return Boolean(order && order.taskAction === "quality-feedback");
+  if (message?.messageType) return false;
+  const legacyTitles = {
+    escortServiceOrders: "助医陪诊：服务投诉待跟进",
+    internetNursingOrders: "互联网护理：服务投诉待跟进"
+  };
+  return message?.targetRole === "institution"
+    && message?.title === legacyTitles[message?.collection];
 }
 
 function residentServiceMessageTargetOrgCode(message, data) {
@@ -21363,7 +21372,10 @@ function residentServiceMessageTargetOrgCode(message, data) {
   if (message.collection === "escortServiceOrders") {
     const provider = (Array.isArray(data?.escortServiceProviders) ? data.escortServiceProviders : [])
       .find((item) => item.id === order.providerId);
-    derived = uniqueCode([order.institutionCode, provider?.institutionCode, order.hospitalCode]);
+    // The provider owns service-quality complaints. hospitalCode is the visit
+    // location and remains part of order visibility, but never grants complaint
+    // ownership. Conflicting provider identities fail closed.
+    derived = uniqueCode([order.institutionCode, provider?.institutionCode]);
   } else {
     const institution = institutionForNursingOrder(data, order);
     derived = uniqueCode([order.institutionCode, institution?.institutionCode]);
@@ -21504,8 +21516,18 @@ function buildCitizenTaskActionMessage(item, collection, payload, user, data) {
   };
   const qualityFeedback = action === "quality-feedback" && ["escortServiceOrders", "internetNursingOrders"].includes(collection);
   const targetOrgCode = qualityFeedback
-    ? residentServiceMessageTargetOrgCode({ collection, sourceId: item.id }, data)
+    ? residentServiceMessageTargetOrgCode({
+        taskId: `${collection}:${item.id}`,
+        collection,
+        sourceId: item.id,
+        residentId: item.residentId || item.maternalResidentId || ""
+      }, data)
     : "";
+  if (qualityFeedback && !targetOrgCode) {
+    const error = new Error("resident service feedback owner is unresolved");
+    error.code = "RESIDENT_SERVICE_FEEDBACK_OWNER_UNRESOLVED";
+    throw error;
+  }
   return {
     id: `msg-${randomUUID()}`,
     taskId: `${collection}:${item.id}`,
