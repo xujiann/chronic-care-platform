@@ -77,7 +77,7 @@ function actionRequest(baseUrl, token, intakeId, payload, key) {
   });
 }
 
-test("return-source and close have complete real HTTP command evidence", async (t) => {
+test("assign-profile, return-source and close have complete real HTTP command evidence", async (t) => {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "physical-exam-specialized-http-"));
   const dbFile = path.join(dataDir, "db.json");
   fs.copyFileSync(path.join(ROOT, "data", "db.json"), dbFile);
@@ -101,6 +101,16 @@ test("return-source and close have complete real HTTP command evidence", async (
   );
 
   const scenarios = [
+    {
+      action: "assign-profile",
+      expectedStatus: "routed-to-specialized-system",
+      initialStatus: "awaiting-specialized-profile",
+      commandFields: {
+        targetSystem: "specialized-profile-system",
+        profileId: "specialized-http-profile-v1"
+      },
+      changedPayloadFields: { profileId: "specialized-http-profile-changed" }
+    },
     {
       action: "return-source",
       expectedStatus: "returned-to-source",
@@ -169,7 +179,8 @@ test("return-source and close have complete real HTTP command evidence", async (
       evidenceRef: `EVIDENCE-${scenario.action.toUpperCase()}`,
       note: `${scenario.action} real HTTP evidence`,
       expectedVersion: 0,
-      idempotencyKey: commandKey
+      idempotencyKey: commandKey,
+      ...(scenario.commandFields || {})
     };
 
     const roleDeniedBefore = structuredClone(persistedIntake(dbFile, scenario.primaryId));
@@ -199,6 +210,24 @@ test("return-source and close have complete real HTTP command evidence", async (
     }, `${scenario.action}: resource scope denial`);
     assert.deepEqual(persistedIntake(dbFile, scenario.deniedId), scopeDeniedBefore, `${scenario.action}: scope denial is immutable`);
 
+    if (scenario.action === "assign-profile") {
+      const keyMismatchBefore = persistedState(dbFile);
+      const bodyKey = `${commandKey}-body-key`;
+      const keyMismatch = await actionRequest(baseUrl, institutionToken, scenario.primaryId, {
+        ...command,
+        idempotencyKey: bodyKey
+      }, `${commandKey}-header-key`);
+      assert.deepEqual(keyMismatch, {
+        status: 400,
+        body: {
+          error: "Bad Request",
+          code: `${ERROR_PREFIX}_INVALID`,
+          message: "Idempotency-Key conflicts with body idempotencyKey"
+        }
+      }, `${scenario.action}: header and body keys are bound`);
+      assert.deepEqual(persistedState(dbFile), keyMismatchBefore, `${scenario.action}: key mismatch is immutable`);
+    }
+
     const beforeSuccess = persistedState(dbFile);
     const accessAuditMatches = (state) => state.dataAccessLogs.filter((item) =>
       item.residentId === inScopeResidentId && item.scope === "专项体检分流处置" && item.purpose?.endsWith(`· ${scenario.action}`)
@@ -215,6 +244,9 @@ test("return-source and close have complete real HTTP command evidence", async (
     assert.equal(success.body.intake.status, scenario.expectedStatus, `${scenario.action}: state transition`);
     assert.equal(success.body.intake.version, 1, `${scenario.action}: version increment`);
     assert.equal(Object.hasOwn(success.body.intake, "_apiCommandReceipts"), false, `${scenario.action}: receipt is private`);
+    Object.entries(scenario.commandFields || {}).forEach(([field, value]) => {
+      assert.equal(success.body.intake[field], value, `${scenario.action}: ${field} is committed`);
+    });
 
     const replay = await actionRequest(baseUrl, institutionToken, scenario.primaryId, command, commandKey);
     assert.equal(replay.status, 200, `${scenario.action}: replay status`);
@@ -223,7 +255,7 @@ test("return-source and close have complete real HTTP command evidence", async (
 
     const changedPayload = await actionRequest(baseUrl, institutionToken, scenario.primaryId, {
       ...command,
-      note: `${command.note} changed`
+      ...(scenario.changedPayloadFields || { note: `${command.note} changed` })
     }, commandKey);
     assert.equal(changedPayload.status, 409, `${scenario.action}: changed payload status`);
     assert.equal(changedPayload.body.code, `${ERROR_PREFIX}_IDEMPOTENCY_CONFLICT`, `${scenario.action}: changed payload code`);
