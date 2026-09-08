@@ -950,7 +950,7 @@
       "worktree": ".codex-platform-worktrees/process-v2/t00-resident-feedback-pwa-v63-20260908",
       "branch": "process/t00-resident-feedback-pwa-v63-20260908",
       "planRef": "docs/lifecycle-governance.md#ops-019-pwa-v63-缓存失效-plan",
-      "pullRequestRef": "",
+      "pullRequestRef": "https://github.com/xujiann/chronic-care-platform/pull/275",
       "ciRef": "",
       "writeScopes": [
         "service-worker.js",
