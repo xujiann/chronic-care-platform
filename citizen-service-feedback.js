@@ -58,7 +58,7 @@
     const resolvedAt = Date.parse(complaint.resolvedAt);
     const residentNotifiedAt = Date.parse(complaint.residentNotifiedAt);
     if ([submittedAt, acknowledgedAt, dueAt, resolvedAt, residentNotifiedAt].some((value) => !Number.isFinite(value))) return false;
-    if (acknowledgedAt < submittedAt || dueAt <= submittedAt || resolvedAt < submittedAt || residentNotifiedAt < resolvedAt) return false;
+    if (acknowledgedAt < submittedAt || dueAt <= submittedAt || resolvedAt < acknowledgedAt || residentNotifiedAt < resolvedAt) return false;
     if (resolvedAt > dueAt && (!String(complaint.slaBreachReason || "").trim() || !Number.isFinite(Date.parse(complaint.escalatedAt)))) return false;
     return true;
   }
