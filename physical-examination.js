@@ -1,4 +1,6 @@
 const PHYSICAL_EXAM_API = location.protocol === "file:" ? "" : `${location.origin}/api`;
+const PHYSICAL_EXAM_UNAVAILABLE_MESSAGE = "体检数据暂不可用，请重试。";
+const PHYSICAL_EXAM_REFRESH_FAILED_MESSAGE = "体检数据刷新失败，请重试。";
 const physicalExamState = {
   overview: null,
   residentId: "",
@@ -81,28 +83,35 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
   bindPhysicalExamControls();
   seedImportDefaults();
-  await loadPhysicalExams();
-  renderPhysicalExamSystem();
+  await refreshPhysicalExamData();
 });
 
-async function loadPhysicalExams({ fallbackOnFailure = true } = {}) {
+async function loadPhysicalExams() {
   const params = new URLSearchParams();
   if (physicalExamState.residentId) params.set("residentId", physicalExamState.residentId);
   if (PHYSICAL_EXAM_API) {
-    try {
-      const request = window.HealthCityAuth?.authFetch || fetch;
-      const response = await request(`${PHYSICAL_EXAM_API}/physical-exams${params.toString() ? `?${params}` : ""}`);
-      if (response.ok) {
-        physicalExamState.overview = await response.json();
-        return physicalExamState.overview;
-      }
-      throw new Error(`体检工作台刷新失败：${response.status}`);
-    } catch (error) {
-      if (!fallbackOnFailure) throw error;
-    }
+    const request = window.HealthCityAuth?.authFetch || fetch;
+    const response = await request(`${PHYSICAL_EXAM_API}/physical-exams${params.toString() ? `?${params}` : ""}`);
+    if (!response.ok) throw new Error("PHYSICAL_EXAM_OVERVIEW_UNAVAILABLE");
+    const overview = validatePhysicalExamOverview(await response.json());
+    physicalExamState.overview = overview;
+    return overview;
   }
   physicalExamState.overview = buildFallbackOverview();
   return physicalExamState.overview;
+}
+
+function validatePhysicalExamOverview(overview) {
+  if (!overview || typeof overview !== "object" || Array.isArray(overview)) {
+    throw new Error("PHYSICAL_EXAM_OVERVIEW_INVALID");
+  }
+  if (!overview.summary || typeof overview.summary !== "object" || Array.isArray(overview.summary)) {
+    throw new Error("PHYSICAL_EXAM_OVERVIEW_INVALID");
+  }
+  if (![overview.residents, overview.reports, overview.years].every(Array.isArray)) {
+    throw new Error("PHYSICAL_EXAM_OVERVIEW_INVALID");
+  }
+  return overview;
 }
 
 function buildFallbackOverview() {
@@ -118,7 +127,11 @@ function buildFallbackOverview() {
 }
 
 function renderPhysicalExamSystem() {
-  const overview = physicalExamState.overview || buildFallbackOverview();
+  const overview = physicalExamState.overview;
+  if (!overview) {
+    renderPhysicalExamUnavailable();
+    return;
+  }
   renderPhysicalExamSummary(overview.summary || {});
   renderPhysicalExamHighlights(overview.highlights || {});
   renderSourceContracts(overview.sourceContracts || []);
@@ -132,6 +145,45 @@ function renderPhysicalExamSystem() {
   renderJointTests(overview.jointTests || []);
   renderGatewayEvents(overview.gatewayEvents || []);
   populateImportResidents(overview.residents || []);
+}
+
+function renderPhysicalExamUnavailable() {
+  const unavailableTargets = [
+    "physical-exam-summary", "physical-exam-highlight-summary", "physical-exam-trajectories",
+    "physical-exam-translations", "physical-exam-plans", "physical-exam-repeat-radiation",
+    "physical-exam-quality-reviews", "physical-exam-benchmarks", "physical-exam-city-radar",
+    "physical-exam-standards-impact", "physical-exam-critical-paths", "physical-exam-contracts",
+    "physical-exam-specialized-intakes", "physical-exam-standards", "physical-exam-quality-indicators",
+    "physical-exam-readiness", "physical-exam-blockers", "physical-exam-abnormal-cases",
+    "physical-exam-joint-tests", "physical-exam-gateway-events"
+  ];
+  unavailableTargets.forEach((id) => {
+    document.getElementById(id)?.replaceChildren(physicalExamEmpty(PHYSICAL_EXAM_UNAVAILABLE_MESSAGE));
+  });
+  const reportSummary = document.querySelector("#physical-exam-report-summary");
+  if (reportSummary) reportSummary.textContent = PHYSICAL_EXAM_UNAVAILABLE_MESSAGE;
+  document.querySelector("#physical-exam-report-list")?.replaceChildren(physicalExamEmpty(PHYSICAL_EXAM_UNAVAILABLE_MESSAGE));
+  document.querySelector("#physical-exam-resident-filter")?.replaceChildren(createPhysicalExamElement("option", { value: "", text: "全部可授权居民" }));
+  document.querySelector("#physical-exam-year-filter")?.replaceChildren(createPhysicalExamElement("option", { value: "", text: "全部年度" }));
+  populateImportResidents([]);
+  const readinessStatus = document.querySelector("#physical-exam-readiness-status");
+  if (readinessStatus) {
+    readinessStatus.textContent = "数据不可用";
+    readinessStatus.className = "status-chip warn";
+  }
+}
+
+async function refreshPhysicalExamData({ successMessage = "", failureMessage = "" } = {}) {
+  try {
+    await loadPhysicalExams();
+    renderPhysicalExamSystem();
+    if (successMessage) showPhysicalExamToast(successMessage);
+    return true;
+  } catch {
+    if (!physicalExamState.overview) renderPhysicalExamUnavailable();
+    if (failureMessage) showPhysicalExamToast(failureMessage);
+    return false;
+  }
 }
 
 function renderPhysicalExamSummary(summary) {
@@ -586,19 +638,26 @@ function populateImportResidents(residents) {
 
 function bindPhysicalExamControls() {
   document.querySelector("#physical-exam-resident-filter")?.addEventListener("change", async (event) => {
+    const previousResidentId = physicalExamState.residentId;
+    const previousYear = physicalExamState.year;
     physicalExamState.residentId = event.target.value;
     physicalExamState.year = "";
-    await loadPhysicalExams();
-    renderPhysicalExamSystem();
+    const refreshed = await refreshPhysicalExamData({ failureMessage: PHYSICAL_EXAM_REFRESH_FAILED_MESSAGE });
+    if (!refreshed) {
+      physicalExamState.residentId = previousResidentId;
+      physicalExamState.year = previousYear;
+      if (physicalExamState.overview) renderPhysicalExamSystem();
+    }
   });
   document.querySelector("#physical-exam-year-filter")?.addEventListener("change", (event) => {
     physicalExamState.year = event.target.value;
     renderPhysicalExamReports(physicalExamState.overview?.reports || []);
   });
   document.querySelector("#physical-exam-refresh")?.addEventListener("click", async () => {
-    await loadPhysicalExams();
-    renderPhysicalExamSystem();
-    showPhysicalExamToast("体检报告已与健康档案重新同步");
+    await refreshPhysicalExamData({
+      successMessage: "体检报告已与健康档案重新同步",
+      failureMessage: PHYSICAL_EXAM_REFRESH_FAILED_MESSAGE
+    });
   });
   document.querySelector("#physical-exam-import-form")?.addEventListener("submit", submitPhysicalExamImport);
   document.querySelector("#physical-exam-report-list")?.addEventListener("click", (event) => {
@@ -659,7 +718,7 @@ async function handleSpecializedIntakeAction(event) {
     if (deterministicFailure) physicalExamState.specializedPendingCommands.delete(intakeId);
     let refreshed = false;
     try {
-      await loadPhysicalExams({ fallbackOnFailure: false });
+      await loadPhysicalExams();
       renderPhysicalExamSystem();
       refreshed = true;
     } catch {
@@ -798,9 +857,10 @@ async function postPhysicalExamAction(path, payload, { idempotencyKey = "" } = {
 }
 
 async function refreshPhysicalExamWorkbench(message) {
-  await loadPhysicalExams();
-  renderPhysicalExamSystem();
-  showPhysicalExamToast(message);
+  return refreshPhysicalExamData({
+    successMessage: message,
+    failureMessage: "操作已完成，但体检数据刷新失败，请重试。"
+  });
 }
 
 function seedImportDefaults() {
@@ -845,9 +905,8 @@ async function submitPhysicalExamImport(event) {
         ? `已将 ${result.routed} 份专项体检分流至受限队列，未写入一般体检档案。`
         : `检测到 ${result.duplicates + (result.routedDuplicates || 0)} 份重复报告，未重复归档。`;
     physicalExamState.residentId = values.residentId;
-    await loadPhysicalExams();
-    renderPhysicalExamSystem();
-    seedImportDefaults();
+    const refreshed = await refreshPhysicalExamData({ failureMessage: "接入已完成，但体检数据刷新失败，请重试。" });
+    if (refreshed) seedImportDefaults();
   } catch (error) {
     resultTarget.textContent = error.message;
   }
