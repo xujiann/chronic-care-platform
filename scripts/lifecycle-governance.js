@@ -72,6 +72,21 @@ function assertNoDependencyCycle(tasksById) {
   for (const taskId of tasksById.keys()) visit(taskId);
 }
 
+function normalizedWriteScope(scope) {
+  const value = typeof scope === "string" ? scope.replaceAll("\\", "/").replace(/(?:\/\*\*|\/)$/, "") : "";
+  if (!value || /[:*?]/.test(value) || value.split("/").some((part) => !part || part === "." || part === ".." || part.trim() !== part)) {
+    throw new Error("invalid write scope: expected a repository-relative file or directory");
+  }
+  // Case folding also protects the shared Windows checkout from alias writers.
+  return value.toLowerCase();
+}
+
+function writeScopesOverlap(left, right) {
+  const a = normalizedWriteScope(left);
+  const b = normalizedWriteScope(right);
+  return a === b || a.startsWith(`${b}/`) || b.startsWith(`${a}/`);
+}
+
 function validateLifecycleGovernance(config, options = {}) {
   const root = options.root || ROOT;
   if (config?.schemaVersion !== "platform-lifecycle-governance-v1") throw new Error("unsupported lifecycle governance schema");
@@ -135,6 +150,7 @@ function validateLifecycleGovernance(config, options = {}) {
     for (const field of ["affectedModules", "acceptanceCriteria", "writeScopes"]) {
       if (!Array.isArray(task[field]) || task[field].length === 0) throw new Error(`${task.id} lacks ${field}`);
     }
+    task.writeScopes.forEach(normalizedWriteScope);
     for (const field of ["dataSensitivity", "rollback", "planRef", "branch", "worktree"]) {
       if (!String(task[field] || "").trim()) throw new Error(`${task.id} lacks ${field}`);
     }
@@ -169,12 +185,12 @@ function validateLifecycleGovernance(config, options = {}) {
     }
   }
   if (active.length > config.portfolioPolicy.maximumWip) throw new Error(`WIP limit exceeded: ${active.length}/${config.portfolioPolicy.maximumWip}`);
-  const scopeWriters = new Map();
+  const scopeWriters = [];
   for (const task of active) {
     for (const scope of task.writeScopes) {
-      const previous = scopeWriters.get(scope);
-      if (previous) throw new Error(`core write scope ${scope} has concurrent writers ${previous} and ${task.id}`);
-      scopeWriters.set(scope, task.id);
+      const previous = scopeWriters.find((entry) => entry.taskId !== task.id && writeScopesOverlap(scope, entry.scope));
+      if (previous) throw new Error(`core write scope ${scope} has concurrent writers ${previous.taskId} and ${task.id}`);
+      scopeWriters.push({ scope, taskId: task.id });
     }
   }
 
@@ -223,6 +239,55 @@ function validateLifecycleGovernance(config, options = {}) {
   };
 }
 
+function buildHandoffReport(config, options = {}) {
+  const validation = validateLifecycleGovernance(config, options);
+  const active = config.tasks.filter((task) => config.portfolioPolicy.wipStatuses.includes(task.taskStatus));
+  const byId = new Map(config.tasks.map((task) => [task.id, task]));
+  const decisions = new Map(config.decisions.map((decision) => [decision.id, decision]));
+  const integrationReview = [];
+  const dependencyReview = [];
+  const capabilityFollowups = [];
+  for (const task of config.tasks) {
+    if (task.taskStatus !== "已关闭" && task.pullRequestRef) {
+      integrationReview.push({
+        taskId: task.id, ownerProcess: task.integrationOwner || task.ownerProcess,
+        pullRequestRef: task.pullRequestRef, ciRef: task.ciRef || "",
+        nextAction: "verify-merge-and-ci"
+      });
+    }
+    if (["候选", "待批准", "已阻塞", "已批准"].includes(task.taskStatus)) {
+      const blockingDependencies = task.dependencies.filter((id) => byId.get(id).taskStatus !== "已关闭");
+      const conflictingTaskIds = active.filter((other) => other.id !== task.id && task.writeScopes.some((scope) => other.writeScopes.some((otherScope) => writeScopesOverlap(scope, otherScope)))).map((other) => other.id);
+      const approvalReady = task.approval?.state === "approved" && Boolean(task.approval.ref)
+        && task.approval.mode === RISK_APPROVAL_MODES[task.riskLevel]
+        && (task.riskLevel !== "高" || (task.decisionIds.length > 0 && task.testIds.length > 0 && task.decisionIds.every((id) => decisions.get(id).status === "Accepted")));
+      const wipAvailable = active.some((other) => other.id === task.id) || active.length < config.portfolioPolicy.maximumWip;
+      const unresolved = [...(task.unresolved || [])];
+      const nextAction = !approvalReady ? "obtain-approval"
+        : blockingDependencies.length ? "await-dependencies"
+          : conflictingTaskIds.length ? "await-write-scope"
+            : !wipAvailable ? "await-wip-slot"
+              : unresolved.length ? "review-unresolved-blockers" : "review-dependency-release";
+      dependencyReview.push({ taskId: task.id, ownerProcess: task.ownerProcess, approvalReady, blockingDependencies, conflictingTaskIds, wipAvailable, unresolved, nextAction });
+    }
+    if (task.taskStatus === "已关闭") {
+      const missingObservability = task.runtimeCapability === true
+        ? REQUIRED_OBSERVABILITY.filter((field) => !String(task.observability[field] || "").trim()) : [];
+      if (missingObservability.length || task.unresolved?.length) {
+        capabilityFollowups.push({ taskId: task.id, ownerProcess: task.ownerProcess, capabilityStatus: task.capabilityStatus,
+          missingObservability, unresolved: [...(task.unresolved || [])], nextAction: "register-capability-follow-up" });
+      }
+    }
+  }
+  return {
+    schemaVersion: "platform-lifecycle-handoff-v1",
+    automaticActionsAllowed: false,
+    productionDecision: validation.summary.productionDecision,
+    activeWip: active.length, maximumWip: config.portfolioPolicy.maximumWip,
+    integrationReview, dependencyReview, capabilityFollowups
+  };
+}
+
 function parseArg(prefix, argv = process.argv.slice(2)) {
   return argv.find((item) => item.startsWith(`${prefix}=`))?.slice(prefix.length + 1) || "";
 }
@@ -251,14 +316,24 @@ function analyzeImpact(config, files) {
   const modules = new Set();
   const requiredTiers = new Set();
   const quickTests = new Set();
+  const classifiedFiles = new Set();
   for (const rule of config.impactRules || []) {
-    if (!files.some((file) => rule.patterns.some((pattern) => file === pattern || file.startsWith(pattern) || file.endsWith(pattern)))) continue;
+    const matchingFiles = files.filter((file) => rule.patterns.some((pattern) => {
+      if (/^\.[a-z0-9]+$/i.test(pattern)) return file.endsWith(pattern);
+      if (pattern.endsWith("/")) return file.startsWith(pattern);
+      // Preserve the existing bare filename-family rule (for example "auth").
+      if (/^[a-z0-9-]+$/i.test(pattern)) return file.startsWith(pattern);
+      return file === pattern;
+    }));
+    if (matchingFiles.length === 0) continue;
+    matchingFiles.forEach((file) => classifiedFiles.add(file));
     matchedRules.push(rule.id);
     rule.modules.forEach((item) => modules.add(item));
     rule.requiredTiers.forEach((item) => requiredTiers.add(item));
     (rule.quickTests || []).forEach((item) => quickTests.add(item));
   }
-  if (files.length > 0 && matchedRules.length === 0) {
+  const unclassifiedFiles = [...new Set(files.filter((file) => !classifiedFiles.has(file)))].sort();
+  if (unclassifiedFiles.length > 0) {
     requiredTiers.add("quick");
     requiredTiers.add("pr");
     modules.add("unclassified-change");
@@ -271,7 +346,8 @@ function analyzeImpact(config, files) {
     modules: [...modules].sort(),
     requiredTiers: order.filter((item) => requiredTiers.has(item)),
     quickTests: [...quickTests].sort(),
-    fullUnitFallback: files.length > 0 && matchedRules.length === 0
+    unclassifiedFiles,
+    fullUnitFallback: unclassifiedFiles.length > 0
   };
 }
 
@@ -304,6 +380,7 @@ function runChangedUnitTests(config, files, options = {}) {
   const impact = analyzeImpact(config, files);
   const spawn = options.spawnSync || spawnSync;
   const root = options.root || ROOT;
+  let supplementalTests = [];
   if (impact.fullUnitFallback) {
     const invocation = npmRunInvocation("test:unit", options);
     const result = spawn(invocation.command, invocation.args, {
@@ -313,6 +390,15 @@ function runChangedUnitTests(config, files, options = {}) {
       shell: invocation.shell
     });
     assertSpawnSucceeded(result, "unclassified change full unit fallback failed");
+    const unitTests = new Set(require("./run-standard-test-suite").listStandardSuite("unit"));
+    supplementalTests = impact.quickTests.filter((testPath) => !unitTests.has(testPath));
+    if (supplementalTests.length > 0) {
+      for (const testPath of supplementalTests) {
+        if (!fs.existsSync(path.join(root, testPath))) throw new Error(`quick test does not exist: ${testPath}`);
+      }
+      const additional = spawn(process.execPath, ["--test", ...supplementalTests], { cwd: root, stdio: "inherit", windowsHide: true });
+      assertSpawnSucceeded(additional, "supplemental affected tests failed");
+    }
   } else {
     const tests = impact.quickTests.length > 0 ? impact.quickTests : ["test/lifecycle-governance.test.js"];
     for (const testPath of tests) {
@@ -321,13 +407,14 @@ function runChangedUnitTests(config, files, options = {}) {
     const result = spawn(process.execPath, ["--test", ...tests], { cwd: root, stdio: "inherit", windowsHide: true });
     assertSpawnSucceeded(result, "changed unit tests failed");
   }
-  return { ...impact, executed: impact.fullUnitFallback ? "full-unit-fallback" : "affected-unit-tests" };
+  return { ...impact, supplementalTests, executed: impact.fullUnitFallback ? "full-unit-fallback" : "affected-unit-tests" };
 }
 
 function runCli(argv = process.argv.slice(2)) {
   const command = argv[0] || "check";
   const config = readJson(parseArg("--config", argv) || DEFAULT_CONFIG);
   if (command === "check") return validateLifecycleGovernance(config);
+  if (command === "handoff") return buildHandoffReport(config);
   if (command === "impact") {
     const explicitFiles = parseArg("--files", argv);
     const files = changedFiles({ base: parseArg("--base", argv) || "origin/main", files: explicitFiles ? explicitFiles.split(",").filter(Boolean) : undefined });
@@ -338,7 +425,7 @@ function runCli(argv = process.argv.slice(2)) {
     const files = changedFiles({ base: parseArg("--base", argv) || "origin/main", files: explicitFiles ? explicitFiles.split(",").filter(Boolean) : undefined });
     return runChangedUnitTests(config, files);
   }
-  throw new Error("Usage: lifecycle-governance.js check|impact|tests [--base=ref] [--files=path,...]");
+  throw new Error("Usage: lifecycle-governance.js check|handoff|impact|tests [--base=ref] [--files=path,...]");
 }
 
 if (require.main === module) {
@@ -350,4 +437,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { analyzeImpact, assertNoDependencyCycle, assertSpawnSucceeded, changedFiles, npmRunInvocation, readJson, runChangedUnitTests, validateLifecycleGovernance };
+module.exports = { analyzeImpact, assertNoDependencyCycle, assertSpawnSucceeded, buildHandoffReport, changedFiles, npmRunInvocation, readJson, runChangedUnitTests, validateLifecycleGovernance, writeScopesOverlap };
