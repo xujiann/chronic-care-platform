@@ -23,7 +23,7 @@
     guardian: "监护代理账号"
   });
   const ACTIVE_STATES = new Set(["active", "enabled", "启用"]);
-  const state = { query: "", role: "all", status: "all" };
+  const documentControllers = new WeakMap();
 
   function value(input) {
     return String(input ?? "").trim();
@@ -130,16 +130,37 @@
     return card;
   }
 
-  function matches(row) {
-    const query = state.query.toLocaleLowerCase("zh-CN");
+  function controllerFor(documentRef) {
+    let controller = documentControllers.get(documentRef);
+    if (!controller) {
+      controller = {
+        accounts: [],
+        policy: undefined,
+        boundControls: new WeakSet()
+      };
+      documentControllers.set(documentRef, controller);
+    }
+    return controller;
+  }
+
+  function readFilters(documentRef) {
+    return {
+      query: value(documentRef.querySelector("#identity-account-search")?.value),
+      role: value(documentRef.querySelector("#identity-account-role-filter")?.value || "all"),
+      status: value(documentRef.querySelector("#identity-account-status-filter")?.value || "all")
+    };
+  }
+
+  function matches(row, filters) {
+    const query = filters.query.toLocaleLowerCase("zh-CN");
     const searchable = [row.accountCode, row.username, row.name, row.roleLabel, row.accountTypeLabel, row.orgCode, row.orgName, row.dataScope]
       .join(" ").toLocaleLowerCase("zh-CN");
     if (query && !searchable.includes(query)) return false;
-    if (state.role !== "all" && row.role !== state.role) return false;
-    if (state.status === "enabled" && !row.enabled) return false;
-    if (state.status === "disabled" && row.enabled) return false;
-    if (state.status === "external-unbound" && (!row.enabled || row.externalBound)) return false;
-    if (state.status === "review" && row.risks.length === 0) return false;
+    if (filters.role !== "all" && row.role !== filters.role) return false;
+    if (filters.status === "enabled" && !row.enabled) return false;
+    if (filters.status === "disabled" && row.enabled) return false;
+    if (filters.status === "external-unbound" && (!row.enabled || row.externalBound)) return false;
+    if (filters.status === "review" && row.risks.length === 0) return false;
     return true;
   }
 
@@ -170,25 +191,17 @@
     return card;
   }
 
-  function bindFilters(documentRef, rerender) {
+  function bindFilters(documentRef, controller) {
     const search = documentRef.querySelector("#identity-account-search");
     const role = documentRef.querySelector("#identity-account-role-filter");
     const status = documentRef.querySelector("#identity-account-status-filter");
+    const rerender = () => render(controller.accounts, { document: documentRef, policy: controller.policy });
     [search, role, status].forEach((control) => {
-      if (!control || control.dataset.identityGovernanceBound === "true") return;
+      if (!control || controller.boundControls.has(control)) return;
+      controller.boundControls.add(control);
       control.dataset.identityGovernanceBound = "true";
-      control.addEventListener("input", () => {
-        state.query = value(search?.value);
-        state.role = value(role?.value || "all");
-        state.status = value(status?.value || "all");
-        rerender();
-      });
-      control.addEventListener("change", () => {
-        state.query = value(search?.value);
-        state.role = value(role?.value || "all");
-        state.status = value(status?.value || "all");
-        rerender();
-      });
+      control.addEventListener("input", rerender);
+      control.addEventListener("change", rerender);
     });
   }
 
@@ -200,8 +213,12 @@
     const statusTarget = documentRef.querySelector("#identity-account-filter-status");
     const boundaryTarget = documentRef.querySelector("#identity-account-boundary");
     if (!summaryTarget || !listTarget || !statusTarget) return null;
+    const controller = controllerFor(documentRef);
+    controller.accounts = accounts;
+    controller.policy = policy;
     const view = buildView(accounts, policy);
-    const filtered = view.accounts.filter(matches);
+    const filters = readFilters(documentRef);
+    const filtered = view.accounts.filter((row) => matches(row, filters));
     summaryTarget.replaceChildren(
       metricCard(documentRef, "账号总数", view.summary.total, `${view.summary.enabled} 个启用，${view.summary.disabled} 个停用`),
       metricCard(documentRef, "权限映射", `${view.summary.mappingReady}/${view.summary.enabled}`, "启用账号均须具备可访问功能"),
@@ -212,7 +229,7 @@
     if (!filtered.length) listTarget.append(element(documentRef, "p", "muted identity-account-empty", "当前筛选条件下没有账号。"));
     statusTarget.textContent = `当前显示 ${filtered.length}/${view.summary.total} 个账号`;
     if (boundaryTarget) boundaryTarget.textContent = view.boundary;
-    bindFilters(documentRef, () => render(accounts, options));
+    bindFilters(documentRef, controller);
     return view;
   }
 
