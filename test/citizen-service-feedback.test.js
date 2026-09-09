@@ -263,6 +263,40 @@ test("feedback dialog validation keeps known input guidance without issuing a re
   assert.equal(h.submitButton.disabled, false);
 });
 
+for (const status of ["cancel-requested", "取消待确认"]) {
+  test(`pending cancellation ${status} remains a warning that needs attention`, () => {
+    const order = feedback.normalizeServiceOrder({ status });
+    assert.equal(order.lifecycle, "待处理");
+    assert.equal(order.statusClass, "warn");
+    assert.equal(feedback.serviceOrderNeedsAttention(order), true);
+    assert.equal(order.status, status);
+    assert.match(feedback.buildServiceOrderHighlight([order], [order], "#orders").status, /1 需关注/);
+  });
+}
+
+test("pending cancellation classification preserves genuine terminal and other pending states", () => {
+  for (const status of ["cancelled", "canceled", "已取消", "rejected", "failed"]) {
+    const order = feedback.normalizeServiceOrder({ status });
+    assert.equal(order.lifecycle, "已终止", status);
+    assert.equal(order.statusClass, "danger", status);
+    assert.equal(feedback.serviceOrderNeedsAttention(order), false, status);
+  }
+  for (const status of ["completed", "closed", "已完成", "已关闭"]) {
+    const order = feedback.normalizeServiceOrder({ status });
+    assert.equal(order.lifecycle, "已完成", status);
+    assert.equal(feedback.serviceOrderNeedsAttention(order), false, status);
+  }
+  for (const status of ["requested", "pending", "待确认", "refund-pending"]) {
+    const order = feedback.normalizeServiceOrder({ status });
+    assert.equal(order.lifecycle, "待处理", status);
+    assert.equal(order.statusClass, "warn", status);
+    assert.equal(feedback.serviceOrderNeedsAttention(order), true, status);
+  }
+  const cancelledWithComplaint = feedback.normalizeServiceOrder({ status: "cancelled", complaintStatus: "open" });
+  assert.equal(cancelledWithComplaint.lifecycle, "已终止");
+  assert.equal(feedback.serviceOrderNeedsAttention(cancelledWithComplaint), true);
+});
+
 test("resident service feedback is offered only after completion and only once", () => {
   for (const collection of ["escortServiceOrders", "internetNursingOrders"]) {
     assert.equal(feedback.isFeedbackEligible({ collection, status: "requested" }), false);

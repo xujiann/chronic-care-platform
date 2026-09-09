@@ -302,4 +302,61 @@ test("resident UI keeps a failed draft, recovers an ambiguous submission, and sc
       await verifyDialogSessionIsolation(page, { outcome, nextSubmitting: true, sameButton: true, nativeClose: true });
     });
   }
+
+  for (const source of ["official", "local-fallback"]) {
+    await test.step(`${source} orders keep cancellation requests pending until cancellation is confirmed`, async () => {
+      await page.evaluate((orderSource) => {
+        const orders = [
+          { id: "eso-cancellation-pending-e2e", hospital: "取消申请回归医院", status: "cancel-requested" },
+          { id: "eso-cancellation-terminal-e2e", hospital: "取消终态回归医院", status: "cancelled" }
+        ].map((order) => ({
+          ...order, residentId: "r1", department: "全科", providerName: "示范陪诊机构",
+          serviceItems: ["exam escort"], appointmentAt: "2099-01-01",
+          contractStatus: "signed", insuranceStatus: "covered", complaintStatus: "none"
+        }));
+        state.escortServiceOrders = orders;
+        escortDashboard = { ...(escortDashboard || {}), orders: orders.map((order) => ({ ...order })) };
+        const otherOrders = (serviceOrderCenter?.orders || []).filter((order) => order.serviceType !== "escort");
+        serviceOrderCenter = {
+          ...(serviceOrderCenter || {}),
+          orders: orderSource === "official" ? [
+            ...otherOrders,
+            ...orders.map((order) => ({
+              serviceOrderId: `escortServiceOrders:${order.id}`, sourceCollection: "escortServiceOrders",
+              sourceId: order.id, serviceType: "escort", residentId: order.residentId,
+              title: order.hospital, status: order.status, providerName: order.providerName,
+              entryPage: "escort", scheduledAt: order.appointmentAt
+            }))
+          ] : []
+        };
+        renderCitizen("r1");
+        document.body.classList.remove("service-paged-mode");
+      }, source);
+
+      const pendingOrder = page.locator("#service-order-cards .service-order-card").filter({ hasText: "取消申请回归医院" });
+      const terminalOrder = page.locator("#service-order-cards .service-order-card").filter({ hasText: "取消终态回归医院" });
+      const escortMetric = page.locator("#service-order-metrics article").filter({ has: page.getByText("陪诊", { exact: true }) });
+      await expect(pendingOrder).toBeVisible();
+      await expect(pendingOrder.locator(".status")).toHaveText(source === "official" ? "待处理 · cancel-requested" : "待处理 · 取消待确认");
+      await expect(pendingOrder.locator(".status")).toHaveClass(/\bwarn\b/);
+      await expect(terminalOrder.locator(".status")).toHaveText(/^已终止 · /);
+      await expect(terminalOrder.locator(".status")).toHaveClass(/\bdanger\b/);
+      await expect(escortMetric.locator("strong")).toHaveText("2");
+      await expect(escortMetric.locator("small")).toHaveText("1 个需关注");
+
+      await page.evaluate(() => {
+        for (const order of [...state.escortServiceOrders, ...escortDashboard.orders]) {
+          if (order.id === "eso-cancellation-pending-e2e") order.status = "cancelled";
+        }
+        for (const order of serviceOrderCenter.orders) {
+          if (order.sourceId === "eso-cancellation-pending-e2e") order.status = "cancelled";
+        }
+        renderCitizen("r1");
+      });
+      await expect(pendingOrder.locator(".status")).toHaveText(/^已终止 · /);
+      await expect(pendingOrder.locator(".status")).toHaveClass(/\bdanger\b/);
+      await expect(escortMetric.locator("strong")).toHaveText("2");
+      await expect(escortMetric.locator("small")).toHaveText("0 个需关注");
+    });
+  }
 });
