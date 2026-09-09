@@ -299,8 +299,8 @@
       "title": "卫监任务创建重试绑定缺口未闭合",
       "owner": "T03",
       "mitigation": "仅按批准范围实施最小修复，先补负向回归，独立审查及 exact-head CI 后串行集成",
-      "status": "open",
-      "evidenceIds": []
+      "status": "mitigated",
+      "evidenceIds": ["EVD-OPS-025"]
     },
     {
       "id": "RISK-OPS-026",
@@ -308,8 +308,8 @@
       "title": "急救授权响应失败关闭缺口未闭合",
       "owner": "T06",
       "mitigation": "仅按批准范围实施最小修复，先补负向回归，独立审查及 exact-head CI 后串行集成",
-      "status": "open",
-      "evidenceIds": []
+      "status": "mitigated",
+      "evidenceIds": ["EVD-OPS-026"]
     },
     {
       "id": "RISK-OPS-027",
@@ -317,8 +317,8 @@
       "title": "血液在线失败禁止演示成功缺口未闭合",
       "owner": "T06",
       "mitigation": "仅按批准范围实施最小修复，先补负向回归，独立审查及 exact-head CI 后串行集成",
-      "status": "open",
-      "evidenceIds": []
+      "status": "mitigated",
+      "evidenceIds": ["EVD-OPS-027"]
     },
     {
       "id": "RISK-OPS-028",
@@ -326,8 +326,8 @@
       "title": "支付创建稳定重试键缺口未闭合",
       "owner": "T07",
       "mitigation": "仅按批准范围实施最小修复，先补负向回归，独立审查及 exact-head CI 后串行集成",
-      "status": "open",
-      "evidenceIds": []
+      "status": "mitigated",
+      "evidenceIds": ["EVD-OPS-028"]
     },
     {
       "id": "RISK-GOV-006",
@@ -539,31 +539,31 @@
   "tests": [
     {
       "id": "TEST-GOV-007",
-      "kind": "existing-regression-baseline-new-behavior-tests-required-before-closure",
+      "kind": "scoped-behavior-regression-contract",
       "path": "test/lifecycle-governance.test.js",
       "command": "node --test test/lifecycle-governance.test.js"
     },
     {
       "id": "TEST-OPS-025",
-      "kind": "existing-regression-baseline-new-behavior-tests-required-before-closure",
+      "kind": "scoped-behavior-regression-contract",
       "path": "test/public-health-supervision-ui.test.js",
       "command": "node --test test/public-health-supervision-ui.test.js"
     },
     {
       "id": "TEST-OPS-026",
-      "kind": "existing-regression-baseline-new-behavior-tests-required-before-closure",
-      "path": "test/emergency-lifechain.test.js",
-      "command": "node --test test/emergency-lifechain.test.js"
+      "kind": "scoped-behavior-regression-contract",
+      "path": "test/emergency-lifechain-ui-response-behavior.test.js",
+      "command": "node --test test/emergency-lifechain-ui-response-behavior.test.js"
     },
     {
       "id": "TEST-OPS-027",
-      "kind": "existing-regression-baseline-new-behavior-tests-required-before-closure",
-      "path": "test/blood-dashboard-route-characterization.test.js",
-      "command": "node --test test/blood-dashboard-route-characterization.test.js"
+      "kind": "scoped-behavior-regression-contract",
+      "path": "test/blood-online-failure-behavior.test.js",
+      "command": "node --test test/blood-online-failure-behavior.test.js"
     },
     {
       "id": "TEST-OPS-028",
-      "kind": "existing-regression-baseline-new-behavior-tests-required-before-closure",
+      "kind": "scoped-behavior-regression-contract",
       "path": "test/medical-payment-one-stop-ui.test.js",
       "command": "node --test test/medical-payment-one-stop-ui.test.js"
     },
@@ -713,6 +713,56 @@
     }
   ],
   "evidence": [
+    {
+      "id": "EVD-OPS-025",
+      "scope": "repository-integration",
+      "type": "pull-request-ci",
+      "ref": "https://github.com/xujiann/chronic-care-platform/actions/runs/34338508417",
+      "testIds": [
+        "TEST-OPS-025"
+      ],
+      "productionEvidence": false
+    },
+    {
+      "id": "EVD-OPS-026",
+      "scope": "repository-integration",
+      "type": "pull-request-ci",
+      "ref": "https://github.com/xujiann/chronic-care-platform/actions/runs/34332249997",
+      "testIds": [
+        "TEST-OPS-026"
+      ],
+      "productionEvidence": false
+    },
+    {
+      "id": "EVD-OPS-027",
+      "scope": "repository-integration",
+      "type": "pull-request-ci",
+      "ref": "https://github.com/xujiann/chronic-care-platform/actions/runs/34336251802",
+      "testIds": [
+        "TEST-OPS-027"
+      ],
+      "productionEvidence": false
+    },
+    {
+      "id": "EVD-OPS-028",
+      "scope": "repository-integration",
+      "type": "pull-request-ci",
+      "ref": "https://github.com/xujiann/chronic-care-platform/actions/runs/34337368379",
+      "testIds": [
+        "TEST-OPS-028"
+      ],
+      "productionEvidence": false
+    },
+    {
+      "id": "EVD-GOV-007-LOCAL",
+      "scope": "repository",
+      "type": "executable-contract",
+      "ref": "node --test test/lifecycle-governance.test.js test/documentation-fact-drift.test.js",
+      "testIds": [
+        "TEST-GOV-007"
+      ],
+      "productionEvidence": false
+    },
     {
       "id": "EVD-GOV-006",
       "scope": "repository-integration",
@@ -931,7 +981,7 @@
       "baseline": "主线模块化单体及其现有运行、存储和发布边界",
       "target": "边界、状态和生产资格均可由控制塔追踪",
       "status": "已集成",
-      "gapTaskIds": ["GOV-002","OPS-015","OPS-016","OPS-017","OPS-018","SEC-011","GOV-007","OPS-025","OPS-026","OPS-027","OPS-028"],
+      "gapTaskIds": ["GOV-002","OPS-015","OPS-016","OPS-017","OPS-018","SEC-011","GOV-007"],
       "evidenceIds": ["EVD-GOV-001", "EVD-GOV-002"]
     },
     {
@@ -940,7 +990,7 @@
       "baseline": "T00至T09及临床子域已建立模块所有权",
       "target": "模块写入冲突和跨任务依赖自动失败关闭",
       "status": "已集成",
-      "gapTaskIds": ["OPS-017","GOV-007","OPS-025","OPS-026","OPS-027","OPS-028"],
+      "gapTaskIds": ["OPS-017","GOV-007"],
       "evidenceIds": ["EVD-GOV-001", "EVD-GOV-002"]
     },
     {
@@ -949,7 +999,7 @@
       "baseline": "数据事实源、迁移和生产写资格已有独立治理",
       "target": "数据敏感级别和迁移证据进入每项任务追踪链",
       "status": "已集成",
-      "gapTaskIds": ["OPS-015","OPS-016","OPS-017","OPS-018","GOV-007","OPS-025","OPS-026","OPS-027","OPS-028"],
+      "gapTaskIds": ["OPS-015","OPS-016","OPS-017","OPS-018","GOV-007"],
       "evidenceIds": ["EVD-GOV-001", "EVD-GOV-002"]
     },
     {
@@ -958,7 +1008,7 @@
       "baseline": "生产API目录及认证、授权、幂等证据独立存在",
       "target": "接口变更由任务风险和影响范围选择门禁",
       "status": "已集成",
-      "gapTaskIds": ["OPS-015","OPS-016","OPS-018","SEC-011","GOV-007","OPS-025","OPS-026","OPS-027","OPS-028"],
+      "gapTaskIds": ["OPS-015","OPS-016","OPS-018","SEC-011","GOV-007"],
       "evidenceIds": ["EVD-GOV-001", "EVD-GOV-002"]
     },
     {
@@ -967,7 +1017,7 @@
       "baseline": "代码、运行时和外部依赖边界已有事实地图",
       "target": "任务前置关系、WIP和核心写范围形成可检查依赖图",
       "status": "已集成",
-      "gapTaskIds": ["GOV-002","OPS-015","OPS-017","OPS-018","GOV-007","OPS-025","OPS-026","OPS-027","OPS-028"],
+      "gapTaskIds": ["GOV-002","OPS-015","OPS-017","OPS-018","GOV-007"],
       "evidenceIds": ["EVD-GOV-001", "EVD-GOV-002"]
     },
     {
@@ -976,7 +1026,7 @@
       "baseline": "技术债以稳定编号记录仓库及现场缺口",
       "target": "风险、差距任务、退出条件和关闭证据双向可追踪",
       "status": "已集成",
-      "gapTaskIds": ["GOV-002","OPS-015","OPS-016","OPS-017","OPS-018","SEC-011","GOV-007","OPS-025","OPS-026","OPS-027","OPS-028"],
+      "gapTaskIds": ["GOV-002","OPS-015","OPS-016","OPS-017","OPS-018","SEC-011","GOV-007"],
       "evidenceIds": ["EVD-GOV-001", "EVD-GOV-002"]
     }
   ],
@@ -986,8 +1036,8 @@
       "title": "全平台缺口组合登记",
       "ownerProcess": "T00",
       "integrationOwner": "T00",
-      "taskStatus": "已批准",
-      "capabilityStatus": "未建设",
+      "taskStatus": "待集成",
+      "capabilityStatus": "已验证",
       "riskLevel": "中",
       "approval": {
         "state": "approved",
@@ -1020,15 +1070,13 @@
       "testIds": [
         "TEST-GOV-007"
       ],
-      "evidenceIds": [],
+      "evidenceIds": ["EVD-GOV-007-LOCAL"],
       "rollback": "回退本任务独立提交并重跑专项及 required CI；不回退服务端业务事实，无数据迁移",
-      "unresolved": [
-        "尚需新增行为回归、独立评审、PR 与 exact-head CI；现有测试引用仅为回归基线，不是本修复已验证证据"
-      ],
+      "unresolved": ["本中央 PR #286 尚需最终 head 独立复审、required CI 和合并，不以四领域证据自证集成"],
       "worktree": ".codex-platform-worktrees/process-v2/t00-platform-gap-portfolio-20260909",
       "branch": "process/t00-platform-gap-portfolio-20260909",
       "planRef": "docs/lifecycle-governance.md#gov-007-全平台缺口组合-plan",
-      "pullRequestRef": "",
+      "pullRequestRef": "https://github.com/xujiann/chronic-care-platform/pull/286",
       "ciRef": "",
       "writeScopes": [
         "config/lifecycle-governance.json",
@@ -1046,8 +1094,8 @@
       "title": "卫监任务创建重试绑定",
       "ownerProcess": "T03",
       "integrationOwner": "T00",
-      "taskStatus": "已批准",
-      "capabilityStatus": "未建设",
+      "taskStatus": "已关闭",
+      "capabilityStatus": "已集成",
       "riskLevel": "中",
       "approval": {
         "state": "approved",
@@ -1080,16 +1128,14 @@
       "testIds": [
         "TEST-OPS-025"
       ],
-      "evidenceIds": [],
+      "evidenceIds": ["EVD-OPS-025"],
       "rollback": "回退本任务独立提交并重跑专项及 required CI；不回退服务端业务事实，无数据迁移",
-      "unresolved": [
-        "尚需新增行为回归、独立评审、PR 与 exact-head CI；现有测试引用仅为回归基线，不是本修复已验证证据"
-      ],
+      "unresolved": [],
       "worktree": ".codex-platform-worktrees/process-v2/t03-supervision-create-retry-20260909",
       "branch": "process/t03-supervision-create-retry-20260909",
       "planRef": "docs/lifecycle-governance.md#gov-007-全平台缺口组合-plan",
-      "pullRequestRef": "",
-      "ciRef": "",
+      "pullRequestRef": "https://github.com/xujiann/chronic-care-platform/pull/290",
+      "ciRef": "https://github.com/xujiann/chronic-care-platform/actions/runs/34338508417",
       "writeScopes": [
         "public-health-supervision.js",
         "test/public-health-supervision-ui.test.js"
@@ -1105,8 +1151,8 @@
       "title": "急救授权响应失败关闭",
       "ownerProcess": "T06",
       "integrationOwner": "T00",
-      "taskStatus": "已批准",
-      "capabilityStatus": "未建设",
+      "taskStatus": "已关闭",
+      "capabilityStatus": "已集成",
       "riskLevel": "中",
       "approval": {
         "state": "approved",
@@ -1139,16 +1185,14 @@
       "testIds": [
         "TEST-OPS-026"
       ],
-      "evidenceIds": [],
+      "evidenceIds": ["EVD-OPS-026"],
       "rollback": "回退本任务独立提交并重跑专项及 required CI；不回退服务端业务事实，无数据迁移",
-      "unresolved": [
-        "尚需新增行为回归、独立评审、PR 与 exact-head CI；现有测试引用仅为回归基线，不是本修复已验证证据"
-      ],
+      "unresolved": [],
       "worktree": ".codex-platform-worktrees/process-v2/t06-emergency-response-validation-20260909",
       "branch": "process/t06-emergency-response-validation-20260909",
       "planRef": "docs/lifecycle-governance.md#gov-007-全平台缺口组合-plan",
-      "pullRequestRef": "",
-      "ciRef": "",
+      "pullRequestRef": "https://github.com/xujiann/chronic-care-platform/pull/287",
+      "ciRef": "https://github.com/xujiann/chronic-care-platform/actions/runs/34332249997",
       "writeScopes": [
         "emergency-lifechain-ui.js",
         "test/emergency-lifechain-ui-response-behavior.test.js"
@@ -1164,8 +1208,8 @@
       "title": "血液在线失败禁止演示成功",
       "ownerProcess": "T06",
       "integrationOwner": "T00",
-      "taskStatus": "已批准",
-      "capabilityStatus": "未建设",
+      "taskStatus": "已关闭",
+      "capabilityStatus": "已集成",
       "riskLevel": "中",
       "approval": {
         "state": "approved",
@@ -1198,16 +1242,14 @@
       "testIds": [
         "TEST-OPS-027"
       ],
-      "evidenceIds": [],
+      "evidenceIds": ["EVD-OPS-027"],
       "rollback": "回退本任务独立提交并重跑专项及 required CI；不回退服务端业务事实，无数据迁移",
-      "unresolved": [
-        "尚需新增行为回归、独立评审、PR 与 exact-head CI；现有测试引用仅为回归基线，不是本修复已验证证据"
-      ],
+      "unresolved": [],
       "worktree": ".codex-platform-worktrees/process-v2/t06-blood-online-failure-20260909",
       "branch": "process/t06-blood-online-failure-20260909",
       "planRef": "docs/lifecycle-governance.md#gov-007-全平台缺口组合-plan",
-      "pullRequestRef": "",
-      "ciRef": "",
+      "pullRequestRef": "https://github.com/xujiann/chronic-care-platform/pull/289",
+      "ciRef": "https://github.com/xujiann/chronic-care-platform/actions/runs/34336251802",
       "writeScopes": [
         "blood.js",
         "test/blood-online-failure-behavior.test.js"
@@ -1223,8 +1265,8 @@
       "title": "支付创建稳定重试键",
       "ownerProcess": "T07",
       "integrationOwner": "T00",
-      "taskStatus": "已批准",
-      "capabilityStatus": "未建设",
+      "taskStatus": "已关闭",
+      "capabilityStatus": "已集成",
       "riskLevel": "中",
       "approval": {
         "state": "approved",
@@ -1257,16 +1299,14 @@
       "testIds": [
         "TEST-OPS-028"
       ],
-      "evidenceIds": [],
+      "evidenceIds": ["EVD-OPS-028"],
       "rollback": "回退本任务独立提交并重跑专项及 required CI；不回退服务端业务事实，无数据迁移",
-      "unresolved": [
-        "尚需新增行为回归、独立评审、PR 与 exact-head CI；现有测试引用仅为回归基线，不是本修复已验证证据"
-      ],
+      "unresolved": [],
       "worktree": ".codex-platform-worktrees/process-v2/t07-payment-create-retry-20260909",
       "branch": "process/t07-payment-create-retry-20260909",
       "planRef": "docs/lifecycle-governance.md#gov-007-全平台缺口组合-plan",
-      "pullRequestRef": "",
-      "ciRef": "",
+      "pullRequestRef": "https://github.com/xujiann/chronic-care-platform/pull/288",
+      "ciRef": "https://github.com/xujiann/chronic-care-platform/actions/runs/34337368379",
       "writeScopes": [
         "medical-payment.js",
         "test/medical-payment-one-stop-ui.test.js"
