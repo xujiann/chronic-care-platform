@@ -745,7 +745,7 @@
       "worktree": ".codex-platform-worktrees/process-v2/t00-four-line-wip-register-20260909",
       "branch": "process/t00-four-line-wip-register-20260909",
       "planRef": "docs/lifecycle-governance.md#gov-006-四路并行开发-wip-与写范围登记-plan",
-      "pullRequestRef": "",
+      "pullRequestRef": "https://github.com/xujiann/chronic-care-platform/pull/280",
       "ciRef": "",
       "writeScopes": ["config/lifecycle-governance.json", "docs/lifecycle-governance.md", "ROADMAP.md"],
       "observability": {"applicable": false, "reason": "仅登记任务组合、写范围和仓库证据，不新增生产运行时"},
