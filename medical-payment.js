@@ -5,6 +5,7 @@
   const apiEnabled = location.protocol !== "file:" && !location.hostname.endsWith("github.io");
   const user = auth?.getUser?.() || {};
   const state = { center: null, source: "loading", keyword: "", gateway: "all", status: "all" };
+  let paymentDraft = null;
 
   const fallbackCenter = Object.freeze({
     schemaVersion: "medical-payment-one-stop-view-v1",
@@ -313,9 +314,55 @@
     }
   }
 
+  async function submitPayment(form) {
+    const draft = paymentDraft;
+    const dialog = form.closest("dialog");
+    if (!draft || draft.pending || draft.completed || !dialog.open || state.source !== "api" || !state.center.actions.dispatchPayment) return;
+    const submit = form.querySelector("button[value='submit']");
+    const errorTarget = form.querySelector("[data-form-error]");
+    draft.pending = true;
+    submit.disabled = true;
+    errorTarget.hidden = true;
+    try {
+      const values = Object.fromEntries(new FormData(form));
+      const payload = { externalId: values.orderNo, orderNo: values.orderNo, amountFen: Number(values.amountFen), currency: values.currency, institutionCode: values.institutionCode.trim() };
+      const fingerprint = JSON.stringify(payload);
+      // Keep every binding in this draft: changing A -> B -> A must not dispatch A twice.
+      if (!draft.keys.has(fingerprint)) draft.keys.set(fingerprint, idempotencyKey("medical-payment"));
+      const key = draft.keys.get(fingerprint);
+      const receipt = await requestJson("/api/financial-gateways/dispatch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "PAYMENT", operation: "create-payment", idempotencyKey: key, payload })
+      });
+      if (paymentDraft !== draft || !dialog.open) return;
+      const validReceipt = receipt && typeof receipt.id === "string" && receipt.id.trim()
+        && receipt.adapterType === "financial" && receipt.gatewayType === "PAYMENT"
+        && receipt.operation === "create-payment" && receipt.idempotencyKey === key
+        && receipt.externalId === String(payload.orderNo).trim()
+        && ["dispatching", "retrying", "accepted", "processing", "succeeded", "cancelled", "reversed"].includes(receipt.status)
+        && receipt.payload && Object.entries(payload).every(([name, value]) => receipt.payload[name] === value);
+      if (!validReceipt) throw new Error("未收到匹配的支付创建回执，结果尚未确认。请保持原草稿重试，或先核对权威支付状态。");
+      draft.completed = true;
+      dialog.close();
+      setBanner("支付创建请求已受理", "受理不代表资金支付成功，正在重新读取权威支付状态。", "normal");
+      await load();
+    } catch (error) {
+      if (paymentDraft !== draft || !dialog.open) return;
+      errorTarget.textContent = error.message || "支付创建结果尚未确认，请保持原草稿重试。";
+      errorTarget.hidden = false;
+      setBanner("支付创建结果未确认", "未修改本地业务状态；原草稿相同内容重试将复用请求标识。", "danger");
+    } finally {
+      draft.pending = false;
+      if (paymentDraft === draft) submit.disabled = false;
+    }
+  }
+
   $("#payment-refresh").addEventListener("click", load);
   $("#payment-create-open").addEventListener("click", () => {
     const form = $("#payment-form");
+    paymentDraft = { keys: new Map(), pending: false, completed: false };
+    form.querySelector("button[value='submit']").disabled = false;
     form.reset();
     form.elements.currency.value = "CNY";
     form.elements.institutionCode.value = user.orgCode || "";
@@ -343,16 +390,7 @@
 
   $("#payment-form").addEventListener("submit", (event) => {
     event.preventDefault();
-    submitForm(event.currentTarget, (values) => requestJson("/api/financial-gateways/dispatch", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        type: "PAYMENT",
-        operation: "create-payment",
-        idempotencyKey: idempotencyKey("medical-payment"),
-        payload: { externalId: values.orderNo, orderNo: values.orderNo, amountFen: Number(values.amountFen), currency: values.currency, institutionCode: values.institutionCode }
-      })
-    }));
+    submitPayment(event.currentTarget);
   });
 
   $("#refund-form").addEventListener("submit", (event) => {
