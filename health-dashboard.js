@@ -104,8 +104,10 @@ function buildStaticDashboardSummary(state) {
   const interfaces = Array.isArray(state.platformInterfaces) ? state.platformInterfaces : [];
   const dependencies = Array.isArray(state.productionDeploymentPlan) ? state.productionDeploymentPlan : [];
   const taskActions = collectStaticTaskActions(state, applications);
-  const openActions = taskActions.filter((item) => !item.closed).slice(0, 12);
-  const actionSummary = openActions.reduce((summary, item) => {
+  const sourceOpenTaskActions = taskActions.filter((item) => !item.closed);
+  const openActions = sourceOpenTaskActions.slice(0, 12);
+  // Aggregate all source tasks independently of the bounded display preview.
+  const actionSummary = sourceOpenTaskActions.reduce((summary, item) => {
     const current = summary[item.applicationId] || { openActions: 0, highRisks: 0 };
     current.openActions += 1;
     if (item.priority === "high") current.highRisks += 1;
@@ -164,7 +166,7 @@ function buildStaticDashboardSummary(state) {
       openActions: openActions.length,
       previewOpenActions: openActions.length,
       sourceOpenActions,
-      highRisks: openActions.filter((item) => item.priority === "high").length,
+      highRisks: sourceOpenTaskActions.filter((item) => item.priority === "high").length,
       interfaceTracks: interfaces.length,
       evidenceRecords: evidence.reduce((sum, item) => sum + (Array.isArray(item.records) ? item.records.length : 0), 0),
       siteDependencies: dependencies.length,
