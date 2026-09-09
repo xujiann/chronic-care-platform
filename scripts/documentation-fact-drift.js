@@ -32,6 +32,14 @@ const DOCUMENT_PATHS = Object.freeze({
   adrIndex: "docs/adr/README.md",
   e2eAdr: "docs/adr/2026-08-23-playwright-e2e-isolation-and-browser-policy.md"
 });
+const ALLOWED_TECH_DEBT_GOVERNANCE_REFERENCES = new Set([
+  "DATA-003:DATABASE_SCHEMA.md",
+  "TEST-006:DEPENDENCY_MAP.md",
+  "ARC-002:DEPENDENCY_MAP.md",
+  "TEST-007:docs/adr/2026-08-18-clinical-five-governed-subdomains.md",
+  "TEST-007:docs/operations-command-behavior-matrix.md",
+  "TEST-001:docs/internal-boundary-coverage-governance.md"
+]);
 
 function check(id, passed, detail) {
   return { id, passed: Boolean(passed), detail: String(detail || "") };
@@ -61,6 +69,19 @@ function hasOneNumericFact(source, expression, expected) {
 function hasAcceptedWithoutProposed(source) {
   const statuses = [...String(source || "").matchAll(/\b(Accepted|Proposed)\b/g)].map((match) => match[1]);
   return statuses.length === 1 && statuses[0] === "Accepted";
+}
+
+function techDebtTableIds(source) {
+  return [...String(source || "").matchAll(/^\|\s*([A-Z][A-Z0-9-]*-\d{3})\s*\|/gm)].map((match) => match[1]);
+}
+
+function governedMarkdownIdDefinitions(source, documentPath) {
+  const definitions = [];
+  for (const line of String(source || "").split(/\r?\n/)) {
+    const match = line.match(/^(?:\|\s*|[-*]\s+|#{1,6}\s+)([A-Z][A-Z0-9-]*-\d{3})(?:\s*\||\s*[：:]|\s+)/);
+    if (match) definitions.push({ id: match[1], path: documentPath });
+  }
+  return definitions;
 }
 
 function buildSqliteSchemaFacts() {
@@ -117,6 +138,12 @@ function readRepositoryState(options = {}) {
   const e2eFacts = options.e2eFacts || buildE2eFacts();
   const productionReleaseScopeReport = options.productionReleaseScopeReport
     || buildProductionReleaseScopeReport(loadDefaultAuthorities());
+  const lifecycleTaskIds = options.lifecycleTaskIds || JSON.parse(fs.readFileSync(
+    path.join(ROOT, "config", "lifecycle-governance.json"), "utf8"
+  )).tasks.map((task) => task.id);
+  const governedMarkdownDefinitions = options.governedMarkdownDefinitions || repositoryGovernanceReport.markdown.entries
+    .filter((entry) => entry.classification === "current" && entry.path !== DOCUMENT_PATHS.techDebt)
+    .flatMap((entry) => governedMarkdownIdDefinitions(fs.readFileSync(path.join(ROOT, entry.path), "utf8"), entry.path));
   return {
     documents,
     catalogSummary,
@@ -126,7 +153,9 @@ function readRepositoryState(options = {}) {
     firstReleaseMigrationReport,
     sqliteSchemaFacts,
     e2eFacts,
-    productionReleaseScopeReport
+    productionReleaseScopeReport,
+    lifecycleTaskIds,
+    governedMarkdownDefinitions
   };
 }
 
@@ -140,7 +169,9 @@ function buildReport(input) {
     firstReleaseMigrationReport = {},
     sqliteSchemaFacts = {},
     e2eFacts = {},
-    productionReleaseScopeReport = {}
+    productionReleaseScopeReport = {},
+    lifecycleTaskIds = [],
+    governedMarkdownDefinitions = []
   } = input || {};
   const entries = catalogSummary.entries;
   const writeRoutes = catalogSummary.writeRoutes;
@@ -183,6 +214,13 @@ function buildReport(input) {
   const e2eAdrCurrent = uniqueSection(documents.e2eAdr, "## 2026-09-06 当前套件状态");
   const adrIndexE2e = uniqueLineContaining(documents.adrIndex, "[Playwright E2E 采用统一浏览器策略与独占测试服务]");
   const techDebtRepositoryGovernance = uniqueLineContaining(documents.techDebt, "| DOC-001 |");
+  const techDebtIds = techDebtTableIds(documents.techDebt);
+  const duplicateTechDebtIds = [...new Set(techDebtIds.filter((id, index) => techDebtIds.indexOf(id) !== index))];
+  const lifecycleTaskIdSet = new Set(lifecycleTaskIds);
+  const lifecycleIdConflicts = [...new Set(techDebtIds.filter((id) => lifecycleTaskIdSet.has(id)))];
+  const techDebtIdSet = new Set(techDebtIds);
+  const governedDocumentIdConflicts = governedMarkdownDefinitions.filter(({ id, path: documentPath }) =>
+    techDebtIdSet.has(id) && !ALLOWED_TECH_DEBT_GOVERNANCE_REFERENCES.has(`${id}:${documentPath}`));
 
   const catalogFactsValid = [entries, writeRoutes, behaviorProofRequired, reviewRequired]
     .every(Number.isSafeInteger)
@@ -221,6 +259,14 @@ function buildReport(input) {
       && e2eRoot > 0 && e2eResident > 0 && e2ePwa > 0
       && e2eRoot + e2eResident + e2ePwa === e2eTotal,
     `root=${e2eRoot}; resident=${e2eResident}; PWA=${e2ePwa}; total=${e2eTotal}; spec files=${e2eFacts.specFiles}`),
+    check("techDebt:uniqueTableIds", techDebtIds.length > 0 && duplicateTechDebtIds.length === 0,
+      duplicateTechDebtIds.length ? `duplicate ids: ${duplicateTechDebtIds.join(", ")}` : `${techDebtIds.length} unique table ids`),
+    check("techDebt:lifecycleTaskIdNamespace", lifecycleIdConflicts.length === 0,
+      lifecycleIdConflicts.length ? `conflicting lifecycle task ids: ${lifecycleIdConflicts.join(", ")}` : "no lifecycle task id conflicts"),
+    check("techDebt:governedDocumentIdNamespace", governedDocumentIdConflicts.length === 0,
+      governedDocumentIdConflicts.length
+        ? `conflicting governed document ids: ${governedDocumentIdConflicts.map(({ id, path: documentPath }) => `${id}@${documentPath}`).join(", ")}`
+        : "no conflicting governed document ids"),
     check("authority:firstReleaseScope", releaseScopeFactsValid, `${productionReleaseScopeReport.status || "missing"}; API reviews=${scopedApiReviewRequired}; collection reviews=${scopedCollectionReviewRequired}; plan gaps=${scopedRepositoryPlanMissing}`),
     check("roadmap:apiCatalogFacts", roadmapApi.count === 1
       && hasOneNumericFact(roadmapApi.text, /v3 当前 (\d+) 项/g, entries)
@@ -367,6 +413,12 @@ function buildReport(input) {
         markdownSuperseded,
         pdfArtifacts: repositoryGovernanceReport.pdf?.entries?.length
       },
+      techDebt: {
+        tableIds: techDebtIds.length,
+        duplicateIds: duplicateTechDebtIds,
+        lifecycleTaskIdConflicts: lifecycleIdConflicts,
+        governedDocumentIdConflicts
+      },
       sqliteSchema: {
         head: sqliteHead,
         tables: sqliteTableCount
@@ -417,5 +469,7 @@ module.exports = {
   buildSqliteSchemaFacts,
   buildReport,
   readRepositoryState,
+  governedMarkdownIdDefinitions,
+  techDebtTableIds,
   verifyRepository
 };

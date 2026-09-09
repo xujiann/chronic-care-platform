@@ -40,6 +40,13 @@
   },
   "requirements": [
     {
+      "id": "REQ-GOV-005",
+      "title": "六图差距必须与未完全闭合任务双向一致且技术债编号唯一",
+      "sourceType": "approved-user-requirement",
+      "sourceRef": "USER-APPROVED-GOV-005-2026-09-08",
+      "acceptance": ["未完全闭合任务至少映射一张 AS-IS 地图", "完全闭合任务不得残留 gapTaskIds", "TECH_DEBT 表 ID 唯一且不与生命周期任务或受管文档中的其他治理 ID 冲突"]
+    },
+    {
       "id": "REQ-GOV-004",
       "title": "开发流程应明确集成收尾和依赖交接并完整选择测试",
       "sourceType": "approved-user-requirement",
@@ -167,6 +174,15 @@
   ],
   "risks": [
     {
+      "id": "RISK-GOV-005",
+      "level": "中",
+      "title": "六图遗漏真实缺口或技术债编号重用导致错误追踪",
+      "owner": "T00",
+      "mitigation": "以任务最新状态反向校验地图覆盖，并对技术债表 ID 做闭集唯一性、生命周期任务及受管 Markdown 治理定义命名空间检查",
+      "status": "open",
+      "evidenceIds": []
+    },
+    {
       "id": "RISK-GOV-004",
       "level": "中",
       "title": "交接遗漏、父子写范围冲突或混合变更漏测",
@@ -226,8 +242,8 @@
       "title": "已安装 PWA 继续使用评价投诉变更前的旧资产",
       "owner": "T04",
       "mitigation": "递增缓存命名并以浏览器测试证明安装、激活、旧缓存清理和离线边界",
-      "status": "open",
-      "evidenceIds": []
+      "status": "mitigated",
+      "evidenceIds": ["EVD-OPS-019"]
     },
     {
       "id": "RISK-SEC-011",
@@ -293,6 +309,12 @@
     }
   ],
   "tests": [
+    {
+      "id": "TEST-GOV-005",
+      "kind": "map-gap-reverse-coverage-and-tech-debt-id-contract",
+      "path": "test/lifecycle-governance.test.js",
+      "command": "node --test test/lifecycle-governance.test.js test/documentation-fact-drift.test.js"
+    },
     {
       "id": "TEST-GOV-004",
       "kind": "lifecycle-handoff-and-impact-regression",
@@ -379,6 +401,14 @@
     }
   ],
   "evidence": [
+    {
+      "id": "EVD-OPS-019",
+      "scope": "repository-integration",
+      "type": "pull-request-ci",
+      "ref": "https://github.com/xujiann/chronic-care-platform/actions/runs/34228860692",
+      "testIds": ["TEST-OPS-019"],
+      "productionEvidence": false
+    },
     {
       "id": "EVD-GOV-004",
       "scope": "repository-integration",
@@ -507,7 +537,7 @@
       "baseline": "主线模块化单体及其现有运行、存储和发布边界",
       "target": "边界、状态和生产资格均可由控制塔追踪",
       "status": "已集成",
-      "gapTaskIds": [],
+      "gapTaskIds": ["GOV-002", "OPS-015", "OPS-016", "OPS-017", "OPS-018", "SEC-011", "GOV-005"],
       "evidenceIds": ["EVD-GOV-001", "EVD-GOV-002"]
     },
     {
@@ -516,7 +546,7 @@
       "baseline": "T00至T09及临床子域已建立模块所有权",
       "target": "模块写入冲突和跨任务依赖自动失败关闭",
       "status": "已集成",
-      "gapTaskIds": [],
+      "gapTaskIds": ["OPS-017"],
       "evidenceIds": ["EVD-GOV-001", "EVD-GOV-002"]
     },
     {
@@ -525,7 +555,7 @@
       "baseline": "数据事实源、迁移和生产写资格已有独立治理",
       "target": "数据敏感级别和迁移证据进入每项任务追踪链",
       "status": "已集成",
-      "gapTaskIds": [],
+      "gapTaskIds": ["OPS-015", "OPS-016", "OPS-017", "OPS-018"],
       "evidenceIds": ["EVD-GOV-001", "EVD-GOV-002"]
     },
     {
@@ -534,7 +564,7 @@
       "baseline": "生产API目录及认证、授权、幂等证据独立存在",
       "target": "接口变更由任务风险和影响范围选择门禁",
       "status": "已集成",
-      "gapTaskIds": [],
+      "gapTaskIds": ["OPS-015", "OPS-016", "OPS-018", "SEC-011"],
       "evidenceIds": ["EVD-GOV-001", "EVD-GOV-002"]
     },
     {
@@ -543,7 +573,7 @@
       "baseline": "代码、运行时和外部依赖边界已有事实地图",
       "target": "任务前置关系、WIP和核心写范围形成可检查依赖图",
       "status": "已集成",
-      "gapTaskIds": [],
+      "gapTaskIds": ["GOV-002", "OPS-015", "OPS-017", "OPS-018", "GOV-005"],
       "evidenceIds": ["EVD-GOV-001", "EVD-GOV-002"]
     },
     {
@@ -552,11 +582,58 @@
       "baseline": "技术债以稳定编号记录仓库及现场缺口",
       "target": "风险、差距任务、退出条件和关闭证据双向可追踪",
       "status": "已集成",
-      "gapTaskIds": [],
+      "gapTaskIds": ["GOV-002", "OPS-015", "OPS-016", "OPS-017", "OPS-018", "SEC-011", "GOV-005"],
       "evidenceIds": ["EVD-GOV-001", "EVD-GOV-002"]
     }
   ],
   "tasks": [
+    {
+      "id": "GOV-005",
+      "title": "生命周期地图反向覆盖与技术债编号治理",
+      "ownerProcess": "T00",
+      "taskStatus": "实施中",
+      "capabilityStatus": "已实现",
+      "riskLevel": "中",
+      "approval": {
+        "state": "approved",
+        "mode": "T00-plan-approval",
+        "ref": "USER-APPROVED-GOV-005-2026-09-08",
+        "approvedScope": "lifecycle-map-gap-reverse-coverage-and-tech-debt-id-governance"
+      },
+      "requirementIds": ["REQ-GOV-005"],
+      "regulatoryControlIds": ["REG-GOV-001"],
+      "riskIds": ["RISK-GOV-005"],
+      "decisionIds": [],
+      "dependencies": ["GOV-002", "GOV-004"],
+      "affectedModules": ["integration-governance", "documentation-governance", "architecture-maps"],
+      "dataSensitivity": "研发治理元数据-不含居民数据或生产凭据",
+      "acceptanceCriteria": [
+        "所有未完全闭合任务至少由一张地图 gapTaskIds 反向覆盖",
+        "完全闭合任务的陈旧地图引用失败关闭",
+        "TECH_DEBT 表 ID 重复、与生命周期任务或受管文档中的其他治理 ID 冲突时文档门禁失败"
+      ],
+      "testIds": ["TEST-GOV-005"],
+      "evidenceIds": [],
+      "rollback": "回退本任务八个治理文件；不修改业务运行时、数据、schema 或生产证据",
+      "unresolved": [],
+      "worktree": ".codex-platform-worktrees/process-v2/t00-governance-gap-coverage-20260908",
+      "branch": "process/t00-governance-gap-coverage-20260908",
+      "planRef": "docs/lifecycle-governance.md#gov-005-生命周期地图反向覆盖与技术债编号治理-plan",
+      "pullRequestRef": "https://github.com/xujiann/chronic-care-platform/pull/277",
+      "ciRef": "",
+      "writeScopes": [
+        "config/lifecycle-governance.json",
+        "scripts/lifecycle-governance.js",
+        "test/lifecycle-governance.test.js",
+        "scripts/documentation-fact-drift.js",
+        "test/documentation-fact-drift.test.js",
+        "TECH_DEBT.md",
+        "ROADMAP.md",
+        "docs/lifecycle-governance.md"
+      ],
+      "observability": {"applicable": false, "reason": "仅加强仓库治理反向覆盖和文档编号合同，不新增生产运行时"},
+      "runtimeCapability": false
+    },
     {
       "id": "GOV-004",
       "title": "优化集成收尾、依赖交接与变更测试选择",
@@ -718,17 +795,16 @@
       ],
       "testIds": ["TEST-OPS-016", "TEST-OPS-016B"],
       "evidenceIds": ["EVD-OPS-016", "EVD-OPS-016B", "EVD-OPS-016C"],
-      "rollback": "回退 PR #258；内部回执字段由公开投影剔除，回退前保留审计证据",
+      "rollback": "按依赖顺序回退 PR #268、#263 与 #258；内部回执字段由公开投影剔除，回退前保留审计证据",
       "unresolved": [
-        "三类动作 HTTP 行为证据已集成；中央 endpoint 合同登记与目录晋级由 GOV-003 独立治理",
         "进程锁和 JSON 存储不提供分布式 exactly-once",
         "结构化指标、追踪、SLO、告警、手册、降级和补偿尚未完整交付"
       ],
       "worktree": ".codex-platform-worktrees/process-v2/t06-physical-exam-action-http-evidence-20260907",
       "branch": "process/t06-physical-exam-action-http-evidence-20260907",
       "planRef": "T00-PLAN-OPS-016-HTTP-EVIDENCE-2026-09-07",
-      "pullRequestRef": "https://github.com/xujiann/chronic-care-platform/pull/268",
-      "ciRef": "https://github.com/xujiann/chronic-care-platform/actions/runs/34185200792",
+      "pullRequestRef": "https://github.com/xujiann/chronic-care-platform/pull/258; https://github.com/xujiann/chronic-care-platform/pull/263; https://github.com/xujiann/chronic-care-platform/pull/268",
+      "ciRef": "https://github.com/xujiann/chronic-care-platform/actions/runs/34101751863; https://github.com/xujiann/chronic-care-platform/actions/runs/34183706992; https://github.com/xujiann/chronic-care-platform/actions/runs/34185200792",
       "writeScopes": [
         "src/clinical-specialties/physical-examination/specialized-intake-action-command.js",
         "src/http/routes/clinical-specialties/blood-innovation.js",
@@ -827,7 +903,6 @@
       "unresolved": [
         "投诉目前复用站内消息，尚无独立工单、SLA、升级和结案模型",
         "并发证据覆盖单进程命令锁、真实 SQLite CAS 与注入持久层冲突，尚未证明多实例 exactly-once",
-        "已安装客户端资产刷新等待 OPS-019 完成 PWA 缓存版本闭环",
         "结构化指标、追踪、SLO、告警、手册、降级和补偿尚未完整交付"
       ],
       "worktree": ".codex-platform-worktrees/process-v2/t04-citizen-complaint-followup-20260907",
@@ -922,8 +997,8 @@
       "title": "居民评价投诉 PWA 缓存失效闭环",
       "ownerProcess": "T04",
       "integrationOwner": "T00",
-      "taskStatus": "实施中",
-      "capabilityStatus": "已实现",
+      "taskStatus": "已关闭",
+      "capabilityStatus": "已集成",
       "riskLevel": "低",
       "approval": {
         "state": "approved",
@@ -944,14 +1019,14 @@
         "PWA 三条浏览器场景和静态契约通过"
       ],
       "testIds": ["TEST-OPS-019"],
-      "evidenceIds": [],
+      "evidenceIds": ["EVD-OPS-019"],
       "rollback": "回退缓存版本与对应测试；不修改业务数据或数据库 schema",
       "unresolved": [],
       "worktree": ".codex-platform-worktrees/process-v2/t00-resident-feedback-pwa-v63-20260908",
       "branch": "process/t00-resident-feedback-pwa-v63-20260908",
       "planRef": "docs/lifecycle-governance.md#ops-019-pwa-v63-缓存失效-plan",
       "pullRequestRef": "https://github.com/xujiann/chronic-care-platform/pull/275",
-      "ciRef": "",
+      "ciRef": "https://github.com/xujiann/chronic-care-platform/actions/runs/34228860692",
       "writeScopes": [
         "service-worker.js",
         "test/e2e/pwa-service-worker.spec.js",

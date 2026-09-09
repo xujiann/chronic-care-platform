@@ -12,12 +12,20 @@ function copy() {
   return structuredClone(config);
 }
 
+function syncMapGapFixture(fixture) {
+  const required = fixture.tasks.filter((task) => task.taskStatus !== "已关闭"
+    || fixture.capabilityStatusLifecycle.indexOf(task.capabilityStatus) < fixture.capabilityStatusLifecycle.indexOf("已集成")
+    || task.unresolved.length > 0).map((task) => task.id);
+  fixture.maps.forEach((map, index) => { map.gapTaskIds = index === 0 ? required : []; });
+  return fixture;
+}
+
 function activeControlTowerFixture() {
   const fixture = copy();
   fixture.tasks = fixture.tasks.filter((task) => task.id === "GOV-002");
   fixture.tasks[0].taskStatus = "待集成";
   fixture.tasks[0].capabilityStatus = "已验证";
-  return fixture;
+  return syncMapGapFixture(fixture);
 }
 
 test("parent and child write scopes collide while sibling directories remain independent", () => {
@@ -30,6 +38,7 @@ test("parent and child write scopes collide while sibling directories remain ind
     fixture.tasks.push(other);
     assert.throws(() => validateLifecycleGovernance(fixture), /concurrent writers/);
     other.writeScopes = ["src/runtime-peer/task.js"];
+    syncMapGapFixture(fixture);
     assert.doesNotThrow(() => validateLifecycleGovernance(fixture));
   }
   for (const scope of ["../src", "/src", "C:/src", "src/../runtime", "src//runtime", "src/*/file.js", "", "src/."]) {
@@ -85,7 +94,7 @@ function handoffFixture() {
   child.ciRef = "";
   child.unresolved = [];
   fixture.tasks.push(child);
-  return fixture;
+  return syncMapGapFixture(fixture);
 }
 
 test("mixed changes retain selected integration tests outside the full unit partition", () => {
@@ -132,6 +141,7 @@ test("handoff candidates require dependency, approval, scope and WIP review with
   writer.taskStatus = "实施中";
   writer.writeScopes = ["src/next-task/child.js"];
   fixture.tasks.push(writer);
+  syncMapGapFixture(fixture);
   assert.deepEqual(buildHandoffReport(fixture).dependencyReview[0].conflictingTaskIds, ["OPS-101"]);
   writer.writeScopes = ["src/other"];
   fixture.portfolioPolicy.maximumWip = 1;
@@ -169,6 +179,20 @@ test("the lifecycle control tower validates the governed portfolio", () => {
   assert.equal(report.summary.gateTiers, 4);
   assert.equal(report.summary.productionDecision, "NO-GO");
   assert.equal(report.summary.productionNoGoDomains.length, 6);
+});
+
+test("map gaps are the reverse coverage of every not-fully-closed task", () => {
+  const missing = copy();
+  for (const map of missing.maps) map.gapTaskIds = map.gapTaskIds.filter((taskId) => taskId !== "OPS-016");
+  assert.throws(() => validateLifecycleGovernance(missing), /requiring map gap coverage are unmapped: OPS-016/);
+
+  const stale = copy();
+  stale.maps[0].gapTaskIds.push("OPS-019");
+  assert.throws(() => validateLifecycleGovernance(stale), /fully closed tasks retain stale map gaps: OPS-019/);
+
+  const duplicate = copy();
+  duplicate.maps[0].gapTaskIds.push(duplicate.maps[0].gapTaskIds[0]);
+  assert.throws(() => validateLifecycleGovernance(duplicate), /duplicate gap task ids/);
 });
 
 test("WIP and concurrent core writers fail closed", () => {

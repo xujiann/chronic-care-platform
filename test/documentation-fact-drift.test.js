@@ -48,6 +48,35 @@ test("current documentation facts are derived from machine authorities", () => {
     repositoryPlanMissing: 0,
     productionReady: false
   });
+  assert.deepEqual(report.summary.techDebt, {
+    tableIds: governance.techDebtTableIds(state.documents.techDebt).length,
+    duplicateIds: [],
+    lifecycleTaskIdConflicts: [],
+    governedDocumentIdConflicts: []
+  });
+});
+
+test("TECH_DEBT table ids remain unique and separate from lifecycle task ids", () => {
+  const duplicate = cloneRepositoryState();
+  duplicate.documents.techDebt = duplicate.documents.techDebt.replace("| ARC-003 |", "| ARC-001 |");
+  let report = governance.buildReport(duplicate);
+  assert.equal(report.ok, false);
+  assert.equal(failed(report, "techDebt:uniqueTableIds"), true);
+
+  const conflict = cloneRepositoryState();
+  conflict.documents.techDebt = conflict.documents.techDebt.replace("| ARC-001 |", "| GOV-002 |");
+  report = governance.buildReport(conflict);
+  assert.equal(report.ok, false);
+  assert.equal(failed(report, "techDebt:lifecycleTaskIdNamespace"), true);
+
+  const governedDocumentConflict = cloneRepositoryState();
+  governedDocumentConflict.governedMarkdownDefinitions.push({
+    id: "TEST-COVERAGE-001",
+    path: "docs/another-governance-plan.md"
+  });
+  report = governance.buildReport(governedDocumentConflict);
+  assert.equal(report.ok, false);
+  assert.equal(failed(report, "techDebt:governedDocumentIdNamespace"), true);
 });
 
 test("current E2E partition facts fail closed against the declared Playwright inventory", () => {

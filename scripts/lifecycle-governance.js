@@ -87,6 +87,12 @@ function writeScopesOverlap(left, right) {
   return a === b || a.startsWith(`${b}/`) || b.startsWith(`${a}/`);
 }
 
+function taskNeedsMapGap(task, capabilityStatuses) {
+  return task.taskStatus !== "已关闭"
+    || capabilityStatuses.indexOf(task.capabilityStatus) < capabilityStatuses.indexOf("已集成")
+    || (task.unresolved || []).length > 0;
+}
+
 function validateLifecycleGovernance(config, options = {}) {
   const root = options.root || ROOT;
   if (config?.schemaVersion !== "platform-lifecycle-governance-v1") throw new Error("unsupported lifecycle governance schema");
@@ -194,12 +200,22 @@ function validateLifecycleGovernance(config, options = {}) {
     }
   }
 
+  const requiredMapGapTaskIds = new Set([...tasks.values()]
+    .filter((task) => taskNeedsMapGap(task, capabilityStatuses))
+    .map((task) => task.id));
+  const mappedGapTaskIds = new Set();
   for (const map of maps.values()) {
     if (!map.baseline || !map.target || !capabilityStatuses.includes(map.status)) throw new Error(`${map.id} lacks baseline, target or status`);
     assertReferences(map.gapTaskIds, tasks, map.id);
+    if (new Set(map.gapTaskIds || []).size !== (map.gapTaskIds || []).length) throw new Error(`${map.id} has duplicate gap task ids`);
+    for (const taskId of map.gapTaskIds || []) mappedGapTaskIds.add(taskId);
     assertReferences(map.evidenceIds, evidence, map.id);
     if (capabilityStatuses.indexOf(map.status) >= capabilityStatuses.indexOf("已验证") && map.evidenceIds.length === 0) throw new Error(`${map.id} is verified without evidence`);
   }
+  const missingMapGapTaskIds = [...requiredMapGapTaskIds].filter((taskId) => !mappedGapTaskIds.has(taskId));
+  if (missingMapGapTaskIds.length) throw new Error(`tasks requiring map gap coverage are unmapped: ${missingMapGapTaskIds.join(", ")}`);
+  const staleMapGapTaskIds = [...mappedGapTaskIds].filter((taskId) => !requiredMapGapTaskIds.has(taskId));
+  if (staleMapGapTaskIds.length) throw new Error(`fully closed tasks retain stale map gaps: ${staleMapGapTaskIds.join(", ")}`);
   for (const gate of gates.values()) {
     if (!gate.trigger || !gate.command || !Array.isArray(gate.contents) || gate.contents.length === 0) throw new Error(`${gate.id} gate is incomplete`);
   }
@@ -437,4 +453,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { analyzeImpact, assertNoDependencyCycle, assertSpawnSucceeded, buildHandoffReport, changedFiles, npmRunInvocation, readJson, runChangedUnitTests, validateLifecycleGovernance, writeScopesOverlap };
+module.exports = { analyzeImpact, assertNoDependencyCycle, assertSpawnSucceeded, buildHandoffReport, changedFiles, npmRunInvocation, readJson, runChangedUnitTests, taskNeedsMapGap, validateLifecycleGovernance, writeScopesOverlap };
