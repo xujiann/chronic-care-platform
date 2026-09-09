@@ -2,6 +2,25 @@
 
 ## 1. 权威边界
 
+### GOV-007 全平台缺口组合 PLAN
+
+- 来源与批准：用户于 2026-09-09 要求继续全平台缺口开发；T00 批准中风险治理登记与以下四项现有浏览器兼容修复。基线为 main `7fe6882b`，main CI 34325866200 已成功。
+- 中央范围仅总账、本规范和 ROADMAP；GOV-006 已由 PR #280 合并，最终 head `13327891` 的 CI 34324353339 成功，合并提交 `7fe6882b` 已在主线。本次正常登记据此关闭 GOV-006，不使用本任务自身未来证据。
+- WIP 为 GOV-007 与 OPS-025～OPS-028 共 5 项；各领域使用独立 process worktree、分支、测试、评审和 PR。四项仅批准下表范围，不改变 API、schema、服务端授权、临床规则、金融协议、worker 或生产激活。
+
+| 任务 / Owner | 唯一写范围 | 验收 |
+|---|---|---|
+| OPS-025 / T03 | public-health-supervision.js；test/public-health-supervision-ui.test.js | 创建检查任务 pending 单 POST；同草稿同载荷未知重试同键，变更载荷不得复用已绑定键，新操作新键，失败保留输入；不得按载荷合并合法独立检查 |
+| OPS-026 / T06 emergency | emergency-lifechain-ui.js；test/emergency-lifechain-ui-response-behavior.test.js | 建立和撤销授权只接受现有合法成功投影；坏 JSON、坏 2xx 不报成功、不自动重发；保留正常 201/200、取消确认和可信渲染 |
+| OPS-027 / T06 blood | blood.js；test/blood-online-failure-behavior.test.js | queryTrace 与 submitBloodRequest 在线 HTTP/JSON/网络失败不得回退为本地核验通过或 LOCAL-DEMO；未知写需核对，不提示安全重提；保留合法在线及 file 演示 |
+| OPS-028 / T07 | medical-payment.js；test/medical-payment-one-stop-ui.test.js | 仅支付创建同草稿同载荷重试同键、pending 单 POST、变更载荷不复用绑定键、新操作新键、坏响应不误报；退款不在范围 |
+
+- 证据：卫监真实页面/API client 双击产生不同键，route harness 产生两任务；支付页面重提换键而现有路由仅按键去重，不构成真实 provider 重复扣款证据。急救及血液只读审计发现解析/在线异常进入成功分支。以上是待修复事实，不是完成证据。
+- 测试：先补真实脚本负向回归再实施；总账现有 test 引用只是可执行回归基线，新测试须在领域提交后补登记。专项、页面/安全、process/diff、本地 legacy test:all、独立 review 与 exact-head required CI 全部满足后才串行合并。既有成功 CI 不重复跑无关本地全量。
+- 回滚：每领域独立 revert，不回退服务端业务事实；中央整体回退登记提交，不删除领域证据。无 migration。
+- 候选队列（不占 WIP、不授权实施）：T01 身份筛选旧快照、T02 驾驶舱统计被预览截断、T04 居民照护命令回执错会话归属、T06 质量拒绝刷新后旧授权快照/影像查询乱序/体检角色控件、T08 文书重复补传、T09 共享 DomainTaskUI 刷新失败误报。共享写范围须单独核定，T05 服务端证据链变化须另行决策。
+- 覆盖边界：本轮候选池来自九域及五临床子域的有界审计，不是全平台穷尽证明；363 写接口、324 端点证明缺口和浏览器风险 inventory 不等于已确认缺陷数量。GS-01～GS-10 的系统证据映射审计尚未完成，继续未建设，不把零散测试冒充系统级验收。六域生产始终 NO-GO。
+
 ### GOV-006 四路并行开发 WIP 与写范围登记 PLAN
 
 - 来源：用户于 2026-09-09 要求继续四路同步开发；T00 已批准本轮中风险控制塔登记 PLAN。
@@ -10,7 +29,7 @@
 - 验收：GOV-005 已绑定 PR #277/CI run 34233229053 关闭；OPS-020 至 OPS-024、TEST-010 与 TEST-011 均有唯一编号、owner、依赖、精确写范围、测试、回滚及非生产证据。末批 OPS-022/OPS-023/OPS-024/TEST-011 分别由 PR #281/#283/#285/#284 集成后，仅 GOV-006 保持待集成，组合 WIP 降为 1/5 且没有范围冲突。
 - 测试：本地执行生命周期定向测试、文档事实漂移、只读 handoff、T00 process verify、所有权/治理检查及 CI 未覆盖的 legacy `test:all`；最终 head 的 required CI 分别提供 unit/integration、lint/typecheck、smoke 与 build 证据，不把依赖 PR 的证据冒充为 GOV-006 自身集成证据。
 - 回滚：整体回退本登记补丁；不删除或回退领域分支代码、业务数据、历史 PR 或 CI 证据。
-- 放行边界：GOV-006 当前位于 Draft PR #280，本地 `EVD-GOV-006-LOCAL` 只证明治理契约达到“已验证”；在最终 head 独立评审、required CI 与合并完成前保持“待集成/已验证”，风险仍为 open，且不得提前标记“已关闭/已集成”。任何仓库结果都不改变六域生产 `NO-GO`。
+- 集成结果：GOV-006 已由 PR #280 合并；最终 head `13327891` 的 required CI 34324353339 成功，合并提交 `7fe6882b` 已在主线。独立评审与本地证据已完成，现关闭并标记已集成；任何仓库结果都不改变六域生产 `NO-GO`。
 
 ### TEST-010 区域运营 E2E 静态 fixture PLAN
 

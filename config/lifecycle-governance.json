@@ -40,6 +40,61 @@
   },
   "requirements": [
     {
+      "id": "REQ-GOV-007",
+      "title": "全平台缺口组合登记",
+      "sourceType": "approved-t00-plan",
+      "sourceRef": "T00-PLAN-GOV-007-APPROVED-2026-09-09",
+      "acceptance": [
+        "关闭 GOV-006 的真实 PR/CI 证据",
+        "登记四项已复现缺口及排队候选，WIP 不超过 5",
+        "黄金场景审计未完成不伪报覆盖，生产六域保持 NO-GO"
+      ]
+    },
+    {
+      "id": "REQ-OPS-025",
+      "title": "卫监任务创建重试绑定",
+      "sourceType": "approved-t00-plan",
+      "sourceRef": "T00-PLAN-OPS-025-APPROVED-2026-09-09",
+      "acceptance": [
+        "同草稿同载荷未知重试使用同一幂等键且 pending 单 POST",
+        "改变载荷不复用已绑定键，新操作使用新键，失败保留输入",
+        "已提交但响应丢失重试只产生一个任务，不按载荷去重合法独立任务"
+      ]
+    },
+    {
+      "id": "REQ-OPS-026",
+      "title": "急救授权响应失败关闭",
+      "sourceType": "approved-t00-plan",
+      "sourceRef": "T00-PLAN-OPS-026-APPROVED-2026-09-09",
+      "acceptance": [
+        "建立及撤销授权的坏 JSON 或 malformed 2xx 不显示成功且不自动重提",
+        "合法 201/200 遵守现有 ok/item 响应合同",
+        "取消确认及可信渲染保持，禁止扩大授权协议"
+      ]
+    },
+    {
+      "id": "REQ-OPS-027",
+      "title": "血液在线失败禁止演示成功",
+      "sourceType": "approved-t00-plan",
+      "sourceRef": "T00-PLAN-OPS-027-APPROVED-2026-09-09",
+      "acceptance": [
+        "在线 queryTrace 和 submitBloodRequest 的网络/HTTP/JSON 错误不产生本地核验成功或 LOCAL-DEMO",
+        "未知写结果不提示可安全重复提交",
+        "有效在线响应及 file 静态演示保留，不改临床规则"
+      ]
+    },
+    {
+      "id": "REQ-OPS-028",
+      "title": "支付创建稳定重试键",
+      "sourceType": "approved-t00-plan",
+      "sourceRef": "T00-PLAN-OPS-028-APPROVED-2026-09-09",
+      "acceptance": [
+        "同草稿同载荷重试保持同一键且 pending 单 POST",
+        "改变载荷不复用旧键，新操作使用新键",
+        "坏成功响应不误报；仅修复创建，不修改退款或金融协议，不宣称真实 provider 重复扣款"
+      ]
+    },
+    {
       "id": "REQ-GOV-006",
       "title": "四路并行开发必须在控制塔中登记唯一写入范围、依赖和放行边界",
       "sourceType": "approved-user-requirement",
@@ -230,13 +285,58 @@
   ],
   "risks": [
     {
+      "id": "RISK-GOV-007",
+      "level": "中",
+      "title": "全平台缺口组合登记缺口未闭合",
+      "owner": "T00",
+      "mitigation": "仅按批准范围实施最小修复，先补负向回归，独立审查及 exact-head CI 后串行集成",
+      "status": "open",
+      "evidenceIds": []
+    },
+    {
+      "id": "RISK-OPS-025",
+      "level": "中",
+      "title": "卫监任务创建重试绑定缺口未闭合",
+      "owner": "T03",
+      "mitigation": "仅按批准范围实施最小修复，先补负向回归，独立审查及 exact-head CI 后串行集成",
+      "status": "open",
+      "evidenceIds": []
+    },
+    {
+      "id": "RISK-OPS-026",
+      "level": "中",
+      "title": "急救授权响应失败关闭缺口未闭合",
+      "owner": "T06",
+      "mitigation": "仅按批准范围实施最小修复，先补负向回归，独立审查及 exact-head CI 后串行集成",
+      "status": "open",
+      "evidenceIds": []
+    },
+    {
+      "id": "RISK-OPS-027",
+      "level": "中",
+      "title": "血液在线失败禁止演示成功缺口未闭合",
+      "owner": "T06",
+      "mitigation": "仅按批准范围实施最小修复，先补负向回归，独立审查及 exact-head CI 后串行集成",
+      "status": "open",
+      "evidenceIds": []
+    },
+    {
+      "id": "RISK-OPS-028",
+      "level": "中",
+      "title": "支付创建稳定重试键缺口未闭合",
+      "owner": "T07",
+      "mitigation": "仅按批准范围实施最小修复，先补负向回归，独立审查及 exact-head CI 后串行集成",
+      "status": "open",
+      "evidenceIds": []
+    },
+    {
       "id": "RISK-GOV-006",
       "level": "中",
       "title": "并行任务未登记或写范围重叠导致集成冲突和错误放行",
       "owner": "T00",
       "mitigation": "在实施期间登记四项在制任务、精确文件写范围、依赖、验收和非生产边界，并由生命周期门禁验证 WIP 与冲突",
-      "status": "open",
-      "evidenceIds": []
+      "status": "mitigated",
+      "evidenceIds": ["EVD-GOV-006"]
     },
     {
       "id": "RISK-OPS-020",
@@ -438,6 +538,36 @@
   ],
   "tests": [
     {
+      "id": "TEST-GOV-007",
+      "kind": "existing-regression-baseline-new-behavior-tests-required-before-closure",
+      "path": "test/lifecycle-governance.test.js",
+      "command": "node --test test/lifecycle-governance.test.js"
+    },
+    {
+      "id": "TEST-OPS-025",
+      "kind": "existing-regression-baseline-new-behavior-tests-required-before-closure",
+      "path": "test/public-health-supervision-ui.test.js",
+      "command": "node --test test/public-health-supervision-ui.test.js"
+    },
+    {
+      "id": "TEST-OPS-026",
+      "kind": "existing-regression-baseline-new-behavior-tests-required-before-closure",
+      "path": "test/emergency-lifechain.test.js",
+      "command": "node --test test/emergency-lifechain.test.js"
+    },
+    {
+      "id": "TEST-OPS-027",
+      "kind": "existing-regression-baseline-new-behavior-tests-required-before-closure",
+      "path": "test/blood-dashboard-route-characterization.test.js",
+      "command": "node --test test/blood-dashboard-route-characterization.test.js"
+    },
+    {
+      "id": "TEST-OPS-028",
+      "kind": "existing-regression-baseline-new-behavior-tests-required-before-closure",
+      "path": "test/medical-payment-one-stop-ui.test.js",
+      "command": "node --test test/medical-payment-one-stop-ui.test.js"
+    },
+    {
       "id": "TEST-GOV-006",
       "kind": "four-line-wip-registration-contract",
       "path": "test/lifecycle-governance.test.js",
@@ -583,6 +713,16 @@
     }
   ],
   "evidence": [
+    {
+      "id": "EVD-GOV-006",
+      "scope": "repository-integration",
+      "type": "pull-request-ci",
+      "ref": "https://github.com/xujiann/chronic-care-platform/actions/runs/34324353339",
+      "testIds": [
+        "TEST-GOV-006"
+      ],
+      "productionEvidence": false
+    },
     {
       "id": "EVD-GOV-006-LOCAL",
       "scope": "repository",
@@ -791,7 +931,7 @@
       "baseline": "主线模块化单体及其现有运行、存储和发布边界",
       "target": "边界、状态和生产资格均可由控制塔追踪",
       "status": "已集成",
-      "gapTaskIds": ["GOV-002", "OPS-015", "OPS-016", "OPS-017", "OPS-018", "SEC-011", "GOV-006"],
+      "gapTaskIds": ["GOV-002","OPS-015","OPS-016","OPS-017","OPS-018","SEC-011","GOV-007","OPS-025","OPS-026","OPS-027","OPS-028"],
       "evidenceIds": ["EVD-GOV-001", "EVD-GOV-002"]
     },
     {
@@ -800,7 +940,7 @@
       "baseline": "T00至T09及临床子域已建立模块所有权",
       "target": "模块写入冲突和跨任务依赖自动失败关闭",
       "status": "已集成",
-      "gapTaskIds": ["OPS-017", "GOV-006"],
+      "gapTaskIds": ["OPS-017","GOV-007","OPS-025","OPS-026","OPS-027","OPS-028"],
       "evidenceIds": ["EVD-GOV-001", "EVD-GOV-002"]
     },
     {
@@ -809,7 +949,7 @@
       "baseline": "数据事实源、迁移和生产写资格已有独立治理",
       "target": "数据敏感级别和迁移证据进入每项任务追踪链",
       "status": "已集成",
-      "gapTaskIds": ["OPS-015", "OPS-016", "OPS-017", "OPS-018"],
+      "gapTaskIds": ["OPS-015","OPS-016","OPS-017","OPS-018","GOV-007","OPS-025","OPS-026","OPS-027","OPS-028"],
       "evidenceIds": ["EVD-GOV-001", "EVD-GOV-002"]
     },
     {
@@ -818,7 +958,7 @@
       "baseline": "生产API目录及认证、授权、幂等证据独立存在",
       "target": "接口变更由任务风险和影响范围选择门禁",
       "status": "已集成",
-      "gapTaskIds": ["OPS-015", "OPS-016", "OPS-018", "SEC-011"],
+      "gapTaskIds": ["OPS-015","OPS-016","OPS-018","SEC-011","GOV-007","OPS-025","OPS-026","OPS-027","OPS-028"],
       "evidenceIds": ["EVD-GOV-001", "EVD-GOV-002"]
     },
     {
@@ -827,7 +967,7 @@
       "baseline": "代码、运行时和外部依赖边界已有事实地图",
       "target": "任务前置关系、WIP和核心写范围形成可检查依赖图",
       "status": "已集成",
-      "gapTaskIds": ["GOV-002", "OPS-015", "OPS-017", "OPS-018", "GOV-006"],
+      "gapTaskIds": ["GOV-002","OPS-015","OPS-017","OPS-018","GOV-007","OPS-025","OPS-026","OPS-027","OPS-028"],
       "evidenceIds": ["EVD-GOV-001", "EVD-GOV-002"]
     },
     {
@@ -836,17 +976,313 @@
       "baseline": "技术债以稳定编号记录仓库及现场缺口",
       "target": "风险、差距任务、退出条件和关闭证据双向可追踪",
       "status": "已集成",
-      "gapTaskIds": ["GOV-002", "OPS-015", "OPS-016", "OPS-017", "OPS-018", "SEC-011", "GOV-006"],
+      "gapTaskIds": ["GOV-002","OPS-015","OPS-016","OPS-017","OPS-018","SEC-011","GOV-007","OPS-025","OPS-026","OPS-027","OPS-028"],
       "evidenceIds": ["EVD-GOV-001", "EVD-GOV-002"]
     }
   ],
   "tasks": [
     {
+      "id": "GOV-007",
+      "title": "全平台缺口组合登记",
+      "ownerProcess": "T00",
+      "integrationOwner": "T00",
+      "taskStatus": "已批准",
+      "capabilityStatus": "未建设",
+      "riskLevel": "中",
+      "approval": {
+        "state": "approved",
+        "mode": "T00-plan-approval",
+        "ref": "T00-PLAN-GOV-007-APPROVED-2026-09-09",
+        "approvedScope": "config/lifecycle-governance.json, docs/lifecycle-governance.md, ROADMAP.md"
+      },
+      "requirementIds": [
+        "REQ-GOV-007"
+      ],
+      "regulatoryControlIds": [
+        "REG-GOV-001"
+      ],
+      "riskIds": [
+        "RISK-GOV-007"
+      ],
+      "decisionIds": [],
+      "dependencies": [
+        "GOV-006"
+      ],
+      "affectedModules": [
+        "portfolio-control"
+      ],
+      "dataSensitivity": "研发治理元数据，无居民数据或凭据",
+      "acceptanceCriteria": [
+        "关闭 GOV-006 的真实 PR/CI 证据",
+        "登记四项已复现缺口及排队候选，WIP 不超过 5",
+        "黄金场景审计未完成不伪报覆盖，生产六域保持 NO-GO"
+      ],
+      "testIds": [
+        "TEST-GOV-007"
+      ],
+      "evidenceIds": [],
+      "rollback": "回退本任务独立提交并重跑专项及 required CI；不回退服务端业务事实，无数据迁移",
+      "unresolved": [
+        "尚需新增行为回归、独立评审、PR 与 exact-head CI；现有测试引用仅为回归基线，不是本修复已验证证据"
+      ],
+      "worktree": ".codex-platform-worktrees/process-v2/t00-platform-gap-portfolio-20260909",
+      "branch": "process/t00-platform-gap-portfolio-20260909",
+      "planRef": "docs/lifecycle-governance.md#gov-007-全平台缺口组合-plan",
+      "pullRequestRef": "",
+      "ciRef": "",
+      "writeScopes": [
+        "config/lifecycle-governance.json",
+        "docs/lifecycle-governance.md",
+        "ROADMAP.md"
+      ],
+      "observability": {
+        "applicable": false,
+        "reason": "仅修复既有浏览器交互或治理登记，不新增独立生产运行能力；外部监控、耐久性和现场验收仍未闭合"
+      },
+      "runtimeCapability": false
+    },
+    {
+      "id": "OPS-025",
+      "title": "卫监任务创建重试绑定",
+      "ownerProcess": "T03",
+      "integrationOwner": "T00",
+      "taskStatus": "已批准",
+      "capabilityStatus": "未建设",
+      "riskLevel": "中",
+      "approval": {
+        "state": "approved",
+        "mode": "T00-plan-approval",
+        "ref": "T00-PLAN-OPS-025-APPROVED-2026-09-09",
+        "approvedScope": "public-health-supervision.js, test/public-health-supervision-ui.test.js"
+      },
+      "requirementIds": [
+        "REQ-OPS-025"
+      ],
+      "regulatoryControlIds": [
+        "REG-GOV-001"
+      ],
+      "riskIds": [
+        "RISK-OPS-025"
+      ],
+      "decisionIds": [],
+      "dependencies": [
+        "GOV-006"
+      ],
+      "affectedModules": [
+        "supervision-create-retry"
+      ],
+      "dataSensitivity": "现有敏感业务元数据，仅修复浏览器交互，不新增持久化",
+      "acceptanceCriteria": [
+        "同草稿同载荷未知重试使用同一幂等键且 pending 单 POST",
+        "改变载荷不复用已绑定键，新操作使用新键，失败保留输入",
+        "已提交但响应丢失重试只产生一个任务，不按载荷去重合法独立任务"
+      ],
+      "testIds": [
+        "TEST-OPS-025"
+      ],
+      "evidenceIds": [],
+      "rollback": "回退本任务独立提交并重跑专项及 required CI；不回退服务端业务事实，无数据迁移",
+      "unresolved": [
+        "尚需新增行为回归、独立评审、PR 与 exact-head CI；现有测试引用仅为回归基线，不是本修复已验证证据"
+      ],
+      "worktree": ".codex-platform-worktrees/process-v2/t03-supervision-create-retry-20260909",
+      "branch": "process/t03-supervision-create-retry-20260909",
+      "planRef": "docs/lifecycle-governance.md#gov-007-全平台缺口组合-plan",
+      "pullRequestRef": "",
+      "ciRef": "",
+      "writeScopes": [
+        "public-health-supervision.js",
+        "test/public-health-supervision-ui.test.js"
+      ],
+      "observability": {
+        "applicable": false,
+        "reason": "仅修复既有浏览器交互或治理登记，不新增独立生产运行能力；外部监控、耐久性和现场验收仍未闭合"
+      },
+      "runtimeCapability": false
+    },
+    {
+      "id": "OPS-026",
+      "title": "急救授权响应失败关闭",
+      "ownerProcess": "T06",
+      "integrationOwner": "T00",
+      "taskStatus": "已批准",
+      "capabilityStatus": "未建设",
+      "riskLevel": "中",
+      "approval": {
+        "state": "approved",
+        "mode": "T00-plan-approval",
+        "ref": "T00-PLAN-OPS-026-APPROVED-2026-09-09",
+        "approvedScope": "emergency-lifechain-ui.js, test/emergency-lifechain-ui-response-behavior.test.js"
+      },
+      "requirementIds": [
+        "REQ-OPS-026"
+      ],
+      "regulatoryControlIds": [
+        "REG-GOV-001"
+      ],
+      "riskIds": [
+        "RISK-OPS-026"
+      ],
+      "decisionIds": [],
+      "dependencies": [
+        "GOV-006"
+      ],
+      "affectedModules": [
+        "emergency-response-validation"
+      ],
+      "dataSensitivity": "现有敏感业务元数据，仅修复浏览器交互，不新增持久化",
+      "acceptanceCriteria": [
+        "建立及撤销授权的坏 JSON 或 malformed 2xx 不显示成功且不自动重提",
+        "合法 201/200 遵守现有 ok/item 响应合同",
+        "取消确认及可信渲染保持，禁止扩大授权协议"
+      ],
+      "testIds": [
+        "TEST-OPS-026"
+      ],
+      "evidenceIds": [],
+      "rollback": "回退本任务独立提交并重跑专项及 required CI；不回退服务端业务事实，无数据迁移",
+      "unresolved": [
+        "尚需新增行为回归、独立评审、PR 与 exact-head CI；现有测试引用仅为回归基线，不是本修复已验证证据"
+      ],
+      "worktree": ".codex-platform-worktrees/process-v2/t06-emergency-response-validation-20260909",
+      "branch": "process/t06-emergency-response-validation-20260909",
+      "planRef": "docs/lifecycle-governance.md#gov-007-全平台缺口组合-plan",
+      "pullRequestRef": "",
+      "ciRef": "",
+      "writeScopes": [
+        "emergency-lifechain-ui.js",
+        "test/emergency-lifechain-ui-response-behavior.test.js"
+      ],
+      "observability": {
+        "applicable": false,
+        "reason": "仅修复既有浏览器交互或治理登记，不新增独立生产运行能力；外部监控、耐久性和现场验收仍未闭合"
+      },
+      "runtimeCapability": false
+    },
+    {
+      "id": "OPS-027",
+      "title": "血液在线失败禁止演示成功",
+      "ownerProcess": "T06",
+      "integrationOwner": "T00",
+      "taskStatus": "已批准",
+      "capabilityStatus": "未建设",
+      "riskLevel": "中",
+      "approval": {
+        "state": "approved",
+        "mode": "T00-plan-approval",
+        "ref": "T00-PLAN-OPS-027-APPROVED-2026-09-09",
+        "approvedScope": "blood.js, test/blood-online-failure-behavior.test.js"
+      },
+      "requirementIds": [
+        "REQ-OPS-027"
+      ],
+      "regulatoryControlIds": [
+        "REG-GOV-001"
+      ],
+      "riskIds": [
+        "RISK-OPS-027"
+      ],
+      "decisionIds": [],
+      "dependencies": [
+        "GOV-006"
+      ],
+      "affectedModules": [
+        "blood-online-failure"
+      ],
+      "dataSensitivity": "现有敏感业务元数据，仅修复浏览器交互，不新增持久化",
+      "acceptanceCriteria": [
+        "在线 queryTrace 和 submitBloodRequest 的网络/HTTP/JSON 错误不产生本地核验成功或 LOCAL-DEMO",
+        "未知写结果不提示可安全重复提交",
+        "有效在线响应及 file 静态演示保留，不改临床规则"
+      ],
+      "testIds": [
+        "TEST-OPS-027"
+      ],
+      "evidenceIds": [],
+      "rollback": "回退本任务独立提交并重跑专项及 required CI；不回退服务端业务事实，无数据迁移",
+      "unresolved": [
+        "尚需新增行为回归、独立评审、PR 与 exact-head CI；现有测试引用仅为回归基线，不是本修复已验证证据"
+      ],
+      "worktree": ".codex-platform-worktrees/process-v2/t06-blood-online-failure-20260909",
+      "branch": "process/t06-blood-online-failure-20260909",
+      "planRef": "docs/lifecycle-governance.md#gov-007-全平台缺口组合-plan",
+      "pullRequestRef": "",
+      "ciRef": "",
+      "writeScopes": [
+        "blood.js",
+        "test/blood-online-failure-behavior.test.js"
+      ],
+      "observability": {
+        "applicable": false,
+        "reason": "仅修复既有浏览器交互或治理登记，不新增独立生产运行能力；外部监控、耐久性和现场验收仍未闭合"
+      },
+      "runtimeCapability": false
+    },
+    {
+      "id": "OPS-028",
+      "title": "支付创建稳定重试键",
+      "ownerProcess": "T07",
+      "integrationOwner": "T00",
+      "taskStatus": "已批准",
+      "capabilityStatus": "未建设",
+      "riskLevel": "中",
+      "approval": {
+        "state": "approved",
+        "mode": "T00-plan-approval",
+        "ref": "T00-PLAN-OPS-028-APPROVED-2026-09-09",
+        "approvedScope": "medical-payment.js, test/medical-payment-one-stop-ui.test.js"
+      },
+      "requirementIds": [
+        "REQ-OPS-028"
+      ],
+      "regulatoryControlIds": [
+        "REG-GOV-001"
+      ],
+      "riskIds": [
+        "RISK-OPS-028"
+      ],
+      "decisionIds": [],
+      "dependencies": [
+        "GOV-006"
+      ],
+      "affectedModules": [
+        "payment-create-retry"
+      ],
+      "dataSensitivity": "现有敏感业务元数据，仅修复浏览器交互，不新增持久化",
+      "acceptanceCriteria": [
+        "同草稿同载荷重试保持同一键且 pending 单 POST",
+        "改变载荷不复用旧键，新操作使用新键",
+        "坏成功响应不误报；仅修复创建，不修改退款或金融协议，不宣称真实 provider 重复扣款"
+      ],
+      "testIds": [
+        "TEST-OPS-028"
+      ],
+      "evidenceIds": [],
+      "rollback": "回退本任务独立提交并重跑专项及 required CI；不回退服务端业务事实，无数据迁移",
+      "unresolved": [
+        "尚需新增行为回归、独立评审、PR 与 exact-head CI；现有测试引用仅为回归基线，不是本修复已验证证据"
+      ],
+      "worktree": ".codex-platform-worktrees/process-v2/t07-payment-create-retry-20260909",
+      "branch": "process/t07-payment-create-retry-20260909",
+      "planRef": "docs/lifecycle-governance.md#gov-007-全平台缺口组合-plan",
+      "pullRequestRef": "",
+      "ciRef": "",
+      "writeScopes": [
+        "medical-payment.js",
+        "test/medical-payment-one-stop-ui.test.js"
+      ],
+      "observability": {
+        "applicable": false,
+        "reason": "仅修复既有浏览器交互或治理登记，不新增独立生产运行能力；外部监控、耐久性和现场验收仍未闭合"
+      },
+      "runtimeCapability": false
+    },
+    {
       "id": "GOV-006",
       "title": "四路并行开发 WIP 与写范围控制塔登记",
       "ownerProcess": "T00",
-      "taskStatus": "待集成",
-      "capabilityStatus": "已验证",
+      "taskStatus": "已关闭",
+      "capabilityStatus": "已集成",
       "riskLevel": "中",
       "approval": {
         "state": "approved",
@@ -867,14 +1303,14 @@
         "四项末批依赖均以独立 PR、required CI、独立评审和本地门禁完成仓库集成；仅 GOV-006 保持待集成，组合 WIP 为 1/5 且不存在写范围冲突"
       ],
       "testIds": ["TEST-GOV-006"],
-      "evidenceIds": ["EVD-GOV-006-LOCAL"],
+      "evidenceIds": ["EVD-GOV-006-LOCAL", "EVD-GOV-006"],
       "rollback": "回退本任务治理登记提交；不回退或删除各领域分支代码、业务数据、PR 与历史证据",
-      "unresolved": ["本任务需在 Draft PR #280 最终 head required CI 与独立评审通过并合入主线后另行关闭；不得以依赖任务证据自证集成"],
+      "unresolved": [],
       "worktree": ".codex-platform-worktrees/process-v2/t00-four-line-wip-register-20260909",
       "branch": "process/t00-four-line-wip-register-20260909",
       "planRef": "docs/lifecycle-governance.md#gov-006-四路并行开发-wip-与写范围登记-plan",
       "pullRequestRef": "https://github.com/xujiann/chronic-care-platform/pull/280",
-      "ciRef": "",
+      "ciRef": "https://github.com/xujiann/chronic-care-platform/actions/runs/34324353339",
       "writeScopes": ["config/lifecycle-governance.json", "docs/lifecycle-governance.md", "ROADMAP.md"],
       "observability": {"applicable": false, "reason": "仅登记任务组合、写范围和仓库证据，不新增生产运行时"},
       "runtimeCapability": false
