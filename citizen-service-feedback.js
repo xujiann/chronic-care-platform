@@ -127,6 +127,7 @@
 
   function serviceOrderStatusClass(status = "") {
     const value = String(status).toLowerCase();
+    if (value === "cancel-requested" || value === "取消待确认") return "warn";
     if (/cancel|reject|failed|异常|取消|拒绝|失败/.test(value)) return "danger";
     if (/pending|wait|待|审核|处理中|requested|submitted/.test(value)) return "warn";
     return "";
@@ -134,6 +135,7 @@
 
   function serviceOrderLifecycle(status = "") {
     const value = String(status).toLowerCase();
+    if (value === "cancel-requested" || value === "取消待确认") return "待处理";
     if (/completed|closed|done|已完成|已关闭|完诊|履约/.test(value)) return "已完成";
     if (/cancel|reject|failed|取消|拒绝|失败/.test(value)) return "已终止";
     if (/pending|wait|submitted|requested|待|审核|处理中/.test(value)) return "待处理";
