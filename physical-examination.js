@@ -1,12 +1,20 @@
 const PHYSICAL_EXAM_API = location.protocol === "file:" ? "" : `${location.origin}/api`;
 const PHYSICAL_EXAM_UNAVAILABLE_MESSAGE = "体检数据暂不可用，请重试。";
 const PHYSICAL_EXAM_REFRESH_FAILED_MESSAGE = "体检数据刷新失败，请重试。";
+const PHYSICAL_EXAM_ACTION_FAILED_MESSAGE = "异常处置失败，请稍后重试。";
+const PHYSICAL_EXAM_REFRESH_APPLIED = "applied";
+const PHYSICAL_EXAM_REFRESH_FAILED = "failed";
+const PHYSICAL_EXAM_REFRESH_SUPERSEDED = "superseded";
 const physicalExamState = {
   overview: null,
   residentId: "",
   year: "",
+  appliedResidentId: "",
+  appliedYear: "",
   user: null,
-  specializedPendingCommands: new Map()
+  specializedPendingCommands: new Map(),
+  abnormalCaseLocks: new Map(),
+  overviewRequestSequence: 0
 };
 const PHYSICAL_EXAM_OFFICIAL_SOURCE_ORIGINS = Object.freeze([
   "https://flk.npc.gov.cn",
@@ -93,12 +101,9 @@ async function loadPhysicalExams() {
     const request = window.HealthCityAuth?.authFetch || fetch;
     const response = await request(`${PHYSICAL_EXAM_API}/physical-exams${params.toString() ? `?${params}` : ""}`);
     if (!response.ok) throw new Error("PHYSICAL_EXAM_OVERVIEW_UNAVAILABLE");
-    const overview = validatePhysicalExamOverview(await response.json());
-    physicalExamState.overview = overview;
-    return overview;
+    return validatePhysicalExamOverview(await response.json());
   }
-  physicalExamState.overview = buildFallbackOverview();
-  return physicalExamState.overview;
+  return buildFallbackOverview();
 }
 
 function validatePhysicalExamOverview(overview) {
@@ -174,15 +179,30 @@ function renderPhysicalExamUnavailable() {
 }
 
 async function refreshPhysicalExamData({ successMessage = "", failureMessage = "" } = {}) {
+  const requestSequence = ++physicalExamState.overviewRequestSequence;
+  const requestedResidentId = physicalExamState.residentId;
+  const staleLocksAtRequestStart = new Map(
+    [...physicalExamState.abnormalCaseLocks].filter(([, lock]) => lock.status === "stale")
+  );
   try {
-    await loadPhysicalExams();
+    const overview = await loadPhysicalExams();
+    if (requestSequence !== physicalExamState.overviewRequestSequence) return PHYSICAL_EXAM_REFRESH_SUPERSEDED;
+    physicalExamState.overview = overview;
+    physicalExamState.appliedResidentId = requestedResidentId;
+    physicalExamState.appliedYear = physicalExamState.year;
+    staleLocksAtRequestStart.forEach((lock, caseId) => {
+      if (physicalExamState.abnormalCaseLocks.get(caseId) === lock && lock.status === "stale") {
+        physicalExamState.abnormalCaseLocks.delete(caseId);
+      }
+    });
     renderPhysicalExamSystem();
     if (successMessage) showPhysicalExamToast(successMessage);
-    return true;
+    return PHYSICAL_EXAM_REFRESH_APPLIED;
   } catch {
+    if (requestSequence !== physicalExamState.overviewRequestSequence) return PHYSICAL_EXAM_REFRESH_SUPERSEDED;
     if (!physicalExamState.overview) renderPhysicalExamUnavailable();
     if (failureMessage) showPhysicalExamToast(failureMessage);
-    return false;
+    return PHYSICAL_EXAM_REFRESH_FAILED;
   }
 }
 
@@ -425,24 +445,28 @@ function renderProductionReadiness(readiness) {
 function renderAbnormalCases(cases) {
   const target = document.querySelector("#physical-exam-abnormal-cases");
   if (!target) return;
-  const cards = cases.map((item) => createPhysicalExamElement("article", { className: "workflow-card" }, [
-    createPhysicalExamElement("header", {}, [
-      createPhysicalExamElement("strong", { text: item.findingCodes?.join("、") || "异常项目" }),
-      createPhysicalExamElement("span", {
-        className: `status-chip ${item.status === "closed" ? "ok" : "warn"}`,
-        text: `${item.classification === "high-risk" ? "高危异常" : "重要异常"} · ${String(item.status ?? "")}`
-      })
-    ]),
-    createPhysicalExamElement("p", { text: item.latestAction || "待处置" }),
-    createPhysicalExamElement("small", { text: `负责人：${String(item.owner || "待分派")} · 时限：${String(item.dueAt || "待确定")}` }),
-    createPhysicalExamElement("div", { className: "inline-actions" }, [
-      physicalExamButton("确认异常", { caseId: item.id, caseAction: "confirm" }),
-      physicalExamButton("通知居民", { caseId: item.id, caseAction: "notify" }),
-      physicalExamButton("安排复查", { caseId: item.id, caseAction: "schedule" }),
-      physicalExamButton("记录随访", { caseId: item.id, caseAction: "followup" }),
-      physicalExamButton("关闭", { caseId: item.id, caseAction: "close" })
-    ])
-  ]));
+  const cards = cases.map((item) => {
+    const card = createPhysicalExamElement("article", { className: "workflow-card" }, [
+      createPhysicalExamElement("header", {}, [
+        createPhysicalExamElement("strong", { text: item.findingCodes?.join("、") || "异常项目" }),
+        createPhysicalExamElement("span", {
+          className: `status-chip ${item.status === "closed" ? "ok" : "warn"}`,
+          text: `${item.classification === "high-risk" ? "高危异常" : "重要异常"} · ${String(item.status ?? "")}`
+        })
+      ]),
+      createPhysicalExamElement("p", { text: item.latestAction || "待处置" }),
+      createPhysicalExamElement("small", { text: `负责人：${String(item.owner || "待分派")} · 时限：${String(item.dueAt || "待确定")}` }),
+      createPhysicalExamElement("div", { className: "inline-actions" }, [
+        physicalExamButton("确认异常", { caseId: item.id, caseAction: "confirm" }),
+        physicalExamButton("通知居民", { caseId: item.id, caseAction: "notify" }),
+        physicalExamButton("安排复查", { caseId: item.id, caseAction: "schedule" }),
+        physicalExamButton("记录随访", { caseId: item.id, caseAction: "followup" }),
+        physicalExamButton("关闭", { caseId: item.id, caseAction: "close" })
+      ])
+    ]);
+    setPhysicalExamAbnormalCaseCardBusy(card, physicalExamState.abnormalCaseLocks.has(String(item.id ?? "")));
+    return card;
+  });
   replacePhysicalExamChildren(target, cards, physicalExamEmpty("当前没有待处置的异常报告。"));
 }
 
@@ -638,19 +662,19 @@ function populateImportResidents(residents) {
 
 function bindPhysicalExamControls() {
   document.querySelector("#physical-exam-resident-filter")?.addEventListener("change", async (event) => {
-    const previousResidentId = physicalExamState.residentId;
-    const previousYear = physicalExamState.year;
-    physicalExamState.residentId = event.target.value;
+    const selectedResidentId = event.target.value;
+    physicalExamState.residentId = selectedResidentId;
     physicalExamState.year = "";
-    const refreshed = await refreshPhysicalExamData({ failureMessage: PHYSICAL_EXAM_REFRESH_FAILED_MESSAGE });
-    if (!refreshed) {
-      physicalExamState.residentId = previousResidentId;
-      physicalExamState.year = previousYear;
+    const refreshOutcome = await refreshPhysicalExamData({ failureMessage: PHYSICAL_EXAM_REFRESH_FAILED_MESSAGE });
+    if (refreshOutcome === PHYSICAL_EXAM_REFRESH_FAILED && physicalExamState.residentId === selectedResidentId) {
+      physicalExamState.residentId = physicalExamState.appliedResidentId;
+      physicalExamState.year = physicalExamState.appliedYear;
       if (physicalExamState.overview) renderPhysicalExamSystem();
     }
   });
   document.querySelector("#physical-exam-year-filter")?.addEventListener("change", (event) => {
     physicalExamState.year = event.target.value;
+    physicalExamState.appliedYear = physicalExamState.year;
     renderPhysicalExamReports(physicalExamState.overview?.reports || []);
   });
   document.querySelector("#physical-exam-refresh")?.addEventListener("click", async () => {
@@ -716,22 +740,27 @@ async function handleSpecializedIntakeAction(event) {
   } catch (error) {
     const deterministicFailure = Number.isInteger(error.status) && error.status < 500;
     if (deterministicFailure) physicalExamState.specializedPendingCommands.delete(intakeId);
-    let refreshed = false;
+    let refreshOutcome = PHYSICAL_EXAM_REFRESH_FAILED;
     try {
-      await loadPhysicalExams();
-      renderPhysicalExamSystem();
-      refreshed = true;
+      refreshOutcome = await refreshPhysicalExamData();
     } catch {
       // Keep the original command key so an unknown result can be retried safely.
     }
+    const refreshed = refreshOutcome === PHYSICAL_EXAM_REFRESH_APPLIED;
     if (error.status === 409) {
-      showPhysicalExamToast(refreshed ? "分流记录已被更新，请核对最新状态后重新提交" : "分流记录版本冲突，且最新状态刷新失败");
+      showPhysicalExamToast(refreshed
+        ? "分流记录已被更新，请核对最新状态后重新提交"
+        : refreshOutcome === PHYSICAL_EXAM_REFRESH_FAILED
+          ? "分流记录版本冲突，且最新状态刷新失败"
+          : "分流记录版本冲突；刷新正由较新请求处理，请核对后再操作");
     } else if (deterministicFailure) {
       showPhysicalExamToast(error.message);
     } else {
       showPhysicalExamToast(refreshed
         ? "操作结果暂未确认；再次点击原操作将使用同一重试凭据"
-        : "操作结果和最新状态均未确认；网络恢复后请重试原操作");
+        : refreshOutcome === PHYSICAL_EXAM_REFRESH_FAILED
+          ? "操作结果和最新状态均未确认；网络恢复后请重试原操作"
+          : "操作结果仍待确认；刷新正由较新请求处理，请稍后核对或使用原操作重试");
     }
   } finally {
     setPhysicalExamSpecializedCardBusy(card, false);
@@ -753,16 +782,42 @@ function setPhysicalExamSpecializedCardBusy(card, busy) {
 async function handleAbnormalCaseAction(event) {
   const button = event.target.closest("[data-case-action]");
   if (!button) return;
+  const caseId = String(button.dataset.caseId || "");
+  if (!caseId || physicalExamState.abnormalCaseLocks.has(caseId)) return;
+  const card = button.closest(".workflow-card");
   const labels = { confirm: "医师已确认重要异常结果及分级", notify: "已向居民发送异常项目随访提醒", schedule: "已安排复查并进入任务队列", followup: "已回收后续诊疗情况并完成随访记录", close: "确认、通知和随访证据完整，异常处置已闭环" };
-  button.disabled = true;
+  const lock = { status: "pending" };
+  physicalExamState.abnormalCaseLocks.set(caseId, lock);
+  if (card) setPhysicalExamAbnormalCaseCardBusy(card, true);
+  else button.disabled = true;
   try {
-    await postPhysicalExamAction(`/physical-exams/abnormal-cases/${encodeURIComponent(button.dataset.caseId)}/actions`, { action: button.dataset.caseAction, note: labels[button.dataset.caseAction] });
+    await postPhysicalExamAction(`/physical-exams/abnormal-cases/${encodeURIComponent(caseId)}/actions`, { action: button.dataset.caseAction, note: labels[button.dataset.caseAction] });
+    lock.status = "stale";
     await refreshPhysicalExamWorkbench("异常处置状态已更新");
-  } catch (error) {
-    showPhysicalExamToast(error.message);
+  } catch {
+    if (physicalExamState.abnormalCaseLocks.get(caseId) === lock) {
+      physicalExamState.abnormalCaseLocks.delete(caseId);
+    }
+    showPhysicalExamToast(PHYSICAL_EXAM_ACTION_FAILED_MESSAGE);
   } finally {
-    button.disabled = false;
+    setPhysicalExamAbnormalCaseBusyById(caseId, physicalExamState.abnormalCaseLocks.has(caseId));
   }
+}
+
+function setPhysicalExamAbnormalCaseBusyById(caseId, busy) {
+  document.querySelectorAll("#physical-exam-abnormal-cases .workflow-card").forEach((candidate) => {
+    if (candidate.querySelector("[data-case-action]")?.dataset.caseId === caseId) {
+      setPhysicalExamAbnormalCaseCardBusy(candidate, busy);
+    }
+  });
+}
+
+function setPhysicalExamAbnormalCaseCardBusy(card, busy) {
+  if (!card) return;
+  card.setAttribute("aria-busy", String(busy));
+  card.querySelectorAll("button[data-case-action]").forEach((candidate) => {
+    candidate.disabled = busy;
+  });
 }
 
 async function handleJointTestAction(event) {
@@ -905,8 +960,8 @@ async function submitPhysicalExamImport(event) {
         ? `已将 ${result.routed} 份专项体检分流至受限队列，未写入一般体检档案。`
         : `检测到 ${result.duplicates + (result.routedDuplicates || 0)} 份重复报告，未重复归档。`;
     physicalExamState.residentId = values.residentId;
-    const refreshed = await refreshPhysicalExamData({ failureMessage: "接入已完成，但体检数据刷新失败，请重试。" });
-    if (refreshed) seedImportDefaults();
+    const refreshOutcome = await refreshPhysicalExamData({ failureMessage: "接入已完成，但体检数据刷新失败，请重试。" });
+    if (refreshOutcome === PHYSICAL_EXAM_REFRESH_APPLIED) seedImportDefaults();
   } catch (error) {
     resultTarget.textContent = error.message;
   }
