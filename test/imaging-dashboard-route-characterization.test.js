@@ -660,6 +660,133 @@ function assertQcRecoveryGuidance(message) {
   assert.doesNotMatch(message, /对账后重新加载页面/);
 }
 
+test("imaging browser accepts only the existing committed QC success projection", async (t) => {
+  const source = fs.readFileSync(path.join(__dirname, "..", "imaging-cloud.js"), "utf8");
+  const studyId = "study/response-001";
+  const resourceId = "diagnostic-report-response-001";
+  let successResponse;
+  let writes = 0;
+  const data = { imageCloudStudies: [{ id: studyId, qcStatus: "待质控" }], imageCloudQualityReviews: [] };
+  const segment = createImagingRouteSegment({
+    requireApiRole() { return { role: "institution", name: "影像质控员" }; },
+    readDatabase() { return data; },
+    async collectJson() { return { result: "质控通过", scanScore: 90, reportScore: 91 }; },
+    randomUUID() { return "response-review-001"; },
+    async publishDiagnosticReportToFhir() { return { diagnosticReport: { id: resourceId } }; },
+    writeDatabase() { writes += 1; },
+    sendJson(_res, status, body) { successResponse = { status, body }; }
+  });
+  await segment.handle({ method: "POST" }, {}, new URL(`http://platform.test/api/imaging-cloud/studies/${encodeURIComponent(studyId)}/qc`));
+  assert.equal(writes, 1);
+  assert.equal(successResponse.status, 200);
+  // Use the actual public route projection; the server does not require FHIR version/type/status here.
+  assert.deepEqual(successResponse.body.fhirReportSync, { diagnosticReport: { id: resourceId } });
+  const scenarios = [
+    { name: "valid committed response", valid: true },
+    ...["a", `A.${"x".repeat(61)}-`].map((id) => ({
+      name: `valid resource ID length ${id.length}`, valid: true,
+      body: (body) => ({ ...body, study: { ...body.study, fhirDiagnosticReportId: id }, fhirReportSync: { diagnosticReport: { id } } })
+    })),
+    { name: "additional fields and existing review values remain compatible", valid: true, body: (body) => ({
+      ...body, extension: { contractHint: "synthetic-compatible-field" },
+      review: { ...body.review, result: "需复核", scanScore: 0, reportScore: 0 }
+    }) },
+    { name: "malformed JSON", invalidJson: true },
+    { name: "null response", body: () => null },
+    { name: "array response", body: () => [] },
+    { name: "empty response", body: () => ({}) },
+    { name: "string response", body: () => "success" },
+    { name: "missing study", body: (body) => ({ ...body, study: undefined }) },
+    { name: "wrong study", body: (body) => ({ ...body, study: { ...body.study, id: "other-study" } }) },
+    { name: "missing review", body: (body) => ({ ...body, review: null }) },
+    { name: "wrong review study", body: (body) => ({ ...body, review: { ...body.review, studyId: "other-study" } }) },
+    { name: "unconfirmed local sync", body: (body) => ({ ...body, study: { ...body.study, fhirReportSyncStatus: "pending" } }) },
+    { name: "missing local resource ID", body: (body) => ({ ...body, study: { ...body.study, fhirDiagnosticReportId: undefined } }) },
+    { name: "mismatched resource IDs", body: (body) => ({ ...body, study: { ...body.study, fhirDiagnosticReportId: "other-report" } }) },
+    { name: "missing FHIR receipt", body: (body) => ({ ...body, fhirReportSync: null }) },
+    { name: "missing DiagnosticReport", body: (body) => ({ ...body, fhirReportSync: {} }) },
+    ...[undefined, 123, "", " ", "invalid/report", "x".repeat(65)].map((id, index) => ({
+      name: `invalid resource ID ${index}`,
+      body: (body) => ({ ...body, study: { ...body.study, fhirDiagnosticReportId: id }, fhirReportSync: { diagnosticReport: { id } } })
+    })),
+    { name: "202 is not committed 200", status: 202 },
+    { name: "204 is not committed 200", status: 204 }
+  ];
+  for (const scenario of scenarios) await t.test(scenario.name, async () => {
+    const calls = [];
+    const alerts = [];
+    const table = { innerHTML: "" };
+    const attributes = new Map();
+    let promptCount = 0;
+    const prompts = ["质控通过", "90", "91", "影像与报告质控通过"];
+    const originalPayload = { studies: [{ id: studyId, qcStatus: "待质控" }] };
+    const refreshedPayload = { studies: [], qualityReviews: [] };
+    const body = scenario.body ? scenario.body(successResponse.body) : successResponse.body;
+    const window = {
+      alert(message) { alerts.push(message); },
+      HealthStructuredDialog: { async prompt() { return prompts[promptCount++ % prompts.length]; } },
+      HealthCityAuth: {
+        getUser() { return { role: "institution" }; },
+        async authFetch(url, options = {}) {
+          const method = options.method || "GET";
+          calls.push({ method, url });
+          if (method === "GET") return { ok: true, status: 200, async json() { return refreshedPayload; } };
+          return { ok: true, status: scenario.status || 200, async json() {
+            if (scenario.invalidJson) throw new SyntaxError("synthetic-private-response-marker");
+            return body;
+          } };
+        }
+      }
+    };
+    const context = {
+      console, window, URL, URLSearchParams,
+      location: { origin: "http://platform.test", protocol: "http:" },
+      document: { addEventListener() {}, querySelector(selector) { return selector === "#study-table" ? table : null; } },
+      fetch() { throw new Error("unexpected unauthenticated fetch"); }
+    };
+    vm.runInNewContext(`${source}\n;globalThis.qcTest = { imagingState, imagingQualityControlActionState, imagingQualityControlRecovery, qualityControlStudy, inspectQualityControlStatus };`, context);
+    const qc = context.qcTest;
+    qc.imagingState.payload = originalPayload;
+    const button = {
+      dataset: {}, disabled: false, textContent: "质控回写",
+      setAttribute(name, value) { attributes.set(name, value); },
+      removeAttribute(name) { attributes.delete(name); }
+    };
+    await qc.qualityControlStudy(studyId, button);
+    assert.equal(promptCount, 4);
+    assert.equal(calls[0].url, "http://platform.test/api/imaging-cloud/studies/study%2Fresponse-001/qc");
+    if (scenario.valid) {
+      assert.deepEqual(calls.map((call) => call.method), ["POST", "GET"]);
+      assert.equal(qc.imagingState.payload, refreshedPayload);
+      assert.equal(qc.imagingQualityControlActionState.has(studyId), false);
+      assert.equal(qc.imagingQualityControlRecovery.has(studyId), false);
+      assert.equal(button.disabled, false);
+      assert.match(alerts[0], /FHIR 回执确认并保存到本地/);
+      return;
+    }
+    assert.equal(qc.imagingQualityControlActionState.get(studyId), "reconciliation-required");
+    const recovery = qc.imagingQualityControlRecovery.get(studyId);
+    assert.equal(recovery.externalOutcome, "unknown");
+    assert.equal(recovery.resourceId, undefined);
+    assert.equal(qc.imagingState.payload, originalPayload);
+    assert.equal(button.disabled, true);
+    assert.equal(button.textContent, "需对账");
+    assert.equal(attributes.has("aria-busy"), false);
+    assertQcRecoveryGuidance(alerts[0]);
+    assert.doesNotMatch(alerts[0], /FHIR 回执确认并保存|synthetic-private-response-marker/);
+    await qc.qualityControlStudy(studyId, button);
+    assert.equal(promptCount, 4);
+    assert.deepEqual(calls.map((call) => call.method), ["POST"]);
+    assert.equal(qc.imagingQualityControlRecovery.get(studyId), recovery);
+    assert.match(table.innerHTML, /data-qc-status=/);
+    await qc.inspectQualityControlStatus(studyId);
+    assert.deepEqual(calls.map((call) => call.method), ["POST", "GET"]);
+    assert.equal(qc.imagingQualityControlActionState.get(studyId), "reconciliation-required");
+    assert.equal(qc.imagingQualityControlRecovery.get(studyId), recovery);
+    assertQcRecoveryGuidance(alerts.at(-1));
+  });
+});
+
 test("imaging QC recovery guidance preserves locks across transport and strict-read failures", async (t) => {
   const source = fs.readFileSync(path.join(__dirname, "..", "imaging-cloud.js"), "utf8");
   const scenarios = [
