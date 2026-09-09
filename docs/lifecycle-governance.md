@@ -35,7 +35,7 @@
 - 范围：仅 `citizen-service-feedback.js`、`test/citizen-service-feedback.test.js` 和 `test/e2e/citizen-service-feedback.spec.js`；不修改 API、schema、服务端授权、投诉 SLA 或服务端状态机。
 - 验收：关闭 A 并打开 B 后，A 的迟到成功、失败或原生 close 事件不得影响 B；同会话提交中不得并行重复请求；失败保留当前草稿、使用固定脱敏提示并允许按既有命令语义重试。
 - 测试与回滚：定向单元和居民 E2E 先复现失败，再验证会话隔离、重复提交、失败重试、file 模式和 XSS 边界；回退单一前端/测试提交，不删除评价、投诉、消息、回执或审计。
-- 放行边界：任务保持实施中；投诉独立工单、SLA、升级、结案、多实例 exactly-once 和现场验收不在本范围，生产继续 `NO-GO`。
+- 放行边界：实现已进入 Draft PR #279，任务为待集成；required CI、独立评审和 T00 合并验收尚未完成。投诉独立工单、SLA、升级、结案、多实例 exactly-once 和现场验收不在本范围，生产继续 `NO-GO`。
 
 ### OPS-022 体检异常操作陈旧卡片锁定 PLAN
 
