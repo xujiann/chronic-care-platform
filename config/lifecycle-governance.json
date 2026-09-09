@@ -250,8 +250,8 @@
       "title": "区域运营 E2E 因 fixture 未完整拦截而偶发访问测试服务器回源",
       "owner": "T00",
       "mitigation": "仅在目标 Playwright 场景以完整静态 fixture fulfill 替代 route.fetch，并以 repeat 20、真实路由单测和在线根套件验证",
-      "status": "open",
-      "evidenceIds": []
+      "status": "mitigated",
+      "evidenceIds": ["EVD-TEST-010"]
     },
     {
       "id": "RISK-GOV-005",
@@ -512,6 +512,14 @@
   ],
   "evidence": [
     {
+      "id": "EVD-TEST-010",
+      "scope": "repository-integration",
+      "type": "pull-request-ci",
+      "ref": "https://github.com/xujiann/chronic-care-platform/actions/runs/34310567775",
+      "testIds": ["TEST-CI-010"],
+      "productionEvidence": false
+    },
+    {
       "id": "EVD-OPS-021",
       "scope": "repository-integration",
       "type": "pull-request-ci",
@@ -707,7 +715,7 @@
       "baseline": "代码、运行时和外部依赖边界已有事实地图",
       "target": "任务前置关系、WIP和核心写范围形成可检查依赖图",
       "status": "已集成",
-      "gapTaskIds": ["GOV-002", "OPS-015", "OPS-017", "OPS-018", "GOV-006", "OPS-022", "TEST-010"],
+      "gapTaskIds": ["GOV-002", "OPS-015", "OPS-017", "OPS-018", "GOV-006", "OPS-022"],
       "evidenceIds": ["EVD-GOV-001", "EVD-GOV-002"]
     },
     {
@@ -716,7 +724,7 @@
       "baseline": "技术债以稳定编号记录仓库及现场缺口",
       "target": "风险、差距任务、退出条件和关闭证据双向可追踪",
       "status": "已集成",
-      "gapTaskIds": ["GOV-002", "OPS-015", "OPS-016", "OPS-017", "OPS-018", "SEC-011", "GOV-006", "OPS-022", "TEST-010"],
+      "gapTaskIds": ["GOV-002", "OPS-015", "OPS-016", "OPS-017", "OPS-018", "SEC-011", "GOV-006", "OPS-022"],
       "evidenceIds": ["EVD-GOV-001", "EVD-GOV-002"]
     }
   ],
@@ -744,7 +752,7 @@
       "acceptanceCriteria": [
         "GOV-005 仅依据已合并 PR #277 与全部成功 CI run 34233229053 关闭",
         "OPS-020、OPS-021 与 OPS-022 的 owner、依赖、写范围、验收、回滚和 NO-GO 边界可机器检查",
-        "OPS-020 与 OPS-021 合并关闭后 GOV-006、OPS-022 与 TEST-010 三项在制任务为 WIP 3/5 且不存在写范围冲突"
+        "OPS-020、OPS-021 与 TEST-010 合并关闭后 GOV-006 与 OPS-022 两项在制任务为 WIP 2/5 且不存在写范围冲突"
       ],
       "testIds": ["TEST-GOV-006"],
       "evidenceIds": [],
@@ -763,8 +771,8 @@
       "id": "TEST-010",
       "title": "区域运营可信渲染静态 fixture 稳定化",
       "ownerProcess": "T00",
-      "taskStatus": "实施中",
-      "capabilityStatus": "未建设",
+      "taskStatus": "已关闭",
+      "capabilityStatus": "已集成",
       "riskLevel": "低",
       "approval": {
         "state": "approved",
@@ -785,14 +793,14 @@
         "在线根 Playwright 60 项保持通过且测试数量不漂移"
       ],
       "testIds": ["TEST-CI-010"],
-      "evidenceIds": [],
+      "evidenceIds": ["EVD-TEST-010"],
       "rollback": "回退目标 E2E spec 的单一提交并恢复原 fixture；不修改业务运行时、数据或测试全局策略",
-      "unresolved": ["实现、独立评审、Draft PR 与 required CI 尚未完成"],
+      "unresolved": [],
       "worktree": ".codex-platform-worktrees/process-v2/t00-product-regional-route-fixture-20260909",
       "branch": "process/t00-product-regional-route-fixture-20260909",
       "planRef": "docs/lifecycle-governance.md#test-010-区域运营-e2e-静态-fixture-plan",
-      "pullRequestRef": "",
-      "ciRef": "",
+      "pullRequestRef": "https://github.com/xujiann/chronic-care-platform/pull/282",
+      "ciRef": "https://github.com/xujiann/chronic-care-platform/actions/runs/34310567775",
       "writeScopes": ["test/e2e/product-regional-operations-trusted-rendering.spec.js"],
       "observability": {"applicable": false, "reason": "仅稳定化脱敏浏览器测试 fixture，不新增生产运行时或监控能力"},
       "runtimeCapability": false
