@@ -262,8 +262,8 @@
       "title": "体检异常操作已成功但页面仍允许对陈旧快照重复或错序提交",
       "owner": "T06",
       "mitigation": "刷新失败后锁定对应陈旧卡片的全部动作，仅在有效 GET 重新渲染后恢复",
-      "status": "open",
-      "evidenceIds": []
+      "status": "mitigated",
+      "evidenceIds": ["EVD-OPS-022"]
     },
     {
       "id": "RISK-TEST-010",
@@ -280,8 +280,8 @@
       "title": "居民取消待确认被页面误显示为已取消并从需关注中遗漏",
       "owner": "T04",
       "mitigation": "仅精确识别既有 cancel-requested 与取消待确认两种状态并映射为待处理 warn，以单元和真实页面 E2E 锁定终态对照",
-      "status": "open",
-      "evidenceIds": []
+      "status": "mitigated",
+      "evidenceIds": ["EVD-OPS-023"]
     },
     {
       "id": "RISK-OPS-024",
@@ -289,8 +289,8 @@
       "title": "影像质控不完整或错关联的 200 响应被误判成功并允许重复写入",
       "owner": "T06",
       "mitigation": "对现有响应承诺执行闭集形状、关联和资源标识校验，任何不确定结果保持 unknown 锁且禁止自动 GET 或重发",
-      "status": "open",
-      "evidenceIds": []
+      "status": "mitigated",
+      "evidenceIds": ["EVD-OPS-024"]
     },
     {
       "id": "RISK-TEST-011",
@@ -298,8 +298,8 @@
       "title": "挂号跨端 E2E 的 URL 等待早于认证脚本执行导致 authFetch 未定义",
       "owner": "T00",
       "mitigation": "仅在目标 roles spec 等待页面公开的认证和导航就绪标记，不使用 sleep、timeout 放宽或生产代码变更",
-      "status": "open",
-      "evidenceIds": []
+      "status": "mitigated",
+      "evidenceIds": ["EVD-TEST-011"]
     },
     {
       "id": "RISK-GOV-005",
@@ -584,6 +584,46 @@
   ],
   "evidence": [
     {
+      "id": "EVD-GOV-006-LOCAL",
+      "scope": "repository",
+      "type": "executable-contract",
+      "ref": "node --test test/lifecycle-governance.test.js test/documentation-fact-drift.test.js",
+      "testIds": ["TEST-GOV-006"],
+      "productionEvidence": false
+    },
+    {
+      "id": "EVD-OPS-022",
+      "scope": "repository-integration",
+      "type": "pull-request-ci",
+      "ref": "https://github.com/xujiann/chronic-care-platform/actions/runs/34322391949",
+      "testIds": ["TEST-OPS-022"],
+      "productionEvidence": false
+    },
+    {
+      "id": "EVD-OPS-023",
+      "scope": "repository-integration",
+      "type": "pull-request-ci",
+      "ref": "https://github.com/xujiann/chronic-care-platform/actions/runs/34316616188",
+      "testIds": ["TEST-OPS-023", "TEST-OPS-023-E2E"],
+      "productionEvidence": false
+    },
+    {
+      "id": "EVD-OPS-024",
+      "scope": "repository-integration",
+      "type": "pull-request-ci",
+      "ref": "https://github.com/xujiann/chronic-care-platform/actions/runs/34320210182",
+      "testIds": ["TEST-OPS-024"],
+      "productionEvidence": false
+    },
+    {
+      "id": "EVD-TEST-011",
+      "scope": "repository-integration",
+      "type": "pull-request-ci",
+      "ref": "https://github.com/xujiann/chronic-care-platform/actions/runs/34321272742",
+      "testIds": ["TEST-CI-011"],
+      "productionEvidence": false
+    },
+    {
       "id": "EVD-TEST-010",
       "scope": "repository-integration",
       "type": "pull-request-ci",
@@ -751,7 +791,7 @@
       "baseline": "主线模块化单体及其现有运行、存储和发布边界",
       "target": "边界、状态和生产资格均可由控制塔追踪",
       "status": "已集成",
-      "gapTaskIds": ["GOV-002", "OPS-015", "OPS-016", "OPS-017", "OPS-018", "SEC-011", "GOV-006", "OPS-022", "OPS-023", "OPS-024"],
+      "gapTaskIds": ["GOV-002", "OPS-015", "OPS-016", "OPS-017", "OPS-018", "SEC-011", "GOV-006"],
       "evidenceIds": ["EVD-GOV-001", "EVD-GOV-002"]
     },
     {
@@ -760,7 +800,7 @@
       "baseline": "T00至T09及临床子域已建立模块所有权",
       "target": "模块写入冲突和跨任务依赖自动失败关闭",
       "status": "已集成",
-      "gapTaskIds": ["OPS-017", "GOV-006", "OPS-022", "OPS-023", "OPS-024"],
+      "gapTaskIds": ["OPS-017", "GOV-006"],
       "evidenceIds": ["EVD-GOV-001", "EVD-GOV-002"]
     },
     {
@@ -787,7 +827,7 @@
       "baseline": "代码、运行时和外部依赖边界已有事实地图",
       "target": "任务前置关系、WIP和核心写范围形成可检查依赖图",
       "status": "已集成",
-      "gapTaskIds": ["GOV-002", "OPS-015", "OPS-017", "OPS-018", "GOV-006", "OPS-022", "OPS-023", "OPS-024", "TEST-011"],
+      "gapTaskIds": ["GOV-002", "OPS-015", "OPS-017", "OPS-018", "GOV-006"],
       "evidenceIds": ["EVD-GOV-001", "EVD-GOV-002"]
     },
     {
@@ -796,7 +836,7 @@
       "baseline": "技术债以稳定编号记录仓库及现场缺口",
       "target": "风险、差距任务、退出条件和关闭证据双向可追踪",
       "status": "已集成",
-      "gapTaskIds": ["GOV-002", "OPS-015", "OPS-016", "OPS-017", "OPS-018", "SEC-011", "GOV-006", "OPS-022", "OPS-023", "OPS-024", "TEST-011"],
+      "gapTaskIds": ["GOV-002", "OPS-015", "OPS-016", "OPS-017", "OPS-018", "SEC-011", "GOV-006"],
       "evidenceIds": ["EVD-GOV-001", "EVD-GOV-002"]
     }
   ],
@@ -805,8 +845,8 @@
       "id": "GOV-006",
       "title": "四路并行开发 WIP 与写范围控制塔登记",
       "ownerProcess": "T00",
-      "taskStatus": "实施中",
-      "capabilityStatus": "已实现",
+      "taskStatus": "待集成",
+      "capabilityStatus": "已验证",
       "riskLevel": "中",
       "approval": {
         "state": "approved",
@@ -823,13 +863,13 @@
       "dataSensitivity": "研发治理元数据-不含居民数据或生产凭据",
       "acceptanceCriteria": [
         "GOV-005 仅依据已合并 PR #277 与全部成功 CI run 34233229053 关闭",
-        "OPS-020、OPS-021 与 OPS-022 的 owner、依赖、写范围、验收、回滚和 NO-GO 边界可机器检查",
-        "OPS-023、OPS-024 与 TEST-011 获批后，GOV-006、OPS-022、OPS-023、OPS-024 与 TEST-011 五项在制任务达到 WIP 5/5 且不存在写范围冲突"
+        "OPS-020 至 OPS-024、TEST-010 与 TEST-011 的 owner、依赖、写范围、验收、回滚和 NO-GO 边界可机器检查",
+        "四项末批依赖均以独立 PR、required CI、独立评审和本地门禁完成仓库集成；仅 GOV-006 保持待集成，组合 WIP 为 1/5 且不存在写范围冲突"
       ],
       "testIds": ["TEST-GOV-006"],
-      "evidenceIds": [],
+      "evidenceIds": ["EVD-GOV-006-LOCAL"],
       "rollback": "回退本任务治理登记提交；不回退或删除各领域分支代码、业务数据、PR 与历史证据",
-      "unresolved": ["本任务需在 Draft PR required CI 与独立评审通过并合入主线后另行关闭"],
+      "unresolved": ["本任务需在 Draft PR #280 最终 head required CI 与独立评审通过并合入主线后另行关闭；不得以依赖任务证据自证集成"],
       "worktree": ".codex-platform-worktrees/process-v2/t00-four-line-wip-register-20260909",
       "branch": "process/t00-four-line-wip-register-20260909",
       "planRef": "docs/lifecycle-governance.md#gov-006-四路并行开发-wip-与写范围登记-plan",
@@ -882,8 +922,8 @@
       "title": "居民取消待确认展示与需关注计数纠正",
       "ownerProcess": "T04",
       "integrationOwner": "T00",
-      "taskStatus": "已批准",
-      "capabilityStatus": "未建设",
+      "taskStatus": "已关闭",
+      "capabilityStatus": "已集成",
       "riskLevel": "低",
       "approval": {
         "state": "approved",
@@ -904,25 +944,25 @@
         "先以单元测试证明两种待确认来源和终态对照为 RED，再通过既有弹窗回归与真实页面 E2E"
       ],
       "testIds": ["TEST-OPS-023", "TEST-OPS-023-E2E"],
-      "evidenceIds": [],
+      "evidenceIds": ["EVD-OPS-023"],
       "rollback": "回退本任务三文件单一提交并重跑居民单元与 E2E；不修改或删除服务订单、取消请求、评价、投诉、消息或审计数据",
-      "unresolved": ["尚未进入实现、独立评审、Draft PR 与 required CI"],
+      "unresolved": [],
       "worktree": ".codex-platform-worktrees/process-v2/t04-cancellation-pending-status-20260909",
       "branch": "process/t04-cancellation-pending-status-20260909",
       "planRef": "docs/lifecycle-governance.md#ops-023-居民取消待确认展示纠正-plan",
-      "pullRequestRef": "",
-      "ciRef": "",
+      "pullRequestRef": "https://github.com/xujiann/chronic-care-platform/pull/283",
+      "ciRef": "https://github.com/xujiann/chronic-care-platform/actions/runs/34316616188",
       "writeScopes": ["citizen-service-feedback.js", "test/citizen-service-feedback.test.js", "test/e2e/citizen-service-feedback.spec.js"],
-      "observability": {"applicable": true, "gaps": "本切片不新增遥测；居民服务状态运行治理缺口继续由既有 OPS-017 跟踪"},
-      "runtimeCapability": true
+      "observability": {"applicable": false, "reason": "本任务只纠正既有居民状态的浏览器展示兼容语义，不新增独立运行能力；居民服务运行治理仍由 OPS-017 跟踪"},
+      "runtimeCapability": false
     },
     {
       "id": "OPS-024",
       "title": "影像质控成功响应完整性与关联校验",
       "ownerProcess": "T06",
       "integrationOwner": "T00",
-      "taskStatus": "已批准",
-      "capabilityStatus": "未建设",
+      "taskStatus": "已关闭",
+      "capabilityStatus": "已集成",
       "riskLevel": "中",
       "approval": {
         "state": "approved",
@@ -943,24 +983,24 @@
         "完整合法且与当前 study、review 和同步资源一致的 200 保留既有成功行为，不新增 FHIR 协议字段要求"
       ],
       "testIds": ["TEST-OPS-024"],
-      "evidenceIds": [],
+      "evidenceIds": ["EVD-OPS-024"],
       "rollback": "回退本任务两文件单一提交并重跑影像专项；无 schema、migration、服务端协议或业务数据变化",
-      "unresolved": ["尚未进入实现、独立评审、Draft PR 与 required CI", "耐久 command/outbox、provider 协议、迁移、worker 与现场证据仍由 OPS-015、OPS-018 和 Proposed ADR 跟踪"],
+      "unresolved": [],
       "worktree": ".codex-platform-worktrees/process-v2/t06-imaging-qc-response-validation-20260909",
       "branch": "process/t06-imaging-qc-response-validation-20260909",
       "planRef": "docs/lifecycle-governance.md#ops-024-影像质控响应完整性与关联校验-plan",
-      "pullRequestRef": "",
-      "ciRef": "",
+      "pullRequestRef": "https://github.com/xujiann/chronic-care-platform/pull/285",
+      "ciRef": "https://github.com/xujiann/chronic-care-platform/actions/runs/34320210182",
       "writeScopes": ["imaging-cloud.js", "test/imaging-dashboard-route-characterization.test.js"],
-      "observability": {"applicable": true, "gaps": "本切片不新增遥测；影像质控运行治理缺口继续由 OPS-015 与 OPS-018 跟踪"},
-      "runtimeCapability": true
+      "observability": {"applicable": false, "reason": "本任务只收紧既有影像质控浏览器响应判定，不新增独立运行能力；耐久性与运行治理仍由 OPS-015、OPS-018 跟踪"},
+      "runtimeCapability": false
     },
     {
       "id": "TEST-011",
       "title": "挂号跨端 E2E 认证与导航就绪等待",
       "ownerProcess": "T00",
-      "taskStatus": "已批准",
-      "capabilityStatus": "未建设",
+      "taskStatus": "已关闭",
+      "capabilityStatus": "已集成",
       "riskLevel": "低",
       "approval": {
         "state": "approved",
@@ -981,14 +1021,14 @@
         "挂号跨端定向场景与在线根 Playwright 60 项全部通过"
       ],
       "testIds": ["TEST-CI-011"],
-      "evidenceIds": [],
+      "evidenceIds": ["EVD-TEST-011"],
       "rollback": "回退目标 roles spec 单一提交并恢复原等待；不修改业务运行时、认证状态、数据或全局测试策略",
-      "unresolved": ["尚未进入实现、独立评审、Draft PR 与 required CI"],
+      "unresolved": [],
       "worktree": ".codex-platform-worktrees/process-v2/t00-registration-auth-readiness-20260909",
       "branch": "process/t00-registration-auth-readiness-20260909",
       "planRef": "docs/lifecycle-governance.md#test-011-挂号跨端认证与导航就绪等待-plan",
-      "pullRequestRef": "",
-      "ciRef": "",
+      "pullRequestRef": "https://github.com/xujiann/chronic-care-platform/pull/284",
+      "ciRef": "https://github.com/xujiann/chronic-care-platform/actions/runs/34321272742",
       "writeScopes": ["test/e2e/roles.spec.js"],
       "observability": {"applicable": false, "reason": "仅修复脱敏浏览器测试就绪等待，不新增生产运行时或监控能力"},
       "runtimeCapability": false
@@ -1076,8 +1116,8 @@
       "title": "体检异常操作后陈旧卡片锁定",
       "ownerProcess": "T06",
       "integrationOwner": "T00",
-      "taskStatus": "实施中",
-      "capabilityStatus": "未建设",
+      "taskStatus": "已关闭",
+      "capabilityStatus": "已集成",
       "riskLevel": "中",
       "approval": {
         "state": "approved",
@@ -1093,22 +1133,22 @@
       "affectedModules": ["clinical-physical-examination", "physical-examination-browser"],
       "dataSensitivity": "体检异常处置页面状态-敏感健康业务元数据不新增持久化",
       "acceptanceCriteria": [
-        "异常操作 POST 成功而后续 GET 失败时保留最后成功快照并把同卡片全部动作标为陈旧和禁用",
-        "陈旧卡片重复点击不得产生第二次 POST，错误提示不得泄露内部响应",
-        "后续有效 GET 重新渲染最新快照并恢复允许的操作；POST 失败仍保留既有可重试行为"
+        "异常操作按 request ordering 只允许 last-applied 结果更新 resident+year 视图，ABA 场景中 superseded 请求不得误报成功或回滚当前 overview",
+        "POST 已应用、待确认或失败三态均保持对应安全语义；刷新失败时保留最后成功快照并锁定同卡片全部动作，重复点击不得产生第二次 POST",
+        "后续有效 GET 仅为当前 resident+year 重新渲染最新快照并恢复允许的操作；POST 失败保持既有可重试行为且错误提示不泄露内部响应"
       ],
       "testIds": ["TEST-OPS-022"],
-      "evidenceIds": [],
+      "evidenceIds": ["EVD-OPS-022"],
       "rollback": "回退本任务两文件单一提交并重跑体检专项；不回退服务端状态、删除体检记录或改变 API/schema",
-      "unresolved": ["实现、独立评审、Draft PR 与 required CI 尚未完成", "服务端幂等/CAS、多实例 exactly-once、完整可观测性和现场验收仍由既有高风险缺口跟踪，生产继续 NO-GO"],
+      "unresolved": [],
       "worktree": ".codex-platform-worktrees/process-v2/t06-physical-exam-next-gap-20260909",
       "branch": "process/t06-physical-exam-next-gap-20260909",
       "planRef": "docs/lifecycle-governance.md#ops-022-体检异常操作陈旧卡片锁定-plan",
-      "pullRequestRef": "",
-      "ciRef": "",
+      "pullRequestRef": "https://github.com/xujiann/chronic-care-platform/pull/281",
+      "ciRef": "https://github.com/xujiann/chronic-care-platform/actions/runs/34322391949",
       "writeScopes": ["physical-examination.js", "test/e2e/physical-examination-trusted-rendering.spec.js"],
-      "observability": {"applicable": true, "gaps": "本切片不新增遥测；体检异常处置专用结构化日志、指标告警、追踪、健康检查、SLO、手册、降级与补偿继续由后续运行治理任务交付"},
-      "runtimeCapability": true
+      "observability": {"applicable": false, "reason": "本任务只收紧既有体检页面的异步排序和陈旧快照交互，不新增独立运行能力；服务端幂等、可观测性与现场能力仍由 OPS-016 等上位缺口跟踪"},
+      "runtimeCapability": false
     },
     {
       "id": "GOV-005",

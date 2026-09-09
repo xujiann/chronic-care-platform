@@ -7,10 +7,10 @@
 - 来源：用户于 2026-09-09 要求继续四路同步开发；T00 已批准本轮中风险控制塔登记 PLAN。
 - 目标：以一个中央治理任务关闭已验收的 GOV-005，同时正式登记影像、居民和体检三条互不重叠的实施线，使依赖、WIP、验收和生产边界可机器检查。
 - 范围：仅修改生命周期总账、本规范和 `ROADMAP.md` 当前事实；不修改三条领域线业务文件，不代替各领域独立 worktree、测试、评审、PR 或 CI。
-- 验收：GOV-005 绑定已合并 PR #277 与 CI run 34233229053 的非生产证据后关闭；OPS-020 至 OPS-024、TEST-010 与 TEST-011 均有唯一编号、owner、依赖、精确写范围、测试和回滚；OPS-023、OPS-024 与 TEST-011 获批后，GOV-006、OPS-022、OPS-023、OPS-024 与 TEST-011 使组合 WIP 达到 5/5，且没有范围冲突，释放前不得再登记新在制任务。
-- 测试：生命周期定向测试、文档事实漂移、只读 handoff、T00 process verify 和本 Draft PR 的 required CI。
+- 验收：GOV-005 已绑定 PR #277/CI run 34233229053 关闭；OPS-020 至 OPS-024、TEST-010 与 TEST-011 均有唯一编号、owner、依赖、精确写范围、测试、回滚及非生产证据。末批 OPS-022/OPS-023/OPS-024/TEST-011 分别由 PR #281/#283/#285/#284 集成后，仅 GOV-006 保持待集成，组合 WIP 降为 1/5 且没有范围冲突。
+- 测试：本地执行生命周期定向测试、文档事实漂移、只读 handoff、T00 process verify、所有权/治理检查及 CI 未覆盖的 legacy `test:all`；最终 head 的 required CI 分别提供 unit/integration、lint/typecheck、smoke 与 build 证据，不把依赖 PR 的证据冒充为 GOV-006 自身集成证据。
 - 回滚：整体回退本登记补丁；不删除或回退领域分支代码、业务数据、历史 PR 或 CI 证据。
-- 放行边界：GOV-006 当前位于 Draft PR #280，在合并和 required CI 归档前保持实施中；三条领域线仍需各自验收。任何仓库结果都不改变六域生产 `NO-GO`。
+- 放行边界：GOV-006 当前位于 Draft PR #280，本地 `EVD-GOV-006-LOCAL` 只证明治理契约达到“已验证”；在最终 head 独立评审、required CI 与合并完成前保持“待集成/已验证”，风险仍为 open，且不得提前标记“已关闭/已集成”。任何仓库结果都不改变六域生产 `NO-GO`。
 
 ### TEST-010 区域运营 E2E 静态 fixture PLAN
 
@@ -26,7 +26,7 @@
 - 范围：仅修改 `test/e2e/roles.spec.js`，等待页面既有 `data-auth-resolved=allowed` 与 `data-navigation-shell=ready` 标记后再调用 `authFetch`；不修改生产代码、认证协议、timeout、retry 或 workflow。
 - 验收：延迟 auth 脚本时仍等待真实认证和导航就绪；不使用固定 sleep 或放宽 timeout；挂号跨端定向场景及在线根 Playwright 60 项通过。
 - 回滚：回退该测试文件单一提交，恢复原等待；不修改业务数据、认证状态或生产证据。
-- 放行边界：任务当前为已批准/未建设，实施须使用登记 worktree 和 branch，完成后仍需独立评审、Draft PR 与 required CI；生产继续 `NO-GO`。
+- 集成结果：PR #284 已合并，最终 head `8db2faa9` 的 required CI run 34321272742 九项通过；独立 rebase delta 核验确认仍为原一文件两行就绪等待修复，定向 1/1、在线根 60/60、legacy 14 批零失败及 unit/build/lint/typecheck/process 均通过。TEST-011 已关闭并达到“已集成”，但证据仅属于仓库测试稳定性，生产继续 `NO-GO`。
 
 ### OPS-020 影像质控恢复指引 PLAN
 
@@ -51,15 +51,15 @@
 - 范围：仅 `citizen-service-feedback.js`、`test/citizen-service-feedback.test.js` 和 `test/e2e/citizen-service-feedback.spec.js`；只精确识别既有两种待确认状态，不修改 API、领域状态机、schema、取消命令或服务端事实。
 - 验收：两种待确认来源均显示待处理 warn 并计入需关注；真正取消与完成终态保持现有显示和计数；先补两来源与终态对照 RED，再通过既有弹窗回归和真实页面 E2E。
 - 回滚：回退三文件单一提交并重跑居民单元与 E2E；不修改或删除服务订单、取消请求、评价、投诉、消息或审计数据。
-- 放行边界：任务当前为已批准/未建设，实施须使用登记 worktree 和 branch，完成后仍需独立评审、Draft PR 与 required CI；生产继续 `NO-GO`。
+- 集成结果：PR #283 已合并，最终 head `4aee44e9` 的 required CI run 34316616188 九项通过且独立评审无 blocker；本地 legacy `test:all` 共 14 批 3135 项通过、1 项环境跳过、零失败，unit 462 与 integration 66 项通过。OPS-023 已关闭并达到“已集成”；更广的居民服务运行治理继续由 OPS-017 跟踪，生产继续 `NO-GO`。
 
 ### OPS-022 体检异常操作陈旧卡片锁定 PLAN
 
 - 来源与审批：T06 复现异常处置 POST 成功、随后 GET 刷新失败时旧快照动作仍可点击的问题；T00 于 2026-09-09 批准中风险前端兼容修复。
 - 范围：仅 `physical-examination.js` 与 `test/e2e/physical-examination-trusted-rendering.spec.js`；不改变 API method/path、服务端状态机、幂等/CAS、schema、审计或中央治理文件。
-- 验收：POST 成功而刷新失败时保留最后成功快照，将对应卡片标为陈旧并禁用全部动作；再次点击不产生第二次 POST；后续有效 GET 重新渲染最新快照并恢复允许操作；POST 本身失败保持既有重试语义。
-- 测试与回滚：在现有单一体检 E2E 内覆盖 200→502、稳定脱敏提示、旧快照锁定、零重复 POST 与有效 GET 恢复；回退两文件单一提交，不回退或删除服务端体检事实。
-- 放行边界：任务保持实施中；服务端多实例 exactly-once、完整可观测性和现场验收仍由既有高风险缺口跟踪，生产继续 `NO-GO`。
+- 验收：request ordering 只允许 last-applied 结果更新当前 resident+year；ABA 切换中的 superseded 请求不得误报成功或回滚 overview。POST 已应用、待确认、失败三态保持安全语义；刷新失败时锁定最后成功快照且零重复 POST，有效 GET 仅恢复当前 resident+year 的允许动作。
+- 测试与回滚：在现有单一体检 E2E 内覆盖排序、ABA、三态、200→502、稳定脱敏提示、旧快照锁定、零重复 POST 与有效 GET 恢复；回退两文件单一提交，不回退或删除服务端体检事实。
+- 集成结果：PR #281 已合并，最终 head `401f0ee0` 的 required CI run 34322391949 九项通过；独立复审核验 rebase 两文件零内容漂移，定向 1/1、体检子域 40/40、套件 21/21、legacy 14/14 批零失败且 1 项环境跳过。OPS-022 已关闭并达到“已集成”，仅缓释 RISK-OPS-022；服务端幂等/CAS、多实例 exactly-once、可观测性和现场验收仍由 OPS-016 等上位缺口跟踪，生产继续 `NO-GO`。
 
 ### OPS-024 影像质控响应完整性与关联校验 PLAN
 
@@ -67,7 +67,7 @@
 - 范围：仅 `imaging-cloud.js` 和 `test/imaging-dashboard-route-characterization.test.js`；不修改服务端 API、FHIR 协议字段、schema、migration、领域状态机或 worker。
 - 验收：坏 JSON、null、数组、空对象、study/review 错关联及同步资源 ID 缺失、非法或不一致均不得进入成功；所有 202 保持 unknown 锁且不自动 GET 或重发；完整合法且关联一致的 200 保留原成功行为。
 - 测试与回滚：先以真实脚本特征测试覆盖响应形状、关联、资源 ID、202 与合法 200 对照，再运行影像专项；回退两文件单一提交，无数据迁移或外部补偿。
-- 放行边界：任务当前为已批准/未建设；只验证现有服务端承诺，不新增 FHIR 字段要求。耐久 command/outbox、provider 协议、worker 与现场证据继续由 OPS-015、OPS-018 和 Proposed ADR 跟踪，生产保持 `NO-GO`。
+- 集成结果：PR #285 已合并，最终 head `35cc2c67` 的 required CI run 34320210182 九项通过；独立评审无 blocker，rebase 后两文件零内容漂移，目标特征测试 52/52、process/diff 通过，旧 head 的 legacy 14 批零失败且 1 项既有环境跳过。OPS-024 已关闭并达到“已集成”，仅缓释 RISK-OPS-024；耐久 command/outbox、provider 协议、worker、可观测性和现场证据继续由 OPS-015、OPS-018 与 Proposed ADR 跟踪，生产保持 `NO-GO`。
 
 ### GOV-005 生命周期地图反向覆盖与技术债编号治理 PLAN
 
