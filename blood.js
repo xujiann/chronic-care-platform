@@ -124,15 +124,37 @@ function bind() {
 async function queryTrace() {
   const code = $("#trace-code").value.trim();
   $("#trace-title").textContent = code || "未输入编码";
-  if (location.protocol !== "file:" && code) {
-    try {
-      const response = await (window.HealthCityAuth?.authFetch || fetch)(`${location.origin}/api/blood-system/trace/${encodeURIComponent(code)}`);
-      const result = await response.json();
-      toast(response.ok ? `追溯链已核验：${result.events.length}条服务端事件` : result.message);
-      return;
-    } catch (error) { /* retain the local trace when the service is unavailable */ }
+  if (location.protocol === "file:") {
+    toast("追溯链已通过本地规则核验");
+    return;
   }
-  toast("追溯链已通过本地规则核验");
+  if (!code) {
+    toast("请输入追溯编码");
+    return;
+  }
+  let response;
+  try {
+    response = await (window.HealthCityAuth?.authFetch || fetch)(`${location.origin}/api/blood-system/trace/${encodeURIComponent(code)}`);
+  } catch (error) {
+    toast("追溯服务暂不可用，请稍后重试");
+    return;
+  }
+  let result;
+  try {
+    result = await response.json();
+  } catch (error) {
+    toast("追溯服务响应异常，请稍后重试");
+    return;
+  }
+  if (!response.ok) {
+    toast(result?.message || "追溯查询失败，请稍后重试");
+    return;
+  }
+  if (!Array.isArray(result?.events)) {
+    toast("追溯服务响应异常，请稍后重试");
+    return;
+  }
+  toast(`追溯链已核验：${result.events.length}条服务端事件`);
 }
 
 async function submitBloodRequest(event) {
@@ -144,18 +166,30 @@ async function submitBloodRequest(event) {
     amount: "2U", indication: form.get("indication") || "Hb 62g/L，拟手术",
     urgency: form.get("urgency") || "常规", preAssessmentComplete: true, consentSigned: true
   };
-  if (location.protocol !== "file:") {
-    try {
-      const response = await (window.HealthCityAuth?.authFetch || fetch)(`${location.origin}/api/blood-system/transfusion-requests`, {
-        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload)
-      });
-      const result = await response.json();
-      toast(response.ok ? `申请已持久化：${result.request.id}` : result.message);
-      if (response.ok) { await loadBloodSystem(); render(); }
-      return;
-    } catch (error) { /* retain the local demonstration when the service is unavailable */ }
+  if (location.protocol === "file:") {
+    toast(`静态演示申请：${BloodDomain.buildExchangeMessage("blood_order", payload).messageId}`);
+    return;
   }
-  toast(`静态演示申请：${BloodDomain.buildExchangeMessage("blood_order", payload).messageId}`);
+  try {
+    const response = await (window.HealthCityAuth?.authFetch || fetch)(`${location.origin}/api/blood-system/transfusion-requests`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload)
+    });
+    const result = await response.json();
+    if (!response.ok) {
+      toast(result?.message || "用血申请提交失败");
+      return;
+    }
+    const requestId = typeof result?.request?.id === "string" ? result.request.id.trim() : "";
+    if (!requestId) {
+      toast("申请结果暂未确认，请核对服务端记录后再操作");
+      return;
+    }
+    toast(`申请已持久化：${requestId}`);
+    await loadBloodSystem();
+    render();
+  } catch (error) {
+    toast("申请结果暂未确认，请核对服务端记录后再操作");
+  }
 }
 
 function render() {
