@@ -1,6 +1,64 @@
 const { expect, test } = require("@playwright/test");
 const fs = require("node:fs");
 
+for (const navigation of ["member-switch", "ABA"]) {
+  for (const outcome of ["success", "failure"]) {
+    test(`care workspace isolates delayed correction ${outcome} after ${navigation}`, async ({ page }) => {
+      // Synthetic member and receipt fixtures exercise browser context isolation only;
+      // they do not grant family write permission or prove server authorization.
+      await page.route("**/api/record-care-workspace**", (route) => route.fulfill({ json: { corrections: [], sharePackages: [], taskUpdates: {}, syncedAt: new Date().toISOString() } }));
+      let release;
+      let sent;
+      let responseFinished;
+      const finished = new Promise((resolve) => { responseFinished = resolve; });
+      const gate = new Promise((resolve) => { release = resolve; });
+      await page.route("**/api/record-corrections", async (route) => {
+        sent = route.request().postDataJSON();
+        await gate;
+        await route.fulfill({ status: outcome === "success" ? 201 : 503, json: outcome === "success"
+          ? { ...sent, receiptId: "session-correction-receipt", auditRef: "session-correction-audit" }
+          : { message: "旧视图请求失败" } });
+        responseFinished();
+      });
+      await page.goto("/login.html");
+      await page.locator("#login-user").selectOption("citizen");
+      await page.locator("input[name='password']").fill("123456");
+      await page.locator("#login-form button[type='submit']").click();
+      await expect(page).toHaveURL(/citizen\.html$/);
+      await expect(page.locator("#citizen-care-sync-status")).toContainText("已安全同步");
+      await page.evaluate(() => {
+        const resident = state.residents.find((item) => item.id === "r1");
+        state.residents.push({ ...resident, id: "session-member-2", name: "示例成员" });
+        const account = state.accounts.find((item) => item.id === currentAccountId);
+        account.members.push({ residentId: "session-member-2", relation: "家庭成员" });
+        renderCitizen("r1");
+        document.body.classList.remove("service-paged-mode");
+      });
+      const form = page.locator("#citizen-correction-form");
+      await form.locator("select[name='field']").selectOption("summary");
+      await form.locator("input[name='requestedValue']").fill("请机构核对摘要");
+      await form.locator("textarea[name='reason']").fill("原视图申请");
+      await form.getByRole("button", { name: "提交纠错申请" }).click();
+      await expect.poll(() => sent?.residentId).toBe("r1");
+      await page.locator("[data-member='session-member-2']").click();
+      await expect(page.locator("#citizen-care-sync-status")).toContainText("已安全同步");
+      if (navigation === "ABA") await page.locator("[data-member='r1']").click();
+      await form.locator("textarea[name='reason']").fill("新视图草稿必须保留");
+      release();
+      await finished;
+      // Flush the real fetch continuation and subsequent DOM tasks before asserting.
+      await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+      await expect(form.locator("textarea[name='reason']")).toHaveValue("新视图草稿必须保留");
+      await expect(page.locator("#toast")).not.toContainText("旧视图请求失败");
+      await page.locator("[data-member='session-member-2']").click();
+      await expect(page.locator("#citizen-correction-list")).not.toContainText("session-correction-receipt");
+      await page.locator("[data-member='r1']").click();
+      if (outcome === "success") await expect(page.locator("#citizen-correction-list")).toContainText("session-correction-receipt");
+      else await expect(page.locator("#citizen-correction-list")).not.toContainText("session-correction-receipt");
+    });
+  }
+}
+
 test("resident creates a scoped consent and revokes it through the dedicated audit route", async ({ page }) => {
   const authorizationWrites = [];
   await page.route(/\/api\/(?:personal-records|authorizations\/.*\/revoke)$/, async (route) => {

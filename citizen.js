@@ -551,6 +551,7 @@ let citizenOperationsPublicFeed = {
 };
 let currentResidentId;
 let currentAccountId;
+let citizenCareViewGeneration = 0;
 
 document.addEventListener("DOMContentLoaded", async () => {
   state = await loadState();
@@ -1465,6 +1466,7 @@ function renderCitizen(residentId) {
   const resident = state.residents.find((item) => item.id === residentId) || state.residents[0];
   if (!resident) return;
   currentResidentId = resident.id;
+  citizenCareViewGeneration += 1;
   renderAccount(getCurrentAccount());
 
   const risk = assessRisk(resident);
@@ -3133,7 +3135,7 @@ function citizenCareRequestNonce() {
 async function submitCitizenCareAction(path, payload, operation) {
   const action = window.CitizenRecordsV2.buildIdempotentAction({
     operation,
-    residentId: currentResidentId,
+    residentId: payload.residentId,
     nonce: citizenCareRequestNonce(),
     payload
   });
@@ -3230,6 +3232,14 @@ function openAuthorizationRenewal(recordId) {
   }
 }
 
+function captureCitizenCareContext() {
+  return { residentId: currentResidentId, generation: citizenCareViewGeneration };
+}
+
+function isCurrentCitizenCareContext(context) {
+  return context.residentId === currentResidentId && context.generation === citizenCareViewGeneration;
+}
+
 function bindCitizenCareWorkspace() {
   const api = window.CitizenRecordsV2;
   const section = document.querySelector("#citizen-care-workspace");
@@ -3260,24 +3270,27 @@ function bindCitizenCareWorkspace() {
   document.querySelector("#citizen-correction-form")?.addEventListener("submit", async (event) => {
     event.preventDefault();
     const form = event.currentTarget;
+    const context = captureCitizenCareContext();
     try {
       const request = api.buildCorrectionRequest({
         recordId: form.elements.recordId.value,
-        residentId: currentResidentId,
+        residentId: context.residentId,
         field: form.elements.field.value,
         requestedValue: form.elements.requestedValue.value,
         reason: form.elements.reason.value
       });
       const response = await submitCitizenCareAction("/record-corrections", request, "correction-submit");
       const saved = api.projectCorrectionReceipt(response, request);
-      const careState = ensureCitizenCareCollections(currentResidentId);
+      const careState = ensureCitizenCareCollections(context.residentId);
       careState.recordCorrections.unshift(saved);
-      saveCitizenCareCollections(currentResidentId);
-      markCitizenCareActionSynced(currentResidentId, saved);
+      saveCitizenCareCollections(context.residentId);
+      markCitizenCareActionSynced(context.residentId, saved);
+      if (!isCurrentCitizenCareContext(context)) return;
       form.reset();
-      renderCitizen(currentResidentId);
+      renderCitizen(context.residentId);
       showToast("纠错申请已提交，原始记录保持不变");
     } catch (error) {
+      if (!isCurrentCitizenCareContext(context)) return;
       showToast(error.message || "纠错申请提交失败");
     }
   });
@@ -3285,10 +3298,11 @@ function bindCitizenCareWorkspace() {
   document.querySelector("#citizen-share-package-form")?.addEventListener("submit", async (event) => {
     event.preventDefault();
     const form = event.currentTarget;
+    const context = captureCitizenCareContext();
     try {
       const scopes = [...form.querySelectorAll("input[name='scopes']:checked")].map((item) => item.value);
       const packageRecord = api.buildSharePackage({
-        residentId: currentResidentId,
+        residentId: context.residentId,
         granteeId: form.elements.granteeId.value,
         purpose: form.elements.purpose.value,
         scopes,
@@ -3296,14 +3310,16 @@ function bindCitizenCareWorkspace() {
       });
       const response = await submitCitizenCareAction("/record-share-packages", packageRecord, "share-create");
       const saved = api.projectSharePackageReceipt(response, packageRecord);
-      const careState = ensureCitizenCareCollections(currentResidentId);
+      const careState = ensureCitizenCareCollections(context.residentId);
       careState.recordSharePackages.unshift(saved);
-      saveCitizenCareCollections(currentResidentId);
-      markCitizenCareActionSynced(currentResidentId, saved);
+      saveCitizenCareCollections(context.residentId);
+      markCitizenCareActionSynced(context.residentId, saved);
+      if (!isCurrentCitizenCareContext(context)) return;
       form.reset();
-      renderCitizen(currentResidentId);
+      renderCitizen(context.residentId);
       showToast("一次性健康资料包已创建");
     } catch (error) {
+      if (!isCurrentCitizenCareContext(context)) return;
       showToast(error.message || "资料包创建失败");
     }
   });
@@ -3311,9 +3327,10 @@ function bindCitizenCareWorkspace() {
   document.querySelector("#citizen-access-dispute-form")?.addEventListener("submit", async (event) => {
     event.preventDefault();
     const form = event.currentTarget;
+    const context = captureCitizenCareContext();
     try {
       const dispute = api.buildAccessDispute({
-        residentId: currentResidentId,
+        residentId: context.residentId,
         accessLogId: form.elements.accessLogId.value,
         category: form.elements.category.value,
         reason: form.elements.reason.value,
@@ -3325,14 +3342,16 @@ function bindCitizenCareWorkspace() {
         "access-dispute"
       );
       const saved = api.projectAccessReviewActionReceipt(response, dispute);
-      const careState = ensureCitizenCareCollections(currentResidentId);
+      const careState = ensureCitizenCareCollections(context.residentId);
       careState.accessDisputes.unshift(saved);
-      saveCitizenCareCollections(currentResidentId);
-      markCitizenCareActionSynced(currentResidentId, saved);
+      saveCitizenCareCollections(context.residentId);
+      markCitizenCareActionSynced(context.residentId, saved);
+      if (!isCurrentCitizenCareContext(context)) return;
       form.reset();
-      renderCitizen(currentResidentId);
+      renderCitizen(context.residentId);
       showToast("访问异议已提交，平台将按审计回执复核");
     } catch (error) {
+      if (!isCurrentCitizenCareContext(context)) return;
       showToast(error.message || "访问异议提交失败");
     }
   });
@@ -3399,9 +3418,10 @@ function bindCitizenCareWorkspace() {
       return;
     }
     if (acknowledgeButton) {
+      const context = captureCitizenCareContext();
       try {
         const acknowledgement = api.buildAccessAcknowledgement({
-          residentId: currentResidentId,
+          residentId: context.residentId,
           accessLogId: acknowledgeButton.dataset.acknowledgeAccess
         });
         const response = await submitCitizenCareAction(
@@ -3410,57 +3430,66 @@ function bindCitizenCareWorkspace() {
           "access-acknowledge"
         );
         const saved = api.projectAccessReviewActionReceipt(response, acknowledgement);
-        const careState = ensureCitizenCareCollections(currentResidentId);
+        const careState = ensureCitizenCareCollections(context.residentId);
         careState.accessAcknowledgements.unshift(saved);
-        saveCitizenCareCollections(currentResidentId);
-        markCitizenCareActionSynced(currentResidentId, saved);
-        renderCitizen(currentResidentId);
+        saveCitizenCareCollections(context.residentId);
+        markCitizenCareActionSynced(context.residentId, saved);
+        if (!isCurrentCitizenCareContext(context)) return;
+        renderCitizen(context.residentId);
         showToast("已记录为居民确认的正常访问");
       } catch (error) {
+        if (!isCurrentCitizenCareContext(context)) return;
         showToast(error.message || "访问确认失败");
       }
       return;
     }
     if (revokeButton) {
-      const careState = ensureCitizenCareCollections(currentResidentId);
+      const context = captureCitizenCareContext();
+      const careState = ensureCitizenCareCollections(context.residentId);
       const item = careState.recordSharePackages.find((candidate) => candidate.id === revokeButton.dataset.revokeSharePackage);
       if (!item || !window.confirm(`确认撤销一次性资料包“${item.accessRef}”？`)) return;
       try {
         const revoked = api.revokeSharePackage(item);
         const response = await submitCitizenCareAction(`/record-share-packages/${encodeURIComponent(item.id)}/revoke`, {
-          residentId: currentResidentId,
+          residentId: context.residentId,
           resourceId: item.id,
           revokedAt: revoked.revokedAt
         }, "share-revoke");
-        const receipt = api.projectActionReceipt(response, { residentId: currentResidentId, resourceId: item.id });
+        const receipt = api.projectActionReceipt(response, { residentId: context.residentId, resourceId: item.id });
         Object.assign(item, revoked, receipt);
-        saveCitizenCareCollections(currentResidentId);
-        markCitizenCareActionSynced(currentResidentId, receipt);
-        renderCitizen(currentResidentId);
+        saveCitizenCareCollections(context.residentId);
+        markCitizenCareActionSynced(context.residentId, receipt);
+        if (!isCurrentCitizenCareContext(context)) return;
+        renderCitizen(context.residentId);
         showToast("一次性资料包已撤销");
       } catch (error) {
+        if (!isCurrentCitizenCareContext(context)) return;
         showToast(error.message || "资料包撤销失败");
       }
     }
     if (taskButton) {
-      const careState = ensureCitizenCareCollections(currentResidentId);
+      const context = captureCitizenCareContext();
+      const resourceId = taskButton.dataset.careTaskComplete;
+      const careState = ensureCitizenCareCollections(context.residentId);
       const update = { status: "completed", completedAt: new Date().toISOString() };
       try {
-        const response = await submitCitizenCareAction(`/care-tasks/${encodeURIComponent(taskButton.dataset.careTaskComplete)}/actions`, {
+        const response = await submitCitizenCareAction(`/care-tasks/${encodeURIComponent(resourceId)}/actions`, {
           ...update,
-          residentId: currentResidentId,
-          resourceId: taskButton.dataset.careTaskComplete
+          residentId: context.residentId,
+          resourceId
         }, "care-task-complete");
         const receipt = api.projectActionReceipt(response, {
-          residentId: currentResidentId,
-          resourceId: taskButton.dataset.careTaskComplete
+          residentId: context.residentId,
+          resourceId
         });
-        careState.careTaskUpdates[taskButton.dataset.careTaskComplete] = { ...update, ...receipt };
-        saveCitizenCareCollections(currentResidentId);
-        markCitizenCareActionSynced(currentResidentId, receipt);
-        renderCitizen(currentResidentId);
+        careState.careTaskUpdates[resourceId] = { ...update, ...receipt };
+        saveCitizenCareCollections(context.residentId);
+        markCitizenCareActionSynced(context.residentId, receipt);
+        if (!isCurrentCitizenCareContext(context)) return;
+        renderCitizen(context.residentId);
         showToast("异常结果处置进度已记录");
       } catch (error) {
+        if (!isCurrentCitizenCareContext(context)) return;
         showToast(error.message || "处置进度保存失败");
       }
     }
