@@ -266,14 +266,16 @@
     const error = document?.querySelector("#service-quality-feedback-error");
     const title = document?.querySelector("#service-quality-feedback-title");
     if (!dialog || !form || !error || typeof submitTaskAction !== "function") return null;
-    let activeButton = null;
-    let activeCommand = null;
+    let activeSession = null;
 
     function reset() {
+      if (activeSession) activeSession.button.disabled = false;
+      activeSession = null;
       form.reset();
       delete form.dataset.taskKey;
-      activeCommand = null;
       error.textContent = "";
+      const submit = form.querySelector("button[type='submit']");
+      if (submit) submit.disabled = false;
     }
 
     function close() {
@@ -282,20 +284,23 @@
     }
 
     document.querySelectorAll("[data-quality-feedback-cancel]").forEach((button) => button.addEventListener("click", close));
-    dialog.addEventListener("cancel", reset);
+    dialog.addEventListener("cancel", (event) => {
+      event.preventDefault();
+      close();
+    });
     dialog.addEventListener("close", () => {
-      if (activeButton) activeButton.disabled = false;
-      activeButton = null;
-      const submit = form.querySelector("button[type='submit']");
-      if (submit) submit.disabled = false;
+      // Native close events are queued and may arrive after another session opens.
+      if (!dialog.open) reset();
     });
     form.addEventListener("submit", async (event) => {
       event.preventDefault();
-      const sourceButton = activeButton;
-      if (!sourceButton) {
+      const session = activeSession;
+      if (!dialog.open) return;
+      if (!session) {
         error.textContent = "未找到需要评价的服务，请关闭后重试。";
         return;
       }
+      if (session.pending) return;
       let payload;
       try {
         const data = Object.fromEntries(new root.FormData(form));
@@ -309,22 +314,26 @@
         return;
       }
       const submit = form.querySelector("button[type='submit']");
-      sourceButton.disabled = true;
+      session.pending = true;
+      session.button.disabled = true;
       if (submit) submit.disabled = true;
       error.textContent = "正在提交评价…";
       try {
-        const result = await submitTaskAction(sourceButton.dataset.taskId, sourceButton.dataset.taskCollection, payload, activeCommand || {});
+        const result = await submitTaskAction(session.taskId, session.collection, payload, session.command);
+        if (activeSession !== session || !dialog.open) return;
         close();
         showToast(result?.recoveredFromDuplicate
           ? "评价与投诉已登记，已同步最新状态"
           : payload.complaintStatus === "open" ? "评价已提交，服务机构将跟进处理" : "服务评价已提交");
         render();
-      } catch (submitError) {
-        error.textContent = submitError.message || "服务评价提交失败，请重试";
+      } catch {
+        if (activeSession !== session || !dialog.open) return;
+        error.textContent = "服务评价提交失败，请稍后重试。";
         showToast("服务评价提交失败，已保留填写内容");
       } finally {
-        if (dialog.open) {
-          sourceButton.disabled = false;
+        session.pending = false;
+        if (activeSession === session && dialog.open) {
+          session.button.disabled = false;
           if (submit) submit.disabled = false;
         }
       }
@@ -334,12 +343,18 @@
       open(button) {
         if (!button) return false;
         const taskKey = `${button.dataset.taskCollection}:${button.dataset.taskId}`;
-        if (form.dataset.taskKey !== taskKey) {
-          form.reset();
+        if (!dialog.open || !activeSession || form.dataset.taskKey !== taskKey) {
+          reset();
           form.dataset.taskKey = taskKey;
-          activeCommand = commandContext(button) || {};
+          activeSession = {
+            button,
+            taskId: button.dataset.taskId,
+            collection: button.dataset.taskCollection,
+            command: commandContext(button) || {},
+            pending: false
+          };
         }
-        activeButton = button;
+        if (activeSession.pending) return true;
         if (title) title.textContent = `${button.dataset.taskCollection === "internetNursingOrders" ? "互联网护理" : "助医陪诊"}服务评价`;
         error.textContent = "";
         dialog.showModal();
