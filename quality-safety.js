@@ -3,6 +3,8 @@ const QUALITY_API_BASE = location.protocol === "file:" ? "" : "/api";
 let qualitySafetyState = null;
 let qualitySafetyInterfacePack = null;
 let qualitySafetyValidationResult = null;
+const qualitySafetyReadGeneration = { dashboard: 0, pack: 0 };
+const QUALITY_SNAPSHOT_UNAVAILABLE = "当前数据不可用，旧快照及操作已停用，请重新刷新后再操作。";
 let qualitySafetyFilters = {
   status: "",
   domain: "",
@@ -259,7 +261,7 @@ function qualityToken() {
   return window.HealthCityAuth?.getToken?.() || "";
 }
 
-async function qualityApi(pathname, options = {}) {
+async function qualityApi(pathname, options = {}, isCurrent = () => true) {
   const response = await fetch(`${QUALITY_API_BASE}${pathname}`, {
     ...options,
     headers: {
@@ -268,12 +270,12 @@ async function qualityApi(pathname, options = {}) {
       ...(options.headers || {})
     }
   });
-  const body = await response.json();
   if (response.status === 401) {
-    window.HealthCityAuth?.logout?.();
-    throw new Error("登录已过期，请重新登录");
+    if (isCurrent()) window.HealthCityAuth?.logout?.();
+    throw Object.assign(new Error("登录已过期，请重新登录"), { status: 401 });
   }
-  if (!response.ok) throw new Error(body.message || body.error || "请求失败");
+  const body = await response.json().catch((error) => { throw Object.assign(error, { status: response.status }); });
+  if (!response.ok) throw Object.assign(new Error(body?.message || body?.error || "请求失败"), { status: response.status });
   return body;
 }
 
@@ -886,25 +888,68 @@ function renderBloodCoordination(coordination = {}) {
   });
 }
 
+function invalidateQualitySnapshot(kind) {
+  qualitySafetyReadGeneration[kind] += 1;
+  if (kind === "pack") {
+    qualitySafetyInterfacePack = null;
+    qualitySafetyValidationResult = null;
+    mountQualityContent("quality-safety-interface-pack", qualityTextElement("p", QUALITY_SNAPSHOT_UNAVAILABLE));
+    return;
+  }
+  qualitySafetyState = null;
+  const sections = [
+    "metrics", "brief", "department-view", "department-queue", "national-goals", "national-goal-cadence",
+    "core-systems", "readiness", "prelaunch-gaps", "cutover-sequence", "next-development", "onsite-requirements",
+    "operations-runbook", "warning-indicators", "actions", "risks", "reuse", "signoffs", "issues",
+    "rectifications", "critical", "blood-coordination", "boundaries"
+  ];
+  sections.forEach((section) => mountQualityContent(`quality-safety-${section}`, qualityTextElement("p", QUALITY_SNAPSHOT_UNAVAILABLE)));
+  const updated = document.getElementById("quality-safety-updated");
+  if (updated) updated.textContent = "";
+}
+
+function failQualitySnapshot(kind, error) {
+  invalidateQualitySnapshot(kind);
+  if (error.status === 401 || error.status === 403) invalidateQualitySnapshot(kind === "dashboard" ? "pack" : "dashboard");
+}
+
 async function loadQualitySafety() {
+  const generation = ++qualitySafetyReadGeneration.dashboard;
+  const isCurrent = () => generation === qualitySafetyReadGeneration.dashboard;
   try {
-    renderQualitySafety(await qualityApi("/quality-safety/dashboard"));
+    const data = await qualityApi("/quality-safety/dashboard", {}, isCurrent);
+    if (!isCurrent()) return;
+    if (!data || typeof data !== "object" || Array.isArray(data) || typeof data.role !== "string" ||
+        !Array.isArray(data.issues) || !Array.isArray(data.rectifications)) throw new Error(QUALITY_SNAPSHOT_UNAVAILABLE);
+    renderQualitySafety(data);
   } catch (error) {
-    mountQualityContent("quality-safety-issues", qualityTextElement("p", error.message));
+    if (isCurrent()) failQualitySnapshot("dashboard", error);
   }
 }
 
 async function loadQualitySafetyInterfacePack() {
+  const generation = ++qualitySafetyReadGeneration.pack;
+  const isCurrent = () => generation === qualitySafetyReadGeneration.pack;
   try {
-    qualitySafetyInterfacePack = await qualityApi("/quality-safety/interface-joint-test-pack");
-    renderInterfaceJointTestPack(qualitySafetyInterfacePack, qualitySafetyValidationResult);
+    const pack = await qualityApi("/quality-safety/interface-joint-test-pack", {}, isCurrent);
+    if (!isCurrent()) return;
+    if (!pack || typeof pack !== "object" || Array.isArray(pack) || !Array.isArray(pack.sampleRequests)) throw new Error(QUALITY_SNAPSHOT_UNAVAILABLE);
+    renderInterfaceJointTestPack(pack, qualitySafetyValidationResult);
+    qualitySafetyInterfacePack = pack;
   } catch (error) {
-    mountQualityContent("quality-safety-interface-pack", qualityTextElement("p", error.message));
+    if (isCurrent()) failQualitySnapshot("pack", error);
   }
 }
 
+async function qualityDashboardCommand(pathname, options) {
+  if (!qualitySafetyState) throw new Error(QUALITY_SNAPSHOT_UNAVAILABLE);
+  const generation = qualitySafetyReadGeneration.dashboard;
+  await qualityApi(pathname, options);
+  if (generation === qualitySafetyReadGeneration.dashboard) await loadQualitySafety();
+}
+
 async function dispatchIssue(issueId) {
-  await qualityApi(`/quality-safety/issues/${encodeURIComponent(issueId)}/dispatch`, {
+  await qualityDashboardCommand(`/quality-safety/issues/${encodeURIComponent(issueId)}/dispatch`, {
     method: "POST",
     body: JSON.stringify({
       ownerRole: "institution",
@@ -912,64 +957,58 @@ async function dispatchIssue(issueId) {
       requirement: "完成根因分析、整改证据和科室签收。"
     })
   });
-  await loadQualitySafety();
 }
 
 async function submitFeedback(orderId) {
-  await qualityApi(`/quality-safety/rectifications/${encodeURIComponent(orderId)}/feedback`, {
+  await qualityDashboardCommand(`/quality-safety/rectifications/${encodeURIComponent(orderId)}/feedback`, {
     method: "POST",
     body: JSON.stringify({
       content: "通过质量安全监管平台提交演示反馈。",
       attachments: ["site-evidence-placeholder"]
     })
   });
-  await loadQualitySafety();
 }
 
 async function reviewOrder(orderId) {
-  await qualityApi(`/quality-safety/rectifications/${encodeURIComponent(orderId)}/review`, {
+  await qualityDashboardCommand(`/quality-safety/rectifications/${encodeURIComponent(orderId)}/review`, {
     method: "POST",
     body: JSON.stringify({
       decision: "approved",
       comment: "反馈证据核验后通过演示复核。"
     })
   });
-  await loadQualitySafety();
 }
 
 async function escalateOrder(orderId) {
-  await qualityApi(`/quality-safety/rectifications/${encodeURIComponent(orderId)}/escalate`, {
+  await qualityDashboardCommand(`/quality-safety/rectifications/${encodeURIComponent(orderId)}/escalate`, {
     method: "POST",
     body: JSON.stringify({
       reason: "通过质量安全监管平台手动升级。"
     })
   });
-  await loadQualitySafety();
 }
 
 async function acknowledgeCritical(alertId) {
-  await qualityApi(`/quality-safety/critical-values/${encodeURIComponent(alertId)}/acknowledge`, {
+  await qualityDashboardCommand(`/quality-safety/critical-values/${encodeURIComponent(alertId)}/acknowledge`, {
     method: "POST",
     body: JSON.stringify({
       note: "通过质量安全监管平台确认危急值。"
     })
   });
-  await loadQualitySafety();
 }
 
 async function disposeCritical(alertId) {
-  await qualityApi(`/quality-safety/critical-values/${encodeURIComponent(alertId)}/dispose`, {
+  await qualityDashboardCommand(`/quality-safety/critical-values/${encodeURIComponent(alertId)}/dispose`, {
     method: "POST",
     body: JSON.stringify({
       action: "已通知责任医师；源系统已完成处置记录。",
       outcome: "disposed"
     })
   });
-  await loadQualitySafety();
 }
 
 async function reviewClinicalPathway(caseId) {
-  await qualityApi(`/quality-safety/clinical-pathways/${encodeURIComponent(caseId)}/review`, {
+  await qualityDashboardCommand(`/quality-safety/clinical-pathways/${encodeURIComponent(caseId)}/review`, {
     method: "POST",
     body: JSON.stringify({
       decision: "approved",
@@ -977,11 +1016,10 @@ async function reviewClinicalPathway(caseId) {
       evidence: ["emr-follow-up-note"]
     })
   });
-  await loadQualitySafety();
 }
 
 async function reviewSiteSignoff(signoffId) {
-  await qualityApi(`/quality-safety/site-signoffs/${encodeURIComponent(signoffId)}/review`, {
+  await qualityDashboardCommand(`/quality-safety/site-signoffs/${encodeURIComponent(signoffId)}/review`, {
     method: "POST",
     body: JSON.stringify({
       decision: "ready_for_joint_test",
@@ -989,35 +1027,34 @@ async function reviewSiteSignoff(signoffId) {
       evidence: ["site-joint-test-note"]
     })
   });
-  await loadQualitySafety();
 }
 
 async function submitSiteSignoffEvidence(signoffId) {
-  await qualityApi(`/quality-safety/site-signoffs/${encodeURIComponent(signoffId)}/evidence`, {
+  await qualityDashboardCommand(`/quality-safety/site-signoffs/${encodeURIComponent(signoffId)}/evidence`, {
     method: "POST",
     body: JSON.stringify({
       note: "通过质量安全监管平台提交现场联调证据。",
       evidence: ["site-joint-test-evidence"]
     })
   });
-  await loadQualitySafety();
 }
 
 async function submitCoreSystemEvidence(coreSystemId) {
-  await qualityApi(`/quality-safety/core-systems/${encodeURIComponent(coreSystemId)}/evidence`, {
+  await qualityDashboardCommand(`/quality-safety/core-systems/${encodeURIComponent(coreSystemId)}/evidence`, {
     method: "POST",
     body: JSON.stringify({
       note: "通过质量安全监管平台提交核心制度落实证据。",
       evidence: ["core-system-evidence-placeholder"]
     })
   });
-  await loadQualitySafety();
 }
 
 async function validateInterfaceSample(interfaceId) {
+  if (!qualitySafetyInterfacePack) throw new Error(QUALITY_SNAPSHOT_UNAVAILABLE);
+  const generation = qualitySafetyReadGeneration.pack;
   const request = (qualitySafetyInterfacePack?.sampleRequests || []).find((item) => item.interfaceId === interfaceId);
   if (!request) throw new Error("接口样例尚未加载");
-  qualitySafetyValidationResult = await qualityApi("/quality-safety/interface-messages/validate", {
+  const validationResult = await qualityApi("/quality-safety/interface-messages/validate", {
     method: "POST",
     body: JSON.stringify({
       interfaceId: request.interfaceId,
@@ -1027,6 +1064,8 @@ async function validateInterfaceSample(interfaceId) {
       message: request.message
     })
   });
+  if (generation !== qualitySafetyReadGeneration.pack) return;
+  qualitySafetyValidationResult = validationResult;
   await loadQualitySafetyInterfacePack();
 }
 
