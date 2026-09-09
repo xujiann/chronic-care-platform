@@ -4,6 +4,8 @@
   const API_BASE = "/public-health/supervision";
   let board = null;
   let client = null;
+  const taskCommands = new Map();
+  let taskSubmissionPending = false;
 
   function element(tag, { className = "", text = "", dataset = {} } = {}) {
     const node = root.document.createElement(tag);
@@ -122,11 +124,13 @@
       const response = await client.get(`${API_BASE}/workbench`);
       renderWorkbench(response.data);
       setStatus(`工作台已刷新 · ${new Date(response.data.generatedAt).toLocaleString("zh-CN")}`);
+      return true;
     } catch (error) {
       board = null;
       setStatus(`工作台加载失败：${error.message || "请稍后重试"}`, true);
       ["#supervision-tasks", "#supervision-subjects", "#supervision-findings", "#supervision-records"]
         .forEach((selector) => replace(root.document.querySelector(selector), [empty("数据暂不可用") ]));
+      return false;
     }
   }
 
@@ -147,7 +151,7 @@
 
   async function submitTask(form) {
     const data = new root.FormData(form);
-    await client.post(`${API_BASE}/inspection-tasks`, {
+    const payload = {
       subjectId: String(data.get("subjectId") || "").trim(),
       taskType: String(data.get("taskType") || "routine"),
       priority: String(data.get("priority") || "normal"),
@@ -155,7 +159,29 @@
       checklistTemplateId: "general-health-supervision-baseline",
       checklistTemplateVersion: 1,
       expectedVersion: 0
+    };
+    const user = root.HealthCityAuth?.getUser?.() || {};
+    const intent = JSON.stringify([
+      user.id || user.username || "", user.role || "", user.orgCode || "",
+      user.accountType || "", user.orgType || "", payload
+    ]);
+    // Keep A/B/A identities; confirmed writes await a successful read before retirement.
+    if (!taskCommands.has(intent)) taskCommands.set(intent, { key: root.HealthPlatformApi.newCorrelationId(), confirmed: false });
+    const command = taskCommands.get(intent);
+    if (command.confirmed) return intent;
+    const response = await client.post(`${API_BASE}/inspection-tasks`, payload, {
+      headers: { "Idempotency-Key": command.key }
     });
+    const task = response.data?.task;
+    const confirmedReceipt = (response.status === 201 && response.data?.idempotent === false)
+      || (response.status === 200 && response.data?.idempotent === true);
+    if (response.data?.ok !== true || typeof task?.id !== "string" || !task.id.trim()
+      || !confirmedReceipt || task.version !== 1 || task.status !== "assigned"
+      || Object.keys(payload).some((key) => key !== "expectedVersion" && task[key] !== payload[key])) {
+      throw new Error("创建结果未确认，请保留草稿并使用相同内容重试核对原命令");
+    }
+    command.confirmed = true;
+    return intent;
   }
 
   async function submitAction(form) {
@@ -218,12 +244,30 @@
     const handler = handlers[event.target?.id];
     if (!handler) return;
     event.preventDefault();
+    const isTask = handler === submitTask;
+    if (isTask && taskSubmissionPending) return;
+    const controls = isTask
+      ? Array.from(event.target.querySelectorAll('button[type="submit"], input[type="submit"]'), (control) => ({ control, disabled: control.disabled }))
+      : [];
+    if (isTask) {
+      taskSubmissionPending = true;
+      controls.forEach(({ control }) => { control.disabled = true; });
+    }
     try {
-      await handler(event.target);
+      const intent = await handler(event.target);
       setStatus("命令已提交并保存");
-      await loadWorkbench();
+      const refreshed = await loadWorkbench();
+      if (isTask) {
+        if (refreshed) taskCommands.delete(intent);
+        else setStatus("任务已保存，刷新失败；请仅刷新核对。再次提交相同草稿只会重试刷新，不会重复创建。");
+      }
     } catch (error) {
       setStatus(`提交失败：${error.message || "请检查输入"}`, true);
+    } finally {
+      if (isTask) {
+        taskSubmissionPending = false;
+        controls.forEach(({ control, disabled }) => { control.disabled = disabled; });
+      }
     }
   }
 
