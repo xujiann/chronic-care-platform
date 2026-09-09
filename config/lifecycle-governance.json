@@ -40,6 +40,17 @@
   },
   "requirements": [
     {
+      "id": "REQ-OPS-030",
+      "title": "账号筛选与最新文档快照绑定",
+      "sourceType": "approved-t00-plan",
+      "sourceRef": "T00-PLAN-OPS-030-APPROVED-2026-09-09",
+      "acceptance": [
+        "后续 render 及全部筛选只消费当前 document 最新 accounts/policy，删除或停用账号不得由旧快照复活",
+        "每个实际控件监听器只绑定一次，替换控件可绑定；不同 document 筛选和快照独立",
+        "保留 buildView/排序/摘要/空态/文本惰性渲染/缺 target 返回 null；不改身份、授权、API 或 schema"
+      ]
+    },
+    {
       "id": "REQ-OPS-029",
       "title": "居民照护工作台回执与发起会话绑定",
       "sourceType": "approved-t00-plan",
@@ -329,6 +340,15 @@
   ],
   "risks": [
     {
+      "id": "RISK-OPS-030",
+      "level": "中",
+      "title": "账号筛选旧闭包和跨文档状态泄漏",
+      "owner": "T01",
+      "mitigation": "每 document 独立 controller 持有最新上下文，按实际控件绑定去重，覆盖快照替换/双文档/恶意输入回归",
+      "status": "open",
+      "evidenceIds": []
+    },
+    {
       "id": "RISK-OPS-029",
       "level": "中",
       "title": "迟到回执错归居民缓存或污染新视图草稿",
@@ -617,6 +637,12 @@
     }
   ],
   "tests": [
+    {
+      "id": "TEST-OPS-030",
+      "kind": "existing-identity-ui-baseline-multisnapshot-regression-required",
+      "path": "test/platform-identity-governance-ui.test.js",
+      "command": "node --test test/platform-identity-governance-ui.test.js"
+    },
     {
       "id": "TEST-OPS-029",
       "kind": "existing-record-projection-baseline-session-regression-required",
@@ -1104,7 +1130,7 @@
       "baseline": "T00至T09及临床子域已建立模块所有权",
       "target": "模块写入冲突和跨任务依赖自动失败关闭",
       "status": "已集成",
-      "gapTaskIds": ["OPS-017","GOV-008","OPS-031","OPS-032","OPS-029"],
+      "gapTaskIds": ["OPS-017","GOV-008","OPS-031","OPS-032","OPS-029","OPS-030"],
       "evidenceIds": ["EVD-GOV-001", "EVD-GOV-002"]
     },
     {
@@ -1140,11 +1166,70 @@
       "baseline": "技术债以稳定编号记录仓库及现场缺口",
       "target": "风险、差距任务、退出条件和关闭证据双向可追踪",
       "status": "已集成",
-      "gapTaskIds": ["GOV-002","OPS-015","OPS-016","OPS-017","OPS-018","SEC-011","GOV-008","OPS-031","OPS-032","OPS-029"],
+      "gapTaskIds": ["GOV-002","OPS-015","OPS-016","OPS-017","OPS-018","SEC-011","GOV-008","OPS-031","OPS-032","OPS-029","OPS-030"],
       "evidenceIds": ["EVD-GOV-001", "EVD-GOV-002"]
     }
   ],
   "tasks": [
+    {
+      "id": "OPS-030",
+      "title": "账号筛选最新快照与文档隔离",
+      "ownerProcess": "T01",
+      "integrationOwner": "T00",
+      "taskStatus": "已批准",
+      "capabilityStatus": "未建设",
+      "riskLevel": "中",
+      "approval": {
+        "state": "approved",
+        "mode": "T00-plan-approval",
+        "ref": "T00-PLAN-OPS-030-APPROVED-2026-09-09",
+        "approvedScope": "identity-governance-ui-document-controller-and-latest-filter-context-only"
+      },
+      "requirementIds": [
+        "REQ-OPS-030"
+      ],
+      "regulatoryControlIds": [
+        "REG-GOV-001"
+      ],
+      "riskIds": [
+        "RISK-OPS-030"
+      ],
+      "decisionIds": [],
+      "dependencies": [
+        "GOV-007"
+      ],
+      "affectedModules": [
+        "identity-governance-browser"
+      ],
+      "dataSensitivity": "既有账号治理元数据，不改变服务端身份事实或授权",
+      "acceptanceCriteria": [
+        "后续 render 及全部筛选只消费当前 document 最新 accounts/policy，删除或停用账号不得由旧快照复活",
+        "每个实际控件监听器只绑定一次，替换控件可绑定；不同 document 筛选和快照独立",
+        "保留 buildView/排序/摘要/空态/文本惰性渲染/缺 target 返回 null；不改身份、授权、API 或 schema"
+      ],
+      "testIds": [
+        "TEST-OPS-030"
+      ],
+      "evidenceIds": [],
+      "rollback": "回退本任务独立提交并重跑相关门禁；无 migration，不回退服务端业务事实",
+      "unresolved": [
+        "尚需新增行为回归、独立评审、PR 及最终提交 CI；现有 test 引用仅为回归基线"
+      ],
+      "worktree": ".codex-platform-worktrees/process-v2/t01-identity-account-filter-snapshot-20260909",
+      "branch": "process/t01-identity-account-filter-snapshot-20260909",
+      "planRef": "docs/lifecycle-governance.md#gov-008-下一批缺口组合-plan",
+      "pullRequestRef": "",
+      "ciRef": "",
+      "writeScopes": [
+        "platform-identity-governance-ui.js",
+        "test/platform-identity-governance-ui.test.js"
+      ],
+      "observability": {
+        "applicable": false,
+        "reason": "仅既有浏览器兼容修复或治理登记，不新增独立生产运行能力；完整运行观测及现场证据仍未闭合"
+      },
+      "runtimeCapability": false
+    },
     {
       "id": "OPS-029",
       "title": "居民照护工作台会话与回执归属隔离",
