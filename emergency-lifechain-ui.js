@@ -50,11 +50,21 @@ function lifeChainButton(label, dataset) {
 function lifeChainEmpty(message) {
   return lifeChainElement("p", { text: message });
 }
-async function lifeChainRequest(path, options = {}) {
+async function lifeChainRequest(path, options = {}, authorization = null) {
   const authFetch = window.HealthCityAuth?.authFetch || fetch;
   const response = await authFetch(`${LIFE_CHAIN_API}${path}`, { headers:{ "Content-Type":"application/json", ...(options.headers || {}) }, ...options });
   const body = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(body.message || "Life-chain operation failed");
+  if (authorization) {
+    const item = body?.item;
+    const creating = Object.hasOwn(authorization, "deviceId");
+    if (response.status !== (creating ? 201 : 200) || !body || typeof body !== "object" || Array.isArray(body) || body.ok !== true ||
+        !item || typeof item !== "object" || Array.isArray(item) || typeof item.id !== "string" || !item.id.trim() ||
+        item.active !== creating || item.autoCallEnabled !== creating ||
+        (creating ? item.deviceId !== String(authorization.deviceId || "").trim().slice(0, 80) : item.id !== authorization.id)) {
+      throw new Error("Authorization result not confirmed. Check the current authorization status before submitting again; no automatic retry was sent.");
+    }
+  }
   return body;
 }
 function lifeChainMessage(message, error = false) {
@@ -158,7 +168,7 @@ async function submitLifeChainForm(event) {
   const form = event.currentTarget; const payload = Object.fromEntries(new FormData(form).entries());
   const pathByForm = { "lifechain-authorization-form":"/life-chain/authorizations", "lifechain-family-form":"/life-chain/family-contacts", "lifechain-device-sos-form":"/life-chain/device-sos" };
   try {
-    const result = await lifeChainRequest(pathByForm[form.id], { method:"POST", body:JSON.stringify(payload) });
+    const result = await lifeChainRequest(pathByForm[form.id], { method:"POST", body:JSON.stringify(payload) }, form.id === "lifechain-authorization-form" ? { deviceId: payload.deviceId } : null);
     lifeChainMessage(form.id === "lifechain-device-sos-form" ? (result.submission?.deduplicated ? "Duplicate device signal was suppressed; the original SOS remains in the 120 information queue." : "Pre-authorized device SOS submitted to the 120 information queue.") : "Life-chain authorization information saved.");
     await loadLifeChain();
     if (form.id === "lifechain-device-sos-form" && !result.submission?.deduplicated && result.callInstruction?.telUri) lifeChainSafeTelephone(result.callInstruction.telUri);
@@ -173,7 +183,7 @@ document.addEventListener("DOMContentLoaded", () => {
     try {
       if (button.dataset.revokeAuthorization) {
         if (!window.confirm("Revoke automatic SOS for this device?")) return;
-        await lifeChainRequest(`/life-chain/authorizations/${encodeURIComponent(button.dataset.revokeAuthorization)}/revoke`, { method:"POST", body:JSON.stringify({ confirmed:true }) });
+        await lifeChainRequest(`/life-chain/authorizations/${encodeURIComponent(button.dataset.revokeAuthorization)}/revoke`, { method:"POST", body:JSON.stringify({ confirmed:true }) }, { id: button.dataset.revokeAuthorization });
         lifeChainMessage("Automatic SOS authorization revoked.");
       } else if (button.dataset.cancellationEvent) {
         if (!window.confirm("Request a 120 human review for this automatic SOS? This does not cancel a dispatched ambulance.")) return;
