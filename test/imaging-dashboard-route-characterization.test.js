@@ -653,6 +653,123 @@ test("imaging workbench exposes role-scoped QC and explicit non-blind retry guid
   assert.match(source, /function inspectQualityControlStatus/);
 });
 
+function assertQcRecoveryGuidance(message) {
+  for (const text of ["暂停重复提交", "刷新页面不能证明对账完成", "点击查看状态", "机构受控工单", "影像管理员", "明确核验结论前保留需对账状态"]) {
+    assert.ok(message.includes(text), `missing QC recovery guidance: ${text}`);
+  }
+  assert.doesNotMatch(message, /对账后重新加载页面/);
+}
+
+test("imaging QC recovery guidance preserves locks across transport and strict-read failures", async (t) => {
+  const source = fs.readFileSync(path.join(__dirname, "..", "imaging-cloud.js"), "utf8");
+  const scenarios = [
+    { name: "unknown receipt and HTTP read failure", external: "unknown", read: "http" },
+    { name: "lost POST response and offline GET", external: "network", read: "network" },
+    { name: "confirmed receipt and malformed JSON", external: "confirmed", read: "json" },
+    { name: "unknown receipt and missing study list", external: "unknown", read: "shape" },
+    { name: "unknown receipt and study outside current view", external: "unknown", read: "missing" },
+    { name: "confirmed receipt and same local resource ID", external: "confirmed", read: "matching" },
+    { name: "unknown receipt cannot be confirmed by matching local fields", external: "unknown", read: "matching" }
+  ];
+  for (const scenario of scenarios) await t.test(scenario.name, async () => {
+    const calls = [];
+    const alerts = [];
+    const attributes = new Map();
+    const table = { innerHTML: "" };
+    const prompts = ["质控通过", "90", "91", "影像与报告质控通过"];
+    let promptCount = 0;
+    let fallbackCount = 0;
+    const currentPayload = {
+      studies: scenario.read === "missing" ? [] : [{
+        id: "study-001", qcStatus: "质控通过", fhirReportSyncStatus: "synced",
+        fhirDiagnosticReportId: "diagnostic-report-001"
+      }],
+      qualityReviews: []
+    };
+    const window = {
+      alert(message) { alerts.push(message); },
+      HealthStructuredDialog: { async prompt() { promptCount += 1; return prompts.shift(); } },
+      HealthCityAuth: {
+        getUser() { return { role: "institution" }; },
+        async authFetch(url, options = {}) {
+          const method = options.method || "GET";
+          calls.push({ method, url });
+          if (method === "POST") {
+            if (scenario.external === "network") throw new Error("connection lost");
+            return { ok: false, status: scenario.external === "confirmed" ? 503 : 502, async json() {
+              return {
+                message: "质控结果需核对", retryable: false, reconciliationRequired: true,
+                reconciliation: {
+                  studyId: "study-001", externalOutcome: scenario.external, localOutcome: "not-committed",
+                  ...(scenario.external === "confirmed" ? { resourceType: "DiagnosticReport", resourceId: "diagnostic-report-001" } : {})
+                }
+              };
+            } };
+          }
+          if (scenario.read === "network") throw new Error("offline");
+          return { ok: scenario.read !== "http", status: scenario.read === "http" ? 503 : 200, async json() {
+            if (scenario.read === "json") throw new SyntaxError("invalid JSON");
+            if (scenario.read === "shape") return { summary: {} };
+            if (scenario.read === "http") return { message: "dashboard unavailable" };
+            return currentPayload;
+          } };
+        }
+      }
+    };
+    const context = {
+      console, window, URL, URLSearchParams,
+      location: { origin: "http://platform.test", protocol: "http:" },
+      document: { addEventListener() {}, querySelector(selector) { return selector === "#study-table" ? table : null; } },
+      fetch() { fallbackCount += 1; throw new Error("unexpected unauthenticated fetch"); },
+      fallbackProbe() { fallbackCount += 1; throw new Error("unexpected demo fallback"); }
+    };
+    vm.runInNewContext(`${source}\n;buildFallbackImagingCloud = fallbackProbe; globalThis.qcTest = { imagingState, imagingQualityControlActionState, imagingQualityControlRecovery, qualityControlStudy, inspectQualityControlStatus };`, context);
+    const qc = context.qcTest;
+    const originalPayload = { studies: [{ id: "study-001", qcStatus: "待质控" }] };
+    qc.imagingState.payload = originalPayload;
+    qc.imagingState.selectedResidentId = "resident-fixture";
+    qc.imagingState.selectedInstitutionCode = "institution-fixture";
+    const button = {
+      dataset: {}, textContent: "质控回写", disabled: false,
+      setAttribute(name, value) { attributes.set(name, value); },
+      removeAttribute(name) { attributes.delete(name); }
+    };
+    await qc.qualityControlStudy("study-001", button);
+    assertQcRecoveryGuidance(alerts.at(-1));
+    assert.equal(qc.imagingState.payload, originalPayload);
+    assert.equal(button.disabled, true);
+    assert.equal(button.textContent, "需对账");
+    assert.equal(attributes.get("aria-disabled"), "true");
+    assert.match(attributes.get("title"), /刷新页面不能证明对账完成.*机构受控工单.*影像管理员/);
+    assert.doesNotMatch(attributes.get("title"), /对账后重新加载页面/);
+    const recovery = qc.imagingQualityControlRecovery.get("study-001");
+    assert.equal(recovery.externalOutcome, scenario.external === "confirmed" ? "confirmed" : "unknown");
+
+    await qc.inspectQualityControlStatus("study-001");
+    assertQcRecoveryGuidance(alerts.at(-1));
+    assert.equal(qc.imagingQualityControlRecovery.get("study-001"), recovery);
+    assert.equal(qc.imagingQualityControlActionState.get("study-001"), "reconciliation-required");
+    assert.equal(fallbackCount, 0);
+    assert.equal(calls[1].url, "http://platform.test/api/imaging-cloud?residentId=resident-fixture&institutionCode=institution-fixture");
+    if (["http", "network", "json", "shape"].includes(scenario.read)) {
+      assert.equal(qc.imagingState.payload, originalPayload);
+      assert.match(alerts.at(-1), /未能读取当前本地状态.*未使用演示数据替代/);
+    } else {
+      assert.equal(qc.imagingState.payload, currentPayload);
+      if (scenario.read === "missing") assert.match(alerts.at(-1), /当前授权与筛选范围内未找到.*不等于外部报告不存在/);
+      if (scenario.read === "matching" && scenario.external === "confirmed") assert.match(alerts.at(-1), /相同资源标识.*不能替代.*对账完成证明/);
+      if (scenario.external === "unknown") assert.match(alerts.at(-1), /外部结果仍未知/);
+    }
+    await qc.qualityControlStudy("study-001", button);
+    assertQcRecoveryGuidance(alerts.at(-1));
+    assert.deepEqual(calls.map((call) => call.method), ["POST", "GET"]);
+    assert.equal(promptCount, 4);
+    assert.equal(qc.imagingQualityControlRecovery.get("study-001"), recovery);
+    assert.equal(qc.imagingQualityControlActionState.get("study-001"), "reconciliation-required");
+    assert.equal(button.disabled, true);
+  });
+});
+
 test("imaging browser recovery view performs one strict GET and keeps the QC write locked", async () => {
   const source = fs.readFileSync(path.join(__dirname, "..", "imaging-cloud.js"), "utf8");
   const alerts = [];
@@ -721,6 +838,7 @@ test("imaging browser recovery view performs one strict GET and keeps the QC wri
   };
 
   await context.__imagingRecoveryTest.qualityControlStudy("study-001", button);
+  assertQcRecoveryGuidance(alerts.at(-1));
   await context.__imagingRecoveryTest.inspectQualityControlStatus("study-001");
 
   assert.deepEqual(calls.map((item) => item.method), ["POST", "GET"]);
@@ -729,6 +847,7 @@ test("imaging browser recovery view performs one strict GET and keeps the QC wri
   assert.match(alerts.at(-1), /diagnostic-report-001/);
   assert.match(alerts.at(-1), /本地当前状态：待质控/);
   assert.match(alerts.at(-1), /仍保持锁定/);
+  assertQcRecoveryGuidance(alerts.at(-1));
   assert.match(table.innerHTML, /data-qc-status="study-001"/);
 });
 
@@ -764,6 +883,7 @@ test("imaging browser recovery view never replaces a failed strict read with fal
   assert.equal(context.__imagingRecoveryFailureTest.imagingState.payload, originalPayload);
   assert.equal(context.__imagingRecoveryFailureTest.imagingQualityControlActionState.get("study-001"), "reconciliation-required");
   assert.match(alerts[0], /未能读取当前本地状态/);
+  assertQcRecoveryGuidance(alerts[0]);
   assert.doesNotMatch(alerts[0], /已完成|已确认并保存/);
 });
 
@@ -816,10 +936,14 @@ test("imaging browser flow locks an uncertain QC result and releases an explicit
   assert.equal(uncertain.context.__imagingTest.imagingQualityControlActionState.get("study-001"), "reconciliation-required");
   assert.equal(uncertain.button.disabled, true);
   assert.equal(uncertain.button.textContent, "需对账");
-  assert.match(uncertain.alerts[0], /不要直接重复提交/);
+  assertQcRecoveryGuidance(uncertain.alerts[0]);
   await uncertain.context.__imagingTest.qualityControlStudy("study-001", uncertain.button);
   assert.equal(uncertain.getRequestCount(), 1);
   assert.match(uncertain.alerts[1], /已阻止重复提交/);
+  assertQcRecoveryGuidance(uncertain.alerts[1]);
+  assert.match(uncertain.attributes.get("title"), /刷新页面不能证明对账完成/);
+  assert.match(uncertain.table.innerHTML, /刷新页面不能证明对账完成/);
+  assert.doesNotMatch(uncertain.table.innerHTML, /对账后重新加载页面/);
   assert.match(uncertain.table.innerHTML, /data-qc-study="study-001" disabled aria-disabled="true"/);
   assert.match(uncertain.table.innerHTML, />需对账<\/button>/);
 
