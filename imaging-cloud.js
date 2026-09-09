@@ -834,6 +834,18 @@ async function qualityControlStudy(studyId, button) {
       window.alert(`${payload.message || `质控回写失败（HTTP ${response.status}）`} ${guidance}`);
       return;
     }
+    const diagnosticReport = payload?.fhirReportSync?.diagnosticReport;
+    const committedResponse = [payload, payload?.study, payload?.review, payload?.fhirReportSync, diagnosticReport]
+      .every((item) => item && typeof item === "object" && !Array.isArray(item))
+      && payload.study.id === studyId
+      && payload.review.studyId === studyId
+      && payload.study.fhirReportSyncStatus === "synced"
+      && typeof diagnosticReport.id === "string"
+      && /^[A-Za-z0-9.-]{1,64}$/.test(diagnosticReport.id)
+      && payload.study.fhirDiagnosticReportId === diagnosticReport.id;
+    if (response.status !== 200 || !committedResponse) {
+      throw new Error("质控响应缺少有效的本地提交确认，无法确认结果");
+    }
     imagingQualityControlActionState.delete(studyId);
     imagingQualityControlRecovery.delete(studyId);
     await loadImagingCloud();
