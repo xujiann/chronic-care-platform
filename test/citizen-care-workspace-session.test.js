@@ -29,13 +29,16 @@ function harness({ online = true } = {}) {
     };
   }
   const section = { addEventListener: (type, fn) => { handlers.section = fn; } };
-  const posts = [];
+  const posts = [], gets = [];
   const context = vm.createContext({
     API_BASE: online ? "https://example.test/api" : "",
     state: { residents: [{ id: "r1" }, { id: "r2" }], diseases: [], followups: [] },
     citizenCareSession: session, citizenCareSyncStatus: new Map(), citizenExtra: {}, CITIZEN_EXTRA_KEY: "synthetic-care",
     window: { CitizenRecordsV2: api, confirm: () => true, HealthCityAuth: {
-      authFetch: (url, options) => new Promise((resolve, reject) => posts.push({ url, body: JSON.parse(options.body), resolve, reject }))
+      authFetch: (url, options) => new Promise((resolve, reject) => {
+        if (options.method === "POST") posts.push({ url, body: JSON.parse(options.body), resolve, reject });
+        else gets.push({ url, resolve, reject });
+      })
     } },
     document: { querySelector: (selector) => selector === "#citizen-care-workspace" ? section : forms[selector] || (selector.startsWith("#profile-") ? {} : null), querySelectorAll: () => [] },
     localStorage: { setItem: (key, value) => storage.push({ key, value }) },
@@ -49,6 +52,7 @@ function harness({ online = true } = {}) {
   vm.runInContext([
     between("let currentResidentId;", "\ndocument.addEventListener(\"DOMContentLoaded\""),
     between("function clearCitizenCareLocalPreview(", "\nfunction renderCitizenCareSyncStatus("),
+    between("function renderCitizenCareSyncStatus(", "\nfunction scheduleCitizenCareWorkspaceSync("),
     between("function markCitizenCareActionSynced(", "\nfunction citizenCareEmpty("),
     between("function citizenCareRequestNonce()", "\nfunction currentRecordAccessibility()"),
     between(helpersStart, "\nfunction cleanTextForSpeech("), render,
@@ -61,7 +65,7 @@ function harness({ online = true } = {}) {
   }
   effects.length = 0;
   return {
-    effects, posts, forms, storage, context,
+    effects, posts, gets, forms, storage, context,
     cache: (id) => context.ensureCitizenCareCollections(id),
     switchTo(id) { context.renderCitizen(id); effects.length = 0; },
     start(command) {
@@ -72,6 +76,49 @@ function harness({ online = true } = {}) {
     },
     reply(overrides = {}) { posts[0].resolve({ ok: true, json: async () => ({ ...posts[0].body, receiptId: "synthetic-receipt", auditRef: "synthetic-audit", ...overrides }) }); }
   };
+}
+
+for (const command of ["share-revoke", "care-task-complete"]) {
+  for (const missing of [false, true]) {
+    test(`${command}: real refresh replacement ${missing ? "missing target is not recreated" : "receives the pending receipt"}`, async () => {
+      const ui = harness();
+      const original = ui.cache("r1");
+      const originalPackage = original.recordSharePackages[0];
+      const pending = ui.start(command);
+      ui.switchTo("r2");
+      ui.switchTo("r1");
+      // A user-cleared cache plus a fresh empty snapshot must not resurrect old rows.
+      if (missing) ui.context.citizenCareSession.delete("r1");
+      const refresh = ui.context.refreshCitizenCareWorkspace("r1", { silent: true });
+      ui.gets[0].resolve({ ok: true, json: async () => ({
+        sharePackages: missing ? [] : [{ ...originalPackage, purpose: "new authoritative metadata" }],
+        taskUpdates: [
+          ...(!missing ? [{ id: "task-1", residentId: "r1", status: "in-progress" }] : []),
+          { id: "untouched-task", residentId: "r1", status: "pending-resident" }
+        ],
+        syncedAt: new Date().toISOString()
+      }) });
+      await refresh;
+      const replacement = ui.cache("r1");
+      assert.notEqual(replacement, original);
+      ui.effects.length = 0;
+      ui.reply();
+      await pending;
+      assert.equal(receipts(original).length, 0, "detached cache must not receive the receipt");
+      assert.equal(receipts(replacement).length, missing ? 0 : 1);
+      assert.equal(replacement.careTaskUpdates["untouched-task"].status, "pending-resident");
+      assert.equal(ui.context.citizenCareSyncStatus.get("r1").label.startsWith("在线已确认"), !missing);
+      assert.deepEqual(ui.effects, [], "a refresh must not restore the old view generation");
+      if (!missing && command === "share-revoke") {
+        assert.equal(replacement.recordSharePackages[0].status, "revoked");
+        assert.equal(replacement.recordSharePackages[0].purpose, "new authoritative metadata");
+      }
+      if (missing) {
+        assert.equal(replacement.recordSharePackages.length, 0);
+        assert.equal(Object.hasOwn(replacement.careTaskUpdates, "task-1"), false);
+      }
+    });
+  }
 }
 
 function receipts(cache) {

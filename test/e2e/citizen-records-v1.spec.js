@@ -1,13 +1,14 @@
 const { expect, test } = require("@playwright/test");
 const fs = require("node:fs");
 
-for (const navigation of ["member-switch", "ABA"]) {
-  for (const outcome of ["success", "failure"]) {
-    test(`care workspace isolates delayed correction ${outcome} after ${navigation}`, async ({ page }) => {
+async function verifyCareWorkspaceSession(browser, baseURL, navigation, outcome) {
+  const context = await browser.newContext({ baseURL, serviceWorkers: "block" });
+  const page = await context.newPage();
+  let release;
+  try {
       // Synthetic member and receipt fixtures exercise browser context isolation only;
       // they do not grant family write permission or prove server authorization.
       await page.route("**/api/record-care-workspace**", (route) => route.fulfill({ json: { corrections: [], sharePackages: [], taskUpdates: {}, syncedAt: new Date().toISOString() } }));
-      let release;
       let sent;
       let responseFinished;
       const finished = new Promise((resolve) => { responseFinished = resolve; });
@@ -55,11 +56,14 @@ for (const navigation of ["member-switch", "ABA"]) {
       await page.locator("[data-member='r1']").click();
       if (outcome === "success") await expect(page.locator("#citizen-correction-list")).toContainText("session-correction-receipt");
       else await expect(page.locator("#citizen-correction-list")).not.toContainText("session-correction-receipt");
-    });
+  } finally {
+    release?.();
+    await context.close();
   }
 }
 
-test("resident creates a scoped consent and revokes it through the dedicated audit route", async ({ page }) => {
+test("resident creates a scoped consent and revokes it through the dedicated audit route", async ({ page, browser, baseURL }) => {
+  await test.step("care workspace isolates delayed success after member switch", () => verifyCareWorkspaceSession(browser, baseURL, "member-switch", "success"));
   const authorizationWrites = [];
   await page.route(/\/api\/(?:personal-records|authorizations\/.*\/revoke)$/, async (route) => {
     if (route.request().method() !== "POST") {
@@ -227,7 +231,8 @@ test("resident creates a scoped consent and revokes it through the dedicated aud
   await expect(page.locator("#access-log-cards")).not.toContainText("personIndex");
 });
 
-test("resident uses the V2 care workspace for correction, one-time sharing and accessibility", async ({ page }) => {
+test("resident uses the V2 care workspace for correction, one-time sharing and accessibility", async ({ page, browser, baseURL }) => {
+  await test.step("care workspace isolates delayed failure after member switch", () => verifyCareWorkspaceSession(browser, baseURL, "member-switch", "failure"));
   await page.route("**/api/record-care-workspace**", async (route) => {
     await route.fulfill({
       status: 200,
@@ -448,7 +453,8 @@ test("resident uses the V2 care workspace for correction, one-time sharing and a
   await expect(page.locator("#citizen-correction-list")).toContainText("尚未提交");
 });
 
-test("resident reviews all eight next-stage health record capabilities", async ({ page }) => {
+test("resident reviews all eight next-stage health record capabilities", async ({ page, browser, baseURL }) => {
+  await test.step("care workspace preserves a new ABA draft after delayed success", () => verifyCareWorkspaceSession(browser, baseURL, "ABA", "success"));
   await page.addInitScript(() => {
     globalThis.__CITIZEN_PRODUCTION_EVIDENCE__ = {
       identity: {
@@ -537,7 +543,8 @@ test("resident reviews all eight next-stage health record capabilities", async (
   expect(qualitySummaryBox.height).toBeGreaterThanOrEqual(44);
 });
 
-test("resident-facing pages do not expose English business copy", async ({ page }) => {
+test("resident-facing pages do not expose English business copy", async ({ page, browser, baseURL }) => {
+  await test.step("care workspace suppresses delayed failure in a new ABA view", () => verifyCareWorkspaceSession(browser, baseURL, "ABA", "failure"));
   const routes = ["health-record", "emr", "escort", "family-doctor", "registration"];
 
   await page.goto("/login.html");

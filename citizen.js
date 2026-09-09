@@ -3448,15 +3448,19 @@ function bindCitizenCareWorkspace() {
       const careState = ensureCitizenCareCollections(context.residentId);
       const item = careState.recordSharePackages.find((candidate) => candidate.id === revokeButton.dataset.revokeSharePackage);
       if (!item || !window.confirm(`确认撤销一次性资料包“${item.accessRef}”？`)) return;
+      const resourceId = item.id;
       try {
         const revoked = api.revokeSharePackage(item);
-        const response = await submitCitizenCareAction(`/record-share-packages/${encodeURIComponent(item.id)}/revoke`, {
+        const response = await submitCitizenCareAction(`/record-share-packages/${encodeURIComponent(resourceId)}/revoke`, {
           residentId: context.residentId,
-          resourceId: item.id,
+          resourceId,
           revokedAt: revoked.revokedAt
         }, "share-revoke");
-        const receipt = api.projectActionReceipt(response, { residentId: context.residentId, resourceId: item.id });
-        Object.assign(item, revoked, receipt);
+        const receipt = api.projectActionReceipt(response, { residentId: context.residentId, resourceId });
+        const currentItem = ensureCitizenCareCollections(context.residentId).recordSharePackages
+          .find((candidate) => candidate.id === resourceId && candidate.residentId === context.residentId);
+        if (!currentItem) throw new Error("当前工作台已无该资料包，请刷新并核对服务端撤销记录");
+        Object.assign(currentItem, { status: revoked.status, revokedAt: revoked.revokedAt }, receipt);
         saveCitizenCareCollections(context.residentId);
         markCitizenCareActionSynced(context.residentId, receipt);
         if (!isCurrentCitizenCareContext(context)) return;
@@ -3470,7 +3474,7 @@ function bindCitizenCareWorkspace() {
     if (taskButton) {
       const context = captureCitizenCareContext();
       const resourceId = taskButton.dataset.careTaskComplete;
-      const careState = ensureCitizenCareCollections(context.residentId);
+      const sourceState = ensureCitizenCareCollections(context.residentId);
       const update = { status: "completed", completedAt: new Date().toISOString() };
       try {
         const response = await submitCitizenCareAction(`/care-tasks/${encodeURIComponent(resourceId)}/actions`, {
@@ -3482,7 +3486,11 @@ function bindCitizenCareWorkspace() {
           residentId: context.residentId,
           resourceId
         });
-        careState.careTaskUpdates[resourceId] = { ...update, ...receipt };
+        const careState = ensureCitizenCareCollections(context.residentId);
+        if (careState !== sourceState && !Object.hasOwn(careState.careTaskUpdates, resourceId)) {
+          throw new Error("工作台已刷新且无该处置记录，请核对服务端处理结果");
+        }
+        careState.careTaskUpdates[resourceId] = { ...careState.careTaskUpdates[resourceId], ...update, ...receipt };
         saveCitizenCareCollections(context.residentId);
         markCitizenCareActionSynced(context.residentId, receipt);
         if (!isCurrentCitizenCareContext(context)) return;
