@@ -8,6 +8,120 @@ async function loginCitizen(page) {
   await expect(page).toHaveURL(/citizen\.html$/);
 }
 
+async function verifyDialogSessionIsolation(page, scenario) {
+  const result = await page.evaluate(async ({ outcome, nextSubmitting, sameButton = false, nativeClose = false }) => {
+    // A separate real DOM avoids adding another controller to the production dialog.
+    const frame = document.createElement("iframe");
+    frame.title = "评价弹窗会话隔离回归";
+    document.body.append(frame);
+    try {
+      const doc = frame.contentDocument;
+      doc.body.innerHTML = `<button id="source-a" data-task-id="escort:a" data-task-collection="escortServiceOrders">评价 A</button>
+        <button id="source-b" data-task-id="escort:b" data-task-collection="escortServiceOrders">评价 B</button>
+        <dialog id="service-quality-feedback-dialog">
+          <h2 id="service-quality-feedback-title"></h2>
+          <form id="service-quality-feedback-form" method="dialog">
+            <select name="satisfaction"><option value=""></option><option value="满意">满意</option><option value="不满意">不满意</option></select>
+            <textarea name="comment"></textarea>
+            <input type="checkbox" name="complaintRequested" value="open">
+            <output id="service-quality-feedback-error"></output>
+            <button type="button" data-quality-feedback-cancel>取消</button>
+            <button type="submit">提交评价</button>
+          </form>
+        </dialog>`;
+      const dialog = doc.querySelector("dialog");
+      const form = doc.querySelector("form");
+      const error = doc.querySelector("output");
+      const submit = form.querySelector("button[type='submit']");
+      const a = doc.querySelector("#source-a");
+      const b = doc.querySelector(sameButton ? "#source-a" : "#source-b");
+      const requests = [];
+      const toasts = [];
+      let renders = 0;
+      let commandNumber = 0;
+      const controller = window.CitizenServiceFeedback.createDialogController(doc, (taskId, collection, payload, command) => {
+        let resolve;
+        let reject;
+        const promise = new Promise((onResolve, onReject) => { resolve = onResolve; reject = onReject; });
+        requests.push({ taskId, collection, payload, command, promise, resolve, reject });
+        return promise;
+      }, (message) => toasts.push(message), () => { renders += 1; }, () => ({ idempotencyKey: `browser-command-${++commandNumber}` }));
+      const fill = (comment) => {
+        form.elements.satisfaction.value = "不满意";
+        form.elements.comment.value = comment;
+        form.elements.complaintRequested.checked = true;
+      };
+      const send = () => form.dispatchEvent(new frame.contentWindow.Event("submit", { bubbles: true, cancelable: true }));
+      const closed = () => new Promise((resolve) => dialog.addEventListener("close", resolve, { once: true }));
+      controller.open(a);
+      fill("第一会话的评价");
+      send();
+      send();
+      const firstRequestCount = requests.length;
+      const firstClosed = closed();
+      if (nativeClose) dialog.close();
+      else form.querySelector("[data-quality-feedback-cancel]").click();
+      // Open before the browser dispatches A's queued native close event.
+      controller.open(b);
+      fill("第二会话的独立评价");
+      if (nextSubmitting) send();
+      await firstClosed;
+      if (outcome === "success") requests[0].resolve({});
+      else requests[0].reject(new Error("private stale database failure"));
+      // The controller registered its continuation first, so this observes it completed.
+      await requests[0].promise.catch(() => {});
+      const afterOldCompletion = {
+        open: dialog.open,
+        comment: form.elements.comment.value,
+        satisfaction: form.elements.satisfaction.value,
+        complaintRequested: form.elements.complaintRequested.checked,
+        error: error.textContent,
+        submitDisabled: submit.disabled,
+        sourceDisabled: b.disabled,
+        toasts: [...toasts],
+        renders
+      };
+      if (!nextSubmitting) send();
+      const finalClosed = closed();
+      requests[1].resolve({});
+      await requests[1].promise;
+      await finalClosed;
+      return {
+        firstRequestCount,
+        afterOldCompletion,
+        requestCount: requests.length,
+        commands: requests.map((request) => request.command.idempotencyKey),
+        lastTaskId: requests[1].taskId,
+        lastComment: requests[1].payload.comment,
+        finalOpen: dialog.open,
+        finalRenders: renders,
+        finalToasts: toasts
+      };
+    } finally {
+      frame.remove();
+    }
+  }, scenario);
+  expect(result.firstRequestCount).toBe(1);
+  expect(result.afterOldCompletion).toEqual({
+    open: true,
+    comment: "第二会话的独立评价",
+    satisfaction: "不满意",
+    complaintRequested: true,
+    error: scenario.nextSubmitting ? "正在提交评价…" : "",
+    submitDisabled: scenario.nextSubmitting,
+    sourceDisabled: scenario.nextSubmitting,
+    toasts: [],
+    renders: 0
+  });
+  expect(result.requestCount).toBe(2);
+  expect(result.commands).toEqual(["browser-command-1", "browser-command-2"]);
+  expect(result.lastTaskId).toBe(scenario.sameButton ? "escort:a" : "escort:b");
+  expect(result.lastComment).toBe("第二会话的独立评价");
+  expect(result.finalOpen).toBe(false);
+  expect(result.finalRenders).toBe(1);
+  expect(result.finalToasts).toEqual(["评价已提交，服务机构将跟进处理"]);
+}
+
 test("resident UI keeps a failed draft, recovers an ambiguous submission, and scopes family complaints", async ({ page }) => {
   const payloads = [];
   const idempotencyHeaders = [];
@@ -132,7 +246,8 @@ test("resident UI keeps a failed draft, recovers an ambiguous submission, and sc
   await dialog.getByRole("button", { name: "提交评价" }).click();
 
   await expect(dialog).toBeVisible();
-  await expect(dialog.locator("#service-quality-feedback-error")).toContainText("synthetic failure");
+  await expect(dialog.locator("#service-quality-feedback-error")).toHaveText("服务评价提交失败，请稍后重试。");
+  await expect(dialog).not.toContainText("synthetic failure");
   await expect(dialog.locator("select[name='satisfaction']")).toHaveValue("不满意");
   await expect(dialog.locator("textarea[name='comment']")).toHaveValue("服务迟到，希望机构联系说明");
   await expect(dialog.locator("input[name='complaintRequested']")).toBeChecked();
@@ -176,4 +291,15 @@ test("resident UI keeps a failed draft, recovers an ambiguous submission, and sc
   await expect(familyOrder).toBeVisible();
   await expect(familyOrder.getByRole("status", { name: "投诉跟进状态" })).toHaveCount(0);
   await expect(page.locator("#service-order-cards .service-order-card").filter({ hasText: "评价回归医院" })).toHaveCount(0);
+
+  for (const outcome of ["success", "failure"]) {
+    for (const nextSubmitting of [false, true]) {
+      await test.step(`native queued close and stale ${outcome} preserve the ${nextSubmitting ? "submitting" : "editing"} session`, async () => {
+        await verifyDialogSessionIsolation(page, { outcome, nextSubmitting });
+      });
+    }
+    await test.step(`native close and same-button reopen isolate stale ${outcome}`, async () => {
+      await verifyDialogSessionIsolation(page, { outcome, nextSubmitting: true, sameButton: true, nativeClose: true });
+    });
+  }
 });

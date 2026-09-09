@@ -4,10 +4,264 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
+const vm = require("node:vm");
 const feedback = require("../citizen-service-feedback");
 
 const ROOT = path.join(__dirname, "..");
 const read = (file) => fs.readFileSync(path.join(ROOT, file), "utf8");
+
+function deferred() {
+  let resolve;
+  let reject;
+  const promise = new Promise((onResolve, onReject) => { resolve = onResolve; reject = onReject; });
+  return { promise, resolve, reject };
+}
+
+function createFeedbackDialogHarness() {
+  function eventTarget(extra = {}) {
+    const listeners = new Map();
+    return {
+      ...extra,
+      addEventListener(type, listener) {
+        const registered = listeners.get(type) || [];
+        registered.push(listener);
+        listeners.set(type, registered);
+      },
+      async dispatch(type, event = {}) {
+        event.preventDefault = () => { event.defaultPrevented = true; };
+        await Promise.all((listeners.get(type) || []).map((listener) => listener(event)));
+        return event;
+      }
+    };
+  }
+  const closeEvents = [];
+  const submitButton = { disabled: false };
+  const form = eventTarget({
+    dataset: {},
+    values: {},
+    elements: { satisfaction: { focus() {} } },
+    reset() { this.values = { satisfaction: "", comment: "", complaintRequested: "" }; },
+    querySelector(selector) { return selector === "button[type='submit']" ? submitButton : null; }
+  });
+  const dialog = eventTarget({
+    open: false,
+    showModal() { this.open = true; },
+    close() {
+      if (!this.open) return;
+      this.open = false;
+      // Native close events are queued: reopening can precede delivery.
+      closeEvents.push(() => this.dispatch("close"));
+    }
+  });
+  const error = { textContent: "" };
+  const title = { textContent: "" };
+  const cancelButton = eventTarget();
+  const nodes = {
+    "#service-quality-feedback-dialog": dialog,
+    "#service-quality-feedback-form": form,
+    "#service-quality-feedback-error": error,
+    "#service-quality-feedback-title": title
+  };
+  const document = {
+    querySelector: (selector) => nodes[selector] || null,
+    querySelectorAll: (selector) => selector === "[data-quality-feedback-cancel]" ? [cancelButton] : []
+  };
+  const context = vm.createContext({
+    module: { exports: {} },
+    FormData: class {
+      constructor(target) { this.entries = Object.entries(target.values); }
+      [Symbol.iterator]() { return this.entries[Symbol.iterator](); }
+    }
+  });
+  vm.runInContext(read("citizen-service-feedback.js"), context, { filename: "citizen-service-feedback.js" });
+  const requests = [];
+  const toasts = [];
+  const commands = [];
+  let renders = 0;
+  const controller = context.module.exports.createDialogController(document, (taskId, collection, payload, command) => {
+    const request = { taskId, collection, payload, command, ...deferred() };
+    requests.push(request);
+    return request.promise;
+  }, (message) => toasts.push(message), () => { renders += 1; }, () => {
+    const command = { idempotencyKey: `feedback-command-${commands.length + 1}`, expectedVersion: 7 };
+    commands.push(command);
+    return command;
+  });
+  return {
+    controller, dialog, form, error, title, submitButton, requests, toasts, commands,
+    get renders() { return renders; },
+    button(id) { return { disabled: false, dataset: { taskId: `escort:${id}`, taskCollection: "escortServiceOrders" } }; },
+    fill(comment = "服务体验良好", satisfaction = "满意", complaintRequested = "") {
+      form.values = { satisfaction, comment, complaintRequested };
+    },
+    submit() { return form.dispatch("submit"); },
+    close() { return cancelButton.dispatch("click"); },
+    async cancel() {
+      const event = await dialog.dispatch("cancel");
+      if (!event.defaultPrevented) dialog.close();
+    },
+    async flushCloseEvents() {
+      while (closeEvents.length) await closeEvents.shift()();
+    }
+  };
+}
+
+for (const outcome of ["success", "failure"]) {
+  for (const nextSubmitting of [false, true]) {
+    test(`feedback dialog ignores stale ${outcome} while next session is ${nextSubmitting ? "submitting" : "editing"}`, async () => {
+      const h = createFeedbackDialogHarness();
+      const a = h.button("a");
+      const b = h.button("b");
+      h.controller.open(a);
+      h.fill("第一单的原始评价");
+      const pendingA = h.submit();
+      await h.close();
+      await h.flushCloseEvents();
+      h.controller.open(b);
+      h.fill("第二单的独立评价", "不满意", "open");
+      const pendingB = nextSubmitting ? h.submit() : null;
+      const expectedError = h.error.textContent;
+      const expectedDraft = { ...h.form.values };
+      if (outcome === "success") h.requests[0].resolve({});
+      else h.requests[0].reject(new Error("internal stale service failure"));
+      await pendingA;
+      assert.equal(h.dialog.open, true);
+      assert.deepEqual(h.form.values, expectedDraft);
+      assert.equal(h.error.textContent, expectedError);
+      assert.equal(h.submitButton.disabled, nextSubmitting);
+      assert.equal(b.disabled, nextSubmitting);
+      assert.deepEqual(h.toasts, []);
+      assert.equal(h.renders, 0);
+      if (pendingB) {
+        assert.equal(h.requests[1].command, h.commands[1]);
+        h.requests[1].resolve({});
+        await pendingB;
+        assert.equal(h.dialog.open, false);
+        assert.equal(h.renders, 1);
+      }
+    });
+  }
+}
+
+test("feedback dialog suppresses repeated submit events and retains failed draft and command for retry", async () => {
+  const h = createFeedbackDialogHarness();
+  const button = h.button("retry");
+  h.controller.open(button);
+  h.fill("需要机构联系说明", "不满意", "open");
+  const original = { ...h.form.values };
+  const first = h.submit();
+  const duplicate = h.submit();
+  assert.equal(h.requests.length, 1);
+  await duplicate;
+  h.requests[0].reject(new Error("database password and internal stack"));
+  await first;
+  assert.equal(h.dialog.open, true);
+  assert.deepEqual(h.form.values, original);
+  assert.equal(h.error.textContent, "服务评价提交失败，请稍后重试。");
+  assert.equal(h.submitButton.disabled, false);
+  assert.equal(button.disabled, false);
+  assert.deepEqual(h.toasts, ["服务评价提交失败，已保留填写内容"]);
+  const retry = h.submit();
+  assert.equal(h.requests.length, 2);
+  assert.equal(h.commands.length, 1);
+  assert.equal(h.requests[1].command, h.requests[0].command);
+  assert.equal(JSON.stringify(h.requests[1].payload), JSON.stringify(h.requests[0].payload));
+  h.requests[1].resolve({ recoveredFromDuplicate: true });
+  await retry;
+  await h.flushCloseEvents();
+  assert.equal(h.dialog.open, false);
+  assert.equal(button.disabled, false);
+  assert.equal(h.toasts.at(-1), "评价与投诉已登记，已同步最新状态");
+  assert.equal(h.renders, 1);
+});
+
+test("feedback dialog delayed close and old completion do not unlock a reopened same-button session", async () => {
+  const h = createFeedbackDialogHarness();
+  const button = h.button("same");
+  h.controller.open(button);
+  h.fill("第一会话评价");
+  const old = h.submit();
+  await h.close();
+  h.controller.open(button);
+  h.fill("重新打开后的评价");
+  const current = h.submit();
+  assert.equal(h.commands.length, 2);
+  assert.notEqual(h.requests[0].command.idempotencyKey, h.requests[1].command.idempotencyKey);
+  await h.flushCloseEvents();
+  assert.equal(h.dialog.open, true);
+  assert.equal(h.submitButton.disabled, true);
+  assert.equal(button.disabled, true);
+  h.requests[0].reject(new Error("old failure"));
+  await old;
+  assert.equal(h.error.textContent, "正在提交评价…");
+  assert.equal(h.submitButton.disabled, true);
+  assert.equal(button.disabled, true);
+  h.requests[1].resolve({});
+  await current;
+  assert.equal(h.dialog.open, false);
+  assert.equal(h.renders, 1);
+});
+
+for (const closeKind of ["cancel", "native"]) {
+  test(`feedback dialog ${closeKind} close invalidates the old session before reopen`, async () => {
+    const h = createFeedbackDialogHarness();
+    const button = h.button("same");
+    h.controller.open(button);
+    h.fill("关闭前的评价");
+    const old = h.submit();
+    if (closeKind === "cancel") await h.cancel();
+    else h.dialog.close();
+    h.controller.open(button);
+    assert.equal(h.commands.length, 2);
+    assert.equal(h.form.values.comment, "");
+    await h.flushCloseEvents();
+    h.fill("关闭后新会话评价");
+    h.requests[0].resolve({});
+    await old;
+    assert.equal(h.dialog.open, true);
+    assert.equal(h.form.values.comment, "关闭后新会话评价");
+    assert.deepEqual(h.toasts, []);
+    assert.equal(h.renders, 0);
+    const current = h.submit();
+    assert.equal(h.requests.length, 2);
+    h.requests[1].resolve({});
+    await current;
+  });
+}
+
+test("feedback dialog completion after dismissal produces no stale toast or render", async () => {
+  for (const outcome of ["success", "failure"]) {
+    const h = createFeedbackDialogHarness();
+    const button = h.button("dismissed");
+    h.controller.open(button);
+    h.fill();
+    const pending = h.submit();
+    await h.close();
+    if (outcome === "success") h.requests[0].resolve({});
+    else h.requests[0].reject(new Error("late failure"));
+    await pending;
+    await h.flushCloseEvents();
+    assert.equal(h.dialog.open, false);
+    assert.equal(h.error.textContent, "");
+    assert.equal(button.disabled, false);
+    assert.deepEqual(h.toasts, []);
+    assert.equal(h.renders, 0);
+  }
+});
+
+test("feedback dialog validation keeps known input guidance without issuing a request", async () => {
+  const h = createFeedbackDialogHarness();
+  h.controller.open(h.button("validation"));
+  h.fill("正常长度评价", "");
+  await h.submit();
+  assert.equal(h.error.textContent, "请选择总体满意度");
+  h.fill("好", "满意");
+  await h.submit();
+  assert.equal(h.error.textContent, "请填写至少 2 个字符的评价内容");
+  assert.equal(h.requests.length, 0);
+  assert.equal(h.commands.length, 1);
+  assert.equal(h.submitButton.disabled, false);
+});
 
 test("resident service feedback is offered only after completion and only once", () => {
   for (const collection of ["escortServiceOrders", "internetNursingOrders"]) {
