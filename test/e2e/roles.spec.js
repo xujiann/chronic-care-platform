@@ -742,6 +742,8 @@ test("registration journey crosses resident and institution portals", async ({ p
   await expect(completeButton).toHaveCount(0);
 
   await login(page, "health", "index.html");
+  await expect(page.locator("html")).toHaveAttribute("data-auth-resolved", "allowed");
+  await expect(page.locator("html")).toHaveAttribute("data-navigation-shell", "ready");
   const result = await page.evaluate(async (id) => {
     const dashboard = await (await window.HealthCityAuth.authFetch("/api/registrations/dashboard")).json();
     const audit = await (await window.HealthCityAuth.authFetch("/api/audit/verify")).json();
