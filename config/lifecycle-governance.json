@@ -232,8 +232,8 @@
       "title": "居民评价旧异步结果污染新弹窗或重复提交",
       "owner": "T04",
       "mitigation": "以弹窗会话令牌和提交状态隔离迟到结果、阻止并行提交并保留失败草稿",
-      "status": "open",
-      "evidenceIds": []
+      "status": "mitigated",
+      "evidenceIds": ["EVD-OPS-021"]
     },
     {
       "id": "RISK-OPS-022",
@@ -512,6 +512,14 @@
   ],
   "evidence": [
     {
+      "id": "EVD-OPS-021",
+      "scope": "repository-integration",
+      "type": "pull-request-ci",
+      "ref": "https://github.com/xujiann/chronic-care-platform/actions/runs/34309613178",
+      "testIds": ["TEST-OPS-021"],
+      "productionEvidence": false
+    },
+    {
       "id": "EVD-OPS-020",
       "scope": "repository-integration",
       "type": "pull-request-ci",
@@ -663,7 +671,7 @@
       "baseline": "主线模块化单体及其现有运行、存储和发布边界",
       "target": "边界、状态和生产资格均可由控制塔追踪",
       "status": "已集成",
-      "gapTaskIds": ["GOV-002", "OPS-015", "OPS-016", "OPS-017", "OPS-018", "SEC-011", "GOV-006", "OPS-021", "OPS-022"],
+      "gapTaskIds": ["GOV-002", "OPS-015", "OPS-016", "OPS-017", "OPS-018", "SEC-011", "GOV-006", "OPS-022"],
       "evidenceIds": ["EVD-GOV-001", "EVD-GOV-002"]
     },
     {
@@ -672,7 +680,7 @@
       "baseline": "T00至T09及临床子域已建立模块所有权",
       "target": "模块写入冲突和跨任务依赖自动失败关闭",
       "status": "已集成",
-      "gapTaskIds": ["OPS-017", "GOV-006", "OPS-021", "OPS-022"],
+      "gapTaskIds": ["OPS-017", "GOV-006", "OPS-022"],
       "evidenceIds": ["EVD-GOV-001", "EVD-GOV-002"]
     },
     {
@@ -699,7 +707,7 @@
       "baseline": "代码、运行时和外部依赖边界已有事实地图",
       "target": "任务前置关系、WIP和核心写范围形成可检查依赖图",
       "status": "已集成",
-      "gapTaskIds": ["GOV-002", "OPS-015", "OPS-017", "OPS-018", "GOV-006", "OPS-021", "OPS-022", "TEST-010"],
+      "gapTaskIds": ["GOV-002", "OPS-015", "OPS-017", "OPS-018", "GOV-006", "OPS-022", "TEST-010"],
       "evidenceIds": ["EVD-GOV-001", "EVD-GOV-002"]
     },
     {
@@ -708,7 +716,7 @@
       "baseline": "技术债以稳定编号记录仓库及现场缺口",
       "target": "风险、差距任务、退出条件和关闭证据双向可追踪",
       "status": "已集成",
-      "gapTaskIds": ["GOV-002", "OPS-015", "OPS-016", "OPS-017", "OPS-018", "SEC-011", "GOV-006", "OPS-021", "OPS-022", "TEST-010"],
+      "gapTaskIds": ["GOV-002", "OPS-015", "OPS-016", "OPS-017", "OPS-018", "SEC-011", "GOV-006", "OPS-022", "TEST-010"],
       "evidenceIds": ["EVD-GOV-001", "EVD-GOV-002"]
     }
   ],
@@ -736,7 +744,7 @@
       "acceptanceCriteria": [
         "GOV-005 仅依据已合并 PR #277 与全部成功 CI run 34233229053 关闭",
         "OPS-020、OPS-021 与 OPS-022 的 owner、依赖、写范围、验收、回滚和 NO-GO 边界可机器检查",
-        "OPS-020 合并关闭后 GOV-006、OPS-021、OPS-022 与 TEST-010 四项在制任务为 WIP 4/5 且不存在写范围冲突"
+        "OPS-020 与 OPS-021 合并关闭后 GOV-006、OPS-022 与 TEST-010 三项在制任务为 WIP 3/5 且不存在写范围冲突"
       ],
       "testIds": ["TEST-GOV-006"],
       "evidenceIds": [],
@@ -833,8 +841,8 @@
       "title": "居民评价弹窗异步提交会话隔离",
       "ownerProcess": "T04",
       "integrationOwner": "T00",
-      "taskStatus": "待集成",
-      "capabilityStatus": "已实现",
+      "taskStatus": "已关闭",
+      "capabilityStatus": "已集成",
       "riskLevel": "中",
       "approval": {
         "state": "approved",
@@ -855,17 +863,17 @@
         "固定脱敏失败提示、file 模式、既有 API/schema/投诉 SLA 与服务端授权保持不变"
       ],
       "testIds": ["TEST-OPS-021"],
-      "evidenceIds": [],
+      "evidenceIds": ["EVD-OPS-021"],
       "rollback": "回退本任务前端与测试单一提交；不删除既有居民评价、投诉、消息、回执或审计数据",
-      "unresolved": ["Draft PR #279 的 required CI、独立评审与 T00 合并验收尚未完成", "投诉独立工单、SLA、升级、结案与多实例 exactly-once 不在本任务范围，生产继续 NO-GO"],
+      "unresolved": [],
       "worktree": ".codex-platform-worktrees/process-v2/t04-feedback-dialog-session-20260909",
       "branch": "process/t04-feedback-dialog-session-20260909",
       "planRef": "docs/lifecycle-governance.md#ops-021-居民评价弹窗会话隔离-plan",
       "pullRequestRef": "https://github.com/xujiann/chronic-care-platform/pull/279",
-      "ciRef": "",
+      "ciRef": "https://github.com/xujiann/chronic-care-platform/actions/runs/34309613178",
       "writeScopes": ["citizen-service-feedback.js", "test/citizen-service-feedback.test.js", "test/e2e/citizen-service-feedback.spec.js"],
-      "observability": {"applicable": true, "gaps": "本切片不新增遥测；评价投诉专用结构化日志、指标告警、追踪、健康检查、SLO、手册、降级与补偿继续由后续运行治理任务交付"},
-      "runtimeCapability": true
+      "observability": {"applicable": false, "reason": "本任务仅修复既有弹窗异步会话隔离，不新增运行能力；评价投诉运行治理缺口继续由 OPS-017 跟踪"},
+      "runtimeCapability": false
     },
     {
       "id": "OPS-022",
