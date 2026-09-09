@@ -2,6 +2,49 @@
 
 ## 1. 权威边界
 
+### GOV-006 四路并行开发 WIP 与写范围登记 PLAN
+
+- 来源：用户于 2026-09-09 要求继续四路同步开发；T00 已批准本轮中风险控制塔登记 PLAN。
+- 目标：以一个中央治理任务关闭已验收的 GOV-005，同时正式登记影像、居民和体检三条互不重叠的实施线，使依赖、WIP、验收和生产边界可机器检查。
+- 范围：仅修改生命周期总账、本规范和 `ROADMAP.md` 当前事实；不修改三条领域线业务文件，不代替各领域独立 worktree、测试、评审、PR 或 CI。
+- 验收：GOV-005 绑定已合并 PR #277 与 CI run 34233229053 的非生产证据后关闭；OPS-020、OPS-021、OPS-022 与 TEST-010 均有唯一编号、owner、依赖、精确写范围、测试和回滚；OPS-020 合并关闭后，GOV-006 连同三项执行任务使组合 WIP 为 4/5，且没有范围冲突。
+- 测试：生命周期定向测试、文档事实漂移、只读 handoff、T00 process verify 和本 Draft PR 的 required CI。
+- 回滚：整体回退本登记补丁；不删除或回退领域分支代码、业务数据、历史 PR 或 CI 证据。
+- 放行边界：GOV-006 在自身 PR 合并和 required CI 归档前保持实施中；三条领域线仍需各自验收。任何仓库结果都不改变六域生产 `NO-GO`。
+
+### TEST-010 区域运营 E2E 静态 fixture PLAN
+
+- 来源与审批：主线定时 Lifecycle gates run 34271928551 的在线根 E2E 为 59/60，唯一失败位于 `test/e2e/product-regional-operations-trusted-rendering.spec.js`；T00 将其纳入已批准低风险任务包。
+- 范围：仅修改该 Playwright spec，把偶发的 `route.fetch` 回源替换为完整脱敏静态 fixture 的 `route.fulfill`；不修改业务路由、timeout、retry、workflow、生产数据或运行时。
+- 验收：目标场景 `repeat-each=20` 稳定通过；真实 productization route 单元测试继续验证服务端行为；在线根 Playwright 60 项全部通过且测试清单不漂移。
+- 回滚：回退该测试文件单一提交，恢复原 fixture；不修改业务数据或生产证据。
+- 放行边界：任务保持实施中，需独立评审、Draft PR 和 required CI；测试稳定化不能制造生产证据，六域继续 `NO-GO`。
+
+### OPS-020 影像质控恢复指引 PLAN
+
+- 来源与审批：T06 基于已合并的影像质控对账计划提出最小兼容切片；T00 于 2026-09-09 以中风险 PLAN 批准，范围仅限 `imaging-cloud.js` 和 `test/imaging-dashboard-route-characterization.test.js`。
+- 目标：unknown、本地提交失败、严格状态读取失败或当前视图未找到时，只提示刷新、核对和升级，不能暗示外部动作已经完成或资源不存在。
+- 验收：保留 POST→GET、相同资源写锁和全部请求语义；失败路径不新增 POST、不使用演示回退、不泄露 provider 或内部错误；特征测试覆盖七类恢复场景。PR #278 已合并，required CI run 34308801123 九项通过，OPS-020 已关闭并达到“已集成”。
+- 回滚：合并前关闭 #278；合并后回退该 PR 单一提交并重跑影像专项及 required CI。无 schema 或数据迁移。
+- 非目标：不实施耐久 command/outbox、幂等/CAS、机构范围、migration、worker 或 FHIR 回读。`docs/adr/2026-09-07-imaging-quality-control-durable-reconciliation.md` 仍为 Proposed，生产继续 `NO-GO`。
+- 证据边界：#278/CI 只证明本次恢复指引仓库集成；耐久、可观测性和现场缺口继续由 OPS-015、OPS-018 及 Proposed ADR 跟踪，不构成生产证据。
+
+### OPS-021 居民评价弹窗会话隔离 PLAN
+
+- 来源与审批：T04 复现居民评价 A 会话请求迟到后关闭、重置或污染 B 会话的问题；T00 于 2026-09-09 批准中风险前端兼容修复。
+- 范围：仅 `citizen-service-feedback.js`、`test/citizen-service-feedback.test.js` 和 `test/e2e/citizen-service-feedback.spec.js`；不修改 API、schema、服务端授权、投诉 SLA 或服务端状态机。
+- 验收：关闭 A 并打开 B 后，A 的迟到成功、失败或原生 close 事件不得影响 B；同会话提交中不得并行重复请求；失败保留当前草稿、使用固定脱敏提示并允许按既有命令语义重试。
+- 测试与回滚：定向单元和居民 E2E 先复现失败，再验证会话隔离、重复提交、失败重试、file 模式和 XSS 边界；回退单一前端/测试提交，不删除评价、投诉、消息、回执或审计。
+- 放行边界：任务保持实施中；投诉独立工单、SLA、升级、结案、多实例 exactly-once 和现场验收不在本范围，生产继续 `NO-GO`。
+
+### OPS-022 体检异常操作陈旧卡片锁定 PLAN
+
+- 来源与审批：T06 复现异常处置 POST 成功、随后 GET 刷新失败时旧快照动作仍可点击的问题；T00 于 2026-09-09 批准中风险前端兼容修复。
+- 范围：仅 `physical-examination.js` 与 `test/e2e/physical-examination-trusted-rendering.spec.js`；不改变 API method/path、服务端状态机、幂等/CAS、schema、审计或中央治理文件。
+- 验收：POST 成功而刷新失败时保留最后成功快照，将对应卡片标为陈旧并禁用全部动作；再次点击不产生第二次 POST；后续有效 GET 重新渲染最新快照并恢复允许操作；POST 本身失败保持既有重试语义。
+- 测试与回滚：在现有单一体检 E2E 内覆盖 200→502、稳定脱敏提示、旧快照锁定、零重复 POST 与有效 GET 恢复；回退两文件单一提交，不回退或删除服务端体检事实。
+- 放行边界：任务保持实施中；服务端多实例 exactly-once、完整可观测性和现场验收仍由既有高风险缺口跟踪，生产继续 `NO-GO`。
+
 ### GOV-005 生命周期地图反向覆盖与技术债编号治理 PLAN
 
 - 来源：用户于 2026-09-08 批准中风险 T00 PLAN；T00 负责本轮治理修复。
@@ -11,6 +54,7 @@
 - 验收：OPS-019 按已合并 PR #275 与 CI run 34228860692 闭合但只登记非生产证据；OPS-016 保留 #258/#263/#268 完整 PR/CI 链并删除已闭合的 GOV-003 缺口；正向治理检查及缺失、陈旧、重复映射和编号冲突负向测试均通过。
 - 测试：生命周期与文档事实漂移定向测试、quick、architecture 和 process verify，并由本 Draft PR 的 required CI 继续验证。
 - 回滚：整体回退本治理补丁，恢复旧任务总账与文档；不删除业务数据或历史证据，也不改变六域生产 `NO-GO`。
+- 集成结果：PR #277 已合并至主线，required CI run 34233229053 九项通过；该证据仅证明仓库集成，GOV-005 已关闭但不构成生产证据。
 
 ### GOV-004 流程优化 PLAN
 

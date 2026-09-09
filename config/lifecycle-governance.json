@@ -40,6 +40,41 @@
   },
   "requirements": [
     {
+      "id": "REQ-GOV-006",
+      "title": "四路并行开发必须在控制塔中登记唯一写入范围、依赖和放行边界",
+      "sourceType": "approved-user-requirement",
+      "sourceRef": "USER-APPROVED-FOUR-LINE-CONTINUATION-2026-09-09",
+      "acceptance": ["关闭已合并且 CI 全绿的 GOV-005", "OPS-020、OPS-021 与 OPS-022 使用独立任务编号和互斥写范围", "组合 WIP 不超过 5 且六张地图覆盖全部未闭合任务"]
+    },
+    {
+      "id": "REQ-OPS-020",
+      "title": "影像质控未知或恢复失败时必须给出不暗示完成的受控恢复指引",
+      "sourceType": "approved-t00-plan",
+      "sourceRef": "T00-PLAN-OPS-020-APPROVED-2026-09-09",
+      "acceptance": ["未知、严格读取失败和本地提交失败均不得显示为已完成", "指引只允许刷新、核对和升级，不触发额外写请求", "耐久 command、outbox、迁移和 worker 继续受 Proposed ADR 阻断"]
+    },
+    {
+      "id": "REQ-OPS-021",
+      "title": "居民评价弹窗异步提交结果必须绑定其发起会话",
+      "sourceType": "approved-t00-plan",
+      "sourceRef": "T00-PLAN-OPS-021-APPROVED-2026-09-09",
+      "acceptance": ["旧会话迟到成功或失败不得关闭、重置或污染新会话", "重复提交不得产生并行请求", "失败保留当前草稿并使用稳定脱敏提示供同命令重试"]
+    },
+    {
+      "id": "REQ-OPS-022",
+      "title": "体检异常操作成功但刷新失败时必须锁定陈旧卡片",
+      "sourceType": "approved-t00-plan",
+      "sourceRef": "T00-PLAN-OPS-022-APPROVED-2026-09-09",
+      "acceptance": ["POST 成功而刷新失败时保留最后成功快照并锁定同卡片全部动作", "陈旧卡片再次点击不得产生第二次 POST", "后续有效 GET 重新渲染最新状态并恢复可用操作"]
+    },
+    {
+      "id": "REQ-TEST-010",
+      "title": "区域运营可信渲染 E2E 必须脱离偶发的未拦截回源",
+      "sourceType": "observed-ci-failure",
+      "sourceRef": "https://github.com/xujiann/chronic-care-platform/actions/runs/34271928551",
+      "acceptance": ["目标 E2E 使用完整静态 fixture 响应且不再调用 route.fetch 回源", "目标场景连续重复 20 次稳定通过", "真实路由单元测试与在线根 60 项保持通过"]
+    },
+    {
       "id": "REQ-GOV-005",
       "title": "六图差距必须与未完全闭合任务双向一致且技术债编号唯一",
       "sourceType": "approved-user-requirement",
@@ -174,13 +209,58 @@
   ],
   "risks": [
     {
+      "id": "RISK-GOV-006",
+      "level": "中",
+      "title": "并行任务未登记或写范围重叠导致集成冲突和错误放行",
+      "owner": "T00",
+      "mitigation": "在实施期间登记四项在制任务、精确文件写范围、依赖、验收和非生产边界，并由生命周期门禁验证 WIP 与冲突",
+      "status": "open",
+      "evidenceIds": []
+    },
+    {
+      "id": "RISK-OPS-020",
+      "level": "中",
+      "title": "影像质控未知结果被页面指引误报完成或诱导重复外部副作用",
+      "owner": "T06",
+      "mitigation": "只调整受控恢复文案并以真实脚本特征测试证明无额外 POST、无回退和写锁保持；耐久能力不在本任务授权内",
+      "status": "mitigated",
+      "evidenceIds": ["EVD-OPS-020"]
+    },
+    {
+      "id": "RISK-OPS-021",
+      "level": "中",
+      "title": "居民评价旧异步结果污染新弹窗或重复提交",
+      "owner": "T04",
+      "mitigation": "以弹窗会话令牌和提交状态隔离迟到结果、阻止并行提交并保留失败草稿",
+      "status": "open",
+      "evidenceIds": []
+    },
+    {
+      "id": "RISK-OPS-022",
+      "level": "中",
+      "title": "体检异常操作已成功但页面仍允许对陈旧快照重复或错序提交",
+      "owner": "T06",
+      "mitigation": "刷新失败后锁定对应陈旧卡片的全部动作，仅在有效 GET 重新渲染后恢复",
+      "status": "open",
+      "evidenceIds": []
+    },
+    {
+      "id": "RISK-TEST-010",
+      "level": "低",
+      "title": "区域运营 E2E 因 fixture 未完整拦截而偶发访问测试服务器回源",
+      "owner": "T00",
+      "mitigation": "仅在目标 Playwright 场景以完整静态 fixture fulfill 替代 route.fetch，并以 repeat 20、真实路由单测和在线根套件验证",
+      "status": "open",
+      "evidenceIds": []
+    },
+    {
       "id": "RISK-GOV-005",
       "level": "中",
       "title": "六图遗漏真实缺口或技术债编号重用导致错误追踪",
       "owner": "T00",
       "mitigation": "以任务最新状态反向校验地图覆盖，并对技术债表 ID 做闭集唯一性、生命周期任务及受管 Markdown 治理定义命名空间检查",
-      "status": "open",
-      "evidenceIds": []
+      "status": "mitigated",
+      "evidenceIds": ["EVD-GOV-005"]
     },
     {
       "id": "RISK-GOV-004",
@@ -310,6 +390,36 @@
   ],
   "tests": [
     {
+      "id": "TEST-GOV-006",
+      "kind": "four-line-wip-registration-contract",
+      "path": "test/lifecycle-governance.test.js",
+      "command": "node --test test/lifecycle-governance.test.js test/documentation-fact-drift.test.js"
+    },
+    {
+      "id": "TEST-OPS-020",
+      "kind": "imaging-qc-browser-recovery-guidance-contract",
+      "path": "test/imaging-dashboard-route-characterization.test.js",
+      "command": "node scripts/clinical-subdomain-test-gate.js --subdomain imaging"
+    },
+    {
+      "id": "TEST-OPS-021",
+      "kind": "resident-feedback-dialog-session-isolation-contract",
+      "path": "test/citizen-service-feedback.test.js",
+      "command": "node --test test/citizen-service-feedback.test.js && npx playwright test test/e2e/citizen-service-feedback.spec.js --reporter=line"
+    },
+    {
+      "id": "TEST-OPS-022",
+      "kind": "physical-examination-stale-action-lock-contract",
+      "path": "test/e2e/physical-examination-trusted-rendering.spec.js",
+      "command": "npx playwright test test/e2e/physical-examination-trusted-rendering.spec.js --reporter=line"
+    },
+    {
+      "id": "TEST-CI-010",
+      "kind": "product-regional-operations-static-fixture-stability-contract",
+      "path": "test/e2e/product-regional-operations-trusted-rendering.spec.js",
+      "command": "npx playwright test test/e2e/product-regional-operations-trusted-rendering.spec.js --repeat-each=20 --workers=1 --reporter=line"
+    },
+    {
       "id": "TEST-GOV-005",
       "kind": "map-gap-reverse-coverage-and-tech-debt-id-contract",
       "path": "test/lifecycle-governance.test.js",
@@ -401,6 +511,22 @@
     }
   ],
   "evidence": [
+    {
+      "id": "EVD-OPS-020",
+      "scope": "repository-integration",
+      "type": "pull-request-ci",
+      "ref": "https://github.com/xujiann/chronic-care-platform/actions/runs/34308801123",
+      "testIds": ["TEST-OPS-020"],
+      "productionEvidence": false
+    },
+    {
+      "id": "EVD-GOV-005",
+      "scope": "repository-integration",
+      "type": "pull-request-ci",
+      "ref": "https://github.com/xujiann/chronic-care-platform/actions/runs/34233229053",
+      "testIds": ["TEST-GOV-005"],
+      "productionEvidence": false
+    },
     {
       "id": "EVD-OPS-019",
       "scope": "repository-integration",
@@ -537,7 +663,7 @@
       "baseline": "主线模块化单体及其现有运行、存储和发布边界",
       "target": "边界、状态和生产资格均可由控制塔追踪",
       "status": "已集成",
-      "gapTaskIds": ["GOV-002", "OPS-015", "OPS-016", "OPS-017", "OPS-018", "SEC-011", "GOV-005"],
+      "gapTaskIds": ["GOV-002", "OPS-015", "OPS-016", "OPS-017", "OPS-018", "SEC-011", "GOV-006", "OPS-021", "OPS-022"],
       "evidenceIds": ["EVD-GOV-001", "EVD-GOV-002"]
     },
     {
@@ -546,7 +672,7 @@
       "baseline": "T00至T09及临床子域已建立模块所有权",
       "target": "模块写入冲突和跨任务依赖自动失败关闭",
       "status": "已集成",
-      "gapTaskIds": ["OPS-017"],
+      "gapTaskIds": ["OPS-017", "GOV-006", "OPS-021", "OPS-022"],
       "evidenceIds": ["EVD-GOV-001", "EVD-GOV-002"]
     },
     {
@@ -573,7 +699,7 @@
       "baseline": "代码、运行时和外部依赖边界已有事实地图",
       "target": "任务前置关系、WIP和核心写范围形成可检查依赖图",
       "status": "已集成",
-      "gapTaskIds": ["GOV-002", "OPS-015", "OPS-017", "OPS-018", "GOV-005"],
+      "gapTaskIds": ["GOV-002", "OPS-015", "OPS-017", "OPS-018", "GOV-006", "OPS-021", "OPS-022", "TEST-010"],
       "evidenceIds": ["EVD-GOV-001", "EVD-GOV-002"]
     },
     {
@@ -582,17 +708,210 @@
       "baseline": "技术债以稳定编号记录仓库及现场缺口",
       "target": "风险、差距任务、退出条件和关闭证据双向可追踪",
       "status": "已集成",
-      "gapTaskIds": ["GOV-002", "OPS-015", "OPS-016", "OPS-017", "OPS-018", "SEC-011", "GOV-005"],
+      "gapTaskIds": ["GOV-002", "OPS-015", "OPS-016", "OPS-017", "OPS-018", "SEC-011", "GOV-006", "OPS-021", "OPS-022", "TEST-010"],
       "evidenceIds": ["EVD-GOV-001", "EVD-GOV-002"]
     }
   ],
   "tasks": [
     {
-      "id": "GOV-005",
-      "title": "生命周期地图反向覆盖与技术债编号治理",
+      "id": "GOV-006",
+      "title": "四路并行开发 WIP 与写范围控制塔登记",
       "ownerProcess": "T00",
       "taskStatus": "实施中",
       "capabilityStatus": "已实现",
+      "riskLevel": "中",
+      "approval": {
+        "state": "approved",
+        "mode": "T00-plan-approval",
+        "ref": "USER-APPROVED-FOUR-LINE-CONTINUATION-2026-09-09",
+        "approvedScope": "close-gov-005-and-register-ops-020-ops-021-ops-022-with-non-overlapping-wip"
+      },
+      "requirementIds": ["REQ-GOV-006"],
+      "regulatoryControlIds": ["REG-GOV-001"],
+      "riskIds": ["RISK-GOV-006"],
+      "decisionIds": [],
+      "dependencies": ["GOV-005"],
+      "affectedModules": ["integration-governance", "architecture-maps", "portfolio-control"],
+      "dataSensitivity": "研发治理元数据-不含居民数据或生产凭据",
+      "acceptanceCriteria": [
+        "GOV-005 仅依据已合并 PR #277 与全部成功 CI run 34233229053 关闭",
+        "OPS-020、OPS-021 与 OPS-022 的 owner、依赖、写范围、验收、回滚和 NO-GO 边界可机器检查",
+        "OPS-020 合并关闭后 GOV-006、OPS-021、OPS-022 与 TEST-010 四项在制任务为 WIP 4/5 且不存在写范围冲突"
+      ],
+      "testIds": ["TEST-GOV-006"],
+      "evidenceIds": [],
+      "rollback": "回退本任务治理登记提交；不回退或删除各领域分支代码、业务数据、PR 与历史证据",
+      "unresolved": ["本任务需在 Draft PR required CI 与独立评审通过并合入主线后另行关闭"],
+      "worktree": ".codex-platform-worktrees/process-v2/t00-four-line-wip-register-20260909",
+      "branch": "process/t00-four-line-wip-register-20260909",
+      "planRef": "docs/lifecycle-governance.md#gov-006-四路并行开发-wip-与写范围登记-plan",
+      "pullRequestRef": "",
+      "ciRef": "",
+      "writeScopes": ["config/lifecycle-governance.json", "docs/lifecycle-governance.md", "ROADMAP.md"],
+      "observability": {"applicable": false, "reason": "仅登记任务组合、写范围和仓库证据，不新增生产运行时"},
+      "runtimeCapability": false
+    },
+    {
+      "id": "TEST-010",
+      "title": "区域运营可信渲染静态 fixture 稳定化",
+      "ownerProcess": "T00",
+      "taskStatus": "实施中",
+      "capabilityStatus": "未建设",
+      "riskLevel": "低",
+      "approval": {
+        "state": "approved",
+        "mode": "approved-task-package",
+        "ref": "USER-APPROVED-FOUR-LINE-CONTINUATION-2026-09-09",
+        "approvedScope": "product-regional-operations-e2e-static-fixture-only"
+      },
+      "requirementIds": ["REQ-TEST-010"],
+      "regulatoryControlIds": ["REG-GOV-001"],
+      "riskIds": ["RISK-TEST-010"],
+      "decisionIds": [],
+      "dependencies": ["GOV-005"],
+      "affectedModules": ["browser-e2e", "product-regional-operations-test-fixture"],
+      "dataSensitivity": "脱敏静态 E2E fixture-不含居民数据或生产凭据",
+      "acceptanceCriteria": [
+        "仅将目标 spec 的 route.fetch 回源替换为完整静态 route.fulfill，不改业务路由、timeout、retry 或 workflow",
+        "目标 E2E repeat-each 20 全部通过且真实路由单元测试保持通过",
+        "在线根 Playwright 60 项保持通过且测试数量不漂移"
+      ],
+      "testIds": ["TEST-CI-010"],
+      "evidenceIds": [],
+      "rollback": "回退目标 E2E spec 的单一提交并恢复原 fixture；不修改业务运行时、数据或测试全局策略",
+      "unresolved": ["实现、独立评审、Draft PR 与 required CI 尚未完成"],
+      "worktree": ".codex-platform-worktrees/process-v2/t00-product-regional-route-fixture-20260909",
+      "branch": "process/t00-product-regional-route-fixture-20260909",
+      "planRef": "docs/lifecycle-governance.md#test-010-区域运营-e2e-静态-fixture-plan",
+      "pullRequestRef": "",
+      "ciRef": "",
+      "writeScopes": ["test/e2e/product-regional-operations-trusted-rendering.spec.js"],
+      "observability": {"applicable": false, "reason": "仅稳定化脱敏浏览器测试 fixture，不新增生产运行时或监控能力"},
+      "runtimeCapability": false
+    },
+    {
+      "id": "OPS-020",
+      "title": "影像质控恢复与升级指引兼容加固",
+      "ownerProcess": "T06",
+      "integrationOwner": "T00",
+      "taskStatus": "已关闭",
+      "capabilityStatus": "已集成",
+      "riskLevel": "中",
+      "approval": {
+        "state": "approved",
+        "mode": "T00-plan-approval",
+        "ref": "T00-PLAN-OPS-020-APPROVED-2026-09-09",
+        "approvedScope": "imaging-qc-browser-recovery-guidance-only"
+      },
+      "requirementIds": ["REQ-OPS-020"],
+      "regulatoryControlIds": ["REG-GOV-001"],
+      "riskIds": ["RISK-OPS-015", "RISK-OPS-020"],
+      "decisionIds": [],
+      "dependencies": ["GOV-005", "OPS-018"],
+      "affectedModules": ["clinical-imaging", "imaging-browser"],
+      "dataSensitivity": "影像质控用户提示-不新增或持久化敏感健康数据",
+      "acceptanceCriteria": [
+        "unknown、本地提交失败和严格 GET 失败只显示刷新、核对与升级指引且不暗示完成",
+        "POST 到 GET 顺序、写锁、无额外 POST、无演示回退及现有请求语义保持不变",
+        "Proposed 耐久 ADR、schema、migration、command、outbox 与 worker 均不因本任务获准"
+      ],
+      "testIds": ["TEST-OPS-020"],
+      "evidenceIds": ["EVD-OPS-020"],
+      "rollback": "合并前关闭 PR #278；合并后回退该 PR 的单一提交并重跑影像专项与 required CI；无数据迁移",
+      "unresolved": [],
+      "worktree": ".codex-platform-worktrees/process-v2/t06-imaging-qc-recovery-guidance-20260909",
+      "branch": "process/t06-imaging-qc-recovery-guidance-20260909",
+      "planRef": "docs/lifecycle-governance.md#ops-020-影像质控恢复指引-plan",
+      "pullRequestRef": "https://github.com/xujiann/chronic-care-platform/pull/278",
+      "ciRef": "https://github.com/xujiann/chronic-care-platform/actions/runs/34308801123",
+      "writeScopes": ["imaging-cloud.js", "test/imaging-dashboard-route-characterization.test.js"],
+      "observability": {"applicable": false, "reason": "本任务仅更正既有恢复指引，不新增运行能力；影像质控运行治理缺口继续由 OPS-015 与 OPS-018 跟踪"},
+      "runtimeCapability": false
+    },
+    {
+      "id": "OPS-021",
+      "title": "居民评价弹窗异步提交会话隔离",
+      "ownerProcess": "T04",
+      "integrationOwner": "T00",
+      "taskStatus": "实施中",
+      "capabilityStatus": "未建设",
+      "riskLevel": "中",
+      "approval": {
+        "state": "approved",
+        "mode": "T00-plan-approval",
+        "ref": "T00-PLAN-OPS-021-APPROVED-2026-09-09",
+        "approvedScope": "resident-feedback-dialog-async-session-isolation"
+      },
+      "requirementIds": ["REQ-OPS-021"],
+      "regulatoryControlIds": ["REG-GOV-001"],
+      "riskIds": ["RISK-OPS-017", "RISK-OPS-021"],
+      "decisionIds": [],
+      "dependencies": ["GOV-005", "OPS-017"],
+      "affectedModules": ["citizen-portal", "resident-feedback-browser"],
+      "dataSensitivity": "居民评价与投诉表单-个人敏感信息仅保留在既有浏览器会话",
+      "acceptanceCriteria": [
+        "关闭旧弹窗并打开新任务后，旧请求迟到成功或失败不得关闭、清空或污染新弹窗",
+        "同一会话提交中禁止重复并行请求，失败后保留草稿并允许按既有命令语义重试",
+        "固定脱敏失败提示、file 模式、既有 API/schema/投诉 SLA 与服务端授权保持不变"
+      ],
+      "testIds": ["TEST-OPS-021"],
+      "evidenceIds": [],
+      "rollback": "回退本任务前端与测试单一提交；不删除既有居民评价、投诉、消息、回执或审计数据",
+      "unresolved": ["实现、独立评审、Draft PR 与 required CI 尚未完成", "投诉独立工单、SLA、升级、结案与多实例 exactly-once 不在本任务范围，生产继续 NO-GO"],
+      "worktree": ".codex-platform-worktrees/process-v2/t04-feedback-dialog-session-20260909",
+      "branch": "process/t04-feedback-dialog-session-20260909",
+      "planRef": "docs/lifecycle-governance.md#ops-021-居民评价弹窗会话隔离-plan",
+      "pullRequestRef": "",
+      "ciRef": "",
+      "writeScopes": ["citizen-service-feedback.js", "test/citizen-service-feedback.test.js", "test/e2e/citizen-service-feedback.spec.js"],
+      "observability": {"applicable": true, "gaps": "本切片不新增遥测；评价投诉专用结构化日志、指标告警、追踪、健康检查、SLO、手册、降级与补偿继续由后续运行治理任务交付"},
+      "runtimeCapability": true
+    },
+    {
+      "id": "OPS-022",
+      "title": "体检异常操作后陈旧卡片锁定",
+      "ownerProcess": "T06",
+      "integrationOwner": "T00",
+      "taskStatus": "实施中",
+      "capabilityStatus": "未建设",
+      "riskLevel": "中",
+      "approval": {
+        "state": "approved",
+        "mode": "T00-plan-approval",
+        "ref": "T00-PLAN-OPS-022-APPROVED-2026-09-09",
+        "approvedScope": "physical-examination-post-success-refresh-failure-stale-card-lock"
+      },
+      "requirementIds": ["REQ-OPS-022"],
+      "regulatoryControlIds": ["REG-GOV-001"],
+      "riskIds": ["RISK-OPS-016", "RISK-OPS-022"],
+      "decisionIds": [],
+      "dependencies": ["GOV-005", "OPS-016"],
+      "affectedModules": ["clinical-physical-examination", "physical-examination-browser"],
+      "dataSensitivity": "体检异常处置页面状态-敏感健康业务元数据不新增持久化",
+      "acceptanceCriteria": [
+        "异常操作 POST 成功而后续 GET 失败时保留最后成功快照并把同卡片全部动作标为陈旧和禁用",
+        "陈旧卡片重复点击不得产生第二次 POST，错误提示不得泄露内部响应",
+        "后续有效 GET 重新渲染最新快照并恢复允许的操作；POST 失败仍保留既有可重试行为"
+      ],
+      "testIds": ["TEST-OPS-022"],
+      "evidenceIds": [],
+      "rollback": "回退本任务两文件单一提交并重跑体检专项；不回退服务端状态、删除体检记录或改变 API/schema",
+      "unresolved": ["实现、独立评审、Draft PR 与 required CI 尚未完成", "服务端幂等/CAS、多实例 exactly-once、完整可观测性和现场验收仍由既有高风险缺口跟踪，生产继续 NO-GO"],
+      "worktree": ".codex-platform-worktrees/process-v2/t06-physical-exam-next-gap-20260909",
+      "branch": "process/t06-physical-exam-next-gap-20260909",
+      "planRef": "docs/lifecycle-governance.md#ops-022-体检异常操作陈旧卡片锁定-plan",
+      "pullRequestRef": "",
+      "ciRef": "",
+      "writeScopes": ["physical-examination.js", "test/e2e/physical-examination-trusted-rendering.spec.js"],
+      "observability": {"applicable": true, "gaps": "本切片不新增遥测；体检异常处置专用结构化日志、指标告警、追踪、健康检查、SLO、手册、降级与补偿继续由后续运行治理任务交付"},
+      "runtimeCapability": true
+    },
+    {
+      "id": "GOV-005",
+      "title": "生命周期地图反向覆盖与技术债编号治理",
+      "ownerProcess": "T00",
+      "taskStatus": "已关闭",
+      "capabilityStatus": "已集成",
       "riskLevel": "中",
       "approval": {
         "state": "approved",
@@ -613,14 +932,14 @@
         "TECH_DEBT 表 ID 重复、与生命周期任务或受管文档中的其他治理 ID 冲突时文档门禁失败"
       ],
       "testIds": ["TEST-GOV-005"],
-      "evidenceIds": [],
+      "evidenceIds": ["EVD-GOV-005"],
       "rollback": "回退本任务八个治理文件；不修改业务运行时、数据、schema 或生产证据",
       "unresolved": [],
       "worktree": ".codex-platform-worktrees/process-v2/t00-governance-gap-coverage-20260908",
       "branch": "process/t00-governance-gap-coverage-20260908",
       "planRef": "docs/lifecycle-governance.md#gov-005-生命周期地图反向覆盖与技术债编号治理-plan",
       "pullRequestRef": "https://github.com/xujiann/chronic-care-platform/pull/277",
-      "ciRef": "",
+      "ciRef": "https://github.com/xujiann/chronic-care-platform/actions/runs/34233229053",
       "writeScopes": [
         "config/lifecycle-governance.json",
         "scripts/lifecycle-governance.js",
