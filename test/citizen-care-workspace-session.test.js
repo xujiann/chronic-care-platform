@@ -48,7 +48,7 @@ function harness({ online = true } = {}) {
   const render = between("function renderCitizen(residentId)", "\nfunction bindLargeMode()");
   for (const name of [...render.matchAll(/^  (render\w+)\(/gm)].map((match) => match[1])) context[name] = () => {};
   context.renderCitizenCareWorkspace = () => effects.push("render");
-  const helpersStart = source.includes("function captureCitizenCareContext()") ? "function captureCitizenCareContext()" : "function bindCitizenCareWorkspace()";
+  const helpersStart = source.includes("function captureCareView()") ? "function captureCareView()" : "function bindCitizenCareWorkspace()";
   vm.runInContext([
     between("let currentResidentId;", "\ndocument.addEventListener(\"DOMContentLoaded\""),
     between("function clearCitizenCareLocalPreview(", "\nfunction renderCitizenCareSyncStatus("),

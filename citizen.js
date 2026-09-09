@@ -551,7 +551,7 @@ let citizenOperationsPublicFeed = {
 };
 let currentResidentId;
 let currentAccountId;
-let citizenCareViewGeneration = 0;
+let careViewGeneration = 0;
 
 document.addEventListener("DOMContentLoaded", async () => {
   state = await loadState();
@@ -1466,7 +1466,7 @@ function renderCitizen(residentId) {
   const resident = state.residents.find((item) => item.id === residentId) || state.residents[0];
   if (!resident) return;
   currentResidentId = resident.id;
-  citizenCareViewGeneration += 1;
+  careViewGeneration += 1;
   renderAccount(getCurrentAccount());
 
   const risk = assessRisk(resident);
@@ -3232,12 +3232,21 @@ function openAuthorizationRenewal(recordId) {
   }
 }
 
-function captureCitizenCareContext() {
-  return { residentId: currentResidentId, generation: citizenCareViewGeneration };
+function captureCareView() {
+  return { residentId: currentResidentId, generation: careViewGeneration };
 }
 
-function isCurrentCitizenCareContext(context) {
-  return context.residentId === currentResidentId && context.generation === citizenCareViewGeneration;
+function isCurrentCareView(view) {
+  return view.residentId === currentResidentId && view.generation === careViewGeneration;
+}
+
+function finishCareAction(view, receipt, message, form) {
+  saveCitizenCareCollections(view.residentId);
+  markCitizenCareActionSynced(view.residentId, receipt);
+  if (!isCurrentCareView(view)) return;
+  form?.reset();
+  renderCitizen(view.residentId);
+  showToast(message);
 }
 
 function bindCitizenCareWorkspace() {
@@ -3270,39 +3279,32 @@ function bindCitizenCareWorkspace() {
   document.querySelector("#citizen-correction-form")?.addEventListener("submit", async (event) => {
     event.preventDefault();
     const form = event.currentTarget;
-    const context = captureCitizenCareContext();
+    const view = captureCareView();
     try {
       const request = api.buildCorrectionRequest({
         recordId: form.elements.recordId.value,
-        residentId: context.residentId,
+        residentId: view.residentId,
         field: form.elements.field.value,
         requestedValue: form.elements.requestedValue.value,
         reason: form.elements.reason.value
       });
       const response = await submitCitizenCareAction("/record-corrections", request, "correction-submit");
       const saved = api.projectCorrectionReceipt(response, request);
-      const careState = ensureCitizenCareCollections(context.residentId);
-      careState.recordCorrections.unshift(saved);
-      saveCitizenCareCollections(context.residentId);
-      markCitizenCareActionSynced(context.residentId, saved);
-      if (!isCurrentCitizenCareContext(context)) return;
-      form.reset();
-      renderCitizen(context.residentId);
-      showToast("纠错申请已提交，原始记录保持不变");
+      ensureCitizenCareCollections(view.residentId).recordCorrections.unshift(saved);
+      finishCareAction(view, saved, "纠错申请已提交，原始记录保持不变", form);
     } catch (error) {
-      if (!isCurrentCitizenCareContext(context)) return;
-      showToast(error.message || "纠错申请提交失败");
+      if (isCurrentCareView(view)) showToast(error.message || "纠错申请提交失败");
     }
   });
 
   document.querySelector("#citizen-share-package-form")?.addEventListener("submit", async (event) => {
     event.preventDefault();
     const form = event.currentTarget;
-    const context = captureCitizenCareContext();
+    const view = captureCareView();
     try {
       const scopes = [...form.querySelectorAll("input[name='scopes']:checked")].map((item) => item.value);
       const packageRecord = api.buildSharePackage({
-        residentId: context.residentId,
+        residentId: view.residentId,
         granteeId: form.elements.granteeId.value,
         purpose: form.elements.purpose.value,
         scopes,
@@ -3310,27 +3312,20 @@ function bindCitizenCareWorkspace() {
       });
       const response = await submitCitizenCareAction("/record-share-packages", packageRecord, "share-create");
       const saved = api.projectSharePackageReceipt(response, packageRecord);
-      const careState = ensureCitizenCareCollections(context.residentId);
-      careState.recordSharePackages.unshift(saved);
-      saveCitizenCareCollections(context.residentId);
-      markCitizenCareActionSynced(context.residentId, saved);
-      if (!isCurrentCitizenCareContext(context)) return;
-      form.reset();
-      renderCitizen(context.residentId);
-      showToast("一次性健康资料包已创建");
+      ensureCitizenCareCollections(view.residentId).recordSharePackages.unshift(saved);
+      finishCareAction(view, saved, "一次性健康资料包已创建", form);
     } catch (error) {
-      if (!isCurrentCitizenCareContext(context)) return;
-      showToast(error.message || "资料包创建失败");
+      if (isCurrentCareView(view)) showToast(error.message || "资料包创建失败");
     }
   });
 
   document.querySelector("#citizen-access-dispute-form")?.addEventListener("submit", async (event) => {
     event.preventDefault();
     const form = event.currentTarget;
-    const context = captureCitizenCareContext();
+    const view = captureCareView();
     try {
       const dispute = api.buildAccessDispute({
-        residentId: context.residentId,
+        residentId: view.residentId,
         accessLogId: form.elements.accessLogId.value,
         category: form.elements.category.value,
         reason: form.elements.reason.value,
@@ -3342,17 +3337,10 @@ function bindCitizenCareWorkspace() {
         "access-dispute"
       );
       const saved = api.projectAccessReviewActionReceipt(response, dispute);
-      const careState = ensureCitizenCareCollections(context.residentId);
-      careState.accessDisputes.unshift(saved);
-      saveCitizenCareCollections(context.residentId);
-      markCitizenCareActionSynced(context.residentId, saved);
-      if (!isCurrentCitizenCareContext(context)) return;
-      form.reset();
-      renderCitizen(context.residentId);
-      showToast("访问异议已提交，平台将按审计回执复核");
+      ensureCitizenCareCollections(view.residentId).accessDisputes.unshift(saved);
+      finishCareAction(view, saved, "访问异议已提交，平台将按审计回执复核", form);
     } catch (error) {
-      if (!isCurrentCitizenCareContext(context)) return;
-      showToast(error.message || "访问异议提交失败");
+      if (isCurrentCareView(view)) showToast(error.message || "访问异议提交失败");
     }
   });
 
@@ -3418,10 +3406,10 @@ function bindCitizenCareWorkspace() {
       return;
     }
     if (acknowledgeButton) {
-      const context = captureCitizenCareContext();
+      const view = captureCareView();
       try {
         const acknowledgement = api.buildAccessAcknowledgement({
-          residentId: context.residentId,
+          residentId: view.residentId,
           accessLogId: acknowledgeButton.dataset.acknowledgeAccess
         });
         const response = await submitCitizenCareAction(
@@ -3430,75 +3418,59 @@ function bindCitizenCareWorkspace() {
           "access-acknowledge"
         );
         const saved = api.projectAccessReviewActionReceipt(response, acknowledgement);
-        const careState = ensureCitizenCareCollections(context.residentId);
-        careState.accessAcknowledgements.unshift(saved);
-        saveCitizenCareCollections(context.residentId);
-        markCitizenCareActionSynced(context.residentId, saved);
-        if (!isCurrentCitizenCareContext(context)) return;
-        renderCitizen(context.residentId);
-        showToast("已记录为居民确认的正常访问");
+        ensureCitizenCareCollections(view.residentId).accessAcknowledgements.unshift(saved);
+        finishCareAction(view, saved, "已记录为居民确认的正常访问");
       } catch (error) {
-        if (!isCurrentCitizenCareContext(context)) return;
-        showToast(error.message || "访问确认失败");
+        if (isCurrentCareView(view)) showToast(error.message || "访问确认失败");
       }
       return;
     }
     if (revokeButton) {
-      const context = captureCitizenCareContext();
-      const careState = ensureCitizenCareCollections(context.residentId);
+      const view = captureCareView();
+      const careState = ensureCitizenCareCollections(view.residentId);
       const item = careState.recordSharePackages.find((candidate) => candidate.id === revokeButton.dataset.revokeSharePackage);
       if (!item || !window.confirm(`确认撤销一次性资料包“${item.accessRef}”？`)) return;
       const resourceId = item.id;
       try {
         const revoked = api.revokeSharePackage(item);
         const response = await submitCitizenCareAction(`/record-share-packages/${encodeURIComponent(resourceId)}/revoke`, {
-          residentId: context.residentId,
+          residentId: view.residentId,
           resourceId,
           revokedAt: revoked.revokedAt
         }, "share-revoke");
-        const receipt = api.projectActionReceipt(response, { residentId: context.residentId, resourceId });
-        const currentItem = ensureCitizenCareCollections(context.residentId).recordSharePackages
-          .find((candidate) => candidate.id === resourceId && candidate.residentId === context.residentId);
-        if (!currentItem) throw new Error("当前工作台已无该资料包，请刷新并核对服务端撤销记录");
+        const receipt = api.projectActionReceipt(response, { residentId: view.residentId, resourceId });
+        const currentItem = ensureCitizenCareCollections(view.residentId).recordSharePackages
+          .find((candidate) => candidate.id === resourceId && candidate.residentId === view.residentId);
+        if (!currentItem) throw new Error("资料包已不在工作台，请刷新核对服务端撤销记录");
         Object.assign(currentItem, { status: revoked.status, revokedAt: revoked.revokedAt }, receipt);
-        saveCitizenCareCollections(context.residentId);
-        markCitizenCareActionSynced(context.residentId, receipt);
-        if (!isCurrentCitizenCareContext(context)) return;
-        renderCitizen(context.residentId);
-        showToast("一次性资料包已撤销");
+        finishCareAction(view, receipt, "一次性资料包已撤销");
       } catch (error) {
-        if (!isCurrentCitizenCareContext(context)) return;
-        showToast(error.message || "资料包撤销失败");
+        if (isCurrentCareView(view)) showToast(error.message || "资料包撤销失败");
       }
     }
     if (taskButton) {
-      const context = captureCitizenCareContext();
+      const view = captureCareView();
       const resourceId = taskButton.dataset.careTaskComplete;
-      const sourceState = ensureCitizenCareCollections(context.residentId);
+      const sourceState = ensureCitizenCareCollections(view.residentId);
       const update = { status: "completed", completedAt: new Date().toISOString() };
       try {
         const response = await submitCitizenCareAction(`/care-tasks/${encodeURIComponent(resourceId)}/actions`, {
           ...update,
-          residentId: context.residentId,
+          residentId: view.residentId,
           resourceId
         }, "care-task-complete");
         const receipt = api.projectActionReceipt(response, {
-          residentId: context.residentId,
+          residentId: view.residentId,
           resourceId
         });
-        const careState = ensureCitizenCareCollections(context.residentId);
+        const careState = ensureCitizenCareCollections(view.residentId);
         if (careState !== sourceState && !Object.hasOwn(careState.careTaskUpdates, resourceId)) {
-          throw new Error("工作台已刷新且无该处置记录，请核对服务端处理结果");
+          throw new Error("处置记录已不在工作台，请核对服务端处理结果");
         }
         careState.careTaskUpdates[resourceId] = { ...careState.careTaskUpdates[resourceId], ...update, ...receipt };
-        saveCitizenCareCollections(context.residentId);
-        markCitizenCareActionSynced(context.residentId, receipt);
-        if (!isCurrentCitizenCareContext(context)) return;
-        renderCitizen(context.residentId);
-        showToast("异常结果处置进度已记录");
+        finishCareAction(view, receipt, "异常结果处置进度已记录");
       } catch (error) {
-        if (!isCurrentCitizenCareContext(context)) return;
-        showToast(error.message || "处置进度保存失败");
+        if (isCurrentCareView(view)) showToast(error.message || "处置进度保存失败");
       }
     }
   });
