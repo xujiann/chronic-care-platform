@@ -9,6 +9,8 @@ const imagingState = {
 };
 const imagingQualityControlActionState = new Map();
 const imagingQualityControlRecovery = new Map();
+const IMAGING_QC_RECONCILIATION_GUIDANCE = "① 暂停重复提交；刷新页面不能证明对账完成。② 点击查看状态，并通过机构受控工单联系影像管理员核对外部报告与本地记录。③ 在取得明确核验结论前保留需对账状态。";
+const IMAGING_QC_RECONCILIATION_TITLE = "结果未确认；刷新页面不能证明对账完成，请通过机构受控工单联系影像管理员";
 
 const IMAGING_API_BASE = location.protocol === "file:" ? "" : `${location.origin}/api`;
 
@@ -366,7 +368,7 @@ function renderQualityControlAction(studyId) {
   const reconciliationRequired = actionState === "reconciliation-required";
   const label = reconciliationRequired ? "需对账" : actionState ? "处理中..." : "质控回写";
   const unavailable = actionState
-    ? ` disabled aria-disabled="true" title="${reconciliationRequired ? "结果未确认；完成外部与本地对账后重新加载页面" : "该检查的质控操作正在进行"}"`
+    ? ` disabled aria-disabled="true" title="${reconciliationRequired ? IMAGING_QC_RECONCILIATION_TITLE : "该检查的质控操作正在进行"}"`
     : "";
   const inspectAction = reconciliationRequired
     ? ` <button class="inline-action" type="button" data-qc-status="${escapeHtml(studyId)}">查看状态</button>`
@@ -745,7 +747,7 @@ async function qualityControlStudy(studyId, button) {
   const existingState = imagingQualityControlActionState.get(studyId);
   if (existingState) {
     window.alert(existingState === "reconciliation-required"
-      ? "该检查的质控结果尚未确认，本页已阻止重复提交；请完成外部与本地对账后重新加载页面。"
+      ? `该检查的质控结果尚未确认，本页已阻止重复提交。${IMAGING_QC_RECONCILIATION_GUIDANCE}`
       : "该检查的质控操作正在进行，请勿重复提交。");
     return;
   }
@@ -825,7 +827,7 @@ async function qualityControlStudy(studyId, button) {
         retainReconciliationLock = true;
       }
       const guidance = reconciliationRequired
-        ? "外部与本地结果可能不一致，请先完成对账，不要直接重复提交。"
+        ? `外部与本地结果可能不一致。${IMAGING_QC_RECONCILIATION_GUIDANCE}`
         : payload.retryable
           ? "本地未提交，可在问题恢复后重试。"
           : "请核对质控数据或联系平台运维处理。";
@@ -845,7 +847,7 @@ async function qualityControlStudy(studyId, button) {
       localOutcome: "not-committed"
     });
     retainReconciliationLock = true;
-    window.alert(`质控请求结果未知：${error.message}。本页已阻止重复提交；请完成本地与 FHIR 对账后重新加载页面。`);
+    window.alert(`质控请求结果未知：${error.message}。本页已阻止重复提交。${IMAGING_QC_RECONCILIATION_GUIDANCE}`);
   } finally {
     if (retainReconciliationLock) {
       if (button) {
@@ -853,7 +855,7 @@ async function qualityControlStudy(studyId, button) {
         button.disabled = true;
         button.removeAttribute("aria-busy");
         button.setAttribute("aria-disabled", "true");
-        button.setAttribute("title", "结果未确认；完成外部与本地对账后重新加载页面");
+        button.setAttribute("title", IMAGING_QC_RECONCILIATION_TITLE);
         delete button.dataset.idleLabel;
       }
     } else {
@@ -897,7 +899,7 @@ async function inspectQualityControlStatus(studyId) {
       : "本页外部回执：结果未知；当前没有可信 DiagnosticReport 回读证据。";
     const localObservation = study
       ? `本地当前状态：${study.qcStatus || "未标记"}；FHIR 同步：${study.fhirReportSyncStatus || "未记录"}；资源标识：${study.fhirDiagnosticReportId || "未记录"}。`
-      : "本地当前状态：在当前授权与筛选范围内未找到该检查。";
+      : "本地当前状态：在当前授权与筛选范围内未找到该检查；这不等于外部报告不存在。";
     const reviewObservation = latestReview
       ? `本地最新质控记录：${latestReview.result || "未标记"}（${latestReview.sampledAt || "时间未记录"}）。`
       : "本地最新质控记录：未观察到。";
@@ -906,9 +908,9 @@ async function inspectQualityControlStatus(studyId) {
       : recovery.externalOutcome === "confirmed"
         ? "本地快照尚未观察到本页外部回执对应的资源标识。"
         : "外部结果仍未知，不能据本地字段推断外部成功或失败。";
-    window.alert(`${externalObservation}\n${localObservation}\n${reviewObservation}\n${comparison}\n写操作仍保持锁定；请按运维对账流程核验，系统不会自动重发。`);
+    window.alert(`${externalObservation}\n${localObservation}\n${reviewObservation}\n${comparison}\n写操作仍保持锁定，系统不会自动重发。${IMAGING_QC_RECONCILIATION_GUIDANCE}`);
   } catch (error) {
-    window.alert(`未能读取当前本地状态：${error.message}。未使用演示数据替代，本页写操作仍保持锁定。`);
+    window.alert(`未能读取当前本地状态：${error.message}。未使用演示数据替代，本页写操作仍保持锁定。${IMAGING_QC_RECONCILIATION_GUIDANCE}`);
   }
 }
 
