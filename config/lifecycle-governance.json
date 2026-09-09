@@ -75,6 +75,27 @@
       "acceptance": ["目标 E2E 使用完整静态 fixture 响应且不再调用 route.fetch 回源", "目标场景连续重复 20 次稳定通过", "真实路由单元测试与在线根 60 项保持通过"]
     },
     {
+      "id": "REQ-OPS-023",
+      "title": "居民取消待确认状态必须显示为待处理并计入需关注",
+      "sourceType": "approved-t00-task-package",
+      "sourceRef": "T00-APPROVED-TASK-PACKAGE-OPS-023-2026-09-09",
+      "acceptance": ["cancel-requested 与取消待确认仅显示待处理 warn", "两种待确认来源均计入需关注", "真正取消和完成终态、API 与领域状态机保持不变"]
+    },
+    {
+      "id": "REQ-OPS-024",
+      "title": "影像质控成功响应必须完整且与当前 study、review 和同步资源关联",
+      "sourceType": "approved-t00-plan",
+      "sourceRef": "T00-PLAN-OPS-024-APPROVED-2026-09-09",
+      "acceptance": ["坏 JSON、null、数组、空对象和关联错配的 200 响应均失败关闭", "202 与同步资源标识缺失、非法或不一致均进入 unknown 并保持锁定", "只有完整合法且关联一致的 200 保留原成功行为"]
+    },
+    {
+      "id": "REQ-TEST-011",
+      "title": "挂号跨端 E2E 必须等待真实认证与导航外壳就绪后调用 authFetch",
+      "sourceType": "observed-ci-failure",
+      "sourceRef": "https://github.com/xujiann/chronic-care-platform/actions/runs/34311363398",
+      "acceptance": ["延迟 auth 脚本时等待 data-auth-resolved=allowed", "等待 data-navigation-shell=ready 后才调用 authFetch", "不增加 sleep、不放宽 timeout 且挂号定向与在线根 60 项通过"]
+    },
+    {
       "id": "REQ-GOV-005",
       "title": "六图差距必须与未完全闭合任务双向一致且技术债编号唯一",
       "sourceType": "approved-user-requirement",
@@ -254,6 +275,33 @@
       "evidenceIds": ["EVD-TEST-010"]
     },
     {
+      "id": "RISK-OPS-023",
+      "level": "低",
+      "title": "居民取消待确认被页面误显示为已取消并从需关注中遗漏",
+      "owner": "T04",
+      "mitigation": "仅精确识别既有 cancel-requested 与取消待确认两种状态并映射为待处理 warn，以单元和真实页面 E2E 锁定终态对照",
+      "status": "open",
+      "evidenceIds": []
+    },
+    {
+      "id": "RISK-OPS-024",
+      "level": "中",
+      "title": "影像质控不完整或错关联的 200 响应被误判成功并允许重复写入",
+      "owner": "T06",
+      "mitigation": "对现有响应承诺执行闭集形状、关联和资源标识校验，任何不确定结果保持 unknown 锁且禁止自动 GET 或重发",
+      "status": "open",
+      "evidenceIds": []
+    },
+    {
+      "id": "RISK-TEST-011",
+      "level": "低",
+      "title": "挂号跨端 E2E 的 URL 等待早于认证脚本执行导致 authFetch 未定义",
+      "owner": "T00",
+      "mitigation": "仅在目标 roles spec 等待页面公开的认证和导航就绪标记，不使用 sleep、timeout 放宽或生产代码变更",
+      "status": "open",
+      "evidenceIds": []
+    },
+    {
       "id": "RISK-GOV-005",
       "level": "中",
       "title": "六图遗漏真实缺口或技术债编号重用导致错误追踪",
@@ -418,6 +466,30 @@
       "kind": "product-regional-operations-static-fixture-stability-contract",
       "path": "test/e2e/product-regional-operations-trusted-rendering.spec.js",
       "command": "npx playwright test test/e2e/product-regional-operations-trusted-rendering.spec.js --repeat-each=20 --workers=1 --reporter=line"
+    },
+    {
+      "id": "TEST-OPS-023",
+      "kind": "resident-cancellation-pending-status-presentation-contract",
+      "path": "test/citizen-service-feedback.test.js",
+      "command": "node --test test/citizen-service-feedback.test.js"
+    },
+    {
+      "id": "TEST-OPS-023-E2E",
+      "kind": "resident-cancellation-pending-status-browser-contract",
+      "path": "test/e2e/citizen-service-feedback.spec.js",
+      "command": "npx playwright test test/e2e/citizen-service-feedback.spec.js --reporter=line"
+    },
+    {
+      "id": "TEST-OPS-024",
+      "kind": "imaging-qc-response-integrity-and-correlation-contract",
+      "path": "test/imaging-dashboard-route-characterization.test.js",
+      "command": "node scripts/clinical-subdomain-test-gate.js --subdomain imaging"
+    },
+    {
+      "id": "TEST-CI-011",
+      "kind": "registration-cross-terminal-auth-navigation-readiness-contract",
+      "path": "test/e2e/roles.spec.js",
+      "command": "npx playwright test test/e2e/roles.spec.js --reporter=line"
     },
     {
       "id": "TEST-GOV-005",
@@ -679,7 +751,7 @@
       "baseline": "主线模块化单体及其现有运行、存储和发布边界",
       "target": "边界、状态和生产资格均可由控制塔追踪",
       "status": "已集成",
-      "gapTaskIds": ["GOV-002", "OPS-015", "OPS-016", "OPS-017", "OPS-018", "SEC-011", "GOV-006", "OPS-022"],
+      "gapTaskIds": ["GOV-002", "OPS-015", "OPS-016", "OPS-017", "OPS-018", "SEC-011", "GOV-006", "OPS-022", "OPS-023", "OPS-024"],
       "evidenceIds": ["EVD-GOV-001", "EVD-GOV-002"]
     },
     {
@@ -688,7 +760,7 @@
       "baseline": "T00至T09及临床子域已建立模块所有权",
       "target": "模块写入冲突和跨任务依赖自动失败关闭",
       "status": "已集成",
-      "gapTaskIds": ["OPS-017", "GOV-006", "OPS-022"],
+      "gapTaskIds": ["OPS-017", "GOV-006", "OPS-022", "OPS-023", "OPS-024"],
       "evidenceIds": ["EVD-GOV-001", "EVD-GOV-002"]
     },
     {
@@ -715,7 +787,7 @@
       "baseline": "代码、运行时和外部依赖边界已有事实地图",
       "target": "任务前置关系、WIP和核心写范围形成可检查依赖图",
       "status": "已集成",
-      "gapTaskIds": ["GOV-002", "OPS-015", "OPS-017", "OPS-018", "GOV-006", "OPS-022"],
+      "gapTaskIds": ["GOV-002", "OPS-015", "OPS-017", "OPS-018", "GOV-006", "OPS-022", "OPS-023", "OPS-024", "TEST-011"],
       "evidenceIds": ["EVD-GOV-001", "EVD-GOV-002"]
     },
     {
@@ -724,7 +796,7 @@
       "baseline": "技术债以稳定编号记录仓库及现场缺口",
       "target": "风险、差距任务、退出条件和关闭证据双向可追踪",
       "status": "已集成",
-      "gapTaskIds": ["GOV-002", "OPS-015", "OPS-016", "OPS-017", "OPS-018", "SEC-011", "GOV-006", "OPS-022"],
+      "gapTaskIds": ["GOV-002", "OPS-015", "OPS-016", "OPS-017", "OPS-018", "SEC-011", "GOV-006", "OPS-022", "OPS-023", "OPS-024", "TEST-011"],
       "evidenceIds": ["EVD-GOV-001", "EVD-GOV-002"]
     }
   ],
@@ -752,7 +824,7 @@
       "acceptanceCriteria": [
         "GOV-005 仅依据已合并 PR #277 与全部成功 CI run 34233229053 关闭",
         "OPS-020、OPS-021 与 OPS-022 的 owner、依赖、写范围、验收、回滚和 NO-GO 边界可机器检查",
-        "OPS-020、OPS-021 与 TEST-010 合并关闭后 GOV-006 与 OPS-022 两项在制任务为 WIP 2/5 且不存在写范围冲突"
+        "OPS-023、OPS-024 与 TEST-011 获批后，GOV-006、OPS-022、OPS-023、OPS-024 与 TEST-011 五项在制任务达到 WIP 5/5 且不存在写范围冲突"
       ],
       "testIds": ["TEST-GOV-006"],
       "evidenceIds": [],
@@ -803,6 +875,122 @@
       "ciRef": "https://github.com/xujiann/chronic-care-platform/actions/runs/34310567775",
       "writeScopes": ["test/e2e/product-regional-operations-trusted-rendering.spec.js"],
       "observability": {"applicable": false, "reason": "仅稳定化脱敏浏览器测试 fixture，不新增生产运行时或监控能力"},
+      "runtimeCapability": false
+    },
+    {
+      "id": "OPS-023",
+      "title": "居民取消待确认展示与需关注计数纠正",
+      "ownerProcess": "T04",
+      "integrationOwner": "T00",
+      "taskStatus": "已批准",
+      "capabilityStatus": "未建设",
+      "riskLevel": "低",
+      "approval": {
+        "state": "approved",
+        "mode": "approved-task-package",
+        "ref": "T00-APPROVED-TASK-PACKAGE-OPS-023-2026-09-09",
+        "approvedScope": "resident-cancellation-pending-status-presentation-only"
+      },
+      "requirementIds": ["REQ-OPS-023"],
+      "regulatoryControlIds": ["REG-GOV-001"],
+      "riskIds": ["RISK-OPS-023"],
+      "decisionIds": [],
+      "dependencies": ["GOV-005", "OPS-021"],
+      "affectedModules": ["citizen-portal", "resident-feedback-browser"],
+      "dataSensitivity": "居民服务取消状态展示-只读取既有个人敏感业务状态且不新增持久化",
+      "acceptanceCriteria": [
+        "cancel-requested 与取消待确认两种既有来源均显示待处理 warn 并计入需关注",
+        "真正取消与完成终态保持既有显示和计数语义，其他状态不被扩张匹配",
+        "先以单元测试证明两种待确认来源和终态对照为 RED，再通过既有弹窗回归与真实页面 E2E"
+      ],
+      "testIds": ["TEST-OPS-023", "TEST-OPS-023-E2E"],
+      "evidenceIds": [],
+      "rollback": "回退本任务三文件单一提交并重跑居民单元与 E2E；不修改或删除服务订单、取消请求、评价、投诉、消息或审计数据",
+      "unresolved": ["尚未进入实现、独立评审、Draft PR 与 required CI"],
+      "worktree": ".codex-platform-worktrees/process-v2/t04-cancellation-pending-status-20260909",
+      "branch": "process/t04-cancellation-pending-status-20260909",
+      "planRef": "docs/lifecycle-governance.md#ops-023-居民取消待确认展示纠正-plan",
+      "pullRequestRef": "",
+      "ciRef": "",
+      "writeScopes": ["citizen-service-feedback.js", "test/citizen-service-feedback.test.js", "test/e2e/citizen-service-feedback.spec.js"],
+      "observability": {"applicable": true, "gaps": "本切片不新增遥测；居民服务状态运行治理缺口继续由既有 OPS-017 跟踪"},
+      "runtimeCapability": true
+    },
+    {
+      "id": "OPS-024",
+      "title": "影像质控成功响应完整性与关联校验",
+      "ownerProcess": "T06",
+      "integrationOwner": "T00",
+      "taskStatus": "已批准",
+      "capabilityStatus": "未建设",
+      "riskLevel": "中",
+      "approval": {
+        "state": "approved",
+        "mode": "T00-plan-approval",
+        "ref": "T00-PLAN-OPS-024-APPROVED-2026-09-09",
+        "approvedScope": "imaging-qc-existing-response-integrity-and-correlation-validation"
+      },
+      "requirementIds": ["REQ-OPS-024"],
+      "regulatoryControlIds": ["REG-GOV-001"],
+      "riskIds": ["RISK-OPS-015", "RISK-OPS-024"],
+      "decisionIds": [],
+      "dependencies": ["GOV-005", "OPS-018", "OPS-020"],
+      "affectedModules": ["clinical-imaging", "imaging-browser"],
+      "dataSensitivity": "影像质控 study、review 与同步资源关联-敏感健康业务元数据不新增持久化",
+      "acceptanceCriteria": [
+        "坏 JSON、null、数组、空对象、study 或 review 错关联的 200 响应均不得进入成功",
+        "同步资源 ID 缺失、非法或不一致及所有 202 均进入 unknown 并保持写锁，不自动 GET 或重发",
+        "完整合法且与当前 study、review 和同步资源一致的 200 保留既有成功行为，不新增 FHIR 协议字段要求"
+      ],
+      "testIds": ["TEST-OPS-024"],
+      "evidenceIds": [],
+      "rollback": "回退本任务两文件单一提交并重跑影像专项；无 schema、migration、服务端协议或业务数据变化",
+      "unresolved": ["尚未进入实现、独立评审、Draft PR 与 required CI", "耐久 command/outbox、provider 协议、迁移、worker 与现场证据仍由 OPS-015、OPS-018 和 Proposed ADR 跟踪"],
+      "worktree": ".codex-platform-worktrees/process-v2/t06-imaging-qc-response-validation-20260909",
+      "branch": "process/t06-imaging-qc-response-validation-20260909",
+      "planRef": "docs/lifecycle-governance.md#ops-024-影像质控响应完整性与关联校验-plan",
+      "pullRequestRef": "",
+      "ciRef": "",
+      "writeScopes": ["imaging-cloud.js", "test/imaging-dashboard-route-characterization.test.js"],
+      "observability": {"applicable": true, "gaps": "本切片不新增遥测；影像质控运行治理缺口继续由 OPS-015 与 OPS-018 跟踪"},
+      "runtimeCapability": true
+    },
+    {
+      "id": "TEST-011",
+      "title": "挂号跨端 E2E 认证与导航就绪等待",
+      "ownerProcess": "T00",
+      "taskStatus": "已批准",
+      "capabilityStatus": "未建设",
+      "riskLevel": "低",
+      "approval": {
+        "state": "approved",
+        "mode": "approved-task-package",
+        "ref": "T00-APPROVED-TASK-PACKAGE-TEST-011-2026-09-09",
+        "approvedScope": "registration-cross-terminal-auth-navigation-readiness-wait-only"
+      },
+      "requirementIds": ["REQ-TEST-011"],
+      "regulatoryControlIds": ["REG-GOV-001"],
+      "riskIds": ["RISK-TEST-011"],
+      "decisionIds": [],
+      "dependencies": ["GOV-005", "TEST-010"],
+      "affectedModules": ["browser-e2e", "registration-cross-terminal-test-fixture"],
+      "dataSensitivity": "脱敏挂号 E2E 会话状态-不含居民数据或生产凭据",
+      "acceptanceCriteria": [
+        "延迟 auth 脚本时等待 data-auth-resolved=allowed 和 data-navigation-shell=ready 后再调用 authFetch",
+        "不使用固定 sleep、不放宽 timeout、不增加 retry 且不修改生产代码",
+        "挂号跨端定向场景与在线根 Playwright 60 项全部通过"
+      ],
+      "testIds": ["TEST-CI-011"],
+      "evidenceIds": [],
+      "rollback": "回退目标 roles spec 单一提交并恢复原等待；不修改业务运行时、认证状态、数据或全局测试策略",
+      "unresolved": ["尚未进入实现、独立评审、Draft PR 与 required CI"],
+      "worktree": ".codex-platform-worktrees/process-v2/t00-registration-auth-readiness-20260909",
+      "branch": "process/t00-registration-auth-readiness-20260909",
+      "planRef": "docs/lifecycle-governance.md#test-011-挂号跨端认证与导航就绪等待-plan",
+      "pullRequestRef": "",
+      "ciRef": "",
+      "writeScopes": ["test/e2e/roles.spec.js"],
+      "observability": {"applicable": false, "reason": "仅修复脱敏浏览器测试就绪等待，不新增生产运行时或监控能力"},
       "runtimeCapability": false
     },
     {
