@@ -120,11 +120,14 @@
         renderMetrics(nodes.metrics, state.rows);
         render();
         setStatus(`已从业务接口刷新 · ${new Date().toLocaleString("zh-CN")}`);
+        return { ok: true };
       } catch (error) {
         state.rows = [];
         renderMetrics(nodes.metrics, []);
         render();
-        setStatus(`加载失败：${error.message || "业务接口暂不可用"}`, true);
+        const message = `加载失败：${error.message || "业务接口暂不可用"}`;
+        setStatus(message, true);
+        return { ok: false, error: message };
       }
     }
 
@@ -135,7 +138,11 @@
       setStatus(`正在提交“${action.label}”……`);
       try {
         await action.run(client, row, role());
-        await load();
+        const refreshed = await load();
+        if (!refreshed.ok) {
+          setStatus(`“${action.label}”已由业务接口保存，但刷新失败；请刷新核对最新状态，无需重复提交。${refreshed.error}`, true);
+          return;
+        }
         setStatus(`“${action.label}”已由业务接口保存并刷新`);
       } catch (error) {
         setStatus(`提交失败，未在页面伪造成功：${error.message || "请稍后重试"}`, true);
