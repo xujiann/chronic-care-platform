@@ -1,7 +1,69 @@
 const { expect, test } = require("@playwright/test");
 const fs = require("node:fs");
 
-test("resident creates a scoped consent and revokes it through the dedicated audit route", async ({ page }) => {
+async function verifyCareWorkspaceSession(browser, baseURL, navigation, outcome) {
+  const context = await browser.newContext({ baseURL, serviceWorkers: "block" });
+  const page = await context.newPage();
+  let release;
+  try {
+      // Synthetic member and receipt fixtures exercise browser context isolation only;
+      // they do not grant family write permission or prove server authorization.
+      await page.route("**/api/record-care-workspace**", (route) => route.fulfill({ json: { corrections: [], sharePackages: [], taskUpdates: {}, syncedAt: new Date().toISOString() } }));
+      let sent;
+      let responseFinished;
+      const finished = new Promise((resolve) => { responseFinished = resolve; });
+      const gate = new Promise((resolve) => { release = resolve; });
+      await page.route("**/api/record-corrections", async (route) => {
+        sent = route.request().postDataJSON();
+        await gate;
+        await route.fulfill({ status: outcome === "success" ? 201 : 503, json: outcome === "success"
+          ? { ...sent, receiptId: "session-correction-receipt", auditRef: "session-correction-audit" }
+          : { message: "旧视图请求失败" } });
+        responseFinished();
+      });
+      await page.goto("/login.html");
+      await page.locator("#login-user").selectOption("citizen");
+      await page.locator("input[name='password']").fill("123456");
+      await page.locator("#login-form button[type='submit']").click();
+      await expect(page).toHaveURL(/citizen\.html$/);
+      await expect(page.locator("#citizen-care-sync-status")).toContainText("已安全同步");
+      await page.evaluate(() => {
+        const resident = state.residents.find((item) => item.id === "r1");
+        state.residents.push({ ...resident, id: "session-member-2", name: "示例成员" });
+        const account = state.accounts.find((item) => item.id === currentAccountId);
+        account.members.push({ residentId: "session-member-2", relation: "家庭成员" });
+        renderCitizen("r1");
+        document.body.classList.remove("service-paged-mode");
+      });
+      const form = page.locator("#citizen-correction-form");
+      await form.locator("select[name='field']").selectOption("summary");
+      await form.locator("input[name='requestedValue']").fill("请机构核对摘要");
+      await form.locator("textarea[name='reason']").fill("原视图申请");
+      await form.getByRole("button", { name: "提交纠错申请" }).click();
+      await expect.poll(() => sent?.residentId).toBe("r1");
+      await page.locator("[data-member='session-member-2']").click();
+      await expect(page.locator("#citizen-care-sync-status")).toContainText("已安全同步");
+      if (navigation === "ABA") await page.locator("[data-member='r1']").click();
+      await form.locator("textarea[name='reason']").fill("新视图草稿必须保留");
+      release();
+      await finished;
+      // Flush the real fetch continuation and subsequent DOM tasks before asserting.
+      await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+      await expect(form.locator("textarea[name='reason']")).toHaveValue("新视图草稿必须保留");
+      await expect(page.locator("#toast")).not.toContainText("旧视图请求失败");
+      await page.locator("[data-member='session-member-2']").click();
+      await expect(page.locator("#citizen-correction-list")).not.toContainText("session-correction-receipt");
+      await page.locator("[data-member='r1']").click();
+      if (outcome === "success") await expect(page.locator("#citizen-correction-list")).toContainText("session-correction-receipt");
+      else await expect(page.locator("#citizen-correction-list")).not.toContainText("session-correction-receipt");
+  } finally {
+    release?.();
+    await context.close();
+  }
+}
+
+test("resident creates a scoped consent and revokes it through the dedicated audit route", async ({ page, browser, baseURL }) => {
+  await test.step("care workspace isolates delayed success after member switch", () => verifyCareWorkspaceSession(browser, baseURL, "member-switch", "success"));
   const authorizationWrites = [];
   await page.route(/\/api\/(?:personal-records|authorizations\/.*\/revoke)$/, async (route) => {
     if (route.request().method() !== "POST") {
@@ -169,7 +231,8 @@ test("resident creates a scoped consent and revokes it through the dedicated aud
   await expect(page.locator("#access-log-cards")).not.toContainText("personIndex");
 });
 
-test("resident uses the V2 care workspace for correction, one-time sharing and accessibility", async ({ page }) => {
+test("resident uses the V2 care workspace for correction, one-time sharing and accessibility", async ({ page, browser, baseURL }) => {
+  await test.step("care workspace isolates delayed failure after member switch", () => verifyCareWorkspaceSession(browser, baseURL, "member-switch", "failure"));
   await page.route("**/api/record-care-workspace**", async (route) => {
     await route.fulfill({
       status: 200,
@@ -390,7 +453,8 @@ test("resident uses the V2 care workspace for correction, one-time sharing and a
   await expect(page.locator("#citizen-correction-list")).toContainText("尚未提交");
 });
 
-test("resident reviews all eight next-stage health record capabilities", async ({ page }) => {
+test("resident reviews all eight next-stage health record capabilities", async ({ page, browser, baseURL }) => {
+  await test.step("care workspace preserves a new ABA draft after delayed success", () => verifyCareWorkspaceSession(browser, baseURL, "ABA", "success"));
   await page.addInitScript(() => {
     globalThis.__CITIZEN_PRODUCTION_EVIDENCE__ = {
       identity: {
@@ -479,7 +543,8 @@ test("resident reviews all eight next-stage health record capabilities", async (
   expect(qualitySummaryBox.height).toBeGreaterThanOrEqual(44);
 });
 
-test("resident-facing pages do not expose English business copy", async ({ page }) => {
+test("resident-facing pages do not expose English business copy", async ({ page, browser, baseURL }) => {
+  await test.step("care workspace suppresses delayed failure in a new ABA view", () => verifyCareWorkspaceSession(browser, baseURL, "ABA", "failure"));
   const routes = ["health-record", "emr", "escort", "family-doctor", "registration"];
 
   await page.goto("/login.html");
