@@ -5,6 +5,7 @@
   const apiEnabled = location.protocol !== "file:" && !location.hostname.endsWith("github.io");
   const user = auth?.getUser?.() || {};
   const state = { center: null, source: "loading", keyword: "", type: "all", reportingStatus: "all", institution: "all", selectedId: "" };
+  const pendingRetries = new Set();
 
   const fallbackCenter = Object.freeze({
     schemaVersion: "regional-clinical-document-center-v1",
@@ -166,7 +167,7 @@
       card.append(header, el("p", { text: `${item.residentReference} · 异常项：${(item.issueCodes || []).join("、") || "网关传输异常"}` }), el("p", { text: `${item.nextAction || "核对源数据后处理"} · 已重试 ${item.retryCount || 0} 次` }));
       if (item.actions?.retryException && state.center.actions.retryExceptions) {
         const actions = el("div", { className: "clinical-document-card-actions" });
-        actions.append(actionButton("通过既有事件补传", { documentRetry: item.id }, state.source === "api"));
+        actions.append(actionButton(pendingRetries.has(item.id) ? "正在核对补传状态" : "通过既有事件补传", { documentRetry: item.id }, state.source === "api" && !pendingRetries.has(item.id)));
         card.append(actions);
       }
       target.append(card);
@@ -281,13 +282,20 @@
   }
 
   async function retryDocument(id) {
-    setBanner("正在提交异常补传", "补传将复用既有集成事件重试入口。", "warning");
+    const item = state.center?.exceptions?.find((entry) => entry.id === id);
+    if (state.source !== "api" || !state.center?.actions?.retryExceptions || !item?.actions?.retryException || pendingRetries.has(id)) return;
+    pendingRetries.add(id);
     try {
+      renderExceptions();
+      setBanner("正在提交异常补传", "补传将复用既有集成事件重试入口。", "warning");
       await requestJson(`/api/integration/events/${encodeURIComponent(id)}/retry`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ reason: "区域医疗文书中心人工复核后补传" }) });
       setBanner("异常补传已由服务端受理", "正在重新读取权威采集与报送状态。", "normal");
       await load();
     } catch (error) {
-      setBanner("异常补传未完成", `${error.message || "服务端未返回成功回执"}。页面未修改本地业务状态。`, "danger");
+      setBanner("异常补传未完成", `${error.message || "服务端未返回成功回执"}。提交结果可能未确认，请先核对服务端事件状态；页面未修改本地业务状态。`, "danger");
+    } finally {
+      pendingRetries.delete(id);
+      renderExceptions();
     }
   }
 
