@@ -1014,6 +1014,232 @@ test("imaging browser recovery view never replaces a failed strict read with fal
   assert.doesNotMatch(alerts[0], /已完成|已确认并保存/);
 });
 
+function createImagingDashboardReadHarness({ protocol = "http:" } = {}) {
+  const source = fs.readFileSync(path.join(__dirname, "..", "imaging-cloud.js"), "utf8");
+  const requests = [];
+  const alerts = [];
+  const table = { innerHTML: "" };
+  const mobileViewer = { innerHTML: "" };
+  const phoneTitle = { textContent: "" };
+  const phoneSubtitle = { textContent: "" };
+  let fallbackCalls = 0;
+  const window = {
+    alert(message) { alerts.push(message); },
+    HealthCityAuth: {
+      getUser() { return { role: "commission" }; },
+      authFetch(url) {
+        return new Promise((resolve, reject) => requests.push({ url, resolve, reject }));
+      }
+    }
+  };
+  const context = {
+    console,
+    window,
+    URL,
+    URLSearchParams,
+    location: { origin: "http://platform.test", protocol },
+    document: {
+      addEventListener() {},
+      querySelector(selector) {
+        return {
+          "#study-table": table,
+          "#mobile-viewer": mobileViewer,
+          "#phone-title": phoneTitle,
+          "#phone-subtitle": phoneSubtitle
+        }[selector] || null;
+      }
+    },
+    fetch() { throw new Error("unexpected unauthenticated fetch"); },
+    fallbackProbe() {
+      fallbackCalls += 1;
+      return { studies: [{ id: "demo-fallback", modality: "DR", bodyPart: "胸部", institutionName: "示范医院", studyDate: "2026-09-10" }] };
+    }
+  };
+  vm.runInNewContext(`${source}\n;buildFallbackImagingCloud = fallbackProbe; globalThis.dashboardReadTest = { imagingState, imagingQualityControlActionState, imagingQualityControlRecovery, loadImagingCloud, inspectQualityControlStatus, renderImagingCloud };`, context);
+  return {
+    alerts,
+    context,
+    requests,
+    table,
+    mobileViewer,
+    phoneTitle,
+    phoneSubtitle,
+    getFallbackCalls: () => fallbackCalls,
+    state: context.dashboardReadTest.imagingState,
+    qcState: context.dashboardReadTest.imagingQualityControlActionState,
+    qcRecovery: context.dashboardReadTest.imagingQualityControlRecovery,
+    load: context.dashboardReadTest.loadImagingCloud,
+    inspect: context.dashboardReadTest.inspectQualityControlStatus,
+    render: context.dashboardReadTest.renderImagingCloud
+  };
+}
+
+function imagingDashboardResponse(body, { ok = true, status = ok ? 200 : 503 } = {}) {
+  return { ok, status, async json() { return body; } };
+}
+
+test("imaging dashboard commits only the latest filtered GET snapshot", async () => {
+  const harness = createImagingDashboardReadHarness();
+  harness.state.selectedResidentId = "resident-A";
+  const loadA = harness.load();
+  harness.state.selectedResidentId = "resident-B";
+  const loadB = harness.load();
+
+  assert.deepEqual(harness.requests.map((item) => item.url), [
+    "http://platform.test/api/imaging-cloud?residentId=resident-A",
+    "http://platform.test/api/imaging-cloud?residentId=resident-B"
+  ]);
+  harness.requests[1].resolve(imagingDashboardResponse({ studies: [{ id: "study-B", residentId: "resident-B" }] }));
+  await loadB;
+  harness.requests[0].resolve(imagingDashboardResponse({ studies: [{ id: "study-A", residentId: "resident-A" }] }));
+  await loadA;
+
+  assert.equal(harness.state.selectedResidentId, "resident-B");
+  assert.equal(harness.state.payload.studies[0].id, "study-B");
+  assert.equal(harness.state.dashboardStatus, "ready");
+  assert.equal(harness.getFallbackCalls(), 0);
+});
+
+test("imaging dashboard invalidates an old snapshot while a new filter is pending", async () => {
+  const harness = createImagingDashboardReadHarness();
+  harness.state.payload = { studies: [{ id: "study-A", residentId: "resident-A" }] };
+  harness.state.dashboardStatus = "ready";
+  harness.table.innerHTML = '<button data-share-study="study-A">旧操作</button>';
+  harness.phoneTitle.textContent = "CT 胸部";
+  harness.phoneSubtitle.textContent = "旧机构 · 2026-09-09";
+  harness.state.selectedResidentId = "resident-B";
+
+  const loadB = harness.load();
+
+  assert.equal(harness.state.payload, null);
+  assert.equal(harness.state.dashboardStatus, "loading");
+  assert.match(harness.table.innerHTML, /正在加载影像检查/);
+  assert.doesNotMatch(harness.table.innerHTML, /data-(?:share|qc|view|open|start|decide|appeal)/);
+  assert.equal(harness.phoneTitle.textContent, "影像调阅");
+  assert.equal(harness.phoneSubtitle.textContent, "正在加载影像检查");
+  assert.equal(harness.getFallbackCalls(), 0);
+
+  harness.requests[0].resolve(imagingDashboardResponse({ studies: [{ id: "study-B", residentId: "resident-B", modality: "MR", bodyPart: "头颅", institutionName: "示范医院", studyDate: "2026-09-10" }] }));
+  await loadB;
+  assert.equal(harness.state.payload.studies[0].id, "study-B");
+  assert.equal(harness.phoneTitle.textContent, "MR 头颅");
+  assert.equal(harness.phoneSubtitle.textContent, "示范医院 · 2026-09-10");
+});
+
+test("imaging dashboard fails closed online and keeps file preview fallback", async (t) => {
+  const onlineFailures = [
+    {
+      name: "HTTP failure",
+      settle(request) { request.resolve(imagingDashboardResponse({ message: "unavailable" }, { ok: false, status: 503 })); }
+    },
+    {
+      name: "network failure",
+      settle(request) { request.reject(new Error("offline")); }
+    },
+    {
+      name: "malformed JSON",
+      settle(request) { request.resolve({ ok: true, status: 200, async json() { throw new SyntaxError("private marker"); } }); }
+    },
+    {
+      name: "missing study list",
+      settle(request) { request.resolve(imagingDashboardResponse({ summary: {} })); }
+    }
+  ];
+  for (const scenario of onlineFailures) await t.test(scenario.name, async () => {
+    const harness = createImagingDashboardReadHarness();
+    harness.state.payload = { studies: [{ id: "old-study" }] };
+    harness.state.dashboardStatus = "ready";
+    harness.state.selectedInstitutionCode = "institution-B";
+    harness.phoneTitle.textContent = "CT 胸部";
+    harness.phoneSubtitle.textContent = "旧机构 · 2026-09-09";
+    const loading = harness.load();
+    scenario.settle(harness.requests[0]);
+    await loading;
+    assert.equal(harness.state.payload, null);
+    assert.equal(harness.state.dashboardStatus, "error");
+    assert.match(harness.table.innerHTML, /影像检查暂时不可用/);
+    assert.doesNotMatch(harness.table.innerHTML, /data-(?:share|qc|view|open|start|decide|appeal)/);
+    assert.equal(harness.phoneTitle.textContent, "影像调阅");
+    assert.equal(harness.phoneSubtitle.textContent, "影像检查暂时不可用");
+    assert.equal(harness.getFallbackCalls(), 0);
+  });
+
+  const emptySuccess = createImagingDashboardReadHarness();
+  emptySuccess.state.payload = { studies: [{ id: "old-study" }] };
+  emptySuccess.state.dashboardStatus = "ready";
+  emptySuccess.phoneTitle.textContent = "CT 胸部";
+  emptySuccess.phoneSubtitle.textContent = "旧机构 · 2026-09-09";
+  const emptyLoading = emptySuccess.load();
+  emptySuccess.requests[0].resolve(imagingDashboardResponse({ studies: [] }));
+  await emptyLoading;
+  assert.equal(emptySuccess.state.dashboardStatus, "ready");
+  assert.equal(emptySuccess.phoneTitle.textContent, "影像调阅");
+  assert.equal(emptySuccess.phoneSubtitle.textContent, "暂无可调阅影像");
+
+  const filePreview = createImagingDashboardReadHarness({ protocol: "file:" });
+  await filePreview.load();
+  filePreview.render();
+  assert.equal(filePreview.requests.length, 0);
+  assert.equal(filePreview.state.payload.studies[0].id, "demo-fallback");
+  assert.equal(filePreview.state.dashboardStatus, "ready");
+  assert.equal(filePreview.getFallbackCalls(), 1);
+  assert.equal(filePreview.phoneTitle.textContent, "DR 胸部");
+  assert.equal(filePreview.phoneSubtitle.textContent, "示范医院 · 2026-09-10");
+});
+
+test("stale imaging GET failures and QC status reads cannot replace the current filter", async (t) => {
+  const staleFailures = [
+    {
+      name: "HTTP failure",
+      settle(request) { request.resolve(imagingDashboardResponse({ message: "forbidden" }, { ok: false, status: 403 })); }
+    },
+    {
+      name: "network failure",
+      settle(request) { request.reject(new Error("offline")); }
+    },
+    {
+      name: "malformed JSON",
+      settle(request) { request.resolve({ ok: true, status: 200, async json() { throw new SyntaxError("private marker"); } }); }
+    }
+  ];
+  for (const scenario of staleFailures) await t.test(scenario.name, async () => {
+    const staleFailure = createImagingDashboardReadHarness();
+    staleFailure.state.selectedResidentId = "resident-A";
+    staleFailure.state.selectedInstitutionCode = "institution-A";
+    const loadA = staleFailure.load();
+    staleFailure.state.selectedResidentId = "resident-B";
+    staleFailure.state.selectedInstitutionCode = "institution-B";
+    const loadB = staleFailure.load();
+    assert.equal(staleFailure.requests[1].url, "http://platform.test/api/imaging-cloud?residentId=resident-B&institutionCode=institution-B");
+    staleFailure.requests[1].resolve(imagingDashboardResponse({ studies: [{ id: "study-B" }] }));
+    await loadB;
+    scenario.settle(staleFailure.requests[0]);
+    await loadA;
+    assert.equal(staleFailure.state.payload.studies[0].id, "study-B");
+    assert.equal(staleFailure.state.dashboardStatus, "ready");
+    assert.equal(staleFailure.getFallbackCalls(), 0);
+  });
+
+  const qcRace = createImagingDashboardReadHarness();
+  qcRace.state.payload = { studies: [{ id: "study-A" }] };
+  qcRace.state.dashboardStatus = "ready";
+  qcRace.state.selectedResidentId = "resident-A";
+  qcRace.qcState.set("study-A", "reconciliation-required");
+  qcRace.qcRecovery.set("study-A", { studyId: "study-A", externalOutcome: "unknown", localOutcome: "not-committed" });
+  const inspectA = qcRace.inspect("study-A");
+  qcRace.state.selectedResidentId = "resident-B";
+  const currentB = qcRace.load();
+  qcRace.requests[1].resolve(imagingDashboardResponse({ studies: [{ id: "study-B" }], qualityReviews: [] }));
+  await currentB;
+  qcRace.requests[0].resolve(imagingDashboardResponse({ studies: [{ id: "study-A" }], qualityReviews: [] }));
+  await inspectA;
+
+  assert.equal(qcRace.state.payload.studies[0].id, "study-B");
+  assert.equal(qcRace.alerts.length, 0);
+  assert.equal(qcRace.qcState.get("study-A"), "reconciliation-required");
+  assert.deepEqual(qcRace.qcRecovery.get("study-A"), { studyId: "study-A", externalOutcome: "unknown", localOutcome: "not-committed" });
+});
+
 test("imaging browser flow locks an uncertain QC result and releases an explicitly retryable rejection", async () => {
   const source = fs.readFileSync(path.join(__dirname, "..", "imaging-cloud.js"), "utf8");
 

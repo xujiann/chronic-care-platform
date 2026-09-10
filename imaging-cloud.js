@@ -5,7 +5,10 @@ const imagingState = {
   productionApiReady: false,
   selectedResidentId: "",
   selectedInstitutionCode: "",
-  selectedStudyId: ""
+  selectedStudyId: "",
+  dashboardStatus: "idle",
+  dashboardError: "",
+  dashboardRequestGeneration: 0
 };
 const imagingQualityControlActionState = new Map();
 const imagingQualityControlRecovery = new Map();
@@ -21,22 +24,67 @@ document.addEventListener("DOMContentLoaded", async () => {
 });
 
 async function loadImagingCloud() {
-  const params = new URLSearchParams();
-  if (imagingState.selectedResidentId) params.set("residentId", imagingState.selectedResidentId);
-  if (imagingState.selectedInstitutionCode) params.set("institutionCode", imagingState.selectedInstitutionCode);
-  if (IMAGING_API_BASE) {
-    try {
-      const request = window.HealthCityAuth?.authFetch || fetch;
-      const response = await request(`${IMAGING_API_BASE}/imaging-cloud${params.toString() ? `?${params}` : ""}`);
-      if (response.ok) {
-        imagingState.payload = await response.json();
-        return;
-      }
-    } catch (error) {
-      // Static preview falls through to embedded demo data.
-    }
+  if (!IMAGING_API_BASE) {
+    imagingState.payload = buildFallbackImagingCloud();
+    imagingState.dashboardStatus = "ready";
+    imagingState.dashboardError = "";
+    return;
   }
-  imagingState.payload = buildFallbackImagingCloud();
+
+  const dashboardRead = beginImagingDashboardRead({ invalidate: true });
+  renderImagingCloud();
+  try {
+    const request = window.HealthCityAuth?.authFetch || fetch;
+    const response = await request(buildImagingDashboardUrl(dashboardRead));
+    const payload = await response.json();
+    if (!isCurrentImagingDashboardRead(dashboardRead)) return;
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    if (!isImagingDashboardPayload(payload)) throw new Error("影像云响应缺少检查列表");
+    imagingState.payload = payload;
+    imagingState.dashboardStatus = "ready";
+    imagingState.dashboardError = "";
+    renderImagingCloud();
+  } catch (error) {
+    if (!isCurrentImagingDashboardRead(dashboardRead)) return;
+    imagingState.payload = null;
+    imagingState.selectedStudyId = "";
+    imagingState.dashboardStatus = "error";
+    imagingState.dashboardError = "影像检查暂时不可用，请稍后重试。";
+    renderImagingCloud();
+  }
+}
+
+function beginImagingDashboardRead({ invalidate = false } = {}) {
+  const dashboardRead = {
+    generation: imagingState.dashboardRequestGeneration + 1,
+    residentId: imagingState.selectedResidentId,
+    institutionCode: imagingState.selectedInstitutionCode
+  };
+  imagingState.dashboardRequestGeneration = dashboardRead.generation;
+  if (invalidate) {
+    imagingState.payload = null;
+    imagingState.selectedStudyId = "";
+    imagingState.dashboardStatus = "loading";
+    imagingState.dashboardError = "";
+  }
+  return dashboardRead;
+}
+
+function isCurrentImagingDashboardRead(dashboardRead) {
+  return dashboardRead.generation === imagingState.dashboardRequestGeneration
+    && dashboardRead.residentId === imagingState.selectedResidentId
+    && dashboardRead.institutionCode === imagingState.selectedInstitutionCode;
+}
+
+function buildImagingDashboardUrl(dashboardRead) {
+  const params = new URLSearchParams();
+  if (dashboardRead.residentId) params.set("residentId", dashboardRead.residentId);
+  if (dashboardRead.institutionCode) params.set("institutionCode", dashboardRead.institutionCode);
+  return `${IMAGING_API_BASE}/imaging-cloud${params.toString() ? `?${params}` : ""}`;
+}
+
+function isImagingDashboardPayload(payload) {
+  return Boolean(payload) && typeof payload === "object" && !Array.isArray(payload) && Array.isArray(payload.studies);
 }
 
 async function loadProductionCenter() {
@@ -80,7 +128,9 @@ function bindImagingControls() {
 }
 
 function renderImagingCloud() {
-  const payload = imagingState.payload || buildFallbackImagingCloud();
+  const onlineDashboardUnavailable = Boolean(IMAGING_API_BASE)
+    && (imagingState.dashboardStatus === "loading" || imagingState.dashboardStatus === "error" || !imagingState.payload);
+  const payload = onlineDashboardUnavailable ? { studies: [] } : imagingState.payload || buildFallbackImagingCloud();
   const studies = payload.studies || [];
   if (!imagingState.selectedStudyId || !studies.some((item) => item.id === imagingState.selectedStudyId)) {
     imagingState.selectedStudyId = studies[0]?.id || "";
@@ -88,7 +138,7 @@ function renderImagingCloud() {
   renderFilters(payload);
   renderSummary(payload.summary || {});
   renderProductionGate(imagingState.productionCenter || payload.productionCenter || fallbackProductionCenter());
-  renderStudyTable(studies);
+  renderStudyTable(studies, imagingState.dashboardStatus);
   renderMutualRecognition(payload.mutualRecognition || []);
   renderDevelopmentPlan(payload);
   renderGateways(payload);
@@ -298,9 +348,14 @@ function renderSummary(summary) {
   </article>`).join("");
 }
 
-function renderStudyTable(studies) {
+function renderStudyTable(studies, dashboardStatus = imagingState.dashboardStatus) {
   const target = document.querySelector("#study-table");
   if (!target) return;
+  const emptyMessage = dashboardStatus === "loading"
+    ? "正在加载影像检查，请稍候。"
+    : dashboardStatus === "error"
+      ? imagingState.dashboardError || "影像检查暂时不可用，请稍后重试。"
+      : "暂无影像云检查。";
   target.innerHTML = `<table>
     <thead><tr><th>检查</th><th>医院</th><th>主索引</th><th>入云</th><th>质控/EMR</th><th>跨机构互认</th><th>操作</th></tr></thead>
     <tbody>${studies.map((item) => `<tr>
@@ -317,7 +372,7 @@ function renderStudyTable(studies) {
         ${renderQualityControlAction(item.id)}
         ${canManageMutualRecognition() && !item.mutualRecognitionRecordId ? `<button class="inline-action" type="button" data-start-recognition="${escapeHtml(item.id)}">纳入互认</button>` : ""}
       </td>
-    </tr>`).join("") || `<tr><td colspan="7">暂无影像云检查。</td></tr>`}</tbody>
+    </tr>`).join("") || `<tr><td colspan="7">${escapeHtml(emptyMessage)}</td></tr>`}</tbody>
   </table>`;
 }
 
@@ -492,6 +547,14 @@ function renderMobileViewer(study, payload) {
   const subtitle = document.querySelector("#phone-subtitle");
   if (!target) return;
   if (!study) {
+    if (title) title.textContent = "影像调阅";
+    if (subtitle) {
+      subtitle.textContent = imagingState.dashboardStatus === "loading"
+        ? "正在加载影像检查"
+        : imagingState.dashboardStatus === "error"
+          ? "影像检查暂时不可用"
+          : "暂无可调阅影像";
+    }
     target.innerHTML = `<p>暂无可调阅影像。</p>`;
     return;
   }
@@ -889,21 +952,22 @@ async function inspectQualityControlStatus(studyId) {
     externalOutcome: "unknown",
     localOutcome: "not-committed"
   };
-  const params = new URLSearchParams();
-  if (imagingState.selectedResidentId) params.set("residentId", imagingState.selectedResidentId);
-  if (imagingState.selectedInstitutionCode) params.set("institutionCode", imagingState.selectedInstitutionCode);
+  const dashboardRead = beginImagingDashboardRead();
   try {
     const request = window.HealthCityAuth?.authFetch || fetch;
-    const response = await request(`${IMAGING_API_BASE}/imaging-cloud${params.toString() ? `?${params}` : ""}`);
+    const response = await request(buildImagingDashboardUrl(dashboardRead));
     const payload = await response.json().catch(() => ({}));
+    if (!isCurrentImagingDashboardRead(dashboardRead)) return;
     if (!response.ok) throw new Error(payload.message || `HTTP ${response.status}`);
-    if (!Array.isArray(payload.studies)) throw new Error("影像云响应缺少检查列表");
+    if (!isImagingDashboardPayload(payload)) throw new Error("影像云响应缺少检查列表");
 
     const study = payload.studies.find((item) => item.id === studyId);
     const latestReview = Array.isArray(payload.qualityReviews)
       ? payload.qualityReviews.find((item) => item.studyId === studyId)
       : null;
     imagingState.payload = payload;
+    imagingState.dashboardStatus = "ready";
+    imagingState.dashboardError = "";
     renderImagingCloud();
 
     const externalObservation = recovery.externalOutcome === "confirmed"
@@ -922,6 +986,7 @@ async function inspectQualityControlStatus(studyId) {
         : "外部结果仍未知，不能据本地字段推断外部成功或失败。";
     window.alert(`${externalObservation}\n${localObservation}\n${reviewObservation}\n${comparison}\n写操作仍保持锁定，系统不会自动重发。${IMAGING_QC_RECONCILIATION_GUIDANCE}`);
   } catch (error) {
+    if (!isCurrentImagingDashboardRead(dashboardRead)) return;
     window.alert(`未能读取当前本地状态：${error.message}。未使用演示数据替代，本页写操作仍保持锁定。${IMAGING_QC_RECONCILIATION_GUIDANCE}`);
   }
 }
