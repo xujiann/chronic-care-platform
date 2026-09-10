@@ -40,6 +40,61 @@
   },
   "requirements": [
     {
+      "id": "REQ-OPS-036",
+      "title": "文书补传同事件在途去重",
+      "sourceType": "approved-t00-plan",
+      "sourceRef": "T00-PLAN-OPS-036-APPROVED-2026-09-10",
+      "acceptance": [
+        "同页面同event在POST及成功后GET刷新完成前最多一个在途请求，重绘不解除锁",
+        "按最新api来源及总动作和当前异常项动作重验，fallback撤权移除或旧按钮不发POST",
+        "保留不同event独立操作与既有payload，未知提交结果只提示核对；不宣称服务端幂等或跨页面exactly-once"
+      ]
+    },
+    {
+      "id": "REQ-OPS-035",
+      "title": "共享工作台保存与刷新结果分离",
+      "sourceType": "approved-t00-plan",
+      "sourceRef": "T00-PLAN-OPS-035-APPROVED-2026-09-10",
+      "acceptance": [
+        "load显式返回结果且不新增向调用方抛出异常，提交失败不刷新",
+        "提交成功刷新失败保留清空错误态，明确已保存但刷新失败需核对，不误导重复提交",
+        "保留成功与空列表刷新和五调用方兼容，不改API授权schema并发或幂等协议"
+      ]
+    },
+    {
+      "id": "REQ-OPS-034",
+      "title": "体检独立核验控件与现有角色合同一致",
+      "sourceType": "approved-t00-plan",
+      "sourceRef": "T00-PLAN-OPS-034-APPROVED-2026-09-10",
+      "acceptance": [
+        "仅commission且存在未核验提交时显示verify与reject控件",
+        "institution仍保留合法update-check及submit，服务端commission-only合同不变",
+        "在既有E2E内增加角色矩阵步骤，不变测试拓扑并保留可信渲染及分流回归"
+      ]
+    },
+    {
+      "id": "REQ-OPS-033",
+      "title": "影像查询最新筛选快照与在线失败隔离",
+      "sourceType": "approved-t00-plan",
+      "sourceRef": "T00-PLAN-OPS-033-APPROVED-2026-09-10",
+      "acceptance": [
+        "dashboard与质控状态读取共享代次及居民机构筛选绑定，迟到成功失败不污染当前视图",
+        "在线读取开始失效旧快照，HTTP网络JSON及最小结构失败不回流演示；file预览保持兼容",
+        "保留质控对账锁及恢复指引，不改API服务端授权schema或耐久命令"
+      ]
+    },
+    {
+      "id": "REQ-GOV-009",
+      "title": "浏览器缺口组合与跨任务集成",
+      "sourceType": "approved-t00-plan",
+      "sourceRef": "T00-PLAN-GOV-009-APPROVED-2026-09-10",
+      "acceptance": [
+        "以PR293及最终CI真实证据关闭GOV008，分批登记独立任务",
+        "WIP最多5且单scope单writer，领域PR独立审查后串行集成",
+        "不将浏览器局部修复或模拟回执当作系统验收和生产证据"
+      ]
+    },
+    {
       "id": "REQ-OPS-030",
       "title": "账号筛选与最新文档快照绑定",
       "sourceType": "approved-t00-plan",
@@ -340,6 +395,59 @@
   ],
   "risks": [
     {
+      "id": "RISK-OPS-036",
+      "title": "文书补传同事件在途去重",
+      "level": "中",
+      "owner": "T08",
+      "mitigation": "同步event锁与最新权限投影核验；未知结果不自动重试，不把浏览器锁当服务端幂等",
+      "status": "mitigated",
+      "evidenceIds": [
+        "EVD-OPS-036"
+      ]
+    },
+    {
+      "id": "RISK-OPS-035",
+      "level": "中",
+      "title": "共享工作台保存与刷新结果分离缺口未闭合",
+      "owner": "T09",
+      "mitigation": "精确范围负向回归、独立审查、最终CI与串行集成，不改变生产边界",
+      "status": "mitigated",
+      "evidenceIds": [
+        "EVD-OPS-035"
+      ]
+    },
+    {
+      "id": "RISK-OPS-034",
+      "level": "中",
+      "title": "体检独立核验控件与现有角色合同一致缺口未闭合",
+      "owner": "T06",
+      "mitigation": "精确范围负向回归、独立审查、最终CI与串行集成，不改变生产边界",
+      "status": "mitigated",
+      "evidenceIds": [
+        "EVD-OPS-034"
+      ]
+    },
+    {
+      "id": "RISK-OPS-033",
+      "level": "中",
+      "title": "影像查询最新筛选快照与在线失败隔离缺口未闭合",
+      "owner": "T06",
+      "mitigation": "精确范围负向回归、独立审查、最终CI与串行集成，不改变生产边界",
+      "status": "mitigated",
+      "evidenceIds": [
+        "EVD-OPS-033"
+      ]
+    },
+    {
+      "id": "RISK-GOV-009",
+      "level": "中",
+      "title": "浏览器缺口组合与跨任务集成缺口未闭合",
+      "owner": "T00",
+      "mitigation": "精确范围负向回归、独立审查、最终CI与串行集成，不改变生产边界",
+      "status": "open",
+      "evidenceIds": []
+    },
+    {
       "id": "RISK-OPS-030",
       "level": "中",
       "title": "账号筛选旧闭包和跨文档状态泄漏",
@@ -367,8 +475,10 @@
       "title": "下一批缺口组合登记未完成",
       "owner": "T00",
       "mitigation": "先以真实脚本复现，限于精确批准范围实施并通过独立审查、专项和最终提交 CI",
-      "status": "open",
-      "evidenceIds": []
+      "status": "mitigated",
+      "evidenceIds": [
+        "EVD-GOV-008"
+      ]
     },
     {
       "id": "RISK-OPS-031",
@@ -646,6 +756,36 @@
   ],
   "tests": [
     {
+      "id": "TEST-OPS-036",
+      "kind": "scoped-behavior-regression-contract",
+      "path": "test/regional-clinical-document-retry-session.test.js",
+      "command": "node --test test/regional-clinical-document-retry-session.test.js"
+    },
+    {
+      "id": "TEST-OPS-035",
+      "kind": "scoped-behavior-regression-contract",
+      "path": "test/domain-task-ui-refresh.test.js",
+      "command": "node --test test/domain-task-ui-refresh.test.js"
+    },
+    {
+      "id": "TEST-OPS-034",
+      "kind": "scoped-behavior-regression-contract",
+      "path": "test/e2e/physical-examination-trusted-rendering.spec.js",
+      "command": "npx playwright test test/e2e/physical-examination-trusted-rendering.spec.js"
+    },
+    {
+      "id": "TEST-OPS-033",
+      "kind": "scoped-behavior-regression-contract",
+      "path": "test/imaging-dashboard-route-characterization.test.js",
+      "command": "node --test test/imaging-dashboard-route-characterization.test.js"
+    },
+    {
+      "id": "TEST-GOV-009",
+      "kind": "existing-regression-baseline-before-scoped-implementation",
+      "path": "test/lifecycle-governance.test.js",
+      "command": "node --test test/lifecycle-governance.test.js"
+    },
+    {
       "id": "TEST-OPS-030",
       "kind": "scoped-behavior-regression-contract",
       "path": "test/platform-identity-governance-ui.test.js",
@@ -851,6 +991,66 @@
     }
   ],
   "evidence": [
+    {
+      "id": "EVD-GOV-009-LOCAL",
+      "scope": "repository",
+      "type": "executable-contract",
+      "ref": "node --test test/lifecycle-governance.test.js test/documentation-fact-drift.test.js",
+      "testIds": [
+        "TEST-GOV-009"
+      ],
+      "productionEvidence": false
+    },
+    {
+      "id": "EVD-OPS-036",
+      "scope": "repository-integration",
+      "type": "pull-request-ci",
+      "ref": "https://github.com/xujiann/chronic-care-platform/actions/runs/34496981872",
+      "testIds": [
+        "TEST-OPS-036"
+      ],
+      "productionEvidence": false
+    },
+    {
+      "id": "EVD-OPS-035",
+      "scope": "repository-integration",
+      "type": "pull-request-ci",
+      "ref": "https://github.com/xujiann/chronic-care-platform/actions/runs/34489286669",
+      "testIds": [
+        "TEST-OPS-035"
+      ],
+      "productionEvidence": false
+    },
+    {
+      "id": "EVD-OPS-034",
+      "scope": "repository-integration",
+      "type": "pull-request-ci",
+      "ref": "https://github.com/xujiann/chronic-care-platform/actions/runs/34502407255",
+      "testIds": [
+        "TEST-OPS-034"
+      ],
+      "productionEvidence": false
+    },
+    {
+      "id": "EVD-OPS-033",
+      "scope": "repository-integration",
+      "type": "pull-request-ci",
+      "ref": "https://github.com/xujiann/chronic-care-platform/actions/runs/34504010391",
+      "testIds": [
+        "TEST-OPS-033"
+      ],
+      "productionEvidence": false
+    },
+    {
+      "id": "EVD-GOV-008",
+      "scope": "repository-integration",
+      "type": "pull-request-ci",
+      "ref": "https://github.com/xujiann/chronic-care-platform/actions/runs/34486531706",
+      "testIds": [
+        "TEST-GOV-008"
+      ],
+      "productionEvidence": false
+    },
     {
       "id": "EVD-GOV-008-LOCAL",
       "scope": "repository",
@@ -1179,7 +1379,7 @@
       "baseline": "主线模块化单体及其现有运行、存储和发布边界",
       "target": "边界、状态和生产资格均可由控制塔追踪",
       "status": "已集成",
-      "gapTaskIds": ["GOV-002","OPS-015","OPS-016","OPS-017","OPS-018","SEC-011","GOV-008"],
+      "gapTaskIds": ["GOV-002","OPS-015","OPS-016","OPS-017","OPS-018","SEC-011","GOV-009"],
       "evidenceIds": ["EVD-GOV-001", "EVD-GOV-002"]
     },
     {
@@ -1188,7 +1388,7 @@
       "baseline": "T00至T09及临床子域已建立模块所有权",
       "target": "模块写入冲突和跨任务依赖自动失败关闭",
       "status": "已集成",
-      "gapTaskIds": ["OPS-017","GOV-008"],
+      "gapTaskIds": ["OPS-017","GOV-009"],
       "evidenceIds": ["EVD-GOV-001", "EVD-GOV-002"]
     },
     {
@@ -1197,7 +1397,7 @@
       "baseline": "数据事实源、迁移和生产写资格已有独立治理",
       "target": "数据敏感级别和迁移证据进入每项任务追踪链",
       "status": "已集成",
-      "gapTaskIds": ["OPS-015","OPS-016","OPS-017","OPS-018","GOV-008"],
+      "gapTaskIds": ["OPS-015","OPS-016","OPS-017","OPS-018","GOV-009"],
       "evidenceIds": ["EVD-GOV-001", "EVD-GOV-002"]
     },
     {
@@ -1206,7 +1406,7 @@
       "baseline": "生产API目录及认证、授权、幂等证据独立存在",
       "target": "接口变更由任务风险和影响范围选择门禁",
       "status": "已集成",
-      "gapTaskIds": ["OPS-015","OPS-016","OPS-018","SEC-011","GOV-008"],
+      "gapTaskIds": ["OPS-015","OPS-016","OPS-018","SEC-011","GOV-009"],
       "evidenceIds": ["EVD-GOV-001", "EVD-GOV-002"]
     },
     {
@@ -1215,7 +1415,7 @@
       "baseline": "代码、运行时和外部依赖边界已有事实地图",
       "target": "任务前置关系、WIP和核心写范围形成可检查依赖图",
       "status": "已集成",
-      "gapTaskIds": ["GOV-002","OPS-015","OPS-017","OPS-018","GOV-008"],
+      "gapTaskIds": ["GOV-002","OPS-015","OPS-017","OPS-018","GOV-009"],
       "evidenceIds": ["EVD-GOV-001", "EVD-GOV-002"]
     },
     {
@@ -1224,11 +1424,309 @@
       "baseline": "技术债以稳定编号记录仓库及现场缺口",
       "target": "风险、差距任务、退出条件和关闭证据双向可追踪",
       "status": "已集成",
-      "gapTaskIds": ["GOV-002","OPS-015","OPS-016","OPS-017","OPS-018","SEC-011","GOV-008"],
+      "gapTaskIds": ["GOV-002","OPS-015","OPS-016","OPS-017","OPS-018","SEC-011","GOV-009"],
       "evidenceIds": ["EVD-GOV-001", "EVD-GOV-002"]
     }
   ],
   "tasks": [
+    {
+      "id": "OPS-036",
+      "title": "文书补传同事件在途去重",
+      "ownerProcess": "T08",
+      "integrationOwner": "T00",
+      "taskStatus": "已关闭",
+      "capabilityStatus": "已集成",
+      "riskLevel": "中",
+      "approval": {
+        "state": "approved",
+        "mode": "T00-plan-approval",
+        "ref": "T00-PLAN-OPS-036-APPROVED-2026-09-10",
+        "approvedScope": "regional-clinical-documents.js, test/regional-clinical-document-retry-session.test.js"
+      },
+      "requirementIds": [
+        "REQ-OPS-036"
+      ],
+      "regulatoryControlIds": [
+        "REG-GOV-001"
+      ],
+      "riskIds": [
+        "RISK-OPS-036"
+      ],
+      "decisionIds": [],
+      "dependencies": [
+        "GOV-008"
+      ],
+      "affectedModules": [
+        "clinical-document-retry-session"
+      ],
+      "dataSensitivity": "既有浏览器业务元数据或研发治理数据；不新增持久化或服务端授权",
+      "acceptanceCriteria": [
+        "同页面同event在POST及成功后GET刷新完成前最多一个在途请求，重绘不解除锁",
+        "按最新api来源及总动作和当前异常项动作重验，fallback撤权移除或旧按钮不发POST",
+        "保留不同event独立操作与既有payload，未知提交结果只提示核对；不宣称服务端幂等或跨页面exactly-once"
+      ],
+      "testIds": [
+        "TEST-OPS-036"
+      ],
+      "evidenceIds": [
+        "EVD-OPS-036"
+      ],
+      "rollback": "回退本任务独立提交并重跑相关门禁；无 migration，不回退服务端业务事实",
+      "unresolved": [],
+      "worktree": ".codex-platform-worktrees/process-v2/t08-document-retry-session-20260910",
+      "branch": "process/t08-document-retry-session-20260910",
+      "planRef": "docs/lifecycle-governance.md#gov-009-浏览器缺口组合-plan",
+      "pullRequestRef": "https://github.com/xujiann/chronic-care-platform/pull/298",
+      "ciRef": "https://github.com/xujiann/chronic-care-platform/actions/runs/34496981872",
+      "writeScopes": [
+        "regional-clinical-documents.js",
+        "test/regional-clinical-document-retry-session.test.js"
+      ],
+      "observability": {
+        "applicable": false,
+        "reason": "仅既有浏览器兼容修复或治理登记，不新增独立生产运行能力；完整运行观测及现场证据仍未闭合"
+      },
+      "runtimeCapability": false
+    },
+    {
+      "id": "OPS-035",
+      "title": "共享工作台保存与刷新结果分离",
+      "ownerProcess": "T09",
+      "integrationOwner": "T00",
+      "taskStatus": "已关闭",
+      "capabilityStatus": "已集成",
+      "riskLevel": "中",
+      "approval": {
+        "state": "approved",
+        "mode": "T00-plan-approval",
+        "ref": "T00-PLAN-OPS-035-APPROVED-2026-09-10",
+        "approvedScope": "domain-task-ui.js, test/domain-task-ui-refresh.test.js"
+      },
+      "requirementIds": [
+        "REQ-OPS-035"
+      ],
+      "regulatoryControlIds": [
+        "REG-GOV-001"
+      ],
+      "riskIds": [
+        "RISK-OPS-035"
+      ],
+      "decisionIds": [],
+      "dependencies": [
+        "GOV-008"
+      ],
+      "affectedModules": [
+        "domain-task-refresh-result"
+      ],
+      "dataSensitivity": "既有浏览器业务元数据或研发治理数据；不新增持久化或服务端授权",
+      "acceptanceCriteria": [
+        "load显式返回结果且不新增向调用方抛出异常，提交失败不刷新",
+        "提交成功刷新失败保留清空错误态，明确已保存但刷新失败需核对，不误导重复提交",
+        "保留成功与空列表刷新和五调用方兼容，不改API授权schema并发或幂等协议"
+      ],
+      "testIds": [
+        "TEST-OPS-035"
+      ],
+      "evidenceIds": [
+        "EVD-OPS-035"
+      ],
+      "rollback": "回退本任务独立提交并重跑相关门禁；无 migration，不回退服务端业务事实",
+      "unresolved": [],
+      "worktree": ".codex-platform-worktrees/process-v2/t09-domain-task-refresh-result-20260910",
+      "branch": "process/t09-domain-task-refresh-result-20260910",
+      "planRef": "docs/lifecycle-governance.md#gov-009-浏览器缺口组合-plan",
+      "pullRequestRef": "https://github.com/xujiann/chronic-care-platform/pull/297",
+      "ciRef": "https://github.com/xujiann/chronic-care-platform/actions/runs/34489286669",
+      "writeScopes": [
+        "domain-task-ui.js",
+        "test/domain-task-ui-refresh.test.js"
+      ],
+      "observability": {
+        "applicable": false,
+        "reason": "仅既有浏览器兼容修复或治理登记，不新增独立生产运行能力；完整运行观测及现场证据仍未闭合"
+      },
+      "runtimeCapability": false
+    },
+    {
+      "id": "OPS-034",
+      "title": "体检独立核验控件与现有角色合同一致",
+      "ownerProcess": "T06",
+      "integrationOwner": "T00",
+      "taskStatus": "已关闭",
+      "capabilityStatus": "已集成",
+      "riskLevel": "中",
+      "approval": {
+        "state": "approved",
+        "mode": "T00-plan-approval",
+        "ref": "T00-PLAN-OPS-034-APPROVED-2026-09-10",
+        "approvedScope": "physical-examination.js, test/e2e/physical-examination-trusted-rendering.spec.js"
+      },
+      "requirementIds": [
+        "REQ-OPS-034"
+      ],
+      "regulatoryControlIds": [
+        "REG-GOV-001"
+      ],
+      "riskIds": [
+        "RISK-OPS-034"
+      ],
+      "decisionIds": [],
+      "dependencies": [
+        "GOV-008"
+      ],
+      "affectedModules": [
+        "physical-signoff-controls"
+      ],
+      "dataSensitivity": "既有浏览器业务元数据或研发治理数据；不新增持久化或服务端授权",
+      "acceptanceCriteria": [
+        "仅commission且存在未核验提交时显示verify与reject控件",
+        "institution仍保留合法update-check及submit，服务端commission-only合同不变",
+        "在既有E2E内增加角色矩阵步骤，不变测试拓扑并保留可信渲染及分流回归"
+      ],
+      "testIds": [
+        "TEST-OPS-034"
+      ],
+      "evidenceIds": [
+        "EVD-OPS-034"
+      ],
+      "rollback": "回退本任务独立提交并重跑相关门禁；无 migration，不回退服务端业务事实",
+      "unresolved": [],
+      "worktree": ".codex-platform-worktrees/process-v2/t06-physical-signoff-controls-20260910",
+      "branch": "process/t06-physical-signoff-controls-20260910",
+      "planRef": "docs/lifecycle-governance.md#gov-009-浏览器缺口组合-plan",
+      "pullRequestRef": "https://github.com/xujiann/chronic-care-platform/pull/300",
+      "ciRef": "https://github.com/xujiann/chronic-care-platform/actions/runs/34502407255",
+      "writeScopes": [
+        "physical-examination.js",
+        "test/e2e/physical-examination-trusted-rendering.spec.js"
+      ],
+      "observability": {
+        "applicable": false,
+        "reason": "仅既有浏览器兼容修复或治理登记，不新增独立生产运行能力；完整运行观测及现场证据仍未闭合"
+      },
+      "runtimeCapability": false
+    },
+    {
+      "id": "OPS-033",
+      "title": "影像查询最新筛选快照与在线失败隔离",
+      "ownerProcess": "T06",
+      "integrationOwner": "T00",
+      "taskStatus": "已关闭",
+      "capabilityStatus": "已集成",
+      "riskLevel": "中",
+      "approval": {
+        "state": "approved",
+        "mode": "T00-plan-approval",
+        "ref": "T00-PLAN-OPS-033-APPROVED-2026-09-10",
+        "approvedScope": "imaging-cloud.js, test/imaging-dashboard-route-characterization.test.js"
+      },
+      "requirementIds": [
+        "REQ-OPS-033"
+      ],
+      "regulatoryControlIds": [
+        "REG-GOV-001"
+      ],
+      "riskIds": [
+        "RISK-OPS-033"
+      ],
+      "decisionIds": [],
+      "dependencies": [
+        "GOV-008"
+      ],
+      "affectedModules": [
+        "imaging-read-snapshot"
+      ],
+      "dataSensitivity": "既有浏览器业务元数据或研发治理数据；不新增持久化或服务端授权",
+      "acceptanceCriteria": [
+        "dashboard与质控状态读取共享代次及居民机构筛选绑定，迟到成功失败不污染当前视图",
+        "在线读取开始失效旧快照，HTTP网络JSON及最小结构失败不回流演示；file预览保持兼容",
+        "保留质控对账锁及恢复指引，不改API服务端授权schema或耐久命令"
+      ],
+      "testIds": [
+        "TEST-OPS-033"
+      ],
+      "evidenceIds": [
+        "EVD-OPS-033"
+      ],
+      "rollback": "回退本任务独立提交并重跑相关门禁；无 migration，不回退服务端业务事实",
+      "unresolved": [],
+      "worktree": ".codex-platform-worktrees/process-v2/t06-imaging-read-snapshot-20260910",
+      "branch": "process/t06-imaging-read-snapshot-20260910",
+      "planRef": "docs/lifecycle-governance.md#gov-009-浏览器缺口组合-plan",
+      "pullRequestRef": "https://github.com/xujiann/chronic-care-platform/pull/299",
+      "ciRef": "https://github.com/xujiann/chronic-care-platform/actions/runs/34504010391",
+      "writeScopes": [
+        "imaging-cloud.js",
+        "test/imaging-dashboard-route-characterization.test.js"
+      ],
+      "observability": {
+        "applicable": false,
+        "reason": "仅既有浏览器兼容修复或治理登记，不新增独立生产运行能力；完整运行观测及现场证据仍未闭合"
+      },
+      "runtimeCapability": false
+    },
+    {
+      "id": "GOV-009",
+      "title": "浏览器缺口组合与跨任务集成",
+      "ownerProcess": "T00",
+      "integrationOwner": "T00",
+      "taskStatus": "待集成",
+      "capabilityStatus": "已验证",
+      "riskLevel": "中",
+      "approval": {
+        "state": "approved",
+        "mode": "T00-plan-approval",
+        "ref": "T00-PLAN-GOV-009-APPROVED-2026-09-10",
+        "approvedScope": "config/lifecycle-governance.json, docs/lifecycle-governance.md, ROADMAP.md"
+      },
+      "requirementIds": [
+        "REQ-GOV-009"
+      ],
+      "regulatoryControlIds": [
+        "REG-GOV-001"
+      ],
+      "riskIds": [
+        "RISK-GOV-009"
+      ],
+      "decisionIds": [],
+      "dependencies": [
+        "GOV-008"
+      ],
+      "affectedModules": [
+        "browser-gap-portfolio"
+      ],
+      "dataSensitivity": "既有浏览器业务元数据或研发治理数据；不新增持久化或服务端授权",
+      "acceptanceCriteria": [
+        "以PR293及最终CI真实证据关闭GOV008，分批登记独立任务",
+        "WIP最多5且单scope单writer，领域PR独立审查后串行集成",
+        "不将浏览器局部修复或模拟回执当作系统验收和生产证据"
+      ],
+      "testIds": [
+        "TEST-GOV-009"
+      ],
+      "evidenceIds": [
+        "EVD-GOV-009-LOCAL"
+      ],
+      "rollback": "回退本任务独立提交并重跑相关门禁；无 migration，不回退服务端业务事实",
+      "unresolved": [
+        "中央PR296尚待最终独立评审、legacy及exact-head CI后集成，不以领域证据替代自身证据"
+      ],
+      "worktree": ".codex-platform-worktrees/process-v2/t00-browser-gap-portfolio-20260910",
+      "branch": "process/t00-browser-gap-portfolio-20260910",
+      "planRef": "docs/lifecycle-governance.md#gov-009-浏览器缺口组合-plan",
+      "pullRequestRef": "https://github.com/xujiann/chronic-care-platform/pull/296",
+      "ciRef": "",
+      "writeScopes": [
+        "config/lifecycle-governance.json",
+        "docs/lifecycle-governance.md",
+        "ROADMAP.md"
+      ],
+      "observability": {
+        "applicable": false,
+        "reason": "仅既有浏览器兼容修复或治理登记，不新增独立生产运行能力；完整运行观测及现场证据仍未闭合"
+      },
+      "runtimeCapability": false
+    },
     {
       "id": "OPS-030",
       "title": "账号筛选最新快照与文档隔离",
@@ -1353,8 +1851,8 @@
       "title": "下一批缺口组合登记",
       "ownerProcess": "T00",
       "integrationOwner": "T00",
-      "taskStatus": "待集成",
-      "capabilityStatus": "已验证",
+      "taskStatus": "已关闭",
+      "capabilityStatus": "已集成",
       "riskLevel": "中",
       "approval": {
         "state": "approved",
@@ -1388,17 +1886,15 @@
         "TEST-GOV-008"
       ],
       "evidenceIds": [
-        "EVD-GOV-008-LOCAL"
+        "EVD-GOV-008"
       ],
       "rollback": "回退本任务独立提交并重跑相关门禁；无 migration，不回退服务端业务事实",
-      "unresolved": [
-        "中央 PR #293 尚待最终独立评审、legacy 与 exact-head CI 后集成；不以领域证据替代本任务证据"
-      ],
+      "unresolved": [],
       "worktree": ".codex-platform-worktrees/process-v2/t00-next-gap-portfolio-20260909",
       "branch": "process/t00-next-gap-portfolio-20260909",
       "planRef": "docs/lifecycle-governance.md#gov-008-下一批缺口组合-plan",
       "pullRequestRef": "https://github.com/xujiann/chronic-care-platform/pull/293",
-      "ciRef": "",
+      "ciRef": "https://github.com/xujiann/chronic-care-platform/actions/runs/34486531706",
       "writeScopes": [
         "config/lifecycle-governance.json",
         "docs/lifecycle-governance.md",

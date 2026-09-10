@@ -2,6 +2,33 @@
 
 ## 1. 权威边界
 
+### GOV-009 浏览器缺口组合 PLAN
+
+- 来源：用户于 2026-09-10 要求继续全部开发。T00 批准本中风险登记及下列四项精确 PLAN；基线 main `3918a79d`。GOV-008 已由 #293 / head `3d856f8f` / CI 34486531706 九项成功、独立无 P0–P2 复审和 legacy 14 批（3332 项、3331 通过、1 本地环境跳过、零失败、退出 0）合并，本次据此正常关闭，不制造递归自证。
+- 中央只写总账、本规范及 ROADMAP；实施时 GOV-009 与 OPS-033～OPS-036 共 WIP 5/5；2026-09-11 四领域已独立集成，仅中央 #296 待集成，WIP 1/5。不再扩增本批实施任务。
+- OPS-036 / T08：仅 `regional-clinical-documents.js` 与新 `test/regional-clinical-document-retry-session.test.js`。已复现同 event 同步双触发产生两个 POST；既有非金融 retry 不读取客户端幂等键。采用同步 eventId 在途 Set，覆盖 POST 及成功后 GET 刷新，重绘持续禁用同事件，finally 释放当前视图；进入 handler 重验 API 来源、总 action 及当前 exception action，fallback/撤权/移除/旧按钮拒绝，不误锁不同 event。失败不自动重发、不改业务计数，未知提交结果提示核对，不鼓励盲目重试。测试真实 handler/render/委托、pending 重绘、失败释放、成功后刷新锁、GET 失败 fallback 禁止补传及合法路径。非目标：服务端幂等、跨 tab/刷新后 exactly-once、未知结果耐久对账、PDF、通用 load 乱序；这些能力继续未证明。
+- OPS-033 / T06：仅 `imaging-cloud.js`、`test/imaging-dashboard-route-characterization.test.js`。已复现 A/B 读取乱序使筛选 B 显示 A、旧失败回流演示及质控状态读取覆盖新筛选。采用共享 dashboard read generation 和居民/机构绑定；在线 pending 失效旧快照并清除动作，最新 HTTP/网络/JSON/最小结构失败明确不可用，禁止演示回流，file 兼容保留；迟到响应不覆盖状态或提示。保留质控对账锁、恢复指引及现有命令语义，不修改 productionCenter、OHIF、API/schema、中央文件或 Proposed durable ADR。
+- OPS-034 / T06：仅 `physical-examination.js`、`test/e2e/physical-examination-trusted-rendering.spec.js`。现有服务端 verify/reject 仅 commission，页面却向 institution 显示。仅 commission 且未核验提交时显示这两个按钮，保留 institution 合法 update-check/submit；既有 E2E 内加角色矩阵步骤并保护 XSS、快照及分流回归，不变套件拓扑。不是服务端授权模型变更，不混入跨机构投影问题。
+- OPS-035 / T09：T00 核定本次跨域共享浏览器工具的单 writer，仅 `domain-task-ui.js` 与新 `test/domain-task-ui-refresh.test.js`，五个领域调用方不修改。已复现提交成功后 GET 403 被 load 吞掉、随后报保存并刷新成功。load 返回显式结果但不向现有调用方新抛异常；提交失败不刷新；已保存但刷新失败保留清空错误态并明确刷新核对，不误导重复提交。覆盖 HTTP/网络/rows/normalize 失败、双成功、空列表和手工恢复；不扩展并发去重、查询排序、API、幂等或角色模型。
+- 验收：各线先 RED 再 GREEN、完整真实脚本或浏览器行为回归、相关调用方/领域/安全及 process 门禁，独立 review、legacy 和最终 head CI 后由 T00 串行集成。新测试提交前登记已有可执行基线，随后绑定实际专项路径。标准 build/lint/type/unit/integration/smoke 可由最终 CI 提供精确证据，legacy 不省略。
+- 回滚：各域独立 revert；中央整体回退登记，不删除业务数据或历史证据。无 migration、新依赖或生产激活。
+- 非目标：居民三条新后端 POST 继续归 OPS-017，跨域归属/资源授权/幂等审计需独立 ADR 和人工评审；GS-01～GS-10、运行观测、生产六域 NO-GO 均保持，不将本批等同全平台完成。
+
+#### GOV-009 四路集成证据（2026-09-11）
+
+| 任务 | PR | 最终 head | 成功 CI run | main 合并提交 |
+|---|---|---|---|---|
+| OPS-035 共享工作台 | #297 | 2721a2d7771c3fc4546d3466c86c5f8aa798235d | 34489286669 | d9cc12579111c60e616e94e066cca24549227b64 |
+| OPS-036 文书补传 | #298 | 30ea33ce4c637b5489de09509fa574106dfd9b86 | 34496981872 | 7706024c29d7f67d7175ef6151d277d8ecbeea35 |
+| OPS-034 体检控件 | #300 | a117470eacc13273283a78ba67b7bbfb5c1f788e | 34502407255 | bf79f0429c2e03719f3fad75927f666452688f82 |
+| OPS-033 影像快照 | #299 | d5088db216a3e0f33feac097c568068bd504f600 | 34504010391 | 9e651ef623bfcf4613eee06529098b6e3ce1a4b1 |
+
+- 四项最终 CI 各九项成功，独立评审无未解决 P0–P2；无冲突重基逐文件 blob 零漂移后复用原完整验证与评审，并补窄测和新 strict CI。四领域 legacy 均 14 批退出 0；本地真实 PostgreSQL 环境跳过不计通过，由各自最终 CI 真实 PostgreSQL 合同补证。
+- 评审闭环：OPS-036 修复渲染异常逃出 finally 导致事件锁残留，回归验证先释放锁再重绘及后续恢复；OPS-033 修复居民切换后手机标题/副标题残留旧检查信息，真实浏览器验证 pending、错误、空成功清理及正常恢复。两项均先 RED 再 GREEN，并由独立增量复审关闭。
+- 影像最终串行 legacy 为 3343 项、3342 通过、1 环境跳过、零失败；首次并行尝试曾出现监测日志 path-swap 断言失败，原始失败记录保留，孤立专项 10/10 和串行全量随后通过。未将首次失败抹去，也未据此断言其根因已解决。unit 的 466、integration 的 66 是测试文件数，不是断言数。
+- Windows CRLF 原始字节预算失败仅通过独立工作树 citizen.js 的 LF 机械规范化处理，Git blob 始终为 `81185db19ff16b1f84fe0326a2e938f3e3b53388`；不改预算或 Git 配置。失败记录及最终重跑结果分开保存，换行预算可移植性仍属候选问题。
+- 中央 GOV-009 保持待集成/已验证，仅引用已执行本地合同，不引用未来自身 CI；最终独立评审、legacy 及 exact-head CI 齐备后才合并 #296。领域修复不关闭系统黄金场景、生产运行观测、后端幂等、耐久对账或现场准入。
+
 ### GOV-008 下一批缺口组合 PLAN
 
 - 来源：用户于 2026-09-09 再次要求继续开发。T00 批准本中风险登记及下列四项精确 PLAN，基线 main `8e400c4c`。GOV-007 已由 #286 / head `a409bfb4` / CI 34339809407 九项成功及 14 批 legacy 退出 0、独立复审完成仓库集成，本次正常登记据此关闭，不创建递归自证任务。
