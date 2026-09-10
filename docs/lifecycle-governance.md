@@ -5,13 +5,28 @@
 ### GOV-008 下一批缺口组合 PLAN
 
 - 来源：用户于 2026-09-09 再次要求继续开发。T00 批准本中风险登记及下列四项精确 PLAN，基线 main `8e400c4c`。GOV-007 已由 #286 / head `a409bfb4` / CI 34339809407 九项成功及 14 批 legacy 退出 0、独立复审完成仓库集成，本次正常登记据此关闭，不创建递归自证任务。
-- 中央只修改总账、本规范和 ROADMAP。已登记 GOV-008 与 OPS-029～OPS-032 四领域任务，WIP 5/5；同一核心范围只有一个 writer，其他候选排队，不再增加实施任务。
+- 中央只修改总账、本规范和 ROADMAP。实施时 GOV-008 与 OPS-029～OPS-032 的 WIP 为 5/5；2026-09-10 四领域均已独立集成，只剩 GOV-008 待集成，WIP 1/5。其他候选排队，未获独立批准不得实施。
 - OPS-030 / T01：仅 `platform-identity-governance-ui.js` 与 `test/platform-identity-governance-ui.test.js`。按 document 使用 WeakMap controller 持有最新 accounts/policy，从该 document 当前控件读取筛选；按实际控件 WeakSet 去重，保留 dataset 兼容观察但不以其为唯一绑定权威。覆盖 first→second 后 query/role/全部状态筛选、删除/停用不复活、双 document 隔离、多次 render 监听器不增长、替换控件与恶意字段惰性文本、缺 target 返回 null。保持 buildView、排序、摘要、空态、返回 schema 和 productionReady=false；不改 platform 调用方、服务端身份/授权/OIDC/SMS/session/API/schema。
 - OPS-029 / T04：仅 `citizen.js`、新 `test/citizen-care-workspace-session.test.js`、`test/e2e/citizen-records-v1.spec.js`。六入口分别冻结居民/资源及 renderCitizen 单调视图代次；合法迟到回执只合并发起居民既有缓存并标记其同步，reset/render/toast 仅同代次当前视图可用。覆盖六命令×r1→r2/ABA×成功/失败 24 组、当前视图对照、错居民/资源回执拒绝、在线不写 localStorage 和 file 兼容。只改客户端隔离，不补运行路由中未检出的访问确认、异议和照护任务处置三个 POST；这些正向测试为模拟回执的客户端证据，接口能力缺口另留 OPS-017。不改 URL、幂等协议、服务端授权/schema 或同步 GET 治理。
 - OPS-031 / T02：仅 `health-dashboard.js` 和新 `test/health-dashboard-static-summary.test.js`。真实全脚本 VM 复现 20 条待办被截为 12、后八条高风险漏计。全量未闭合源事项用于应用和总计汇总，再单独截 12 条预览；保留排序、riskDrilldowns 8 条、辖区预览与 closureTrend 口径、任务分类、闭合判定及 API 正常路径。覆盖 0/12/20、第二应用在第 13 条后、闭合项排除、缺数组、排序变化与源数据不可变；不修改 API/schema/DOM sinks。
 - OPS-032 / T06 quality：仅 `quality-safety.js` 和 `test/quality-safety-trusted-rendering.test.js`。已复现 GET 403 后筛选复活旧数据且旧按钮仍 POST（未宣称服务端越权成功）。dashboard 失败清空动态快照及更新时间，用明确错误态而非零或旧统计；筛选/重置不可复活，十类相关动作无有效快照时不 POST。interfacePack 失败清空包和 validationResult、禁样例校验；任一 GET 明确 401/403 同时废弃两缓存及读取世代，十一类写入口失效。迟到成功/失败不得覆盖更新状态，后续各自有效重取才恢复对应入口；不改角色映射、服务端授权、临床规则或 POST 结果协议。
 - 验收：四线先 RED 后 GREEN，以真实完整 controller/renderer 测试失败、迟到响应、正常与恶意输入；相关专项、页面、安全、process、diff、legacy test:all、独立 review 和最终 head CI 均满足后交 T00 串行集成。新测试提交前只引用已有可执行回归基线，不冒充已存在的新行为证据。
 - 回滚：每项独立 revert，无数据迁移，不回退服务端业务事实。生产六域 NO-GO、GS 系统证据映射和上位运行能力缺口继续保留；T08 文书重试等剩余候选仍排队，不将本批等同全平台完成。
+
+#### GOV-008 四路集成证据（2026-09-10）
+
+| 任务 | PR | 最终 head | 成功 CI run | main 合并提交 |
+|---|---|---|---|---|
+| OPS-031 驾驶舱 | #291 | da2d7d5f89d38760cd84c28e7479653e3efef354 | 34342944573 | 7f26147c98f80ea60ba1fbf1c91202c9d1435125 |
+| OPS-032 质量快照 | #292 | 35aa1de421d4335c6100fad4ec7ee15edf30c3c6 | 34344396358 | 412bbabd052a0d2ee2041fe4ef09d090ddaa6b61 |
+| OPS-030 账号筛选 | #295 | 2e08ae143c6a8e01dd4b543b4650e9e464d099e1 | 34345586932 | 6de353382c361108bcbb7db75543de1198e3d476 |
+| OPS-029 居民会话 | #294 | 0c71038a0ebe5ef6f07c525666ed60be9de900aa | 34347104698 | 7bd15793cf79ef57fb6b45f2f9631e09faab21e1 |
+
+- 四项最终 CI 各九项成功，独立评审无未解决 P0–P2。各领域 legacy 均 14 批退出 0；本地真实 PostgreSQL 环境跳过不计通过，由相应 CI 真实 PostgreSQL 合同补证。无冲突重基逐文件 blob 零漂移后复用原 legacy/评审，同时补窄测和新 strict CI。
+- 居民线补充修复并验证 GET 刷新替换缓存后的迟到回执合并，资源已消失时不伪造同步成功；最终 legacy 为 3283 项、3282 通过、1 环境跳过。真实浏览器保留原四用例并加入隔离步骤，在线根 60、居民 13、PWA 3 的清单未改变。
+- Windows 重基后的居民源文件 CRLF 原始字节数触发预算；仅将该工作树文件规范化为 LF 后通过，三个 Git blob 均未变化。未改预算或 Git 配置；原始字节预算的跨平台换行可移植性仍为候选问题。
+- 中央 #293 只将四领域的已合并事实记入总账；GOV-008 自身保留待集成及本地合同证据，最终独立评审、legacy 和 exact-head CI 完成前不得关闭，不引用未来自身 CI。
+- 三条访问确认、异议、照护任务处置 POST 缺失仍归 OPS-017；模拟回执仅证明客户端隔离，不证明后端鉴权、持久化或业务闭环。GS-01～GS-10 系统证据映射及六域生产 NO-GO 均不变。
 
 ### GOV-007 全平台缺口组合 PLAN
 

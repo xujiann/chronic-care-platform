@@ -345,8 +345,10 @@
       "title": "账号筛选旧闭包和跨文档状态泄漏",
       "owner": "T01",
       "mitigation": "每 document 独立 controller 持有最新上下文，按实际控件绑定去重，覆盖快照替换/双文档/恶意输入回归",
-      "status": "open",
-      "evidenceIds": []
+      "status": "mitigated",
+      "evidenceIds": [
+        "EVD-OPS-030"
+      ]
     },
     {
       "id": "RISK-OPS-029",
@@ -354,8 +356,10 @@
       "title": "迟到回执错归居民缓存或污染新视图草稿",
       "owner": "T04",
       "mitigation": "发起上下文冻结、视图代次隔离和真实处理器/投影24组矩阵，独立审查不替代服务端授权证明",
-      "status": "open",
-      "evidenceIds": []
+      "status": "mitigated",
+      "evidenceIds": [
+        "EVD-OPS-029"
+      ]
     },
     {
       "id": "RISK-GOV-008",
@@ -372,8 +376,10 @@
       "title": "驾驶舱全量统计与预览分离未完成",
       "owner": "T02",
       "mitigation": "先以真实脚本复现，限于精确批准范围实施并通过独立审查、专项和最终提交 CI",
-      "status": "open",
-      "evidenceIds": []
+      "status": "mitigated",
+      "evidenceIds": [
+        "EVD-OPS-031"
+      ]
     },
     {
       "id": "RISK-OPS-032",
@@ -381,8 +387,10 @@
       "title": "质量看板授权失效快照隔离未完成",
       "owner": "T06",
       "mitigation": "先以真实脚本复现，限于精确批准范围实施并通过独立审查、专项和最终提交 CI",
-      "status": "open",
-      "evidenceIds": []
+      "status": "mitigated",
+      "evidenceIds": [
+        "EVD-OPS-032"
+      ]
     },
     {
       "id": "RISK-GOV-007",
@@ -639,31 +647,31 @@
   "tests": [
     {
       "id": "TEST-OPS-030",
-      "kind": "existing-identity-ui-baseline-multisnapshot-regression-required",
+      "kind": "scoped-behavior-regression-contract",
       "path": "test/platform-identity-governance-ui.test.js",
       "command": "node --test test/platform-identity-governance-ui.test.js"
     },
     {
       "id": "TEST-OPS-029",
-      "kind": "existing-record-projection-baseline-session-regression-required",
-      "path": "test/citizen-records-v2.test.js",
-      "command": "node --test test/citizen-records-v2.test.js"
+      "kind": "scoped-behavior-regression-contract",
+      "path": "test/citizen-care-workspace-session.test.js",
+      "command": "node --test test/citizen-care-workspace-session.test.js"
     },
     {
       "id": "TEST-GOV-008",
-      "kind": "existing-regression-baseline-new-behavior-required-before-closure",
+      "kind": "scoped-behavior-regression-contract",
       "path": "test/lifecycle-governance.test.js",
       "command": "node --test test/lifecycle-governance.test.js"
     },
     {
       "id": "TEST-OPS-031",
-      "kind": "existing-regression-baseline-new-behavior-required-before-closure",
-      "path": "test/health-dashboard-summary.test.js",
-      "command": "node --test test/health-dashboard-summary.test.js"
+      "kind": "scoped-behavior-regression-contract",
+      "path": "test/health-dashboard-static-summary.test.js",
+      "command": "node --test test/health-dashboard-static-summary.test.js"
     },
     {
       "id": "TEST-OPS-032",
-      "kind": "existing-regression-baseline-new-behavior-required-before-closure",
+      "kind": "scoped-behavior-regression-contract",
       "path": "test/quality-safety-trusted-rendering.test.js",
       "command": "node --test test/quality-safety-trusted-rendering.test.js"
     },
@@ -843,6 +851,56 @@
     }
   ],
   "evidence": [
+    {
+      "id": "EVD-GOV-008-LOCAL",
+      "scope": "repository",
+      "type": "executable-contract",
+      "ref": "node --test test/lifecycle-governance.test.js test/documentation-fact-drift.test.js",
+      "testIds": [
+        "TEST-GOV-008"
+      ],
+      "productionEvidence": false
+    },
+    {
+      "id": "EVD-OPS-032",
+      "scope": "repository-integration",
+      "type": "pull-request-ci",
+      "ref": "https://github.com/xujiann/chronic-care-platform/actions/runs/34344396358",
+      "testIds": [
+        "TEST-OPS-032"
+      ],
+      "productionEvidence": false
+    },
+    {
+      "id": "EVD-OPS-031",
+      "scope": "repository-integration",
+      "type": "pull-request-ci",
+      "ref": "https://github.com/xujiann/chronic-care-platform/actions/runs/34342944573",
+      "testIds": [
+        "TEST-OPS-031"
+      ],
+      "productionEvidence": false
+    },
+    {
+      "id": "EVD-OPS-030",
+      "scope": "repository-integration",
+      "type": "pull-request-ci",
+      "ref": "https://github.com/xujiann/chronic-care-platform/actions/runs/34345586932",
+      "testIds": [
+        "TEST-OPS-030"
+      ],
+      "productionEvidence": false
+    },
+    {
+      "id": "EVD-OPS-029",
+      "scope": "repository-integration",
+      "type": "pull-request-ci",
+      "ref": "https://github.com/xujiann/chronic-care-platform/actions/runs/34347104698",
+      "testIds": [
+        "TEST-OPS-029"
+      ],
+      "productionEvidence": false
+    },
     {
       "id": "EVD-GOV-007",
       "scope": "repository-integration",
@@ -1130,7 +1188,7 @@
       "baseline": "T00至T09及临床子域已建立模块所有权",
       "target": "模块写入冲突和跨任务依赖自动失败关闭",
       "status": "已集成",
-      "gapTaskIds": ["OPS-017","GOV-008","OPS-031","OPS-032","OPS-029","OPS-030"],
+      "gapTaskIds": ["OPS-017","GOV-008"],
       "evidenceIds": ["EVD-GOV-001", "EVD-GOV-002"]
     },
     {
@@ -1166,7 +1224,7 @@
       "baseline": "技术债以稳定编号记录仓库及现场缺口",
       "target": "风险、差距任务、退出条件和关闭证据双向可追踪",
       "status": "已集成",
-      "gapTaskIds": ["GOV-002","OPS-015","OPS-016","OPS-017","OPS-018","SEC-011","GOV-008","OPS-031","OPS-032","OPS-029","OPS-030"],
+      "gapTaskIds": ["GOV-002","OPS-015","OPS-016","OPS-017","OPS-018","SEC-011","GOV-008"],
       "evidenceIds": ["EVD-GOV-001", "EVD-GOV-002"]
     }
   ],
@@ -1176,8 +1234,8 @@
       "title": "账号筛选最新快照与文档隔离",
       "ownerProcess": "T01",
       "integrationOwner": "T00",
-      "taskStatus": "已批准",
-      "capabilityStatus": "未建设",
+      "taskStatus": "已关闭",
+      "capabilityStatus": "已集成",
       "riskLevel": "中",
       "approval": {
         "state": "approved",
@@ -1210,16 +1268,16 @@
       "testIds": [
         "TEST-OPS-030"
       ],
-      "evidenceIds": [],
-      "rollback": "回退本任务独立提交并重跑相关门禁；无 migration，不回退服务端业务事实",
-      "unresolved": [
-        "尚需新增行为回归、独立评审、PR 及最终提交 CI；现有 test 引用仅为回归基线"
+      "evidenceIds": [
+        "EVD-OPS-030"
       ],
+      "rollback": "回退本任务独立提交并重跑相关门禁；无 migration，不回退服务端业务事实",
+      "unresolved": [],
       "worktree": ".codex-platform-worktrees/process-v2/t01-identity-account-filter-snapshot-20260909",
       "branch": "process/t01-identity-account-filter-snapshot-20260909",
       "planRef": "docs/lifecycle-governance.md#gov-008-下一批缺口组合-plan",
-      "pullRequestRef": "",
-      "ciRef": "",
+      "pullRequestRef": "https://github.com/xujiann/chronic-care-platform/pull/295",
+      "ciRef": "https://github.com/xujiann/chronic-care-platform/actions/runs/34345586932",
       "writeScopes": [
         "platform-identity-governance-ui.js",
         "test/platform-identity-governance-ui.test.js"
@@ -1235,8 +1293,8 @@
       "title": "居民照护工作台会话与回执归属隔离",
       "ownerProcess": "T04",
       "integrationOwner": "T00",
-      "taskStatus": "已批准",
-      "capabilityStatus": "未建设",
+      "taskStatus": "已关闭",
+      "capabilityStatus": "已集成",
       "riskLevel": "中",
       "approval": {
         "state": "approved",
@@ -1269,16 +1327,16 @@
       "testIds": [
         "TEST-OPS-029"
       ],
-      "evidenceIds": [],
-      "rollback": "回退本任务独立提交并重跑相关门禁；无 migration，不回退服务端业务事实",
-      "unresolved": [
-        "尚需新增行为回归、独立评审、PR 及最终提交 CI；现有 test 引用仅为回归基线"
+      "evidenceIds": [
+        "EVD-OPS-029"
       ],
+      "rollback": "回退本任务独立提交并重跑相关门禁；无 migration，不回退服务端业务事实",
+      "unresolved": [],
       "worktree": ".codex-platform-worktrees/process-v2/t04-care-workspace-session-20260909",
       "branch": "process/t04-care-workspace-session-20260909",
       "planRef": "docs/lifecycle-governance.md#gov-008-下一批缺口组合-plan",
-      "pullRequestRef": "",
-      "ciRef": "",
+      "pullRequestRef": "https://github.com/xujiann/chronic-care-platform/pull/294",
+      "ciRef": "https://github.com/xujiann/chronic-care-platform/actions/runs/34347104698",
       "writeScopes": [
         "citizen.js",
         "test/citizen-care-workspace-session.test.js",
@@ -1295,8 +1353,8 @@
       "title": "下一批缺口组合登记",
       "ownerProcess": "T00",
       "integrationOwner": "T00",
-      "taskStatus": "已批准",
-      "capabilityStatus": "未建设",
+      "taskStatus": "待集成",
+      "capabilityStatus": "已验证",
       "riskLevel": "中",
       "approval": {
         "state": "approved",
@@ -1329,15 +1387,17 @@
       "testIds": [
         "TEST-GOV-008"
       ],
-      "evidenceIds": [],
+      "evidenceIds": [
+        "EVD-GOV-008-LOCAL"
+      ],
       "rollback": "回退本任务独立提交并重跑相关门禁；无 migration，不回退服务端业务事实",
       "unresolved": [
-        "尚需新增行为回归、独立评审、PR 及最终提交 CI；现有 test 引用仅为回归基线"
+        "中央 PR #293 尚待最终独立评审、legacy 与 exact-head CI 后集成；不以领域证据替代本任务证据"
       ],
       "worktree": ".codex-platform-worktrees/process-v2/t00-next-gap-portfolio-20260909",
       "branch": "process/t00-next-gap-portfolio-20260909",
       "planRef": "docs/lifecycle-governance.md#gov-008-下一批缺口组合-plan",
-      "pullRequestRef": "",
+      "pullRequestRef": "https://github.com/xujiann/chronic-care-platform/pull/293",
       "ciRef": "",
       "writeScopes": [
         "config/lifecycle-governance.json",
@@ -1355,8 +1415,8 @@
       "title": "驾驶舱全量统计与预览分离",
       "ownerProcess": "T02",
       "integrationOwner": "T00",
-      "taskStatus": "已批准",
-      "capabilityStatus": "未建设",
+      "taskStatus": "已关闭",
+      "capabilityStatus": "已集成",
       "riskLevel": "中",
       "approval": {
         "state": "approved",
@@ -1389,16 +1449,16 @@
       "testIds": [
         "TEST-OPS-031"
       ],
-      "evidenceIds": [],
-      "rollback": "回退本任务独立提交并重跑相关门禁；无 migration，不回退服务端业务事实",
-      "unresolved": [
-        "尚需新增行为回归、独立评审、PR 及最终提交 CI；现有 test 引用仅为回归基线"
+      "evidenceIds": [
+        "EVD-OPS-031"
       ],
+      "rollback": "回退本任务独立提交并重跑相关门禁；无 migration，不回退服务端业务事实",
+      "unresolved": [],
       "worktree": ".codex-platform-worktrees/process-v2/t02-dashboard-source-totals-20260909",
       "branch": "process/t02-dashboard-source-totals-20260909",
       "planRef": "docs/lifecycle-governance.md#gov-008-下一批缺口组合-plan",
-      "pullRequestRef": "",
-      "ciRef": "",
+      "pullRequestRef": "https://github.com/xujiann/chronic-care-platform/pull/291",
+      "ciRef": "https://github.com/xujiann/chronic-care-platform/actions/runs/34342944573",
       "writeScopes": [
         "health-dashboard.js",
         "test/health-dashboard-static-summary.test.js"
@@ -1414,8 +1474,8 @@
       "title": "质量看板授权失效快照隔离",
       "ownerProcess": "T06",
       "integrationOwner": "T00",
-      "taskStatus": "已批准",
-      "capabilityStatus": "未建设",
+      "taskStatus": "已关闭",
+      "capabilityStatus": "已集成",
       "riskLevel": "中",
       "approval": {
         "state": "approved",
@@ -1448,16 +1508,16 @@
       "testIds": [
         "TEST-OPS-032"
       ],
-      "evidenceIds": [],
-      "rollback": "回退本任务独立提交并重跑相关门禁；无 migration，不回退服务端业务事实",
-      "unresolved": [
-        "尚需新增行为回归、独立评审、PR 及最终提交 CI；现有 test 引用仅为回归基线"
+      "evidenceIds": [
+        "EVD-OPS-032"
       ],
+      "rollback": "回退本任务独立提交并重跑相关门禁；无 migration，不回退服务端业务事实",
+      "unresolved": [],
       "worktree": ".codex-platform-worktrees/process-v2/t06-quality-snapshot-invalidation-20260909",
       "branch": "process/t06-quality-snapshot-invalidation-20260909",
       "planRef": "docs/lifecycle-governance.md#gov-008-下一批缺口组合-plan",
-      "pullRequestRef": "",
-      "ciRef": "",
+      "pullRequestRef": "https://github.com/xujiann/chronic-care-platform/pull/292",
+      "ciRef": "https://github.com/xujiann/chronic-care-platform/actions/runs/34344396358",
       "writeScopes": [
         "quality-safety.js",
         "test/quality-safety-trusted-rendering.test.js"
