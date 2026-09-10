@@ -6,12 +6,21 @@ const HOSTILE_TEXT = '<img data-physical-exam-text-xss src="x" onerror="window._
 const HOSTILE_CLASS = '"><img data-physical-exam-class-xss src="x" onerror="window.__physicalExamXss=true">';
 const PHYSICAL_EXAM_OVERVIEW_URL = /\/api\/physical-exams(?:\?.*)?$/;
 
-async function loginCommission(page) {
+async function loginUser(page, username) {
+  if (page.url() !== "about:blank") {
+    await page.waitForLoadState("domcontentloaded");
+    await page.evaluate(() => localStorage.removeItem("health-city-auth-session"));
+  }
+  await page.context().clearCookies();
   await page.goto("/login.html");
-  await page.locator("#login-user").selectOption("health");
+  await page.locator("#login-user").selectOption(username);
   await page.locator("input[name='password']").fill("123456");
   await page.locator("#login-form button[type='submit']").click();
-  await expect(page).toHaveURL(/index\.html$/);
+  await expect(page).toHaveURL(username === "hospital" ? /institution\.html$/ : /index\.html$/);
+}
+
+async function loginCommission(page) {
+  await loginUser(page, "health");
 }
 
 async function fulfillPhysicalExamOverview(route, resident) {
@@ -22,6 +31,51 @@ async function fulfillPhysicalExamOverview(route, resident) {
   overview.years = [];
   overview.summary = { ...overview.summary, reports: 0, residents: 1 };
   await route.fulfill({ response, contentType: "application/json", body: JSON.stringify(overview) });
+}
+
+async function verifyJointSignoffRoleControls(page) {
+  const jointTest = {
+    id: "joint-role-controls",
+    institutionName: "示范医院",
+    sourceType: "HIS",
+    signoffStatus: "submitted-awaiting-independent-verification",
+    siteSignoffVerified: false,
+    checks: [{ id: "network", name: "网络连通", status: "pending" }],
+    signoffSubmission: {
+      externalSigner: "现场负责人",
+      signerOrganization: "示范医院",
+      evidenceDigest: "a".repeat(64)
+    }
+  };
+  let jointActionRequests = 0;
+
+  await page.route("**/api/physical-exams/joint-tests/**/actions", async (route) => {
+    jointActionRequests += 1;
+    await route.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify({ message: "unexpected role-control request" }) });
+  });
+  await page.route("**/api/physical-exams", async (route) => {
+    const response = await route.fetch();
+    const overview = await response.json();
+    overview.jointTests = [jointTest];
+    await route.fulfill({ response, contentType: "application/json", body: JSON.stringify(overview) });
+  });
+
+  await loginUser(page, "hospital");
+  await page.goto("/physical-examination.html");
+  const institutionCard = page.locator("[data-joint-test='joint-role-controls']");
+  await expect(institutionCard.locator("[data-joint-check='network']")).toBeVisible();
+  await expect(institutionCard.locator("[data-joint-submit]")).toBeVisible();
+  await expect(institutionCard.locator("[data-joint-verify]")).toHaveCount(0);
+  await expect(institutionCard.locator("[data-joint-reject]")).toHaveCount(0);
+  expect(jointActionRequests).toBe(0);
+
+  await loginCommission(page);
+  await page.goto("/physical-examination.html");
+  const commissionCard = page.locator("[data-joint-test='joint-role-controls']");
+  await expect(commissionCard.locator("[data-joint-verify]")).toBeVisible();
+  await expect(commissionCard.locator("[data-joint-reject]")).toBeVisible();
+  expect(jointActionRequests).toBe(0);
+  await page.unrouteAll({ behavior: "wait" });
 }
 
 async function verifyInitialLoadFailureAndRecovery(page) {
@@ -532,6 +586,9 @@ async function verifyFilePreviewFallback(page) {
 
 test("physical examination workbench keeps hostile API fields inert across all legacy render regions", async ({ page }) => {
   test.setTimeout(120_000);
+  await test.step("joint signoff controls match the service role boundary", async () => {
+    await verifyJointSignoffRoleControls(page);
+  });
   await test.step("initial HTTP failure fails closed and a retry recovers", async () => {
     await verifyInitialLoadFailureAndRecovery(page);
   });
