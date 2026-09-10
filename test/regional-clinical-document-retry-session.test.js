@@ -69,6 +69,43 @@ function harness() {
 
 const flush = () => new Promise((resolve) => setImmediate(resolve));
 
+test("a one-time pre-submit render failure releases the event for a later action", async () => {
+  const h = harness();
+  const target = h.node("#document-exceptions");
+  const replace = target.replaceChildren;
+  let fail = true;
+  target.replaceChildren = function (...items) {
+    if (fail) { fail = false; throw new Error("synthetic render failure"); }
+    return replace.apply(this, items);
+  };
+  await h.retryDocument("event-a").catch(() => {});
+  assert.equal(h.requests.length, 0);
+  h.renderExceptions();
+  assert.equal(h.buttons()[0].disabled, false);
+  const retry = h.retryDocument("event-a");
+  h.retryDocument("event-a");
+  assert.equal(h.requests.length, 1);
+  h.requests[0].respond({}, 403);
+  await retry;
+});
+
+test("a final render failure cannot retain the pending lock", async () => {
+  const h = harness();
+  const first = h.retryDocument("event-a");
+  const target = h.node("#document-exceptions");
+  const replace = target.replaceChildren;
+  target.replaceChildren = () => { throw new Error("synthetic final render failure"); };
+  h.requests[0].respond({}, 403);
+  await first.catch(() => {});
+  target.replaceChildren = replace;
+  h.renderExceptions();
+  assert.equal(h.buttons()[0].disabled, false);
+  const retry = h.retryDocument("event-a");
+  assert.equal(h.requests.length, 2);
+  h.requests[1].respond({}, 403);
+  await retry;
+});
+
 test("same event is single-flight through the real delegated click and rerender", async () => {
   const h = harness();
   h.click("event-a");

@@ -285,9 +285,9 @@
     const item = state.center?.exceptions?.find((entry) => entry.id === id);
     if (state.source !== "api" || !state.center?.actions?.retryExceptions || !item?.actions?.retryException || pendingRetries.has(id)) return;
     pendingRetries.add(id);
-    renderExceptions();
-    setBanner("正在提交异常补传", "补传将复用既有集成事件重试入口。", "warning");
     try {
+      renderExceptions();
+      setBanner("正在提交异常补传", "补传将复用既有集成事件重试入口。", "warning");
       await requestJson(`/api/integration/events/${encodeURIComponent(id)}/retry`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ reason: "区域医疗文书中心人工复核后补传" }) });
       setBanner("异常补传已由服务端受理", "正在重新读取权威采集与报送状态。", "normal");
       await load();
