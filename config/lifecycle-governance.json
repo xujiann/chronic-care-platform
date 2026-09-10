@@ -40,6 +40,17 @@
   },
   "requirements": [
     {
+      "id": "REQ-OPS-036",
+      "title": "文书补传同事件在途去重",
+      "sourceType": "approved-t00-plan",
+      "sourceRef": "T00-PLAN-OPS-036-APPROVED-2026-09-10",
+      "acceptance": [
+        "同页面同event在POST及成功后GET刷新完成前最多一个在途请求，重绘不解除锁",
+        "按最新api来源及总动作和当前异常项动作重验，fallback撤权移除或旧按钮不发POST",
+        "保留不同event独立操作与既有payload，未知提交结果只提示核对；不宣称服务端幂等或跨页面exactly-once"
+      ]
+    },
+    {
       "id": "REQ-OPS-035",
       "title": "共享工作台保存与刷新结果分离",
       "sourceType": "approved-t00-plan",
@@ -384,6 +395,15 @@
   ],
   "risks": [
     {
+      "id": "RISK-OPS-036",
+      "title": "文书补传同事件在途去重",
+      "level": "中",
+      "owner": "T08",
+      "mitigation": "同步event锁与最新权限投影核验；未知结果不自动重试，不把浏览器锁当服务端幂等",
+      "status": "open",
+      "evidenceIds": []
+    },
+    {
       "id": "RISK-OPS-035",
       "level": "中",
       "title": "共享工作台保存与刷新结果分离缺口未闭合",
@@ -727,6 +747,12 @@
     }
   ],
   "tests": [
+    {
+      "id": "TEST-OPS-036",
+      "kind": "existing-regression-baseline-before-scoped-implementation",
+      "path": "test/regional-clinical-document-ui.test.js",
+      "command": "node --test test/regional-clinical-document-ui.test.js"
+    },
     {
       "id": "TEST-OPS-035",
       "kind": "existing-regression-baseline-before-scoped-implementation",
@@ -1304,7 +1330,7 @@
       "baseline": "T00至T09及临床子域已建立模块所有权",
       "target": "模块写入冲突和跨任务依赖自动失败关闭",
       "status": "已集成",
-      "gapTaskIds": ["OPS-017","GOV-009","OPS-033","OPS-034","OPS-035"],
+      "gapTaskIds": ["OPS-017","GOV-009","OPS-033","OPS-034","OPS-035","OPS-036"],
       "evidenceIds": ["EVD-GOV-001", "EVD-GOV-002"]
     },
     {
@@ -1345,6 +1371,65 @@
     }
   ],
   "tasks": [
+    {
+      "id": "OPS-036",
+      "title": "文书补传同事件在途去重",
+      "ownerProcess": "T08",
+      "integrationOwner": "T00",
+      "taskStatus": "已批准",
+      "capabilityStatus": "未建设",
+      "riskLevel": "中",
+      "approval": {
+        "state": "approved",
+        "mode": "T00-plan-approval",
+        "ref": "T00-PLAN-OPS-036-APPROVED-2026-09-10",
+        "approvedScope": "regional-clinical-documents.js, test/regional-clinical-document-retry-session.test.js"
+      },
+      "requirementIds": [
+        "REQ-OPS-036"
+      ],
+      "regulatoryControlIds": [
+        "REG-GOV-001"
+      ],
+      "riskIds": [
+        "RISK-OPS-036"
+      ],
+      "decisionIds": [],
+      "dependencies": [
+        "GOV-008"
+      ],
+      "affectedModules": [
+        "clinical-document-retry-session"
+      ],
+      "dataSensitivity": "既有浏览器业务元数据或研发治理数据；不新增持久化或服务端授权",
+      "acceptanceCriteria": [
+        "同页面同event在POST及成功后GET刷新完成前最多一个在途请求，重绘不解除锁",
+        "按最新api来源及总动作和当前异常项动作重验，fallback撤权移除或旧按钮不发POST",
+        "保留不同event独立操作与既有payload，未知提交结果只提示核对；不宣称服务端幂等或跨页面exactly-once"
+      ],
+      "testIds": [
+        "TEST-OPS-036"
+      ],
+      "evidenceIds": [],
+      "rollback": "回退本任务独立提交并重跑相关门禁；无 migration，不回退服务端业务事实",
+      "unresolved": [
+        "待实现专项负向回归、独立评审、legacy及最终提交CI；已有test仅为回归基线"
+      ],
+      "worktree": ".codex-platform-worktrees/process-v2/t08-document-retry-session-20260910",
+      "branch": "process/t08-document-retry-session-20260910",
+      "planRef": "docs/lifecycle-governance.md#gov-009-浏览器缺口组合-plan",
+      "pullRequestRef": "",
+      "ciRef": "",
+      "writeScopes": [
+        "regional-clinical-documents.js",
+        "test/regional-clinical-document-retry-session.test.js"
+      ],
+      "observability": {
+        "applicable": false,
+        "reason": "仅既有浏览器兼容修复或治理登记，不新增独立生产运行能力；完整运行观测及现场证据仍未闭合"
+      },
+      "runtimeCapability": false
+    },
     {
       "id": "OPS-035",
       "title": "共享工作台保存与刷新结果分离",

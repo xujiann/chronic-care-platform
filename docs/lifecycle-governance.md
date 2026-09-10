@@ -4,8 +4,9 @@
 
 ### GOV-009 浏览器缺口组合 PLAN
 
-- 来源：用户于 2026-09-10 要求继续全部开发。T00 批准本中风险登记及下列三项精确 PLAN；基线 main `3918a79d`。GOV-008 已由 #293 / head `3d856f8f` / CI 34486531706 九项成功、独立无 P0–P2 复审和 legacy 14 批（3332 项、3331 通过、1 本地环境跳过、零失败、退出 0）合并，本次据此正常关闭，不制造递归自证。
-- 中央只写总账、本规范及 ROADMAP；GOV-009 与 OPS-033～OPS-035 共 WIP 4/5。第四候选文书补传尚待核定，不提前占 writer；同一核心范围单写者。
+- 来源：用户于 2026-09-10 要求继续全部开发。T00 批准本中风险登记及下列四项精确 PLAN；基线 main `3918a79d`。GOV-008 已由 #293 / head `3d856f8f` / CI 34486531706 九项成功、独立无 P0–P2 复审和 legacy 14 批（3332 项、3331 通过、1 本地环境跳过、零失败、退出 0）合并，本次据此正常关闭，不制造递归自证。
+- 中央只写总账、本规范及 ROADMAP；GOV-009 与 OPS-033～OPS-036 共 WIP 5/5，同一核心范围单写者，不再扩增本批实施任务。
+- OPS-036 / T08：仅 `regional-clinical-documents.js` 与新 `test/regional-clinical-document-retry-session.test.js`。已复现同 event 同步双触发产生两个 POST；既有非金融 retry 不读取客户端幂等键。采用同步 eventId 在途 Set，覆盖 POST 及成功后 GET 刷新，重绘持续禁用同事件，finally 释放当前视图；进入 handler 重验 API 来源、总 action 及当前 exception action，fallback/撤权/移除/旧按钮拒绝，不误锁不同 event。失败不自动重发、不改业务计数，未知提交结果提示核对，不鼓励盲目重试。测试真实 handler/render/委托、pending 重绘、失败释放、成功后刷新锁、GET 失败 fallback 禁止补传及合法路径。非目标：服务端幂等、跨 tab/刷新后 exactly-once、未知结果耐久对账、PDF、通用 load 乱序；这些能力继续未证明。
 - OPS-033 / T06：仅 `imaging-cloud.js`、`test/imaging-dashboard-route-characterization.test.js`。已复现 A/B 读取乱序使筛选 B 显示 A、旧失败回流演示及质控状态读取覆盖新筛选。采用共享 dashboard read generation 和居民/机构绑定；在线 pending 失效旧快照并清除动作，最新 HTTP/网络/JSON/最小结构失败明确不可用，禁止演示回流，file 兼容保留；迟到响应不覆盖状态或提示。保留质控对账锁、恢复指引及现有命令语义，不修改 productionCenter、OHIF、API/schema、中央文件或 Proposed durable ADR。
 - OPS-034 / T06：仅 `physical-examination.js`、`test/e2e/physical-examination-trusted-rendering.spec.js`。现有服务端 verify/reject 仅 commission，页面却向 institution 显示。仅 commission 且未核验提交时显示这两个按钮，保留 institution 合法 update-check/submit；既有 E2E 内加角色矩阵步骤并保护 XSS、快照及分流回归，不变套件拓扑。不是服务端授权模型变更，不混入跨机构投影问题。
 - OPS-035 / T09：T00 核定本次跨域共享浏览器工具的单 writer，仅 `domain-task-ui.js` 与新 `test/domain-task-ui-refresh.test.js`，五个领域调用方不修改。已复现提交成功后 GET 403 被 load 吞掉、随后报保存并刷新成功。load 返回显式结果但不向现有调用方新抛异常；提交失败不刷新；已保存但刷新失败保留清空错误态并明确刷新核对，不误导重复提交。覆盖 HTTP/网络/rows/normalize 失败、双成功、空列表和手工恢复；不扩展并发去重、查询排序、API、幂等或角色模型。
