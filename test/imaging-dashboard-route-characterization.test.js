@@ -1019,6 +1019,9 @@ function createImagingDashboardReadHarness({ protocol = "http:" } = {}) {
   const requests = [];
   const alerts = [];
   const table = { innerHTML: "" };
+  const mobileViewer = { innerHTML: "" };
+  const phoneTitle = { textContent: "" };
+  const phoneSubtitle = { textContent: "" };
   let fallbackCalls = 0;
   const window = {
     alert(message) { alerts.push(message); },
@@ -1037,26 +1040,37 @@ function createImagingDashboardReadHarness({ protocol = "http:" } = {}) {
     location: { origin: "http://platform.test", protocol },
     document: {
       addEventListener() {},
-      querySelector(selector) { return selector === "#study-table" ? table : null; }
+      querySelector(selector) {
+        return {
+          "#study-table": table,
+          "#mobile-viewer": mobileViewer,
+          "#phone-title": phoneTitle,
+          "#phone-subtitle": phoneSubtitle
+        }[selector] || null;
+      }
     },
     fetch() { throw new Error("unexpected unauthenticated fetch"); },
     fallbackProbe() {
       fallbackCalls += 1;
-      return { studies: [{ id: "demo-fallback" }] };
+      return { studies: [{ id: "demo-fallback", modality: "DR", bodyPart: "胸部", institutionName: "示范医院", studyDate: "2026-09-10" }] };
     }
   };
-  vm.runInNewContext(`${source}\n;buildFallbackImagingCloud = fallbackProbe; globalThis.dashboardReadTest = { imagingState, imagingQualityControlActionState, imagingQualityControlRecovery, loadImagingCloud, inspectQualityControlStatus };`, context);
+  vm.runInNewContext(`${source}\n;buildFallbackImagingCloud = fallbackProbe; globalThis.dashboardReadTest = { imagingState, imagingQualityControlActionState, imagingQualityControlRecovery, loadImagingCloud, inspectQualityControlStatus, renderImagingCloud };`, context);
   return {
     alerts,
     context,
     requests,
     table,
+    mobileViewer,
+    phoneTitle,
+    phoneSubtitle,
     getFallbackCalls: () => fallbackCalls,
     state: context.dashboardReadTest.imagingState,
     qcState: context.dashboardReadTest.imagingQualityControlActionState,
     qcRecovery: context.dashboardReadTest.imagingQualityControlRecovery,
     load: context.dashboardReadTest.loadImagingCloud,
-    inspect: context.dashboardReadTest.inspectQualityControlStatus
+    inspect: context.dashboardReadTest.inspectQualityControlStatus,
+    render: context.dashboardReadTest.renderImagingCloud
   };
 }
 
@@ -1091,6 +1105,8 @@ test("imaging dashboard invalidates an old snapshot while a new filter is pendin
   harness.state.payload = { studies: [{ id: "study-A", residentId: "resident-A" }] };
   harness.state.dashboardStatus = "ready";
   harness.table.innerHTML = '<button data-share-study="study-A">旧操作</button>';
+  harness.phoneTitle.textContent = "CT 胸部";
+  harness.phoneSubtitle.textContent = "旧机构 · 2026-09-09";
   harness.state.selectedResidentId = "resident-B";
 
   const loadB = harness.load();
@@ -1099,11 +1115,15 @@ test("imaging dashboard invalidates an old snapshot while a new filter is pendin
   assert.equal(harness.state.dashboardStatus, "loading");
   assert.match(harness.table.innerHTML, /正在加载影像检查/);
   assert.doesNotMatch(harness.table.innerHTML, /data-(?:share|qc|view|open|start|decide|appeal)/);
+  assert.equal(harness.phoneTitle.textContent, "影像调阅");
+  assert.equal(harness.phoneSubtitle.textContent, "正在加载影像检查");
   assert.equal(harness.getFallbackCalls(), 0);
 
-  harness.requests[0].resolve(imagingDashboardResponse({ studies: [{ id: "study-B", residentId: "resident-B" }] }));
+  harness.requests[0].resolve(imagingDashboardResponse({ studies: [{ id: "study-B", residentId: "resident-B", modality: "MR", bodyPart: "头颅", institutionName: "示范医院", studyDate: "2026-09-10" }] }));
   await loadB;
   assert.equal(harness.state.payload.studies[0].id, "study-B");
+  assert.equal(harness.phoneTitle.textContent, "MR 头颅");
+  assert.equal(harness.phoneSubtitle.textContent, "示范医院 · 2026-09-10");
 });
 
 test("imaging dashboard fails closed online and keeps file preview fallback", async (t) => {
@@ -1130,6 +1150,8 @@ test("imaging dashboard fails closed online and keeps file preview fallback", as
     harness.state.payload = { studies: [{ id: "old-study" }] };
     harness.state.dashboardStatus = "ready";
     harness.state.selectedInstitutionCode = "institution-B";
+    harness.phoneTitle.textContent = "CT 胸部";
+    harness.phoneSubtitle.textContent = "旧机构 · 2026-09-09";
     const loading = harness.load();
     scenario.settle(harness.requests[0]);
     await loading;
@@ -1137,15 +1159,32 @@ test("imaging dashboard fails closed online and keeps file preview fallback", as
     assert.equal(harness.state.dashboardStatus, "error");
     assert.match(harness.table.innerHTML, /影像检查暂时不可用/);
     assert.doesNotMatch(harness.table.innerHTML, /data-(?:share|qc|view|open|start|decide|appeal)/);
+    assert.equal(harness.phoneTitle.textContent, "影像调阅");
+    assert.equal(harness.phoneSubtitle.textContent, "影像检查暂时不可用");
     assert.equal(harness.getFallbackCalls(), 0);
   });
 
+  const emptySuccess = createImagingDashboardReadHarness();
+  emptySuccess.state.payload = { studies: [{ id: "old-study" }] };
+  emptySuccess.state.dashboardStatus = "ready";
+  emptySuccess.phoneTitle.textContent = "CT 胸部";
+  emptySuccess.phoneSubtitle.textContent = "旧机构 · 2026-09-09";
+  const emptyLoading = emptySuccess.load();
+  emptySuccess.requests[0].resolve(imagingDashboardResponse({ studies: [] }));
+  await emptyLoading;
+  assert.equal(emptySuccess.state.dashboardStatus, "ready");
+  assert.equal(emptySuccess.phoneTitle.textContent, "影像调阅");
+  assert.equal(emptySuccess.phoneSubtitle.textContent, "暂无可调阅影像");
+
   const filePreview = createImagingDashboardReadHarness({ protocol: "file:" });
   await filePreview.load();
+  filePreview.render();
   assert.equal(filePreview.requests.length, 0);
   assert.equal(filePreview.state.payload.studies[0].id, "demo-fallback");
   assert.equal(filePreview.state.dashboardStatus, "ready");
   assert.equal(filePreview.getFallbackCalls(), 1);
+  assert.equal(filePreview.phoneTitle.textContent, "DR 胸部");
+  assert.equal(filePreview.phoneSubtitle.textContent, "示范医院 · 2026-09-10");
 });
 
 test("stale imaging GET failures and QC status reads cannot replace the current filter", async (t) => {

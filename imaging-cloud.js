@@ -547,6 +547,14 @@ function renderMobileViewer(study, payload) {
   const subtitle = document.querySelector("#phone-subtitle");
   if (!target) return;
   if (!study) {
+    if (title) title.textContent = "影像调阅";
+    if (subtitle) {
+      subtitle.textContent = imagingState.dashboardStatus === "loading"
+        ? "正在加载影像检查"
+        : imagingState.dashboardStatus === "error"
+          ? "影像检查暂时不可用"
+          : "暂无可调阅影像";
+    }
     target.innerHTML = `<p>暂无可调阅影像。</p>`;
     return;
   }
