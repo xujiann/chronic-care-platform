@@ -473,6 +473,7 @@ function renderAbnormalCases(cases) {
 function renderJointTests(rows) {
   const target = document.querySelector("#physical-exam-joint-tests");
   if (!target) return;
+  const canVerifySignoff = physicalExamState.user?.role === "commission";
   const evidenceField = (label, input) => createPhysicalExamElement("label", { className: "evidence-field" }, [label, input]);
   const cards = rows.map((item) => createPhysicalExamElement("article", { className: "workflow-card", dataset: { jointTest: item.id } }, [
     createPhysicalExamElement("header", {}, [
@@ -500,8 +501,8 @@ function renderJointTests(rows) {
     ]),
     createPhysicalExamElement("div", { className: "inline-actions" }, [
       physicalExamButton("提交上线证据", { jointSubmit: "" }),
-      item.signoffSubmission && !item.siteSignoffVerified ? physicalExamButton("独立核验通过", { jointVerify: "" }) : null,
-      item.signoffSubmission && !item.siteSignoffVerified ? physicalExamButton("退回证据", { jointReject: "" }) : null
+      canVerifySignoff && item.signoffSubmission && !item.siteSignoffVerified ? physicalExamButton("独立核验通过", { jointVerify: "" }) : null,
+      canVerifySignoff && item.signoffSubmission && !item.siteSignoffVerified ? physicalExamButton("退回证据", { jointReject: "" }) : null
     ])
   ]));
   replacePhysicalExamChildren(target, cards, physicalExamEmpty("暂无机构联调记录。"));
