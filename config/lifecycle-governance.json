@@ -40,6 +40,28 @@
   },
   "requirements": [
     {
+      "id": "REQ-TEST-012",
+      "title": "九项预算资源确定性LF检出",
+      "sourceType": "approved-t00-plan",
+      "sourceRef": "T00-PLAN-TEST-012-APPROVED-2026-09-11",
+      "acceptance": [
+        "仅九项根资源text eol=lf，未列资源与无属性同Git配置对照兼容",
+        "隔离Git配置与环境，跨autocrlf及eol矩阵从index物化证明检出字节确定",
+        "保留raw bytes/lines及阈值，用手写边界验证CR、BOM、多字节、缺失及未提交增长",
+        "复用现有构建证明九资产源与产物Buffer、bytes、sha256一致，不虚构主动篡改拒绝"
+      ]
+    },
+    {
+      "id": "REQ-GOV-011",
+      "title": "预算资源LF治理组合登记",
+      "sourceType": "approved-t00-plan",
+      "sourceRef": "T00-PLAN-GOV-011-APPROVED-2026-09-11",
+      "acceptance": [
+        "依据PR301真实证据关闭GOV010并登记独立预算任务",
+        "保持单writer、原始字节计量及生产NO-GO"
+      ]
+    },
+    {
       "id": "REQ-SEC-014",
       "title": "身份生命周期数据通用写旁路保护",
       "sourceType": "approved-t00-plan",
@@ -415,6 +437,24 @@
     }
   ],
   "risks": [
+    {
+      "id": "RISK-TEST-012",
+      "title": "九项预算资源确定性LF检出",
+      "level": "中",
+      "owner": "T09",
+      "mitigation": "精确三文件范围、隔离Git负向矩阵、原始字节阈值不变、独立评审与最终CI",
+      "status": "open",
+      "evidenceIds": []
+    },
+    {
+      "id": "RISK-GOV-011",
+      "title": "预算资源LF治理组合登记",
+      "level": "中",
+      "owner": "T00",
+      "mitigation": "精确三文件范围、隔离Git负向矩阵、原始字节阈值不变、独立评审与最终CI",
+      "status": "open",
+      "evidenceIds": []
+    },
     {
       "id": "RISK-SEC-014",
       "title": "身份生命周期数据通用写旁路保护",
@@ -805,6 +845,18 @@
   ],
   "tests": [
     {
+      "id": "TEST-TEST-012",
+      "kind": "existing-regression-baseline-before-scoped-implementation",
+      "path": "test/platform-nonfunctional-readiness.test.js",
+      "command": "node --test test/platform-nonfunctional-readiness.test.js test/static-publication.test.js"
+    },
+    {
+      "id": "TEST-GOV-011",
+      "kind": "existing-regression-baseline-before-scoped-implementation",
+      "path": "test/lifecycle-governance.test.js",
+      "command": "node --test test/lifecycle-governance.test.js"
+    },
+    {
       "id": "TEST-SEC-014",
       "kind": "existing-regression-baseline-before-scoped-implementation",
       "path": "test/state-data-identity-boundary-api.test.js",
@@ -1052,6 +1104,16 @@
     }
   ],
   "evidence": [
+    {
+      "id": "EVD-GOV-010",
+      "scope": "repository-integration",
+      "type": "pull-request-ci",
+      "ref": "https://github.com/xujiann/chronic-care-platform/actions/runs/34567441437",
+      "testIds": [
+        "TEST-GOV-010"
+      ],
+      "productionEvidence": false
+    },
     {
       "id": "EVD-GOV-009",
       "scope": "repository-integration",
@@ -1458,8 +1520,19 @@
       "baseline": "主线模块化单体及其现有运行、存储和发布边界",
       "target": "边界、状态和生产资格均可由控制塔追踪",
       "status": "已集成",
-      "gapTaskIds": ["GOV-002","OPS-015","OPS-016","OPS-017","OPS-018","SEC-011","GOV-010"],
-      "evidenceIds": ["EVD-GOV-001", "EVD-GOV-002"]
+      "gapTaskIds": [
+        "GOV-002",
+        "OPS-015",
+        "OPS-016",
+        "OPS-017",
+        "OPS-018",
+        "SEC-011",
+        "GOV-011"
+      ],
+      "evidenceIds": [
+        "EVD-GOV-001",
+        "EVD-GOV-002"
+      ]
     },
     {
       "id": "MAP-MODULE",
@@ -1467,8 +1540,15 @@
       "baseline": "T00至T09及临床子域已建立模块所有权",
       "target": "模块写入冲突和跨任务依赖自动失败关闭",
       "status": "已集成",
-      "gapTaskIds": ["OPS-017","GOV-010","SEC-014"],
-      "evidenceIds": ["EVD-GOV-001", "EVD-GOV-002"]
+      "gapTaskIds": [
+        "OPS-017",
+        "SEC-014",
+        "TEST-012"
+      ],
+      "evidenceIds": [
+        "EVD-GOV-001",
+        "EVD-GOV-002"
+      ]
     },
     {
       "id": "MAP-DATA",
@@ -1476,8 +1556,16 @@
       "baseline": "数据事实源、迁移和生产写资格已有独立治理",
       "target": "数据敏感级别和迁移证据进入每项任务追踪链",
       "status": "已集成",
-      "gapTaskIds": ["OPS-015","OPS-016","OPS-017","OPS-018","GOV-010"],
-      "evidenceIds": ["EVD-GOV-001", "EVD-GOV-002"]
+      "gapTaskIds": [
+        "OPS-015",
+        "OPS-016",
+        "OPS-017",
+        "OPS-018"
+      ],
+      "evidenceIds": [
+        "EVD-GOV-001",
+        "EVD-GOV-002"
+      ]
     },
     {
       "id": "MAP-API",
@@ -1485,8 +1573,16 @@
       "baseline": "生产API目录及认证、授权、幂等证据独立存在",
       "target": "接口变更由任务风险和影响范围选择门禁",
       "status": "已集成",
-      "gapTaskIds": ["OPS-015","OPS-016","OPS-018","SEC-011","GOV-010"],
-      "evidenceIds": ["EVD-GOV-001", "EVD-GOV-002"]
+      "gapTaskIds": [
+        "OPS-015",
+        "OPS-016",
+        "OPS-018",
+        "SEC-011"
+      ],
+      "evidenceIds": [
+        "EVD-GOV-001",
+        "EVD-GOV-002"
+      ]
     },
     {
       "id": "MAP-DEPENDENCY",
@@ -1494,8 +1590,18 @@
       "baseline": "代码、运行时和外部依赖边界已有事实地图",
       "target": "任务前置关系、WIP和核心写范围形成可检查依赖图",
       "status": "已集成",
-      "gapTaskIds": ["GOV-002","OPS-015","OPS-017","OPS-018","GOV-010"],
-      "evidenceIds": ["EVD-GOV-001", "EVD-GOV-002"]
+      "gapTaskIds": [
+        "GOV-002",
+        "OPS-015",
+        "OPS-017",
+        "OPS-018",
+        "GOV-011",
+        "TEST-012"
+      ],
+      "evidenceIds": [
+        "EVD-GOV-001",
+        "EVD-GOV-002"
+      ]
     },
     {
       "id": "MAP-DEBT",
@@ -1503,11 +1609,143 @@
       "baseline": "技术债以稳定编号记录仓库及现场缺口",
       "target": "风险、差距任务、退出条件和关闭证据双向可追踪",
       "status": "已集成",
-      "gapTaskIds": ["GOV-002","OPS-015","OPS-016","OPS-017","OPS-018","SEC-011","GOV-010"],
-      "evidenceIds": ["EVD-GOV-001", "EVD-GOV-002"]
+      "gapTaskIds": [
+        "GOV-002",
+        "OPS-015",
+        "OPS-016",
+        "OPS-017",
+        "OPS-018",
+        "SEC-011",
+        "GOV-011",
+        "TEST-012"
+      ],
+      "evidenceIds": [
+        "EVD-GOV-001",
+        "EVD-GOV-002"
+      ]
     }
   ],
   "tasks": [
+    {
+      "id": "TEST-012",
+      "title": "九项预算资源确定性LF检出",
+      "ownerProcess": "T09",
+      "integrationOwner": "T00",
+      "taskStatus": "已批准",
+      "capabilityStatus": "未建设",
+      "riskLevel": "中",
+      "approval": {
+        "state": "approved",
+        "mode": "T00-plan-approval",
+        "ref": "T00-PLAN-TEST-012-APPROVED-2026-09-11",
+        "approvedScope": ".gitattributes, test/platform-nonfunctional-readiness.test.js, test/static-publication.test.js"
+      },
+      "requirementIds": [
+        "REQ-TEST-012"
+      ],
+      "regulatoryControlIds": [
+        "REG-GOV-001"
+      ],
+      "riskIds": [
+        "RISK-TEST-012"
+      ],
+      "decisionIds": [],
+      "dependencies": [
+        "GOV-010"
+      ],
+      "affectedModules": [
+        "budget-assets-checkout"
+      ],
+      "dataSensitivity": "研发源码与合成测试数据；不处理身份凭据或业务敏感记录",
+      "acceptanceCriteria": [
+        "仅九项根资源text eol=lf，未列资源与无属性同Git配置对照兼容",
+        "隔离Git配置与环境，跨autocrlf及eol矩阵从index物化证明检出字节确定",
+        "保留raw bytes/lines及阈值，用手写边界验证CR、BOM、多字节、缺失及未提交增长",
+        "复用现有构建证明九资产源与产物Buffer、bytes、sha256一致，不虚构主动篡改拒绝"
+      ],
+      "testIds": [
+        "TEST-TEST-012"
+      ],
+      "evidenceIds": [],
+      "rollback": "回退本任务独立提交并重跑相关门禁；无 migration，不回退服务端业务事实",
+      "unresolved": [
+        "待实施与独立验证；不改变生产准入"
+      ],
+      "worktree": ".codex-platform-worktrees/process-v2/t09-budget-assets-lf-20260911",
+      "branch": "process/t09-budget-assets-lf-20260911",
+      "planRef": "docs/lifecycle-governance.md#gov-011-预算资源lf治理-plan",
+      "pullRequestRef": "",
+      "ciRef": "",
+      "writeScopes": [
+        ".gitattributes",
+        "test/platform-nonfunctional-readiness.test.js",
+        "test/static-publication.test.js"
+      ],
+      "observability": {
+        "applicable": false,
+        "reason": "仅源码检出属性、测试或治理登记；不新增服务端或浏览器运行能力，生产观测缺口不改变"
+      },
+      "runtimeCapability": false
+    },
+    {
+      "id": "GOV-011",
+      "title": "预算资源LF治理组合登记",
+      "ownerProcess": "T00",
+      "integrationOwner": "T00",
+      "taskStatus": "已批准",
+      "capabilityStatus": "未建设",
+      "riskLevel": "中",
+      "approval": {
+        "state": "approved",
+        "mode": "T00-plan-approval",
+        "ref": "T00-PLAN-GOV-011-APPROVED-2026-09-11",
+        "approvedScope": "config/lifecycle-governance.json, docs/lifecycle-governance.md, ROADMAP.md"
+      },
+      "requirementIds": [
+        "REQ-GOV-011"
+      ],
+      "regulatoryControlIds": [
+        "REG-GOV-001"
+      ],
+      "riskIds": [
+        "RISK-GOV-011"
+      ],
+      "decisionIds": [],
+      "dependencies": [
+        "GOV-010"
+      ],
+      "affectedModules": [
+        "budget-lf-portfolio"
+      ],
+      "dataSensitivity": "研发源码与合成测试数据；不处理身份凭据或业务敏感记录",
+      "acceptanceCriteria": [
+        "依据PR301真实证据关闭GOV010并登记独立预算任务",
+        "保持单writer、原始字节计量及生产NO-GO"
+      ],
+      "testIds": [
+        "TEST-GOV-011"
+      ],
+      "evidenceIds": [],
+      "rollback": "回退本任务独立提交并重跑相关门禁；无 migration，不回退服务端业务事实",
+      "unresolved": [
+        "待实施与独立验证；不改变生产准入"
+      ],
+      "worktree": ".codex-platform-worktrees/process-v2/t00-budget-lf-portfolio-20260911",
+      "branch": "process/t00-budget-lf-portfolio-20260911",
+      "planRef": "docs/lifecycle-governance.md#gov-011-预算资源lf治理-plan",
+      "pullRequestRef": "",
+      "ciRef": "",
+      "writeScopes": [
+        "config/lifecycle-governance.json",
+        "docs/lifecycle-governance.md",
+        "ROADMAP.md"
+      ],
+      "observability": {
+        "applicable": false,
+        "reason": "仅源码检出属性、测试或治理登记；不新增服务端或浏览器运行能力，生产观测缺口不改变"
+      },
+      "runtimeCapability": false
+    },
     {
       "id": "SEC-014",
       "title": "身份生命周期数据通用写旁路保护",
@@ -1576,8 +1814,8 @@
       "title": "身份写入边界前置登记",
       "ownerProcess": "T00",
       "integrationOwner": "T00",
-      "taskStatus": "已批准",
-      "capabilityStatus": "未建设",
+      "taskStatus": "已关闭",
+      "capabilityStatus": "已集成",
       "riskLevel": "中",
       "approval": {
         "state": "approved",
@@ -1609,16 +1847,16 @@
       "testIds": [
         "TEST-GOV-010"
       ],
-      "evidenceIds": [],
-      "rollback": "回退本任务独立提交并重跑相关门禁；无 migration，不回退服务端业务事实",
-      "unresolved": [
-        "待实施与独立验证；不代表后续临时授权或系统黄金场景完成"
+      "evidenceIds": [
+        "EVD-GOV-010"
       ],
+      "rollback": "回退本任务独立提交并重跑相关门禁；无 migration，不回退服务端业务事实",
+      "unresolved": [],
       "worktree": ".codex-platform-worktrees/process-v2/t00-identity-boundary-intake-20260911",
       "branch": "process/t00-identity-boundary-intake-20260911",
       "planRef": "docs/lifecycle-governance.md#gov-010-身份写入边界前置-plan",
-      "pullRequestRef": "",
-      "ciRef": "",
+      "pullRequestRef": "https://github.com/xujiann/chronic-care-platform/pull/301",
+      "ciRef": "https://github.com/xujiann/chronic-care-platform/actions/runs/34567441437",
       "writeScopes": [
         "config/lifecycle-governance.json",
         "docs/lifecycle-governance.md",

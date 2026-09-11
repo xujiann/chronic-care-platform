@@ -2,6 +2,19 @@
 
 ## 1. 权威边界
 
+### GOV-011 预算资源LF治理 PLAN
+
+- 来源：用户要求继续开发并批准按计划分路实施；T00 批准本中风险登记及 TEST-012 精确范围。新基线 `origin/main@a9603e450bfbb5ef1144fe6b04da4566534463e5`；从最新 fetched origin/main 经 process:plan/create 建立独立工作树。GOV-010 已由 PR #301 / head `9b298620750040c826d95245eb855bfae8cdc4e3` / CI 34567441437 九项成功合并，本批据此关闭，不自证本批完成。
+- GOV-010 独立复审无 P0–P2；中央路由 72、架构 137、process 8、iterations 98 通过。legacy 日志 `C:/Users/drxuj/Temp/gov010-test-all-9b298620-final.log` 完整 14 批、3370 tests、3369 pass、1 环境性 PostgreSQL skip、0 fail/cancelled；原进程句柄已失效，退出码未重新取得，不伪造退出码记录。
+- 中央 GOV-011 仅写本规范、ROADMAP、config/lifecycle-governance.json；TEST-012 / T09 独立三文件 writer。当前 WIP 2/5，二者依赖已关闭 GOV-010。中央授权本批跨域检出属性范围，不移交 runtime、打包器或 CI 文件所有权。
+- TEST-012 精确范围：新根 `.gitattributes`、既有 `test/platform-nonfunctional-readiness.test.js`、`test/static-publication.test.js`。分支 `process/t09-budget-assets-lf-20260911`；工作树 `.codex-platform-worktrees/process-v2/t09-budget-assets-lf-20260911`。不复制中央登记到领域分支。
+- 方案：仅为 citizen.js、public-health.js、platform.js、operations.js、regional-cutover-workbench-ui.js、platform-productization-ui.js、platform-procurement-governance-ui.js、product-operations-ui.js、product-regional-operations-ui.js 九个根路径新增精确 `text eol=lf`。不使用全仓通配符、不修改资源源码、预算阈值、raw bytes/lines 公式、runtime、build、manifest 生成器或依赖；拒绝“统计时扣除 CR”方案。
+- 先测试 RED，再属性 GREEN。Git fixture 使用项目外允许的临时目录，隔离继承 GIT_*、系统/global 配置、attributes、template 与 hook；无需 commit。覆盖 autocrlf true/false/input 与 eol lf/crlf，每次从 index 重新物化；未列根 JS、嵌套同名及 NUL binary sentinel 与无属性同配置对照，不能要求未列文件也全 LF。
+- 预算测试用独立手写 N/N+1、CRLF/lone CR/CRCRLF/BOM/多字节/非法 UTF-8、末尾 LF、缺失及未提交增长验证原始指标；不复制被测公式自证。现有一次静态构建中核对九项源/产物 Buffer、manifest.bytes、sha256；篡改仅证明摘要不匹配，不声称构建器新增主动拒绝。
+- 验证：两个专项、旧断言保留、lint/type/build、相关与标准 CI 门禁、process/diff、独立复审和 exact-head legacy。全量串行，不并发重复。提交 Draft PR 后冻结 head，T00 按精确 SHA 串行合并。旧 CRLF 失败及临时 LF 规范化证据保留，测试通过不倒写初次失败。
+- 回滚：独立 revert 属性与测试提交，恢复旧检出行为但不删除源码或业务数据；不运行全仓 renormalize，不改全局 Git 设置。新工作树如需使属性生效，先证明无用户改动并核对 Git blob，再仅处理明确九项检出格式。
+- 非目标：身份版本、会话接线、居民接口、GS-01/04/06、真实生产观测与六域 NO-GO。SEC-014 已合并仍仅“已实现”，其观测前置未验不得启动身份下游；care/GS 只读审计不占 writer、不构成实施授权。
+
 ### GOV-010 身份写入边界前置 PLAN
 
 - 来源：用户批准 GS-04→GS-01 方向，并明确确认所有安全权限变更使旧会话下一请求失效、增权重新认证、版本单调与账号审计原子持久化策略。Accepted ADR 见 `docs/adr/2026-09-11-live-authorization-session-version.md`；Accepted 策略不等于所有实现段同时准入。
