@@ -1,15 +1,37 @@
 "use strict";
 
 const assert = require("node:assert/strict");
+const { createHash } = require("node:crypto");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const test = require("node:test");
+const budgets = require("../config/platform-nonfunctional-budgets.json");
+const operationsProgram = require("../config/product-operations-program.json");
+const regionalProgram = require("../config/product-regional-enhancement-program.json");
 const { buildStaticPublication, resolveOutput } = require("../scripts/static-publication");
 const { collectPublicAssets, createStaticAssetPolicy, loadStaticPublicationContract } = require("../src/http/static-asset-policy");
 
 const ROOT = path.resolve(__dirname, "..");
 const EXCLUDED_INVENTORY_DIRECTORIES = new Set([".git", "node_modules", "output", "playwright-report", "release", "reports", "test-results"]);
+
+function temporaryRoot(prefix) {
+  const base = fs.realpathSync(os.tmpdir());
+  assert.notEqual(base, path.parse(base).root);
+  assert.doesNotMatch(base, /(?:^|[\\/])OneDrive(?:[^\\/]*)(?:[\\/]|$)/i);
+  return fs.mkdtempSync(path.join(base, prefix));
+}
+
+function removeTemporaryRoot(directory) {
+  assert.equal(path.isAbsolute(directory), true);
+  const base = fs.realpathSync(os.tmpdir());
+  const resolved = fs.realpathSync(directory);
+  const relative = path.relative(base, resolved);
+  assert.notEqual(resolved, path.parse(resolved).root);
+  assert.doesNotMatch(resolved, /(?:^|[\\/])OneDrive(?:[^\\/]*)(?:[\\/]|$)/i);
+  assert.match(relative, /^health-platform-publication-[^\\/]+$/);
+  fs.rmSync(resolved, { recursive: true, force: true });
+}
 
 function listFiles(directory, root = directory) {
   const files = [];
@@ -64,8 +86,8 @@ test("static publication contract exposes only the explicit browser graph", () =
 });
 
 test("static publication build writes a sanitized standalone Pages artifact", () => {
-  const temporaryRoot = fs.mkdtempSync(path.join(os.tmpdir(), "health-platform-publication-"));
-  const output = path.join(temporaryRoot, "site");
+  const directory = temporaryRoot("health-platform-publication-");
+  const output = path.join(directory, "site");
   try {
     const result = buildStaticPublication({ output, generatedAt: "2026-08-18T00:00:00.000Z" });
     const published = JSON.parse(fs.readFileSync(path.join(output, "data", "public-demo.json"), "utf8"));
@@ -88,20 +110,54 @@ test("static publication build writes a sanitized standalone Pages artifact", ()
     assert.equal(fs.existsSync(path.join(output, "static-publication-manifest.json")), false);
     assert.deepEqual(secretKeys(published), []);
     assert.equal(published.storageMeta.publicDemoSnapshot.classification, "PUBLIC_DEMO");
+
+    const budgetAssets = [
+      ...budgets.frontendAssets.map((asset) => asset.file),
+      operationsProgram.frontendAsset.file,
+      regionalProgram.frontend.file
+    ];
+    assert.deepEqual([...budgetAssets].sort(), [
+      "citizen.js", "public-health.js", "platform.js", "operations.js",
+      "regional-cutover-workbench-ui.js", "platform-productization-ui.js",
+      "platform-procurement-governance-ui.js", "product-operations-ui.js",
+      "product-regional-operations-ui.js"
+    ].sort());
+    budgetAssets.forEach((file) => {
+      const source = fs.readFileSync(path.join(ROOT, file));
+      const artifact = fs.readFileSync(path.join(output, file));
+      const entries = result.manifest.files.filter((entry) => entry.path === file);
+      assert.equal(entries.length, 1, file);
+      assert.deepEqual(artifact, source, file);
+      assert.equal(entries[0].generated, false, file);
+      assert.equal(entries[0].bytes, source.length, file);
+      assert.equal(entries[0].bytes, artifact.length, file);
+      assert.equal(entries[0].sha256, createHash("sha256").update(source).digest("hex"), file);
+      assert.equal(entries[0].sha256, createHash("sha256").update(artifact).digest("hex"), file);
+    });
+
+    // The build records raw bytes; this detects a later mismatch, not an active rejection API.
+    const alteredFile = "citizen.js";
+    const entry = result.manifest.files.find((file) => file.path === alteredFile);
+    fs.appendFileSync(path.join(output, alteredFile), Buffer.from([0x0d]));
+    const altered = fs.readFileSync(path.join(output, alteredFile));
+    assert.equal(altered.length, entry.bytes + 1);
+    assert.notEqual(altered.length, entry.bytes);
+    assert.notEqual(createHash("sha256").update(altered).digest("hex"), entry.sha256);
+    assert.notDeepEqual(altered, fs.readFileSync(path.join(ROOT, alteredFile)));
   } finally {
-    fs.rmSync(temporaryRoot, { recursive: true, force: true });
+    removeTemporaryRoot(directory);
   }
 });
 
 test("static publication refuses repository outputs and unapproved snapshot sources", () => {
   assert.throws(() => resolveOutput(path.join(ROOT, "..unsafe-publication")), /outside the repository/);
-  const temporaryRoot = fs.mkdtempSync(path.join(os.tmpdir(), "health-platform-publication-source-"));
+  const directory = temporaryRoot("health-platform-publication-source-");
   try {
     const contract = structuredClone(loadStaticPublicationContract());
     contract.generatedAssets["data/public-demo.json"].source = "../data/db.json";
-    assert.throws(() => buildStaticPublication({ output: path.join(temporaryRoot, "site"), contract }), /not approved/);
+    assert.throws(() => buildStaticPublication({ output: path.join(directory, "site"), contract }), /not approved/);
   } finally {
-    fs.rmSync(temporaryRoot, { recursive: true, force: true });
+    removeTemporaryRoot(directory);
   }
 });
 
