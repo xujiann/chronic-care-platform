@@ -17,6 +17,8 @@
 
 ### GOV-010 身份写入边界前置 PLAN
 
+> GOV-011 后续交付记录：TEST-012 已由 PR #304 / head `1d6c34c96916fca52f5800463b6631b1ba7cb009` / CI 34573014899 九项成功合并为 `2582698b112050b2401264288650c27c7f29b729`。两个作者外复核无剩余 P0–P2；企业 OneDrive 临时目录检查遗漏已在提交前修复并复核。legacy 日志 `C:/Users/drxuj/Temp/test012-test-all-1d6c34c9.log` 为 14 批、3374 tests、3373 pass、1 本地 PostgreSQL 环境 skip、0 fail/cancelled，实际进程 exit 0；中央逐批汇总核对一致。仅九条根资源属性与两个既有测试，raw bytes/lines、阈值、runtime/build 不变。TEST-012 关闭，当前 WIP 1/5（GOV-011）；上方 WIP 2/5 为准入快照。GOV-011 自身仍待最终门禁，不自证已集成。
+
 - 来源：用户批准 GS-04→GS-01 方向，并明确确认所有安全权限变更使旧会话下一请求失效、增权重新认证、版本单调与账号审计原子持久化策略。Accepted ADR 见 `docs/adr/2026-09-11-live-authorization-session-version.md`；Accepted 策略不等于所有实现段同时准入。
 - 基线 main `f1ce053da9e6c08b13755caed35996c0fe7056ad`。GOV-009 由 #296 / head `d13e7a0f` / CI 34505513741 九项成功、独立复审及串行 legacy 14 批（3370 项、3369 通过、1 环境跳过、零失败、退出 0）合并，本次正常登记据此关闭。
 - 中央 GOV-010 只写总账、规范、ROADMAP、ADR/索引及新增 Markdown 所需的文档分类与地图计数，不修改运行时。SEC-014 为独立 T02 实施任务，二者 WIP 2/5；后续 SEC-012/SEC-013 仅候选，不占实施位、不授权源码写入。

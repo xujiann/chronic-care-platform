@@ -1105,6 +1105,16 @@
   ],
   "evidence": [
     {
+      "id": "EVD-TEST-012",
+      "scope": "repository-integration",
+      "type": "pull-request-ci",
+      "ref": "https://github.com/xujiann/chronic-care-platform/actions/runs/34573014899",
+      "testIds": [
+        "TEST-TEST-012"
+      ],
+      "productionEvidence": false
+    },
+    {
       "id": "EVD-GOV-010",
       "scope": "repository-integration",
       "type": "pull-request-ci",
@@ -1542,8 +1552,7 @@
       "status": "已集成",
       "gapTaskIds": [
         "OPS-017",
-        "SEC-014",
-        "TEST-012"
+        "SEC-014"
       ],
       "evidenceIds": [
         "EVD-GOV-001",
@@ -1595,8 +1604,7 @@
         "OPS-015",
         "OPS-017",
         "OPS-018",
-        "GOV-011",
-        "TEST-012"
+        "GOV-011"
       ],
       "evidenceIds": [
         "EVD-GOV-001",
@@ -1616,8 +1624,7 @@
         "OPS-017",
         "OPS-018",
         "SEC-011",
-        "GOV-011",
-        "TEST-012"
+        "GOV-011"
       ],
       "evidenceIds": [
         "EVD-GOV-001",
@@ -1631,8 +1638,8 @@
       "title": "九项预算资源确定性LF检出",
       "ownerProcess": "T09",
       "integrationOwner": "T00",
-      "taskStatus": "已批准",
-      "capabilityStatus": "未建设",
+      "taskStatus": "已关闭",
+      "capabilityStatus": "已集成",
       "riskLevel": "中",
       "approval": {
         "state": "approved",
@@ -1666,16 +1673,16 @@
       "testIds": [
         "TEST-TEST-012"
       ],
-      "evidenceIds": [],
-      "rollback": "回退本任务独立提交并重跑相关门禁；无 migration，不回退服务端业务事实",
-      "unresolved": [
-        "待实施与独立验证；不改变生产准入"
+      "evidenceIds": [
+        "EVD-TEST-012"
       ],
+      "rollback": "回退本任务独立提交并重跑相关门禁；无 migration，不回退服务端业务事实",
+      "unresolved": [],
       "worktree": ".codex-platform-worktrees/process-v2/t09-budget-assets-lf-20260911",
       "branch": "process/t09-budget-assets-lf-20260911",
       "planRef": "docs/lifecycle-governance.md#gov-011-预算资源lf治理-plan",
-      "pullRequestRef": "",
-      "ciRef": "",
+      "pullRequestRef": "https://github.com/xujiann/chronic-care-platform/pull/304",
+      "ciRef": "https://github.com/xujiann/chronic-care-platform/actions/runs/34573014899",
       "writeScopes": [
         ".gitattributes",
         "test/platform-nonfunctional-readiness.test.js",
