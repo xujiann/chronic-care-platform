@@ -23,7 +23,16 @@ const IDENTITY_LIFECYCLE_FIELDS = Object.freeze([
 
 function apiLifecycleMutationCases(state, collection) {
   if (collection === "accountLifecycleVersion") {
-    return [null, String(state[collection]), -1, 0.5, [], {}, Number.MAX_SAFE_INTEGER + 1];
+    return [
+      Number(state[collection]) + 1,
+      null,
+      String(state[collection]),
+      -1,
+      0.5,
+      [],
+      {},
+      Number.MAX_SAFE_INTEGER + 1
+    ];
   }
   return [null, {}, [...state[collection], { id: `forged-${collection}` }]];
 }

@@ -46,6 +46,9 @@ function collectionMutationCases(value) {
 function lifecycleMutationCases(original, collection) {
   if (collection !== "accountLifecycleVersion") return collectionMutationCases(original[collection]);
   return [
+    { label: "increment", value: original[collection] + 1 },
+    { label: "decrement", value: original[collection] - 1 },
+    { label: "zero", value: 0 },
     { label: "null", value: null },
     { label: "numeric string", value: String(original[collection]) },
     { label: "negative", value: -1 },
