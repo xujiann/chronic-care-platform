@@ -1435,6 +1435,14 @@
       "productionEvidence": false
     },
     {
+      "id": "EVD-SEC-014",
+      "scope": "repository-integration",
+      "type": "pull-request-ci",
+      "ref": "https://github.com/xujiann/chronic-care-platform/actions/runs/34562342319",
+      "testIds": ["TEST-SEC-014"],
+      "productionEvidence": false
+    },
+    {
       "id": "EVD-SEC-011",
       "scope": "repository-integration",
       "type": "pull-request-ci",
@@ -1505,8 +1513,8 @@
       "title": "身份生命周期数据通用写旁路保护",
       "ownerProcess": "T02",
       "integrationOwner": "T00",
-      "taskStatus": "已批准",
-      "capabilityStatus": "未建设",
+      "taskStatus": "已关闭",
+      "capabilityStatus": "已实现",
       "riskLevel": "高",
       "approval": {
         "state": "approved",
@@ -1541,17 +1549,17 @@
       "testIds": [
         "TEST-SEC-014"
       ],
-      "evidenceIds": [],
+      "evidenceIds": ["EVD-SEC-014"],
       "rollback": "回退本任务独立提交并重跑相关门禁；无 migration，不回退服务端业务事实",
       "unresolved": [
-        "待实施与独立验证；不代表后续临时授权或系统黄金场景完成",
+        "三文件代码已由 PR #302 合并为 a6181a8c86adaa497adcf88de7b901e13791e666；不代表后续临时授权或系统黄金场景完成",
         "运行观测交付尚未核验；在观测适用性及复用证据完成核验前，不标记已验证或已集成运行能力；补证不自动扩大领域三文件范围"
       ],
       "worktree": ".codex-platform-worktrees/process-v2/t02-identity-lifecycle-write-boundary-20260911",
       "branch": "process/t02-identity-lifecycle-write-boundary-20260911",
       "planRef": "docs/lifecycle-governance.md#gov-010-身份写入边界前置-plan",
-      "pullRequestRef": "",
-      "ciRef": "",
+      "pullRequestRef": "https://github.com/xujiann/chronic-care-platform/pull/302",
+      "ciRef": "https://github.com/xujiann/chronic-care-platform/actions/runs/34562342319",
       "writeScopes": [
         "src/http/routes/state-data.js",
         "test/state-data-identity-boundary-api.test.js",
