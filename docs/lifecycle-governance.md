@@ -2,6 +2,18 @@
 
 ## 1. 权威边界
 
+### GOV-010 身份写入边界前置 PLAN
+
+- 来源：用户批准 GS-04→GS-01 方向，并明确确认所有安全权限变更使旧会话下一请求失效、增权重新认证、版本单调与账号审计原子持久化策略。Accepted ADR 见 `docs/adr/2026-09-11-live-authorization-session-version.md`；Accepted 策略不等于所有实现段同时准入。
+- 基线 main `f1ce053da9e6c08b13755caed35996c0fe7056ad`。GOV-009 由 #296 / head `d13e7a0f` / CI 34505513741 九项成功、独立复审及串行 legacy 14 批（3370 项、3369 通过、1 环境跳过、零失败、退出 0）合并，本次正常登记据此关闭。
+- 中央 GOV-010 只写总账、规范、ROADMAP、ADR/索引及新增 Markdown 所需的文档分类与地图计数，不修改运行时。SEC-014 为独立 T02 实施任务，二者 WIP 2/5；后续 SEC-012/SEC-013 仅候选，不占实施位、不授权源码写入。
+- SEC-014 精确范围：`src/http/routes/state-data.js`、`test/state-data-identity-boundary-api.test.js`、`test/t02-state-ownership-contract.test.js`。新增保护 accountLifecycleRequests、accountTemporaryGrants、accountLifecycleCommandReceipts、accountLifecycleVersion 四项现有字段；身份数据 owner 不变。
+- 验收：full-state 对四项显式替换、伪造、置空/删除内容及数组重排拒绝为既有 409，省略/深相等保留服务器权威值；collection 写使用既有 403，拒绝前零 writeDatabase。version 是标量，不伪造数组测试。保留 authUsers 脱敏相等兼容、角色拒绝与其他 owner 路径；非生产 reset 边界不扩大。
+- required tests：先真实现有路由/应用 HTTP harness RED→GREEN；两个限定测试、原 state-data/API/owner 相关门禁、process/diff；标准 build/lint/type/unit/integration/smoke、独立 legacy 与最终 head CI，独立 review。最终 CI 可提供标准套件精确证据，不重复并行跑多个全量；失败记录保留。
+- 交接：从届时最新 fetched origin/main 用 process:plan/create 创建 `process/t02-identity-lifecycle-write-boundary-20260911`，不复制中央登记到领域分支；任务登记提交可供只读核对。提交 Draft PR 与精确 head/证据，T00 串行合并，不自行重基或合并；新主线重基须逐文件零漂移及新 CI。
+- 回滚：独立 revert SEC-014；不删授权/审批/回执/审计。保护回退后不得继续放行临时授权接线。无 schema、数据迁移、权限激活、容量变更或生产发布。
+- 依赖：SEC-014 集成验证后才核定 T01 版本/容量领域段与中央接线段；server.js、身份主路由、session-store、GS 测试和 PG 合同均不在本次领域 scope。GS-01/04/06、真实 PG 传播、居民新接口与生产六域 NO-GO 不变。
+
 ### GOV-009 浏览器缺口组合 PLAN
 
 - 来源：用户于 2026-09-10 要求继续全部开发。T00 批准本中风险登记及下列四项精确 PLAN；基线 main `3918a79d`。GOV-008 已由 #293 / head `3d856f8f` / CI 34486531706 九项成功、独立无 P0–P2 复审和 legacy 14 批（3332 项、3331 通过、1 本地环境跳过、零失败、退出 0）合并，本次据此正常关闭，不制造递归自证。

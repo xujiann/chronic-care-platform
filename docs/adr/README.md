@@ -21,6 +21,7 @@
 
 | 决策 | 状态 | 范围 |
 |---|---|---|
+| [实时授权版本与旧会话失败关闭](./2026-09-11-live-authorization-session-version.md) | Accepted | 人工确认的重新认证策略；先封堵通用身份写旁路，后续身份与组合接线须独立准入 |
 | [main 作为唯一集成主干](../ADR-main唯一集成主干-2026-08-03.md) | Accepted | 分支、PR、CI 和发布基线 |
 | [PR 所有权门禁跟随目标集成分支](./2026-08-19-pr-ownership-gate-target-base.md) | Accepted | process PR 的比较基线与所有权校验 |
 | [仓库文档与跟踪 PDF 采用闭集治理](./2026-08-23-repository-documentation-and-artifact-governance.md) | Accepted | 当前工作流、Markdown 分类、历史快照冻结与 PDF 来源/摘要治理 |

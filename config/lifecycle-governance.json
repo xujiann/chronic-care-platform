@@ -40,6 +40,27 @@
   },
   "requirements": [
     {
+      "id": "REQ-SEC-014",
+      "title": "身份生命周期数据通用写旁路保护",
+      "sourceType": "approved-t00-plan",
+      "sourceRef": "USER-CONFIRMED-LIVE-AUTHORIZATION-POLICY-2026-09-11",
+      "acceptance": [
+        "四项审批/临时授权/回执/版本full-state显式变化409且零写；省略/深相等保留权威值",
+        "四项collection写403，数组与标量按真实类型验证",
+        "保持身份owner、既有角色及authUsers脱敏兼容；不接临时权限、不改session/容量/schema"
+      ]
+    },
+    {
+      "id": "REQ-GOV-010",
+      "title": "身份写入边界前置登记",
+      "sourceType": "approved-t00-plan",
+      "sourceRef": "T00-PLAN-GOV-010-APPROVED-2026-09-11",
+      "acceptance": [
+        "以PR296真实证据关闭GOV009，记录人工授权策略与前置任务",
+        "保持单writer与依赖，后续身份/GS任务不提前实施"
+      ]
+    },
+    {
       "id": "REQ-OPS-036",
       "title": "文书补传同事件在途去重",
       "sourceType": "approved-t00-plan",
@@ -395,6 +416,24 @@
   ],
   "risks": [
     {
+      "id": "RISK-SEC-014",
+      "title": "身份生命周期数据通用写旁路保护",
+      "level": "高",
+      "owner": "T02",
+      "mitigation": "Accepted ADR与人工确认，先RED后GREEN验证写前拒绝，独立评审及精确CI后集成",
+      "status": "open",
+      "evidenceIds": []
+    },
+    {
+      "id": "RISK-GOV-010",
+      "title": "身份写入边界前置登记",
+      "level": "中",
+      "owner": "T00",
+      "mitigation": "Accepted ADR与人工确认，先RED后GREEN验证写前拒绝，独立评审及精确CI后集成",
+      "status": "open",
+      "evidenceIds": []
+    },
+    {
       "id": "RISK-OPS-036",
       "title": "文书补传同事件在途去重",
       "level": "中",
@@ -444,8 +483,10 @@
       "title": "浏览器缺口组合与跨任务集成缺口未闭合",
       "owner": "T00",
       "mitigation": "精确范围负向回归、独立审查、最终CI与串行集成，不改变生产边界",
-      "status": "open",
-      "evidenceIds": []
+      "status": "mitigated",
+      "evidenceIds": [
+        "EVD-GOV-009"
+      ]
     },
     {
       "id": "RISK-OPS-030",
@@ -738,6 +779,14 @@
       "supersedes": []
     },
     {
+      "id": "ADR-SEC-012",
+      "status": "Accepted",
+      "path": "docs/adr/2026-09-11-live-authorization-session-version.md",
+      "effectiveScope": "live-authorization-policy-and-identity-write-boundary-prerequisite",
+      "reviewDue": "2027-03-11",
+      "supersedes": []
+    },
+    {
       "id": "ADR-CLINICAL-001",
       "status": "Accepted",
       "path": "docs/adr/2026-08-18-clinical-five-governed-subdomains.md",
@@ -755,6 +804,18 @@
     }
   ],
   "tests": [
+    {
+      "id": "TEST-SEC-014",
+      "kind": "existing-regression-baseline-before-scoped-implementation",
+      "path": "test/state-data-identity-boundary-api.test.js",
+      "command": "node --test test/state-data-identity-boundary-api.test.js"
+    },
+    {
+      "id": "TEST-GOV-010",
+      "kind": "existing-regression-baseline-before-scoped-implementation",
+      "path": "test/lifecycle-governance.test.js",
+      "command": "node --test test/lifecycle-governance.test.js"
+    },
     {
       "id": "TEST-OPS-036",
       "kind": "scoped-behavior-regression-contract",
@@ -991,6 +1052,16 @@
     }
   ],
   "evidence": [
+    {
+      "id": "EVD-GOV-009",
+      "scope": "repository-integration",
+      "type": "pull-request-ci",
+      "ref": "https://github.com/xujiann/chronic-care-platform/actions/runs/34505513741",
+      "testIds": [
+        "TEST-GOV-009"
+      ],
+      "productionEvidence": false
+    },
     {
       "id": "EVD-GOV-009-LOCAL",
       "scope": "repository",
@@ -1379,7 +1450,7 @@
       "baseline": "主线模块化单体及其现有运行、存储和发布边界",
       "target": "边界、状态和生产资格均可由控制塔追踪",
       "status": "已集成",
-      "gapTaskIds": ["GOV-002","OPS-015","OPS-016","OPS-017","OPS-018","SEC-011","GOV-009"],
+      "gapTaskIds": ["GOV-002","OPS-015","OPS-016","OPS-017","OPS-018","SEC-011","GOV-010"],
       "evidenceIds": ["EVD-GOV-001", "EVD-GOV-002"]
     },
     {
@@ -1388,7 +1459,7 @@
       "baseline": "T00至T09及临床子域已建立模块所有权",
       "target": "模块写入冲突和跨任务依赖自动失败关闭",
       "status": "已集成",
-      "gapTaskIds": ["OPS-017","GOV-009"],
+      "gapTaskIds": ["OPS-017","GOV-010","SEC-014"],
       "evidenceIds": ["EVD-GOV-001", "EVD-GOV-002"]
     },
     {
@@ -1397,7 +1468,7 @@
       "baseline": "数据事实源、迁移和生产写资格已有独立治理",
       "target": "数据敏感级别和迁移证据进入每项任务追踪链",
       "status": "已集成",
-      "gapTaskIds": ["OPS-015","OPS-016","OPS-017","OPS-018","GOV-009"],
+      "gapTaskIds": ["OPS-015","OPS-016","OPS-017","OPS-018","GOV-010"],
       "evidenceIds": ["EVD-GOV-001", "EVD-GOV-002"]
     },
     {
@@ -1406,7 +1477,7 @@
       "baseline": "生产API目录及认证、授权、幂等证据独立存在",
       "target": "接口变更由任务风险和影响范围选择门禁",
       "status": "已集成",
-      "gapTaskIds": ["OPS-015","OPS-016","OPS-018","SEC-011","GOV-009"],
+      "gapTaskIds": ["OPS-015","OPS-016","OPS-018","SEC-011","GOV-010"],
       "evidenceIds": ["EVD-GOV-001", "EVD-GOV-002"]
     },
     {
@@ -1415,7 +1486,7 @@
       "baseline": "代码、运行时和外部依赖边界已有事实地图",
       "target": "任务前置关系、WIP和核心写范围形成可检查依赖图",
       "status": "已集成",
-      "gapTaskIds": ["GOV-002","OPS-015","OPS-017","OPS-018","GOV-009"],
+      "gapTaskIds": ["GOV-002","OPS-015","OPS-017","OPS-018","GOV-010"],
       "evidenceIds": ["EVD-GOV-001", "EVD-GOV-002"]
     },
     {
@@ -1424,11 +1495,138 @@
       "baseline": "技术债以稳定编号记录仓库及现场缺口",
       "target": "风险、差距任务、退出条件和关闭证据双向可追踪",
       "status": "已集成",
-      "gapTaskIds": ["GOV-002","OPS-015","OPS-016","OPS-017","OPS-018","SEC-011","GOV-009"],
+      "gapTaskIds": ["GOV-002","OPS-015","OPS-016","OPS-017","OPS-018","SEC-011","GOV-010"],
       "evidenceIds": ["EVD-GOV-001", "EVD-GOV-002"]
     }
   ],
   "tasks": [
+    {
+      "id": "SEC-014",
+      "title": "身份生命周期数据通用写旁路保护",
+      "ownerProcess": "T02",
+      "integrationOwner": "T00",
+      "taskStatus": "已批准",
+      "capabilityStatus": "未建设",
+      "riskLevel": "高",
+      "approval": {
+        "state": "approved",
+        "mode": "accepted-adr-human-review-special-validation",
+        "ref": "USER-CONFIRMED-LIVE-AUTHORIZATION-POLICY-2026-09-11",
+        "approvedScope": "src/http/routes/state-data.js, test/state-data-identity-boundary-api.test.js, test/t02-state-ownership-contract.test.js"
+      },
+      "requirementIds": [
+        "REQ-SEC-014"
+      ],
+      "regulatoryControlIds": [
+        "REG-GOV-001"
+      ],
+      "riskIds": [
+        "RISK-SEC-014"
+      ],
+      "decisionIds": [
+        "ADR-SEC-012"
+      ],
+      "dependencies": [
+        "GOV-009"
+      ],
+      "affectedModules": [
+        "identity-lifecycle-write-boundary"
+      ],
+      "dataSensitivity": "既有浏览器业务元数据或研发治理数据；不新增持久化或服务端授权",
+      "acceptanceCriteria": [
+        "四项审批/临时授权/回执/版本full-state显式变化409且零写；省略/深相等保留权威值",
+        "四项collection写403，数组与标量按真实类型验证",
+        "保持身份owner、既有角色及authUsers脱敏兼容；不接临时权限、不改session/容量/schema"
+      ],
+      "testIds": [
+        "TEST-SEC-014"
+      ],
+      "evidenceIds": [],
+      "rollback": "回退本任务独立提交并重跑相关门禁；无 migration，不回退服务端业务事实",
+      "unresolved": [
+        "待实施与独立验证；不代表后续临时授权或系统黄金场景完成"
+      ],
+      "worktree": ".codex-platform-worktrees/process-v2/t02-identity-lifecycle-write-boundary-20260911",
+      "branch": "process/t02-identity-lifecycle-write-boundary-20260911",
+      "planRef": "docs/lifecycle-governance.md#gov-010-身份写入边界前置-plan",
+      "pullRequestRef": "",
+      "ciRef": "",
+      "writeScopes": [
+        "src/http/routes/state-data.js",
+        "test/state-data-identity-boundary-api.test.js",
+        "test/t02-state-ownership-contract.test.js"
+      ],
+      "observability": {
+        "applicable": false,
+        "reason": "仅既有浏览器兼容修复或治理登记，不新增独立生产运行能力；完整运行观测及现场证据仍未闭合"
+      },
+      "runtimeCapability": false
+    },
+    {
+      "id": "GOV-010",
+      "title": "身份写入边界前置登记",
+      "ownerProcess": "T00",
+      "integrationOwner": "T00",
+      "taskStatus": "已批准",
+      "capabilityStatus": "未建设",
+      "riskLevel": "中",
+      "approval": {
+        "state": "approved",
+        "mode": "T00-plan-approval",
+        "ref": "T00-PLAN-GOV-010-APPROVED-2026-09-11",
+        "approvedScope": "config/lifecycle-governance.json, docs/lifecycle-governance.md, ROADMAP.md, docs/adr/2026-09-11-live-authorization-session-version.md, docs/adr/README.md, config/repository-governance.json, CURRENT_ARCHITECTURE.md, MODULE_MAP.md, TECH_DEBT.md"
+      },
+      "requirementIds": [
+        "REQ-GOV-010"
+      ],
+      "regulatoryControlIds": [
+        "REG-GOV-001"
+      ],
+      "riskIds": [
+        "RISK-GOV-010"
+      ],
+      "decisionIds": [],
+      "dependencies": [
+        "GOV-009"
+      ],
+      "affectedModules": [
+        "identity-boundary-intake"
+      ],
+      "dataSensitivity": "既有浏览器业务元数据或研发治理数据；不新增持久化或服务端授权",
+      "acceptanceCriteria": [
+        "以PR296真实证据关闭GOV009，记录人工授权策略与前置任务",
+        "保持单writer与依赖，后续身份/GS任务不提前实施"
+      ],
+      "testIds": [
+        "TEST-GOV-010"
+      ],
+      "evidenceIds": [],
+      "rollback": "回退本任务独立提交并重跑相关门禁；无 migration，不回退服务端业务事实",
+      "unresolved": [
+        "待实施与独立验证；不代表后续临时授权或系统黄金场景完成"
+      ],
+      "worktree": ".codex-platform-worktrees/process-v2/t00-identity-boundary-intake-20260911",
+      "branch": "process/t00-identity-boundary-intake-20260911",
+      "planRef": "docs/lifecycle-governance.md#gov-010-身份写入边界前置-plan",
+      "pullRequestRef": "",
+      "ciRef": "",
+      "writeScopes": [
+        "config/lifecycle-governance.json",
+        "docs/lifecycle-governance.md",
+        "ROADMAP.md",
+        "docs/adr/2026-09-11-live-authorization-session-version.md",
+        "docs/adr/README.md",
+        "config/repository-governance.json",
+        "CURRENT_ARCHITECTURE.md",
+        "MODULE_MAP.md",
+        "TECH_DEBT.md"
+      ],
+      "observability": {
+        "applicable": false,
+        "reason": "仅既有浏览器兼容修复或治理登记，不新增独立生产运行能力；完整运行观测及现场证据仍未闭合"
+      },
+      "runtimeCapability": false
+    },
     {
       "id": "OPS-036",
       "title": "文书补传同事件在途去重",
@@ -1670,8 +1868,8 @@
       "title": "浏览器缺口组合与跨任务集成",
       "ownerProcess": "T00",
       "integrationOwner": "T00",
-      "taskStatus": "待集成",
-      "capabilityStatus": "已验证",
+      "taskStatus": "已关闭",
+      "capabilityStatus": "已集成",
       "riskLevel": "中",
       "approval": {
         "state": "approved",
@@ -1705,17 +1903,15 @@
         "TEST-GOV-009"
       ],
       "evidenceIds": [
-        "EVD-GOV-009-LOCAL"
+        "EVD-GOV-009"
       ],
       "rollback": "回退本任务独立提交并重跑相关门禁；无 migration，不回退服务端业务事实",
-      "unresolved": [
-        "中央PR296尚待最终独立评审、legacy及exact-head CI后集成，不以领域证据替代自身证据"
-      ],
+      "unresolved": [],
       "worktree": ".codex-platform-worktrees/process-v2/t00-browser-gap-portfolio-20260910",
       "branch": "process/t00-browser-gap-portfolio-20260910",
       "planRef": "docs/lifecycle-governance.md#gov-009-浏览器缺口组合-plan",
       "pullRequestRef": "https://github.com/xujiann/chronic-care-platform/pull/296",
-      "ciRef": "",
+      "ciRef": "https://github.com/xujiann/chronic-care-platform/actions/runs/34505513741",
       "writeScopes": [
         "config/lifecycle-governance.json",
         "docs/lifecycle-governance.md",
