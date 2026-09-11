@@ -1532,7 +1532,7 @@
       "affectedModules": [
         "identity-lifecycle-write-boundary"
       ],
-      "dataSensitivity": "既有浏览器业务元数据或研发治理数据；不新增持久化或服务端授权",
+      "dataSensitivity": "服务端身份审批、临时授权、命令回执与授权版本；敏感身份安全治理数据",
       "acceptanceCriteria": [
         "四项审批/临时授权/回执/版本full-state显式变化409且零写；省略/深相等保留权威值",
         "四项collection写403，数组与标量按真实类型验证",
@@ -1544,7 +1544,8 @@
       "evidenceIds": [],
       "rollback": "回退本任务独立提交并重跑相关门禁；无 migration，不回退服务端业务事实",
       "unresolved": [
-        "待实施与独立验证；不代表后续临时授权或系统黄金场景完成"
+        "待实施与独立验证；不代表后续临时授权或系统黄金场景完成",
+        "运行观测交付尚未核验；在观测适用性及复用证据完成核验前，不标记已验证或已集成运行能力；补证不自动扩大领域三文件范围"
       ],
       "worktree": ".codex-platform-worktrees/process-v2/t02-identity-lifecycle-write-boundary-20260911",
       "branch": "process/t02-identity-lifecycle-write-boundary-20260911",
@@ -1557,10 +1558,10 @@
         "test/t02-state-ownership-contract.test.js"
       ],
       "observability": {
-        "applicable": false,
-        "reason": "仅既有浏览器兼容修复或治理登记，不新增独立生产运行能力；完整运行观测及现场证据仍未闭合"
+        "applicable": true,
+        "gaps": "现有409/403拒绝响应需专项验证；拒绝审计、结构化日志、指标告警、追踪、健康检查、SLO、处置手册、降级及补偿的适用性与可复用证据尚未核验，不据此宣称运行能力完成"
       },
-      "runtimeCapability": false
+      "runtimeCapability": true
     },
     {
       "id": "GOV-010",
