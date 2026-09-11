@@ -21,6 +21,13 @@ const IDENTITY_LIFECYCLE_FIELDS = Object.freeze([
   "accountLifecycleVersion"
 ]);
 
+function apiLifecycleMutationCases(state, collection) {
+  if (collection === "accountLifecycleVersion") {
+    return [null, String(state[collection]), -1, 0.5, [], {}, Number.MAX_SAFE_INTEGER + 1];
+  }
+  return [null, {}, [...state[collection], { id: `forged-${collection}` }]];
+}
+
 async function request(baseUrl, pathname, token = "", options = {}) {
   const response = await fetch(`${baseUrl}${pathname}`, {
     ...options,
@@ -114,23 +121,22 @@ test("legacy state identity boundary is enforced through real authenticated HTTP
   assert.equal(conflict.body.collection, "authUsers");
 
   for (const collection of IDENTITY_LIFECYCLE_FIELDS) {
-    const forgedValue = collection === "accountLifecycleVersion"
-      ? Number(managerState.body[collection]) + 1
-      : [...managerState.body[collection], { id: `forged-${collection}` }];
-    const lifecycleConflict = await request(baseUrl, "/api/state", managerToken, {
-      method: "PUT",
-      body: JSON.stringify({
-        ...managerState.body,
-        [collection]: forgedValue
-      })
-    });
-    assert.equal(lifecycleConflict.response.status, 409, collection);
-    assert.equal(lifecycleConflict.body.code, "IDENTITY_SERVER_MANAGED_COLLECTION_CONFLICT");
-    assert.equal(lifecycleConflict.body.collection, collection);
+    for (const [caseIndex, forgedValue] of apiLifecycleMutationCases(managerState.body, collection).entries()) {
+      const lifecycleConflict = await request(baseUrl, "/api/state", managerToken, {
+        method: "PUT",
+        body: JSON.stringify({
+          ...managerState.body,
+          [collection]: forgedValue
+        })
+      });
+      assert.equal(lifecycleConflict.response.status, 409, `${collection} mutation ${caseIndex}`);
+      assert.equal(lifecycleConflict.body.code, "IDENTITY_SERVER_MANAGED_COLLECTION_CONFLICT");
+      assert.equal(lifecycleConflict.body.collection, collection);
 
-    const unchangedState = await request(baseUrl, "/api/state", managerToken);
-    assert.equal(unchangedState.response.status, 200);
-    assert.deepEqual(unchangedState.body, managerState.body, `${collection} conflict must perform zero writes`);
+      const unchangedState = await request(baseUrl, "/api/state", managerToken);
+      assert.equal(unchangedState.response.status, 200);
+      assert.deepEqual(unchangedState.body, managerState.body, `${collection} mutation ${caseIndex} must perform zero writes`);
+    }
   }
 
   const compatiblePayload = structuredClone(managerState.body);
