@@ -5,6 +5,38 @@ const test = require("node:test");
 
 const { createApiRegressionRuntime } = require("./helpers/api-regression-runtime");
 
+const SERVER_MANAGED_IDENTITY_FIELDS = Object.freeze([
+  "authUsers",
+  "authOrganizations",
+  "accountLifecycleRequests",
+  "accountTemporaryGrants",
+  "accountLifecycleCommandReceipts",
+  "accountLifecycleVersion"
+]);
+
+const IDENTITY_LIFECYCLE_FIELDS = Object.freeze([
+  "accountLifecycleRequests",
+  "accountTemporaryGrants",
+  "accountLifecycleCommandReceipts",
+  "accountLifecycleVersion"
+]);
+
+function apiLifecycleMutationCases(state, collection) {
+  if (collection === "accountLifecycleVersion") {
+    return [
+      Number(state[collection]) + 1,
+      null,
+      String(state[collection]),
+      -1,
+      0.5,
+      [],
+      {},
+      Number.MAX_SAFE_INTEGER + 1
+    ];
+  }
+  return [null, {}, [...state[collection], { id: `forged-${collection}` }]];
+}
+
 async function request(baseUrl, pathname, token = "", options = {}) {
   const response = await fetch(`${baseUrl}${pathname}`, {
     ...options,
@@ -75,7 +107,7 @@ test("legacy state identity boundary is enforced through real authenticated HTTP
   assert.equal(specialistCollectionWrite.response.status, 403);
   assert.equal(specialistCollectionWrite.body.code, "STATE_DATA_MANAGER_REQUIRED");
 
-  for (const collection of ["authUsers", "authOrganizations"]) {
+  for (const collection of SERVER_MANAGED_IDENTITY_FIELDS) {
     const collectionWrite = await request(baseUrl, `/api/state-collections/${collection}`, managerToken, {
       method: "PUT",
       body: "{malformed-json"
@@ -97,9 +129,27 @@ test("legacy state identity boundary is enforced through real authenticated HTTP
   assert.equal(conflict.body.code, "IDENTITY_SERVER_MANAGED_COLLECTION_CONFLICT");
   assert.equal(conflict.body.collection, "authUsers");
 
+  for (const collection of IDENTITY_LIFECYCLE_FIELDS) {
+    for (const [caseIndex, forgedValue] of apiLifecycleMutationCases(managerState.body, collection).entries()) {
+      const lifecycleConflict = await request(baseUrl, "/api/state", managerToken, {
+        method: "PUT",
+        body: JSON.stringify({
+          ...managerState.body,
+          [collection]: forgedValue
+        })
+      });
+      assert.equal(lifecycleConflict.response.status, 409, `${collection} mutation ${caseIndex}`);
+      assert.equal(lifecycleConflict.body.code, "IDENTITY_SERVER_MANAGED_COLLECTION_CONFLICT");
+      assert.equal(lifecycleConflict.body.collection, collection);
+
+      const unchangedState = await request(baseUrl, "/api/state", managerToken);
+      assert.equal(unchangedState.response.status, 200);
+      assert.deepEqual(unchangedState.body, managerState.body, `${collection} mutation ${caseIndex} must perform zero writes`);
+    }
+  }
+
   const compatiblePayload = structuredClone(managerState.body);
-  delete compatiblePayload.authUsers;
-  delete compatiblePayload.authOrganizations;
+  for (const collection of SERVER_MANAGED_IDENTITY_FIELDS) delete compatiblePayload[collection];
   const compatibleWrite = await request(baseUrl, "/api/state", managerToken, {
     method: "PUT",
     body: JSON.stringify(compatiblePayload)
@@ -107,6 +157,19 @@ test("legacy state identity boundary is enforced through real authenticated HTTP
   assert.equal(compatibleWrite.response.status, 200, JSON.stringify(compatibleWrite.body));
   assertAuthSecretsRedacted(compatibleWrite.body);
   assert.equal(compatibleWrite.body.authOrganizations.length, managerState.body.authOrganizations.length);
+  for (const field of IDENTITY_LIFECYCLE_FIELDS) {
+    assert.deepEqual(compatibleWrite.body[field], managerState.body[field], `omission must preserve ${field}`);
+  }
+
+  const deepEqualWrite = await request(baseUrl, "/api/state", managerToken, {
+    method: "PUT",
+    body: JSON.stringify(structuredClone(compatibleWrite.body))
+  });
+  assert.equal(deepEqualWrite.response.status, 200, JSON.stringify(deepEqualWrite.body));
+  assertAuthSecretsRedacted(deepEqualWrite.body);
+  for (const field of IDENTITY_LIFECYCLE_FIELDS) {
+    assert.deepEqual(deepEqualWrite.body[field], managerState.body[field], `deep-equal input must preserve ${field}`);
+  }
 
   const reset = await request(baseUrl, "/api/reset", managerToken, { method: "POST" });
   assert.equal(reset.response.status, 200);

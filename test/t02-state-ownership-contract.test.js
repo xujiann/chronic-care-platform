@@ -14,6 +14,51 @@ const {
 } = require("../src/http/routes/t02-state-ownership-contract");
 const stateDataRoutes = require("../src/http/routes/state-data");
 
+const SERVER_MANAGED_IDENTITY_FIELDS = Object.freeze([
+  "authUsers",
+  "authOrganizations",
+  "accountLifecycleRequests",
+  "accountTemporaryGrants",
+  "accountLifecycleCommandReceipts",
+  "accountLifecycleVersion"
+]);
+
+const IDENTITY_LIFECYCLE_FIELDS = Object.freeze([
+  "accountLifecycleRequests",
+  "accountTemporaryGrants",
+  "accountLifecycleCommandReceipts",
+  "accountLifecycleVersion"
+]);
+
+function collectionMutationCases(value) {
+  const removedField = structuredClone(value);
+  delete removedField[0][Object.keys(removedField[0])[0]];
+  return [
+    { label: "null", value: null },
+    { label: "object", value: {} },
+    { label: "empty", value: [] },
+    { label: "append", value: [...structuredClone(value), { id: "forged-item" }] },
+    { label: "reorder", value: [...structuredClone(value)].reverse() },
+    { label: "delete internal field", value: removedField }
+  ];
+}
+
+function lifecycleMutationCases(original, collection) {
+  if (collection !== "accountLifecycleVersion") return collectionMutationCases(original[collection]);
+  return [
+    { label: "increment", value: original[collection] + 1 },
+    { label: "decrement", value: original[collection] - 1 },
+    { label: "zero", value: 0 },
+    { label: "null", value: null },
+    { label: "numeric string", value: String(original[collection]) },
+    { label: "negative", value: -1 },
+    { label: "fraction", value: 7.5 },
+    { label: "array", value: [] },
+    { label: "object", value: {} },
+    { label: "unsafe integer", value: Number.MAX_SAFE_INTEGER + 1 }
+  ];
+}
+
 function responseDouble() {
   return {
     headers: {},
@@ -159,6 +204,19 @@ test("legacy full-state write rejects identity mutations and preserves omitted i
   const original = {
     authUsers: [{ id: "u-manager", username: "manager", password: "plaintext-marker", passwordHash: "hash-marker" }],
     authOrganizations: [{ orgCode: "ORG-HEALTH", status: "enabled" }],
+    accountLifecycleRequests: [
+      { id: "request-1", action: "deactivate" },
+      { id: "request-2", action: "temporary-grant" }
+    ],
+    accountTemporaryGrants: [
+      { id: "grant-1", status: "active" },
+      { id: "grant-2", status: "expired" }
+    ],
+    accountLifecycleCommandReceipts: [
+      { id: "receipt-1", requestId: "request-1" },
+      { id: "receipt-2", requestId: "request-2" }
+    ],
+    accountLifecycleVersion: 7,
     residents: [{ id: "r1", name: "before" }],
     securityEvents: [],
     dataAccessLogs: [],
@@ -189,7 +247,9 @@ test("legacy full-state write rejects identity mutations and preserves omitted i
   };
   const segment = stateDataRoutes.createRouteSegments(runtime)[1];
 
-  for (const collection of stateDataRoutes.SERVER_MANAGED_IDENTITY_COLLECTIONS) {
+  assert.deepEqual(stateDataRoutes.SERVER_MANAGED_IDENTITY_COLLECTIONS, SERVER_MANAGED_IDENTITY_FIELDS);
+
+  for (const collection of ["authUsers", "authOrganizations"]) {
     state = structuredClone(original);
     payload = structuredClone(original);
     payload[collection] = [];
@@ -199,6 +259,20 @@ test("legacy full-state write rejects identity mutations and preserves omitted i
     assert.equal(responseBody.collection, collection);
     assert.deepEqual(state, original);
     assert.equal(writes, 0);
+  }
+
+  for (const collection of IDENTITY_LIFECYCLE_FIELDS) {
+    for (const mutation of lifecycleMutationCases(original, collection)) {
+      state = structuredClone(original);
+      payload = structuredClone(original);
+      payload[collection] = structuredClone(mutation.value);
+      await segment.handle({ method: "PUT", headers: {} }, responseDouble(), new URL("http://local/api/state"));
+      assert.equal(responseStatus, 409, `${collection}: ${mutation.label}`);
+      assert.equal(responseBody.code, "IDENTITY_SERVER_MANAGED_COLLECTION_CONFLICT");
+      assert.equal(responseBody.collection, collection);
+      assert.deepEqual(state, original, `${collection}: ${mutation.label} must preserve authoritative state`);
+      assert.equal(writes, 0, `${collection}: ${mutation.label} must perform zero writes`);
+    }
   }
 
   payload = {
@@ -212,6 +286,9 @@ test("legacy full-state write rejects identity mutations and preserves omitted i
   assert.equal(writes, 1);
   assert.deepEqual(state.authUsers, original.authUsers);
   assert.deepEqual(state.authOrganizations, original.authOrganizations);
+  for (const field of IDENTITY_LIFECYCLE_FIELDS) {
+    assert.deepEqual(state[field], original[field], `omission must preserve ${field}`);
+  }
   assert.equal(responseBody.authUsers[0].password, undefined);
   assert.equal(responseBody.authUsers[0].passwordHash, undefined);
   assert.equal(state.authUsers[0].password, "plaintext-marker");
@@ -226,6 +303,9 @@ test("legacy full-state write rejects identity mutations and preserves omitted i
   assert.equal(writes, 2);
   assert.equal(state.authUsers[0].password, "plaintext-marker");
   assert.equal(state.authUsers[0].passwordHash, "hash-marker");
+  for (const field of IDENTITY_LIFECYCLE_FIELDS) {
+    assert.deepEqual(state[field], original[field], `deep-equal input must preserve ${field}`);
+  }
 });
 
 test("identity collection writes fail closed before body parsing or storage access", async () => {

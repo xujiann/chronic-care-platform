@@ -25,7 +25,11 @@ const SERVER_MANAGED_PROCUREMENT_COLLECTIONS = Object.freeze([
 ]);
 const SERVER_MANAGED_IDENTITY_COLLECTIONS = Object.freeze([
   "authUsers",
-  "authOrganizations"
+  "authOrganizations",
+  "accountLifecycleRequests",
+  "accountTemporaryGrants",
+  "accountLifecycleCommandReceipts",
+  "accountLifecycleVersion"
 ]);
 
 const AUTH_USER_READ_SECRET_FIELDS = Object.freeze([
