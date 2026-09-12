@@ -40,6 +40,36 @@
   },
   "requirements": [
     {
+      "id": "REQ-OPS-038",
+      "title": "共享工作台读取代次隔离",
+      "sourceType": "approved-t00-plan",
+      "sourceRef": "T00-PLAN-OPS-038-APPROVED-2026-09-13",
+      "acceptance": [
+        "后发读取优先，旧成功/失败不改rows/render/status，当前失败清空",
+        "superseded刷新不报告已保存并刷新或刷新失败，不覆盖较新读取提示，保留五调用方及OPS035语义"
+      ]
+    },
+    {
+      "id": "REQ-OPS-037",
+      "title": "文书中心读取代次隔离",
+      "sourceType": "approved-t00-plan",
+      "sourceRef": "T00-PLAN-OPS-037-APPROVED-2026-09-13",
+      "acceptance": [
+        "旧成功/失败不得覆盖最新center/source/banner，最新请求独占refresh状态",
+        "两event补传重叠GET保持最新快照，保留pending锁及file兼容"
+      ]
+    },
+    {
+      "id": "REQ-GOV-012",
+      "title": "读取代次修复组合登记",
+      "sourceType": "approved-t00-plan",
+      "sourceRef": "T00-PLAN-GOV-012-APPROVED-2026-09-13",
+      "acceptance": [
+        "登记两项独立范围、依赖与过期读取语义，保持单writer",
+        "以PR303真实证据关闭GOV011，不预支本批验收"
+      ]
+    },
+    {
       "id": "REQ-TEST-012",
       "title": "九项预算资源确定性LF检出",
       "sourceType": "approved-t00-plan",
@@ -438,6 +468,33 @@
   ],
   "risks": [
     {
+      "id": "RISK-OPS-038",
+      "title": "共享工作台读取代次隔离",
+      "level": "中",
+      "owner": "T09",
+      "mitigation": "确定性deferred RED、最小代次补丁、旧交互回归、独立review与精确门禁；运行观测缺口独立保留",
+      "status": "open",
+      "evidenceIds": []
+    },
+    {
+      "id": "RISK-OPS-037",
+      "title": "文书中心读取代次隔离",
+      "level": "中",
+      "owner": "T08",
+      "mitigation": "确定性deferred RED、最小代次补丁、旧交互回归、独立review与精确门禁；运行观测缺口独立保留",
+      "status": "open",
+      "evidenceIds": []
+    },
+    {
+      "id": "RISK-GOV-012",
+      "title": "读取代次修复组合登记",
+      "level": "中",
+      "owner": "T00",
+      "mitigation": "确定性deferred RED、最小代次补丁、旧交互回归、独立review与精确门禁；运行观测缺口独立保留",
+      "status": "open",
+      "evidenceIds": []
+    },
+    {
       "id": "RISK-TEST-012",
       "title": "九项预算资源确定性LF检出",
       "level": "中",
@@ -451,9 +508,11 @@
       "title": "预算资源LF治理组合登记",
       "level": "中",
       "owner": "T00",
-      "mitigation": "精确三文件范围、隔离Git负向矩阵、原始字节阈值不变、独立评审与最终CI",
-      "status": "open",
-      "evidenceIds": []
+      "mitigation": "中央范围/任务/风险证据登记经PR303独立复审和精确CI合并；不代表生产或身份观测风险关闭",
+      "status": "mitigated",
+      "evidenceIds": [
+        "EVD-GOV-011"
+      ]
     },
     {
       "id": "RISK-SEC-014",
@@ -845,6 +904,24 @@
   ],
   "tests": [
     {
+      "id": "TEST-OPS-038",
+      "kind": "existing-regression-baseline-before-scoped-implementation",
+      "path": "test/domain-task-ui-refresh.test.js",
+      "command": "node --test test/domain-task-ui-refresh.test.js"
+    },
+    {
+      "id": "TEST-OPS-037",
+      "kind": "existing-regression-baseline-before-scoped-implementation",
+      "path": "test/regional-clinical-document-retry-session.test.js",
+      "command": "node --test test/regional-clinical-document-retry-session.test.js"
+    },
+    {
+      "id": "TEST-GOV-012",
+      "kind": "existing-regression-baseline-before-scoped-implementation",
+      "path": "test/lifecycle-governance.test.js",
+      "command": "node --test test/lifecycle-governance.test.js"
+    },
+    {
       "id": "TEST-TEST-012",
       "kind": "existing-regression-baseline-before-scoped-implementation",
       "path": "test/platform-nonfunctional-readiness.test.js",
@@ -1104,6 +1181,16 @@
     }
   ],
   "evidence": [
+    {
+      "id": "EVD-GOV-011",
+      "scope": "repository-integration",
+      "type": "pull-request-ci",
+      "ref": "https://github.com/xujiann/chronic-care-platform/actions/runs/34701539073",
+      "testIds": [
+        "TEST-GOV-011"
+      ],
+      "productionEvidence": false
+    },
     {
       "id": "EVD-TEST-012",
       "scope": "repository-integration",
@@ -1537,7 +1624,7 @@
         "OPS-017",
         "OPS-018",
         "SEC-011",
-        "GOV-011"
+        "GOV-012"
       ],
       "evidenceIds": [
         "EVD-GOV-001",
@@ -1552,7 +1639,9 @@
       "status": "已集成",
       "gapTaskIds": [
         "OPS-017",
-        "SEC-014"
+        "SEC-014",
+        "OPS-037",
+        "OPS-038"
       ],
       "evidenceIds": [
         "EVD-GOV-001",
@@ -1604,7 +1693,7 @@
         "OPS-015",
         "OPS-017",
         "OPS-018",
-        "GOV-011"
+        "GOV-012"
       ],
       "evidenceIds": [
         "EVD-GOV-001",
@@ -1624,7 +1713,9 @@
         "OPS-017",
         "OPS-018",
         "SEC-011",
-        "GOV-011"
+        "GOV-012",
+        "OPS-037",
+        "OPS-038"
       ],
       "evidenceIds": [
         "EVD-GOV-001",
@@ -1633,6 +1724,181 @@
     }
   ],
   "tasks": [
+    {
+      "id": "OPS-038",
+      "title": "共享工作台读取代次隔离",
+      "ownerProcess": "T09",
+      "integrationOwner": "T00",
+      "taskStatus": "已批准",
+      "capabilityStatus": "未建设",
+      "riskLevel": "中",
+      "approval": {
+        "state": "approved",
+        "mode": "T00-plan-approval",
+        "ref": "T00-PLAN-OPS-038-APPROVED-2026-09-13",
+        "approvedScope": "domain-task-ui.js, test/domain-task-ui-refresh.test.js"
+      },
+      "requirementIds": [
+        "REQ-OPS-038"
+      ],
+      "regulatoryControlIds": [
+        "REG-GOV-001"
+      ],
+      "riskIds": [
+        "RISK-OPS-038"
+      ],
+      "decisionIds": [],
+      "dependencies": [
+        "GOV-011"
+      ],
+      "affectedModules": [
+        "domain-task-read-generation"
+      ],
+      "dataSensitivity": "浏览器业务快照，沿用既有授权与最小投影；不新增日志或敏感数据采集",
+      "acceptanceCriteria": [
+        "后发读取优先，旧成功/失败不改rows/render/status，当前失败清空",
+        "superseded刷新不报告已保存并刷新或刷新失败，不覆盖较新读取提示，保留五调用方及OPS035语义"
+      ],
+      "testIds": [
+        "TEST-OPS-038"
+      ],
+      "evidenceIds": [],
+      "rollback": "回退本任务独立提交并重跑相关门禁；无 migration，不回退服务端业务事实",
+      "unresolved": [
+        "仅浏览器局部可靠性修复；运行观测适用性及复用证据未核验，不据代码合并晋级完整能力"
+      ],
+      "worktree": ".codex-platform-worktrees/process-v2/t09-domain-task-read-generation-20260913",
+      "branch": "process/t09-domain-task-read-generation-20260913",
+      "planRef": "docs/lifecycle-governance.md#gov-012-读取代次修复-plan",
+      "pullRequestRef": "",
+      "ciRef": "",
+      "writeScopes": [
+        "domain-task-ui.js",
+        "test/domain-task-ui-refresh.test.js"
+      ],
+      "observability": {
+        "applicable": true,
+        "gaps": "待核验既有可观测性适用性和复用证据；不新增日志、指标或追踪，不冒充运行能力完成"
+      },
+      "runtimeCapability": true
+    },
+    {
+      "id": "OPS-037",
+      "title": "文书中心读取代次隔离",
+      "ownerProcess": "T08",
+      "integrationOwner": "T00",
+      "taskStatus": "已批准",
+      "capabilityStatus": "未建设",
+      "riskLevel": "中",
+      "approval": {
+        "state": "approved",
+        "mode": "T00-plan-approval",
+        "ref": "T00-PLAN-OPS-037-APPROVED-2026-09-13",
+        "approvedScope": "regional-clinical-documents.js, test/regional-clinical-document-retry-session.test.js"
+      },
+      "requirementIds": [
+        "REQ-OPS-037"
+      ],
+      "regulatoryControlIds": [
+        "REG-GOV-001"
+      ],
+      "riskIds": [
+        "RISK-OPS-037"
+      ],
+      "decisionIds": [],
+      "dependencies": [
+        "GOV-011"
+      ],
+      "affectedModules": [
+        "clinical-document-read-generation"
+      ],
+      "dataSensitivity": "浏览器业务快照，沿用既有授权与最小投影；不新增日志或敏感数据采集",
+      "acceptanceCriteria": [
+        "旧成功/失败不得覆盖最新center/source/banner，最新请求独占refresh状态",
+        "两event补传重叠GET保持最新快照，保留pending锁及file兼容"
+      ],
+      "testIds": [
+        "TEST-OPS-037"
+      ],
+      "evidenceIds": [],
+      "rollback": "回退本任务独立提交并重跑相关门禁；无 migration，不回退服务端业务事实",
+      "unresolved": [
+        "仅浏览器局部可靠性修复；运行观测适用性及复用证据未核验，不据代码合并晋级完整能力"
+      ],
+      "worktree": ".codex-platform-worktrees/process-v2/t08-clinical-document-read-generation-20260913",
+      "branch": "process/t08-clinical-document-read-generation-20260913",
+      "planRef": "docs/lifecycle-governance.md#gov-012-读取代次修复-plan",
+      "pullRequestRef": "",
+      "ciRef": "",
+      "writeScopes": [
+        "regional-clinical-documents.js",
+        "test/regional-clinical-document-retry-session.test.js"
+      ],
+      "observability": {
+        "applicable": true,
+        "gaps": "待核验既有可观测性适用性和复用证据；不新增日志、指标或追踪，不冒充运行能力完成"
+      },
+      "runtimeCapability": true
+    },
+    {
+      "id": "GOV-012",
+      "title": "读取代次修复组合登记",
+      "ownerProcess": "T00",
+      "integrationOwner": "T00",
+      "taskStatus": "已批准",
+      "capabilityStatus": "未建设",
+      "riskLevel": "中",
+      "approval": {
+        "state": "approved",
+        "mode": "T00-plan-approval",
+        "ref": "T00-PLAN-GOV-012-APPROVED-2026-09-13",
+        "approvedScope": "config/lifecycle-governance.json, docs/lifecycle-governance.md, ROADMAP.md"
+      },
+      "requirementIds": [
+        "REQ-GOV-012"
+      ],
+      "regulatoryControlIds": [
+        "REG-GOV-001"
+      ],
+      "riskIds": [
+        "RISK-GOV-012"
+      ],
+      "decisionIds": [],
+      "dependencies": [
+        "GOV-011"
+      ],
+      "affectedModules": [
+        "read-generation-portfolio"
+      ],
+      "dataSensitivity": "研发治理元数据",
+      "acceptanceCriteria": [
+        "登记两项独立范围、依赖与过期读取语义，保持单writer",
+        "以PR303真实证据关闭GOV011，不预支本批验收"
+      ],
+      "testIds": [
+        "TEST-GOV-012"
+      ],
+      "evidenceIds": [],
+      "rollback": "回退本任务独立提交并重跑相关门禁；无 migration，不回退服务端业务事实",
+      "unresolved": [
+        "待独立验证与集成"
+      ],
+      "worktree": ".codex-platform-worktrees/process-v2/t00-read-generation-portfolio-20260913",
+      "branch": "process/t00-read-generation-portfolio-20260913",
+      "planRef": "docs/lifecycle-governance.md#gov-012-读取代次修复-plan",
+      "pullRequestRef": "",
+      "ciRef": "",
+      "writeScopes": [
+        "config/lifecycle-governance.json",
+        "docs/lifecycle-governance.md",
+        "ROADMAP.md"
+      ],
+      "observability": {
+        "applicable": false,
+        "reason": "仅中央治理登记，不新增运行能力"
+      },
+      "runtimeCapability": false
+    },
     {
       "id": "TEST-012",
       "title": "九项预算资源确定性LF检出",
@@ -1699,8 +1965,8 @@
       "title": "预算资源LF治理组合登记",
       "ownerProcess": "T00",
       "integrationOwner": "T00",
-      "taskStatus": "已批准",
-      "capabilityStatus": "未建设",
+      "taskStatus": "已关闭",
+      "capabilityStatus": "已集成",
       "riskLevel": "中",
       "approval": {
         "state": "approved",
@@ -1732,16 +1998,16 @@
       "testIds": [
         "TEST-GOV-011"
       ],
-      "evidenceIds": [],
-      "rollback": "回退本任务独立提交并重跑相关门禁；无 migration，不回退服务端业务事实",
-      "unresolved": [
-        "待实施与独立验证；不改变生产准入"
+      "evidenceIds": [
+        "EVD-GOV-011"
       ],
+      "rollback": "回退本任务独立提交并重跑相关门禁；无 migration，不回退服务端业务事实",
+      "unresolved": [],
       "worktree": ".codex-platform-worktrees/process-v2/t00-budget-lf-portfolio-20260911",
       "branch": "process/t00-budget-lf-portfolio-20260911",
       "planRef": "docs/lifecycle-governance.md#gov-011-预算资源lf治理-plan",
-      "pullRequestRef": "",
-      "ciRef": "",
+      "pullRequestRef": "https://github.com/xujiann/chronic-care-platform/pull/303",
+      "ciRef": "https://github.com/xujiann/chronic-care-platform/actions/runs/34701539073",
       "writeScopes": [
         "config/lifecycle-governance.json",
         "docs/lifecycle-governance.md",

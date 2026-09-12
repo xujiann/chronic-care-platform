@@ -2,6 +2,19 @@
 
 ## 1. 权威边界
 
+### GOV-012 读取代次修复 PLAN
+
+- 2026-09-13 T00 准入：基线 `62e56918a94c927bfa4f9a36ff1847930ff238f3`，GOV-011 已由 PR303 / head 2e976b3a / CI34701539073 九项成功、独立 P2 关闭后合并。legacy 日志完整14批3374项、3373通过、1环境跳过、0失败；旧进程退出码未重新取得，不伪造。中央本批仅总账/本规范/ROADMAP三文件。
+- 用户继续开发授权下，T00批准两个新中风险兼容修复；不复用OPS035/036已关闭范围。GOV-012、OPS-037、OPS-038 WIP3/5，各依赖已关闭GOV011；从最新fetched origin/main经process:plan/create建立独立工作树，若基线改变先核验差异。
+- OPS-037 / T08：仅 regional-clinical-documents.js、test/regional-clinical-document-retry-session.test.js，分支 process/t08-clinical-document-read-generation-20260913。真实源码与既有harness内存deferred已复现4种乱序，包括两个event补传POST POST GET GET；诊断exit0代表缺陷复现，不是验收通过。
+- OPS-038 / T09：仅 domain-task-ui.js、test/domain-task-ui-refresh.test.js，分支 process/t09-domain-task-read-generation-20260913。真实源码/harness已复现5种乱序，包括action旧刷新复活快照并虚报刷新完成；每个action仅1个POST。
+- 实施语义：每个组件实例独立递增读取代次，只有当前代次能提交快照、source、render、错误/成功提示或解除refresh忙状态。旧成功、旧失败、旧finally均无UI副作用。同步发起新读取即令旧代次失效；file兼容也服从同一规则，不改变既有fallback策略。
+- 共享load保留当前成功/失败结果合同；过期读取返回显式 superseded（例如 ok:false, superseded:true），不是网络失败。runAction遇superseded不能声称保存并刷新，也不能写“刷新失败”覆盖新状态；较新load负责UI结果，禁止自动重发POST。仍保留当前真实刷新失败时OPS035的已保存但刷新失败提示。
+- 验收先持久RED后GREEN：后发先回、当前失败、旧失败/成功、渲染/归一化抛错、最新pending期间旧完成，以及两个文书event、action刷新与手工刷新重叠。保留事件pending锁、file兼容、五调用方、旧安全和成功路径断言；不改API、权限、幂等、PDF、schema、并发写命令语义。
+- 回滚各自独立提交，不删除业务数据。若发现需改候选范围外文件、读取期间撤权/动作安全新策略或无法保持旧提示合同，停在RED并回报T00，不顺手扩大。
+- 本轮仅准入开发与定向测试、独立审查；不要求立即推送/合并或重型全量。冻结补丁与RED/GREEN证据交接后由T00另行安排标准门禁、最终精确CI/legacy及串行集成，不豁免门禁。
+- 两项是浏览器运行时修复，observability明确适用且未核验；本批不制造完整日志/指标/SLO/现场证据，不据代码完成晋级已验证运行能力。生产六域NO-GO、GS、observer A/B及SEC012均不变且未获本批实施权限。
+
 ### GOV-011 预算资源LF治理 PLAN
 
 - 来源：用户要求继续开发并批准按计划分路实施；T00 批准本中风险登记及 TEST-012 精确范围。新基线 `origin/main@a9603e450bfbb5ef1144fe6b04da4566534463e5`；从最新 fetched origin/main 经 process:plan/create 建立独立工作树。GOV-010 已由 PR #301 / head `9b298620750040c826d95245eb855bfae8cdc4e3` / CI 34567441437 九项成功合并，本批据此关闭，不自证本批完成。
