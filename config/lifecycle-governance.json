@@ -443,8 +443,8 @@
       "level": "中",
       "owner": "T09",
       "mitigation": "精确三文件范围、隔离Git负向矩阵、原始字节阈值不变、独立评审与最终CI",
-      "status": "open",
-      "evidenceIds": []
+      "status": "mitigated",
+      "evidenceIds": ["EVD-TEST-012"]
     },
     {
       "id": "RISK-GOV-011",
@@ -469,9 +469,9 @@
       "title": "身份写入边界前置登记",
       "level": "中",
       "owner": "T00",
-      "mitigation": "Accepted ADR与人工确认，先RED后GREEN验证写前拒绝，独立评审及精确CI后集成",
-      "status": "open",
-      "evidenceIds": []
+      "mitigation": "仅指中央前置登记准确性风险；PR301独立评审、精确CI及合并证据已缓解。身份运行观测与后续实现风险仍由RISK-SEC-014等独立记录保留，不随本项缓解关闭",
+      "status": "mitigated",
+      "evidenceIds": ["EVD-GOV-010"]
     },
     {
       "id": "RISK-OPS-036",
