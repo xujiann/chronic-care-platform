@@ -14,7 +14,7 @@ function center(ids = ["event-a", "event-b"]) {
   };
 }
 
-function harness() {
+function harness({ protocol = "https:" } = {}) {
   class Element {
     constructor() { this.children = []; this.dataset = {}; this.listeners = {}; this.value = "all"; this.disabled = false; }
     append(...items) { this.children.push(...items); }
@@ -30,7 +30,7 @@ function harness() {
   };
   const requests = [];
   const context = {
-    location: { protocol: "https:", hostname: "platform.test" },
+    location: { protocol, hostname: "platform.test" },
     window: { HealthCityAuth: { getUser: () => ({ role: "commission" }) } },
     document: { querySelector: node, querySelectorAll: () => [], createElement: () => new Element() },
     fetch(url, options = {}) {
@@ -205,4 +205,155 @@ test("another completed refresh cannot unlock an event still awaiting its POST",
   assert.equal(h.requests.length, 2);
   h.requests[0].respond({}, 403);
   await first;
+});
+
+function view(h) {
+  return {
+    center: h.state.center,
+    source: h.state.source,
+    title: h.node("#document-source-title").textContent,
+    detail: h.node("#document-source-detail").textContent,
+    tone: h.node("#document-source-banner").dataset.tone,
+    refreshDisabled: h.node("#document-refresh").disabled,
+    metrics: h.node("#document-metrics").children,
+    exceptions: h.node("#document-exceptions").children
+  };
+}
+
+function completeRead(request, outcome, ids) {
+  if (outcome === "network") request.reject(new Error("synthetic read failure"));
+  else if (outcome === "http") request.respond({ message: "synthetic read rejection" }, 403);
+  else request.respond(center(ids));
+}
+
+for (const latestOutcome of ["success", "network", "http"]) {
+  for (const oldOutcome of ["success", "network", "http"]) {
+    test(`latest ${latestOutcome} view survives late old ${oldOutcome} without rerender`, async () => {
+      const h = harness();
+      const old = h.load();
+      const latest = h.load();
+      completeRead(h.requests[1], latestOutcome, ["new-event"]);
+      await latest;
+      assert.equal(h.state.source, latestOutcome === "success" ? "api" : "fallback");
+      if (latestOutcome === "success") assert.equal(h.state.center.exceptions[0].id, "new-event");
+      const expected = view(h);
+      // A superseded finally must not call render, even if rendering would fail.
+      h.node("#document-metrics").replaceChildren = () => { throw new Error("stale render executed"); };
+      completeRead(h.requests[0], oldOutcome, ["old-event"]);
+      await old;
+      assert.deepEqual(view(h), expected);
+    });
+  }
+}
+
+for (const oldOutcome of ["success", "network", "http"]) {
+  test(`old ${oldOutcome} completion cannot change the latest pending view or refresh button`, async () => {
+    const h = harness();
+    const old = h.load();
+    const latest = h.load();
+    const pending = view(h);
+    assert.equal(pending.refreshDisabled, true);
+    completeRead(h.requests[0], oldOutcome, ["old-event"]);
+    await old;
+    assert.deepEqual(view(h), pending);
+    h.requests[1].respond(center(["new-event"]));
+    await latest;
+    assert.equal(h.node("#document-refresh").disabled, false);
+    assert.equal(h.state.center.exceptions[0].id, "new-event");
+  });
+}
+
+test("two actual event retries retain the newest GET and independent event locks", async () => {
+  const h = harness();
+  const a = h.retryDocument("event-a");
+  const b = h.retryDocument("event-b");
+  h.requests[0].respond({});
+  await flush();
+  h.requests[1].respond({});
+  await flush();
+  assert.deepEqual(h.requests.map((request) => request.options.method || "GET"), ["POST", "POST", "GET", "GET"]);
+  const newest = center();
+  newest.summary.documents = 42;
+  h.requests[3].respond(newest);
+  await b;
+  assert.equal(h.buttons().find((button) => button.dataset.documentRetry === "event-a").disabled, true);
+  assert.equal(h.buttons().find((button) => button.dataset.documentRetry === "event-b").disabled, false);
+  h.retryDocument("event-a");
+  assert.equal(h.requests.length, 4);
+  h.requests[2].respond(center());
+  await a;
+  assert.equal(h.state.center.summary.documents, 42);
+  assert.equal(h.buttons().every((button) => !button.disabled), true);
+  assert.equal(h.requests.length, 4);
+});
+
+test("superseded retry refresh releases only its event lock while manual refresh stays busy", async () => {
+  const h = harness();
+  const retry = h.retryDocument("event-a");
+  h.requests[0].respond({});
+  await flush();
+  const latest = h.load();
+  const pendingTitle = h.node("#document-source-title").textContent;
+  h.requests[1].respond(center(["old-event"]));
+  await retry;
+  assert.equal(h.node("#document-refresh").disabled, true);
+  assert.equal(h.node("#document-source-title").textContent, pendingTitle);
+  assert.equal(h.state.center.exceptions[0].id, "event-a");
+  assert.equal(h.buttons()[0].disabled, false);
+  h.requests[2].respond(center(["new-event"]));
+  await latest;
+  assert.equal(h.state.center.exceptions[0].id, "new-event");
+});
+
+test("latest malformed scope keeps existing fallback and a later read can recover", async () => {
+  const h = harness();
+  const malformed = h.load();
+  h.requests[0].respond({ ...center(), scope: null });
+  await malformed;
+  assert.equal(h.state.source, "fallback");
+  assert.equal(h.node("#document-refresh").disabled, false);
+  const recovery = h.load();
+  h.requests[1].respond(center());
+  await recovery;
+  assert.equal(h.state.source, "api");
+});
+
+test("latest render failure keeps refresh releasable and does not poison subsequent reads", async () => {
+  const h = harness();
+  const node = h.node("#document-metrics");
+  const replace = node.replaceChildren;
+  node.replaceChildren = () => { throw new Error("synthetic current render failure"); };
+  const failed = h.load();
+  h.requests[0].respond(center());
+  await assert.rejects(failed, /synthetic current render failure/);
+  assert.equal(h.node("#document-refresh").disabled, false);
+  node.replaceChildren = replace;
+  const recovery = h.load();
+  h.requests[1].respond(center(["recovered-event"]));
+  await recovery;
+  assert.equal(h.state.center.exceptions[0].id, "recovered-event");
+});
+
+test("file reads remain read-only fallback without network or retry commands", async () => {
+  const h = harness({ protocol: "file:" });
+  await h.load();
+  await h.load();
+  assert.equal(h.state.source, "fallback");
+  assert.equal(h.node("#document-refresh").disabled, false);
+  assert.equal(h.buttons().length, 0);
+  await h.retryDocument("event-a");
+  assert.equal(h.requests.length, 0);
+});
+
+test("read generations are local to each document center instance", async () => {
+  const a = harness();
+  const b = harness();
+  const aLoad = a.load();
+  const bLoad = b.load();
+  b.requests[0].respond(center(["b-event"]));
+  await bLoad;
+  a.requests[0].respond(center(["a-event"]));
+  await aLoad;
+  assert.equal(a.state.center.exceptions[0].id, "a-event");
+  assert.equal(b.state.center.exceptions[0].id, "b-event");
 });
