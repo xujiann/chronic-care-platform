@@ -1206,6 +1206,14 @@
   ],
   "evidence": [
     {
+      "id": "EVD-GOV-012-COMBINATION-LOCAL",
+      "type": "frozen-local-combination-gates-with-retained-failure",
+      "scope": "tested SHA 6e92bf5d411bd800520d6d799641b3a6b929eff7; unit3050pass1skip,integration381pass,smoke6pass,legacy3431pass1skip; 完整E2E exit1:根60pass,居民12pass1fail; PWA独立3pass; 组合验收未通过,非远端CI或生产证据",
+      "ref": "C:/Users/drxuj/Temp/gov012-combination-6e92bf5d-final-results.log",
+      "testIds": ["TEST-GOV-012", "TEST-OPS-037", "TEST-OPS-038", "TEST-OPS-039"],
+      "productionEvidence": false
+    },
+    {
       "id": "EVD-OPS-039-LOCAL",
       "type": "frozen-local-implementation-review-and-tests",
       "scope": "OPS-039@69da897af3ec847d4717409204ca3fec3ba66de6; 23专项及76浏览器通过; 不替代组合或生产证据",
@@ -1791,7 +1799,7 @@
       "dataSensitivity": "浏览器既有身份最小投影；不新增凭据或敏感数据采集",
       "acceptanceCriteria": ["在线认证pending、失败和缺失对象均不初始化业务", "消费现有allowed信号并核验现有角色账户守卫，单次启动且保持明确静态预览边界", "完整源码确定性测试及延迟真实身份上下文E2E保持签收分离和导航壳兼容"],
       "testIds": ["TEST-OPS-039"],
-      "evidenceIds": ["EVD-OPS-039-LOCAL"],
+      "evidenceIds": ["EVD-OPS-039-LOCAL", "EVD-GOV-012-COMBINATION-LOCAL"],
       "rollback": "回退独立子站提交并重跑门禁；无迁移，不删除业务数据",
       "unresolved": ["共享auth异常清投影生命周期不在本范围", "运行观测适用性及复用证据尚未核验，生产NO-GO不变"],
       "worktree": ".codex-platform-worktrees/process-v2/t01-digital-hospital-auth-start-20260914",
@@ -1841,7 +1849,7 @@
       "testIds": [
         "TEST-OPS-038"
       ],
-      "evidenceIds": ["EVD-OPS-038-LOCAL"],
+      "evidenceIds": ["EVD-OPS-038-LOCAL", "EVD-GOV-012-COMBINATION-LOCAL"],
       "rollback": "回退本任务独立提交并重跑相关门禁；无 migration，不回退服务端业务事实",
       "unresolved": [
         "仅浏览器局部可靠性修复；运行观测适用性及复用证据未核验，不据代码合并晋级完整能力"
@@ -1899,7 +1907,7 @@
       "testIds": [
         "TEST-OPS-037"
       ],
-      "evidenceIds": ["EVD-OPS-037-LOCAL"],
+      "evidenceIds": ["EVD-OPS-037-LOCAL", "EVD-GOV-012-COMBINATION-LOCAL"],
       "rollback": "回退本任务独立提交并重跑相关门禁；无 migration，不回退服务端业务事实",
       "unresolved": [
         "仅浏览器局部可靠性修复；运行观测适用性及复用证据未核验，不据代码合并晋级完整能力"
@@ -1959,10 +1967,11 @@
       "testIds": [
         "TEST-GOV-012"
       ],
-      "evidenceIds": [],
+      "evidenceIds": ["EVD-GOV-012-COMBINATION-LOCAL"],
       "rollback": "回退本任务独立提交并重跑相关门禁；无 migration，不回退服务端业务事实",
       "unresolved": [
-        "独立来源已冻结，组合候选验证中；待远端精确CI与main集成，未获推送PR合并上线权限"
+        "组合6e92bf5d完整E2E退出1：居民端超时重试场景失败，追踪已保留；后续居民测试修复需独立PLAN与审批",
+        "原OPS037失败保留，组合根E2E60通过仅证明组合候选；待远端精确CI与main集成，未获推送PR合并上线权限"
       ],
       "worktree": ".codex-platform-worktrees/process-v2/t00-read-generation-combination-20260914",
       "branch": "process/t00-read-generation-combination-20260914",
