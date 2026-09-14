@@ -348,17 +348,29 @@ test("non-manager commission reset is denied before seed or storage access", asy
 });
 
 test("manager reset response removes authentication secrets without mutating persisted state", async () => {
+  const calls = [];
   const seeded = {
     authUsers: [{ id: "u-manager", password: "plaintext-marker", passwordHash: "hash-marker" }],
     securityEvents: []
   };
   let persisted = null;
   const runtime = {
-    requireApiRole: () => ({ name: "manager", role: "commission", accountType: "manager" }),
-    seedState: () => structuredClone(seeded),
+    requireApiRole: () => {
+      calls.push("authorize");
+      return { name: "manager", role: "commission", accountType: "manager" };
+    },
+    readDatabase: () => {
+      calls.push("read");
+      return { accessAcknowledgements: [] };
+    },
+    seedState: () => {
+      calls.push("seed");
+      return structuredClone(seeded);
+    },
     prependAuditTrailEntry: (rows, entry) => [entry, ...rows],
     randomUUID: () => "reset-audit-id",
     writeDatabase(data) {
+      calls.push("write");
       persisted = structuredClone(data);
     },
     sendJson(res, statusCode, body) {
@@ -380,6 +392,38 @@ test("manager reset response removes authentication secrets without mutating per
   assert.equal(response.body.authUsers[0].passwordHash, undefined);
   assert.equal(persisted.authUsers[0].password, "plaintext-marker");
   assert.equal(persisted.authUsers[0].passwordHash, "hash-marker");
+  assert.deepEqual(calls, ["authorize", "read", "seed", "write"]);
+});
+
+test("manager reset reads retained declarations before refusing seed and persistence", async () => {
+  for (const accessAcknowledgements of [undefined, null, {}, [{ id: "retained-declaration" }]]) {
+    const calls = [];
+    const current = { accessAcknowledgements };
+    const before = structuredClone(current);
+    const runtime = {
+      requireApiRole() {
+        calls.push("authorize");
+        return { name: "manager", role: "commission", accountType: "manager" };
+      },
+      readDatabase() { calls.push("read"); return current; },
+      seedState() { assert.fail("blocked reset must not load seed"); },
+      writeDatabase() { assert.fail("blocked reset must not persist"); },
+      sendJson(res, statusCode, body) {
+        calls.push("respond");
+        res.statusCode = statusCode;
+        res.body = body;
+      }
+    };
+    const response = responseDouble();
+    const handled = await createRouteSegments(runtime, { environment: { NODE_ENV: "test" } })[2].handle(
+      { method: "POST", headers: {} }, response, new URL("http://local/api/reset")
+    );
+    assert.equal(handled, true);
+    assert.equal(response.statusCode, 409);
+    assert.equal(response.body.code, "CARE_ACCESS_ACK_RESET_BLOCKED");
+    assert.deepEqual(calls, ["authorize", "read", "respond"]);
+    assert.deepEqual(current, before);
+  }
 });
 
 test("GET /api/state stops before reading state when authorization is denied", async () => {
