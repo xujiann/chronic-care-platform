@@ -1206,6 +1206,14 @@
   ],
   "evidence": [
     {
+      "id": "EVD-GOV-012-EVIDENCE-RECHECK-FAILURE",
+      "type": "metadata-only-commit-governance-recheck-with-retained-failure",
+      "scope": "3da30ea9f5322fe5391e869a88c1eaee73a3ae5e相对6e92bf5d仅中央三文件; iterations97pass1fail exit1:监控journal路径替换未抛预期异常; 其余中央六项和独立processverify通过; 未确认环境或测试根因",
+      "ref": "C:/Users/drxuj/Temp/gov012-combination-evidence-results.log",
+      "testIds": ["TEST-GOV-012"],
+      "productionEvidence": false
+    },
+    {
       "id": "EVD-GOV-012-COMBINATION-LOCAL",
       "type": "frozen-local-combination-gates-with-retained-failure",
       "scope": "tested SHA 6e92bf5d411bd800520d6d799641b3a6b929eff7; unit3050pass1skip,integration381pass,smoke6pass,legacy3431pass1skip; 完整E2E exit1:根60pass,居民12pass1fail; PWA独立3pass; 组合验收未通过,非远端CI或生产证据",
@@ -1967,9 +1975,10 @@
       "testIds": [
         "TEST-GOV-012"
       ],
-      "evidenceIds": ["EVD-GOV-012-COMBINATION-LOCAL"],
+      "evidenceIds": ["EVD-GOV-012-COMBINATION-LOCAL", "EVD-GOV-012-EVIDENCE-RECHECK-FAILURE"],
       "rollback": "回退本任务独立提交并重跑相关门禁；无 migration，不回退服务端业务事实",
       "unresolved": [
+        "证据提交3da30ea9的iterations路径替换安全断言失败，须独立诊断与新精确PLAN；不以旧通过覆盖或认定为flaky",
         "组合6e92bf5d完整E2E退出1：居民端超时重试场景失败，追踪已保留；后续居民测试修复需独立PLAN与审批",
         "原OPS037失败保留，组合根E2E60通过仅证明组合候选；待远端精确CI与main集成，未获推送PR合并上线权限"
       ],

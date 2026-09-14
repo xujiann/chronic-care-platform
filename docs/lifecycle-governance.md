@@ -22,6 +22,13 @@
 - 首轮日志汇总命令发生PowerShell参数错误而主动中止，原片段保留；修复记录命令后以final前缀重跑全部门禁，项目代码未变。不将中断片段或独立PWA通过伪装成完整命令成功。
 - 四任务保持验证中/已实现，WIP4/5，未关闭、未集成、六域NO-GO不变。该段为纯证据收口，重型证据只绑定上述tested SHA；后续记录提交仅三份中央元数据，另行独立审查及治理门禁。下一建议是独立审批居民测试确定性切片，保留首请求真实超时、重试计数和主体范围断言，不改运行时失败关闭策略；本轮未授权该修复。
 
+#### 证据提交复查：新增安全断言失败
+
+- 纯证据提交3da30ea9f5322fe5391e869a88c1eaee73a3ae5e通过独立审查，差异仅中央三文件；其后中央复查的platform:iterations:test为97通过/1失败、exit1。失败在test/platform-preproduction-control-cli.test.js:705，测试在open前替换两个空日志文件，未出现预期PILOT_CUTOVER_ALERT_JOURNAL_BOUNDARY_INVALID。其余生命周期、文档、路由检查/测试、架构、process:test六项通过，process:verify独立补跑通过；不能称收口门禁全部通过。
+- 原6e92bf5d的iterations98通过仅属于此前执行，不能注销新失败。证据台账C:/Users/drxuj/Temp/gov012-combination-evidence-results.log，失败日志gov012-combination-evidence-platform-iterations-test.log。相关读取器与测试未变不等于证明环境偶发、测试缺陷或无安全影响。
+- 只读定位到pilot-cutover-alert-lifecycle.js以lstat/open/fstat的dev/ino及size核对文件身份。失败现场未记录stat，文件标识精度或复用仅为待验证假设；不据当前源码文件采样判断失败fixture。下一应优先独立诊断路径替换拒绝行为，形成精确安全PLAN，必要时审批读取器与对应测试修复；不放宽断言、不修改相邻边界。
+- 四任务仍验证中/已实现，两个失败并存。后续纯元数据记录只复核生命周期/文档/所有权与diff，已失败iterations保持未解决，不声称再次执行或通过；所有远端与生产操作仍未授权。
+
 ### OPS-039 数字医院认证就绪启动 PLAN
 
 - 2026-09-14：用户已批准新问题方向，并明确授权当前协调者本轮临时承担 T00 准入登记与分工调度。中央沿用 GOV-012 三文件单写范围；不接管领域实现，不推送、PR、合并或上线。已有 OPS-037/038 冻结不动，中央未合入 main 的状态不冒充已集成。
