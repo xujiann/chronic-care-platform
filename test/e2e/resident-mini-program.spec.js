@@ -184,6 +184,10 @@ test("message receipt failures roll back without claiming local success", async 
 });
 
 test("slow service shows a Chinese timeout gate and retry restores the app", async ({ page }) => {
+  // Control the application's real timers without imposing a wall-clock HTTP budget.
+  const clockStart = Date.now();
+  await page.clock.install({ time: clockStart });
+  await page.clock.pauseAt(clockStart + 1000);
   await page.addInitScript(() => {
     window.__RESIDENT_MINI_PROGRAM_TIMEOUT_MS__ = 500;
   });
@@ -191,6 +195,10 @@ test("slow service shows a Chinese timeout gate and retry restores the app", asy
   let stateRequestCount = 0;
   let releaseFirstStateRequest;
   let finishFirstStateRequest;
+  let signalFirstStateArrival;
+  const firstStateArrival = new Promise((resolve) => {
+    signalFirstStateArrival = resolve;
+  });
   const firstStateRequestBlocked = new Promise((resolve) => {
     releaseFirstStateRequest = resolve;
   });
@@ -202,6 +210,7 @@ test("slow service shows a Chinese timeout gate and retry restores the app", asy
     const isFirstRequest = stateRequestCount === 1;
     try {
       if (isFirstRequest) {
+        signalFirstStateArrival(route.request());
         await firstStateRequestBlocked;
       }
       await route.continue();
@@ -210,16 +219,27 @@ test("slow service shows a Chinese timeout gate and retry restores the app", asy
     }
   });
   await page.goto("/resident-mini-program.html");
+  const firstRequest = await firstStateArrival;
+  const firstRequestFailed = page.waitForEvent("requestfailed", {
+    predicate: (request) => request === firstRequest
+  });
+  await page.clock.runFor(500);
 
   await expect(page.locator("#gate-title")).toHaveText("安全连接超时");
   await expect(page.locator("#app-content")).toBeHidden();
   releaseFirstStateRequest();
   await firstStateRequestFinished;
+  const failedRequest = await firstRequestFailed;
+  expect(failedRequest.failure()?.errorText).toMatch(/aborted/i);
+  expect(stateRequestCount).toBe(1);
+  // Leave timers paused while the retry consumes real server responses.
   await page.locator("#gate-retry").click();
   await expect.poll(() => stateRequestCount).toBe(2);
   await expect(page.locator("#app-content")).toBeVisible();
   await expect(page.locator("#page-home")).toBeVisible();
   expect(await page.evaluate(() => window.ResidentMiniProgramApp.getState())).toMatchObject({
+    residentId: "r1",
+    allowedResidentIds: ["r1"],
     recovering: false,
     retryQueued: false
   });
