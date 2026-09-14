@@ -312,7 +312,14 @@ test("resident uses the V2 care workspace for correction, one-time sharing and a
   });
   await page.route("**/api/access-reviews/*/acknowledge", async (route) => {
     const body = JSON.parse(route.request().postData() || "{}");
-    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ...body, receiptId: "receipt-access-ack", auditRef: "audit-access-ack" }) });
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({
+      schemaVersion: "resident-access-acknowledgement.v1",
+      id: "server-access-ack", residentId: body.residentId,
+      accessLogId: body.accessLogId, resourceId: body.accessLogId,
+      decision: "recognized", status: "accepted", syncStatus: "accepted",
+      acknowledgedAt: "2026-09-14T10:00:00.000Z", acceptedAt: "2026-09-14T10:00:00.000Z",
+      receiptId: "receipt-access-ack", auditRef: "audit-access-ack"
+    }) });
   });
   await page.route("**/api/access-reviews/*/disputes", async (route) => {
     const body = JSON.parse(route.request().postData() || "{}");
