@@ -889,6 +889,7 @@ function createRouteSegments(runtime, options = {}) {
             }
             const result = await runtime.accessAcknowledgementCommand({
               user,
+              session: req.authResolution?.session,
               accessLogId: decodeURIComponent(accessAcknowledgementMatch[1]),
               payload: await collectJson(req),
               idempotencyKey: req.headers["idempotency-key"]

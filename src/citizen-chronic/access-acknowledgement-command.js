@@ -53,8 +53,8 @@ function validStoredRows(rows) {
   return true;
 }
 
-function createAccessAcknowledgementCommand({ readDatabase, writeDatabase, queryResidentAccessEvent, appendSecurityAudit, verifyAuditTrail, getRuntimePolicy, now = () => new Date(), randomUUID = createId } = {}) {
-  for (const [name, port] of Object.entries({ readDatabase, writeDatabase, queryResidentAccessEvent, appendSecurityAudit, verifyAuditTrail, getRuntimePolicy, now, randomUUID })) {
+function createAccessAcknowledgementCommand({ readDatabase, writeDatabase, queryResidentAccessEvent, validateAuthorization, appendSecurityAudit, verifyAuditTrail, getRuntimePolicy, now = () => new Date(), randomUUID = createId } = {}) {
+  for (const [name, port] of Object.entries({ readDatabase, writeDatabase, queryResidentAccessEvent, validateAuthorization, appendSecurityAudit, verifyAuditTrail, getRuntimePolicy, now, randomUUID })) {
     if (typeof port !== "function") throw new TypeError(`${name} port must be a function`);
   }
 
@@ -64,7 +64,7 @@ function createAccessAcknowledgementCommand({ readDatabase, writeDatabase, query
     if (policy?.production !== false || !["json", "sqlite"].includes(policy.storageMode)) fail("STORAGE_UNSUPPORTED", 503, "当前环境不支持此声明命令");
   }
 
-  return async function execute({ user, accessLogId, payload, idempotencyKey } = {}) {
+  return async function execute({ user, session, accessLogId, payload, idempotencyKey } = {}) {
     requireEnvironment();
     if (user?.role !== "citizen" || !exactText(user.id || user.username, 120) || !exactText(user.residentId, 120)) {
       fail("FORBIDDEN", 403, "仅居民本人可以提交访问知晓声明");
@@ -90,7 +90,16 @@ function createAccessAcknowledgementCommand({ readDatabase, writeDatabase, query
     return withStateCommandLock("citizen-chronic:accessAcknowledgements", async () => {
       requireEnvironment();
       let data;
-      try { data = await readDatabase(); } catch { fail("STORAGE_FAILED", 503, "声明存储读取失败"); }
+      try { data = readDatabase(); } catch { fail("STORAGE_FAILED", 503, "声明存储读取失败"); }
+      // Raw read and live authorization are synchronous within the collection lock.
+      // Never trust the principal captured before the HTTP request body completed.
+      try {
+        if (!exactText(session?.sessionId, 128) || data?.then) throw new Error("synchronous session validation required");
+        const validation = validateAuthorization({ data, user, session });
+        if (validation === false || validation?.then) throw new Error("synchronous session validation required");
+      } catch {
+        fail("FORBIDDEN", 403, "当前会话或本人身份已失效");
+      }
       let auditIntact = false;
       try { auditIntact = Array.isArray(data?.securityEvents) && verifyAuditTrail(data.securityEvents).passed === true; } catch { /* reject without resealing */ }
       if (!validStoredRows(data?.accessAcknowledgements) || !auditIntact) fail("STORED_STATE_INVALID", 409, "现有声明或审计无法验证，未修改历史记录");
