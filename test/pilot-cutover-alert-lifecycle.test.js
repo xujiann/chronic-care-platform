@@ -20,10 +20,163 @@ const {
 const NOW = "2030-08-04T12:00:00.000Z";
 const DIGEST = `sha256:${"a".repeat(64)}`;
 
+// Model host stat precision, not the reader's identity validation algorithm.
+function journalStatHost(file, overrides = {}, failureStage = "") {
+  const calls = [];
+  let paths = 0;
+  let descriptors = 0;
+  let closes = 0;
+  let reads = 0;
+  const identity = 9007199254740992n;
+  const project = (stage, options) => {
+    calls.push({ stage, bigint: options?.bigint === true });
+    if (stage === failureStage) throw new Error("injected stat failure");
+    const values = { dev: identity, ino: identity, size: 1n, ...overrides[stage] };
+    return {
+      ...Object.fromEntries(Object.entries(values).map(([key, value]) =>
+        [key, options?.bigint === true ? value : Number(value)])),
+      isFile: () => true,
+      isSymbolicLink: () => false
+    };
+  };
+  const fileSystem = new Proxy(fs, {
+    get(target, property) {
+      if (property === "lstatSync") return (targetFile, options) => {
+        assert.equal(targetFile, file);
+        return project(paths++ === 0 ? "initial" : "current", options);
+      };
+      if (property === "fstatSync") return (_descriptor, options) =>
+        project(descriptors++ === 0 ? "opened" : "finished", options);
+      if (property === "readSync") return (...args) => {
+        reads += 1;
+        if (failureStage === "read") throw new Error("injected read failure");
+        return fs.readSync(...args);
+      };
+      if (property === "closeSync") return (descriptor) => {
+        closes += 1;
+        return fs.closeSync(descriptor);
+      };
+      return Reflect.get(target, property);
+    }
+  });
+  return { fileSystem, calls, closes: () => closes, reads: () => reads };
+}
+
+for (const stage of ["opened", "current", "finished"]) {
+  for (const field of ["dev", "ino"]) {
+    test(`journal rejects Number-colliding ${field} at ${stage} and closes the descriptor`, (t) => {
+      const file = withJournal(t);
+      fs.writeFileSync(file, "\n");
+      const first = 9007199254740992n;
+      const replacement = first + 1n;
+      assert.notEqual(first, replacement);
+      assert.equal(Number(first), Number(replacement));
+      const host = journalStatHost(file, { [stage]: { [field]: replacement } });
+      assert.throws(() => readPilotCutoverAlertJournal(file, { fileSystem: host.fileSystem }),
+        (error) => error.code === "PILOT_CUTOVER_ALERT_JOURNAL_BOUNDARY_INVALID");
+      assert.equal(host.closes(), 1);
+      assert.ok(host.calls.some((call) => call.stage === stage));
+      if (stage !== "finished") assert.equal(host.reads(), 0);
+    });
+  }
+}
+
+test("journal accepts identical large bigint identities at all observations", (t) => {
+  const file = withJournal(t);
+  fs.writeFileSync(file, "\n");
+  const host = journalStatHost(file);
+  assert.deepEqual(readPilotCutoverAlertJournal(file, { fileSystem: host.fileSystem }), []);
+  assert.deepEqual(host.calls, ["initial", "opened", "current", "finished"]
+    .map((stage) => ({ stage, bigint: true })));
+  assert.equal(host.closes(), 1);
+  assert.ok(host.reads() > 0);
+});
+
+for (const stage of ["initial", "opened", "current", "finished"]) {
+  for (const size of [-1n, 4194305n, 9007199254740993n]) {
+    test(`journal rejects ${stage} size ${size} without leaking a descriptor`, (t) => {
+      const file = withJournal(t);
+      fs.writeFileSync(file, "\n");
+      const host = journalStatHost(file, { [stage]: { size } });
+      assert.throws(() => readPilotCutoverAlertJournal(file, { fileSystem: host.fileSystem }),
+        (error) => error.code === "PILOT_CUTOVER_ALERT_JOURNAL_BOUNDARY_INVALID");
+      assert.equal(host.closes(), stage === "initial" ? 0 : 1);
+      if (stage !== "finished") assert.equal(host.reads(), 0);
+    });
+  }
+}
+
+for (const stage of ["opened", "current", "read", "finished"]) {
+  test(`journal closes its descriptor after a ${stage} host exception`, (t) => {
+    const file = withJournal(t);
+    fs.writeFileSync(file, "\n");
+    const host = journalStatHost(file, {}, stage);
+    assert.throws(() => readPilotCutoverAlertJournal(file, { fileSystem: host.fileSystem }),
+      (error) => error.code === "PILOT_CUTOVER_ALERT_JOURNAL_BOUNDARY_INVALID");
+    assert.equal(host.closes(), 1);
+  });
+}
+
+for (const stage of ["initial", "opened", "current", "finished"]) {
+  for (const field of ["dev", "ino", "size"]) {
+    test(`journal rejects a lossy Number ${field} returned for bigint ${stage}`, (t) => {
+      const file = withJournal(t);
+      fs.writeFileSync(file, "\n");
+      const host = journalStatHost(file, { [stage]: { [field]: field === "size" ? 1 : 9007199254740992 } });
+      assert.throws(() => readPilotCutoverAlertJournal(file, { fileSystem: host.fileSystem }),
+        (error) => error.code === "PILOT_CUTOVER_ALERT_JOURNAL_BOUNDARY_INVALID");
+      assert.equal(host.closes(), stage === "initial" ? 0 : 1);
+    });
+  }
+}
+
 function withJournal(t) {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), "cutover-alerts-"));
   t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
   return path.join(directory, "alerts.ndjson");
+}
+
+test("journal accepts the exact byte limit with precise stat identity", (t) => {
+  const file = withJournal(t);
+  fs.writeFileSync(file, Buffer.alloc(4194304, 0x20));
+  const sizes = Object.fromEntries(["initial", "opened", "current", "finished"]
+    .map((stage) => [stage, { size: 4194304n }]));
+  const host = journalStatHost(file, sizes);
+  assert.deepEqual(readPilotCutoverAlertJournal(file, { fileSystem: host.fileSystem }), []);
+  assert.equal(host.closes(), 1);
+});
+
+for (const mutation of ["append", "truncate"]) {
+  test(`journal rejects a real ${mutation} during reading and closes its descriptor`, (t) => {
+    const file = withJournal(t);
+    fs.writeFileSync(file, "\n");
+    let changed = false;
+    let closes = 0;
+    let openedDescriptor;
+    const fileSystem = new Proxy(fs, {
+      get(target, property) {
+        if (property === "readSync") return (...args) => {
+          if (!changed) {
+            changed = true;
+            if (mutation === "append") fs.appendFileSync(file, "\n");
+            else fs.truncateSync(file, 0);
+          }
+          return fs.readSync(...args);
+        };
+        if (property === "closeSync") return (descriptor) => {
+          closes += 1;
+          openedDescriptor = descriptor;
+          return fs.closeSync(descriptor);
+        };
+        return Reflect.get(target, property);
+      }
+    });
+    assert.throws(() => readPilotCutoverAlertJournal(file, { fileSystem }),
+      (error) => error.code === "PILOT_CUTOVER_ALERT_JOURNAL_BOUNDARY_INVALID");
+    assert.equal(changed, true);
+    assert.equal(closes, 1);
+    assert.throws(() => fs.fstatSync(openedDescriptor), (error) => error.code === "EBADF");
+  });
 }
 
 function controlFixture() {

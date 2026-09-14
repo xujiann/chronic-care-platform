@@ -717,6 +717,69 @@ test("monitoring journal rejects oversized, symlinked and path-swapped inputs", 
   }
 });
 
+test("monitoring rejects exact journal identity swaps hidden by Number projection", (t) => {
+  const directory = fixtureDirectory(t);
+  const journal = path.join(directory, "journal-precise-identity.jsonl");
+  fs.writeFileSync(journal, "");
+  const input = writeJson(directory, "monitoring-precise-identity.json",
+    createMonitoringAcceptance(ALERT_GENESIS_DIGEST));
+  const originalIdentity = 9007199254740992n;
+  const replacementIdentity = originalIdentity + 1n;
+  assert.equal(Number(originalIdentity), Number(replacementIdentity));
+  let journalDescriptor;
+  let opened = false;
+  let closes = 0;
+  let reads = 0;
+  const project = (stat, options, identity) => ({
+    ...stat,
+    ino: options?.bigint === true ? identity : Number(identity),
+    isFile: () => stat.isFile(),
+    isSymbolicLink: () => stat.isSymbolicLink()
+  });
+  const fileSystem = new Proxy(fs, {
+    get(target, property) {
+      if (property === "lstatSync") return (file, options) => {
+        const stat = fs.lstatSync(file, options);
+        return file === journal
+          ? project(stat, options, opened ? replacementIdentity : originalIdentity)
+          : stat;
+      };
+      if (property === "openSync") return (...args) => {
+        const descriptor = fs.openSync(...args);
+        if (args[0] === journal) {
+          opened = true;
+          journalDescriptor = descriptor;
+        }
+        return descriptor;
+      };
+      if (property === "fstatSync") return (descriptor, options) => {
+        const stat = fs.fstatSync(descriptor, options);
+        return descriptor === journalDescriptor ? project(stat, options, replacementIdentity) : stat;
+      };
+      if (property === "readSync") return (...args) => {
+        if (args[0] === journalDescriptor) reads += 1;
+        return fs.readSync(...args);
+      };
+      if (property === "closeSync") return (descriptor) => {
+        if (descriptor === journalDescriptor) {
+          closes += 1;
+          journalDescriptor = undefined;
+        }
+        return fs.closeSync(descriptor);
+      };
+      return Reflect.get(target, property);
+    }
+  });
+  assert.throws(() => run({
+    command: "monitoring",
+    options: { journal, input, "release-id": "release-20260804", "package-fingerprint": PACKAGE }
+  }, { now: NOW, fileSystem }),
+  (error) => error.code === "PILOT_CUTOVER_ALERT_JOURNAL_BOUNDARY_INVALID");
+  assert.equal(opened, true);
+  assert.equal(closes, 1);
+  assert.equal(reads, 0);
+});
+
 test("argument and runtime errors use a stable redacted exit-1 projection", () => {
   const secret = "C:\\sensitive\\patient-token.json";
   const argumentResult = spawnSync(process.execPath, [
