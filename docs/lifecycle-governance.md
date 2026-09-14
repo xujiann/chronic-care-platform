@@ -11,7 +11,10 @@
 - 先持久化确定性RED：不同精确身份映射同Number、相同身份成功、各观测点替换拒绝、巨大/负size、原文件/链接/读中变长、异常与关闭。100次真实替换均拒绝且68次inode非安全整数；单项内存碰撞旧reader错误接受是机制证据，不宣称原失败已归因。原诊断日志位于Temp/journal-path-swap-diagnostic-20260914.log及journal-path-swap-number-collision-20260914.log。
 - TEST021仅test/e2e/resident-mini-program.spec.js。先用真实HTTP+暂停浏览器时钟，首state到达后推进500ms触发生产真实timer/abort，保留中文超时、应用隐藏、请求失败与重试恰2次、恢复和主体范围；重试阶段保持暂停解除墙钟机器速度假设。使用当前日期附近时钟避免过期，不改runtime/expect预算、套件13项、Service Worker策略或runner。不能用sleep/force/响应伪成功绕过。
 - 测试：SEC015专项RED/GREEN及CLI/alert关联；TEST021定向浏览器和居民13项，排队串行。独立审查后各冻结，串行必需build/lint/type/unit/integration/smoke/不变legacy与相关中央/安全门禁；组合验收仍需后续精确候选新证据，不复用单分支通过冒称组合通过。
+- 本轮集中门禁细化（独立审查同意）：两切片分别窄测、审查与冻结后，经process:plan/create建立process/t00-failure-repair-validation-20260914，原样应用中央登记、旧三OPS冻结回归输入和两新修复。逐文件blob零漂移后再次组合审查并冻结；全部中央、标准、legacy、静态安全及完整E2E只在该候选串行执行一次，实际证据仅绑定组合SHA，不冒称每个领域原SHA均全量通过。旧三任务仍暂停自身写入/验收，不因作为回归输入自动恢复状态。任何冲突或需要源码修改须停止重新核定。
 - 回滚各自独立提交，不改现有日志、数据库或生产状态。若需扩展安全模型、信任源、拓扑或读写权威，停止并另行ADR/人工审批；观测未核验、共享auth生命周期、真实PG及六域NO-GO不变。本PLAN不授权新增第三修复。
+
+本地切片冻结：SEC015为29a2324ecf5f7a2c84f1dcca59f440d70ed8692d，最终专项56/56，独立审查无P0–P2；有效持久RED为53项32通过/21失败，初版测试宿主修正前日志另保留。TEST021为cdc5d59c211c26eaaae50dd1d6aaa58da319e05c，定向1/1、居民13/13，独立审查通过，仍只改既有单测试。两任务记验证中/已实现，待统一候选全门禁；本段不自证组合通过。日志分别Temp/sec015-red-corrected.log、sec015-green-extended.log、test021-focused.log、test021-resident.log。
 
 ### GOV-012 本地组合验证与台账收口 PLAN
 

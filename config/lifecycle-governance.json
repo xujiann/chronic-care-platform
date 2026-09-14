@@ -1211,6 +1211,8 @@
     }
   ],
   "evidence": [
+    {"id":"EVD-SEC-015-LOCAL","type":"frozen-local-regression-review","scope":"29a2324ecf5f7a2c84f1dcca59f440d70ed8692d; RED53项21fail,最终GREEN56/56; 不代表历史单次失败完整归因或生产验证","ref":"C:/Users/drxuj/Temp/sec015-green-extended.log","testIds":["TEST-SEC-015"],"productionEvidence":false},
+    {"id":"EVD-TEST-021-LOCAL","type":"frozen-local-browser-review","scope":"cdc5d59c211c26eaaae50dd1d6aaa58da319e05c; 定向1/1与居民13/13; 旧失败保留,不冒称完整组合通过","ref":"C:/Users/drxuj/Temp/test021-resident.log","testIds":["TEST-TEST-021"],"productionEvidence":false},
     {
       "id": "EVD-GOV-012-EVIDENCE-RECHECK-FAILURE",
       "type": "metadata-only-commit-governance-recheck-with-retained-failure",
@@ -1799,12 +1801,12 @@
   "tasks": [
     {
       "id":"SEC-015","title":"监控日志文件身份精度修复","ownerProcess":"T00","integrationOwner":"T00",
-      "taskStatus":"已批准","capabilityStatus":"未建设","riskLevel":"中",
+      "taskStatus":"验证中","capabilityStatus":"已实现","riskLevel":"中",
       "approval":{"state":"approved","mode":"T00-plan-approval","ref":"USER-APPROVED-FAILURE-REPAIR-2026-09-14","approvedScope":"src/platform/cutover/pilot-cutover-alert-lifecycle.js, test/pilot-cutover-alert-lifecycle.test.js, test/platform-preproduction-control-cli.test.js"},
       "requirementIds":["REQ-SEC-015"],"regulatoryControlIds":["REG-GOV-001"],"riskIds":["RISK-SEC-015"],"decisionIds":[],"dependencies":["GOV-011"],
       "affectedModules":["pilot-cutover-alert-journal"],"dataSensitivity":"文件身份与合成日志测试元数据，不采集日志正文或凭据",
       "acceptanceCriteria":["相邻bigint身份碰撞负测在旧实现RED，精确比较后GREEN","有界size验证后才转Number，保留描述符清理与原文件/符号链接/签名链失败关闭","不宣称原一次失败已确定归因，不改其他读取器或写入器"],
-      "testIds":["TEST-SEC-015"],"evidenceIds":[],"rollback":"独立回退修复提交；不修改现有journal、schema或业务数据",
+      "testIds":["TEST-SEC-015"],"evidenceIds":["EVD-SEC-015-LOCAL"],"rollback":"独立回退修复提交；不修改现有journal、schema或业务数据",
       "unresolved":["历史路径替换失败现场身份未捕获，机制修复不证明完整历史归因","既有运行观测适用性和复用证据待核验"],
       "worktree":".codex-platform-worktrees/process-v2/t00-journal-file-identity-20260914","branch":"process/t00-journal-file-identity-20260914",
       "planRef":"docs/lifecycle-governance.md#sec-015与test-021-失败修复-plan","pullRequestRef":"","ciRef":"",
@@ -1813,13 +1815,13 @@
     },
     {
       "id":"TEST-021","title":"居民超时恢复浏览器测试确定性","ownerProcess":"T04","integrationOwner":"T00",
-      "taskStatus":"已批准","capabilityStatus":"未建设","riskLevel":"中",
+      "taskStatus":"验证中","capabilityStatus":"已实现","riskLevel":"中",
       "approval":{"state":"approved","mode":"T00-plan-approval","ref":"USER-APPROVED-FAILURE-REPAIR-2026-09-14","approvedScope":"test/e2e/resident-mini-program.spec.js"},
       "requirementIds":["REQ-TEST-021"],"regulatoryControlIds":["REG-GOV-001"],"riskIds":["RISK-TEST-021"],"decisionIds":[],"dependencies":["GOV-011"],
       "affectedModules":["resident-browser-regression"],"dataSensitivity":"仅合成居民身份测试与浏览器虚拟时钟",
       "acceptanceCriteria":["仅现有一条用例引入时钟控制，不改变13项拓扑、真实登录/HTTP与主体范围","首请求到达后推进500ms触发实际abort，保留超时门及重试恰2次与恢复断言","不改runtime超时、expect预算，不用固定sleep、force或重复运行覆盖失败"],
-      "testIds":["TEST-TEST-021"],"evidenceIds":[],"rollback":"回退单测试文件提交；无业务数据变化",
-      "unresolved":["需在暂停浏览器时钟下验证真实导航、请求与点击兼容"],
+      "testIds":["TEST-TEST-021"],"evidenceIds":["EVD-TEST-021-LOCAL"],"rollback":"回退单测试文件提交；无业务数据变化",
+      "unresolved":["单例与居民套件已通过，仍待新组合候选完整门禁；旧失败不得注销"],
       "worktree":".codex-platform-worktrees/process-v2/t04-resident-timeout-clock-20260914","branch":"process/t04-resident-timeout-clock-20260914",
       "planRef":"docs/lifecycle-governance.md#sec-015与test-021-失败修复-plan","pullRequestRef":"","ciRef":"",
       "writeScopes":["test/e2e/resident-mini-program.spec.js"],
