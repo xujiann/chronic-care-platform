@@ -923,19 +923,19 @@
   "tests": [
     {
       "id": "TEST-OPS-039",
-      "kind": "existing-e2e-baseline-before-scoped-implementation",
+      "kind": "frozen-auth-startup-browser-regression",
       "path": "test/e2e/digital-hospital-public-health.spec.js",
       "command": "npm run test:e2e:root -- test/e2e/digital-hospital-public-health.spec.js"
     },
     {
       "id": "TEST-OPS-038",
-      "kind": "existing-regression-baseline-before-scoped-implementation",
+      "kind": "frozen-read-generation-regression",
       "path": "test/domain-task-ui-refresh.test.js",
       "command": "node --test test/domain-task-ui-refresh.test.js"
     },
     {
       "id": "TEST-OPS-037",
-      "kind": "existing-regression-baseline-before-scoped-implementation",
+      "kind": "frozen-read-generation-regression",
       "path": "test/regional-clinical-document-retry-session.test.js",
       "command": "node --test test/regional-clinical-document-retry-session.test.js"
     },
@@ -1205,6 +1205,30 @@
     }
   ],
   "evidence": [
+    {
+      "id": "EVD-OPS-039-LOCAL",
+      "type": "frozen-local-implementation-review-and-tests",
+      "scope": "OPS-039@69da897af3ec847d4717409204ca3fec3ba66de6; 23专项及76浏览器通过; 不替代组合或生产证据",
+      "ref": "C:/Users/drxuj/Temp/platform-ops039-delivery-20260914.md",
+      "testIds": ["TEST-OPS-039"],
+      "productionEvidence": false
+    },
+    {
+      "id": "EVD-OPS-038-LOCAL",
+      "type": "frozen-local-implementation-review-and-tests",
+      "scope": "OPS-038@be4aac2a006502cabcb85107c723a7b5d2c98fd7; 31专项及76浏览器通过; 不替代组合或生产证据",
+      "ref": "C:/Users/drxuj/Temp/platform-ops037-ops038-delivery-20260913.md",
+      "testIds": ["TEST-OPS-038"],
+      "productionEvidence": false
+    },
+    {
+      "id": "EVD-OPS-037-LOCAL",
+      "type": "frozen-local-implementation-review-and-tests-with-retained-failure",
+      "scope": "OPS-037@d8943e7c58ac6ea43993547b977c84c104ec50f5; 31专项通过; 原根E2E59通过1失败保留, 不宣称该分支全部通过",
+      "ref": "C:/Users/drxuj/Temp/platform-ops037-ops038-delivery-20260913.md",
+      "testIds": ["TEST-OPS-037"],
+      "productionEvidence": false
+    },
     {
       "id": "EVD-GOV-011",
       "scope": "repository-integration",
@@ -1754,8 +1778,8 @@
       "title": "数字医院认证就绪启动接线",
       "ownerProcess": "T01",
       "integrationOwner": "T00",
-      "taskStatus": "已批准",
-      "capabilityStatus": "未建设",
+      "taskStatus": "验证中",
+      "capabilityStatus": "已实现",
       "riskLevel": "中",
       "approval": {"state": "approved", "mode": "T00-plan-approval", "ref": "USER-DELEGATED-T00-PLAN-OPS-039-2026-09-14", "approvedScope": "digital-hospital-standard-platform/app.js, test/digital-hospital-auth-initialization.test.js, test/e2e/digital-hospital-public-health.spec.js"},
       "requirementIds": ["REQ-OPS-039"],
@@ -1767,7 +1791,7 @@
       "dataSensitivity": "浏览器既有身份最小投影；不新增凭据或敏感数据采集",
       "acceptanceCriteria": ["在线认证pending、失败和缺失对象均不初始化业务", "消费现有allowed信号并核验现有角色账户守卫，单次启动且保持明确静态预览边界", "完整源码确定性测试及延迟真实身份上下文E2E保持签收分离和导航壳兼容"],
       "testIds": ["TEST-OPS-039"],
-      "evidenceIds": [],
+      "evidenceIds": ["EVD-OPS-039-LOCAL"],
       "rollback": "回退独立子站提交并重跑门禁；无迁移，不删除业务数据",
       "unresolved": ["共享auth异常清投影生命周期不在本范围", "运行观测适用性及复用证据尚未核验，生产NO-GO不变"],
       "worktree": ".codex-platform-worktrees/process-v2/t01-digital-hospital-auth-start-20260914",
@@ -1784,8 +1808,8 @@
       "title": "共享工作台读取代次隔离",
       "ownerProcess": "T09",
       "integrationOwner": "T00",
-      "taskStatus": "已批准",
-      "capabilityStatus": "未建设",
+      "taskStatus": "验证中",
+      "capabilityStatus": "已实现",
       "riskLevel": "中",
       "approval": {
         "state": "approved",
@@ -1817,7 +1841,7 @@
       "testIds": [
         "TEST-OPS-038"
       ],
-      "evidenceIds": [],
+      "evidenceIds": ["EVD-OPS-038-LOCAL"],
       "rollback": "回退本任务独立提交并重跑相关门禁；无 migration，不回退服务端业务事实",
       "unresolved": [
         "仅浏览器局部可靠性修复；运行观测适用性及复用证据未核验，不据代码合并晋级完整能力"
@@ -1842,8 +1866,8 @@
       "title": "文书中心读取代次隔离",
       "ownerProcess": "T08",
       "integrationOwner": "T00",
-      "taskStatus": "已批准",
-      "capabilityStatus": "未建设",
+      "taskStatus": "验证中",
+      "capabilityStatus": "已实现",
       "riskLevel": "中",
       "approval": {
         "state": "approved",
@@ -1875,7 +1899,7 @@
       "testIds": [
         "TEST-OPS-037"
       ],
-      "evidenceIds": [],
+      "evidenceIds": ["EVD-OPS-037-LOCAL"],
       "rollback": "回退本任务独立提交并重跑相关门禁；无 migration，不回退服务端业务事实",
       "unresolved": [
         "仅浏览器局部可靠性修复；运行观测适用性及复用证据未核验，不据代码合并晋级完整能力"
