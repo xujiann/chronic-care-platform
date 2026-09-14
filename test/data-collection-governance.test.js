@@ -189,7 +189,7 @@ test("repository inventory covers every current state collection and never autho
   const report = run({ now: "2026-08-22T00:00:00.000Z" });
   assert.equal(report.ok, true);
   assert.equal(report.summary.collections, 252);
-  assert.equal(Object.keys(manifest.collections).length, 120);
+  assert.equal(Object.keys(manifest.collections).length, 121);
   assert.equal(report.summary.ownerAssigned, 80);
   assert.equal(report.summary.authoritative, 61);
   assert.equal(report.summary.ownerReviewedLegacy, 19);
@@ -255,6 +255,44 @@ test("owner-reviewed legacy collections reject missing or permissive write polic
     (error) => error.code === "PRODUCTION_WRITE_CONTRACT_REQUIRED"
   );
   assert.equal(assertProductionWriteAccess("citizen-chronic", "followups").owner, "citizen-chronic");
+});
+
+test("access acknowledgement has a separate T04 owner decision without changing the first-release batch", () => {
+  const policy = manifest.collections.accessAcknowledgements;
+  assert.equal(policy.owner, "citizen-chronic");
+  assert.equal(policy.writePolicy.productionWriteAllowed, false);
+  assert.equal(policy.writePolicy.productionPromotionAllowed, false);
+  const batch = manifest.ownerReviewBatches.find((item) => item.id === "resident-access-acknowledgement-20260914");
+  assert.ok(batch);
+  assert.deepEqual(batch.collections, ["accessAcknowledgements"]);
+  assert.equal(batch.decisionDigest, "670547e02f5fb4230adc74e9a33677d3ae0eec89c732f2726f6d78c2d230d344");
+  assert.equal(ownerReviewDigest(manifest, batch.collections), batch.decisionDigest);
+  const firstRelease = manifest.ownerReviewBatches.find((item) => item.id === "first-release-scope-20260826");
+  assert.equal(firstRelease.collections.length, 19);
+  assert.equal(firstRelease.collections.includes("accessAcknowledgements"), false);
+  assert.equal(firstRelease.decisionDigest, "aab36e12341d4bc1af76ca2d8c77368860988041caeec70ba1c59da5312cdb60");
+  assert.equal(ownerReviewDigest(manifest, firstRelease.collections), firstRelease.decisionDigest);
+  assert.equal(manifest.ownerReviewBatches.find((item) => item.contract === firstRelease.contract), firstRelease);
+  assert.doesNotThrow(() => validateManifest(manifest));
+  assert.throws(() => assertProductionWriteAccess("citizen-chronic", "accessAcknowledgements"),
+    (error) => error.code === "PRODUCTION_WRITE_CONTRACT_REQUIRED");
+});
+
+test("acknowledgement decision digest detects allowed-domain owner and reader tampering", () => {
+  for (const change of [
+    (policy) => { policy.owner = "research"; },
+    (policy) => { policy.readers.push("research"); }
+  ]) {
+    const altered = structuredClone(manifest);
+    change(altered.collections.accessAcknowledgements);
+    // These are individually legal domain values; rejection comes from the frozen batch binding.
+    assert.throws(() => validateManifest(altered), /owner review decision digest mismatch: resident-access-acknowledgement-20260914/);
+  }
+  for (const flag of ["productionWriteAllowed", "productionPromotionAllowed"]) {
+    const altered = structuredClone(manifest);
+    altered.collections.accessAcknowledgements.writePolicy[flag] = true;
+    assert.throws(() => validateManifest(altered), /explicit fail-closed write policy: accessAcknowledgements/);
+  }
 });
 
 test("owner review digest rejects an incorrect owner or reader allowlist", () => {
