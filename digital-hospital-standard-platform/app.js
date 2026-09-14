@@ -1,4 +1,47 @@
-(function () {
+(function initializeDigitalHospital() {
+  const staticPreview = window.location.protocol === "file:" || window.location.hostname.endsWith("github.io");
+  if (!staticPreview) {
+    const auth = window.HealthCityAuth;
+    if (!auth || typeof auth.getUser !== "function" || typeof auth.requireRole !== "function" || typeof auth.requireAccountType !== "function") return;
+
+    const root = document.documentElement;
+    let allowed = false;
+    try {
+      allowed = root.getAttribute("data-auth-resolved") === "allowed";
+    } catch {
+      return;
+    }
+    if (!allowed) {
+      let resumed = false;
+      let observer;
+      const resumeWhenAllowed = () => {
+        if (resumed) return;
+        try {
+          if (root.getAttribute("data-auth-resolved") !== "allowed") return;
+          resumed = true;
+          observer.disconnect();
+        } catch {
+          return;
+        }
+        initializeDigitalHospital();
+      };
+      try {
+        observer = new MutationObserver(resumeWhenAllowed);
+        observer.observe(root, { attributes: true, attributeFilter: ["data-auth-resolved"] });
+      } catch {
+        return;
+      }
+      // Recheck after subscription so a signal during registration cannot be lost.
+      resumeWhenAllowed();
+      return;
+    }
+    try {
+      if (!auth.getUser() || !auth.requireRole(["commission", "institution"]) || !auth.requireAccountType(["manager"])) return;
+    } catch {
+      return;
+    }
+  }
+
   const storageKey = "digitalHospitalMvpState:v0.21";
 
   const domains = [

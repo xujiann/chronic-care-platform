@@ -8,9 +8,38 @@ async function loginCommission(page) {
   await expect(page).toHaveURL(/index\.html$/);
 }
 
-async function openPublicHealth(page) {
+async function openPublicHealth(page, { delayIdentity = false } = {}) {
   await loginCommission(page);
-  await page.goto("/digital-hospital-standard-platform/index.html");
+  if (delayIdentity) {
+    // Keep the real HttpOnly login cookie, but require fresh browser hydration.
+    await page.evaluate(() => localStorage.removeItem("health-city-auth-session"));
+    let releaseIdentity;
+    let reportRequested;
+    const released = new Promise((resolve) => { releaseIdentity = resolve; });
+    const requested = new Promise((resolve) => { reportRequested = resolve; });
+    const handler = async (route) => {
+      reportRequested();
+      const response = await route.fetch();
+      await released;
+      await route.fulfill({ response });
+    };
+    await page.route("**/api/auth/context", handler);
+    try {
+      await page.goto("/digital-hospital-standard-platform/index.html", { waitUntil: "domcontentloaded" });
+      await requested;
+      await expect(page.locator("html")).toHaveAttribute("data-auth-resolved", "pending");
+      expect(await page.locator("#workspace").evaluate((element) => element.innerHTML)).toBe("");
+      await expect(page.locator("#roleSelect option")).toHaveCount(0);
+    } finally {
+      releaseIdentity();
+    }
+    await expect(page.locator("html")).toHaveAttribute("data-auth-resolved", "allowed");
+    await expect(page.locator("#roleSelect")).toHaveValue("省级管理员");
+    await expect(page.locator("#roleSelect")).toBeDisabled();
+    await page.unroute("**/api/auth/context", handler);
+  } else {
+    await page.goto("/digital-hospital-standard-platform/index.html");
+  }
   const navigationToggle = page.locator(".navigation-toggle");
   if ((page.viewportSize()?.width || 1024) <= 900) {
     await expect(navigationToggle).toBeVisible();
@@ -26,7 +55,7 @@ async function openPublicHealth(page) {
 }
 
 test("digital hospital public health workbench accepts evidence, closes, filters and exports incidents", async ({ page }) => {
-  await openPublicHealth(page);
+  await openPublicHealth(page, { delayIdentity: true });
 
   await expect(page.getByRole("heading", { name: "公共卫生异常事件台账" })).toBeVisible();
   await expect(page.locator("tbody tr").filter({ hasText: "PHE-20260728-003" })).toBeVisible();
