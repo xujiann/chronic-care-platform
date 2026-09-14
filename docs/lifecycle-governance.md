@@ -2,6 +2,16 @@
 
 ## 1. 权威边界
 
+### GOV-012 PR305 集成收尾 PLAN 与事实
+
+- 用户于2026-09-14明确授权按推送组合、PR、精确CI、T00核验、条件合并顺序执行（USER-AUTHORIZED-PR305-INTEGRATION-2026-09-14），扩展下方历史PLAN的仅本地限制；不授权上线或保护规则例外。PR #305 已在九项CI全成功、独立精确复核无P0–P2、主线未漂移后，通过绑定head的squash合并。
+- 事实链：[PR305](https://github.com/xujiann/chronic-care-platform/pull/305)，head `d27eb1cb8f9f8ea3b54092ffc51a6834b7a995c4`，[CI34824818585](https://github.com/xujiann/chronic-care-platform/actions/runs/34824818585)，merge `bb46456392575249bcd9237dfa6af336430bbf63`。合并后整树与冻结head零差异。严格required checks、管理员约束与线性历史保护均未调整。
+- 本地冻结head的18项串行门禁全部exit0：unit3089通过/1环境跳过、integration381/381、smoke6/6、原样legacy3470通过/1环境跳过、完整E2E76/76，以及中央/安全/静态门禁。远端真实PostgreSQL合同成功仅为CI环境证据，不改写本地skip或冒充生产验收。日志索引为`C:/Users/drxuj/Temp/failure-repair-d27eb1cb-results.log`；legacy SHA-256 `42C10D2FF2DDE169305E3F7DE0FF3B52F8B5B620F66E7CB320D65FA6C1123021`，E2E SHA-256 `22C0CD3848A24F8F2DC17B57CE6AB797529FC97965FCF6DBC7BF01F2066338F5`。
+- 本收尾沿用GOV012的中央三文件唯一writer，从最新fetched main@bb464563经process:plan/create创建`process/t00-repair-integration-closeout-20260914`。不改领域源码、测试、API、schema、依赖或部署，不创建新业务任务；原领域分支与组合树继续冻结。
+- 顺序核验并关闭SEC015/TEST021的限定切片后，再逐项核验OPS037/038/039的组合依赖；不恢复并发写入、不制造WIP超限。四项运行能力保持已实现，unresolved及地图保留观测与共享auth后续边界；TEST021测试能力可记录已集成。GOV012原登记和组合交付按已合并PR305关闭，当前收尾只是记录既成事实，不声称自身未来PR或CI已通过。
+- 历史失败证据原样保留，已解决的当前组合阻断转为历史引用；风险只表示限定缺陷已缓解，不代表观测、跨实例、现场或生产风险消失。完全闭合的GOV012/TEST021从差距映射移除，四运行任务继续保留。
+- 收尾验收：独立只读审查后冻结；串行运行生命周期/文档/路由/架构/process/iterations等中央门禁及标准门禁。runtime/test blob不变时复用原head完整legacy/E2E证据，不声称新元数据SHA重新运行过这些重型套件；收尾PR仍须完整required CI。回滚仅回退本三文件收尾，不删除任何日志或业务数据；六域生产NO-GO保持。
+
 ### SEC-015与TEST-021 失败修复 PLAN
 
 - 用户2026-09-14批准安全路径替换问题优先、居民超时恢复测试其次；临时T00继续仅本地开发测试、登记调度，不推送/PR/合并/上线。来源USER-APPROVED-FAILURE-REPAIR-2026-09-14。GOV-012仍唯一写中央三文件，迁至process/t00-journal-identity-portfolio-20260914；旧中央/组合/领域分支冻结只读。

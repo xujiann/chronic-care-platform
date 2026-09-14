@@ -478,43 +478,71 @@
     }
   ],
   "risks": [
-    {"id":"RISK-SEC-015","title":"Number文件身份精度导致拒绝遗漏","level":"中","owner":"T00","mitigation":"精确bigint身份与有界size转换、确定性碰撞RED/GREEN、独立审查、原错误与负向合同回归；历史失败归因仍未确认","status":"open","evidenceIds":[]},
-    {"id":"RISK-TEST-021","title":"故障注入与恢复共享墙钟短超时","level":"中","owner":"T04","mitigation":"虚拟时间仅作用单用例，首请求到达后推进真实timer，真实HTTP与主体断言不变，独立浏览器验证","status":"open","evidenceIds":[]},
+    {
+      "id": "RISK-SEC-015",
+      "title": "Number文件身份精度导致拒绝遗漏",
+      "level": "中",
+      "owner": "T00",
+      "mitigation": "精确bigint身份与有界size转换、确定性碰撞RED/GREEN、独立审查、原错误与负向合同回归；历史失败归因仍未确认；PR305精确head d27eb1cb、CI34824818585九项成功、merge bb464563，仅缓解限定代码/测试/登记缺陷，既有未解决运行与生产风险不随之关闭",
+      "status": "mitigated",
+      "evidenceIds": [
+        "EVD-PR305-INTEGRATION"
+      ]
+    },
+    {
+      "id": "RISK-TEST-021",
+      "title": "故障注入与恢复共享墙钟短超时",
+      "level": "中",
+      "owner": "T04",
+      "mitigation": "虚拟时间仅作用单用例，首请求到达后推进真实timer，真实HTTP与主体断言不变，独立浏览器验证；PR305精确head d27eb1cb、CI34824818585九项成功、merge bb464563，仅缓解限定代码/测试/登记缺陷，既有未解决运行与生产风险不随之关闭",
+      "status": "mitigated",
+      "evidenceIds": [
+        "EVD-PR305-INTEGRATION"
+      ]
+    },
     {
       "id": "RISK-OPS-039",
       "title": "子站先于身份水合启动导致岗位错位",
       "level": "中",
       "owner": "T01",
-      "mitigation": "仅消费既有allowed标记，不改认证决策；完整脚本RED/GREEN、可控浏览器水合延迟、独立审查、冻结后串行门禁",
-      "status": "open",
-      "evidenceIds": []
+      "mitigation": "仅消费既有allowed标记，不改认证决策；完整脚本RED/GREEN、可控浏览器水合延迟、独立审查、冻结后串行门禁；PR305精确head d27eb1cb、CI34824818585九项成功、merge bb464563，仅缓解限定代码/测试/登记缺陷，既有未解决运行与生产风险不随之关闭",
+      "status": "mitigated",
+      "evidenceIds": [
+        "EVD-PR305-INTEGRATION"
+      ]
     },
     {
       "id": "RISK-OPS-038",
       "title": "共享工作台读取代次隔离",
       "level": "中",
       "owner": "T09",
-      "mitigation": "确定性deferred RED、最小代次补丁、旧交互回归、独立review与精确门禁；运行观测缺口独立保留",
-      "status": "open",
-      "evidenceIds": []
+      "mitigation": "确定性deferred RED、最小代次补丁、旧交互回归、独立review与精确门禁；运行观测缺口独立保留；PR305精确head d27eb1cb、CI34824818585九项成功、merge bb464563，仅缓解限定代码/测试/登记缺陷，既有未解决运行与生产风险不随之关闭",
+      "status": "mitigated",
+      "evidenceIds": [
+        "EVD-PR305-INTEGRATION"
+      ]
     },
     {
       "id": "RISK-OPS-037",
       "title": "文书中心读取代次隔离",
       "level": "中",
       "owner": "T08",
-      "mitigation": "确定性deferred RED、最小代次补丁、旧交互回归、独立review与精确门禁；运行观测缺口独立保留",
-      "status": "open",
-      "evidenceIds": []
+      "mitigation": "确定性deferred RED、最小代次补丁、旧交互回归、独立review与精确门禁；运行观测缺口独立保留；PR305精确head d27eb1cb、CI34824818585九项成功、merge bb464563，仅缓解限定代码/测试/登记缺陷，既有未解决运行与生产风险不随之关闭",
+      "status": "mitigated",
+      "evidenceIds": [
+        "EVD-PR305-INTEGRATION"
+      ]
     },
     {
       "id": "RISK-GOV-012",
       "title": "读取代次修复组合登记",
       "level": "中",
       "owner": "T00",
-      "mitigation": "确定性deferred RED、最小代次补丁、旧交互回归、独立review与精确门禁；运行观测缺口独立保留",
-      "status": "open",
-      "evidenceIds": []
+      "mitigation": "确定性deferred RED、最小代次补丁、旧交互回归、独立review与精确门禁；运行观测缺口独立保留；PR305精确head d27eb1cb、CI34824818585九项成功、merge bb464563，仅缓解限定代码/测试/登记缺陷，既有未解决运行与生产风险不随之关闭",
+      "status": "mitigated",
+      "evidenceIds": [
+        "EVD-PR305-INTEGRATION"
+      ]
     },
     {
       "id": "RISK-TEST-012",
@@ -1211,6 +1239,21 @@
     }
   ],
   "evidence": [
+    {
+      "id": "EVD-PR305-INTEGRATION",
+      "type": "reviewed-exact-head-ci-and-merged-source",
+      "scope": "PR305 head d27eb1cb8f9f8ea3b54092ffc51a6834b7a995c4; CI34824818585九项成功; merge bb46456392575249bcd9237dfa6af336430bbf63整树零漂移; 本地18门禁exit0,legacy3470pass1skip,E2E76pass; CI真实PG成功不改写本地skip; 不自证后续元数据收尾PR",
+      "ref": "https://github.com/xujiann/chronic-care-platform/pull/305; https://github.com/xujiann/chronic-care-platform/actions/runs/34824818585",
+      "testIds": [
+        "TEST-SEC-015",
+        "TEST-TEST-021",
+        "TEST-OPS-037",
+        "TEST-OPS-038",
+        "TEST-OPS-039",
+        "TEST-GOV-012"
+      ],
+      "productionEvidence": false
+    },
     {"id":"EVD-SEC-015-LOCAL","type":"frozen-local-regression-review","scope":"29a2324ecf5f7a2c84f1dcca59f440d70ed8692d; RED53项21fail,最终GREEN56/56; 不代表历史单次失败完整归因或生产验证","ref":"C:/Users/drxuj/Temp/sec015-green-extended.log","testIds":["TEST-SEC-015"],"productionEvidence":false},
     {"id":"EVD-TEST-021-LOCAL","type":"frozen-local-browser-review","scope":"cdc5d59c211c26eaaae50dd1d6aaa58da319e05c; 定向1/1与居民13/13; 旧失败保留,不冒称完整组合通过","ref":"C:/Users/drxuj/Temp/test021-resident.log","testIds":["TEST-TEST-021"],"productionEvidence":false},
     {
@@ -1691,18 +1734,17 @@
       "status": "已集成",
       "gapTaskIds": [
         "SEC-015",
-        "TEST-021",
         "GOV-002",
         "OPS-015",
         "OPS-016",
         "OPS-017",
         "OPS-018",
-        "SEC-011",
-        "GOV-012"
+        "SEC-011"
       ],
       "evidenceIds": [
         "EVD-GOV-001",
-        "EVD-GOV-002"
+        "EVD-GOV-002",
+        "EVD-PR305-INTEGRATION"
       ]
     },
     {
@@ -1767,12 +1809,12 @@
         "GOV-002",
         "OPS-015",
         "OPS-017",
-        "OPS-018",
-        "GOV-012"
+        "OPS-018"
       ],
       "evidenceIds": [
         "EVD-GOV-001",
-        "EVD-GOV-002"
+        "EVD-GOV-002",
+        "EVD-PR305-INTEGRATION"
       ]
     },
     {
@@ -1788,73 +1830,205 @@
         "OPS-017",
         "OPS-018",
         "SEC-011",
-        "GOV-012",
         "OPS-037",
         "OPS-038"
       ],
       "evidenceIds": [
         "EVD-GOV-001",
-        "EVD-GOV-002"
+        "EVD-GOV-002",
+        "EVD-PR305-INTEGRATION"
       ]
     }
   ],
   "tasks": [
     {
-      "id":"SEC-015","title":"监控日志文件身份精度修复","ownerProcess":"T00","integrationOwner":"T00",
-      "taskStatus":"验证中","capabilityStatus":"已实现","riskLevel":"中",
-      "approval":{"state":"approved","mode":"T00-plan-approval","ref":"USER-APPROVED-FAILURE-REPAIR-2026-09-14","approvedScope":"src/platform/cutover/pilot-cutover-alert-lifecycle.js, test/pilot-cutover-alert-lifecycle.test.js, test/platform-preproduction-control-cli.test.js"},
-      "requirementIds":["REQ-SEC-015"],"regulatoryControlIds":["REG-GOV-001"],"riskIds":["RISK-SEC-015"],"decisionIds":[],"dependencies":["GOV-011"],
-      "affectedModules":["pilot-cutover-alert-journal"],"dataSensitivity":"文件身份与合成日志测试元数据，不采集日志正文或凭据",
-      "acceptanceCriteria":["相邻bigint身份碰撞负测在旧实现RED，精确比较后GREEN","有界size验证后才转Number，保留描述符清理与原文件/符号链接/签名链失败关闭","不宣称原一次失败已确定归因，不改其他读取器或写入器"],
-      "testIds":["TEST-SEC-015"],"evidenceIds":["EVD-SEC-015-LOCAL"],"rollback":"独立回退修复提交；不修改现有journal、schema或业务数据",
-      "unresolved":["历史路径替换失败现场身份未捕获，机制修复不证明完整历史归因","既有运行观测适用性和复用证据待核验"],
-      "worktree":".codex-platform-worktrees/process-v2/t00-journal-file-identity-20260914","branch":"process/t00-journal-file-identity-20260914",
-      "planRef":"docs/lifecycle-governance.md#sec-015与test-021-失败修复-plan","pullRequestRef":"","ciRef":"",
-      "writeScopes":["src/platform/cutover/pilot-cutover-alert-lifecycle.js","test/pilot-cutover-alert-lifecycle.test.js","test/platform-preproduction-control-cli.test.js"],
-      "observability":{"applicable":true,"gaps":"仅恢复既有文件身份拒绝语义，运行观测复用证据未核验，不晋级已验证能力"},"runtimeCapability":true
+      "id": "SEC-015",
+      "title": "监控日志文件身份精度修复",
+      "ownerProcess": "T00",
+      "integrationOwner": "T00",
+      "taskStatus": "已关闭",
+      "capabilityStatus": "已实现",
+      "riskLevel": "中",
+      "approval": {
+        "state": "approved",
+        "mode": "T00-plan-approval",
+        "ref": "USER-APPROVED-FAILURE-REPAIR-2026-09-14",
+        "approvedScope": "src/platform/cutover/pilot-cutover-alert-lifecycle.js, test/pilot-cutover-alert-lifecycle.test.js, test/platform-preproduction-control-cli.test.js"
+      },
+      "requirementIds": [
+        "REQ-SEC-015"
+      ],
+      "regulatoryControlIds": [
+        "REG-GOV-001"
+      ],
+      "riskIds": [
+        "RISK-SEC-015"
+      ],
+      "decisionIds": [],
+      "dependencies": [
+        "GOV-011"
+      ],
+      "affectedModules": [
+        "pilot-cutover-alert-journal"
+      ],
+      "dataSensitivity": "文件身份与合成日志测试元数据，不采集日志正文或凭据",
+      "acceptanceCriteria": [
+        "相邻bigint身份碰撞负测在旧实现RED，精确比较后GREEN",
+        "有界size验证后才转Number，保留描述符清理与原文件/符号链接/签名链失败关闭",
+        "不宣称原一次失败已确定归因，不改其他读取器或写入器"
+      ],
+      "testIds": [
+        "TEST-SEC-015"
+      ],
+      "evidenceIds": [
+        "EVD-SEC-015-LOCAL",
+        "EVD-PR305-INTEGRATION"
+      ],
+      "rollback": "独立回退修复提交；不修改现有journal、schema或业务数据",
+      "unresolved": [
+        "历史路径替换失败现场身份未捕获，机制修复不证明完整历史归因",
+        "既有运行观测适用性和复用证据待核验"
+      ],
+      "worktree": ".codex-platform-worktrees/process-v2/t00-journal-file-identity-20260914",
+      "branch": "process/t00-journal-file-identity-20260914",
+      "planRef": "docs/lifecycle-governance.md#sec-015与test-021-失败修复-plan",
+      "pullRequestRef": "https://github.com/xujiann/chronic-care-platform/pull/305",
+      "ciRef": "https://github.com/xujiann/chronic-care-platform/actions/runs/34824818585",
+      "writeScopes": [
+        "src/platform/cutover/pilot-cutover-alert-lifecycle.js",
+        "test/pilot-cutover-alert-lifecycle.test.js",
+        "test/platform-preproduction-control-cli.test.js"
+      ],
+      "observability": {
+        "applicable": true,
+        "gaps": "仅恢复既有文件身份拒绝语义，运行观测复用证据未核验，不晋级已验证能力"
+      },
+      "runtimeCapability": true
     },
     {
-      "id":"TEST-021","title":"居民超时恢复浏览器测试确定性","ownerProcess":"T04","integrationOwner":"T00",
-      "taskStatus":"验证中","capabilityStatus":"已实现","riskLevel":"中",
-      "approval":{"state":"approved","mode":"T00-plan-approval","ref":"USER-APPROVED-FAILURE-REPAIR-2026-09-14","approvedScope":"test/e2e/resident-mini-program.spec.js"},
-      "requirementIds":["REQ-TEST-021"],"regulatoryControlIds":["REG-GOV-001"],"riskIds":["RISK-TEST-021"],"decisionIds":[],"dependencies":["GOV-011"],
-      "affectedModules":["resident-browser-regression"],"dataSensitivity":"仅合成居民身份测试与浏览器虚拟时钟",
-      "acceptanceCriteria":["仅现有一条用例引入时钟控制，不改变13项拓扑、真实登录/HTTP与主体范围","首请求到达后推进500ms触发实际abort，保留超时门及重试恰2次与恢复断言","不改runtime超时、expect预算，不用固定sleep、force或重复运行覆盖失败"],
-      "testIds":["TEST-TEST-021"],"evidenceIds":["EVD-TEST-021-LOCAL"],"rollback":"回退单测试文件提交；无业务数据变化",
-      "unresolved":["单例与居民套件已通过，仍待新组合候选完整门禁；旧失败不得注销"],
-      "worktree":".codex-platform-worktrees/process-v2/t04-resident-timeout-clock-20260914","branch":"process/t04-resident-timeout-clock-20260914",
-      "planRef":"docs/lifecycle-governance.md#sec-015与test-021-失败修复-plan","pullRequestRef":"","ciRef":"",
-      "writeScopes":["test/e2e/resident-mini-program.spec.js"],
-      "observability":{"applicable":false,"reason":"仅单用例测试时间控制，不新增运行时能力"},"runtimeCapability":false
+      "id": "TEST-021",
+      "title": "居民超时恢复浏览器测试确定性",
+      "ownerProcess": "T04",
+      "integrationOwner": "T00",
+      "taskStatus": "已关闭",
+      "capabilityStatus": "已集成",
+      "riskLevel": "中",
+      "approval": {
+        "state": "approved",
+        "mode": "T00-plan-approval",
+        "ref": "USER-APPROVED-FAILURE-REPAIR-2026-09-14",
+        "approvedScope": "test/e2e/resident-mini-program.spec.js"
+      },
+      "requirementIds": [
+        "REQ-TEST-021"
+      ],
+      "regulatoryControlIds": [
+        "REG-GOV-001"
+      ],
+      "riskIds": [
+        "RISK-TEST-021"
+      ],
+      "decisionIds": [],
+      "dependencies": [
+        "GOV-011"
+      ],
+      "affectedModules": [
+        "resident-browser-regression"
+      ],
+      "dataSensitivity": "仅合成居民身份测试与浏览器虚拟时钟",
+      "acceptanceCriteria": [
+        "仅现有一条用例引入时钟控制，不改变13项拓扑、真实登录/HTTP与主体范围",
+        "首请求到达后推进500ms触发实际abort，保留超时门及重试恰2次与恢复断言",
+        "不改runtime超时、expect预算，不用固定sleep、force或重复运行覆盖失败"
+      ],
+      "testIds": [
+        "TEST-TEST-021"
+      ],
+      "evidenceIds": [
+        "EVD-TEST-021-LOCAL",
+        "EVD-PR305-INTEGRATION"
+      ],
+      "rollback": "回退单测试文件提交；无业务数据变化",
+      "unresolved": [],
+      "worktree": ".codex-platform-worktrees/process-v2/t04-resident-timeout-clock-20260914",
+      "branch": "process/t04-resident-timeout-clock-20260914",
+      "planRef": "docs/lifecycle-governance.md#sec-015与test-021-失败修复-plan",
+      "pullRequestRef": "https://github.com/xujiann/chronic-care-platform/pull/305",
+      "ciRef": "https://github.com/xujiann/chronic-care-platform/actions/runs/34824818585",
+      "writeScopes": [
+        "test/e2e/resident-mini-program.spec.js"
+      ],
+      "observability": {
+        "applicable": false,
+        "reason": "仅单用例测试时间控制，不新增运行时能力"
+      },
+      "runtimeCapability": false
     },
     {
       "id": "OPS-039",
       "title": "数字医院认证就绪启动接线",
       "ownerProcess": "T01",
       "integrationOwner": "T00",
-      "taskStatus": "已阻塞",
+      "taskStatus": "已关闭",
       "capabilityStatus": "已实现",
       "riskLevel": "中",
-      "approval": {"state": "approved", "mode": "T00-plan-approval", "ref": "USER-DELEGATED-T00-PLAN-OPS-039-2026-09-14", "approvedScope": "digital-hospital-standard-platform/app.js, test/digital-hospital-auth-initialization.test.js, test/e2e/digital-hospital-public-health.spec.js"},
-      "requirementIds": ["REQ-OPS-039"],
-      "regulatoryControlIds": ["REG-GOV-001"],
-      "riskIds": ["RISK-OPS-039"],
+      "approval": {
+        "state": "approved",
+        "mode": "T00-plan-approval",
+        "ref": "USER-DELEGATED-T00-PLAN-OPS-039-2026-09-14",
+        "approvedScope": "digital-hospital-standard-platform/app.js, test/digital-hospital-auth-initialization.test.js, test/e2e/digital-hospital-public-health.spec.js"
+      },
+      "requirementIds": [
+        "REQ-OPS-039"
+      ],
+      "regulatoryControlIds": [
+        "REG-GOV-001"
+      ],
+      "riskIds": [
+        "RISK-OPS-039"
+      ],
       "decisionIds": [],
-      "dependencies": ["GOV-011", "SEC-015", "TEST-021"],
-      "affectedModules": ["digital-hospital-auth-initialization"],
+      "dependencies": [
+        "GOV-011",
+        "SEC-015",
+        "TEST-021"
+      ],
+      "affectedModules": [
+        "digital-hospital-auth-initialization"
+      ],
       "dataSensitivity": "浏览器既有身份最小投影；不新增凭据或敏感数据采集",
-      "acceptanceCriteria": ["在线认证pending、失败和缺失对象均不初始化业务", "消费现有allowed信号并核验现有角色账户守卫，单次启动且保持明确静态预览边界", "完整源码确定性测试及延迟真实身份上下文E2E保持签收分离和导航壳兼容"],
-      "testIds": ["TEST-OPS-039"],
-      "evidenceIds": ["EVD-OPS-039-LOCAL", "EVD-GOV-012-COMBINATION-LOCAL"],
+      "acceptanceCriteria": [
+        "在线认证pending、失败和缺失对象均不初始化业务",
+        "消费现有allowed信号并核验现有角色账户守卫，单次启动且保持明确静态预览边界",
+        "完整源码确定性测试及延迟真实身份上下文E2E保持签收分离和导航壳兼容"
+      ],
+      "testIds": [
+        "TEST-OPS-039"
+      ],
+      "evidenceIds": [
+        "EVD-OPS-039-LOCAL",
+        "EVD-GOV-012-COMBINATION-LOCAL",
+        "EVD-PR305-INTEGRATION"
+      ],
       "rollback": "回退独立子站提交并重跑门禁；无迁移，不删除业务数据",
-      "unresolved": ["共享auth异常清投影生命周期不在本范围", "运行观测适用性及复用证据尚未核验，生产NO-GO不变"],
+      "unresolved": [
+        "共享auth异常清投影生命周期不在本范围",
+        "运行观测适用性及复用证据尚未核验，生产NO-GO不变"
+      ],
       "worktree": ".codex-platform-worktrees/process-v2/t01-digital-hospital-auth-start-20260914",
       "branch": "process/t01-digital-hospital-auth-start-20260914",
       "planRef": "docs/lifecycle-governance.md#ops-039-数字医院认证就绪启动-plan",
-      "pullRequestRef": "",
-      "ciRef": "",
-      "writeScopes": ["digital-hospital-standard-platform/app.js", "test/digital-hospital-auth-initialization.test.js", "test/e2e/digital-hospital-public-health.spec.js"],
-      "observability": {"applicable": true, "gaps": "仅局部初始化时序修复；运行观测复用证据待核验，不冒充生产能力完成"},
+      "pullRequestRef": "https://github.com/xujiann/chronic-care-platform/pull/305",
+      "ciRef": "https://github.com/xujiann/chronic-care-platform/actions/runs/34824818585",
+      "writeScopes": [
+        "digital-hospital-standard-platform/app.js",
+        "test/digital-hospital-auth-initialization.test.js",
+        "test/e2e/digital-hospital-public-health.spec.js"
+      ],
+      "observability": {
+        "applicable": true,
+        "gaps": "仅局部初始化时序修复；运行观测复用证据待核验，不冒充生产能力完成"
+      },
       "runtimeCapability": true
     },
     {
@@ -1862,7 +2036,7 @@
       "title": "共享工作台读取代次隔离",
       "ownerProcess": "T09",
       "integrationOwner": "T00",
-      "taskStatus": "已阻塞",
+      "taskStatus": "已关闭",
       "capabilityStatus": "已实现",
       "riskLevel": "中",
       "approval": {
@@ -1882,7 +2056,9 @@
       ],
       "decisionIds": [],
       "dependencies": [
-        "GOV-011", "SEC-015", "TEST-021"
+        "GOV-011",
+        "SEC-015",
+        "TEST-021"
       ],
       "affectedModules": [
         "domain-task-read-generation"
@@ -1895,7 +2071,11 @@
       "testIds": [
         "TEST-OPS-038"
       ],
-      "evidenceIds": ["EVD-OPS-038-LOCAL", "EVD-GOV-012-COMBINATION-LOCAL"],
+      "evidenceIds": [
+        "EVD-OPS-038-LOCAL",
+        "EVD-GOV-012-COMBINATION-LOCAL",
+        "EVD-PR305-INTEGRATION"
+      ],
       "rollback": "回退本任务独立提交并重跑相关门禁；无 migration，不回退服务端业务事实",
       "unresolved": [
         "仅浏览器局部可靠性修复；运行观测适用性及复用证据未核验，不据代码合并晋级完整能力"
@@ -1903,8 +2083,8 @@
       "worktree": ".codex-platform-worktrees/process-v2/t09-domain-task-read-generation-20260913",
       "branch": "process/t09-domain-task-read-generation-20260913",
       "planRef": "docs/lifecycle-governance.md#gov-012-读取代次修复-plan",
-      "pullRequestRef": "",
-      "ciRef": "",
+      "pullRequestRef": "https://github.com/xujiann/chronic-care-platform/pull/305",
+      "ciRef": "https://github.com/xujiann/chronic-care-platform/actions/runs/34824818585",
       "writeScopes": [
         "domain-task-ui.js",
         "test/domain-task-ui-refresh.test.js"
@@ -1920,7 +2100,7 @@
       "title": "文书中心读取代次隔离",
       "ownerProcess": "T08",
       "integrationOwner": "T00",
-      "taskStatus": "已阻塞",
+      "taskStatus": "已关闭",
       "capabilityStatus": "已实现",
       "riskLevel": "中",
       "approval": {
@@ -1940,7 +2120,9 @@
       ],
       "decisionIds": [],
       "dependencies": [
-        "GOV-011", "SEC-015", "TEST-021"
+        "GOV-011",
+        "SEC-015",
+        "TEST-021"
       ],
       "affectedModules": [
         "clinical-document-read-generation"
@@ -1953,7 +2135,11 @@
       "testIds": [
         "TEST-OPS-037"
       ],
-      "evidenceIds": ["EVD-OPS-037-LOCAL", "EVD-GOV-012-COMBINATION-LOCAL"],
+      "evidenceIds": [
+        "EVD-OPS-037-LOCAL",
+        "EVD-GOV-012-COMBINATION-LOCAL",
+        "EVD-PR305-INTEGRATION"
+      ],
       "rollback": "回退本任务独立提交并重跑相关门禁；无 migration，不回退服务端业务事实",
       "unresolved": [
         "仅浏览器局部可靠性修复；运行观测适用性及复用证据未核验，不据代码合并晋级完整能力"
@@ -1961,8 +2147,8 @@
       "worktree": ".codex-platform-worktrees/process-v2/t08-clinical-document-read-generation-20260913",
       "branch": "process/t08-clinical-document-read-generation-20260913",
       "planRef": "docs/lifecycle-governance.md#gov-012-读取代次修复-plan",
-      "pullRequestRef": "",
-      "ciRef": "",
+      "pullRequestRef": "https://github.com/xujiann/chronic-care-platform/pull/305",
+      "ciRef": "https://github.com/xujiann/chronic-care-platform/actions/runs/34824818585",
       "writeScopes": [
         "regional-clinical-documents.js",
         "test/regional-clinical-document-retry-session.test.js"
@@ -1978,13 +2164,13 @@
       "title": "读取代次修复组合登记",
       "ownerProcess": "T00",
       "integrationOwner": "T00",
-      "taskStatus": "验证中",
-      "capabilityStatus": "已实现",
+      "taskStatus": "已关闭",
+      "capabilityStatus": "已集成",
       "riskLevel": "中",
       "approval": {
         "state": "approved",
         "mode": "T00-plan-approval",
-        "ref": "T00-PLAN-GOV-012-APPROVED-2026-09-13; USER-DELEGATED-T00-PLAN-OPS-039-2026-09-14; USER-DELEGATED-T00-COMBINATION-2026-09-14; USER-APPROVED-FAILURE-REPAIR-2026-09-14",
+        "ref": "T00-PLAN-GOV-012-APPROVED-2026-09-13; USER-DELEGATED-T00-PLAN-OPS-039-2026-09-14; USER-DELEGATED-T00-COMBINATION-2026-09-14; USER-APPROVED-FAILURE-REPAIR-2026-09-14; USER-AUTHORIZED-PR305-INTEGRATION-2026-09-14",
         "approvedScope": "config/lifecycle-governance.json, docs/lifecycle-governance.md, ROADMAP.md"
       },
       "requirementIds": [
@@ -2013,18 +2199,18 @@
       "testIds": [
         "TEST-GOV-012"
       ],
-      "evidenceIds": ["EVD-GOV-012-COMBINATION-LOCAL", "EVD-GOV-012-EVIDENCE-RECHECK-FAILURE"],
-      "rollback": "回退本任务独立提交并重跑相关门禁；无 migration，不回退服务端业务事实",
-      "unresolved": [
-        "证据提交3da30ea9的iterations路径替换安全断言失败，须独立诊断与新精确PLAN；不以旧通过覆盖或认定为flaky",
-        "组合6e92bf5d完整E2E退出1：居民端超时重试场景失败，追踪已保留；后续居民测试修复需独立PLAN与审批",
-        "原OPS037失败保留，组合根E2E60通过仅证明组合候选；待远端精确CI与main集成，未获推送PR合并上线权限"
+      "evidenceIds": [
+        "EVD-GOV-012-COMBINATION-LOCAL",
+        "EVD-GOV-012-EVIDENCE-RECHECK-FAILURE",
+        "EVD-PR305-INTEGRATION"
       ],
-      "worktree": ".codex-platform-worktrees/process-v2/t00-journal-identity-portfolio-20260914",
-      "branch": "process/t00-journal-identity-portfolio-20260914",
-      "planRef": "docs/lifecycle-governance.md#sec-015与test-021-失败修复-plan",
-      "pullRequestRef": "",
-      "ciRef": "",
+      "rollback": "回退本任务独立提交并重跑相关门禁；无 migration，不回退服务端业务事实",
+      "unresolved": [],
+      "worktree": ".codex-platform-worktrees/process-v2/t00-repair-integration-closeout-20260914",
+      "branch": "process/t00-repair-integration-closeout-20260914",
+      "planRef": "docs/lifecycle-governance.md#gov-012-pr305-集成收尾-plan-与事实",
+      "pullRequestRef": "https://github.com/xujiann/chronic-care-platform/pull/305",
+      "ciRef": "https://github.com/xujiann/chronic-care-platform/actions/runs/34824818585",
       "writeScopes": [
         "config/lifecycle-governance.json",
         "docs/lifecycle-governance.md",
