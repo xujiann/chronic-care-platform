@@ -390,7 +390,7 @@ test("resident uses the V2 care workspace for correction, one-time sharing and a
   await renewalForm.getByRole("button", { name: "取消" }).click();
 
   await page.locator("[data-acknowledge-access='access-review-1']").click();
-  await expect(page.locator("#citizen-access-review-v2-list")).toContainText("居民已确认");
+  await expect(page.locator("#citizen-access-review-v2-list")).toContainText("居民已知晓");
   await page.locator("[data-fill-access-dispute='access-review-1']").click();
   const accessDisputeForm = page.locator("#citizen-access-dispute-form");
   await accessDisputeForm.locator("select[name='category']").selectOption("unknown-actor");

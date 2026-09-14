@@ -23,9 +23,18 @@ function harness() {
   let sequence = 0;
   let writeFailure;
   let queryFailure;
+  let authorization = () => undefined;
+  let authorizations = 0;
+  const session = { sessionId: "session-one", user: USER };
   let policy = { production: false, storageMode: "json" };
   const execute = createAccessAcknowledgementCommand({
     readDatabase: () => state,
+    validateAuthorization: (context) => {
+      authorizations += 1;
+      assert.equal(context.data, state);
+      assert.equal(context.session, session);
+      return authorization(context);
+    },
     writeDatabase: (next) => {
       if (writeFailure) throw writeFailure;
       assert.notEqual(next, state, "mutations must use a private snapshot");
@@ -47,10 +56,39 @@ function harness() {
     now: () => new Date(NOW),
     randomUUID: () => `server-${++sequence}`
   });
-  const command = (payload = envelope(), user = USER, key = payload.idempotencyKey) => execute({ user, accessLogId: payload.accessLogId, payload, idempotencyKey: key });
+  const command = (payload = envelope(), user = USER, key = payload.idempotencyKey) => execute({ user, session, accessLogId: payload.accessLogId, payload, idempotencyKey: key });
   return { execute, command, get state() { return state; }, set state(next) { state = next; }, get writes() { return writes; }, get queries() { return queries; },
+    get authorizations() { return authorizations; }, authorize(next) { authorization = next; },
     policy(next) { policy = next; }, failWrite(error) { writeFailure = error; }, failQuery(error) { queryFailure = error; } };
 }
+
+test("missing session and rejected or asynchronous live authorization fail before any write", async () => {
+  const missing = harness();
+  const payload = envelope();
+  await assert.rejects(missing.execute({ user: USER, accessLogId: payload.accessLogId, payload, idempotencyKey: payload.idempotencyKey }), { code: "CARE_ACCESS_ACK_FORBIDDEN", statusCode: 403 });
+  assert.equal(missing.authorizations, 0);
+  assert.equal(missing.writes, 0);
+  for (const guard of [() => false, () => { throw new Error("revoked"); }, () => Promise.resolve(true)]) {
+    const h = harness();
+    h.authorize(guard);
+    const before = structuredClone(h.state);
+    await assert.rejects(h.command(), { code: "CARE_ACCESS_ACK_FORBIDDEN", statusCode: 403 });
+    assert.deepEqual(h.state, before);
+    assert.equal(h.writes, 0);
+    assert.equal(h.queries, 0);
+  }
+});
+
+test("cached replay revalidates live session before exposing its receipt", async () => {
+  const h = harness();
+  await h.command();
+  const before = structuredClone(h.state);
+  h.authorize(() => { throw new Error("session revoked after first commit"); });
+  await assert.rejects(h.command(), { code: "CARE_ACCESS_ACK_FORBIDDEN", statusCode: 403 });
+  assert.equal(h.authorizations, 2);
+  assert.equal(h.writes, 1);
+  assert.deepEqual(h.state, before);
+});
 
 test("real frontend envelope produces server facts, minimal receipt and one atomic audit", async () => {
   const h = harness();

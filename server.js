@@ -15350,7 +15350,7 @@ async function hydrateRequestSession(req) {
     ? await store.hydrate(verified.sessionId)
     : store.get(verified.sessionId);
   const resolved = { ...resolution, session };
-  validateLiveSession(session, req.method === "POST" && /^\/api\/access-reviews\/[^/?]+\/acknowledge(?:\?|$)/.test(req.url) ? platformRuntimeComposition.contexts.forDomain("citizen-chronic").accessAcknowledgementCommand.readAuthorizationState() : readDatabase());
+  validateLiveSession(session, req.method === "POST" && /^\/api\/access-reviews\/[^/]+\/acknowledge$/.test(new URL(req.url, `http://${req.headers.host}`).pathname) ? platformRuntimeComposition.contexts.forDomain("citizen-chronic").accessAcknowledgementCommand.readAuthorizationState() : readDatabase());
   requireCsrf(req, resolved, process.env);
   req.authResolution = resolved;
   return session;
