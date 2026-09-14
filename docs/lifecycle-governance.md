@@ -2,6 +2,17 @@
 
 ## 1. 权威边界
 
+### SEC-015与TEST-021 失败修复 PLAN
+
+- 用户2026-09-14批准安全路径替换问题优先、居民超时恢复测试其次；临时T00继续仅本地开发测试、登记调度，不推送/PR/合并/上线。来源USER-APPROVED-FAILURE-REPAIR-2026-09-14。GOV-012仍唯一写中央三文件，迁至process/t00-journal-identity-portfolio-20260914；旧中央/组合/领域分支冻结只读。
+- 真实阻塞：OPS037/038/039暂停全部写入与验证，改已阻塞/已实现，新增SEC015与TEST021作为组合验收依赖，并非功能实现前置或因果归责；保留原scope与失败证据、不关闭不晋级。在制GOV012/SEC015/TEST021共3/5，另有本组合阻塞3项（不隐藏）；修复交接后按容量逐项恢复旧任务，不自动恢复导致超限。
+- 新两任务均从latest fetched origin/main@62e56918经process:plan/create独立建树。开发A只写SEC015读取器，开发B先写SEC015两个测试；SEC015确定性修复形成并专项通过后，再由B单写TEST021的既有E2E文件。协调者唯一写中央三文件，独立审查者只读，不并行重型套件。
+- SEC015精确scope：src/platform/cutover/pilot-cutover-alert-lifecycle.js、test/pilot-cutover-alert-lifecycle.test.js、test/platform-preproduction-control-cli.test.js。独立风险复核认为是中风险既有安全合同兼容纠错，不改变信任模型，无需用无关ADR冒充授权。仅read函数的lstat/fstat统一精确bigint身份，size保留原上限并在有界检查后转Number；禁止有损回退。保持错误码、普通文件/链接拒绝、descriptor关闭、journal格式、签名链、权限、写入器和其他读取器不变。
+- 先持久化确定性RED：不同精确身份映射同Number、相同身份成功、各观测点替换拒绝、巨大/负size、原文件/链接/读中变长、异常与关闭。100次真实替换均拒绝且68次inode非安全整数；单项内存碰撞旧reader错误接受是机制证据，不宣称原失败已归因。原诊断日志位于Temp/journal-path-swap-diagnostic-20260914.log及journal-path-swap-number-collision-20260914.log。
+- TEST021仅test/e2e/resident-mini-program.spec.js。先用真实HTTP+暂停浏览器时钟，首state到达后推进500ms触发生产真实timer/abort，保留中文超时、应用隐藏、请求失败与重试恰2次、恢复和主体范围；重试阶段保持暂停解除墙钟机器速度假设。使用当前日期附近时钟避免过期，不改runtime/expect预算、套件13项、Service Worker策略或runner。不能用sleep/force/响应伪成功绕过。
+- 测试：SEC015专项RED/GREEN及CLI/alert关联；TEST021定向浏览器和居民13项，排队串行。独立审查后各冻结，串行必需build/lint/type/unit/integration/smoke/不变legacy与相关中央/安全门禁；组合验收仍需后续精确候选新证据，不复用单分支通过冒称组合通过。
+- 回滚各自独立提交，不改现有日志、数据库或生产状态。若需扩展安全模型、信任源、拓扑或读写权威，停止并另行ADR/人工审批；观测未核验、共享auth生命周期、真实PG及六域NO-GO不变。本PLAN不授权新增第三修复。
+
 ### GOV-012 本地组合验证与台账收口 PLAN
 
 - 2026-09-14 用户续授当前协调者临时 T00 权限，仅执行 OPS-037/038/039 本地组合验证和台账收口。来源 USER-DELEGATED-T00-COMBINATION-2026-09-14；禁止推送、PR、合入 main 和上线。沿用 GOV-012 中央三文件 scope，不新增抢占相同 scope 的任务，WIP 仍为 4/5。
