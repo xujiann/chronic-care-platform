@@ -925,7 +925,6 @@
     }
   ],
   "decisions": [
-{"id":"ADR-OPS-040","status":"Accepted","path":"docs/adr/2026-09-14-resident-access-acknowledgement.md","effectiveScope":"non-production-self-access-acknowledgement-only","reviewDue":"2027-03-14","supersedes":[]},
     {
       "id": "ADR-GOV-001",
       "status": "Accepted",
@@ -956,6 +955,14 @@
       "path": "docs/adr/2026-09-08-resident-service-message-authorization.md",
       "effectiveScope": "resident-service-message-role-organization-and-receipt-authorization",
       "reviewDue": "2027-03-08",
+      "supersedes": []
+    },
+    {
+      "id": "ADR-OPS-040",
+      "status": "Accepted",
+      "path": "docs/adr/2026-09-14-resident-access-acknowledgement.md",
+      "effectiveScope": "non-production-self-access-acknowledgement-only",
+      "reviewDue": "2027-03-14",
       "supersedes": []
     }
   ],
