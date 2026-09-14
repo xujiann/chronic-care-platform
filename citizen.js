@@ -2912,7 +2912,7 @@ function renderCitizenCareWorkspace(resident, diseases = []) {
   const accessQueue = citizenAccessReviewQueue(resident.id);
   const acknowledged = new Set(careState.accessAcknowledgements.map((item) => item.accessLogId));
   const disputed = new Set(careState.accessDisputes.filter((item) => !["resolved", "rejected", "withdrawn"].includes(item.status)).map((item) => item.accessLogId));
-  const reviewCount = accessQueue.filter((item) => item.reviewState === "review" && !acknowledged.has(item.eventId)).length;
+  const reviewCount = accessQueue.filter((item) => item.reviewState === "review").length;
   const blockedCount = accessQueue.filter((item) => item.reviewState === "blocked").length;
   document.querySelector("#citizen-access-review-v2-summary").innerHTML = `<div class="citizen-care-row ${reviewCount ? "warning" : ""}">
     <div><strong>${accessQueue.length} 条访问事件</strong><span>${reviewCount} 条待复核</span><em>${blockedCount} 条已拦截</em></div>
@@ -2923,11 +2923,11 @@ function renderCitizenCareWorkspace(resident, diseases = []) {
     const disputedItem = disputed.has(item.eventId);
     const tone = item.reviewState === "review" ? "warning" : item.reviewState === "blocked" ? "denied" : "";
     return `<div class="citizen-care-row ${tone}">
-      <div><strong>${escapeHtml(item.actor)}</strong><span>${escapeHtml(item.label)}</span>${acknowledgedItem ? "<em>居民已确认</em>" : ""}${disputedItem ? "<em>异议处理中</em>" : ""}</div>
+      <div><strong>${escapeHtml(item.actor)}</strong><span>${escapeHtml(item.label)}</span>${acknowledgedItem ? "<em>居民已知晓</em>" : ""}${disputedItem ? "<em>异议处理中</em>" : ""}</div>
       <p>${escapeHtml(item.at || "时间待核验")} · ${escapeHtml(item.scope || "范围待核验")} · ${escapeHtml(item.purpose || "用途待补录")}</p>
       <small>${escapeHtml(item.result)}${item.recommendedAction ? ` · ${escapeHtml(item.recommendedAction)}` : ""}</small>
       <footer>
-        ${!acknowledgedItem && item.reviewState !== "blocked" ? `<button type="button" class="small-button" data-acknowledge-access="${escapeHtml(item.eventId)}">这是正常访问</button>` : ""}
+        ${!acknowledgedItem && item.reviewState !== "blocked" ? `<button type="button" class="small-button" data-acknowledge-access="${escapeHtml(item.eventId)}">我已知晓此次访问</button>` : ""}
         <button type="button" class="small-button" data-fill-access-dispute="${escapeHtml(item.eventId)}">对此访问有异议</button>
       </footer>
     </div>`;
@@ -3417,9 +3417,10 @@ function bindCitizenCareWorkspace() {
           acknowledgement,
           "access-acknowledge"
         );
-        const saved = api.projectAccessReviewActionReceipt(response, acknowledgement);
+        const saved = API_BASE ? api.projectAccessAcknowledgementReceipt(response, acknowledgement)
+          : api.projectAccessReviewActionReceipt(response, acknowledgement);
         ensureCitizenCareCollections(view.residentId).accessAcknowledgements.unshift(saved);
-        finishCareAction(view, saved, "已记录为居民确认的正常访问");
+        finishCareAction(view, saved, "已记录本人知晓，不改变访问结果或授权");
       } catch (error) {
         if (isCurrentCareView(view)) showToast(error.message || "访问确认失败");
       }

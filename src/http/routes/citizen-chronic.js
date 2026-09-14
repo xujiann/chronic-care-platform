@@ -878,6 +878,33 @@ function createRouteSegments(runtime, options = {}) {
       id: "citizen-chronic-07",
       domain: "citizen-chronic",
       async handle(req, res, url) {
+        const accessAcknowledgementMatch = url.pathname.match(/^\/api\/access-reviews\/([^/]+)\/acknowledge$/);
+        if (req.method === "POST" && accessAcknowledgementMatch) {
+          const user = requireApiRole(req, res, ["citizen"], "/api/access-reviews/:accessLogId/acknowledge");
+          if (!user) return true;
+          try {
+            if (typeof runtime.accessAcknowledgementCommand !== "function") {
+              sendJson(res, 503, { code: "CARE_ACCESS_ACK_STORAGE_UNSUPPORTED", message: "访问知晓声明服务未启用" });
+              return true;
+            }
+            const result = await runtime.accessAcknowledgementCommand({
+              user,
+              accessLogId: decodeURIComponent(accessAcknowledgementMatch[1]),
+              payload: await collectJson(req),
+              idempotencyKey: req.headers["idempotency-key"]
+            });
+            sendJson(res, result.statusCode, result.body);
+          } catch (error) {
+            const known = /^(CARE_ACCESS_ACK_|RESIDENT_ACCESS_EVENT_)/.test(error?.code || "")
+              && [400, 403, 404, 409, 503].includes(error.statusCode);
+            const status = known ? error.statusCode : 400;
+            sendJson(res, status, {
+              code: known ? error.code : "CARE_ACCESS_ACK_INVALID",
+              message: known ? error.message : "访问知晓声明请求无效"
+            });
+          }
+          return true;
+        }
     if (req.method === "GET" && url.pathname === "/api/record-care-workspace") {
         const user = requireApiRole(req, res, ["citizen", "commission"], "/api/record-care-workspace");
         if (!user) return true;

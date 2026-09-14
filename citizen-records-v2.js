@@ -1127,6 +1127,27 @@
     };
   }
 
+  function projectAccessAcknowledgementReceipt(payload = {}, request = {}) {
+    const exact = (value, maximum) => typeof value === "string" && value.length > 0
+      && value.length <= maximum && value === value.trim() && !/[\u0000-\u001f\u007f]/.test(value);
+    const serverTime = (value) => exact(value, 60) && toDate(value)?.toISOString() === value;
+    if (payload.schemaVersion !== "resident-access-acknowledgement.v1"
+      || !exact(payload.id, 220) || !exact(payload.residentId, 120) || !exact(payload.accessLogId, 160)
+      || payload.residentId !== request.residentId || payload.accessLogId !== request.accessLogId
+      || payload.resourceId !== request.accessLogId || payload.status !== "accepted"
+      || payload.decision !== "recognized" || payload.syncStatus !== "accepted"
+      || !exact(payload.receiptId, 160) || !exact(payload.auditRef, 160)
+      || !serverTime(payload.acknowledgedAt) || !serverTime(payload.acceptedAt)) {
+      throw new Error("访问知晓声明缺少匹配的服务端回执");
+    }
+    return {
+      schemaVersion: payload.schemaVersion, id: payload.id, residentId: payload.residentId,
+      accessLogId: payload.accessLogId, resourceId: payload.resourceId, decision: "recognized", status: "accepted",
+      acknowledgedAt: payload.acknowledgedAt,
+      ...projectActionReceipt(payload, { residentId: request.residentId, resourceId: request.accessLogId })
+    };
+  }
+
   function projectAccessReviewActionReceipt(payload = {}, request = {}) {
     const allowedStatuses = new Set(["submitted", "accepted", "processing", "resolved", "rejected", "withdrawn"]);
     const status = cleanText(payload.status || request.status, 40);
@@ -1547,6 +1568,7 @@
     buildAccessAcknowledgement,
     buildAccessDispute,
     projectAccessReviewActionReceipt,
+    projectAccessAcknowledgementReceipt,
     buildAccessExportRows,
     filterResidentRecords,
     buildResidentPortableArchive,
