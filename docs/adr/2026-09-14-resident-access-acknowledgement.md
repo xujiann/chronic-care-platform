@@ -61,7 +61,11 @@ SQLite 专属适配直接复用既有状态事务及 append-only hook，提交�
 
 运行时 factory 经既有 src/http/platform-runtime-composition.js 导出并注入 server.js，不增加 server require 预算。dataAccessLogs/securityEvents 原系统 Owner 仍是 platform-governance（T02），T01 仅拥有核验端口，不迁移原审计数据权威；本轮只为 accessAcknowledgements 新增 T04 非生产声明合同。
 
+会话适配只准入现有同步 memory/sqlite 会话存储，按 sessionStoreMode 服务端解析；PostgreSQL 会话缓存 get 不能证明即时撤销，故本首切片拒绝该配置，不引入异步会话存储实现或生产拓扑变更。
+
 ## Completion
+
+授权重验复用既有 validateLiveSession 与会话存储，不建立新身份规则。仅本 POST 的会话水合改读专属原始快照，防止普通 readDatabase 提前补链；命令取得集合锁并读取最新状态后，再验证服务端会话仍有效、账户仍启用且精确绑定同一本人，再执行幂等重放/提交。该接线覆盖请求体传输和等待锁期间撤权，SQLite 全状态版本 CAS 覆盖读取后的状态竞争；不改变其他路由认证行为。
 
 Owner 机器登记复用既有 legacy-owner-review-write-policy.v1 / first-release-legacy-owner-review.v1 数据结构，建立独立 resident-access-acknowledgement 批次与摘要，不改旧批次或首发 portfolio。该历史 schema 名称不表示本声明进入首发迁移或生产：productionWriteAllowed/productionPromotionAllowed 均 false，migrationRequired=true；命令版本单独登记为 resident-access-acknowledgement.v1。该集合已在运行时归一化中存在，但不在跟踪种子的 252 个集合中，因此不向 state-collection-governance 无 Owner 待审清单重复添加，也不编辑种子数据。
 

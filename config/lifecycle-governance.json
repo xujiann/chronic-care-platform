@@ -960,9 +960,9 @@
     }
   ],
   "tests": [
-{"id":"TEST-GOV-013","kind":"access-acknowledgement-boundary","path":"docs/adr/2026-09-14-resident-access-acknowledgement.md","command":"npm run governance:lifecycle"},
+    {"id":"TEST-GOV-013","kind":"access-acknowledgement-boundary","path":"test/lifecycle-governance.test.js","command":"npm run governance:lifecycle"},
     {"id":"TEST-OPS-040","kind":"access-acknowledgement-boundary","path":"test/citizen-access-acknowledgement-api.test.js","command":"node --test --test-concurrency=1 test/citizen-access-acknowledgement.test.js test/citizen-access-acknowledgement-api.test.js test/resident-access-event-query.test.js"},
-    {"id":"TEST-SEC-016","kind":"access-acknowledgement-boundary","path":"test/citizen-access-acknowledgement-api.test.js","command":"node --test --test-concurrency=1 test/citizen-access-acknowledgement.test.js test/citizen-access-acknowledgement-api.test.js test/resident-access-event-query.test.js"},
+    {"id":"TEST-SEC-016","kind":"access-acknowledgement-boundary","path":"test/resident-access-acknowledgement-runtime.test.js","command":"node --test --test-concurrency=1 test/citizen-access-acknowledgement.test.js test/citizen-access-acknowledgement-api.test.js test/resident-access-event-query.test.js test/resident-access-acknowledgement-runtime.test.js"},
     {"id":"TEST-SEC-015","kind":"journal-identity-regression","path":"test/pilot-cutover-alert-lifecycle.test.js","command":"node --test test/pilot-cutover-alert-lifecycle.test.js test/platform-preproduction-control-cli.test.js"},
     {"id":"TEST-TEST-021","kind":"resident-timeout-recovery-browser","path":"test/e2e/resident-mini-program.spec.js","command":"npm run test:e2e:resident"},
     {

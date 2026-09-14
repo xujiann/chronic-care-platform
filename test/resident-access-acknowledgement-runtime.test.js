@@ -25,6 +25,9 @@ function fixture(t, fsOverrides = {}, overrides = {}) {
     fs: { ...fs, ...fsOverrides }, path, DATA_DIR: directory, DB_FILE: file, STORAGE_ENGINE: "json",
     RUNTIME_STORAGE_ENGINES: new Set(["auto", "json", "sqlite"]), POSTGRES_SYNC_MODE: "disabled",
     shouldUseSqlite: () => false, loadSqliteModule: () => null, createHash, randomUUID, verifyAuditTrail,
+    sessionStoreMode: () => "memory",
+    runtimeSessionStore: () => ({ get: () => ({ sessionId: "session-1", user: { id: "actor-1", role: "citizen", residentId: "resident-1" } }) }),
+    validateLiveSession: (session) => ({ user: session.user }),
     prependAuditTrailEntry: (rows, entry) => {
       const row = { ...entry, previousAuditHash: rows[0]?.auditHash || "" };
       row.auditHash = auditHashFor(row);
@@ -33,7 +36,8 @@ function fixture(t, fsOverrides = {}, overrides = {}) {
   });
   const payload = V2.buildIdempotentAction({ operation: "access-acknowledge", residentId: "resident-1", nonce: "runtime-test",
     payload: V2.buildAccessAcknowledgement({ residentId: "resident-1", accessLogId: "event-1" }) });
-  const request = { user: { id: "actor-1", role: "citizen", residentId: "resident-1" }, accessLogId: "event-1", payload, idempotencyKey: payload.idempotencyKey };
+  const user = { id: "actor-1", role: "citizen", residentId: "resident-1" };
+  const request = { user, session: { sessionId: "session-1", user }, accessLogId: "event-1", payload, idempotencyKey: payload.idempotencyKey };
   return { command: () => command(request), initial, file, directory, read: () => JSON.parse(fs.readFileSync(file, "utf8")) };
 }
 
@@ -101,4 +105,35 @@ test("PostgreSQL outbox configuration is outside this non-production command", a
   const before = fs.readFileSync(h.file);
   await assert.rejects(h.command());
   assert.deepEqual(fs.readFileSync(h.file), before);
+});
+
+test("cached PostgreSQL sessions are not accepted as synchronous revocation evidence", async (t) => {
+  const h = fixture(t, {}, { sessionStoreMode: () => "postgres" });
+  const before = fs.readFileSync(h.file);
+  await assert.rejects(h.command(), { code: "CARE_ACCESS_ACK_STORAGE_UNSUPPORTED" });
+  assert.deepEqual(fs.readFileSync(h.file), before);
+});
+
+for (const live of [null, { sessionId: "session-1", user: { id: "actor-1", role: "citizen", residentId: "different-resident" } }]) {
+  test("revoked or rebound live session cannot commit using the request snapshot", async (t) => {
+    const h = fixture(t, {}, { runtimeSessionStore: () => ({ get: () => live }) });
+    const before = fs.readFileSync(h.file);
+    await assert.rejects(h.command(), { code: "CARE_ACCESS_ACK_FORBIDDEN" });
+    assert.deepEqual(fs.readFileSync(h.file), before);
+  });
+}
+
+test("a JSON writer after the authority snapshot is preserved and causes an explicit conflict", async (t) => {
+  let h;
+  h = fixture(t, {}, { validateLiveSession: (session) => {
+    const changed = h.read();
+    changed.concurrentWriterMarker = "synthetic-change";
+    fs.writeFileSync(h.file, JSON.stringify(changed));
+    return { user: session.user };
+  } });
+  await assert.rejects(h.command(), { code: "CARE_ACCESS_ACK_STORAGE_CONFLICT" });
+  assert.equal(h.read().concurrentWriterMarker, "synthetic-change");
+  assert.deepEqual(h.read().accessAcknowledgements, []);
+  assert.deepEqual(h.read().securityEvents, []);
+  assert.deepEqual(fs.readdirSync(h.directory), ["db.json"]);
 });

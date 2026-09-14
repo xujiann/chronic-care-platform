@@ -6597,7 +6597,6 @@ function readDatabase() {
   return data;
 }
 
-
 function currentPublicHealthExternalVersions(data = {}, cas = {}) {
   const dispatch = (Array.isArray(data.publicHealthExternalDispatches) ? data.publicHealthExternalDispatches : [])
     .find((item) => item.id === String(cas.dispatchId || "").trim());
@@ -15351,7 +15350,7 @@ async function hydrateRequestSession(req) {
     ? await store.hydrate(verified.sessionId)
     : store.get(verified.sessionId);
   const resolved = { ...resolution, session };
-  validateLiveSession(session, readDatabase());
+  validateLiveSession(session, req.method === "POST" && /^\/api\/access-reviews\/[^/?]+\/acknowledge(?:\?|$)/.test(req.url) ? platformRuntimeComposition.contexts.forDomain("citizen-chronic").accessAcknowledgementCommand.readAuthorizationState() : readDatabase());
   requireCsrf(req, resolved, process.env);
   req.authResolution = resolved;
   return session;
@@ -28337,7 +28336,7 @@ function createRuntimeCapabilitySource() {
   phoneLoginLockStatus,
   prependAuditEventPreservingTrail,
   prependAuditTrailEntry,
-  accessAcknowledgementCommand: createResidentAccessAcknowledgementRuntime({ fs, path, DATA_DIR, DB_FILE, STORAGE_ENGINE, RUNTIME_STORAGE_ENGINES, POSTGRES_SYNC_MODE, shouldUseSqlite, loadSqliteModule, openSqliteDatabase, RUNTIME_INTERNAL_COLLECTION_KEYS, normalizeState, writeSqliteState, createHash, randomUUID, verifyAuditTrail, prependAuditTrailEntry }),
+  accessAcknowledgementCommand: createResidentAccessAcknowledgementRuntime({ fs, path, DATA_DIR, DB_FILE, STORAGE_ENGINE, RUNTIME_STORAGE_ENGINES, POSTGRES_SYNC_MODE, shouldUseSqlite, loadSqliteModule, openSqliteDatabase, RUNTIME_INTERNAL_COLLECTION_KEYS, normalizeState, writeSqliteState, createHash, randomUUID, verifyAuditTrail, prependAuditTrailEntry, validateLiveSession, runtimeSessionStore, sessionStoreMode }),
   probeSessionStoreStatus,
   productionAdapterCenter,
   promoteNextRegistrationWaitlist,
