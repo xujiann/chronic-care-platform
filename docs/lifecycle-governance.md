@@ -2,6 +2,73 @@
 
 ## 1. 权威边界
 
+### SEC-015与TEST-021 失败修复 PLAN
+
+- 用户2026-09-14批准安全路径替换问题优先、居民超时恢复测试其次；临时T00继续仅本地开发测试、登记调度，不推送/PR/合并/上线。来源USER-APPROVED-FAILURE-REPAIR-2026-09-14。GOV-012仍唯一写中央三文件，迁至process/t00-journal-identity-portfolio-20260914；旧中央/组合/领域分支冻结只读。
+- 真实阻塞：OPS037/038/039暂停全部写入与验证，改已阻塞/已实现，新增SEC015与TEST021作为组合验收依赖，并非功能实现前置或因果归责；保留原scope与失败证据、不关闭不晋级。在制GOV012/SEC015/TEST021共3/5，另有本组合阻塞3项（不隐藏）；修复交接后按容量逐项恢复旧任务，不自动恢复导致超限。
+- 新两任务均从latest fetched origin/main@62e56918经process:plan/create独立建树。开发A只写SEC015读取器，开发B先写SEC015两个测试；SEC015确定性修复形成并专项通过后，再由B单写TEST021的既有E2E文件。协调者唯一写中央三文件，独立审查者只读，不并行重型套件。
+- SEC015精确scope：src/platform/cutover/pilot-cutover-alert-lifecycle.js、test/pilot-cutover-alert-lifecycle.test.js、test/platform-preproduction-control-cli.test.js。独立风险复核认为是中风险既有安全合同兼容纠错，不改变信任模型，无需用无关ADR冒充授权。仅read函数的lstat/fstat统一精确bigint身份，size保留原上限并在有界检查后转Number；禁止有损回退。保持错误码、普通文件/链接拒绝、descriptor关闭、journal格式、签名链、权限、写入器和其他读取器不变。
+- 先持久化确定性RED：不同精确身份映射同Number、相同身份成功、各观测点替换拒绝、巨大/负size、原文件/链接/读中变长、异常与关闭。100次真实替换均拒绝且68次inode非安全整数；单项内存碰撞旧reader错误接受是机制证据，不宣称原失败已归因。原诊断日志位于Temp/journal-path-swap-diagnostic-20260914.log及journal-path-swap-number-collision-20260914.log。
+- TEST021仅test/e2e/resident-mini-program.spec.js。先用真实HTTP+暂停浏览器时钟，首state到达后推进500ms触发生产真实timer/abort，保留中文超时、应用隐藏、请求失败与重试恰2次、恢复和主体范围；重试阶段保持暂停解除墙钟机器速度假设。使用当前日期附近时钟避免过期，不改runtime/expect预算、套件13项、Service Worker策略或runner。不能用sleep/force/响应伪成功绕过。
+- 测试：SEC015专项RED/GREEN及CLI/alert关联；TEST021定向浏览器和居民13项，排队串行。独立审查后各冻结，串行必需build/lint/type/unit/integration/smoke/不变legacy与相关中央/安全门禁；组合验收仍需后续精确候选新证据，不复用单分支通过冒称组合通过。
+- 本轮集中门禁细化（独立审查同意）：两切片分别窄测、审查与冻结后，经process:plan/create建立process/t00-failure-repair-validation-20260914，原样应用中央登记、旧三OPS冻结回归输入和两新修复。逐文件blob零漂移后再次组合审查并冻结；全部中央、标准、legacy、静态安全及完整E2E只在该候选串行执行一次，实际证据仅绑定组合SHA，不冒称每个领域原SHA均全量通过。旧三任务仍暂停自身写入/验收，不因作为回归输入自动恢复状态。任何冲突或需要源码修改须停止重新核定。
+- 回滚各自独立提交，不改现有日志、数据库或生产状态。若需扩展安全模型、信任源、拓扑或读写权威，停止并另行ADR/人工审批；观测未核验、共享auth生命周期、真实PG及六域NO-GO不变。本PLAN不授权新增第三修复。
+
+本地切片冻结：SEC015为29a2324ecf5f7a2c84f1dcca59f440d70ed8692d，最终专项56/56，独立审查无P0–P2；有效持久RED为53项32通过/21失败，初版测试宿主修正前日志另保留。TEST021为cdc5d59c211c26eaaae50dd1d6aaa58da319e05c，定向1/1、居民13/13，独立审查通过，仍只改既有单测试。两任务记验证中/已实现，待统一候选全门禁；本段不自证组合通过。日志分别Temp/sec015-red-corrected.log、sec015-green-extended.log、test021-focused.log、test021-resident.log。
+
+### GOV-012 本地组合验证与台账收口 PLAN
+
+- 2026-09-14 用户续授当前协调者临时 T00 权限，仅执行 OPS-037/038/039 本地组合验证和台账收口。来源 USER-DELEGATED-T00-COMBINATION-2026-09-14；禁止推送、PR、合入 main 和上线。沿用 GOV-012 中央三文件 scope，不新增抢占相同 scope 的任务，WIP 仍为 4/5。
+- 基线 latest fetched origin/main@62e56918a94c927bfa4f9a36ff1847930ff238f3；经 process:plan/create 建立 process/t00-read-generation-combination-20260914 隔离候选。旧中央树与三个领域树全部冻结只读，中央唯一 writer 转到本候选；领域 owner 和原实施 writeScopes 不变，不把组合验证当作 T00 领域开发。
+- 组合输入为中央 ba0c0389、dddedfff 以及领域 d8943e7c58ac6ea43993547b977c84c104ec50f5、be4aac2a006502cabcb85107c723a7b5d2c98fd7、69da897af3ec847d4717409204ca3fec3ba66de6。仅应用冻结提交，七个领域文件逐项 blob 零漂移；其他运行时、共享 auth、页面、调用方、API、schema 和依赖不改。冲突或额外修复需求停止并重新核定范围。
+- 四角色：协调者负责候选组装、中央三文件、冻结及唯一重型队列；开发 A 只读核对来源和行为不变量；开发 B 核对治理合同、测试和证据；独立审查者不写实现。不存在同文件并发 writer。
+- 中风险组合验证，选择一个隔离候选统一验证，不在原冻结分支叠加。专项 31/31、31/31、23/23 与相关调用方/权限合同先执行；独立审查无 P0–P2 后冻结候选，串行 build/lint/typecheck/unit/integration/smoke/原样 test:all、安全/static/完整 E2E，再执行中央生命周期/文档/路由/架构/process/iterations 门禁。以实际退出码和日志计数为准，不累加重复覆盖。
+- 原独立 RED/GREEN 与审核可作来源证据，不能替代组合精确提交的测试。保留 OPS-037 原 E2E 失败，只有包含 OPS-039 的组合新结果可证明该候选回归；PostgreSQL 环境跳过不计通过，运行观测缺口与六域 NO-GO 保持。
+- 现有领域实现如实登记为已实现，组合验证进行中；不能晋级已验证运行能力、已集成或生产状态。最终本地证据须区分经全量验证的冻结候选与其后的纯证据记录提交；若记录提交只改中央文档/元数据，独立复核差异、复跑治理门禁并证明七个领域 blob 不变，不冒称其拥有新的远端 CI。
+- 完成条件为组合审查、真实串行门禁结果与精确提交证据齐备，交接待远端集成，不关闭生产缺口。无迁移；回滚为放弃隔离候选或在该候选中回退单个来源提交，不触碰旧树或业务数据。
+
+#### 本地组合执行结果：未通过完整验收
+
+- 冻结测试提交为 6e92bf5d411bd800520d6d799641b3a6b929eff7，独立审查无 P0–P2，七个领域文件与原来源 blob 一致。unit 3050 通过/1 环境跳过，integration 381/381，smoke 6/6，legacy 14 批 3431 通过/1 环境跳过，均 exit 0；中央生命周期18、路由17、架构141、process8、iterations98、文档/所有权/安全/static23及build/lint/typecheck均通过。跳过为缺少 POSTGRES_URL 的真实 PostgreSQL 合同，不计通过。
+- 完整 test:e2e 命令 exit 1：根站 60/60 通过，居民端 12 通过/1 失败；PWA 未由失败链执行，随后独立串行补跑3/3通过。根站包含数字医院公卫两项，但该候选通过不注销 OPS-037 原分支失败，也不表示完整组合通过。
+- 居民端失败为 test/e2e/resident-mini-program.spec.js:186 的超时重试场景，在:220等待工作区可见超时。trace 确认第二次state请求已继续放行、最终net::ERR_ABORTED且无成功响应；同轮身份与消息请求200，页面保持安全连接超时。500ms测试覆盖对重试仍生效，证据支持再次超时但不提供准确终止耗时，不据此断定环境偶发。居民源码、HTML、测试和运行器与基线无差异，未加载三个组合runtime。
+- 结果台账 C:/Users/drxuj/Temp/gov012-combination-6e92bf5d-final-results.log；legacy日志同前缀final-test-all.log，SHA-256 64AAF83FF27110893C277EBEB129C6432854BD150237A1B692412BD9F6B3A1B1；E2E日志同前缀final-test-e2e.log，SHA-256 4B76909186945B6D946E830E17A210D04369B277F857C2120C0E29D43392AFEE。失败目录 C:/Users/drxuj/Temp/gov012-combination-6e92bf5d-resident-failure，trace.zip SHA-256 4DD6266969384D939FF708D1400FA2CEBCD5BE6C574EABB65FACAF8CB6CE4908。
+- 首轮日志汇总命令发生PowerShell参数错误而主动中止，原片段保留；修复记录命令后以final前缀重跑全部门禁，项目代码未变。不将中断片段或独立PWA通过伪装成完整命令成功。
+- 四任务保持验证中/已实现，WIP4/5，未关闭、未集成、六域NO-GO不变。该段为纯证据收口，重型证据只绑定上述tested SHA；后续记录提交仅三份中央元数据，另行独立审查及治理门禁。下一建议是独立审批居民测试确定性切片，保留首请求真实超时、重试计数和主体范围断言，不改运行时失败关闭策略；本轮未授权该修复。
+
+#### 证据提交复查：新增安全断言失败
+
+- 纯证据提交3da30ea9f5322fe5391e869a88c1eaee73a3ae5e通过独立审查，差异仅中央三文件；其后中央复查的platform:iterations:test为97通过/1失败、exit1。失败在test/platform-preproduction-control-cli.test.js:705，测试在open前替换两个空日志文件，未出现预期PILOT_CUTOVER_ALERT_JOURNAL_BOUNDARY_INVALID。其余生命周期、文档、路由检查/测试、架构、process:test六项通过，process:verify独立补跑通过；不能称收口门禁全部通过。
+- 原6e92bf5d的iterations98通过仅属于此前执行，不能注销新失败。证据台账C:/Users/drxuj/Temp/gov012-combination-evidence-results.log，失败日志gov012-combination-evidence-platform-iterations-test.log。相关读取器与测试未变不等于证明环境偶发、测试缺陷或无安全影响。
+- 只读定位到pilot-cutover-alert-lifecycle.js以lstat/open/fstat的dev/ino及size核对文件身份。失败现场未记录stat，文件标识精度或复用仅为待验证假设；不据当前源码文件采样判断失败fixture。下一应优先独立诊断路径替换拒绝行为，形成精确安全PLAN，必要时审批读取器与对应测试修复；不放宽断言、不修改相邻边界。
+- 四任务仍验证中/已实现，两个失败并存。后续纯元数据记录只复核生命周期/文档/所有权与diff，已失败iterations保持未解决，不声称再次执行或通过；所有远端与生产操作仍未授权。
+
+### OPS-039 数字医院认证就绪启动 PLAN
+
+- 2026-09-14：用户已批准新问题方向，并明确授权当前协调者本轮临时承担 T00 准入登记与分工调度。中央沿用 GOV-012 三文件单写范围；不接管领域实现，不推送、PR、合并或上线。已有 OPS-037/038 冻结不动，中央未合入 main 的状态不冒充已集成。
+- 基线 latest fetched origin/main@62e56918；新任务 OPS-039/T01，WIP4/5，依赖已关闭 GOV-011。process:plan/create 建独立 process/t01-digital-hospital-auth-start-20260914 工作树。单任务内开发A仅写 digital-hospital-standard-platform/app.js，开发B仅写新 test/digital-hospital-auth-initialization.test.js 和既有 test/e2e/digital-hospital-public-health.spec.js；同文件不并发写，中央文件只由协调者修改。
+- 独立风险评估：中风险兼容性接线，仅消费 auth.js 已有 html[data-auth-resolved=allowed] 成功信号。不重复调用 initializePageAccess/refreshAuthContext，不新增身份请求；pending阶段不得 loadState/render/绑定业务写监听器，allowed后再读最新身份和既有角色/manager守卫，一次启动并解除观察器。
+- 保持既有明确静态预览边界（file与现有github.io规则），localhost仍是在线。不能以getUser非空、DOMContentLoaded、守卫pending返回true、isDemoMode或超时替代认证完成。缺auth、401/403、网络失败不降级演示；保留原机构映射、角色锁定、提交与签收分离及导航壳重排兼容。
+- 测试先持久RED再GREEN：完整真实app脚本，不复制业务helper；覆盖延迟/已完成/重复allowed、在线失败/身份缺失/错误角色、观察器注册复查、静态兼容与机构范围。既有公卫E2E用可控/auth/context延迟再继续原签收/关闭/筛选/导出旅程；不放宽原断言，不用固定sleep或强制点击。
+- 独立审查无P0-P2后冻结精确head，唯一重型队列串行build/lint/typecheck/unit/integration/smoke/不变legacy、浏览器安全/static/E2E；中央自身另跑治理/路由/架构/process/iterations门禁。任何改源码须复审并重新绑定证据；昨日失败与环境skip继续保留。
+- 非目标：共享auth.js/page-auth-bootstrap.js、HTML发布面、身份/会话/授权模型、API、持久化、凭据、撤权传播、在线演示准入和现有签收比较。若需要触碰这些边界，停止当前切片另行风险/ADR/人工审批。当前不授予高风险安全模型变更权限。
+- 回滚独立提交，无迁移。运行观测适用性及复用证据未核验，能力不晋级已验证/已集成，生产六域NO-GO保持。
+
+### GOV-012 读取代次修复 PLAN
+
+- 2026-09-14追加：用户临时授权当前协调者承担本轮T00登记与调度；原三文件范围内追加OPS039登记，具体边界见上方[OPS-039准入PLAN](#ops-039-数字医院认证就绪启动-plan)。下述两项范围与WIP3/5是09-13历史快照，当前WIP4/5；原批准来源保留，新来源另行追加，不宣称本地登记已集成。
+
+- 2026-09-13 T00 准入：基线 `62e56918a94c927bfa4f9a36ff1847930ff238f3`，GOV-011 已由 PR303 / head 2e976b3a / CI34701539073 九项成功、独立 P2 关闭后合并。legacy 日志完整14批3374项、3373通过、1环境跳过、0失败；旧进程退出码未重新取得，不伪造。中央本批仅总账/本规范/ROADMAP三文件。
+- 用户继续开发授权下，T00批准两个新中风险兼容修复；不复用OPS035/036已关闭范围。GOV-012、OPS-037、OPS-038 WIP3/5，各依赖已关闭GOV011；从最新fetched origin/main经process:plan/create建立独立工作树，若基线改变先核验差异。
+- OPS-037 / T08：仅 regional-clinical-documents.js、test/regional-clinical-document-retry-session.test.js，分支 process/t08-clinical-document-read-generation-20260913。真实源码与既有harness内存deferred已复现4种乱序，包括两个event补传POST POST GET GET；诊断exit0代表缺陷复现，不是验收通过。
+- OPS-038 / T09：仅 domain-task-ui.js、test/domain-task-ui-refresh.test.js，分支 process/t09-domain-task-read-generation-20260913。真实源码/harness已复现5种乱序，包括action旧刷新复活快照并虚报刷新完成；每个action仅1个POST。
+- 实施语义：每个组件实例独立递增读取代次，只有当前代次能提交快照、source、render、错误/成功提示或解除refresh忙状态。旧成功、旧失败、旧finally均无UI副作用。同步发起新读取即令旧代次失效；file兼容也服从同一规则，不改变既有fallback策略。
+- 共享load保留当前成功/失败结果合同；过期读取返回显式 superseded（例如 ok:false, superseded:true），不是网络失败。runAction遇superseded不能声称保存并刷新，也不能写“刷新失败”覆盖新状态；较新load负责UI结果，禁止自动重发POST。仍保留当前真实刷新失败时OPS035的已保存但刷新失败提示。
+- 验收先持久RED后GREEN：后发先回、当前失败、旧失败/成功、渲染/归一化抛错、最新pending期间旧完成，以及两个文书event、action刷新与手工刷新重叠。保留事件pending锁、file兼容、五调用方、旧安全和成功路径断言；不改API、权限、幂等、PDF、schema、并发写命令语义。
+- 回滚各自独立提交，不删除业务数据。若发现需改候选范围外文件、读取期间撤权/动作安全新策略或无法保持旧提示合同，停在RED并回报T00，不顺手扩大。
+- 本轮仅准入开发与定向测试、独立审查；不要求立即推送/合并或重型全量。冻结补丁与RED/GREEN证据交接后由T00另行安排标准门禁、最终精确CI/legacy及串行集成，不豁免门禁。
+- 两项是浏览器运行时修复，observability明确适用且未核验；本批不制造完整日志/指标/SLO/现场证据，不据代码完成晋级已验证运行能力。生产六域NO-GO、GS、observer A/B及SEC012均不变且未获本批实施权限。
+
 ### GOV-011 预算资源LF治理 PLAN
 
 - 来源：用户要求继续开发并批准按计划分路实施；T00 批准本中风险登记及 TEST-012 精确范围。新基线 `origin/main@a9603e450bfbb5ef1144fe6b04da4566534463e5`；从最新 fetched origin/main 经 process:plan/create 建立独立工作树。GOV-010 已由 PR #301 / head `9b298620750040c826d95245eb855bfae8cdc4e3` / CI 34567441437 九项成功合并，本批据此关闭，不自证本批完成。

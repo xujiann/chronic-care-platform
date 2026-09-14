@@ -6,6 +6,7 @@
   const user = auth?.getUser?.() || {};
   const state = { center: null, source: "loading", keyword: "", type: "all", reportingStatus: "all", institution: "all", selectedId: "" };
   const pendingRetries = new Set();
+  let readGeneration = 0;
 
   const fallbackCenter = Object.freeze({
     schemaVersion: "regional-clinical-document-center-v1",
@@ -236,21 +237,27 @@
   }
 
   async function load() {
+    const generation = ++readGeneration;
     $("#document-refresh").disabled = true;
     setBanner("正在读取授权医疗文书", "正在校验账号、机构与临床详情范围。", "warning");
     try {
       if (!apiEnabled) throw new Error("静态预览未连接业务服务");
-      state.center = await requestJson("/api/integration/clinical-documents/center");
+      const center = await requestJson("/api/integration/clinical-documents/center");
+      if (generation !== readGeneration) return;
+      state.center = center;
       state.source = "api";
       const scopeText = state.center.scope.crossInstitutionVisible ? "跨机构运行视角，不含临床内容" : `${state.center.scope.organizationCode} 机构最小授权视角`;
       setBanner("区域医疗文书业务服务已连接", `${scopeText}；最近刷新：${new Date().toLocaleString("zh-CN", { hour12: false })}。`, "normal");
     } catch (error) {
+      if (generation !== readGeneration) return;
       state.center = fallbackCenter;
       state.source = "fallback";
       setBanner("当前显示只读结构示例", `${error.message || "业务服务不可用"}。补传和 PDF 短时调阅均已禁用。`, "danger");
     } finally {
-      $("#document-refresh").disabled = false;
-      render();
+      if (generation === readGeneration) {
+        $("#document-refresh").disabled = false;
+        render();
+      }
     }
   }
 

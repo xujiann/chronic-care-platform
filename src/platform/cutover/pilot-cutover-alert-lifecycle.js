@@ -208,10 +208,15 @@ function validateAlertEvent(event, index, previousDigest, events) {
 function readPilotCutoverAlertJournal(file, options = {}) {
   const resolved = resolveJournalFile(file);
   const fileSystem = options.fileSystem || fs;
+  const validStat = (value) => typeof value.dev === "bigint"
+    && typeof value.ino === "bigint"
+    && typeof value.size === "bigint"
+    && value.size >= 0n
+    && value.size <= BigInt(MAX_ALERT_JOURNAL_BYTES);
   let stat;
   let descriptor = null;
   try {
-    stat = fileSystem.lstatSync(resolved);
+    stat = fileSystem.lstatSync(resolved, { bigint: true });
   } catch {
     if (options.allowMissing === true) return Object.freeze([]);
     throw lifecycleError(
@@ -219,7 +224,7 @@ function readPilotCutoverAlertJournal(file, options = {}) {
       "pilot cutover alert journal is unavailable"
     );
   }
-  if (stat.isSymbolicLink() || !stat.isFile() || stat.size > MAX_ALERT_JOURNAL_BYTES) {
+  if (stat.isSymbolicLink() || !stat.isFile() || !validStat(stat)) {
     throw lifecycleError(
       "PILOT_CUTOVER_ALERT_JOURNAL_BOUNDARY_INVALID",
       "pilot cutover alert journal must be a regular file within the size limit"
@@ -229,31 +234,38 @@ function readPilotCutoverAlertJournal(file, options = {}) {
   try {
     descriptor = fileSystem.openSync(resolved, fs.constants.O_RDONLY
       | (fs.constants.O_NOFOLLOW || 0));
-    const opened = fileSystem.fstatSync(descriptor);
-    const current = fileSystem.lstatSync(resolved);
+    const opened = fileSystem.fstatSync(descriptor, { bigint: true });
+    const current = fileSystem.lstatSync(resolved, { bigint: true });
     if (!opened.isFile()
       || current.isSymbolicLink()
       || !current.isFile()
+      || !validStat(opened)
+      || !validStat(current)
       || stat.dev !== opened.dev
       || stat.ino !== opened.ino
       || opened.dev !== current.dev
       || opened.ino !== current.ino
-      || opened.size > MAX_ALERT_JOURNAL_BYTES
       || current.size !== opened.size) {
       throw lifecycleError(
         "PILOT_CUTOVER_ALERT_JOURNAL_BOUNDARY_INVALID",
         "pilot cutover alert journal must match the opened regular file and remain within the size limit"
       );
     }
-    const bytes = Buffer.alloc(opened.size + 1);
+    const size = Number(opened.size);
+    const bytes = Buffer.alloc(size + 1);
     let offset = 0;
     while (offset < bytes.length) {
       const count = fileSystem.readSync(descriptor, bytes, offset, bytes.length - offset, offset);
       if (count === 0) break;
       offset += count;
     }
-    const finished = fileSystem.fstatSync(descriptor);
-    if (offset !== opened.size || finished.size !== opened.size) {
+    const finished = fileSystem.fstatSync(descriptor, { bigint: true });
+    if (!finished.isFile()
+      || !validStat(finished)
+      || finished.dev !== opened.dev
+      || finished.ino !== opened.ino
+      || offset !== size
+      || finished.size !== opened.size) {
       throw lifecycleError(
         "PILOT_CUTOVER_ALERT_JOURNAL_BOUNDARY_INVALID",
         "pilot cutover alert journal changed while it was being read"

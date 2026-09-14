@@ -54,6 +54,7 @@
   function start(config) {
     const client = root.HealthPlatformApi.createClient({ baseUrl: "/api" });
     const state = { rows: [], selectedId: "" };
+    let loadGeneration = 0;
     const nodes = {
       status: root.document.querySelector("#domain-workbench-status"),
       error: root.document.querySelector("#domain-workbench-error"),
@@ -111,10 +112,14 @@
     }
 
     async function load() {
+      const generation = ++loadGeneration;
       setStatus("正在加载任务……");
       try {
         const payload = await config.load(client);
-        state.rows = config.rows(payload).map(config.normalize);
+        if (generation !== loadGeneration) return { ok: false, superseded: true };
+        const rows = config.rows(payload).map(config.normalize);
+        if (generation !== loadGeneration) return { ok: false, superseded: true };
+        state.rows = rows;
         if (!state.rows.some((row) => row.id === state.selectedId)) state.selectedId = state.rows[0]?.id || "";
         syncStatusOptions();
         renderMetrics(nodes.metrics, state.rows);
@@ -122,6 +127,7 @@
         setStatus(`已从业务接口刷新 · ${new Date().toLocaleString("zh-CN")}`);
         return { ok: true };
       } catch (error) {
+        if (generation !== loadGeneration) return { ok: false, superseded: true };
         state.rows = [];
         renderMetrics(nodes.metrics, []);
         render();
@@ -138,7 +144,9 @@
       setStatus(`正在提交“${action.label}”……`);
       try {
         await action.run(client, row, role());
+        const refreshGeneration = loadGeneration + 1;
         const refreshed = await load();
+        if (refreshed.superseded || refreshGeneration !== loadGeneration) return;
         if (!refreshed.ok) {
           setStatus(`“${action.label}”已由业务接口保存，但刷新失败；请刷新核对最新状态，无需重复提交。${refreshed.error}`, true);
           return;

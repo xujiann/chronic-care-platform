@@ -101,6 +101,128 @@ function assertRefreshFailure(ui) {
   assert.equal(ui.nodes["#domain-workbench-metrics"].children[0].children[1].textContent, "0");
 }
 
+function deferredReads() {
+  const requests = [];
+  return {
+    requests,
+    load() { return new Promise((resolve, reject) => requests.push({ resolve, reject })); }
+  };
+}
+
+function taskRows(id) { return [{ id, title: id, status: "pending" }]; }
+
+function viewSnapshot(ui) {
+  const project = (node) => ({ text: node.textContent, value: node.value, dataset: { ...node.dataset }, children: node.children.map(project) });
+  return JSON.stringify({ state: ui.controller.state, nodes: Object.fromEntries(Object.entries(ui.nodes).map(([id, node]) => [id, project(node)])) });
+}
+
+for (const latestOutcome of ["success", "failure", "pending"]) {
+  for (const oldOutcome of ["success", "failure", "invalid-projection"]) {
+    test(`superseded ${oldOutcome} cannot change a newer ${latestOutcome} view`, async () => {
+      const ui = harness();
+      const reads = deferredReads();
+      let projections = 0;
+      await ui.start({ load: reads.load, rows(data) { projections += 1; if (data === "invalid") throw new Error("invalid old rows"); return data; } });
+      reads.requests[0].resolve(taskRows("initial"));
+      await settle();
+      const older = ui.controller.load();
+      const latest = ui.controller.load();
+      if (latestOutcome === "success") reads.requests[2].resolve(taskRows("latest"));
+      if (latestOutcome === "failure") reads.requests[2].reject(new Error("latest forbidden"));
+      if (latestOutcome !== "pending") await latest;
+      const before = viewSnapshot(ui);
+      const projectedBefore = projections;
+      if (oldOutcome === "failure") reads.requests[1].reject(new Error("old failure"));
+      else reads.requests[1].resolve(oldOutcome === "invalid-projection" ? "invalid" : taskRows("old"));
+      const result = await older;
+      assert.equal(result.ok, false);
+      assert.equal(result.superseded, true);
+      assert.equal(result.error, undefined, "superseded is not a network or projection failure");
+      assert.equal(projections, projectedBefore, "old payload must not reach the projection callbacks");
+      assert.equal(viewSnapshot(ui), before, "old completion must not change any view or selection");
+      if (latestOutcome === "pending") {
+        reads.requests[2].resolve(taskRows("latest"));
+        assert.equal((await latest).ok, true);
+        assert.equal(ui.controller.state.rows[0].id, "latest");
+      }
+    });
+  }
+}
+
+for (const latestOutcome of ["success", "failure", "pending"]) {
+  for (const oldOutcome of ["success", "failure"]) {
+    test(`action refresh ${oldOutcome} cannot overwrite a newer manual ${latestOutcome}`, async () => {
+      const ui = harness();
+      const reads = deferredReads();
+      await ui.start({ load: reads.load });
+      reads.requests[0].resolve(taskRows("initial"));
+      await settle();
+      await ui.clickAction();
+      assert.equal(reads.requests.length, 2, "the successful action starts its own refresh");
+      const latest = ui.nodes["#domain-refresh"].listeners.click();
+      if (latestOutcome === "success") reads.requests[2].resolve(taskRows("latest"));
+      if (latestOutcome === "failure") reads.requests[2].reject(new Error("latest forbidden"));
+      if (latestOutcome !== "pending") await latest;
+      const before = viewSnapshot(ui);
+      if (oldOutcome === "failure") reads.requests[1].reject(new Error("old action refresh failed"));
+      else reads.requests[1].resolve(taskRows("old-action"));
+      await settle();
+      assert.equal(viewSnapshot(ui), before, "the superseded action continuation must stay silent");
+      assert.equal(ui.calls.writes.length, 1);
+      assert.doesNotMatch(ui.status + ui.error, /保存并刷新|已由业务接口保存，但刷新失败/);
+      if (latestOutcome === "pending") {
+        reads.requests[2].resolve(taskRows("latest"));
+        assert.equal((await latest).ok, true);
+      }
+    });
+  }
+}
+
+test("read generations belong to each started controller, not the shared module", async () => {
+  const ui = harness();
+  const firstReads = deferredReads();
+  await ui.start({ load: firstReads.load });
+  const first = ui.controller;
+  firstReads.requests[0].resolve(taskRows("first-initial"));
+  await settle();
+  const firstPending = first.load();
+  const secondReads = deferredReads();
+  await ui.start({ load: secondReads.load });
+  const second = ui.controller;
+  secondReads.requests[0].resolve(taskRows("second"));
+  await settle();
+  firstReads.requests[1].resolve(taskRows("first-latest"));
+  assert.equal((await firstPending).ok, true);
+  assert.equal(first.state.rows[0].id, "first-latest");
+  assert.equal(second.state.rows[0].id, "second");
+});
+
+test("a new read between action refresh resolution and its continuation owns the status", async () => {
+  const ui = harness();
+  const reads = deferredReads();
+  let manualRefresh;
+  await ui.start({
+    load: reads.load,
+    normalize(row) {
+      if (row.id === "action-result") queueMicrotask(() => { manualRefresh = ui.controller.load(); });
+      return row;
+    }
+  });
+  reads.requests[0].resolve(taskRows("initial"));
+  await settle();
+  await ui.clickAction();
+  reads.requests[1].resolve(taskRows("action-result"));
+  await settle();
+  assert.equal(reads.requests.length, 3);
+  assert.equal(ui.status, "正在加载任务……", "an already-resolved action refresh must not overwrite the new pending status");
+  assert.equal(ui.error, "");
+  assert.equal(ui.calls.writes.length, 1);
+  reads.requests[2].reject(new Error("manual forbidden"));
+  assert.equal((await manualRefresh).ok, false);
+  assert.match(ui.error, /加载失败：manual forbidden/);
+  assert.doesNotMatch(ui.error, /已由业务接口保存/);
+});
+
 for (const mode of ["403", "500", "network", "rows", "normalize", "render"]) {
   test(`successful write followed by ${mode} refresh failure cannot report refreshed success`, async () => {
     const ui = harness();
