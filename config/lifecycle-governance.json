@@ -70,11 +70,12 @@
       "id": "REQ-GOV-012",
       "title": "读取代次修复组合登记",
       "sourceType": "approved-t00-plan",
-      "sourceRef": "T00-PLAN-GOV-012-APPROVED-2026-09-13; USER-DELEGATED-T00-PLAN-OPS-039-2026-09-14",
+      "sourceRef": "T00-PLAN-GOV-012-APPROVED-2026-09-13; USER-DELEGATED-T00-PLAN-OPS-039-2026-09-14; USER-DELEGATED-T00-COMBINATION-2026-09-14",
       "acceptance": [
         "登记两项独立范围、依赖与过期读取语义，保持单writer",
         "以PR303真实证据关闭GOV011，不预支本批验收",
-        "2026-09-14追加用户临时T00授权与OPS039三文件准入，保留原登记历史及待集成状态"
+        "2026-09-14追加用户临时T00授权与OPS039三文件准入，保留原登记历史及待集成状态",
+        "用户续授隔离候选组合验证与台账收口，七领域文件保持冻结blob，保留历史失败及待远端集成边界"
       ]
     },
     {
@@ -1899,13 +1900,13 @@
       "title": "读取代次修复组合登记",
       "ownerProcess": "T00",
       "integrationOwner": "T00",
-      "taskStatus": "已批准",
-      "capabilityStatus": "未建设",
+      "taskStatus": "验证中",
+      "capabilityStatus": "已实现",
       "riskLevel": "中",
       "approval": {
         "state": "approved",
         "mode": "T00-plan-approval",
-        "ref": "T00-PLAN-GOV-012-APPROVED-2026-09-13; USER-DELEGATED-T00-PLAN-OPS-039-2026-09-14",
+        "ref": "T00-PLAN-GOV-012-APPROVED-2026-09-13; USER-DELEGATED-T00-PLAN-OPS-039-2026-09-14; USER-DELEGATED-T00-COMBINATION-2026-09-14",
         "approvedScope": "config/lifecycle-governance.json, docs/lifecycle-governance.md, ROADMAP.md"
       },
       "requirementIds": [
@@ -1928,7 +1929,8 @@
       "acceptanceCriteria": [
         "登记两项独立范围、依赖与过期读取语义，保持单writer",
         "以PR303真实证据关闭GOV011，不预支本批验收",
-        "2026-09-14追加用户临时T00授权与OPS039三文件准入，保留原登记历史及待集成状态"
+        "2026-09-14追加用户临时T00授权与OPS039三文件准入，保留原登记历史及待集成状态",
+        "用户续授隔离候选组合验证与台账收口，七领域文件保持冻结blob，保留历史失败及待远端集成边界"
       ],
       "testIds": [
         "TEST-GOV-012"
@@ -1936,11 +1938,11 @@
       "evidenceIds": [],
       "rollback": "回退本任务独立提交并重跑相关门禁；无 migration，不回退服务端业务事实",
       "unresolved": [
-        "待独立验证与集成"
+        "独立来源已冻结，组合候选验证中；待远端精确CI与main集成，未获推送PR合并上线权限"
       ],
-      "worktree": ".codex-platform-worktrees/process-v2/t00-read-generation-portfolio-20260913",
-      "branch": "process/t00-read-generation-portfolio-20260913",
-      "planRef": "docs/lifecycle-governance.md#gov-012-读取代次修复-plan",
+      "worktree": ".codex-platform-worktrees/process-v2/t00-read-generation-combination-20260914",
+      "branch": "process/t00-read-generation-combination-20260914",
+      "planRef": "docs/lifecycle-governance.md#gov-012-本地组合验证与台账收口-plan",
       "pullRequestRef": "",
       "ciRef": "",
       "writeScopes": [
