@@ -2,7 +2,20 @@
 
 ## 1. 权威边界
 
+### OPS-039 数字医院认证就绪启动 PLAN
+
+- 2026-09-14：用户已批准新问题方向，并明确授权当前协调者本轮临时承担 T00 准入登记与分工调度。中央沿用 GOV-012 三文件单写范围；不接管领域实现，不推送、PR、合并或上线。已有 OPS-037/038 冻结不动，中央未合入 main 的状态不冒充已集成。
+- 基线 latest fetched origin/main@62e56918；新任务 OPS-039/T01，WIP4/5，依赖已关闭 GOV-011。process:plan/create 建独立 process/t01-digital-hospital-auth-start-20260914 工作树。单任务内开发A仅写 digital-hospital-standard-platform/app.js，开发B仅写新 test/digital-hospital-auth-initialization.test.js 和既有 test/e2e/digital-hospital-public-health.spec.js；同文件不并发写，中央文件只由协调者修改。
+- 独立风险评估：中风险兼容性接线，仅消费 auth.js 已有 html[data-auth-resolved=allowed] 成功信号。不重复调用 initializePageAccess/refreshAuthContext，不新增身份请求；pending阶段不得 loadState/render/绑定业务写监听器，allowed后再读最新身份和既有角色/manager守卫，一次启动并解除观察器。
+- 保持既有明确静态预览边界（file与现有github.io规则），localhost仍是在线。不能以getUser非空、DOMContentLoaded、守卫pending返回true、isDemoMode或超时替代认证完成。缺auth、401/403、网络失败不降级演示；保留原机构映射、角色锁定、提交与签收分离及导航壳重排兼容。
+- 测试先持久RED再GREEN：完整真实app脚本，不复制业务helper；覆盖延迟/已完成/重复allowed、在线失败/身份缺失/错误角色、观察器注册复查、静态兼容与机构范围。既有公卫E2E用可控/auth/context延迟再继续原签收/关闭/筛选/导出旅程；不放宽原断言，不用固定sleep或强制点击。
+- 独立审查无P0-P2后冻结精确head，唯一重型队列串行build/lint/typecheck/unit/integration/smoke/不变legacy、浏览器安全/static/E2E；中央自身另跑治理/路由/架构/process/iterations门禁。任何改源码须复审并重新绑定证据；昨日失败与环境skip继续保留。
+- 非目标：共享auth.js/page-auth-bootstrap.js、HTML发布面、身份/会话/授权模型、API、持久化、凭据、撤权传播、在线演示准入和现有签收比较。若需要触碰这些边界，停止当前切片另行风险/ADR/人工审批。当前不授予高风险安全模型变更权限。
+- 回滚独立提交，无迁移。运行观测适用性及复用证据未核验，能力不晋级已验证/已集成，生产六域NO-GO保持。
+
 ### GOV-012 读取代次修复 PLAN
+
+- 2026-09-14追加：用户临时授权当前协调者承担本轮T00登记与调度；原三文件范围内追加OPS039登记，具体边界见上方[OPS-039准入PLAN](#ops-039-数字医院认证就绪启动-plan)。下述两项范围与WIP3/5是09-13历史快照，当前WIP4/5；原批准来源保留，新来源另行追加，不宣称本地登记已集成。
 
 - 2026-09-13 T00 准入：基线 `62e56918a94c927bfa4f9a36ff1847930ff238f3`，GOV-011 已由 PR303 / head 2e976b3a / CI34701539073 九项成功、独立 P2 关闭后合并。legacy 日志完整14批3374项、3373通过、1环境跳过、0失败；旧进程退出码未重新取得，不伪造。中央本批仅总账/本规范/ROADMAP三文件。
 - 用户继续开发授权下，T00批准两个新中风险兼容修复；不复用OPS035/036已关闭范围。GOV-012、OPS-037、OPS-038 WIP3/5，各依赖已关闭GOV011；从最新fetched origin/main经process:plan/create建立独立工作树，若基线改变先核验差异。
