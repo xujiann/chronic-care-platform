@@ -2,6 +2,10 @@
 
 > 状态层权威：当前基线、目标状态、差距任务和验收证据统一登记在 `config/lifecycle-governance.json#maps`；正文继续只陈述 AS-IS 事实。
 
+## 访问知晓声明首切片（2026-09-14）
+
+ADR-OPS-040 为既有非生产 accessAcknowledgements 登记 T04 声明合同 resident-access-acknowledgement.v1，声明行包含服务端回执及私有幂等绑定，不新增表或迁移。历史完整保留，2000 条上限拒绝新写，合法重放不追加。dataAccessLogs/securityEvents 仍为 T02 系统 Owner，T01 只核验原事件。声明与新增 securityEvents/SQLite audit source 同事务；无生产写晋升。
+
 ## 2026-09-06 遗留状态身份数据边界
 
 `authUsers` 与 `authOrganizations` 的数据 Owner 仍为 T01 identity-security，本切片不新增字段、集合、表、DDL、migration 或回填。T02 legacy 全量状态写只能省略这两个集合，或回传权威值/同一 `authUsers` 安全投影；省略及安全投影均由服务端恢复当前权威值，任一公开身份字段差异在 normalize/write 前失败关闭。集合级兼容写入口不接受两个身份集合。

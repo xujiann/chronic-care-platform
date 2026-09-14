@@ -2,6 +2,10 @@
 
 > 状态层权威：当前基线、目标状态、差距任务和验收证据统一登记在 `config/lifecycle-governance.json#maps`；正文继续只陈述 AS-IS 事实。
 
+## 访问知晓声明首切片（2026-09-14）
+
+新增首切片范围：T04 access-acknowledgement-command 与居民路由/页面；T01 resident-access-event-query 只读端口；T00 resident-access-acknowledgement-runtime 经既有组合根装配、state-data 旁路保护。OPS-040/SEC-016 必须联合验收，不能只开放命令而缺少保护；当前为实施候选。
+
 ## 2026-09-06 T00 遗留状态身份边界模块
 
 | 模块 | Owner | 标签 | 当前边界 |

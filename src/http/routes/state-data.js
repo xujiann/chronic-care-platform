@@ -221,6 +221,11 @@ function createRouteSegments(runtime, options = {}) {
           });
           return true;
         }
+        if (Object.hasOwn(payload, "accessAcknowledgements")
+          && !isDeepStrictEqual(payload.accessAcknowledgements, currentData.accessAcknowledgements)) {
+          sendJson(res, 409, { code: "CARE_ACCESS_ACK_SERVER_MANAGED_CONFLICT", message: "访问知晓声明只能通过本人专属命令写入。" });
+          return true;
+        }
         const identityConflict = firstServerManagedIdentityConflict(currentData, payload);
         if (identityConflict) {
           sendJson(res, 409, {
@@ -233,6 +238,7 @@ function createRouteSegments(runtime, options = {}) {
         }
         const effectivePayload = {
           ...payload,
+          accessAcknowledgements: currentData.accessAcknowledgements,
           ...Object.fromEntries(SERVER_MANAGED_CLINICAL_COLLECTIONS.filter((collection) => Object.hasOwn(currentData, collection)).map((collection) => [collection, currentData[collection]])),
           ...serverManagedRegionalState(currentData),
           ...serverManagedProcurementState(currentData),
@@ -316,6 +322,10 @@ function createRouteSegments(runtime, options = {}) {
         if (!user) return true;
         if (!requireManagerForCommissionStateAccess(user, res, sendJson)) return true;
         const collection = decodeURIComponent(url.pathname.replace("/api/state-collections/", "")).trim();
+        if (collection === "accessAcknowledgements") {
+          sendJson(res, 403, { code: "CARE_ACCESS_ACK_SERVER_MANAGED_WRITE_DENIED", collection, message: "访问知晓声明只能通过本人专属命令写入。" });
+          return true;
+        }
         if (SERVER_MANAGED_IDENTITY_COLLECTIONS.includes(collection)) {
           sendJson(res, 403, {
             error: "Forbidden",
@@ -403,6 +413,11 @@ function createRouteSegments(runtime, options = {}) {
             code: "DEMO_RESET_DISABLED_IN_PRODUCTION",
             message: "演示数据重置在生产环境中不可用。"
           });
+          return true;
+        }
+        const current = readDatabase();
+        if (!Array.isArray(current.accessAcknowledgements) || current.accessAcknowledgements.length) {
+          sendJson(res, 409, { code: "CARE_ACCESS_ACK_RESET_BLOCKED", message: "重置不能删除已保留的访问知晓声明。" });
           return true;
         }
         const data = seedState();

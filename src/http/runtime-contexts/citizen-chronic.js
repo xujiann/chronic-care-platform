@@ -3,6 +3,7 @@
 const DOMAIN = "citizen-chronic";
 const PROCESS = "T04";
 const DEPENDENCIES = Object.freeze([
+  "accessAcknowledgementCommand",
   "CitizenRecordsPolicy", "CitizenRecordsV1", "CitizenRecordsV2", "PERSONAL_RECORD_PROTECTED_FIELDS",
   "appendDataAccessLog", "appendSecurityEvent", "applyCitizenLifecycleAction", "applyCitizenOperationsAction",
   "buildChronicAcceptanceLedger", "buildChronicArchiveStandardization", "buildChronicFollowupSummary",

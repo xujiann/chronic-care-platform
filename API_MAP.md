@@ -2,6 +2,10 @@
 
 > 状态层权威：当前基线、目标状态、差距任务和验收证据统一登记在 `config/lifecycle-governance.json#maps`；正文继续只陈述 AS-IS 事实。
 
+## 访问知晓声明首切片（2026-09-14）
+
+候选 POST /api/access-reviews/:accessLogId/acknowledge（T04、ADR-OPS-040）：仅本人 citizen 知晓，真实前端 envelope + 完整 1–240 字符幂等键，首次 201/合法重放 200；主体、资源、原链、环境每次重验。capacity/同键异载荷/同事件异键 409，生产与不安全存储 503；回执服务器 ID/时间，不认定合法性。通用声明 collection 写 403、full-state 改变 409、非空声明 reset 409。仍待专项和联合验证。
+
 ## 2026-09-06 遗留状态身份边界
 
 | API | 身份/范围 | 稳定失败与响应边界 |

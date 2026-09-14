@@ -2,6 +2,10 @@
 
 > 状态层权威：当前基线、目标状态、差距任务和验收证据统一登记在 `config/lifecycle-governance.json#maps`；正文继续只陈述 AS-IS 事实。
 
+## 访问知晓声明首切片（2026-09-14）
+
+访问知晓声明首切片已按 ADR-OPS-040 准入，OPS-040/SEC-016 联合交付，尚未通过冻结组合验证。T04 命令经 T01 原事件只读核验、T00 专属原始存储适配提交；不调用会写日志的 GET，不改变原审计和授权。仅本地非生产，远端发布未授权。
+
 ## 2026-09-06 T00 遗留状态身份边界闭合
 
 - `src/http/routes/state-data.js` 在 `/api/state` 的 commission 读取/全量写入、通用 collection 写入和非生产 `/api/reset` 上增加 `accountType=manager` 边界；专科、审计等非管理 commission 在集合解码、数据库读取、请求体解析或 seed 加载前稳定返回 `403 STATE_DATA_MANAGER_REQUIRED`，institution/insurance/citizen/county 的 GET 既有范围读取保持兼容。

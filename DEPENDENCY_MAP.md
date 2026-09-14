@@ -2,6 +2,10 @@
 
 > 状态层权威：当前基线、目标状态、差距任务和验收证据统一登记在 `config/lifecycle-governance.json#maps`；正文继续只陈述 AS-IS 事实。
 
+## 访问知晓声明首切片（2026-09-14）
+
+访问声明依赖：T04 薄路由 → access-acknowledgement-command → T01 resident-access-event-query / audit-chain 与 T00 专属原始状态适配 → 既有 SQLite CAS/append-only hook 或非生产单进程 JSON 原子替换。原始审计 Owner 不迁移；没有请求路径外部双写。GOV-013 仅文档准入，OPS-040/SEC-016 是独立高风险联合交付任务，最终冻结测试待完成。
+
 ## 2026-09-06 遗留状态身份边界依赖
 
 ```text

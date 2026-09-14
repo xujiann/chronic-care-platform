@@ -32,6 +32,12 @@
   },
   "ownerReviewBatches": [
     {
+      "id": "resident-access-acknowledgement-20260914",
+      "contract": "first-release-legacy-owner-review.v1",
+      "collections": ["accessAcknowledgements"],
+      "decisionDigest": "670547e02f5fb4230adc74e9a33677d3ae0eec89c732f2726f6d78c2d230d344"
+    },
+    {
       "id": "first-release-scope-20260826",
       "contract": "first-release-legacy-owner-review.v1",
       "collections": [
@@ -59,6 +65,29 @@
     }
   ],
   "collections": {
+    "accessAcknowledgements": {
+      "owner": "citizen-chronic",
+      "classification": "restricted",
+      "readers": [],
+      "writePolicy": {
+        "contract": "legacy-owner-review-write-policy.v1",
+        "productionWriteAllowed": false,
+        "productionPromotionAllowed": false,
+        "migrationRequired": true,
+        "authority": "existing-non-production-state-collection",
+        "command": "POST /api/access-reviews/:accessLogId/acknowledge",
+        "retention": "preserve-all-reject-new-at-2000",
+        "rollback": "disable-command-preserve-records-and-generic-write-protection"
+      },
+      "commandContract": "resident-access-acknowledgement.v1",
+      "ownerReview": {
+        "contract": "first-release-legacy-owner-review.v1",
+        "basis": "ADR-OPS-040 explicitly approves T04 resident self-acknowledgement only; existing non-production collection, no first-release portfolio or production promotion",
+        "sourceEvidence": [
+          { "path": "server.js", "access": "read-write" }
+        ]
+      }
+    },
     "chronicAcceptanceLedger": {
       "owner": "citizen-chronic",
       "classification": "internal",
