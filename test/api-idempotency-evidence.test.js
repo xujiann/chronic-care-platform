@@ -34,8 +34,8 @@ function formalGroupingReviewFixture() {
 
 test("idempotency evidence registry validates only directly proven endpoint and action-slice contracts", () => {
   assert.deepEqual(validateEvidenceRegistry(), []);
-  assert.equal(DEFAULT_REGISTRY.contracts.length, 41);
-  assert.equal(endpointEvidenceContracts().length, 39);
+  assert.equal(DEFAULT_REGISTRY.contracts.length, 42);
+  assert.equal(endpointEvidenceContracts().length, 40);
   assert.equal(actionSliceEvidenceContracts().length, 2);
   assert.equal(proofRequiredReviews().length, 0);
   const smsContract = DEFAULT_REGISTRY.contracts.find((contract) => contract.key === "POST /api/auth/sms-delivery-callback");
@@ -86,8 +86,86 @@ test("idempotency evidence registry validates only directly proven endpoint and 
     "POST /api/public-health/supervision/inspection-tasks",
     "POST /api/public-health/supervision/inspection-tasks/:id/actions",
     "POST /api/public-health/supervision/findings/:id/actions",
-    "POST /api/physical-exams/specialized-intakes/:id/actions"
+    "POST /api/physical-exams/specialized-intakes/:id/actions",
+    "POST /api/access-reviews/:accessLogId/acknowledge"
   ]);
+});
+
+test("resident access acknowledgement has executable endpoint evidence without production or distributed claims", () => {
+  const key = "POST /api/access-reviews/:accessLogId/acknowledge";
+  const contract = DEFAULT_REGISTRY.contracts.find((candidate) => candidate.key === key);
+  assert.ok(contract);
+  assert.equal(contract.contractId, "citizen-chronic.resident-access-acknowledgement.v1");
+  assert.equal(contract.method, "POST");
+  assert.equal(contract.path, "/api/access-reviews/:accessLogId/acknowledge");
+  assert.equal(contract.owner, "T04");
+  assert.equal(contract.domain, "citizen-chronic");
+  assert.equal(contract.customAuthenticationEvidence, false);
+  assert.equal(contract.authentication.required, true);
+  assert.deepEqual(contract.authentication, { required: true, mechanism: "bearer-or-cookie-session", principalType: "platform-user" });
+  assert.equal(contract.authorization.model, "live-session-citizen-self-and-exact-access-event");
+  assert.equal(contract.authorization.dataScope, "current authenticated resident only; no household proxy; original access audit and authorization remain unchanged");
+  assert.deepEqual(contract.authorization.roles, ["citizen"]);
+  assert.deepEqual(contract.coverage, { level: "endpoint", selector: "entire-route", actions: ["access-acknowledge"], unverifiedRemainder: false });
+  assert.equal(contract.concurrency.cas.required, true);
+  assert.equal(contract.concurrency.cas.field, "raw-snapshot SQLite collection versions; JSON authority digest under a same-process collection lock");
+  assert.deepEqual(contract.concurrency.cas.conflictCodes, ["CARE_ACCESS_ACK_STORAGE_CONFLICT"]);
+  assert.equal(contract.idempotency.distributedExactlyOnceClaimed, false);
+  assert.equal(contract.productionReady, false);
+  assert.equal(contract.externalEvidenceRequired, true);
+  assert.equal(contract.idempotency.key, "header:Idempotency-Key and body:idempotencyKey must both be present, identical and 1-240 characters");
+  assert.deepEqual(contract.idempotency.payloadBinding, ["actorId", "actorResidentId", "actorRole", "schemaVersion", "action", "accessLogId", "id", "residentId", "decision", "status", "acknowledgedAt", "requestedAt"]);
+  assert.equal(contract.idempotency.conflictingReuse, "CARE_ACCESS_ACK_IDEMPOTENCY_CONFLICT");
+  assert.equal(contract.idempotency.exactReplay, "revalidates non-production environment, current session, self scope and original event integrity before returning the persisted public receipt with status 200 and no declaration or command audit write; new declarations are refused at 2000, valid replay remains allowed and historical over-capacity is preserved without eviction");
+  assert.deepEqual(contract.audit, {
+    accepted: "adds one resident knowledge declaration, server-generated receipt and security audit; leaves dataAccessLogs and personalRecords unchanged",
+    replay: "returns the original public receipt without another declaration, command audit or state write",
+    rejected: "command-level rejection writes no declaration or command audit; existing authentication-layer rejection audit is preserved; commit failures preserve prior authoritative state"
+  });
+  assert.deepEqual(contract.testEvidence.map((item) => item.file).sort(), [
+    "test/citizen-access-acknowledgement-api.test.js",
+    "test/citizen-access-acknowledgement.test.js",
+    "test/resident-access-acknowledgement-runtime.test.js"
+  ]);
+  for (const [file, anchors] of [
+    ["test/citizen-access-acknowledgement.test.js", [
+      "same-process concurrent replay creates one declaration and audit",
+      "full 240-character keys work and distinct tails cannot alias"
+    ]],
+    ["test/citizen-access-acknowledgement-api.test.js", [
+      "exact replay and duplicate/conflict preserve the first durable receipt",
+      "a real SQLite writer racing the raw snapshot is rejected by persisted CAS",
+      "SQLite injected failures roll back declaration, receipt and audit source together"
+    ]],
+    ["test/resident-access-acknowledgement-runtime.test.js", [
+      "JSON runtime atomically persists one declaration and audit, then replays without replacing file",
+      "a JSON writer after the authority snapshot is preserved and causes an explicit conflict"
+    ]]
+  ]) {
+    const evidence = contract.testEvidence.find((item) => item.file === file);
+    for (const anchor of anchors) assert.equal(evidence.anchors.includes(anchor), true, `${file}:${anchor}`);
+  }
+});
+
+test("acknowledgement registry mutations are rejected by actual validator rules", () => {
+  const key = "POST /api/access-reviews/:accessLogId/acknowledge";
+  for (const [mutate, message] of [
+    [(row) => { row.testEvidence[0].anchors.push("nonexistent acknowledgement executable assertion"); }, /missing evidence anchor/],
+    [(row) => { row.testEvidence = []; }, /implementation and test evidence required/],
+    [(row) => { delete row.concurrency.cas.field; }, /CAS field and conflict codes required/],
+    [(row) => { delete row.idempotency.exactReplay; }, /replay and conflict behavior required/],
+    [(row) => { delete row.idempotency.conflictingReuse; }, /replay and conflict behavior required/],
+    [(row) => { delete row.audit.replay; }, /audit behavior contract required/],
+    [(row) => { row.productionReady = true; }, /production fail closed/],
+    [(row) => { row.externalEvidenceRequired = false; }, /production fail closed/],
+    [(row) => { row.idempotency.distributedExactlyOnceClaimed = true; }, /distributed exactly-once must remain unclaimed/]
+  ]) {
+    const altered = clone(DEFAULT_REGISTRY);
+    const row = altered.contracts.find((candidate) => candidate.key === key);
+    assert.ok(row);
+    mutate(row);
+    assert.match(validateEvidenceRegistry(altered).join("\n"), message);
+  }
 });
 
 test("specialized examination intake actions are promoted only as one complete three-action endpoint", () => {
@@ -133,7 +211,7 @@ test("procurement requirement review is promoted by stable endpoint behavior evi
 
 test("catalog promotes only whole endpoints and retains generic action routes as review-required", () => {
   const catalog = buildProductionApiCatalog();
-  assert.equal(catalog.summary.writeIdempotencyBehaviorVerified, 39);
+  assert.equal(catalog.summary.writeIdempotencyBehaviorVerified, 40);
   assert.equal(catalog.summary.writeIdempotencyActionSlicesVerified, 2);
   assert.equal(catalog.summary.writeIdempotencyBehaviorProofRequired,
     catalog.summary.writeRoutes - catalog.summary.writeIdempotencyBehaviorVerified);
@@ -179,7 +257,8 @@ test("catalog promotes only whole endpoints and retains generic action routes as
     "POST /api/public-health/supervision/subjects",
     "POST /api/public-health/supervision/inspection-tasks",
     "POST /api/public-health/supervision/inspection-tasks/:id/actions",
-    "POST /api/public-health/supervision/findings/:id/actions"
+    "POST /api/public-health/supervision/findings/:id/actions",
+    "POST /api/access-reviews/:accessLogId/acknowledge"
   ]) {
     const entry = catalog.entries.find((candidate) => candidate.key === key);
     assert.equal(entry.idempotency.behaviorEvidence.status, "behavior-verified", key);

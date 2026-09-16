@@ -4,6 +4,8 @@
 
 ## 访问知晓声明首切片（2026-09-14）
 
+2026-09-16 状态更新：下段为首切片实施阶段记录。冻结提交 `078840ba` 已经独立复审及 18 项本地串行门禁通过；本轮 GOV-014 仅补幂等行为目录证据，新的冻结验证与远端 CI 尚待执行。用户现授权通过门禁后的推送与条件合并，不授权生产上线；原运行观测和外部证据缺口不关闭。
+
 ADR-OPS-040 为既有非生产 accessAcknowledgements 登记 T04 声明合同 resident-access-acknowledgement.v1，声明行包含服务端回执及私有幂等绑定，不新增表或迁移。历史完整保留，2000 条上限拒绝新写，合法重放不追加。dataAccessLogs/securityEvents 仍为 T02 系统 Owner，T01 只核验原事件。声明与新增 securityEvents/SQLite audit source 同事务；无生产写晋升。
 
 ## 2026-09-06 遗留状态身份数据边界

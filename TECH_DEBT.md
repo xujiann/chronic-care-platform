@@ -4,7 +4,13 @@
 
 ## 访问知晓声明首切片（2026-09-14）
 
+2026-09-16 状态更新：下段为首切片实施阶段记录。冻结提交 `078840ba` 已经独立复审及 18 项本地串行门禁通过；本轮 GOV-014 仅补幂等行为目录证据，新的冻结验证与远端 CI 尚待执行。用户现授权通过门禁后的推送与条件合并，不授权生产上线；原运行观测和外部证据缺口不关闭。
+
 访问知晓声明在实施中（OPS-040/SEC-016，ADR-OPS-040）：目前不声称测试或集成完成。保留上限 2000、新增满额拒绝，后续耐久保留/生产迁移需另批；JSON 不具备跨进程保证，SQLite 本地证据不替代真实 PostgreSQL/现场证据。原访问展示窗口淘汰后的事件不能确认。异议、投诉、影像及照护结案未进入本轮范围，生产继续 NO-GO。
+
+## 2026-09-16 未关闭：访问知晓声明高风险目录元数据
+
+访问知晓声明的高风险 API 目录条目尚未单独登记，当前派生 `highRisk=false` 不表示该身份/审计写入为低风险。GOV-014 不修改高风险策略清单；继续按原高风险 ADR 验证，后续独立补齐风险元数据。幂等目录登记也不证明真实 PostgreSQL、跨实例一致性或生产可用。
 
 ## 2026-09-06 已关闭：遗留状态身份边界 P0
 
@@ -149,7 +155,7 @@ T00 机器登记完成后，`production-release-scope` 中 17 个仓库内 API �
 | ARC-006 | 同名模块 | 根目录与 `src/` 有 6 组同名 | 文档明确前端/服务端/迁移角色，不做全仓改名 |
 | ARC-008 | operations 跨域写入 | OPS-02 为保持兼容，将 T06 的既有直写整体移入 T02；其中 `resourceDispatchRequests`、`taskMessages` 的机器 Owner 仍是 T05 care-coordination | 后续仅在独立 ADR/切片中改为 T05 owner port 或版本化事件；在完成行为矩阵前不得直接改写副作用 |
 | API-001 | 错误契约 | 多种 JSON 错误格式 | 新 API 使用版本化标准错误接口 |
-| API-002 | 接口目录复核 | v3 当前 637 项、13 项认证证据且未分类为 0。T00 已登记 41 份幂等合同、39 个 endpoint verified；体检专项分流三动作由真实 HTTP、命令和路由证据登记为唯一完整 endpoint。`reviewedProofRequired` 为 0。364 个写接口中 325 个仍缺 endpoint 级证明，327 项保持 review-required | 继续逐 owner 渐进补证。既有聚合 receipt 均有界，进程锁只覆盖单实例，JSON 路径和 SQLite CAS 均不是跨实例 exactly-once。`resourceDispatchRequests` 仍有 T05 owner 的既有跨域写债；PG 多实例、长期审计/归档和真实外部/现场证据均未决，相关 endpoint 保持 NO-GO |
+| API-002 | 接口目录复核 | v3 当前 637 项、13 项认证证据且未分类为 0。T00 已登记 42 份幂等合同、40 个 endpoint verified；体检专项分流三动作由真实 HTTP、命令和路由证据登记为唯一完整 endpoint。`reviewedProofRequired` 为 0。364 个写接口中 324 个仍缺 endpoint 级证明，326 项保持 review-required | 继续逐 owner 渐进补证。既有聚合 receipt 均有界，进程锁只覆盖单实例，JSON 路径和 SQLite CAS 均不是跨实例 exactly-once。`resourceDispatchRequests` 仍有 T05 owner 的既有跨域写债；PG 多实例、长期审计/归档和真实外部/现场证据均未决，相关 endpoint 保持 NO-GO |
 | WORKER-OBS-001 | Worker 一致性 | 12 个既有 worker profile、9 个部署入口已建立 `platform-worker-observability.v1` 脱敏兼容投影；领域 state/retry/lease/checkpoint/receipt 仍各自权威，仓库不据此推导生产授权 | 后续接入真实指标/日志采集器与告警路由前，必须另行确认 owner、留存、访问控制和现场启用证据；不得把兼容投影演变为统一领域状态机 |
 | TEST-006 | 静态基线与测试性能 | `test/api.test.js` 的全文件 `no-unreachable` 已关闭，原 3 个 care 显式 skip 已由 T05 owner/route 独立特征测试逐块重验并恢复执行；陪诊引用挂号单的存在性/scope 缺口与 handoff `reject/return` 投影已最小修复。typecheck 为 13 个唯一文件；两个前端文件的 16 个重复翻译键已有逐键 shadow/final 值和真实调用保护，去重保持首次插入顺序及最终生效值，lint 文件级例外已归零；API 热点仍作为独立 integration 批次输出耗时。五个可逆夹具切片已分别提取临时 seed/env/server、单个 HIS hospital mock、单个 SIEM alert mock、单个 financial gateway mock 和单个 object-storage gateway mock 生命周期；storage 的签名响应、四类 operation、动态 URL 与 mutable scan 状态通过领域 helper 和最小 setter 保真。43 个子测试顺序摘要继续锁定 suite 成员、断言、超时、单进程语义、CI 预算与 required checks 不降低 | API 巨型测试仍集中约 8,200 行业务断言和其余共享状态。后续只按一个共享服务生命周期继续小步拆分，不得按耗时并行化共享状态或把 helper 变成生产接口。耗时先观察多次 CI 分布，不凭单机样本设门槛；不得恢复文件级 lint 豁免；外部护理/陪诊/HIS/SIEM/financial/storage 投递与现场证据继续由生产 readiness 跟踪，不以本测试关闭 |
 

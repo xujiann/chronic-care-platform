@@ -1,5 +1,16 @@
 # 工程治理路线图
 
+## GOV-014 访问知晓声明证据登记 PLAN（2026-09-16）
+
+- 用户批准本轮证据登记、测试及完成后的推送/PR/条件合并（USER-APPROVED-ACK-EVIDENCE-INTEGRATION-2026-09-16）；不授权上线、生产激活或保护规则例外。主线新鲜核验为 origin/main@cb8f37e0，无开放 PR；既有功能冻结候选为 078840ba，11 个本地提交尚未集成。
+- 目标：仅为 POST /api/access-reviews/:accessLogId/acknowledge 增加完整 endpoint 幂等行为合同。复用 Accepted API-IDEM-001 与 ADR-OPS-040；不改变运行时、安全模型、验证器、schema、依赖、生产策略或高风险 API 清单。方案为逐 endpoint 实证登记，拒绝仅靠源码 marker 晋级。
+- GOV-013 协调者继续独占 lifecycle 与已有文档范围；新增 GOV-014 为中风险 T00 治理任务，开发 A 独占 config/api-idempotency-evidence.json，开发 B 独占 test/api-idempotency-evidence.test.js 和 test/production-api-catalog.test.js；独立审查者只读。沿用现有 T00 集成树，078840ba 保留为不可变证据点；不新增领域代码任务，在制 4/5。
+- 合同精确绑定本人/当前会话重验、完整 header/body 键与载荷、原事件审计核验、精确回放/冲突、SQLite CAS 和单事务、JSON 单进程原子替换、容量拒绝及历史保留。命令拒绝不新增声明/命令审计，但既有认证层可记录拒绝审计，不写“一律零审计”。不声明专门 Cookie/CSRF、重启后 HTTP 回放、PG 或跨实例证据。
+- 验收：新登记负测、实际 93 项命令/HTTP/适配专项、目录/文档/生命周期校验；独立审查后冻结，串行执行全部 18 项既有门禁。计数从机器结果核实，不提前记通过；productionReady=false、externalEvidenceRequired=true、distributedExactlyOnceClaimed=false 和全部 NO-GO 不变。
+- 推送与合并：仅推送本联合切片；PR 绑定最终冻结 head，全部 required checks 成功、无未解决高风险审查、主线无未处理漂移时按保护规则合并，不用管理员绕过。合并后核对树与主线 CI；现有自动 Pages 工作流按仓库配置运行，不执行生产部署。
+- 回滚：撤销本次证据登记使接口恢复 proof-required，不删除声明或审计。既有功能回滚必须保留声明历史与通用写保护。后续生产、多实例、2000 条保留迁移及接口 highRisk 元数据遗漏继续作为风险，不借本轮自动关闭。
+- 历史证据：078840ba 的 18 项本地门禁已通过，含全量 3566 通过/1 个真实 PG 环境跳过和 E2E 76/76；该事实不替代本轮新提交测试或远端 CI。OPS-040/SEC-016 的生产观测缺口保留，仓库合并不等于完整运行能力验收。
+
 ## 全生命周期治理控制塔（2026-09-07）
 
 - 2026-09-14集成结果：用户追加PR/条件合并授权后，[PR #305](https://github.com/xujiann/chronic-care-platform/pull/305)以head `d27eb1cb`、CI `34824818585`九项成功合并为`bb464563`，整树与冻结候选零差异。SEC015/TEST021及OPS037/038/039限定切片和GOV012组合登记完成仓库交付，本批在制由3/5收口为0/5；不启动新开发。四运行能力仍已实现且保留观测缺口，测试能力TEST021及治理GOV012已集成；历史失败和六域NO-GO保留。当前三文件事实收尾须独立review和自身PR/CI，不能预支自身结果，见[集成收尾PLAN](docs/lifecycle-governance.md#gov-012-pr305-集成收尾-plan-与事实)。下方仅本地/在制/阻塞表述为历史阶段记录，由本条及机器总账给出当前状态。
@@ -99,7 +110,7 @@
 | 7 | 运行时上下文瘦身 | 候选 / P1 | 按领域子端口，逐块迁移，不重写 server |
 | 7A | 临床五个可治理子域 | 治理切片完成，急救/血液/影像/体检首个查询用例已迁移；影像 share/QC 与体检专项分流 action 三个写用例已接入目标命令端口并有单元、顺序/失败保护；operations dashboard 与 command 已由 T00 移交 T02，command 32/32 路径已完成 TEST-007 行为保护 / P1 | Accepted ADR；保持协议兼容，继续按五子域逐用例迁移并禁止已迁用例及 operations 回流 T06；专项分流幂等/CAS/事务、QC 幂等/CAS/机构范围及外调—本地写入核对需独立行为变更审批，当前保持 NO-GO；operations 后续拆分或 ARC-008 治理必须保持矩阵通过并另行审批 |
 | 7B | 健康驾驶舱版本化指标 | 首个 `population-service-visits.v1` 合同已建立 / P1 | 由 T03 确认来源版本与签名证据、由 T00 注入服务端 region scope；其余指标按 owner 逐项接入 |
-| 7C | 生产 API 机器目录 | v3 当前 637 项与 13 项认证合同。现有 41 份幂等行为合同：39 个完整 endpoint、2 个转诊 action-slice；体检专项分流三动作已由真实 HTTP、命令与路由证据登记为一个完整 endpoint，`reviewedProofRequired` 为 0。364 个写接口中 325 个仍缺 endpoint 级证明，通用 action remainder 使总复核为 327，全部 NO-GO / P1 | 继续按高风险与数据写入优先逐 owner 补证；现有合同只证明当前单实例/SQLite 兼容路径，不关闭真实 data owner、PG 多实例、长期留存/归档与现场证据，禁止把进程锁、SQLite CAS 或测试解释为 exactly-once/生产 GO |
+| 7C | 生产 API 机器目录 | v3 当前 637 项与 13 项认证合同。现有 42 份幂等行为合同：40 个完整 endpoint、2 个转诊 action-slice；体检专项分流三动作已由真实 HTTP、命令与路由证据登记为一个完整 endpoint，`reviewedProofRequired` 为 0。364 个写接口中 324 个仍缺 endpoint 级证明，通用 action remainder 使总复核为 326，全部 NO-GO / P1 | 继续按高风险与数据写入优先逐 owner 补证；现有合同只证明当前单实例/SQLite 兼容路径，不关闭真实 data owner、PG 多实例、长期留存/归档与现场证据，禁止把进程锁、SQLite CAS 或测试解释为 exactly-once/生产 GO |
 | 7D | 区域共享只读边界 | 两个 GET builder 已从组合根归位 `regional-sharing-read-model.v1`，shared runtime 以单一 capability 注入；行为/架构/API 特征测试锁定鉴权、范围、投影、排序、审计顺序与响应兼容 / P1 | 继续小步迁移 legacy normalize/seed/handoff evidence，最终源码 owner 移交需独立流程/ADR；`shared-05`、PostgreSQL atomic repository、数据回填、真实机构地区映射和现场验收仍未关闭 |
 | 8 | JSON/SQLite state collection 治理 | DATA-003 状态完整；首发 19 个 legacy 集合已按实际调用点关闭 owner review，当前 61 existing writable、19 owner-reviewed legacy、3 system、168 review-required、1 quarantined / P1 | 继续按 DATA-008 分 owner 确认、归档或 migration 晋升；19 个已审查集合固定生产不可写，process owner 证据不得自动变成 data owner |
 | 9 | 前端可信渲染与 CSP | Accepted ADR；生产 Go/No-Go 与生产安全工作台累计关闭 9 个 P0 HTML sink，管理端选择器再关闭 3 个 P0 HTML sink，平台说明页再关闭 4 个清空型 P0 HTML sink，并以恶意输入/行为回归锁定文本、审批、处置、事件委托与空态边界。Inventory v2 锁定 831 项（789 P0/42 P1）：783 个 DOM HTML、6 个动态 URL、42 个动态样式风险且禁止增加/替换 / P1 | 按高风险资产继续治理 783 个 HTML 与 42 个动态样式 sink；真实 OHIF exact-Origin 到位后迁移剩余 2 个导航；完成全角色恶意输入、真实托管头与独立安全评估后才移除兼容 `unsafe-inline` 并强制严格 CSP |
