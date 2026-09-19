@@ -4847,6 +4847,201 @@
       ],
       "productionReady": false,
       "externalEvidenceRequired": true
+    },
+    {
+      "contractId": "citizen-chronic.resident-access-acknowledgement.v1",
+      "key": "POST /api/access-reviews/:accessLogId/acknowledge",
+      "method": "POST",
+      "path": "/api/access-reviews/:accessLogId/acknowledge",
+      "owner": "T04",
+      "domain": "citizen-chronic",
+      "purpose": "record-resident-knowledge-declaration-without-changing-access-legality",
+      "customAuthenticationEvidence": false,
+      "authentication": {
+        "required": true,
+        "mechanism": "bearer-or-cookie-session",
+        "principalType": "platform-user"
+      },
+      "authorization": {
+        "model": "live-session-citizen-self-and-exact-access-event",
+        "roles": [
+          "citizen"
+        ],
+        "dataScope": "current authenticated resident only; no household proxy; original access audit and authorization remain unchanged"
+      },
+      "coverage": {
+        "level": "endpoint",
+        "selector": "entire-route",
+        "actions": [
+          "access-acknowledge"
+        ],
+        "unverifiedRemainder": false
+      },
+      "idempotency": {
+        "key": "header:Idempotency-Key and body:idempotencyKey must both be present, identical and 1-240 characters",
+        "payloadBinding": [
+          "actorId",
+          "actorResidentId",
+          "actorRole",
+          "schemaVersion",
+          "action",
+          "accessLogId",
+          "id",
+          "residentId",
+          "decision",
+          "status",
+          "acknowledgedAt",
+          "requestedAt"
+        ],
+        "exactReplay": "revalidates non-production environment, current session, self scope and original event integrity before returning the persisted public receipt with status 200 and no declaration or command audit write; new declarations are refused at 2000, valid replay remains allowed and historical over-capacity is preserved without eviction",
+        "conflictingReuse": "CARE_ACCESS_ACK_IDEMPOTENCY_CONFLICT",
+        "persistenceScope": "accessAcknowledgements declaration and receipt plus securityEvents in one non-production state commit; SQLite append-only audit source participates in the same transaction; JSON uses synchronous atomic file replacement",
+        "distributedExactlyOnceClaimed": false
+      },
+      "concurrency": {
+        "cas": {
+          "required": true,
+          "field": "raw-snapshot SQLite collection versions; JSON authority digest under a same-process collection lock",
+          "conflictCodes": [
+            "CARE_ACCESS_ACK_STORAGE_CONFLICT"
+          ]
+        }
+      },
+      "errors": [
+        {
+          "code": "CARE_ACCESS_ACK_INVALID",
+          "status": 400
+        },
+        {
+          "code": "CARE_ACCESS_ACK_KEY_MISMATCH",
+          "status": 400
+        },
+        {
+          "code": "CARE_ACCESS_ACK_FORBIDDEN",
+          "status": 403
+        },
+        {
+          "code": "CARE_ACCESS_ACK_IDEMPOTENCY_CONFLICT",
+          "status": 409
+        },
+        {
+          "code": "CARE_ACCESS_ACK_ALREADY_ACKNOWLEDGED",
+          "status": 409
+        },
+        {
+          "code": "CARE_ACCESS_ACK_CAPACITY",
+          "status": 409
+        },
+        {
+          "code": "CARE_ACCESS_ACK_STORED_STATE_INVALID",
+          "status": 409
+        },
+        {
+          "code": "CARE_ACCESS_ACK_STORAGE_CONFLICT",
+          "status": 409
+        },
+        {
+          "code": "CARE_ACCESS_ACK_STORAGE_FAILED",
+          "status": 503
+        },
+        {
+          "code": "CARE_ACCESS_ACK_PRODUCTION_DISABLED",
+          "status": 503
+        },
+        {
+          "code": "CARE_ACCESS_ACK_STORAGE_UNSUPPORTED",
+          "status": 503
+        },
+        {
+          "code": "RESIDENT_ACCESS_EVENT_SCOPE_DENIED",
+          "status": 403
+        },
+        {
+          "code": "RESIDENT_ACCESS_EVENT_INVALID",
+          "status": 400
+        },
+        {
+          "code": "RESIDENT_ACCESS_EVENT_INVALID",
+          "status": 404
+        },
+        {
+          "code": "RESIDENT_ACCESS_EVENT_INVALID",
+          "status": 409
+        }
+      ],
+      "audit": {
+        "accepted": "adds one resident knowledge declaration, server-generated receipt and security audit; leaves dataAccessLogs and personalRecords unchanged",
+        "replay": "returns the original public receipt without another declaration, command audit or state write",
+        "rejected": "command-level rejection writes no declaration or command audit; existing authentication-layer rejection audit is preserved; commit failures preserve prior authoritative state"
+      },
+      "implementationEvidence": [
+        {
+          "file": "src/http/routes/citizen-chronic.js",
+          "anchors": [
+            "/api/access-reviews/:accessLogId/acknowledge",
+            "session: req.authResolution?.session"
+          ]
+        },
+        {
+          "file": "src/citizen-chronic/access-acknowledgement-command.js",
+          "anchors": [
+            "function createAccessAcknowledgementCommand",
+            "validateAuthorization({ data, user, session })",
+            "withStateCommandLock(\"citizen-chronic:accessAcknowledgements\"",
+            "data.accessAcknowledgements.length >= CAPACITY"
+          ]
+        },
+        {
+          "file": "src/identity-security/resident-access-event-query.js",
+          "anchors": [
+            "function queryResidentAccessEvent",
+            "verifyAuditTrail(data?.dataAccessLogs).passed === true"
+          ]
+        },
+        {
+          "file": "src/http/resident-access-acknowledgement-runtime.js",
+          "anchors": [
+            "function readAccessAcknowledgementState",
+            "function writeAccessAcknowledgementState",
+            "writeSqliteState(data, \"resident-access-acknowledgement\", data.storageMeta.collectionVersions)",
+            "fs.renameSync(temporary, DB_FILE)"
+          ]
+        }
+      ],
+      "testEvidence": [
+        {
+          "file": "test/citizen-access-acknowledgement.test.js",
+          "anchors": [
+            "same-process concurrent replay creates one declaration and audit",
+            "full 240-character keys work and distinct tails cannot alias",
+            "same key binds complete request field",
+            "capacity 2000 refuses additions without eviction but permits valid replay"
+          ]
+        },
+        {
+          "file": "test/citizen-access-acknowledgement-api.test.js",
+          "anchors": [
+            "exact replay and duplicate/conflict preserve the first durable receipt",
+            "a real SQLite writer racing the raw snapshot is rejected by persisted CAS",
+            "SQLite injected failures roll back declaration, receipt and audit source together",
+            "self success persists server receipt without changing original audit or authorization",
+            "replay verifies raw audit integrity without normalizing damaged source",
+            "after authenticated arrival",
+            "both role denials retain their normal durable audit"
+          ]
+        },
+        {
+          "file": "test/resident-access-acknowledgement-runtime.test.js",
+          "anchors": [
+            "JSON runtime atomically persists one declaration and audit, then replays without replacing file",
+            "a JSON writer after the authority snapshot is preserved and causes an explicit conflict",
+            "failure leaves authority bytes unchanged and removes only temporary file",
+            "cached PostgreSQL sessions are not accepted as synchronous revocation evidence"
+          ]
+        }
+      ],
+      "productionReady": false,
+      "externalEvidenceRequired": true
     }
   ]
 }

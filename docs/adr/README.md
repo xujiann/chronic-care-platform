@@ -2,6 +2,7 @@
 
 | 新增决策 | 状态 | 范围 |
 |---|---|---|
+| [居民本人访问知晓声明首切片](./2026-09-14-resident-access-acknowledgement.md) | Accepted | 本人声明、原事件只读核验、完整幂等和原子提交；仅非生产，禁止泛化为合法性判断 |
 | [现有 AI/CDSS 中心与规则治理保护整合](./2026-09-06-ai-cdss-reconciliation.md) | Accepted | 保留主线两中心，统一规则审批、漂移、范围和回执保护 |
 | [居民服务评价投诉消息按角色与订单机构失败关闭](./2026-09-08-resident-service-message-authorization.md) | Accepted | 护理与陪诊评价消息的目标角色、订单机构、历史兼容和回执状态 |
 

@@ -74,7 +74,18 @@ function harness({ online = true } = {}) {
       const button = { dataset: { acknowledgeAccess: "access-1", revokeSharePackage: context.ensureCitizenCareCollections("r1").recordSharePackages[0].id, careTaskComplete: "task-1" } };
       return handlers.section({ target: { closest: (value) => value === selector ? button : null } });
     },
-    reply(overrides = {}) { posts[0].resolve({ ok: true, json: async () => ({ ...posts[0].body, receiptId: "synthetic-receipt", auditRef: "synthetic-audit", ...overrides }) }); }
+    reply(overrides = {}) {
+      const acknowledgement = posts[0].url.endsWith("/acknowledge") ? {
+        schemaVersion: "resident-access-acknowledgement.v1",
+        id: "synthetic-server-acknowledgement",
+        resourceId: posts[0].body.accessLogId,
+        status: "accepted",
+        acknowledgedAt: "2026-09-14T10:00:00.000Z",
+        acceptedAt: "2026-09-14T10:00:00.000Z",
+        syncStatus: "accepted"
+      } : {};
+      posts[0].resolve({ ok: true, json: async () => ({ ...posts[0].body, ...acknowledgement, receiptId: "synthetic-receipt", auditRef: "synthetic-audit", ...overrides }) });
+    }
   };
 }
 

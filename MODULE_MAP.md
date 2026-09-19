@@ -2,6 +2,12 @@
 
 > 状态层权威：当前基线、目标状态、差距任务和验收证据统一登记在 `config/lifecycle-governance.json#maps`；正文继续只陈述 AS-IS 事实。
 
+## 访问知晓声明首切片（2026-09-14）
+
+2026-09-16 状态更新：下段为首切片实施阶段记录。冻结提交 `078840ba` 已经独立复审及 18 项本地串行门禁通过；本轮 GOV-014 仅补幂等行为目录证据，新的冻结验证与远端 CI 尚待执行。用户现授权通过门禁后的推送与条件合并，不授权生产上线；原运行观测和外部证据缺口不关闭。
+
+新增首切片范围：T04 access-acknowledgement-command 与居民路由/页面；T01 resident-access-event-query 只读端口；T00 resident-access-acknowledgement-runtime 经既有组合根装配、state-data 旁路保护。OPS-040/SEC-016 必须联合验收，不能只开放命令而缺少保护；当前为实施候选。
+
 ## 2026-09-06 T00 遗留状态身份边界模块
 
 | 模块 | Owner | 标签 | 当前边界 |
@@ -195,7 +201,7 @@
 | 静态发布与浏览器安全 | `src/http/static-asset-policy.js`、`src/http/static-content-runtime.js`、`src/http/browser-security-policy.js`、`src/http/browser-security-inventory.js`、`browser-safe-url.js`、`page-auth-bootstrap.js`、`scripts/static-publication.js` | 57 个入口、189 个显式发布资产、Pages 制品和服务端读取共用默认拒绝契约；既有高风险页面、生产 Go/No-Go 页面、生产安全工作台、平台说明页、卫生监督页、医疗付费页、区域医疗文书页、临床决策支持页、平台 AI 治理页及审计治理页均按可信 DOM/text 渲染，管理端居民/机构选择器使用显式 option/textContent。Safe URL port 按 internal/official/object-storage/tel/blob 能力在 mutation 前检查协议、凭据和 exact-Origin。Inventory v2 现锁定 783 个 DOM HTML、6 个动态 URL 和 42 个动态样式风险；新增页面自身 P0/P1 finding 为 0，2 个 OHIF URL occurrence 仍复核。严格 CSP 仍是 Report-Only，生产 NO-GO |
 | 居民护理/陪诊评价投诉 | `citizen-service-feedback.js`、`citizen.js`、`citizen.html`、既有 `POST /api/tasks/:id/actions` | 完成态才开放五级满意度和 2–500 字符评价；投诉只接受 `none/open` 并生成机构待跟进消息；居民范围先校验，重复评价失败关闭，浏览器失败时保留草稿；不新增 API、schema 或生产授权 |
 | 演示脱敏 | `src/platform/data/public-demo-snapshot.js` | 服务端合成、Pages 构建和 storage-admin 共用纯函数，凭据字段删除、个人姓名/身份/联系字段稳定掩码 |
-| API 生产目录 | `routeSourceFiles` + `api-authentication-evidence` + `api-idempotency-evidence` → `api-authorization-matrix-v3` → `production-api-catalog-v3` | 当前目录 636 项，13 项认证证据保持未分类为 0。41 份幂等行为合同覆盖 39 个完整 endpoint 与 2 个转诊 action-slice；体检专项分流三动作已由真实 HTTP、命令与路由证据登记为完整 endpoint。363 个写接口中 324 个仍缺 endpoint 级行为证明，通用 action remainder 使 326 项保持复核，全部生产 NO-GO。`reviewedProofRequired` 为 0，有界 receipt、进程锁与 SQLite CAS 不是多实例生产证明 |
+| API 生产目录 | `routeSourceFiles` + `api-authentication-evidence` + `api-idempotency-evidence` → `api-authorization-matrix-v3` → `production-api-catalog-v3` | 当前目录 637 项，13 项认证证据保持未分类为 0。42 份幂等行为合同覆盖 40 个完整 endpoint 与 2 个转诊 action-slice；体检专项分流三动作已由真实 HTTP、命令与路由证据登记为完整 endpoint。364 个写接口中 324 个仍缺 endpoint 级行为证明，通用 action remainder 使 326 项保持复核，全部生产 NO-GO。`reviewedProofRequired` 为 0，有界 receipt、进程锁与 SQLite CAS 不是多实例生产证明 |
 | 内部边界覆盖治理 | `config/internal-boundary-coverage.json` → `scripts/internal-boundary-coverage.js` | 复用现有 c8/直接行为测试，以 10 个不重叠源码组锁定 identity、audit、object storage、API governance、worker observability、区域共享命令、转诊 owner command、科研合规导出、浏览器响应头与 Safe URL 真实基线；每组绑定至少一条实际执行的负向合同，报告仅写临时目录 |
 | Playwright E2E 基础设施 | `playwright-browser-policy.v1`、`playwright-pwa-browser-policy.v1`、`playwright-port-policy`、三套 runner/config | 在线根 60 项（含生产 Go/No-Go、各治理中心恶意响应、四方审批角色回归、居民服务评价投诉及 8 个已发布入口直接验证）与居民 13 项继续阻止 Service Worker；独立 PWA 3 项只在专项 context 允许 Worker，三套共 76 项唯一并集，统一 Chromium、动态端口和临时数据，并验证缓存/注册清理 |
 | 生产证据信任 provider | `src/platform/governance/production-evidence-trust-provider.js` → `scripts/production-preflight.js` | T00 通用 signed-envelope/anchor 验证端口与 production decision 适配；CLI 可部署装配，双角色 Ed25519、pin、撤销、时窗和发布上下文失败关闭；不拥有生产授权 |
@@ -441,7 +447,7 @@ owner、文件引用和 closed-world 核心概念匹配只是证据，不能自�
 |---|---|---|---|
 | `config/repository-governance.json` | T00 | 当前 workflow、Markdown 分类规则/闭集摘要、3 个 PDF 来源与 digest 的机器合同 | 不定义业务 owner，不包含 PDF 正文 |
 | `scripts/repository-governance.js` | T00 | 只读枚举 Git 路径，拒绝漏分/重叠/快照改写/旧 baseline/PDF 漂移 | 不生成或修改文档、PDF、报告和归档 |
-| `test/repository-governance.test.js` | T00 / TEST-001 | 锁定当前 285 份 Markdown、三类边界、当前 main 流程和 3 个 PDF 负向漂移 | 不证明 PDF 内容正确或生产可用 |
+| `test/repository-governance.test.js` | T00 / TEST-001 | 锁定当前 286 份 Markdown、三类边界、当前 main 流程和 3 个 PDF 负向漂移 | 不证明 PDF 内容正确或生产可用 |
 
 依赖方向为 `Git 跟踪路径 + ADR 状态 + 当前进程清单 + PDF bytes/source paths → repository governance
 verifier → governance-api/architecture:test`。snapshot 与 superseded 只提供历史证据，不得反向覆盖 current

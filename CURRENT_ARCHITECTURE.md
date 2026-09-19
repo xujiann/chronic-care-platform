@@ -2,6 +2,12 @@
 
 > 状态层权威：当前基线、目标状态、差距任务和验收证据统一登记在 `config/lifecycle-governance.json#maps`；正文继续只陈述 AS-IS 事实。
 
+## 访问知晓声明首切片（2026-09-14）
+
+2026-09-16 状态更新：下段为首切片实施阶段记录。冻结提交 `078840ba` 已经独立复审及 18 项本地串行门禁通过；本轮 GOV-014 仅补幂等行为目录证据，新的冻结验证与远端 CI 尚待执行。用户现授权通过门禁后的推送与条件合并，不授权生产上线；原运行观测和外部证据缺口不关闭。
+
+访问知晓声明首切片已按 ADR-OPS-040 准入，OPS-040/SEC-016 联合交付，尚未通过冻结组合验证。T04 命令经 T01 原事件只读核验、T00 专属原始存储适配提交；不调用会写日志的 GET，不改变原审计和授权。仅本地非生产，远端发布未授权。
+
 ## 2026-09-06 T00 遗留状态身份边界闭合
 
 - `src/http/routes/state-data.js` 在 `/api/state` 的 commission 读取/全量写入、通用 collection 写入和非生产 `/api/reset` 上增加 `accountType=manager` 边界；专科、审计等非管理 commission 在集合解码、数据库读取、请求体解析或 seed 加载前稳定返回 `403 STATE_DATA_MANAGER_REQUIRED`，institution/insurance/citizen/county 的 GET 既有范围读取保持兼容。
@@ -34,7 +40,7 @@
 
 - `src/clinical-specialties/quality-safety/ai-cdss-governance-center.js` 只读取既有 `phase2ClinicalAssistRules/Alerts/Receipts/PluginContracts`，形成规则/模型卡、证据绑定、人工复核、漂移与事件信号的瞬时治理投影；不新增患者、模型或审计事实源。
 - `GET /api/quality-safety/ai-cdss/center` 位于 T06 既有 quality-safety route segment。主管部门仅查看跨机构治理元数据；机构医生按可信 `doctorId`、机构管理员按可信机构代码/名称精确收敛；机构缺少代码时失败关闭。
-- `clinical-ai-cdss.html` 进入分级左侧导航并只用 DOM/text 渲染。`J-CLIN-CDSS` 形成临床侧仓库证据，并由 T01 平台中心汇总最小治理元数据；自动诊断、医嘱、处方和生产激活均禁用。当前静态发布为 57 个入口、189 个显式资产，生产 API 为 636 项且写入口为 363 个。
+- `clinical-ai-cdss.html` 进入分级左侧导航并只用 DOM/text 渲染。`J-CLIN-CDSS` 形成临床侧仓库证据，并由 T01 平台中心汇总最小治理元数据；自动诊断、医嘱、处方和生产激活均禁用。当前静态发布为 57 个入口、189 个显式资产，生产 API 为 637 项且写入口为 364 个。
 
 ## 2026-09-04 T08 区域医疗文书
 
@@ -75,7 +81,7 @@
 ## 2026-08-31 当前架构事实机器对账
 
 - `scripts/documentation-fact-drift.js` 现以生产 API 目录、首批生产范围、SQLite migration、仓库 Markdown/PDF 闭集和 Accepted ADR 注册表为机器权威，对 ROADMAP、ARCHITECTURE、六张架构地图和 ADR 索引共 9 份当前文档失败关闭。
-- 当前对账值为 SQLite head v17/38 张非内部表、生产 API 636 项/363 个写入口/324 个行为证明缺口/326 个总复核项、首批范围 `FROZEN-NO-GO` 且范围内 API/集合复核与仓库迁移计划缺口均为 0、Markdown 285 份（215 current、68 snapshot、2 superseded）。
+- 当前对账值为 SQLite head v17/38 张非内部表、生产 API 637 项/364 个写入口/324 个行为证明缺口/326 个总复核项、首批范围 `FROZEN-NO-GO` 且范围内 API/集合复核与仓库迁移计划缺口均为 0、Markdown 286 份（216 current、68 snapshot、2 superseded）。
 - 该验证仅在内存 SQLite 中重放既有 migration 并读取仓库权威；不写 `data/db.json`、运行时 SQLite、生产证据、生成报告或归档产物，不改变任何运行时行为。
 
 ## 2026-08-31 首发数据迁移计划闭集
@@ -362,7 +368,7 @@ Worker、外部数字医院注册及仍为 Proposed 的对象存储 v2 worker �
 `baseline/governance-20260817-enhancement-v1` 仅保留为可复现证据 tag。历史日期化路由/治理文档不再被
 `AGENTS.md` 作为当前工作流入口引用，原文和摘要保持不变。
 
-`repository-governance-v1` 从 Git 路径派生；当前闭集为 285 份 Markdown：215 份 `current`、68 份
+`repository-governance-v1` 从 Git 路径派生；当前闭集为 286 份 Markdown：216 份 `current`、68 份
 `snapshot`、2 份 `superseded`，每个路径必须唯一命中规则；snapshot 内容聚合摘要失败关闭。
 `output/pdf` 的 3 个 PDF 未修改，分别绑定 SHA-256、大小、页数、引入提交、来源与保留理由。现有仓库
 没有任何一个 PDF 的可复现生成器；医院运行脚本只是 verifier，不能被描述为 generator。机器门禁只读，

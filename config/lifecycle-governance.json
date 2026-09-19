@@ -39,6 +39,10 @@
     "高": "accepted-adr-human-review-special-validation"
   },
   "requirements": [
+    {"id":"REQ-GOV-014","title":"访问知晓声明幂等证据登记","sourceType":"approved-t00-plan","sourceRef":"USER-APPROVED-ACK-EVIDENCE-INTEGRATION-2026-09-16","acceptance":["仅登记本人知晓声明endpoint已有非生产行为","独立审查、冻结串行门禁后推送并按精确CI条件合并，不上线"]},
+{"id":"REQ-GOV-013","title":"访问知晓声明准入与证据登记","sourceType":"approved-t00-plan","sourceRef":"USER-APPROVED-ACCESS-ACKNOWLEDGEMENT-2026-09-14","acceptance":["本人知晓声明，不改变原审计/授权","仅非生产，完整幂等、原子持久、满额拒绝、通用旁路保护"]},
+    {"id":"REQ-OPS-040","title":"居民本人访问知晓声明命令","sourceType":"approved-t00-plan","sourceRef":"USER-APPROVED-ACCESS-ACKNOWLEDGEMENT-2026-09-14","acceptance":["本人知晓声明，不改变原审计/授权","仅非生产，完整幂等、原子持久、满额拒绝、通用旁路保护"]},
+    {"id":"REQ-SEC-016","title":"访问事件只读核验与声明写边界集成","sourceType":"approved-t00-plan","sourceRef":"USER-APPROVED-ACCESS-ACKNOWLEDGEMENT-2026-09-14","acceptance":["本人知晓声明，不改变原审计/授权","仅非生产，完整幂等、原子持久、满额拒绝、通用旁路保护"]},
     {"id":"REQ-SEC-015","title":"监控日志文件身份精确比较","sourceType":"approved-t00-plan","sourceRef":"USER-APPROVED-FAILURE-REPAIR-2026-09-14","acceptance":["不同精确文件身份即使Number投影相同也必须拒绝","不改文件格式、错误码、大小上限、权限、签名或生产门禁"]},
     {"id":"REQ-TEST-021","title":"居民超时恢复测试时钟确定性","sourceType":"approved-t00-plan","sourceRef":"USER-APPROVED-FAILURE-REPAIR-2026-09-14","acceptance":["保留真实首次超时和真实HTTP恢复","暂停浏览器计时避免恢复依赖500ms墙钟预算，不改生产runtime或原断言"]},
     {
@@ -478,6 +482,10 @@
     }
   ],
   "risks": [
+    {"id":"RISK-GOV-014","title":"行为目录登记被误解为生产或跨实例证据","level":"中","owner":"T00","mitigation":"精确绑定可执行测试，负测禁止晋级生产；保留存储、容量、审计和高风险目录缺口","status":"open"},
+    {"id":"RISK-GOV-013","title":"文档准入与证据错配","level":"中","owner":"T00","mitigation":"纯文档登记职责，无数据权威实现；独立审查任务范围与证据状态","status":"open"},
+    {"id":"RISK-OPS-040","title":"访问声明身份与事务边界","level":"高","owner":"T00","mitigation":"Accepted ADR、本人精确核验、单事务与旁路保护、独立审查及冻结测试","status":"open"},
+    {"id":"RISK-SEC-016","title":"访问声明身份与事务边界","level":"高","owner":"T00","mitigation":"Accepted ADR、本人精确核验、单事务与旁路保护、独立审查及冻结测试","status":"open"},
     {
       "id": "RISK-SEC-015",
       "title": "Number文件身份精度导致拒绝遗漏",
@@ -950,9 +958,21 @@
       "effectiveScope": "resident-service-message-role-organization-and-receipt-authorization",
       "reviewDue": "2027-03-08",
       "supersedes": []
+    },
+    {
+      "id": "ADR-OPS-040",
+      "status": "Accepted",
+      "path": "docs/adr/2026-09-14-resident-access-acknowledgement.md",
+      "effectiveScope": "non-production-self-access-acknowledgement-only",
+      "reviewDue": "2027-03-14",
+      "supersedes": []
     }
   ],
   "tests": [
+    {"id":"TEST-GOV-014","kind":"acknowledgement-evidence-registry","path":"test/api-idempotency-evidence.test.js","command":"node --test --test-concurrency=1 test/api-idempotency-evidence.test.js test/production-api-catalog.test.js"},
+    {"id":"TEST-GOV-013","kind":"access-acknowledgement-boundary","path":"test/lifecycle-governance.test.js","command":"npm run governance:lifecycle"},
+    {"id":"TEST-OPS-040","kind":"access-acknowledgement-boundary","path":"test/citizen-access-acknowledgement-api.test.js","command":"node --test --test-concurrency=1 test/citizen-access-acknowledgement.test.js test/citizen-access-acknowledgement-api.test.js test/resident-access-event-query.test.js"},
+    {"id":"TEST-SEC-016","kind":"access-acknowledgement-boundary","path":"test/resident-access-acknowledgement-runtime.test.js","command":"node --test --test-concurrency=1 test/citizen-access-acknowledgement.test.js test/citizen-access-acknowledgement-api.test.js test/resident-access-event-query.test.js test/resident-access-acknowledgement-runtime.test.js"},
     {"id":"TEST-SEC-015","kind":"journal-identity-regression","path":"test/pilot-cutover-alert-lifecycle.test.js","command":"node --test test/pilot-cutover-alert-lifecycle.test.js test/platform-preproduction-control-cli.test.js"},
     {"id":"TEST-TEST-021","kind":"resident-timeout-recovery-browser","path":"test/e2e/resident-mini-program.spec.js","command":"npm run test:e2e:resident"},
     {
@@ -1772,6 +1792,9 @@
       "target": "数据敏感级别和迁移证据进入每项任务追踪链",
       "status": "已集成",
       "gapTaskIds": [
+        "GOV-013",
+        "OPS-040",
+        "SEC-016",
         "OPS-015",
         "OPS-016",
         "OPS-017",
@@ -1789,6 +1812,7 @@
       "target": "接口变更由任务风险和影响范围选择门禁",
       "status": "已集成",
       "gapTaskIds": [
+        "GOV-014",
         "OPS-015",
         "OPS-016",
         "OPS-018",
@@ -1841,6 +1865,10 @@
     }
   ],
   "tasks": [
+    {"id":"GOV-014","title":"访问知晓声明幂等行为证据登记","ownerProcess":"T00","integrationOwner":"T00","taskStatus":"实施中","capabilityStatus":"未建设","riskLevel":"中","approval":{"state":"approved","mode":"T00-plan-approval","ref":"USER-APPROVED-ACK-EVIDENCE-INTEGRATION-2026-09-16","approvedScope":"config/api-idempotency-evidence.json, test/api-idempotency-evidence.test.js, test/production-api-catalog.test.js"},"requirementIds":["REQ-GOV-014"],"regulatoryControlIds":["REG-GOV-001"],"riskIds":["RISK-GOV-014"],"decisionIds":["ADR-OPS-040"],"dependencies":["GOV-013"],"affectedModules":["api-idempotency-evidence"],"dataSensitivity":"仅治理元数据与合成测试，无业务数据","acceptanceCriteria":["精确endpoint合同绑定真实实现与可执行负测，不以marker替代证明","只晋升仓库幂等行为状态，生产与分布式保证不得晋升"],"testIds":["TEST-GOV-014"],"evidenceIds":[],"rollback":"撤销新增合同恢复proof-required，保留运行时、业务事实及历史证据","unresolved":["本轮独立审查、冻结门禁与精确远端CI尚待完成；生产未授权"],"worktree":".codex-platform-worktrees/process-v2/t00-access-acknowledgement-integration-20260914","branch":"process/t00-access-acknowledgement-integration-20260914","planRef":"ROADMAP.md#gov-014-访问知晓声明证据登记-plan2026-09-16","pullRequestRef":"","ciRef":"","writeScopes":["config/api-idempotency-evidence.json","test/api-idempotency-evidence.test.js","test/production-api-catalog.test.js"],"observability":{"applicable":false,"reason":"仅治理证据登记及测试，不交付运行时能力"},"runtimeCapability":false},
+    {"id":"GOV-013","title":"访问知晓声明准入与证据登记","ownerProcess":"T00","integrationOwner":"T00","taskStatus":"验证中","capabilityStatus":"已实现","riskLevel":"中","approval":{"state":"approved","mode":"T00-plan-approval","ref":"USER-APPROVED-ACCESS-ACKNOWLEDGEMENT-2026-09-14","approvedScope":"config/lifecycle-governance.json, ROADMAP.md, docs/adr/2026-09-14-resident-access-acknowledgement.md, CURRENT_ARCHITECTURE.md, MODULE_MAP.md, DATA_MODEL.md, API_MAP.md, DEPENDENCY_MAP.md, TECH_DEBT.md, docs/adr/README.md, config/repository-governance.json"},"requirementIds":["REQ-GOV-013"],"regulatoryControlIds":["REG-GOV-001"],"riskIds":["RISK-GOV-013"],"decisionIds":["ADR-OPS-040"],"dependencies":[],"affectedModules":["lifecycle-governance"],"dataSensitivity":"本人访问事件绑定与知晓声明，仅合成测试数据","acceptanceCriteria":["如实登记已批准ADR、独立高风险领域任务和单写者，不实现数据权威或运行时","独立复核登记，不预填实现或测试证据"],"testIds":["TEST-GOV-013"],"evidenceIds":[],"rollback":"回退纯文档登记，不回退或清理业务事实","unresolved":["078840ba 本地18项门禁已通过；本轮登记候选的独立审查、冻结验证和精确远端CI待完成","2026-09-16用户授权本联合切片推送及条件合并，不授权上线；运行观测、真实PG与现场证据缺口保留"],"worktree":".codex-platform-worktrees/process-v2/t00-access-acknowledgement-integration-20260914","branch":"process/t00-access-acknowledgement-integration-20260914","planRef":"docs/adr/2026-09-14-resident-access-acknowledgement.md#plan-与单写者","pullRequestRef":"","ciRef":"","writeScopes":["config/lifecycle-governance.json","ROADMAP.md","docs/adr/2026-09-14-resident-access-acknowledgement.md","CURRENT_ARCHITECTURE.md","MODULE_MAP.md","DATA_MODEL.md","API_MAP.md","DEPENDENCY_MAP.md","TECH_DEBT.md","docs/adr/README.md","config/repository-governance.json"],"observability":{"applicable":false,"reason":"纯文档与任务准入登记，不交付运行时能力"},"runtimeCapability":false},
+    {"id":"OPS-040","title":"居民本人访问知晓声明命令","ownerProcess":"T04","integrationOwner":"T00","taskStatus":"验证中","capabilityStatus":"已实现","riskLevel":"高","approval":{"state":"approved","mode":"accepted-adr-human-review-special-validation","ref":"USER-APPROVED-ACCESS-ACKNOWLEDGEMENT-2026-09-14","approvedScope":"src/citizen-chronic/access-acknowledgement-command.js, src/http/routes/citizen-chronic.js, citizen.js, citizen-records-v2.js, test/citizen-access-acknowledgement.test.js, test/citizen-access-acknowledgement-api.test.js, test/citizen-care-workspace-session.test.js, test/e2e/citizen-records-v1.spec.js"},"requirementIds":["REQ-OPS-040"],"regulatoryControlIds":["REG-GOV-001"],"riskIds":["RISK-OPS-040"],"decisionIds":["ADR-OPS-040"],"dependencies":["GOV-013"],"affectedModules":["citizen-chronic"],"dataSensitivity":"本人访问事件绑定与知晓声明，仅合成测试数据","acceptanceCriteria":["遵守 Accepted ADR 首切片边界、单写者和独立审查","通过本人/幂等/容量/旁路/事务负向专项，不改变原审计或授权"],"testIds":["TEST-OPS-040"],"evidenceIds":[],"rollback":"关闭专属写入口但保留声明事实、完整历史和通用写保护；无 migration","unresolved":["078840ba 本地18项门禁已通过；本轮登记候选的独立审查、冻结验证和精确远端CI待完成","2026-09-16用户授权本联合切片推送及条件合并，不授权上线；运行观测、真实PG与现场证据缺口保留"],"worktree":".codex-platform-worktrees/process-v2/t04-access-acknowledgement-20260914","branch":"process/t04-access-acknowledgement-20260914","planRef":"docs/adr/2026-09-14-resident-access-acknowledgement.md#plan-与单写者","pullRequestRef":"","ciRef":"","writeScopes":["src/citizen-chronic/access-acknowledgement-command.js","src/http/routes/citizen-chronic.js","citizen.js","citizen-records-v2.js","test/citizen-access-acknowledgement.test.js","test/citizen-access-acknowledgement-api.test.js","test/citizen-care-workspace-session.test.js","test/e2e/citizen-records-v1.spec.js"],"observability":{"applicable":true,"gaps":"待专项核验响应与回执，生产观测及现场证据未闭合"},"runtimeCapability":true},
+    {"id":"SEC-016","title":"访问事件只读核验与声明写边界集成","ownerProcess":"T00","integrationOwner":"T00","taskStatus":"验证中","capabilityStatus":"已实现","riskLevel":"高","approval":{"state":"approved","mode":"accepted-adr-human-review-special-validation","ref":"USER-APPROVED-ACCESS-ACKNOWLEDGEMENT-2026-09-14","approvedScope":"server.js, src/http/runtime-contexts/citizen-chronic.js, src/http/routes/state-data.js, src/identity-security/resident-access-event-query.js, test/resident-access-event-query.test.js, config/domain-data-ownership.json, config/state-collection-governance.json, src/http/platform-runtime-composition.js, src/http/resident-access-acknowledgement-runtime.js, test/resident-access-acknowledgement-runtime.test.js, test/data-collection-governance.test.js, test/state-data-commission-read-projection.test.js"},"requirementIds":["REQ-SEC-016"],"regulatoryControlIds":["REG-GOV-001"],"riskIds":["RISK-SEC-016"],"decisionIds":["ADR-OPS-040"],"dependencies":["GOV-013"],"affectedModules":["access-acknowledgement-boundary"],"dataSensitivity":"本人访问事件绑定与知晓声明，仅合成测试数据","acceptanceCriteria":["遵守 Accepted ADR 首切片边界、单写者和独立审查","通过本人/幂等/容量/旁路/事务负向专项，不改变原审计或授权"],"testIds":["TEST-SEC-016"],"evidenceIds":[],"rollback":"关闭专属写入口但保留声明事实、完整历史和通用写保护；无 migration","unresolved":["078840ba 本地18项门禁已通过；本轮登记候选的独立审查、冻结验证和精确远端CI待完成","2026-09-16用户授权本联合切片推送及条件合并，不授权上线；运行观测、真实PG与现场证据缺口保留"],"worktree":".codex-platform-worktrees/process-v2/t00-access-acknowledgement-integration-20260914","branch":"process/t00-access-acknowledgement-integration-20260914","planRef":"docs/adr/2026-09-14-resident-access-acknowledgement.md#plan-与单写者","pullRequestRef":"","ciRef":"","writeScopes":["server.js","src/http/runtime-contexts/citizen-chronic.js","src/http/routes/state-data.js","src/identity-security/resident-access-event-query.js","test/resident-access-event-query.test.js","config/domain-data-ownership.json","config/state-collection-governance.json","src/http/platform-runtime-composition.js","src/http/resident-access-acknowledgement-runtime.js","test/resident-access-acknowledgement-runtime.test.js","test/data-collection-governance.test.js","test/state-data-commission-read-projection.test.js"],"observability":{"applicable":true,"gaps":"待专项核验响应与回执，生产观测及现场证据未闭合"},"runtimeCapability":true},
     {
       "id": "SEC-015",
       "title": "监控日志文件身份精度修复",

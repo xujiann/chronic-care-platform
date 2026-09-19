@@ -137,6 +137,32 @@ test("custom authentication evidence classifies every proven control flow withou
   assert.equal(callback.production.productionReady, false);
 });
 
+test("resident acknowledgement evidence changes one local review without granting production readiness", () => {
+  const catalog = buildProductionApiCatalog();
+  const entry = catalog.entries.find((row) => row.key === "POST /api/access-reviews/:accessLogId/acknowledge");
+  assert.ok(entry);
+  assert.equal(entry.owner, "T04");
+  assert.equal(entry.domain, "citizen-chronic");
+  assert.deepEqual(entry.authorization.roles, ["citizen"]);
+  assert.equal(entry.idempotency.behaviorEvidence.status, "behavior-verified");
+  assert.equal(entry.idempotency.behaviorEvidence.contractId, "citizen-chronic.resident-access-acknowledgement.v1");
+  assert.equal(entry.idempotency.behaviorEvidence.distributedExactlyOnceClaimed, false);
+  assert.deepEqual(entry.idempotency.behaviorEvidence.verifiedActionContracts, []);
+  assert.equal(entry.production.repositoryReview, "catalogued");
+  assert.equal(entry.production.status, "NO-GO");
+  assert.equal(entry.production.productionReady, false);
+  assert.equal(entry.production.externalEvidenceRequired, true);
+  assert.equal(entry.production.blockers.includes("idempotency-behavior-proof-required"), false);
+  assert.equal(entry.production.blockers.includes("real-environment-and-site-evidence-required"), true);
+  assert.equal(catalog.summary.entries, 637);
+  assert.equal(catalog.summary.writeRoutes, 364);
+  assert.equal(catalog.summary.writeIdempotencyBehaviorVerified, 40);
+  assert.equal(catalog.summary.writeIdempotencyActionSlicesVerified, 2);
+  assert.equal(catalog.summary.writeIdempotencyBehaviorProofRequired, 324);
+  assert.equal(catalog.summary.reviewRequired, 326);
+  assert.equal(catalog.summary.productionNoGo, 637);
+});
+
 test("write APIs always expose an idempotency classification without claiming proof", () => {
   const catalog = buildProductionApiCatalog();
   const writes = catalog.entries.filter((entry) => entry.idempotency.required);
@@ -145,9 +171,9 @@ test("write APIs always expose an idempotency classification without claiming pr
   assert.equal(catalog.policy.sourceMarkersAreBehaviorProof, false);
   assert.equal(catalog.policy.writeIdempotencyEvidence, "explicit-behavior-contract-and-executable-test-evidence");
   assert.equal(catalog.entries.filter((entry) => entry.idempotency.status === "not-observed").every((entry) => entry.production.repositoryReview === "review-required"), true);
-  assert.equal(catalog.summary.writeIdempotencyBehaviorVerified, 39);
+  assert.equal(catalog.summary.writeIdempotencyBehaviorVerified, 40);
   assert.equal(catalog.summary.writeIdempotencyActionSlicesVerified, 2);
-  assert.equal(catalog.summary.writeIdempotencyBehaviorProofRequired, writes.length - 39);
+  assert.equal(catalog.summary.writeIdempotencyBehaviorProofRequired, writes.length - 40);
   assert.equal(writes.filter((entry) => entry.idempotency.behaviorEvidence.status === "behavior-proof-required").every((entry) => entry.production.blockers.includes("idempotency-behavior-proof-required")), true);
   const callback = catalog.entries.find((entry) => entry.key === "POST /api/auth/sms-delivery-callback");
   assert.equal(callback.idempotency.status, "source-marker-observed");

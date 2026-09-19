@@ -2,7 +2,7 @@ const http = require("http");
 const fs = require("fs");
 const path = require("path");
 const LEGACY_REGIONAL_STATS_KEY = "da" + "lianHealthStatistics2025";
-const { createPlatformRuntimeComposition, createClinicalAssistRuntime } = require("./src/http/platform-runtime-composition");
+const { createPlatformRuntimeComposition, createClinicalAssistRuntime, createResidentAccessAcknowledgementRuntime } = require("./src/http/platform-runtime-composition");
 const {
   createBrowserSecurityHeaders,
   createPlatformRequestHandler,
@@ -11427,6 +11427,7 @@ function collectJson(req, maxLength = 2_000_000) {
 }
 
 function normalizeState(data) {
+  const accessAcknowledgementSource = Object.hasOwn(data, "accessAcknowledgements") ? data.accessAcknowledgements : [];
   const auditTrailSource = {
     dataAccessLogs: Array.isArray(data?.dataAccessLogs) ? data.dataAccessLogs : null,
     securityEvents: Array.isArray(data?.securityEvents) ? data.securityEvents : null
@@ -11878,7 +11879,7 @@ function normalizeState(data) {
     recordCorrections: Array.isArray(data.recordCorrections) ? data.recordCorrections.slice(-1000) : [],
     recordSharePackages: Array.isArray(data.recordSharePackages) ? data.recordSharePackages.slice(-1000) : [],
     careTaskUpdates: Array.isArray(data.careTaskUpdates) ? data.careTaskUpdates.slice(-2000) : [],
-    accessAcknowledgements: Array.isArray(data.accessAcknowledgements) ? data.accessAcknowledgements.slice(-2000) : [],
+    accessAcknowledgements: accessAcknowledgementSource,
     accessDisputes: Array.isArray(data.accessDisputes) ? data.accessDisputes.slice(-2000) : [],
     primaryCareAssessments: Array.isArray(data.primaryCareAssessments) ? data.primaryCareAssessments.slice(-1000) : [],
     registrationReferralClosureEvents: Array.isArray(data.registrationReferralClosureEvents) ? data.registrationReferralClosureEvents.slice(0, 300) : [],
@@ -15349,7 +15350,7 @@ async function hydrateRequestSession(req) {
     ? await store.hydrate(verified.sessionId)
     : store.get(verified.sessionId);
   const resolved = { ...resolution, session };
-  validateLiveSession(session, readDatabase());
+  validateLiveSession(session, req.method === "POST" && /^\/api\/access-reviews\/[^/]+\/acknowledge$/.test(new URL(req.url, `http://${req.headers.host}`).pathname) ? platformRuntimeComposition.contexts.forDomain("citizen-chronic").accessAcknowledgementCommand.readAuthorizationState() : readDatabase());
   requireCsrf(req, resolved, process.env);
   req.authResolution = resolved;
   return session;
@@ -28335,6 +28336,7 @@ function createRuntimeCapabilitySource() {
   phoneLoginLockStatus,
   prependAuditEventPreservingTrail,
   prependAuditTrailEntry,
+  accessAcknowledgementCommand: createResidentAccessAcknowledgementRuntime({ fs, path, DATA_DIR, DB_FILE, STORAGE_ENGINE, RUNTIME_STORAGE_ENGINES, POSTGRES_SYNC_MODE, shouldUseSqlite, loadSqliteModule, openSqliteDatabase, RUNTIME_INTERNAL_COLLECTION_KEYS, normalizeState, writeSqliteState, createHash, randomUUID, verifyAuditTrail, prependAuditTrailEntry, validateLiveSession, runtimeSessionStore, sessionStoreMode }),
   probeSessionStoreStatus,
   productionAdapterCenter,
   promoteNextRegistrationWaitlist,
