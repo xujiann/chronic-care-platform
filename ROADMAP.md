@@ -1,5 +1,17 @@
 # 工程治理路线图
 
+## T02 数据质量问题集合 PostgreSQL 迁移样本 PLAN（2026-09-19，待精确准入）
+
+- 基线与事实：`origin/main@b54c9a6c` 已集成 PR #307；另有未推送的 GOV-013/GOV-014 事实收口本地提交 `21cbc055`，不作为本计划的运行时代码基线。首发组合把 `dataQualityIssues` 归于 T02 `platform-governance`、`internal`、`wave-first-release-platform`，目前仅 `repository-plan-ready`。`localExecutionAuthorized=false`、`productionCutoverAuthorized=false`、`productionWriteAllowed=false` 与六域 `NO-GO` 不变。
+- 目标：以一个真实有写入口的集合证明“已提交 SQLite 事实 → 独立 worker/outbox → PostgreSQL 影子集合状态 → 精确核对 → 独立回滚演练”的可重复样本；只将仓库合同和受控本地演练能力推进，不把样本结果推广为 20 个集合或生产切换证据。正常、重复、版本冲突、失联/中断、部分批次失败、核对不符和恢复路径均须可测。
+- 现状与单写者：真实 POST `/api/data-quality/issues/:id/actions` 位于 T09 所有的 `src/http/routes/shared.js:815`，调用 `readDatabase`/`writeDatabase` 并把覆盖项限制在 300 条；它读取 `buildDataQualityIssues` 派生视图，不能把 300 条覆盖项误当全部源数据。T02 拥有集合语义与迁移映射，T09 只拥有兼容路由，T00 独占迁移组合、生命周期登记和集成。第一实施切片不改路由或 `server.js`，不变更请求路径写入语义；若发现现有 SQLite 事务 outbox 不承载本集合完整版本/提交凭证，先停在合同与负测，另立 T09/T00 handoff，不补请求路径双写。
+- 方案：优先复用现有 `health_platform.primary_collection_state`、PostgreSQL 主存储 CAS/批次幂等合同和 `outbox-shadow-then-cutover` 波次，不建第二事实源、新业务表或新依赖。T02 先提供仅接受合成数据的确定性集合提取、版本/摘要与失败关闭测试；T00 对接现有 worker、checkpoint、精确计数/摘要和切回评估。任何真实数据导入、worker 激活或环境切换均不属于此授权。
+- 决策与风险：Accepted 的首发组合 ADR 只批准 metadata-only 计划，未批准执行；本样本若需改变数据权威源、事务 outbox、schema 或本地执行授权，必须先形成专门 Accepted ADR 和任务总账审批。敏感数据不进仓库；执行证据须用受控引用及 SHA-256，不能以测试伪造现场签名。不得用覆盖项的 300 条上限掩盖丢失、重复或摘要不一致。
+- 拟议写范围：T00 独占 `config/lifecycle-governance.json`、`ROADMAP.md`、迁移组合/门禁配置及六图；T02 独占其领域迁移适配模块和专项测试；T09 仅在后续明确批准兼容入口改造时独占 `src/http/routes/shared.js`。每个切片先登记 requirement、依赖、风险、验收、writeScopes、回滚及测试，保持 WIP≤5；不同 owner 不共写同一文件。
+- 测试与验收：先执行集合合同、现有迁移执行/PG 驱动及负向专项，核实空库、升级、重跑、失败、CAS、schema 指纹、核对与回滚；集成前依序运行 `process:verify`、routes/architecture/process/iterations、build、lint、typecheck、unit、integration、smoke、legacy `test:all` 和真实环境允许的 PG 门禁。独立审查通过后冻结 SHA，再 PR/CI；真实 PG、容量、多实例、灾备和现场签署缺一项就保持生产 `NO-GO`。
+- 回滚：仓库切片可按独立提交回退适配与合同；演练环境只能停 worker、保存 checkpoint/批次账本、核对源与影子状态并依受控回滚手册切回，禁止删除源事实、outbox 或审计。未完成可验证恢复前，不晋级 `local-candidate`。
+- 非目标：不推送/合并此 PLAN，不迁移真实数据，不启用生产 worker、PostgreSQL 主读/主写、请求路径双写或自动上线；对其余 19 个持久化引用不作已完成声明。
+
 ## GOV-014 访问知晓声明证据登记 PLAN（2026-09-16）
 
 - 用户批准本轮证据登记、测试及完成后的推送/PR/条件合并（USER-APPROVED-ACK-EVIDENCE-INTEGRATION-2026-09-16）；不授权上线、生产激活或保护规则例外。主线新鲜核验为 origin/main@cb8f37e0，无开放 PR；既有功能冻结候选为 078840ba，11 个本地提交尚未集成。
