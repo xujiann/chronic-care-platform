@@ -6,6 +6,7 @@ const { validatePostgresSyncBatch } = require("../../../postgres-runtime-sync");
 
 const COLLECTION = "dataQualityIssues";
 const MAX_OVERRIDES = 300;
+const MAX_SOURCE_BYTES = 1_048_576;
 const SHA256 = /^[a-f0-9]{64}$/;
 
 function digest(value) {
@@ -28,7 +29,7 @@ function assessDataQualityMigrationSample(input = {}) {
   let recordCount = null;
 
   if (source?.key !== COLLECTION || !Number.isSafeInteger(source.version) || source.version < 1
-    || typeof source.payload !== "string") {
+    || typeof source.payload !== "string" || Buffer.byteLength(source.payload) > MAX_SOURCE_BYTES) {
     blockers.push("SOURCE_COLLECTION_INVALID");
   } else {
     sourceVersion = source.version;
@@ -50,7 +51,8 @@ function assessDataQualityMigrationSample(input = {}) {
 
   const batch = input.outboxBatch;
   let change = null;
-  if (!batch || !validatePostgresSyncBatch(batch).ok) {
+  if (!batch || typeof batch.payload !== "string" || Buffer.byteLength(batch.payload) > MAX_SOURCE_BYTES
+    || !validatePostgresSyncBatch(batch).ok) {
     blockers.push("OUTBOX_BATCH_INVALID");
   } else {
     const envelope = JSON.parse(batch.payload);
@@ -70,7 +72,8 @@ function assessDataQualityMigrationSample(input = {}) {
 
   const receipt = input.commitment;
   if (receipt?.state !== "committed" || receipt.source !== "sqlite-transactional-outbox"
-    || typeof receipt.sourceTransactionId !== "string" || !receipt.sourceTransactionId.trim()
+    || typeof receipt.sourceTransactionId !== "string"
+    || !/^[^\r\n]{1,240}$/.test(receipt.sourceTransactionId) || !receipt.sourceTransactionId.trim()
     || !Number.isSafeInteger(receipt.outboxSequence) || receipt.outboxSequence < 1
     || !exactTimestamp(receipt.committedAt)
     || receipt.payloadSha256 !== batch?.payloadSha256) {

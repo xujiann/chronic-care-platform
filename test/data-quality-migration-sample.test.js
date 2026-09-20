@@ -123,3 +123,13 @@ test("forged dates and non-canonical receipts cannot pass the proof shape", () =
   input.commitment.committedAt = "2026-02-30T00:00:00.000Z";
   assert.ok(assessDataQualityMigrationSample(input).blockers.includes("COMMITTED_OUTBOX_PROOF_MISSING"));
 });
+
+test("oversized source and outbox inputs fail before parsing", () => {
+  const oversizedSource = sample();
+  oversizedSource.sourceRow.payload = "x".repeat(1_048_577);
+  assert.ok(assessDataQualityMigrationSample(oversizedSource).blockers.includes("SOURCE_COLLECTION_INVALID"));
+
+  const oversizedBatch = sample();
+  oversizedBatch.outboxBatch.payload = "x".repeat(1_048_577);
+  assert.ok(assessDataQualityMigrationSample(oversizedBatch).blockers.includes("OUTBOX_BATCH_INVALID"));
+});
