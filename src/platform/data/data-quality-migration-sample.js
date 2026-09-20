@@ -12,6 +12,12 @@ function digest(value) {
   return createHash("sha256").update(value).digest("hex");
 }
 
+function exactTimestamp(value) {
+  if (typeof value !== "string" || !/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/.test(value)) return false;
+  const time = Date.parse(value);
+  return Number.isFinite(time) && new Date(time).toISOString() === value;
+}
+
 // T02-owned, read-only admission check. Inputs must come from independently
 // verified source/outbox/target readers; this function cannot attest provenance.
 function assessDataQualityMigrationSample(input = {}) {
@@ -66,9 +72,7 @@ function assessDataQualityMigrationSample(input = {}) {
   if (receipt?.state !== "committed" || receipt.source !== "sqlite-transactional-outbox"
     || typeof receipt.sourceTransactionId !== "string" || !receipt.sourceTransactionId.trim()
     || !Number.isSafeInteger(receipt.outboxSequence) || receipt.outboxSequence < 1
-    || typeof receipt.committedAt !== "string"
-    || !/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/.test(receipt.committedAt)
-    || !Number.isFinite(Date.parse(receipt.committedAt))
+    || !exactTimestamp(receipt.committedAt)
     || receipt.payloadSha256 !== batch?.payloadSha256) {
     blockers.push("COMMITTED_OUTBOX_PROOF_MISSING");
   }

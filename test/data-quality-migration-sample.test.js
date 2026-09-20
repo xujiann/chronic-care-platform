@@ -1,8 +1,16 @@
 "use strict";
 
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const os = require("node:os");
+const path = require("node:path");
 const test = require("node:test");
-const { buildPostgresSyncBatch } = require("../postgres-runtime-sync");
+const { DatabaseSync } = require("node:sqlite");
+const {
+  buildPostgresSyncBatch,
+  enqueuePostgresSyncBatch,
+  loadPendingPostgresSyncBatches
+} = require("../postgres-runtime-sync");
 const { assessDataQualityMigrationSample } = require("../src/platform/data/data-quality-migration-sample");
 
 function sample(records = [{ id: "synthetic-issue-1", status: "in_progress" }]) {
@@ -40,10 +48,35 @@ test("synthetic source, committed outbox and target match without exposing recor
   assert.equal(JSON.stringify(result).includes("synthetic-issue-1"), false);
 });
 
-test("the current outbox reader's missing transaction and sequence proof blocks the sample", () => {
+test("the actual SQLite outbox reader omits transaction and sequence proof", (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "dq-migration-sample-"));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const sqliteFile = path.join(dir, "outbox.sqlite");
+  const db = new DatabaseSync(sqliteFile);
+  db.exec(`CREATE TABLE postgres_sync_outbox (
+    sequence INTEGER PRIMARY KEY AUTOINCREMENT, batch_id TEXT NOT NULL UNIQUE,
+    created_at TEXT NOT NULL, payload TEXT NOT NULL, payload_sha256 TEXT NOT NULL,
+    previous_chain_hash TEXT NOT NULL DEFAULT '', chain_hash TEXT NOT NULL,
+    status TEXT NOT NULL, attempts INTEGER NOT NULL DEFAULT 0,
+    next_attempt_at TEXT NOT NULL
+  )`);
   const input = sample();
-  delete input.commitment.sourceTransactionId;
-  delete input.commitment.outboxSequence;
+  db.exec("BEGIN IMMEDIATE");
+  enqueuePostgresSyncBatch(db, [{
+    collection: "dataQualityIssues", operation: "upsert", sourceVersion: 2,
+    payload: [{ id: "synthetic-issue-1", status: "in_progress" }]
+  }], { createdAt: "2026-09-20T00:00:00.000Z" });
+  db.exec("COMMIT");
+  db.close();
+  const [loaded] = loadPendingPostgresSyncBatches(sqliteFile, { now: "2026-09-20T00:01:00.000Z" });
+  assert.equal(loaded.outboxSequence, undefined);
+  assert.equal(loaded.sourceTransactionId, undefined);
+  input.outboxBatch = loaded;
+  input.commitment = {
+    state: "committed", source: "sqlite-transactional-outbox",
+    outboxSequence: loaded.outboxSequence, sourceTransactionId: loaded.sourceTransactionId,
+    committedAt: loaded.createdAt, payloadSha256: loaded.payloadSha256
+  };
   assert.deepEqual(assessDataQualityMigrationSample(input).blockers, ["COMMITTED_OUTBOX_PROOF_MISSING"]);
 });
 
@@ -83,4 +116,10 @@ test("malformed and oversized source rows do not leak records", () => {
   const result = assessDataQualityMigrationSample(oversized);
   assert.ok(result.blockers.includes("SOURCE_OVERRIDE_SET_INVALID"));
   assert.equal(JSON.stringify(result).includes("synthetic-300"), false);
+});
+
+test("forged dates and non-canonical receipts cannot pass the proof shape", () => {
+  const input = sample();
+  input.commitment.committedAt = "2026-02-30T00:00:00.000Z";
+  assert.ok(assessDataQualityMigrationSample(input).blockers.includes("COMMITTED_OUTBOX_PROOF_MISSING"));
 });
