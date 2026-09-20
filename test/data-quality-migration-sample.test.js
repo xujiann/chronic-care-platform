@@ -102,9 +102,35 @@ test("changed versions, payload digests and target state are rejected", () => {
   alteredTarget.targetRow.payloadSha256 = "0".repeat(64);
   assert.ok(assessDataQualityMigrationSample(alteredTarget).blockers.includes("TARGET_RECONCILIATION_MISMATCH"));
 
+  for (const deleted of [undefined, null, "true", true]) {
+    const malformedTarget = sample();
+    malformedTarget.targetRow.deleted = deleted;
+    assert.ok(assessDataQualityMigrationSample(malformedTarget).blockers.includes("TARGET_RECONCILIATION_MISMATCH"));
+  }
+
   const alteredDecodedBatch = sample();
   alteredDecodedBatch.outboxBatch.changes[0].sourceVersion = 3;
   assert.ok(assessDataQualityMigrationSample(alteredDecodedBatch).blockers.includes("OUTBOX_SOURCE_MISMATCH"));
+});
+
+test("digest-valid outbox with null changes returns a stable blocker", () => {
+  const input = sample();
+  const malformed = buildPostgresSyncBatch([
+    { collection: "dataQualityIssues", operation: "upsert", sourceVersion: 2, payload: [{ id: "synthetic-issue-1", status: "in_progress" }] }
+  ], { createdAt: "2026-09-20T00:00:00.000Z" });
+  // Keep the envelope's own digest and chain valid while corrupting its member shape.
+  const { createHash } = require("node:crypto");
+  const hash = (value) => createHash("sha256").update(value).digest("hex");
+  const { canonicalStringify } = require("../scripts/postgres-migration-package");
+  const envelope = JSON.parse(malformed.payload);
+  envelope.changes.push(null);
+  malformed.payload = canonicalStringify(envelope);
+  malformed.payloadSha256 = hash(malformed.payload);
+  malformed.chainHash = hash(`:${malformed.payloadSha256}`);
+  malformed.changes.push(null);
+  input.outboxBatch = malformed;
+  input.commitment.payloadSha256 = malformed.payloadSha256;
+  assert.ok(assessDataQualityMigrationSample(input).blockers.includes("OUTBOX_BATCH_INVALID"));
 });
 
 test("malformed and oversized source rows do not leak records", () => {

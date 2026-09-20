@@ -56,16 +56,22 @@ function assessDataQualityMigrationSample(input = {}) {
     blockers.push("OUTBOX_BATCH_INVALID");
   } else {
     const envelope = JSON.parse(batch.payload);
-    const matches = envelope.changes.filter((item) => item.collection === COLLECTION);
-    if (matches.length !== 1) {
-      blockers.push("OUTBOX_COLLECTION_CHANGE_INVALID");
+    if (!Array.isArray(batch.changes)
+      || !envelope.changes.every((item) => item && typeof item === "object" && !Array.isArray(item))
+      || !batch.changes.every((item) => item && typeof item === "object" && !Array.isArray(item))) {
+      blockers.push("OUTBOX_BATCH_INVALID");
     } else {
-      change = matches[0];
-      if (canonicalStringify(batch.changes) !== canonicalStringify(envelope.changes)
-        || change.operation !== "upsert" || change.sourceVersion !== sourceVersion
-        || !sourceDigest || change.payloadSha256 !== sourceDigest
-        || typeof change.payload !== "string" || digest(change.payload) !== sourceDigest) {
-        blockers.push("OUTBOX_SOURCE_MISMATCH");
+      const matches = envelope.changes.filter((item) => item.collection === COLLECTION);
+      if (matches.length !== 1) {
+        blockers.push("OUTBOX_COLLECTION_CHANGE_INVALID");
+      } else {
+        change = matches[0];
+        if (canonicalStringify(batch.changes) !== canonicalStringify(envelope.changes)
+          || change.operation !== "upsert" || change.sourceVersion !== sourceVersion
+          || !sourceDigest || change.payloadSha256 !== sourceDigest
+          || typeof change.payload !== "string" || digest(change.payload) !== sourceDigest) {
+          blockers.push("OUTBOX_SOURCE_MISMATCH");
+        }
       }
     }
   }
@@ -81,7 +87,7 @@ function assessDataQualityMigrationSample(input = {}) {
   }
 
   const target = input.targetRow;
-  if (target?.collection !== COLLECTION || target.deleted === true
+  if (target?.collection !== COLLECTION || target.deleted !== false
     || !Number.isSafeInteger(target.sourceVersion) || target.sourceVersion !== sourceVersion
     || !SHA256.test(target.payloadSha256 || "") || target.payloadSha256 !== sourceDigest) {
     blockers.push("TARGET_RECONCILIATION_MISMATCH");
