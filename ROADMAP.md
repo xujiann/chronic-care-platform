@@ -2,6 +2,8 @@
 
 ## T02 数据质量问题集合 PostgreSQL 迁移样本 PLAN（2026-09-19，待精确准入）
 
+> 2026-09-20 准入与实现边界：用户批准按 T02/T09/T00 单写者范围实施。复核发现 `loadPendingPostgresSyncBatches` 未返回 outbox 序号或可验证事务 ID，而现有 PostgreSQL 主存储合同要求两者；不得由 batch ID 或测试值伪造提交凭证。本轮先由 OPS-041/T02 交付纯只读、合成数据的源/批次/目标精确核验与失败关闭负测，T00 登记任务并组合测试；T09 路由不变。真实 relay、SQLite schema/migration、worker 和本地执行授权等待独立 Accepted ADR 与专项任务，六域生产 NO-GO 不变。
+
 - 基线与事实：`origin/main@b54c9a6c` 已集成 PR #307；另有未推送的 GOV-013/GOV-014 事实收口本地提交 `21cbc055`，不作为本计划的运行时代码基线。首发组合把 `dataQualityIssues` 归于 T02 `platform-governance`、`internal`、`wave-first-release-platform`，目前仅 `repository-plan-ready`。`localExecutionAuthorized=false`、`productionCutoverAuthorized=false`、`productionWriteAllowed=false` 与六域 `NO-GO` 不变。
 - 目标：以一个真实有写入口的集合证明“已提交 SQLite 事实 → 独立 worker/outbox → PostgreSQL 影子集合状态 → 精确核对 → 独立回滚演练”的可重复样本；只将仓库合同和受控本地演练能力推进，不把样本结果推广为 20 个集合或生产切换证据。正常、重复、版本冲突、失联/中断、部分批次失败、核对不符和恢复路径均须可测。
 - 现状与单写者：真实 POST `/api/data-quality/issues/:id/actions` 位于 T09 所有的 `src/http/routes/shared.js:815`，调用 `readDatabase`/`writeDatabase` 并把覆盖项限制在 300 条；它读取 `buildDataQualityIssues` 派生视图，不能把 300 条覆盖项误当全部源数据。T02 拥有集合语义与迁移映射，T09 只拥有兼容路由，T00 独占迁移组合、生命周期登记和集成。第一实施切片不改路由或 `server.js`，不变更请求路径写入语义；若发现现有 SQLite 事务 outbox 不承载本集合完整版本/提交凭证，先停在合同与负测，另立 T09/T00 handoff，不补请求路径双写。
