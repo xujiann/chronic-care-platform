@@ -6,7 +6,7 @@
 
 第一切片由 PR #309 合入 main@6e5ba723，冻结 e4a8d6b3 与合并文件树一致；PR CI35559351287/main CI35560034738 各九项成功，Pages35560034708 成功。仅关闭已交付代码任务；OPS-042 的运行能力仍保留观测和外部证据缺口，不晋升生产。
 
-后续 OPS-043 已独立准入，仅实施严格凭证、完整重放绑定及普通首版本 0/1 兼容，当前等待实现与验证；无 DDL、relay/checkpoint 或服务端接线。旧真实 PostgreSQL CI 只覆盖 auth/shadow，不作为 primary 重放证据。
+后续 OPS-043 已独立准入，仅实施严格凭证、完整重放绑定及普通首版本 0/1 兼容，已实现并进入专项与独立审查验证；无 DDL、relay/checkpoint 或服务端接线。旧真实 PostgreSQL CI 只覆盖 auth/shadow，不作为 primary 重放证据。
 
 T00 `src/platform/storage/sqlite-outbox-commit-receipt.js` 提供 schema creator、局部 upsert 单批次事务包装器和只读 loader，复用既有 outbox 构建器；不依赖 server.js，不替代业务 owner/mirror/audit hooks，也不实现 relay/checkpoint。只允许合成隔离库测试，未接线。
 
@@ -457,7 +457,7 @@ owner、文件引用和 closed-world 核心概念匹配只是证据，不能自�
 |---|---|---|---|
 | `config/repository-governance.json` | T00 | 当前 workflow、Markdown 分类规则/闭集摘要、3 个 PDF 来源与 digest 的机器合同 | 不定义业务 owner，不包含 PDF 正文 |
 | `scripts/repository-governance.js` | T00 | 只读枚举 Git 路径，拒绝漏分/重叠/快照改写/旧 baseline/PDF 漂移 | 不生成或修改文档、PDF、报告和归档 |
-| `test/repository-governance.test.js` | T00 / TEST-001 | 锁定当前 287 份 Markdown、三类边界、当前 main 流程和 3 个 PDF 负向漂移 | 不证明 PDF 内容正确或生产可用 |
+| `test/repository-governance.test.js` | T00 / TEST-001 | 锁定当前 288 份 Markdown、三类边界、当前 main 流程和 3 个 PDF 负向漂移 | 不证明 PDF 内容正确或生产可用 |
 
 依赖方向为 `Git 跟踪路径 + ADR 状态 + 当前进程清单 + PDF bytes/source paths → repository governance
 verifier → governance-api/architecture:test`。snapshot 与 superseded 只提供历史证据，不得反向覆盖 current

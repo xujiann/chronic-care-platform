@@ -6,7 +6,7 @@
 
 第一切片由 PR #309 合入 main@6e5ba723，冻结 e4a8d6b3 与合并文件树一致；PR CI35559351287/main CI35560034738 各九项成功，Pages35560034708 成功。仅关闭已交付代码任务；OPS-042 的运行能力仍保留观测和外部证据缺口，不晋升生产。
 
-后续 OPS-043 已独立准入，仅实施严格凭证、完整重放绑定及普通首版本 0/1 兼容，当前等待实现与验证；无 DDL、relay/checkpoint 或服务端接线。旧真实 PostgreSQL CI 只覆盖 auth/shadow，不作为 primary 重放证据。
+后续 OPS-043 已独立准入，仅实施严格凭证、完整重放绑定及普通首版本 0/1 兼容，已实现并进入专项与独立审查验证；无 DDL、relay/checkpoint 或服务端接线。旧真实 PostgreSQL CI 只覆盖 auth/shadow，不作为 primary 重放证据。
 
 新增 SQLite v18 receipt 结构与未接线的合成库事务/只读装载组件；旧业务入口及旧 worker 仍使用原调用链，不自动生成凭证。全局 schema head 为 18，生产六域 NO-GO 不变。
 
@@ -91,7 +91,7 @@
 ## 2026-08-31 当前架构事实机器对账
 
 - `scripts/documentation-fact-drift.js` 现以生产 API 目录、首批生产范围、SQLite migration、仓库 Markdown/PDF 闭集和 Accepted ADR 注册表为机器权威，对 ROADMAP、ARCHITECTURE、六张架构地图和 ADR 索引共 9 份当前文档失败关闭。
-- 当前对账值为 SQLite head v18/39 张非内部表、生产 API 637 项/364 个写入口/324 个行为证明缺口/326 个总复核项、首批范围 `FROZEN-NO-GO` 且范围内 API/集合复核与仓库迁移计划缺口均为 0、Markdown 287 份（217 current、68 snapshot、2 superseded）。
+- 当前对账值为 SQLite head v18/39 张非内部表、生产 API 637 项/364 个写入口/324 个行为证明缺口/326 个总复核项、首批范围 `FROZEN-NO-GO` 且范围内 API/集合复核与仓库迁移计划缺口均为 0、Markdown 288 份（218 current、68 snapshot、2 superseded）。
 - 该验证仅在内存 SQLite 中重放既有 migration 并读取仓库权威；不写 `data/db.json`、运行时 SQLite、生产证据、生成报告或归档产物，不改变任何运行时行为。
 
 ## 2026-08-31 首发数据迁移计划闭集

@@ -47,6 +47,16 @@ function fakePool(seed = {}) {
   const calls = [];
   let released = 0;
   let ended = 0;
+  function projectBatch(row, sql) {
+    assert.match(sql, /to_char\(committed_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"'\) AS committed_at_utc/);
+    assert.match(sql, /to_char\(committed_at AT TIME ZONE 'UTC', 'BC'\) AS committed_at_era/);
+    const result = { ...clone(row), committed_at_era: "AD", committed_at_utc: typeof row.committed_at === "string" ? row.committed_at.replace(/\.(\d{3})Z$/, ".$1000Z") : undefined };
+    // Match node-postgres bigint text and int4 number results, without truncating timestamp text.
+    result.outbox_sequence = String(row.outbox_sequence);
+    if (seed.omitCommittedProjection) delete result.committed_at_utc;
+    if (seed.projectBatch) seed.projectBatch(result, sql);
+    return result;
+  }
 
   function client() {
     let working = null;
@@ -76,12 +86,12 @@ function fakePool(seed = {}) {
         }
         if (/FROM health_platform\.primary_storage_batches WHERE batch_id = \$1/.test(normalized)) {
           const row = working.batches.get(params[0]);
-          return { rowCount: row ? 1 : 0, rows: row ? [clone(row)] : [] };
+          return { rowCount: row ? 1 : 0, rows: row ? [projectBatch(row, normalized)] : [] };
         }
         if (/FROM health_platform\.primary_storage_batches ORDER BY outbox_sequence DESC/.test(normalized)) {
           const rows = [...working.batches.values()]
             .sort((left, right) => Number(right.outbox_sequence) - Number(left.outbox_sequence));
-          return { rowCount: rows.length ? 1 : 0, rows: rows.length ? [clone(rows[0])] : [] };
+          return { rowCount: rows.length ? 1 : 0, rows: rows.length ? [projectBatch(rows[0], normalized)] : [] };
         }
         if (/FROM health_platform\.primary_collection_state WHERE collection_name = \$1/.test(normalized)) {
           const row = working.collections.get(params[0]);
@@ -134,7 +144,7 @@ function fakePool(seed = {}) {
             applied_at: "2026-08-06T00:01:00.000Z"
           };
           working.batches.set(batchId, row);
-          return { rowCount: 1, rows: [clone(row)] };
+          return { rowCount: 1, rows: [projectBatch(row, normalized)] };
         }
         throw new Error(`unexpected fake PostgreSQL query: ${normalized}`);
       },
@@ -167,7 +177,7 @@ function outboxCommitment(batch, sequence = 1) {
   return {
     state: "committed",
     source: "sqlite-transactional-outbox",
-    sourceTransactionId: `sqlite-tx-${sequence}`,
+    sourceTransactionId: `00000000-0000-4000-8000-${String(sequence).padStart(12, "0")}`,
     outboxSequence: sequence,
     committedAt: `2026-08-06T00:00:0${sequence}.000Z`,
     payloadSha256: batch.payloadSha256
@@ -424,3 +434,91 @@ test("primary storage schema binds tombstones and deferred batch evidence in one
   assert.match(sql, /^BEGIN;/);
   assert.match(sql, /COMMIT;\s*$/);
 });
+
+function replayFixture(seed = {}) {
+  const pool = fakePool(seed);
+  const env = primaryEnv();
+  const driver = createPostgresPrimaryDriver({ env, pool, controlledPool: true });
+  const storage = createPostgresPrimaryStorageContract({ config: buildPostgresPrimaryStorageConfig(env), driver });
+  const batch = buildPostgresSyncBatch([{ collection: "settings", operation: "upsert", sourceVersion: 1, payload: { synthetic: true } }]);
+  const commitment = outboxCommitment(batch);
+  const record = { batchId: batch.batchId, payloadSha256: batch.payloadSha256, previousChainHash: batch.previousChainHash,
+    chainHash: batch.chainHash, sourceTransactionId: commitment.sourceTransactionId, outboxSequence: commitment.outboxSequence,
+    committedAt: commitment.committedAt, appliedChanges: 1 };
+  return { pool, driver, storage, batch, commitment, record };
+}
+const durableSnapshot = (pool) => clone({ collections: [...pool.state.collections], batches: [...pool.state.batches] });
+
+test("formal driver exact replay reuses all source evidence without a second write", async () => {
+  const h = replayFixture();
+  const options = { executionContext: "worker", commitment: h.commitment };
+  assert.equal((await h.storage.applyCommittedOutbox(h.batch, options)).status, "applied");
+  const before = durableSnapshot(h.pool), start = h.pool.calls.length;
+  assert.equal((await h.storage.applyCommittedOutbox(h.batch, options)).status, "duplicate");
+  assert.deepEqual(durableSnapshot(h.pool), before);
+  assert.equal(h.pool.calls.slice(start).some((call) => /INSERT|UPDATE|DELETE/.test(call.sql)), false);
+});
+
+for (const [field, value] of [
+  ["payload_sha256", "a".repeat(64)], ["chain_hash", "b".repeat(64)], ["previous_chain_hash", "c".repeat(64)],
+  ["source_transaction_id", "00000000-0000-4000-8000-000000000002"], ["outbox_sequence", 2],
+  ["committed_at", "2026-08-06T00:00:01.001Z"], ["batch_id", "pgsync-another-valid-id"]
+]) test(`formal driver replay rejects persisted ${field} drift and rolls back without writes`, async () => {
+  const h = replayFixture();
+  const options = { executionContext: "worker", commitment: h.commitment };
+  await h.storage.applyCommittedOutbox(h.batch, options);
+  h.pool.state.batches.get(h.batch.batchId)[field] = value;
+  const before = durableSnapshot(h.pool), start = h.pool.calls.length;
+  await assert.rejects(h.storage.applyCommittedOutbox(h.batch, options), { code: "POSTGRES_PRIMARY_IDEMPOTENCY_CONFLICT" });
+  assert.deepEqual(durableSnapshot(h.pool), before);
+  assert.equal(h.pool.calls.at(-1).sql, "ROLLBACK");
+  assert.equal(h.pool.calls.slice(start).some((call) => /INSERT|UPDATE|DELETE/.test(call.sql)), false);
+});
+
+test("recordAppliedBatch rejects malformed eight-field records before SQL or accessor execution", async () => {
+  let getterExecuted = false;
+  for (const mutate of [
+    (r) => ({ ...r, unknown: true }), (r) => { delete r.committedAt; return r; },
+    (r) => ({ ...r, batchId: ` ${r.batchId}` }), (r) => ({ ...r, payloadSha256: r.payloadSha256.toUpperCase() }),
+    (r) => ({ ...r, previousChainHash: " " }), (r) => ({ ...r, chainHash: `${r.chainHash} ` }),
+    (r) => ({ ...r, sourceTransactionId: "sqlite-tx-1" }), (r) => ({ ...r, outboxSequence: "1" }),
+    (r) => ({ ...r, outboxSequence: Number.MAX_SAFE_INTEGER + 1 }), (r) => ({ ...r, appliedChanges: "1" }),
+    (r) => ({ ...r, committedAt: "2026-02-30T00:00:00.000Z" }),
+    (r) => Object.defineProperty(r, "committedAt", { enumerable: true, get() { getterExecuted = true; return "2026-08-06T00:00:01.000Z"; } })
+  ]) {
+    const h = replayFixture();
+    await assert.rejects(h.driver.transaction({ isolation: "serializable", readOnly: false }, (tx) => tx.recordAppliedBatch(mutate({ ...h.record }))),
+      { code: "INVALID_POSTGRES_PRIMARY_BATCH_RECEIPT" });
+    assert.equal(getterExecuted, false);
+    assert.equal(h.pool.calls.some((call) => /INSERT INTO/.test(call.sql)), false);
+    assert.equal(h.pool.calls.at(-1).sql, "ROLLBACK");
+    assert.equal(h.pool.state.batches.size, 0);
+  }
+});
+
+for (const operation of ["getAppliedBatch", "getLastAppliedBatch", "recordAppliedBatch"]) {
+  for (const [name, mutate] of [
+    ["sub-millisecond timestamp", (row) => { row.committed_at_utc = "2026-08-06T00:00:01.000001Z"; }],
+    ["missing precise timestamp", (row) => { delete row.committed_at_utc; }],
+    ["BC timestamp with AD-shaped digits", (row) => { row.committed_at_utc = "0001-08-06T00:00:01.000000Z"; row.committed_at_era = "BC"; }],
+    ["missing timestamp era", (row) => { delete row.committed_at_era; }],
+    ["zero year", (row) => { row.committed_at_utc = "0000-08-06T00:00:01.000000Z"; }],
+    ["five-digit year", (row) => { row.committed_at_utc = "10000-08-06T00:00:01.000000Z"; }],
+    ["unsafe bigint sequence", (row) => { row.outbox_sequence = "9007199254740993"; }],
+    ["noncanonical bigint sequence", (row) => { row.outbox_sequence = "01"; }],
+    ["missing transaction id", (row) => { delete row.source_transaction_id; }]
+  ]) test(`${operation} rejects ${name} without losing persisted precision`, async () => {
+    let damage = operation === "recordAppliedBatch";
+    const h = replayFixture({ projectBatch(row) { if (damage) mutate(row); } });
+    if (!damage) {
+      await h.driver.transaction({ isolation: "serializable", readOnly: false }, (tx) => tx.recordAppliedBatch(h.record));
+      damage = true;
+    }
+    const before = durableSnapshot(h.pool);
+    await assert.rejects(h.driver.transaction({ isolation: "serializable", readOnly: false }, (tx) =>
+      operation === "recordAppliedBatch" ? tx.recordAppliedBatch(h.record) : tx[operation](h.batch.batchId)),
+    { code: "INVALID_POSTGRES_PRIMARY_BATCH_RECEIPT" });
+    assert.deepEqual(durableSnapshot(h.pool), before);
+    assert.equal(h.pool.calls.at(-1).sql, "ROLLBACK");
+  });
+}

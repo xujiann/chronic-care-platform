@@ -2,6 +2,7 @@
 
 const fs = require("node:fs");
 const path = require("node:path");
+const { normalizeCommitReceipt } = require("./postgres-primary-storage-contract");
 
 const COLLECTION_PATTERN = /^[A-Za-z][A-Za-z0-9_-]{0,239}$/;
 const SHA256_PATTERN = /^[a-f0-9]{64}$/;
@@ -172,17 +173,42 @@ function collectionRow(row) {
   };
 }
 
+function validateBatchReceipt(batch) {
+  try {
+    const keys = ["batchId", "payloadSha256", "previousChainHash", "chainHash", "committedAt", "sourceTransactionId", "outboxSequence", "appliedChanges"];
+    if (!batch || typeof batch !== "object" || ![Object.prototype, null].includes(Object.getPrototypeOf(batch))
+      || Reflect.ownKeys(batch).length !== keys.length
+      || keys.some((key) => {
+        const descriptor = Object.getOwnPropertyDescriptor(batch, key);
+        return !descriptor?.enumerable || !Object.hasOwn(descriptor, "value");
+      })) throw new Error("fields");
+    if (typeof batch.batchId !== "string" || !BATCH_ID_PATTERN.test(batch.batchId)
+      || typeof batch.payloadSha256 !== "string" || !SHA256_PATTERN.test(batch.payloadSha256)
+      || typeof batch.chainHash !== "string" || !SHA256_PATTERN.test(batch.chainHash)
+      || typeof batch.previousChainHash !== "string" || !(batch.previousChainHash === "" || SHA256_PATTERN.test(batch.previousChainHash))
+      || !Number.isSafeInteger(batch.appliedChanges) || batch.appliedChanges < 0) throw new Error("identity");
+    normalizeCommitReceipt({ state: "committed", source: "sqlite-transactional-outbox", sourceTransactionId: batch.sourceTransactionId,
+      outboxSequence: batch.outboxSequence, committedAt: batch.committedAt, payloadSha256: batch.payloadSha256 }, batch);
+    return batch;
+  } catch {
+    throw new PostgresPrimaryDriverError("PostgreSQL primary storage batch receipt is invalid", "INVALID_POSTGRES_PRIMARY_BATCH_RECEIPT");
+  }
+}
+
 function batchRow(row) {
   if (!row) return null;
-  return {
-    batchId: String(row.batch_id),
-    payloadSha256: String(row.payload_sha256),
-    previousChainHash: String(row.previous_chain_hash || ""),
-    chainHash: String(row.chain_hash),
-    committedAt: row.committed_at instanceof Date ? row.committed_at.toISOString() : String(row.committed_at || ""),
-    sourceTransactionId: String(row.source_transaction_id),
-    outboxSequence: Number(row.outbox_sequence),
-    appliedChanges: Number(row.applied_changes),
+  // PostgreSQL timestamps have microsecond precision; never use pg's lossy Date projection.
+  if (row.committed_at_era !== "AD" || typeof row.committed_at_utc !== "string"
+    || !/^(?!0000)\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}000Z$/.test(row.committed_at_utc)
+    || !(typeof row.outbox_sequence === "number" || (typeof row.outbox_sequence === "string" && /^[1-9]\d*$/.test(row.outbox_sequence)))) {
+    throw new PostgresPrimaryDriverError("PostgreSQL primary storage batch receipt is invalid", "INVALID_POSTGRES_PRIMARY_BATCH_RECEIPT");
+  }
+  const batch = validateBatchReceipt({
+    batchId: row.batch_id, payloadSha256: row.payload_sha256, previousChainHash: row.previous_chain_hash,
+    chainHash: row.chain_hash, committedAt: row.committed_at_utc.slice(0, -4) + "Z",
+    sourceTransactionId: row.source_transaction_id, outboxSequence: Number(row.outbox_sequence), appliedChanges: row.applied_changes
+  });
+  return { ...batch,
     appliedAt: row.applied_at instanceof Date ? row.applied_at.toISOString() : String(row.applied_at || "")
   };
 }
@@ -192,7 +218,9 @@ function buildTransactionApi(client, readOnly) {
     async getAppliedBatch(batchId) {
       const id = assertBatchId(batchId);
       const result = await client.query(`
-        SELECT batch_id, payload_sha256, previous_chain_hash, chain_hash, committed_at,
+        SELECT batch_id, payload_sha256, previous_chain_hash, chain_hash,
+               to_char(committed_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS committed_at_utc,
+               to_char(committed_at AT TIME ZONE 'UTC', 'BC') AS committed_at_era,
                source_transaction_id, outbox_sequence, applied_changes, applied_at
         FROM health_platform.primary_storage_batches
         WHERE batch_id = $1
@@ -202,7 +230,9 @@ function buildTransactionApi(client, readOnly) {
 
     async getLastAppliedBatch() {
       const result = await client.query(`
-        SELECT batch_id, payload_sha256, previous_chain_hash, chain_hash, committed_at,
+        SELECT batch_id, payload_sha256, previous_chain_hash, chain_hash,
+               to_char(committed_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS committed_at_utc,
+               to_char(committed_at AT TIME ZONE 'UTC', 'BC') AS committed_at_era,
                source_transaction_id, outbox_sequence, applied_changes, applied_at
         FROM health_platform.primary_storage_batches
         ORDER BY outbox_sequence DESC, applied_at DESC, batch_id DESC
@@ -315,32 +345,16 @@ function buildTransactionApi(client, readOnly) {
           409
         );
       }
-      const batchId = assertBatchId(batch?.batchId);
-      const payloadSha256 = assertDigest(batch?.payloadSha256);
-      const previousChainHash = assertDigest(batch?.previousChainHash, true);
-      const chainHash = assertDigest(batch?.chainHash);
-      const committedAt = clean(batch?.committedAt, 80);
-      const sourceTransactionId = clean(batch?.sourceTransactionId, 160);
-      const outboxSequence = Number(batch?.outboxSequence);
-      const appliedChanges = Number(batch?.appliedChanges);
-      if (!Number.isFinite(Date.parse(committedAt))
-        || sourceTransactionId.length < 4
-        || !Number.isSafeInteger(outboxSequence)
-        || outboxSequence <= 0
-        || !Number.isSafeInteger(appliedChanges)
-        || appliedChanges < 0) {
-        throw new PostgresPrimaryDriverError(
-          "PostgreSQL primary storage batch receipt is invalid",
-          "INVALID_POSTGRES_PRIMARY_BATCH_RECEIPT"
-        );
-      }
+      const { batchId, payloadSha256, previousChainHash, chainHash, committedAt, sourceTransactionId, outboxSequence, appliedChanges } = validateBatchReceipt(batch);
       const result = await client.query(`
         INSERT INTO health_platform.primary_storage_batches (
           batch_id, payload_sha256, previous_chain_hash, chain_hash, committed_at,
           source_transaction_id, outbox_sequence, applied_changes, applied_at
         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, now())
         ON CONFLICT (batch_id) DO NOTHING
-        RETURNING batch_id, payload_sha256, previous_chain_hash, chain_hash, committed_at,
+        RETURNING batch_id, payload_sha256, previous_chain_hash, chain_hash,
+                  to_char(committed_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS committed_at_utc,
+                  to_char(committed_at AT TIME ZONE 'UTC', 'BC') AS committed_at_era,
                   source_transaction_id, outbox_sequence, applied_changes, applied_at
       `, [
         batchId,
