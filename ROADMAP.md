@@ -2,6 +2,8 @@
 
 ## 重放合同加固 PLAN（2026-09-21）
 
+- 同轮交付收尾：PR #310 已保护 squash 合并为 `85bfde7a50a3f2997a941ee03903c39e724284a6`，与冻结 `b3b6d8a813c73f92a42ad195fdf798d723b17c16` 共享 tree `330475f13774b45ad9bc5a4859d3360db77929db`。PR CI `35568133300`、main CI `35568982001` 各九项及静态 Pages `35568981927` 成功。GOV-017/OPS-043 关闭已验收的限定代码切片，WIP 释放为 2/5；OPS-043 保持“已实现”及未闭合能力映射，不晋升生产。本收尾只改总账、路线图和六图，无运行时变化；沿原单写范围独立复核、冻结并运行必需门禁后保护集成，不用 PR #310 的 CI 替代收尾提交验证。
+
 - 准入：用户批准限定范围；基线 origin/main@6e5ba723，工作树 process/t00-outbox-replay-contract-20260921。PR309 冻结 e4a8d6b3 与合并 tree 一致，PR CI35559351287/main CI35560034738 各九项及 Pages35560034708 成功；GOV-016/OPS-042 关闭已交付切片，不关闭生产缺口。
 - 目标与方案：按 ADR-OPS-043 加固六字段凭证、七字段精确重放与正式驱动无损时间校验；只对不存在集合兼容普通首版本 0/1，保留 expectedVersion=-1、已有 CAS 和 baseline 规则。不接 relay/checkpoint、不改 DDL/SQLite head/HTTP/worker/生产。
 - 单写者：开发 A 负责主合同、主合同测试及新增 SQLite receipt→内存主合同测试；开发 B 负责正式 driver 和其测试。协调者负责 GOV-017 治理与 OPS-043 接口/schema 文档；独立审查只读。精确路径见任务总账，先收口旧任务，WIP 4/5。
