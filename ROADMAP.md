@@ -10,6 +10,7 @@
 - 验收：真实正式迁移文件库验证空库、v17升级、重跑、指纹、部分失败；两个连接证明业务/outbox/receipt/storage event 同时提交可见；各写步骤 SQL 故障注入全部回滚。拒绝嵌套、既有批次补证及调用者事务 ID；loader 独立只读一致快照、outbox LEFT JOIN receipt、读取 pending/retry/delivered/failed；历史缺证停止，严格 UUID/安全整数/摘要/UTC毫秒时间/未知字段、完整 envelope/changes 和链后继验证，允许有链证明的序号空隙。
 - 测试顺序：专项开发负测 → 独立审查 → 冻结 SHA → 串行 build、lint、typecheck、unit、integration、smoke、legacy test:all 及 process/routes/architecture/iterations/文档治理；既有远端真实 PG/E2E 门禁保留。按已授权保护流程推送、PR、精确 CI 后合并，不启用自动合并或绕过保护。
 - 开发验证：receipt/migration/既有同步/只读样本专项 82/82 通过，object-storage 兼容/storage/文档专项 38/38 通过。独立审查提出的集合版本起点问题已修复并补测：首个版本只能为 1，触达已有状态但缺认证历史或历史存在而状态丢失均拒绝；不改变 PostgreSQL 目标版本合同，当前结果不构成可直接重放证明。
+- 首次冻结 `59ee6ef6` 的全量 unit 因旧迁移数量常量断言失败并停止。必要兼容测试修正由协调者单写，已登记 `test/chronic-followup-dispatch-outbox.test.js`、`test/object-storage-durable.test.js`、`test/production-db-readiness.test.js`、`test/release-report.test.js`；仅把当前 head/升级数量与正式注册表精确对齐，历史 v17、领域行为及生产阻断断言保持，复审后重新冻结并重跑全部门禁。
 - 非目标与回滚：不改 server.js、T09路由、旧 worker投递目标/状态、主存储replay/checkpoint、依赖或生产配置；不迁移真实数据、不启用worker/主库。停止新增调用方并保留 receipt/outbox和业务事实，不自动DROP；已升级库不得直接交旧runtime，恢复通过受控前滚修复或备份恢复。真实PG、多实例、容量、灾备、现场签署和六域NO-GO不因库级测试关闭。
 
 ## T02 数据质量问题集合 PostgreSQL 迁移样本 PLAN（2026-09-19，已准入只读首切片）

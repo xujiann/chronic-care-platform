@@ -3,6 +3,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const test = require("node:test");
 const { readRuntimeSource } = require("../src/http/runtime-source");
+const { SQLITE_SCHEMA_HEAD } = require("../src/platform/storage/sqlite-migrations");
 
 const {
   applyProductionDatabaseCutoverAction,
@@ -32,7 +33,7 @@ test("production database readiness validates migration and rehearsal evidence",
   assert.equal(report.checks.some((item) => item.id === "production-db:runtimeBlock" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "production-db:sqliteSchema" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "production-db:sqliteMigrationRegistry" && item.passed), true);
-  assert.equal(report.sqliteMigrationRegistry.head, 17);
+  assert.equal(report.sqliteMigrationRegistry.head, SQLITE_SCHEMA_HEAD);
   assert.match(report.sqliteMigrationRegistry.registryFingerprint, /^[a-f0-9]{64}$/);
   assert.equal(report.checks.some((item) => item.id === "production-db:sqliteRuntimeProfile" && item.passed), true);
   assert.equal(Object.values(report.sqliteRuntimeProfile).every(Boolean), true);
