@@ -2,6 +2,10 @@
 
 > 状态层权威：当前基线、目标状态、差距任务和验收证据统一登记在 `config/lifecycle-governance.json#maps`；正文继续只陈述 AS-IS 事实。
 
+## 提交凭证第一切片（2026-09-21，实施中）
+
+依赖为 versioned SQLite migration → receipt schema creator；合成测试 → receipt wrapper/loader → 原 outbox 构建器及 node:sqlite。数据库读取使用独立只读连接与一致快照，不调用旧 pending/retry reader，不接 PostgreSQL/worker/HTTP。
+
 ## 访问知晓声明首切片（2026-09-14）
 
 2026-09-19 当前集成事实：访问知晓声明与 GOV-014 行为合同已由 [PR #307](https://github.com/xujiann/chronic-care-platform/pull/307) 合入 `main@b54c9a6c`，合并树与冻结候选 `a35faf4f` 一致；独立审查、本地 18 项串行门禁、PR CI 九项及 main CI 均通过，自动 Pages 成功。纯治理 GOV-013/GOV-014 已集成；运行能力 OPS-040/SEC-016 仍为验证中/已实现，保留观测、真实 PostgreSQL/多实例及现场证据缺口，生产六域继续 `NO-GO`。下段 2026-09-16 文字为历史实施阶段记录。
@@ -476,7 +480,7 @@ T00 集成分支承载。
 → secure-object-storage v1 trust port → 外部网关`；HTTP 路径不含网络边。列表依赖 scope-bound HMAC keyset
 cursor 与固定 high-water；对账写持久 case/action，不覆盖附件不可变事实。
 
-T08 已确认为 data owner，T00 仅持有技术端口。架构 verifier 绑定 Accepted ADR、v17 head、owner 和
+T08 已确认为 data owner，T00 仅持有技术端口。架构 verifier 绑定 Accepted ADR、完整注册表及原 v17 条目、owner 和
 promotion=false；worker/deployment/readiness 依赖真实 provider status/abort capability 与现场证据，缺失即
 失败关闭。
 

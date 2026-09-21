@@ -2,6 +2,10 @@
 
 > 状态层权威：当前基线、目标状态、差距任务和验收证据统一登记在 `config/lifecycle-governance.json#maps`；正文继续只陈述 AS-IS 事实。
 
+## 提交凭证第一切片（2026-09-21，实施中）
+
+新增 SQLite v18 receipt 结构与未接线的合成库事务/只读装载组件；旧业务入口及旧 worker 仍使用原调用链，不自动生成凭证。全局 schema head 为 18，生产六域 NO-GO 不变。
+
 ## 访问知晓声明首切片（2026-09-14）
 
 2026-09-19 当前集成事实：访问知晓声明与 GOV-014 行为合同已由 [PR #307](https://github.com/xujiann/chronic-care-platform/pull/307) 合入 `main@b54c9a6c`，合并树与冻结候选 `a35faf4f` 一致；独立审查、本地 18 项串行门禁、PR CI 九项及 main CI 均通过，自动 Pages 成功。纯治理 GOV-013/GOV-014 已集成；运行能力 OPS-040/SEC-016 仍为验证中/已实现，保留观测、真实 PostgreSQL/多实例及现场证据缺口，生产六域继续 `NO-GO`。下段 2026-09-16 文字为历史实施阶段记录。
@@ -83,7 +87,7 @@
 ## 2026-08-31 当前架构事实机器对账
 
 - `scripts/documentation-fact-drift.js` 现以生产 API 目录、首批生产范围、SQLite migration、仓库 Markdown/PDF 闭集和 Accepted ADR 注册表为机器权威，对 ROADMAP、ARCHITECTURE、六张架构地图和 ADR 索引共 9 份当前文档失败关闭。
-- 当前对账值为 SQLite head v17/38 张非内部表、生产 API 637 项/364 个写入口/324 个行为证明缺口/326 个总复核项、首批范围 `FROZEN-NO-GO` 且范围内 API/集合复核与仓库迁移计划缺口均为 0、Markdown 287 份（217 current、68 snapshot、2 superseded）。
+- 当前对账值为 SQLite head v18/39 张非内部表、生产 API 637 项/364 个写入口/324 个行为证明缺口/326 个总复核项、首批范围 `FROZEN-NO-GO` 且范围内 API/集合复核与仓库迁移计划缺口均为 0、Markdown 287 份（217 current、68 snapshot、2 superseded）。
 - 该验证仅在内存 SQLite 中重放既有 migration 并读取仓库权威；不写 `data/db.json`、运行时 SQLite、生产证据、生成报告或归档产物，不改变任何运行时行为。
 
 ## 2026-08-31 首发数据迁移计划闭集
@@ -194,7 +198,7 @@ flowchart TB
    `pilotCutoverControlPlaneReadiness`。provider 缺失、返回值无效或抛错均投影为受限
    `controlErrorCode` 和 `NO-GO`，不泄露错误正文；当前静态图不再形成该环。PR #132、
    required checks、合并后 main CI 与 Pages 均已通过，主线 ARC-002 已关闭。
-5. SQLite v1–v14 已冻结内容指纹，v15 追加 append-only 连续审计 source，v16 追加慢病随访 durable outbox，v17 追加对象存储耐久元数据/命令轨道；`STORAGE_SCHEMA_VERSION`、部署检查和测试统一从注册表 head v17 派生。历史 ledger 的 v1–v14 checksum 保持兼容，v15 起写入内容 SHA-256。
+5. SQLite v1–v14 已冻结内容指纹，v15 追加 append-only 连续审计 source，v16 追加慢病随访 durable outbox，v17 追加对象存储耐久元数据/命令轨道；`STORAGE_SCHEMA_VERSION`、部署检查和测试统一从注册表 head v18 派生。历史 ledger 的 v1–v14 checksum 保持兼容，v15 起写入内容 SHA-256。
 6. TEST-001 已建立统一的 `build`、`lint`、`typecheck`、`test:unit`、`test:integration`、`test:smoke` 入口；build 复用静态发布 allowlist 并默认输出到仓库外，unit/integration 完整分区根测试，smoke 独立启动临时 JSON 运行时。治理 CI 执行 `data:collection-governance:verify`，以源码、owner 和隔离清单漂移失败关闭；原 `server.js` c8 门禁保持 85/85/55，内部边界现以 10 个职责独立组锁定真实覆盖基线和直接负向矩阵：原 identity、audit、object storage、API governance 四组，加上 worker observability、区域共享命令、转诊 owner command、科研合规导出、浏览器响应头策略和 Safe URL 端口六组。所有报告只存在临时目录。TEST-006 已恢复全文件 `no-unreachable`；`internet-nursing.js` 与 `quality-safety.js` 的 16 个重复翻译键已按显式 shadow map 去重，保留原首次插入顺序和最终生效值，lint 不再有文件级规则例外。typecheck 去重后由 9 个唯一文件扩大到 13 个治理/安全边界文件。集成套件成员、顺序、断言和超时不变，但本机三次采样约 294–371 秒的 API 热点现在独立进程执行，并向 CI 日志输出无阈值的批次/套件耗时。
    TEST-006 care revalidation 已把这 3 段显式 skip 全部恢复为可执行断言，并新增陪诊 owner route、护理闭环、护士生命周期 3 个可独立运行的真实 HTTP 特征测试。测试只使用临时 JSON 副本和进程内 owner 证据签发能力；陪诊 handoff 现统一解释 `reject/return`，引用挂号单在补字段前先校验存在性与当前用户 scope。护理通知继续以 planned message + pending outbox 表达，仓库测试不伪造外部送达或现场证据。API 巨型测试的第一个可逆夹具切片已将临时 JSON seed、环境变量和同一 server 生命周期移入 `test/helpers/api-regression-runtime.js`；第二至第五个切片分别只将单个 HIS hospital adapter mock、单个 SIEM alert delivery mock、单个 financial gateway mock 与单个 object-storage gateway mock 的创建、动态回环监听、测试环境和关闭移入各自测试 helper。对象存储 helper 只额外暴露测试正文按原顺序驱动的 `setScanStatus` 控制口。43 个有序子测试、请求/响应与签名断言、告警失败/恢复顺序、金融 callback/reconciliation/retry、对象存储 clean/恶意 provider 文本与 quarantine 断言、超时、单进程执行和 integration 成员均保持不变，并由顺序摘要门禁锁定；synthetic HIS/SIEM/financial/storage 响应均不是外部回执或上线证据。
    TEST-005 将浏览器 E2E 精确分为根 60 项与居民 13 项：两套配置统一使用 Playwright Chromium、

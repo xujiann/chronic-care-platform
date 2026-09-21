@@ -2,6 +2,10 @@
 
 > 状态层权威：当前基线、目标状态、差距任务和验收证据统一登记在 `config/lifecycle-governance.json#maps`；正文继续只陈述 AS-IS 事实。
 
+## 提交凭证第一切片（2026-09-21，实施中）
+
+v18 新表只存 outbox_sequence、batch_id、source_transaction_id、recorded_at 和两个摘要；UUID 在 BEGIN 后生成，业务/upsert、outbox、receipt、storage event 原子提交。历史不补证；记录时间不是精确 COMMIT 时刻。loader 核验完整原始批次与链，旧 delivered/failed 也读取，但不改变投递状态。
+
 ## 数据质量问题迁移样本边界（2026-09-20）
 
 `dataQualityIssues` 的持久化事实是 T02 拥有的覆盖项集合，不是 `buildDataQualityIssues` 由居民、集成事件等源数据生成的派生问题视图；现有写入口在 T09 兼容路由，覆盖项保留上限为 300。OPS-041 只对合成源行、outbox 批次、提交凭证形状和目标集合版本/摘要进行只读失败关闭核验，不写 SQLite 或 PostgreSQL，不生成提交凭证。当前 outbox 读取结果缺少可信事务 ID 和序号，因此不能形成真实主存储 relay 准入；需后续 Accepted ADR、版本化 migration、worker 与回滚专项。首发迁移组合仍为计划就绪，真实数据、生产写入及切换继续禁止。
@@ -72,7 +76,7 @@ ADR-OPS-040 为既有非生产 accessAcknowledgements 登记 T04 声明合同 re
 
 ## 2026-08-31 数据模型事实验证边界
 
-文档事实验证器在一次性内存 SQLite 中按正式 migration 顺序重建 schema，并从 `sqlite_schema` 统计非内部表；当前权威结果为 head v17、38 张表。它不打开、复制或写入运行时 SQLite 和 `data/db.json`，也不创建新 migration、DDL 或生产数据库声明。DATA_MODEL 中的当前 head、表数和升级路径若回退到历史值，治理门禁失败关闭。
+文档事实验证器在一次性内存 SQLite 中按正式 migration 顺序重建 schema，并从 `sqlite_schema` 统计非内部表；当前权威结果为 head v18、39 张表。它不打开、复制或写入运行时 SQLite 和 `data/db.json`，也不创建新 migration、DDL 或生产数据库声明。DATA_MODEL 中的当前 head、表数和升级路径若回退到历史值，治理门禁失败关闭。
 
 ## 2026-08-31 首发迁移计划闭集
 
@@ -158,12 +162,13 @@ PWA 专项 3 项复用相同的仓库外临时数据和动态回环端口；三�
 
 ## 2. SQLite Schema
 
-主存储 migration 位于 `src/platform/storage/sqlite-migrations.js` 的版本化注册表，当前实际与公开 head 均为 v17。包括 `schema_migrations` 在内，主 SQLite 逻辑上创建 38 张表：
+主存储 migration 位于 `src/platform/storage/sqlite-migrations.js` 的版本化注册表，当前实际与公开 head 均为 v18。包括 `schema_migrations` 在内，主 SQLite 逻辑上创建 39 张表：
 
 | 组 | 表 |
 |---|---|
 | 集合与审计 | `state_collections`、`storage_events`、`schema_migrations` |
 | 连续审计来源 | `audit_delivery_source_events` |
+| 原子 outbox 提交凭证 | `postgres_sync_commit_receipts`（v18，原 outbox 序号外键；不补历史凭证） |
 | 慢病随访耐久投递 | `chronic_followup_dispatch_outbox`、`chronic_followup_dispatch_replays` |
 | 对象存储耐久轨道 | `secure_attachment_records`、`object_storage_commands`、`object_storage_command_receipts`、`object_storage_reconciliation_cases`、`object_storage_reconciliation_actions` |
 | 身份主索引镜像 | `residents`、`accounts`、`account_members`、`person_indexes` |
@@ -202,8 +207,8 @@ erDiagram
 - 为兼容既有数据库，v1–v14 ledger checksum 继续使用历史 `version:name` 摘要；对应源码内容另由 14 个冻结 SHA-256 和注册表校验保护，禁止改写。
 - v15 及以后 ledger checksum 使用包含 version、name、owner、apply 实现和显式依赖的内容 SHA-256；新版本必须连续追加。
 - runner 在执行新迁移前校验已应用 ledger 是注册表的连续前缀，name/checksum 漂移会 fail-closed；单个迁移失败时 DDL 与 ledger 行一并回滚。
-- `STORAGE_SCHEMA_VERSION`、`storageMeta`、部署检查、生产 readiness 和发布报告统一从 `SQLITE_SCHEMA_HEAD` 派生，当前为 17。
-- 自动化测试覆盖空库 0→17、v11→17、v15→17、重复执行、冻结指纹、ledger 漂移、v15–v17 内容 checksum 和失败回滚；schema fingerprint 用于比较升级结果与空库结果。
+- `STORAGE_SCHEMA_VERSION`、`storageMeta`、部署检查、生产 readiness 和发布报告统一从 `SQLITE_SCHEMA_HEAD` 派生，当前为 18。
+- 自动化测试覆盖空库 0→18、v11→18、v15→18、v17→18、重复执行、冻结指纹、ledger 漂移、v15–v18 内容 checksum 和失败回滚；schema fingerprint 用于比较升级结果与空库结果。
 
 专项 SQLite 表仍有独立生命周期和台账，不得误计入主 schema head；生产 PostgreSQL 是否已迁移仍必须由现场证据证明。
 
@@ -286,7 +291,7 @@ legal-hold）不会再为新记录让位；这只关闭静默数据丢失，不�
 
 ## 7. 主要风险
 
-- `DATA-001`、`DATA-002` 已关闭：公开 head 已统一为 v17，历史 v1–v14 源码由冻结内容指纹保护，v15+ ledger 使用内容 checksum。
+- `DATA-001`、`DATA-002` 已关闭：公开 head 已统一为 v18，历史 v1–v14 源码由冻结内容指纹保护，v15+ ledger 使用内容 checksum。
 - `DATA-003` 已关闭“未分类”缺口：252/252 集合具有唯一机器状态，未知 owner 不被伪造，新增/删除、
   重复登记、源码使用漂移和生产晋升由 CI 失败关闭。
 - `DATA-008`：首发范围 19 个集合已根据实际读写调用点关闭 owner review；168 个 `review-required`
@@ -327,14 +332,14 @@ legal-hold）不会再为新记录让位；这只关闭静默数据丢失，不�
 | `regionalSharingSnapshots` | platform-governance | internal | 共享目录快照，不是授权事实 |
 | `regionalSharingAccessReviews` | platform-governance | restricted | `regional-sharing-access-receipt.v1` 只追加历史；禁止截断、删除或原地改写旧回执 |
 
-区域共享回执保存授权引用/版本、结构化用途、范围、共享包版本和稳定摘要；不保存原始幂等键或自由文本用途。展示集合 `dataAccessLogs/securityEvents` 仍受 120 条上限约束，v15 source 只保留它们今后的最小投影；区域共享的权威业务回执仍是未截断的 `regionalSharingAccessReviews`。区域切片本身未增 DDL；该切片实施时主 schema 因连续审计来源进至 v15，当前统一 head 已由后续 v16/v17 migration 推进至 v17，生产切换授权仍为 false。
+区域共享回执保存授权引用/版本、结构化用途、范围、共享包版本和稳定摘要；不保存原始幂等键或自由文本用途。展示集合 `dataAccessLogs/securityEvents` 仍受 120 条上限约束，v15 source 只保留它们今后的最小投影；区域共享的权威业务回执仍是未截断的 `regionalSharingAccessReviews`。区域切片本身未增 DDL；该切片实施时主 schema 因连续审计来源进至 v15，当前统一 head 已由后续 v16/v17/v18 migration 推进至 v18，生产切换授权仍为 false。
 
 四个区域 owner 集合均为 legacy state writer 的 server-managed 字段：全量提交时只能省略或深相等，省略从现有状态恢复；集合级写入被拒绝。该规则同时保护 receipt 顺序/原值以及 package `version`、`lastAccessReviewId`，避免客户端绕过命令 CAS。演示 reset 仅允许非生产，生产固定失败关闭。
 
 `regional-sharing-read-model.v1` 只读取上述四个区域集合及既有 residents、诊断报告、个人记录、互认记录和
 接口契约投影；它不创建集合、表、字段、DDL、migration、审计事实或缓存。交接清单的 report ID 和生成时间
 只存在响应及既有安全审计投影中，不成为新的事实源；该 builder 归位切片未改变当时的 SQLite v16 head，
-当前统一 head 已为 v17；JSON/SQLite/PostgreSQL 拓扑和任何 data owner 均未因该切片改变。
+当前统一 head 已为 v18；JSON/SQLite/PostgreSQL 拓扑和任何 data owner 均未因该切片改变。
 ## 10. 健康驾驶舱指标测量
 
 `population-service-visits.v1` 是代码内版本化逻辑合同，不新增集合、表、DDL 或 migration。
@@ -402,7 +407,7 @@ PostgreSQL 多节点主存储尚未建立，`productionReady=false`。
 
 ## 16. 对象存储 v17 耐久模型（Accepted，仓库内已实施）
 
-T08 integration 已确认为 data owner，T00 为 technical owner；SQLite head 为 v17。结构化权威模型包括
+T08 integration 已确认为 data owner，T00 为 technical owner；对象存储在 v17 引入（当前全局 head 为 v18）。结构化权威模型包括
 `secure_attachment_records`、`object_storage_commands`、`object_storage_command_receipts`、
 `object_storage_reconciliation_cases`、`object_storage_reconciliation_actions` 五组关系。
 
@@ -418,7 +423,7 @@ high-water mark 的 HMAC keyset cursor。外部状态/abort capability、KMS/WOR
 不是业务集合、数据库事实、migration 或生产证据正文。anchor bundle 只含公钥、摘要、角色、状态和有效期；
 envelope 只含受控引用、SHA-256、release/artifact/evidence/registry 绑定与签名。preflight 只输出 decision ID、
 envelope digest、角色和 signer 数量，不持久化文件、绝对路径、公钥正文或原始错误。本切片不改变 SQLite
-head v17、PostgreSQL 结构、`data/db.json` 或任何其他 data owner。
+当时的 head v17、PostgreSQL 结构、`data/db.json` 或任何其他 data owner。
 
 ## 18. 生产切换行动证据数据边界
 
@@ -470,7 +475,7 @@ scope 校验不改变该集合 owner；护理 notification plan/outbox 继续是
 
 `platform-worker-observability.v1` 是进程内返回值，不新增集合、SQLite/PostgreSQL 表、DDL、migration、
 data owner 或权威事实。`sourceReportDigest` 只对已脱敏的 profile/outcome/time/identity digest/count/error code
-输入计算，不对业务报告正文、患者数据、凭据或 lease token 计算可关联摘要。当前 schema head v17
+输入计算，不对业务报告正文、患者数据、凭据或 lease token 计算可关联摘要。当前 schema head v18
 和所有核心表冻结；后续若要持久化指标或日志，必须由独立 owner/留存/访问控制决策处理。
 
 ## 22. 仓库清单与 PDF 摘要不是业务数据

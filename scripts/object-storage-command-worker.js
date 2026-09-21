@@ -5,6 +5,7 @@ const path = require("node:path");
 const { DatabaseSync } = require("node:sqlite");
 const {
   SQLITE_SCHEMA_HEAD,
+  SQLITE_MIGRATIONS,
   applySqliteMigrations,
   createSqliteObjectStorageRepository
 } = require("../src/platform/storage/sqlite-migrations");
@@ -49,7 +50,13 @@ function openRepository(env = process.env, flags = {}, options = {}) {
   db.exec("PRAGMA synchronous = FULL");
   db.exec("PRAGMA busy_timeout = 5000");
   const migration = applySqliteMigrations(db);
-  if (migration.head !== SQLITE_SCHEMA_HEAD || SQLITE_SCHEMA_HEAD !== 17) throw new Error("OBJECT_STORAGE_SCHEMA_HEAD_MISMATCH");
+  const objectStorageMigration = SQLITE_MIGRATIONS.find((item) => item.version === 17);
+  const appliedObjectStorage = db.prepare("SELECT name, checksum FROM schema_migrations WHERE version = 17").get();
+  if (migration.head !== SQLITE_SCHEMA_HEAD || !objectStorageMigration
+    || appliedObjectStorage?.name !== objectStorageMigration.name
+    || appliedObjectStorage?.checksum !== objectStorageMigration.contentFingerprint) {
+    throw new Error("OBJECT_STORAGE_SCHEMA_HEAD_MISMATCH");
+  }
   const cursorSecret = String(env.OBJECT_STORAGE_CURSOR_SIGNING_SECRET || "");
   return Object.freeze({ db, repository: createSqliteObjectStorageRepository(db, { cursorSecret }) });
 }

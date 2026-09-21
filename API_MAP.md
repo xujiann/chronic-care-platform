@@ -2,6 +2,10 @@
 
 > 状态层权威：当前基线、目标状态、差距任务和验收证据统一登记在 `config/lifecycle-governance.json#maps`；正文继续只陈述 AS-IS 事实。
 
+## 提交凭证第一切片（2026-09-21，实施中）
+
+本切片不增加或改变 HTTP API。仅 schemaVersion 的既有元数据值从注册表派生为 18；receipt wrapper 和 loader 未接入 HTTP/server，不能解释为写入口已支持新凭证或 PostgreSQL 主存储。
+
 ## 访问知晓声明首切片（2026-09-14）
 
 2026-09-19 当前集成事实：访问知晓声明与 GOV-014 行为合同已由 [PR #307](https://github.com/xujiann/chronic-care-platform/pull/307) 合入 `main@b54c9a6c`，合并树与冻结候选 `a35faf4f` 一致；独立审查、本地 18 项串行门禁、PR CI 九项及 main CI 均通过，自动 Pages 成功。纯治理 GOV-013/GOV-014 已集成；运行能力 OPS-040/SEC-016 仍为验证中/已实现，保留观测、真实 PostgreSQL/多实例及现场证据缺口，生产六域继续 `NO-GO`。下段 2026-09-16 文字为历史实施阶段记录。
@@ -222,7 +226,7 @@ HTTP request
 ## 6. 错误、幂等与审计
 
 - router 未命中统一 404；存储冲突和 session store 不可用有专用错误转换。
-- 健康/存储元数据的既有 `schemaVersion` 字段形状保持不变，值由 SQLite 注册表 head 派生，当前为 17。
+- 健康/存储元数据的既有 `schemaVersion` 字段形状保持不变，值由 SQLite 注册表 head 派生，当前为 18。
 - 静态未知/敏感路径统一 404；`GET/HEAD /data/public-demo.json` 返回合成脱敏数据，`/data/db.json`、源码、配置和仓库元数据不可发布。
 - HTML、静态资源、JSON/API、下载与错误响应由集中端口下发 `nosniff`、frame、referrer、
   permissions 与 CSP。显式发布图的内联脚本/样式静态风险已归零，但兼容 CSP 仍含 `unsafe-inline`，

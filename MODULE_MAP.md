@@ -2,6 +2,10 @@
 
 > 状态层权威：当前基线、目标状态、差距任务和验收证据统一登记在 `config/lifecycle-governance.json#maps`；正文继续只陈述 AS-IS 事实。
 
+## 提交凭证第一切片（2026-09-21，实施中）
+
+T00 `src/platform/storage/sqlite-outbox-commit-receipt.js` 提供 schema creator、局部 upsert 单批次事务包装器和只读 loader，复用既有 outbox 构建器；不依赖 server.js，不替代业务 owner/mirror/audit hooks，也不实现 relay/checkpoint。只允许合成隔离库测试，未接线。
+
 ## 访问知晓声明首切片（2026-09-14）
 
 2026-09-19 当前集成事实：访问知晓声明与 GOV-014 行为合同已由 [PR #307](https://github.com/xujiann/chronic-care-platform/pull/307) 合入 `main@b54c9a6c`，合并树与冻结候选 `a35faf4f` 一致；独立审查、本地 18 项串行门禁、PR CI 九项及 main CI 均通过，自动 Pages 成功。纯治理 GOV-013/GOV-014 已集成；运行能力 OPS-040/SEC-016 仍为验证中/已实现，保留观测、真实 PostgreSQL/多实例及现场证据缺口，生产六域继续 `NO-GO`。下段 2026-09-16 文字为历史实施阶段记录。

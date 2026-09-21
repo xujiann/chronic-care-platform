@@ -2,6 +2,10 @@
 
 > 状态层权威：当前基线、目标状态、差距任务和验收证据统一登记在 `config/lifecycle-governance.json#maps`；正文继续只陈述 AS-IS 事实。
 
+## 提交凭证第一切片（2026-09-21，实施中）
+
+新增 v18 与未接线的库级 receipt 组件不关闭真实源库历史凭证缺口、relay/目标身份/checkpoint/重放严格比较或20集合迁移风险。旧请求仍不生成 receipt，真实数据迁移、生产、容量、灾备和现场签署保持阻断。
+
 ## 访问知晓声明首切片（2026-09-14）
 
 2026-09-19 当前集成事实：访问知晓声明与 GOV-014 行为合同已由 [PR #307](https://github.com/xujiann/chronic-care-platform/pull/307) 合入 `main@b54c9a6c`，合并树与冻结候选 `a35faf4f` 一致；独立审查、本地 18 项串行门禁、PR CI 九项及 main CI 均通过，自动 Pages 成功。纯治理 GOV-013/GOV-014 已集成；运行能力 OPS-040/SEC-016 仍为验证中/已实现，保留观测、真实 PostgreSQL/多实例及现场证据缺口，生产六域继续 `NO-GO`。下段 2026-09-16 文字为历史实施阶段记录。
@@ -169,7 +173,7 @@ T00 机器登记完成后，`production-release-scope` 中 17 个仓库内 API �
 | SEC-002 | 2026-08-19 | 浏览器和 Service Worker 只消费生成的 `public-demo.json`；凭据删除、身份联系字段掩码；初始 v61 激活清理 v60，当前 v63 激活清理 v62 及更早缓存，并拒绝缓存源快照 404 | 共享脱敏纯函数、源快照拒绝、Pages 仓库外构建和 PWA 缓存边界 E2E；仓库历史分类残余风险继续由 `DATA_MODEL.md` 的 DATA-006 跟踪 |
 | CI-001 | 2026-09-06 | 综合 CI 拆为地区矩阵、真实 PostgreSQL、governance-api、browser-e2e、release-readiness 等独立任务；required `test` 以 `always()` 失败关闭其中五个风险上游，`complete-unit-test` 仍独立 required | workflow 契约测试锁定步骤归属、预算、五个上游结果以及失败、取消和跳过均不得误报成功 |
 | TEST-004 | 2026-08-19 | 居民小程序 JSON 制品改为递归扫描语义字符串值，仅跳过精确摘要字段中的合法 SHA-256；非 JSON 仍全文扫描 | 摘要命中放行，伪造摘要字段、`123456`、`888888`、`DEMO-MOBILE` 语义值和非 JSON 文本均拒绝 |
-| DATA-001 | 2026-08-26 | `STORAGE_SCHEMA_VERSION`、storageMeta、部署/readiness/release 门禁统一派生注册表 head v17 | 静态契约、storage、迁移指纹、部署、生产就绪与发布报告测试 |
+| DATA-001 | 2026-08-26 | `STORAGE_SCHEMA_VERSION`、storageMeta、部署/readiness/release 门禁统一派生注册表 head v18 | 静态契约、storage、迁移指纹、部署、生产就绪与发布报告测试 |
 | DATA-002 | 2026-08-22 | v1–v14 独立注册并冻结内容指纹，v15+ ledger 写内容 SHA-256，runner 拒绝连续性/name/checksum 漂移 | 空库、v11/v15 升级、重跑、指纹/ledger 漂移、v15/v16 checksum、未来 v17 与失败回滚测试 |
 | TEST-001 | 2026-08-22 | 建立 build/lint/typecheck/unit/integration/smoke 标准入口并映射 CI/Pages；test:all 与原 server.js 85/85/55 覆盖门禁语义不变；governance-api 静态发布链包含 Safe URL port、Browser Inventory v2，并在 2026-08-23 增加对象存储 Proposed ADR fail-closed 验证 | 标准门禁契约、完整测试分区、隔离 smoke、静态发布链、Inventory v2 精确 occurrence/指纹与 synthetic 负向矩阵、Safe URL 模块/Playwright 恶意协议和 Origin 拒绝、CI 映射、独立内部边界覆盖和全量回归；对象存储专项拒绝未批准 v17/runtime/API/promotion、owner 推断和 ADR/行动台账漂移 |
 | JOB-001 | 2026-08-23 | 盘点 12 套真实 worker 语义并建立 `platform-worker-observability.v1` 兼容投影；保留各业务 state/retry/lease/checkpoint/receipt，未创造第二状态机 | 9 个部署入口自动发现、登记/接入漂移、未知 profile、字段扩宽、敏感正文/原始身份/lease token 泄露和生产误授权负向测试；真实采集、告警与现场验收仍外置 |

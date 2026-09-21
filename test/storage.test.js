@@ -4,6 +4,7 @@ const os = require("node:os");
 const path = require("node:path");
 const test = require("node:test");
 const { auditHashFor } = require("../src/identity-security/audit-chain");
+const { SQLITE_SCHEMA_HEAD } = require("../src/platform/storage/sqlite-migrations");
 
 const ROOT = path.resolve(__dirname, "..");
 let sqliteAvailable = true;
@@ -45,7 +46,7 @@ test("SQLite migrations are idempotent and collection versions change only on wr
 
     withDatabase(storage, (db) => {
       const migrations = db.prepare("SELECT version, name, checksum FROM schema_migrations ORDER BY version").all();
-      assert.deepEqual(migrations.map((item) => Number(item.version)), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17]);
+      assert.deepEqual(migrations.map((item) => Number(item.version)), Array.from({ length: SQLITE_SCHEMA_HEAD }, (_, index) => index + 1));
       assert.ok(migrations.every((item) => item.name && /^[a-f0-9]{64}$/.test(item.checksum)));
 
       const columns = db.prepare("PRAGMA table_info(state_collections)").all().map((item) => item.name);
@@ -285,7 +286,7 @@ test("SQLite migrations are idempotent and collection versions change only on wr
     });
 
     const meta = storage.storageMeta();
-    assert.equal(meta.schemaVersion, 17);
+    assert.equal(meta.schemaVersion, SQLITE_SCHEMA_HEAD);
     assert.equal(meta.postgresSync.reconciliation.status, "never");
     assert.equal(meta.postgresSync.reconciliation.cases.unresolved, 0);
     assert.deepEqual(meta.sqliteProfile, {

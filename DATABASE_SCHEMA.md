@@ -4,8 +4,8 @@
 
 ## 1. Schema Head
 
-- SQLite migration 注册表：v1–v17，位于 `src/platform/storage/sqlite-migrations.js`。
-- 运行时公开常量：`STORAGE_SCHEMA_VERSION = SQLITE_SCHEMA_HEAD = 17`。
+- SQLite migration 注册表：v1–v18，位于 `src/platform/storage/sqlite-migrations.js`。
+- 运行时公开常量：`STORAGE_SCHEMA_VERSION = SQLITE_SCHEMA_HEAD = 18`。
 - migration ledger：`schema_migrations`。
 - v1–v14 ledger checksum 保持历史兼容，源码内容由冻结 SHA-256 保护；v15+ ledger checksum 为内容 SHA-256。
 - PostgreSQL：5 份跟踪 SQL，共 13 张显式候选表；另有脚本生成的迁移包/MPI 结构。
@@ -33,6 +33,14 @@
 | 17 | durable object storage metadata and command track | `secure_attachment_records`、`object_storage_commands`、不可变 receipts、reconciliation case/action、keyset 索引和 legacy 写冻结触发器 |
 
 完整表分组与关系见 `DATA_MODEL.md`。
+
+v18 `add immutable PostgreSQL outbox commit receipts`：仅追加 `postgres_sync_commit_receipts` 与不可变/关联守卫，外键引用 outbox.sequence；batch/transaction ID 唯一，摘要仅 metadata。空库与旧库升级只建结构，不回填历史凭证，不改旧 delivery 状态。T00 wrapper/loader 仅在合成隔离库调用，不接入 server.js，不替代既有 owner、镜像、审计/随访 hook 或 writeDatabase。
+
+`commitSqliteOutboxTransaction(db, { entries, expectedVersions, sourceEvent })` 仅执行显式键的部分 upsert，未列出的键保留，不提供删除或历史导入。每集合从版本 1 起步并逐次加 1；已有状态没有认证历史、历史对应状态丢失或 CAS 不符均停止。输入不允许访问器、调用者事务 ID 或既有批次。业务状态、完整 outbox、receipt 与 storage event 同事务提交；`committedAt` 是事务内 recorded_at，不是精确 COMMIT 时刻。
+
+`loadCommittedSqliteOutboxBatches(sqliteFile, { after, limit })` 使用独立只读快照，先验证整个有界源链再分页；包含全部投递状态，游标绑定 sequence/batch/digest/chain，不能跳过缺证前缀。单批最多 100 个集合和 1 MiB，源链最多 1000 行/16 MiB；超过边界失败关闭，不用于生产容量承诺。稳定错误前缀为 `SQLITE_OUTBOX_RECEIPT_`，不返回底层 SQL、路径或业务 payload。后续切片仍须解决 PostgreSQL 目标初始版本兼容、完整重放绑定及独立 checkpoint；本切片不改变目标合同。
+
+回滚不自动 DROP：保留业务/outbox/receipt；已升级库不能直接运行旧 schema runtime，采用受控前滚修复或经验证的备份恢复。生产部署和真实数据升级仍需外部审批。
 
 ## 3. PostgreSQL 台账
 
@@ -84,7 +92,7 @@ provider/KMS/WORM/扫描证据仍未完成，因此 production promotion 保持 
 `research.dataset-aggregate.v1` 继续提供 `researchDatasets` 的详细逻辑写合同；源数据继续位于
 `state_collections[researchDatasets]`，SQLite v7 的 `research_dataset_records` 保持只读兼容投影；目标复用
 已存在的 PostgreSQL `health_platform.primary_collection_state`，以 `collection_name=researchDatasets`
-定位，不新增 SQLite/PostgreSQL DDL，schema head 仍为 v17。
+定位，不新增 SQLite/PostgreSQL DDL，该 portfolio 本身未改变 schema；当前 head 已由独立 receipt 切片推进至 v18。
 
 整个 portfolio 只达到 repository-plan-ready/non-persistent 分类：没有创建 migration run、没有执行回填、没有激活 worker，也没有
 授权生产主库或生产写入。后续必须提供精确 count/digest、outbox checkpoint、零 mismatch/duplicate、

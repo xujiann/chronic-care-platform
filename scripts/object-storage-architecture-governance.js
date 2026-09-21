@@ -3,6 +3,7 @@
 
 const fs = require("node:fs");
 const path = require("node:path");
+const { SQLITE_MIGRATIONS, validateSqliteMigrationRegistry } = require("../src/platform/storage/sqlite-migrations");
 
 const ROOT = path.resolve(__dirname, "..");
 const DEFAULT_REGISTER = path.join(ROOT, "config", "object-storage-architecture-decision.json");
@@ -72,6 +73,9 @@ function readRepositoryState(options = {}) {
 function buildGovernanceReport(input) {
   const { register, ownership, adrPath, adrSource, readinessSource, sqliteHead } = input;
   const decision = register?.decision || {};
+  // Repository capability only; the worker separately validates the applied ledger.
+  const registry = validateSqliteMigrationRegistry();
+  const objectStorageMigration = SQLITE_MIGRATIONS.find((item) => item.version === 17);
   const actions = Array.isArray(register?.actions) ? register.actions : [];
   const humanDecisions = Array.isArray(decision.requiredHumanDecisions)
     ? decision.requiredHumanDecisions
@@ -122,7 +126,10 @@ function buildGovernanceReport(input) {
       && Array.isArray(item?.dependsOn)), "each action requires owner, dependencies and deliverable"),
     check("objectStorageDecision:actionDependencies", actions.every((item) => item.dependsOn?.every((dependency) => REQUIRED_ACTION_IDS.includes(dependency) && dependency !== item.id)), "all action dependencies must reference another registered action"),
     check("objectStorageDecision:authorizationShape", AUTHORIZATION_FLAGS.every((flag) => typeof authorization[flag] === "boolean"), "all authorization flags must be explicit booleans"),
-    check("objectStorageDecision:v17Applied", decision.reservedSqliteMigrationVersion === 17 && sqliteHead === 17, `reserved=${decision.reservedSqliteMigrationVersion}; currentHead=${sqliteHead}`),
+    check("objectStorageDecision:v17Applied", decision.reservedSqliteMigrationVersion === 17
+      && sqliteHead === registry.head
+      && objectStorageMigration?.name === "add durable object storage metadata and command track",
+    `reserved=${decision.reservedSqliteMigrationVersion}; currentHead=${sqliteHead}; registeredHead=${registry.head}`),
     check("objectStorageDecision:confirmedDataOwnership", ownership?.collections?.secureAttachments?.owner === "integration"
       && ownership?.collections?.secureAttachments?.classification === "restricted"
       && ownership?.collections?.secureAttachments?.writeContract === "object-storage-durable-command-and-metadata.v2"

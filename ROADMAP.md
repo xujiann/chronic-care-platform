@@ -3,12 +3,13 @@
 ## 提交凭证第一切片 PLAN（2026-09-21）
 
 - 准入：用户回复“按照建议执行”。先前只读样本已由 PR #308 合并为 `70521f29`，与冻结 `17df11d7` 文件树一致；独立复审、本地必需门禁和 PR CI `35555853638` 九项成功。合并后 main CI `35556532283` 九项成功，自动 Pages `35556532287` 成功。GOV-015/OPS-041 仅关闭已交付的只读切片，不关闭真实迁移或生产门禁。
-- 目标：按 Accepted ADR `2026-09-21-sqlite-outbox-commit-receipt.md` 第 1 切片建立原子 receipt、受控单批次事务包装器及全部投递状态的只读装载器；从最新 `origin/main@70521f29` 独立工作树开始，源码尚未实施。ADR 后续 relay/checkpoint/目标绑定及主存储重放切片仍未准入。
-- 决策：复用既有 outbox 的完整批次和原摘要链，不从 batch ID 推导事务标识、不补造历史凭证。SQLite head 当前为 17，实施前重验最新 head 与预留后追加顺序版本，历史 migration/checksum 不变。普通旧请求路径不自动生成 receipt。
-- 四角色与单写范围：协调者独占 GOV-016 的中央总账、ROADMAP、ADR/索引、文档治理配置及六图。OPS-042 为明确编号的 T00 技术存储任务，不承载领域业务：开发 A 独占新 `src/platform/storage/sqlite-outbox-commit-receipt.js`；开发 B 独占新 receipt 测试与 `test/sqlite-migration-governance.test.js`；协调者独占 migration 注册表、`DATABASE_SCHEMA.md`、两处 object-storage head 兼容检查及对应测试。独立审查者只读。完整文件闭集见总账 writeScopes，WIP 4/5；新增文件测试登记在文件建立时同步补齐，不预称已存在。
-- 必要兼容：对象存储 worker/架构治理不能继续强制当前 head 等于 17；必须验证原 v17 已应用且指纹正确，并保留完整迁移校验，不能仅改成 `head >= 17`。保留 `reservedSqliteMigrationVersion=17`、原 worker 权限、原生产禁止状态。未来非法版本测试探针改用 head+1。
+- 目标：按 Accepted ADR `2026-09-21-sqlite-outbox-commit-receipt.md` 第 1 切片建立原子 receipt、受控单批次事务包装器及全部投递状态的只读装载器；从最新 `origin/main@70521f29` 独立工作树开始，现已实现、待冻结后的完整门禁及保护集成。ADR 后续 relay/checkpoint/目标绑定及主存储重放切片仍未准入。
+- 决策：复用既有 outbox 的完整批次和原摘要链，不从 batch ID 推导事务标识、不补造历史凭证。实施前重验 head=17 且无 v18 预留后已追加 v18，历史 migration/checksum 不变。普通旧请求路径不自动生成 receipt。
+- 四角色与单写范围：协调者独占 GOV-016 的中央总账、ROADMAP、ADR/索引、文档治理配置及六图。OPS-042 为明确编号的 T00 技术存储任务，不承载领域业务：开发 A 独占新 `src/platform/storage/sqlite-outbox-commit-receipt.js`；开发 B 独占新 receipt 测试与 `test/sqlite-migration-governance.test.js`；协调者独占 migration 注册表、`DATABASE_SCHEMA.md`、三处 object-storage head 兼容检查及对应测试、`test/storage.test.js` 全局 head 断言。独立审查者只读。完整文件闭集见总账 writeScopes，WIP 4/5；新增 receipt 测试已登记为 TEST-OPS-042-RECEIPT。
+- 必要兼容：对象存储 worker/架构治理不能继续强制当前 head 等于 17；必须验证原 v17 已应用且指纹正确，并保留完整迁移校验，不能仅改成 `head >= 17`。实施复核另发现 `src/platform/operations/object-storage-command-worker.js` 的同类 readiness 检查，已加入 OPS-042 精确范围并由协调者单写；仓库 readiness 验注册表，实际 openRepository 验已应用 ledger，两者不得混同。保留 `reservedSqliteMigrationVersion=17`、原 worker 权限、原生产禁止状态。未来非法版本测试探针改用 head+1。
 - 验收：真实正式迁移文件库验证空库、v17升级、重跑、指纹、部分失败；两个连接证明业务/outbox/receipt/storage event 同时提交可见；各写步骤 SQL 故障注入全部回滚。拒绝嵌套、既有批次补证及调用者事务 ID；loader 独立只读一致快照、outbox LEFT JOIN receipt、读取 pending/retry/delivered/failed；历史缺证停止，严格 UUID/安全整数/摘要/UTC毫秒时间/未知字段、完整 envelope/changes 和链后继验证，允许有链证明的序号空隙。
 - 测试顺序：专项开发负测 → 独立审查 → 冻结 SHA → 串行 build、lint、typecheck、unit、integration、smoke、legacy test:all 及 process/routes/architecture/iterations/文档治理；既有远端真实 PG/E2E 门禁保留。按已授权保护流程推送、PR、精确 CI 后合并，不启用自动合并或绕过保护。
+- 开发验证：receipt/migration/既有同步/只读样本专项 82/82 通过，object-storage 兼容/storage/文档专项 38/38 通过。独立审查提出的集合版本起点问题已修复并补测：首个版本只能为 1，触达已有状态但缺认证历史或历史存在而状态丢失均拒绝；不改变 PostgreSQL 目标版本合同，当前结果不构成可直接重放证明。
 - 非目标与回滚：不改 server.js、T09路由、旧 worker投递目标/状态、主存储replay/checkpoint、依赖或生产配置；不迁移真实数据、不启用worker/主库。停止新增调用方并保留 receipt/outbox和业务事实，不自动DROP；已升级库不得直接交旧runtime，恢复通过受控前滚修复或备份恢复。真实PG、多实例、容量、灾备、现场签署和六域NO-GO不因库级测试关闭。
 
 ## T02 数据质量问题集合 PostgreSQL 迁移样本 PLAN（2026-09-19，已准入只读首切片）
