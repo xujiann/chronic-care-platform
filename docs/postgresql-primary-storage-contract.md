@@ -75,7 +75,7 @@ await storage.applyCommittedOutbox(batch, {
   commitment: {
     state: "committed",
     source: "sqlite-transactional-outbox",
-    sourceTransactionId: "sqlite-tx-...",
+    sourceTransactionId: "00000000-0000-4000-8000-000000000001",
     outboxSequence: 123,
     committedAt: "2026-08-06T00:00:00.000Z",
     payloadSha256: batch.payloadSha256
@@ -93,6 +93,18 @@ await storage.applyCommittedOutbox(batch, {
 - 同一批次 ID 被不同证据重复使用。
 
 批次内任一集合失败，整批事务回滚。重复提交完全相同的批次返回 `duplicate`，不会重复写入。
+
+### 重放合同加固切片（2026-09-21，已准入实施）
+
+ADR `2026-09-21-postgres-committed-replay-hardening.md` 只批准合同与正式驱动边界加固。上例 UUID 是文档合成示例，不是可用于真实迁移的凭证；实际输入必须来自已提交 SQLite wrapper/loader，不接受从 batch ID 或调用时间补造证明。
+
+凭证精确包含 `state/source/sourceTransactionId/outboxSequence/committedAt/payloadSha256` 六个普通数据属性。状态与来源取固定原值，事务 ID 为小写规范 UUIDv4，序号为正安全整数，时间为可往返 UTC 毫秒 ISO，摘要为小写 SHA-256 且与批次一致。未知字段、访问器、数字字符串、空白、大小写和日期偏移变体均拒绝，不先转换、截断或 trim。
+
+重复批次须与目标账本逐项相等：`batchId/payloadSha256/previousChainHash/chainHash/sourceTransactionId/outboxSequence/committedAt`。任一缺失/漂移报冲突且不写集合或账本；`appliedAt/appliedChanges` 是目标执行结果，不属于源提交身份。PG 时间读取须保留足够精度，亚毫秒历史值不允许截断成合法毫秒凭证。
+
+普通首次不存在集合允许源版本 0（旧兼容）或 1（SQLite 新凭证），均向驱动传 `expectedVersion=-1`，不把不存在伪装成现有 v0。已有集合和 tombstone 继续原后继 CAS/同版本同内容规则；显式 `baseline-snapshot` 的历史初始版本兼容保持不变，不因此新增历史导入权。
+
+本轮使用正式 SQLite 临时合成库、内存主合同与受控 SQL 驱动测试；SQL mock 不是实际 PostgreSQL。现有远端真实 PostgreSQL 门禁只覆盖 auth/shadow，不能替代 primary 真实数据库、并发和现场证据。无 DDL、relay/checkpoint 或服务端接线；生产及 worker 激活继续禁止。
 
 ## 驱动接入要求
 

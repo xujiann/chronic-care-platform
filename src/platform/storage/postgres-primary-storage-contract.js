@@ -172,25 +172,26 @@ function requireCapability(config, capability) {
 }
 
 function normalizeCommitReceipt(value, batch) {
-  const receipt = value && typeof value === "object" && !Array.isArray(value) ? value : {};
-  const sequence = Number(receipt.outboxSequence);
-  const committedAt = clean(receipt.committedAt, 80);
-  const committedTime = Date.parse(committedAt);
-  const normalized = {
-    state: clean(receipt.state, 40).toLowerCase(),
-    source: clean(receipt.source, 80).toLowerCase(),
-    sourceTransactionId: clean(receipt.sourceTransactionId, 160),
-    outboxSequence: sequence,
-    committedAt,
-    payloadSha256: clean(receipt.payloadSha256, 80).toLowerCase()
-  };
-  const valid = normalized.state === "committed"
+  const keys = ["state", "source", "sourceTransactionId", "outboxSequence", "committedAt", "payloadSha256"];
+  const shape = value !== null && typeof value === "object" && !Array.isArray(value)
+    && [Object.prototype, null].includes(Object.getPrototypeOf(value))
+    && Reflect.ownKeys(value).length === keys.length
+    && keys.every((key) => {
+      const descriptor = Object.getOwnPropertyDescriptor(value, key);
+      return descriptor && descriptor.enumerable && Object.hasOwn(descriptor, "value");
+    });
+  const normalized = shape ? Object.fromEntries(keys.map((key) => [key, Object.getOwnPropertyDescriptor(value, key).value])) : {};
+  const valid = shape && normalized.state === "committed"
     && normalized.source === "sqlite-transactional-outbox"
-    && normalized.sourceTransactionId.length >= 4
-    && Number.isSafeInteger(sequence)
-    && sequence > 0
-    && Number.isFinite(committedTime)
-    && normalized.payloadSha256 === batch.payloadSha256;
+    && typeof normalized.sourceTransactionId === "string"
+    && /^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/.test(normalized.sourceTransactionId)
+    && Number.isSafeInteger(normalized.outboxSequence) && normalized.outboxSequence > 0
+    && typeof normalized.committedAt === "string"
+    && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(normalized.committedAt)
+    && Number.isFinite(Date.parse(normalized.committedAt))
+    && new Date(normalized.committedAt).toISOString() === normalized.committedAt
+    && typeof normalized.payloadSha256 === "string" && /^[a-f0-9]{64}$/.test(normalized.payloadSha256)
+    && normalized.payloadSha256 === batch?.payloadSha256;
   if (!valid) {
     throw new PostgresPrimaryStorageContractError(
       "PostgreSQL primary write relay requires a valid committed outbox receipt",
@@ -312,7 +313,16 @@ function assertTransaction(tx) {
 
 function compareReplay(existing, incoming) {
   if (!existing) return false;
-  if (existing.payloadSha256 !== incoming.payloadSha256 || existing.chainHash !== incoming.chainHash) {
+  const evidence = {
+    batchId: incoming.batchId,
+    payloadSha256: incoming.payloadSha256,
+    previousChainHash: incoming.previousChainHash,
+    chainHash: incoming.chainHash,
+    sourceTransactionId: incoming.commitment.sourceTransactionId,
+    outboxSequence: incoming.commitment.outboxSequence,
+    committedAt: incoming.commitment.committedAt
+  };
+  if (Object.entries(evidence).some(([key, value]) => !Object.hasOwn(existing, key) || existing[key] !== value)) {
     throw new PostgresPrimaryStorageContractError(
       "PostgreSQL outbox idempotency key was reused with different evidence",
       "POSTGRES_PRIMARY_IDEMPOTENCY_CONFLICT",
@@ -348,7 +358,8 @@ function assertCollectionCas(current, change, baseline) {
       { collection: change.collection, sourceVersion: change.sourceVersion }
     );
   }
-  const allowedVersion = baseline && !current ? change.sourceVersion : actualVersion + 1;
+  const allowedVersion = !current && (baseline || change.sourceVersion === 1)
+    ? change.sourceVersion : actualVersion + 1;
   if (change.sourceVersion !== allowedVersion) {
     throw new PostgresPrimaryStorageContractError(
       "PostgreSQL collection compare-and-swap version conflict",
@@ -666,6 +677,7 @@ module.exports = {
   buildPostgresPrimaryStorageConfig,
   buildTransitionAssessment,
   createPostgresPrimaryStorageContract,
+  normalizeCommitReceipt,
   normalizeCommittedBatch,
   safeConfigStatus
 };

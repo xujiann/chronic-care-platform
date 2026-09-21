@@ -37,7 +37,7 @@ function commitment(batch, sequence = 1) {
   return {
     state: "committed",
     source: "sqlite-transactional-outbox",
-    sourceTransactionId: `sqlite-tx-${sequence}`,
+    sourceTransactionId: `00000000-0000-4000-8000-${String(sequence).padStart(12, "0")}`,
     outboxSequence: sequence,
     committedAt: `2026-08-06T00:00:0${sequence}.000Z`,
     payloadSha256: batch.payloadSha256
@@ -62,6 +62,138 @@ function batch(changes, options = {}) {
     previousChainHash: options.previousChainHash || ""
   });
 }
+
+function replayStorage(driver) {
+  return createPostgresPrimaryStorageContract({ config: buildPostgresPrimaryStorageConfig(evidenceEnv("primary-write")), driver });
+}
+
+test("receipt input is strict before opening a target transaction", async () => {
+  const original = batch([change("settings", { synthetic: true }, 1)]);
+  const valid = commitment(original);
+  let getterCalls = 0;
+  const mutations = [
+    () => null, () => [], (r) => ({ ...r, unknown: true }),
+    (r) => { delete r.source; return r; },
+    (r) => ({ ...r, state: "Committed" }), (r) => ({ ...r, source: `${r.source} ` }),
+    (r) => ({ ...r, sourceTransactionId: ` ${r.sourceTransactionId}` }),
+    (r) => ({ ...r, sourceTransactionId: `${r.sourceTransactionId}extra` }),
+    (r) => ({ ...r, sourceTransactionId: "AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAAAA" }),
+    (r) => ({ ...r, sourceTransactionId: "00000000-0000-1000-8000-000000000001" }),
+    (r) => ({ ...r, outboxSequence: "1" }), (r) => ({ ...r, outboxSequence: 0 }),
+    (r) => ({ ...r, outboxSequence: Number.MAX_SAFE_INTEGER + 1 }),
+    (r) => ({ ...r, outboxSequence: 1.5 }),
+    (r) => ({ ...r, payloadSha256: r.payloadSha256.toUpperCase() }),
+    (r) => ({ ...r, payloadSha256: "f".repeat(64) }),
+    (r) => ({ ...r, committedAt: "2026-02-30T00:00:00.000Z" }),
+    (r) => ({ ...r, committedAt: "2026-08-06T00:00:01.000+00:00" }),
+    (r) => ({ ...r, committedAt: "2026-08-06T00:00:01.000000Z" }),
+    (r) => ({ ...r, committedAt: "2026-08-06T00:00:01Z" }),
+    (r) => Object.defineProperty(r, "outboxSequence", { enumerable: true, get() { getterCalls++; return 1; } }),
+    (r) => Object.defineProperty(r, "source", { enumerable: true, set(_value) { getterCalls++; } }),
+    (r) => Object.defineProperty(r, "source", { enumerable: false, value: r.source }),
+    (r) => Object.assign(Object.create({ inherited: true }), r),
+    (r) => Object.assign(r, { [Symbol("extra")]: true })
+  ];
+  for (const mutate of mutations) {
+    const driver = createMemoryPostgresPrimaryDriver();
+    await assert.rejects(() => replayStorage(driver).applyCommittedOutbox(original, {
+      commitment: mutate({ ...valid })
+    }), { code: "POSTGRES_COMMITTED_OUTBOX_RECEIPT_REQUIRED" });
+    assert.equal(driver.history.length, 0);
+    assert.deepEqual(driver.snapshot(), { collections: [], batches: [] });
+  }
+  assert.equal(getterCalls, 0);
+});
+
+test("each persisted replay identity field must be present and exactly equal with zero writes", async () => {
+  const original = batch([change("settings", { synthetic: true }, 1)]);
+  const proof = commitment(original);
+  const source = createMemoryPostgresPrimaryDriver();
+  await replayStorage(source).applyCommittedOutbox(original, { commitment: proof });
+  const snapshot = source.snapshot();
+  const drift = {
+    batchId: "pgsync-" + "a".repeat(32), payloadSha256: "b".repeat(64),
+    previousChainHash: "c".repeat(64), chainHash: "d".repeat(64),
+    sourceTransactionId: "00000000-0000-4000-8000-000000000002",
+    outboxSequence: 2, committedAt: "2026-08-06T00:00:02.000Z"
+  };
+  for (const [field, replacement] of Object.entries(drift)) {
+    for (const missing of [false, true]) {
+      const inner = createMemoryPostgresPrimaryDriver(snapshot);
+      const stored = { ...snapshot.batches[0], [field]: replacement };
+      if (missing) delete stored[field];
+      let writes = 0;
+      const driver = { transaction(options, operation) {
+        return inner.transaction(options, (tx) => operation({ ...tx,
+          getAppliedBatch: async () => stored,
+          applyCollectionChange: async (...args) => { writes++; return tx.applyCollectionChange(...args); },
+          recordAppliedBatch: async (...args) => { writes++; return tx.recordAppliedBatch(...args); }
+        }));
+      } };
+      await assert.rejects(() => replayStorage(driver).applyCommittedOutbox(original, { commitment: proof }),
+        { code: "POSTGRES_PRIMARY_IDEMPOTENCY_CONFLICT" }, `${field}/${missing}`);
+      assert.equal(writes, 0);
+      assert.deepEqual(inner.snapshot(), snapshot);
+      assert.equal(inner.history.at(-1).outcome, "rolled-back");
+    }
+  }
+  for (const patch of [
+    { sourceTransactionId: drift.sourceTransactionId }, { outboxSequence: 2 }, { committedAt: drift.committedAt }
+  ]) await assert.rejects(() => replayStorage(source).applyCommittedOutbox(original, { commitment: { ...proof, ...patch } }),
+    { code: "POSTGRES_PRIMARY_IDEMPOTENCY_CONFLICT" });
+  assert.deepEqual(source.snapshot(), snapshot);
+  const duplicate = await replayStorage(source).applyCommittedOutbox(original, { commitment: proof });
+  assert.equal(duplicate.status, "duplicate");
+  assert.equal(duplicate.appliedChanges, 0);
+  assert.deepEqual(source.snapshot(), snapshot);
+});
+
+test("ordinary absent collection accepts v0 or v1 with missing-row CAS and rejects v2", async () => {
+  for (const version of [0, 1, 2]) {
+    const inner = createMemoryPostgresPrimaryDriver();
+    const expected = [];
+    const driver = { transaction(options, operation) {
+      return inner.transaction(options, (tx) => operation({ ...tx,
+        applyCollectionChange: async (value, opts) => { expected.push(opts.expectedVersion); return tx.applyCollectionChange(value, opts); }
+      }));
+    } };
+    const initial = batch([change("settings", { synthetic: true }, version)]);
+    const work = () => replayStorage(driver).applyCommittedOutbox(initial, { commitment: commitment(initial) });
+    if (version === 2) {
+      await assert.rejects(work, { code: "POSTGRES_PRIMARY_COLLECTION_CAS_CONFLICT" });
+      assert.deepEqual(expected, []);
+      assert.deepEqual(inner.snapshot(), { collections: [], batches: [] });
+    } else {
+      assert.equal((await work()).status, "applied");
+      assert.deepEqual(expected, [-1]);
+      assert.equal(inner.snapshot().collections[0].sourceVersion, version);
+    }
+  }
+});
+
+test("baseline, successor, equal-version replay and tombstone CAS remain unchanged", async () => {
+  const driver = createMemoryPostgresPrimaryDriver();
+  const storage = replayStorage(driver);
+  let previous = "";
+  let sequence = 0;
+  async function apply(version, operation = "upsert", sourceEvent = "write-state", value = { synthetic: true }) {
+    const item = batch([change("settings", value, version, operation)], { previousChainHash: previous, sourceEvent });
+    const result = await storage.applyCommittedOutbox(item, { commitment: commitment(item, ++sequence) });
+    previous = item.chainHash;
+    return result;
+  }
+  await apply(7, "upsert", "baseline-snapshot");
+  await assert.rejects(() => apply(9), { code: "POSTGRES_PRIMARY_COLLECTION_CAS_CONFLICT" });
+  await apply(8);
+  assert.equal((await apply(8)).appliedChanges, 0);
+  await assert.rejects(() => apply(8, "upsert", "write-state", { synthetic: false }), { code: "POSTGRES_PRIMARY_COLLECTION_VERSION_CONFLICT" });
+  await apply(9, "delete");
+  await assert.rejects(() => apply(1), { code: "POSTGRES_PRIMARY_COLLECTION_CAS_CONFLICT" });
+  await assert.rejects(() => apply(9), { code: "POSTGRES_PRIMARY_COLLECTION_VERSION_CONFLICT" });
+  await apply(10);
+  assert.equal(driver.snapshot().collections[0].sourceVersion, 10);
+  assert.equal(driver.snapshot().collections[0].deleted, false);
+});
 
 test("PostgreSQL primary storage mode is explicit, fail-closed and credential-safe", () => {
   const disabled = buildPostgresPrimaryStorageConfig({});

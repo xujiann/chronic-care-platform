@@ -2,7 +2,11 @@
 
 > 状态层权威：当前基线、目标状态、差距任务和验收证据统一登记在 `config/lifecycle-governance.json#maps`；正文继续只陈述 AS-IS 事实。
 
-## 提交凭证第一切片（2026-09-21，实施中）
+## 提交凭证第一切片（2026-09-21，代码已集成）
+
+第一切片由 PR #309 合入 main@6e5ba723，冻结 e4a8d6b3 与合并文件树一致；PR CI35559351287/main CI35560034738 各九项成功，Pages35560034708 成功。仅关闭已交付代码任务；OPS-042 的运行能力仍保留观测和外部证据缺口，不晋升生产。
+
+后续 OPS-043 已独立准入，仅实施严格凭证、完整重放绑定及普通首版本 0/1 兼容，已实现并进入专项与独立审查验证；无 DDL、relay/checkpoint 或服务端接线。旧真实 PostgreSQL CI 只覆盖 auth/shadow，不作为 primary 重放证据。
 
 新增 v18 与未接线的库级 receipt 组件不关闭真实源库历史凭证缺口、relay/目标身份/checkpoint/重放严格比较或20集合迁移风险。旧请求仍不生成 receipt，真实数据迁移、生产、容量、灾备和现场签署保持阻断。
 
@@ -197,7 +201,7 @@ T00 机器登记完成后，`production-release-scope` 中 17 个仓库内 API �
 | TEST-005 | 2026-09-08 | 本地/CI 统一 Playwright Chromium；在线根 60 项与居民 13 项继续阻止 Service Worker；PWA 3 项使用独立允许策略、动态端口和临时数据；新增 Pages 构建产物的 8 个入口、仓库子路径、静态登录、404 边界和 7 个管理页面左侧导航直接覆盖；Go/No-Go 与治理中心覆盖责任属性和恶意响应可信渲染 | 76 项唯一并集/漂移测试、居民同文件 13/13、PWA 重复 9/9、完整标准 E2E；不得把仓库浏览器测试解释为真实 HTTPS、托管安全头或现场验收 |
 | TEST-008 | 2026-09-08 | 专用 PWA/Service Worker E2E 验证居民登录后安装、v62→v63 激活清理并覆盖更早缓存、受控 update、离线 mobile/citizen 回退、API/源快照 404 缓存边界与逐项注销/清缓存 | 真实 HTTPS 终止、OS 安装提示/策略、浏览器设备矩阵、外部 Origin、现场缓存升级与独立安全验收继续外置；仓库测试不产生生产 GO |
 | GOV-001 | 2026-08-23 | `main`/`origin/main` 成为唯一当前集成与默认开发基线；固定 governance tag 仅作可复现证据，旧日期化 workflow 原文冻结 | process plan/verify 默认值、manifest/AGENTS/iteration program 漂移和 CI 目标分支负向测试 |
-| DOC-001 | 2026-08-24 | 关闭时为 267 份；当前 287 份 Markdown 以路径和 ADR 台账唯一分类为 217 current、68 snapshot、2 superseded；不删除历史证据 | 闭集路径/分类摘要、规则重叠、ADR status、当前事实和 snapshot 内容聚合摘要失败关闭 |
+| DOC-001 | 2026-08-24 | 关闭时为 267 份；当前 288 份 Markdown 以路径和 ADR 台账唯一分类为 218 current、68 snapshot、2 superseded；不删除历史证据 | 闭集路径/分类摘要、规则重叠、ADR status、当前事实和 snapshot 内容聚合摘要失败关闭 |
 | REPO-001 | 2026-08-23 | 3 个跟踪 PDF 均登记 SHA-256、大小、页数、引入提交、来源、保留理由和真实 generator 可用性；二进制本体未修改 | exact tracked inventory、digest/size/page/source 漂移负向测试；替换前必须补可复现生成源，禁止手工编辑 |
 
 ## 重复、死代码和命名结论
