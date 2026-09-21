@@ -1,6 +1,7 @@
 "use strict";
 
 const { createHash } = require("node:crypto");
+const { createSqliteOutboxCommitReceiptSchema } = require("./sqlite-outbox-commit-receipt");
 const { createSqliteSessionSchema } = require("../../../session-store");
 const {
   auditDeliverySourceMigrationFingerprintDependencies,
@@ -600,6 +601,14 @@ const MIGRATION_DEFINITIONS = [
     apply(db) {
       createObjectStorageDurableSchema(db);
       backfillObjectStorageFromLegacyCollection(db);
+    }
+  },
+  {
+    version: 18,
+    name: "add immutable PostgreSQL outbox commit receipts",
+    fingerprintDependencies: [createSqliteOutboxCommitReceiptSchema],
+    apply(db) {
+      createSqliteOutboxCommitReceiptSchema(db);
     }
   }
 ].map((migration) => ({ ...migration, owner: MIGRATION_OWNER }));

@@ -107,8 +107,8 @@ test("v17 backfills every legacy attachment, records a digest reconciliation, an
     installLegacyCollection(db, [legacyAttachment("att-a"), legacyAttachment("att-b")]);
     const result = applySqliteMigrations(db);
 
-    assert.equal(result.head, 17);
-    assert.equal(result.applied, 1);
+    assert.equal(result.head, SQLITE_SCHEMA_HEAD);
+    assert.equal(result.applied, SQLITE_SCHEMA_HEAD - 16);
     assert.equal(db.prepare("SELECT COUNT(*) AS count FROM secure_attachment_records").get().count, 2);
     const reconciliation = db.prepare("SELECT * FROM object_storage_reconciliation_cases WHERE case_id='object-storage-v17-backfill'").get();
     assert.equal(reconciliation.status, "resolved");

@@ -3,7 +3,7 @@
 const assert = require("node:assert/strict");
 const test = require("node:test");
 const { DatabaseSync } = require("node:sqlite");
-const { applySqliteMigrations } = require("../src/platform/storage/sqlite-migrations");
+const { applySqliteMigrations, SQLITE_SCHEMA_HEAD } = require("../src/platform/storage/sqlite-migrations");
 const {
   appendFollowupDispatchOutboxChanges,
   createSqliteFollowupDispatchRepository,
@@ -67,7 +67,7 @@ test("v16 hook enqueues atomically, is idempotent, and rejects immutable event d
   }
 });
 
-test("v15 history upgrades through v17 without fabricating delivery evidence", () => {
+test("v15 history upgrades to the current head without fabricating delivery evidence", () => {
   const db = new DatabaseSync(":memory:");
   try {
     db.exec("PRAGMA foreign_keys = ON");
@@ -77,7 +77,8 @@ test("v15 history upgrades through v17 without fabricating delivery evidence", (
       .run(JSON.stringify(state(legacyPublished).followups), T0);
     const upgraded = applySqliteMigrations(db);
     const row = db.prepare("SELECT status, receipt_sha256 FROM chronic_followup_dispatch_outbox WHERE event_id = ?").get(legacyPublished.id);
-    assert.equal(upgraded.applied, 2);
+    assert.equal(upgraded.head, SQLITE_SCHEMA_HEAD);
+    assert.equal(upgraded.applied, SQLITE_SCHEMA_HEAD - 15);
     assert.equal(row.status, "pending");
     assert.equal(row.receipt_sha256, null);
     assert.equal(applySqliteMigrations(db).applied, 0);

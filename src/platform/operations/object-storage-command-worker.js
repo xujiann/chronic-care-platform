@@ -2,6 +2,7 @@
 
 const { attachWorkerObservability } = require("./worker-observability-contract");
 const { sha256 } = require("../storage/object-storage-durable");
+const { SQLITE_MIGRATIONS, validateSqliteMigrationRegistry } = require("../storage/sqlite-migrations");
 
 const WORKER_CONTRACT = "object-storage-command-worker.v2";
 
@@ -164,8 +165,13 @@ async function runObjectStorageCommandWorker(options = {}) {
 }
 
 function inspectObjectStorageWorkerReadiness(env = process.env, options = {}) {
+  // This is a repository preflight, not evidence that a live database was upgraded.
+  const registry = validateSqliteMigrationRegistry();
+  const objectStorageMigration = SQLITE_MIGRATIONS.find((item) => item.version === 17);
   const checks = Object.freeze([
-    Object.freeze({ id: "sqlite-v17", passed: options.sqliteHead === 17, detail: `schema head ${options.sqliteHead || "missing"}` }),
+    Object.freeze({ id: "sqlite-v17", passed: options.sqliteHead === registry.head
+      && objectStorageMigration?.name === "add durable object storage metadata and command track",
+    detail: `repository schema head ${options.sqliteHead || "missing"}; registered head ${registry.head}` }),
     Object.freeze({ id: "worker-identity", passed: Boolean(String(env.OBJECT_STORAGE_COMMAND_WORKER_ID || "").trim()), detail: "worker identity reference required" }),
     Object.freeze({ id: "cursor-signing", passed: String(env.OBJECT_STORAGE_CURSOR_SIGNING_SECRET || "").length >= 32, detail: "cursor signing secret reference required" }),
     Object.freeze({ id: "gateway-contract", passed: options.gatewayConfigured === true, detail: "v1 signed gateway contract required" }),

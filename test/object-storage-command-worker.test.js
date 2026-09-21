@@ -2,6 +2,9 @@
 
 const assert = require("node:assert/strict");
 const test = require("node:test");
+const { DatabaseSync } = require("node:sqlite");
+const { SQLITE_SCHEMA_HEAD, SQLITE_MIGRATIONS, applySqliteMigrations } = require("../src/platform/storage/sqlite-migrations");
+const { openRepository } = require("../scripts/object-storage-command-worker");
 const {
   inspectObjectStorageWorkerReadiness,
   runObjectStorageCommandWorker
@@ -149,7 +152,7 @@ test("worker readiness remains NO-GO until external provider capability and site
     OBJECT_STORAGE_COMMAND_WORKER_ID: "worker-1",
     OBJECT_STORAGE_CURSOR_SIGNING_SECRET: "cursor-secret-012345678901234567890123"
   }, {
-    sqliteHead: 17,
+    sqliteHead: SQLITE_SCHEMA_HEAD,
     gatewayConfigured: true,
     providerStatusCapabilityVerified: false,
     externalEvidenceVerified: false,
@@ -159,4 +162,26 @@ test("worker readiness remains NO-GO until external provider capability and site
   assert.equal(report.productionReady, false);
   assert.equal(report.checks.find((item) => item.id === "provider-status-capability").passed, false);
   assert.equal(report.checks.find((item) => item.id === "site-evidence").passed, false);
+});
+
+test("worker accepts the current registry only and verifies the durable v17 ledger on upgrade", () => {
+  for (const sqliteHead of [16, SQLITE_SCHEMA_HEAD + 1, String(SQLITE_SCHEMA_HEAD)]) {
+    const report = inspectObjectStorageWorkerReadiness({}, { sqliteHead });
+    assert.equal(report.checks.find((item) => item.id === "sqlite-v17").passed, false);
+    assert.equal(report.productionReady, false);
+  }
+  const db = new DatabaseSync(":memory:");
+  try {
+    applySqliteMigrations(db, { targetVersion: 17 });
+    const original = db.prepare("SELECT checksum FROM schema_migrations WHERE version=17").get().checksum;
+    const opened = openRepository({}, {}, { db });
+    assert.equal(opened.db, db);
+    assert.equal(db.prepare("SELECT MAX(version) AS head FROM schema_migrations").get().head, SQLITE_SCHEMA_HEAD);
+    assert.equal(original, SQLITE_MIGRATIONS.find((item) => item.version === 17).contentFingerprint);
+    assert.equal(db.prepare("SELECT checksum FROM schema_migrations WHERE version=17").get().checksum, original);
+    db.prepare("UPDATE schema_migrations SET checksum=? WHERE version=17").run("0".repeat(64));
+    assert.throws(() => openRepository({}, {}, { db }), /checksum mismatch/);
+  } finally {
+    db.close();
+  }
 });

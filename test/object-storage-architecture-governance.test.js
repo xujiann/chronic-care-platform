@@ -3,6 +3,7 @@
 const assert = require("node:assert/strict");
 const test = require("node:test");
 const governance = require("../scripts/object-storage-architecture-governance");
+const { SQLITE_SCHEMA_HEAD } = require("../src/platform/storage/sqlite-migrations");
 
 function cloneRepositoryState() {
   const state = governance.readRepositoryState();
@@ -19,7 +20,7 @@ test("Accepted object storage decision authorizes repository implementation but 
   assert.equal(report.status, "accepted-not-production-ready");
   assert.equal(report.implementationAuthorized, true);
   assert.equal(report.productionReady, false);
-  assert.equal(report.summary.sqliteHead, 17);
+  assert.equal(report.summary.sqliteHead, SQLITE_SCHEMA_HEAD);
   assert.equal(report.summary.reservedSqliteMigrationVersion, 17);
   assert.equal(report.summary.actions, governance.REQUIRED_ACTION_IDS.length);
   assert.equal(report.summary.unresolvedHumanDecisions, 0);
@@ -84,6 +85,13 @@ test("v17 application and action coverage are governed", () => {
   let report = governance.buildGovernanceReport(headDrift);
   assert.equal(report.ok, false);
   assert.equal(failed(report, "objectStorageDecision:v17Applied"), true);
+
+  const futureHead = cloneRepositoryState();
+  futureHead.sqliteHead = SQLITE_SCHEMA_HEAD + 1;
+  assert.equal(failed(governance.buildGovernanceReport(futureHead), "objectStorageDecision:v17Applied"), true);
+  const reassignedReservation = cloneRepositoryState();
+  reassignedReservation.register.decision.reservedSqliteMigrationVersion = SQLITE_SCHEMA_HEAD + 1;
+  assert.equal(failed(governance.buildGovernanceReport(reassignedReservation), "objectStorageDecision:v17Applied"), true);
 
   const incomplete = cloneRepositoryState();
   incomplete.register.actions.pop();
