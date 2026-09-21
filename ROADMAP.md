@@ -1,5 +1,27 @@
 # 工程治理路线图
 
+## T02 数据质量问题集合 PostgreSQL 迁移样本 PLAN（2026-09-19，已准入只读首切片）
+
+> 2026-09-20 准入与实现边界：用户批准按 T02/T09/T00 单写者范围实施。复核发现 `loadPendingPostgresSyncBatches` 未返回 outbox 序号或可验证事务 ID，而现有 PostgreSQL 主存储合同要求两者；不得由 batch ID 或测试值伪造提交凭证。本轮先由 OPS-041/T02 交付纯只读、合成数据的源/批次/目标精确核验与失败关闭负测，T00 登记任务并组合测试；T09 路由不变。真实 relay、SQLite schema/migration、worker 和本地执行授权等待独立 Accepted ADR 与专项任务，六域生产 NO-GO 不变。
+
+- 基线与事实：`origin/main@b54c9a6c` 已集成 PR #307；GOV-013/GOV-014 的本地事实收口已作为独立提交组合进本候选，不作为迁移执行证据。首发组合把 `dataQualityIssues` 归于 T02 `platform-governance`、`internal`、`wave-first-release-platform`，目前仅 `repository-plan-ready`。`localExecutionAuthorized=false`、`productionCutoverAuthorized=false`、`productionWriteAllowed=false` 与六域 `NO-GO` 不变。
+- 目标：以一个真实有写入口的集合证明“已提交 SQLite 事实 → 独立 worker/outbox → PostgreSQL 影子集合状态 → 精确核对 → 独立回滚演练”的可重复样本；只将仓库合同和受控本地演练能力推进，不把样本结果推广为 20 个集合或生产切换证据。正常、重复、版本冲突、失联/中断、部分批次失败、核对不符和恢复路径均须可测。
+- 现状与单写者：真实 POST `/api/data-quality/issues/:id/actions` 位于 T09 所有的 `src/http/routes/shared.js:815`，调用 `readDatabase`/`writeDatabase` 并把覆盖项限制在 300 条；它读取 `buildDataQualityIssues` 派生视图，不能把 300 条覆盖项误当全部源数据。T02 拥有集合语义与迁移映射，T09 只拥有兼容路由，T00 独占迁移组合、生命周期登记和集成。第一实施切片不改路由或 `server.js`，不变更请求路径写入语义；若发现现有 SQLite 事务 outbox 不承载本集合完整版本/提交凭证，先停在合同与负测，另立 T09/T00 handoff，不补请求路径双写。
+- 方案：优先复用现有 `health_platform.primary_collection_state`、PostgreSQL 主存储 CAS/批次幂等合同和 `outbox-shadow-then-cutover` 波次，不建第二事实源、新业务表或新依赖。T02 先提供仅接受合成数据的确定性集合提取、版本/摘要与失败关闭测试；T00 对接现有 worker、checkpoint、精确计数/摘要和切回评估。任何真实数据导入、worker 激活或环境切换均不属于此授权。
+- 决策与风险：Accepted 的首发组合 ADR 只批准 metadata-only 计划，未批准执行；本样本若需改变数据权威源、事务 outbox、schema 或本地执行授权，必须先形成专门 Accepted ADR 和任务总账审批。敏感数据不进仓库；执行证据须用受控引用及 SHA-256，不能以测试伪造现场签名。不得用覆盖项的 300 条上限掩盖丢失、重复或摘要不一致。
+- 拟议写范围：T00 独占 `config/lifecycle-governance.json`、`ROADMAP.md`、迁移组合/门禁配置及六图；T02 独占其领域迁移适配模块和专项测试；T09 仅在后续明确批准兼容入口改造时独占 `src/http/routes/shared.js`。每个切片先登记 requirement、依赖、风险、验收、writeScopes、回滚及测试，保持 WIP≤5；不同 owner 不共写同一文件。
+- 测试与验收：先执行集合合同、现有迁移执行/PG 驱动及负向专项，核实空库、升级、重跑、失败、CAS、schema 指纹、核对与回滚；集成前依序运行 `process:verify`、routes/architecture/process/iterations、build、lint、typecheck、unit、integration、smoke、legacy `test:all` 和真实环境允许的 PG 门禁。独立审查通过后冻结 SHA，再 PR/CI；真实 PG、容量、多实例、灾备和现场签署缺一项就保持生产 `NO-GO`。
+- 回滚：仓库切片可按独立提交回退适配与合同；演练环境只能停 worker、保存 checkpoint/批次账本、核对源与影子状态并依受控回滚手册切回，禁止删除源事实、outbox 或审计。未完成可验证恢复前，不晋级 `local-candidate`。
+- 非目标：不推送/合并此 PLAN，不迁移真实数据，不启用生产 worker、PostgreSQL 主读/主写、请求路径双写或自动上线；对其余 19 个持久化引用不作已完成声明。
+## GOV-013 / GOV-014 远端集成事实收口 PLAN（2026-09-19）
+
+- 准入来源：用户在上一轮批准完成后推送、合并；PR #307 已于 2026-09-19 按保护规则 squash 合并。本轮“继续开发”按已提出的执行顺序先完成 T00 事实收口，唯一主线 `origin/main@b54c9a6c`，独立 `process/t00-access-ack-closeout-20260919` 工作树，工作区干净、无开放 PR。
+- 目标与选择：只将已发生的独立审查、冻结本地 18 项门禁、PR CI 九项和 main CI/Pages 结果如实写回机器台账及六张当前地图。选用 GOV-013 既有中央单写范围，关闭纯治理任务 GOV-013/GOV-014；OPS-040/SEC-016 仅补集成引用并保留“验证中/已实现”与运行观测缺口。其余方案（借本次合并把运行能力标为生产已验证，或重写历史阶段记录）均与现有证据不符。
+- 范围：`config/lifecycle-governance.json`、`ROADMAP.md` 及六张当前 AS-IS 地图。不得改业务源码、验证器、API 合同、schema、依赖、CI、生产状态或历史快照；本轮不推送、合并或上线，后续远端动作另按授权与门禁执行。
+- 证据：冻结 `a35faf4f9e8e29f5f376dc33bf338edf60768cc5`，PR #307 的 CI `35433532188` 九项成功，合并提交 `b54c9a6cdca44381968f9e763e0317f119a5309d` 与冻结 tree `f832c3236cebc487a01a4a0433acd72544193892` 一致；main CI `35434027307`、自动 Pages `35434027259` 成功。完整本地全量 3569 通过/1 项真实 PG 环境跳过，E2E 76/76。自动 Pages 仅是静态演示发布。
+- 验收：生命周期引用与 WIP/地图 gap 对账、文档当前事实一致、仓库文档治理和所有权检查通过；独立 diff 审查无 P0–P2，冻结后按元数据变更风险运行中央门禁。不得把已合并运行时旧提交的重型测试归属伪装为本次元数据提交重新执行。回滚仅撤销元数据收口，不删除居民声明或审计历史。
+- 保留：生产六域 NO-GO；高风险 API 目录条目、长期留存、2000 条容量、真实 PostgreSQL、多实例、现场签署及完整运行观测仍需后续范围。`GOV-013/GOV-014` 纯治理完成不关闭 `OPS-040/SEC-016` 运行能力。
+
 ## GOV-014 访问知晓声明证据登记 PLAN（2026-09-16）
 
 - 用户批准本轮证据登记、测试及完成后的推送/PR/条件合并（USER-APPROVED-ACK-EVIDENCE-INTEGRATION-2026-09-16）；不授权上线、生产激活或保护规则例外。主线新鲜核验为 origin/main@cb8f37e0，无开放 PR；既有功能冻结候选为 078840ba，11 个本地提交尚未集成。

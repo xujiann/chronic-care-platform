@@ -4,6 +4,8 @@
 
 ## 访问知晓声明首切片（2026-09-14）
 
+2026-09-19 当前集成事实：访问知晓声明与 GOV-014 行为合同已由 [PR #307](https://github.com/xujiann/chronic-care-platform/pull/307) 合入 `main@b54c9a6c`，合并树与冻结候选 `a35faf4f` 一致；独立审查、本地 18 项串行门禁、PR CI 九项及 main CI 均通过，自动 Pages 成功。纯治理 GOV-013/GOV-014 已集成；运行能力 OPS-040/SEC-016 仍为验证中/已实现，保留观测、真实 PostgreSQL/多实例及现场证据缺口，生产六域继续 `NO-GO`。下段 2026-09-16 文字为历史实施阶段记录。
+
 2026-09-16 状态更新：下段为首切片实施阶段记录。冻结提交 `078840ba` 已经独立复审及 18 项本地串行门禁通过；本轮 GOV-014 仅补幂等行为目录证据，新的冻结验证与远端 CI 尚待执行。用户现授权通过门禁后的推送与条件合并，不授权生产上线；原运行观测和外部证据缺口不关闭。
 
 访问声明依赖：T04 薄路由 → access-acknowledgement-command → T01 resident-access-event-query / audit-chain 与 T00 专属原始状态适配 → 既有 SQLite CAS/append-only hook 或非生产单进程 JSON 原子替换。原始审计 Owner 不迁移；没有请求路径外部双写。GOV-013 仅文档准入，OPS-040/SEC-016 是独立高风险联合交付任务，最终冻结测试待完成。
