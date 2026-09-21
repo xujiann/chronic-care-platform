@@ -1,5 +1,16 @@
 # 工程治理路线图
 
+## 提交凭证第一切片 PLAN（2026-09-21）
+
+- 准入：用户回复“按照建议执行”。先前只读样本已由 PR #308 合并为 `70521f29`，与冻结 `17df11d7` 文件树一致；独立复审、本地必需门禁和 PR CI `35555853638` 九项成功。合并后 main CI `35556532283` 九项成功，自动 Pages `35556532287` 成功。GOV-015/OPS-041 仅关闭已交付的只读切片，不关闭真实迁移或生产门禁。
+- 目标：按 Accepted ADR `2026-09-21-sqlite-outbox-commit-receipt.md` 第 1 切片建立原子 receipt、受控单批次事务包装器及全部投递状态的只读装载器；从最新 `origin/main@70521f29` 独立工作树开始，源码尚未实施。ADR 后续 relay/checkpoint/目标绑定及主存储重放切片仍未准入。
+- 决策：复用既有 outbox 的完整批次和原摘要链，不从 batch ID 推导事务标识、不补造历史凭证。SQLite head 当前为 17，实施前重验最新 head 与预留后追加顺序版本，历史 migration/checksum 不变。普通旧请求路径不自动生成 receipt。
+- 四角色与单写范围：协调者独占 GOV-016 的中央总账、ROADMAP、ADR/索引、文档治理配置及六图。OPS-042 为明确编号的 T00 技术存储任务，不承载领域业务：开发 A 独占新 `src/platform/storage/sqlite-outbox-commit-receipt.js`；开发 B 独占新 receipt 测试与 `test/sqlite-migration-governance.test.js`；协调者独占 migration 注册表、`DATABASE_SCHEMA.md`、两处 object-storage head 兼容检查及对应测试。独立审查者只读。完整文件闭集见总账 writeScopes，WIP 4/5；新增文件测试登记在文件建立时同步补齐，不预称已存在。
+- 必要兼容：对象存储 worker/架构治理不能继续强制当前 head 等于 17；必须验证原 v17 已应用且指纹正确，并保留完整迁移校验，不能仅改成 `head >= 17`。保留 `reservedSqliteMigrationVersion=17`、原 worker 权限、原生产禁止状态。未来非法版本测试探针改用 head+1。
+- 验收：真实正式迁移文件库验证空库、v17升级、重跑、指纹、部分失败；两个连接证明业务/outbox/receipt/storage event 同时提交可见；各写步骤 SQL 故障注入全部回滚。拒绝嵌套、既有批次补证及调用者事务 ID；loader 独立只读一致快照、outbox LEFT JOIN receipt、读取 pending/retry/delivered/failed；历史缺证停止，严格 UUID/安全整数/摘要/UTC毫秒时间/未知字段、完整 envelope/changes 和链后继验证，允许有链证明的序号空隙。
+- 测试顺序：专项开发负测 → 独立审查 → 冻结 SHA → 串行 build、lint、typecheck、unit、integration、smoke、legacy test:all 及 process/routes/architecture/iterations/文档治理；既有远端真实 PG/E2E 门禁保留。按已授权保护流程推送、PR、精确 CI 后合并，不启用自动合并或绕过保护。
+- 非目标与回滚：不改 server.js、T09路由、旧 worker投递目标/状态、主存储replay/checkpoint、依赖或生产配置；不迁移真实数据、不启用worker/主库。停止新增调用方并保留 receipt/outbox和业务事实，不自动DROP；已升级库不得直接交旧runtime，恢复通过受控前滚修复或备份恢复。真实PG、多实例、容量、灾备、现场签署和六域NO-GO不因库级测试关闭。
+
 ## T02 数据质量问题集合 PostgreSQL 迁移样本 PLAN（2026-09-19，已准入只读首切片）
 
 > 2026-09-20 准入与实现边界：用户批准按 T02/T09/T00 单写者范围实施。复核发现 `loadPendingPostgresSyncBatches` 未返回 outbox 序号或可验证事务 ID，而现有 PostgreSQL 主存储合同要求两者；不得由 batch ID 或测试值伪造提交凭证。本轮先由 OPS-041/T02 交付纯只读、合成数据的源/批次/目标精确核验与失败关闭负测，T00 登记任务并组合测试；T09 路由不变。真实 relay、SQLite schema/migration、worker 和本地执行授权等待独立 Accepted ADR 与专项任务，六域生产 NO-GO 不变。
@@ -141,7 +152,7 @@
 | 12 | 对象存储结构化元数据与耐久命令轨道 | Accepted OBJ-ADR-002；T08 data owner、T00 technical owner、v1/v2 兼容策略、SQLite v17、回填冻结、异步 API、fenced worker、keyset 分页和持久 reconcile 的仓库实现均已完成，production promotion=false / P1 | 真实 provider status/abort capability、KMS/WORM/扫描、容量、备份、监控和现场验收继续 NO-GO；不得把仓库实现完成解释为 worker 已现场激活或生产晋级 |
 | 13 | 严格生产预检证据信任装配 | Accepted ADR；T00 pinned-anchor/Ed25519 双角色 provider、CLI 自动装配、deployment package/env/CI 和负向矩阵已形成 / P0 | 真实 anchor/envelope、独立 signer、权限/轮换、外部 evidence 与现场执行继续由生产环境提供；provider 成功不替代完整 preflight 或最终人类授权 |
 | 14 | 生产切换行动证据与受保护晋级 | Accepted ADR；definitions-only v2、14/14 共享 Ed25519 验证、strict preflight 门禁、main/manual/production/self-hosted workflow 与 digest-only receipt 已形成 / P0 | GitHub production environment reviewers、专用 runner、真实 14 份 envelope、受控路径、外部审批和实际部署/现场签收继续 NO-GO；receipt 只证明预检资格 |
-| 15 | 当前工作流、Markdown 与跟踪 PDF 闭集治理 | GOV-001、DOC-001、REPO-001 仓库内缺口已关闭：开发默认 `origin/main`，固定 tag 仅作证据；286 份 Markdown 唯一分类；3 个 PDF 绑定来源与 digest / P2 | snapshot/superseded 保持只读；新增文档同步清单。两个历史 PDF 与一个现行校验 PDF 均无跟踪生成器，替换前必须先补可复现生成源，不得手工编辑 |
+| 15 | 当前工作流、Markdown 与跟踪 PDF 闭集治理 | GOV-001、DOC-001、REPO-001 仓库内缺口已关闭：开发默认 `origin/main`，固定 tag 仅作证据；287 份 Markdown 唯一分类；3 个 PDF 绑定来源与 digest / P2 | snapshot/superseded 保持只读；新增文档同步清单。两个历史 PDF 与一个现行校验 PDF 均无跟踪生成器，替换前必须先补可复现生成源，不得手工编辑 |
 | 16 | 首批生产范围机器冻结 | Accepted ADR；`priority-eight-applications-v1` 冻结 8 应用、9 页面、32 API、38 数据引用、7 worker、14 外部依赖、16 应用证据与 14 切换动作；API/Owner 复核归零。新增迁移闭集把 21 个受阻引用分为 20 个唯一持久化计划与 1 个派生读模型，`collectionRepositoryPlanMissing=0` / P0 | 仓库计划完整不代表迁移完成；21 个引用仍无生产写资格，全部 API/数据晋级、真实外部证据、worker 激活、PG 主切换和现场验收继续 NO-GO |
 | 17 | 招标需求治理 v2 | Accepted ADR；2 份中性样本文档、5 条候选、27 个能力 ID、受控 PDF 指纹导入、人工复核覆盖层、差距分析与产品化工作台已形成 / P0 | 原始文件、全文、浏览器上传、OCR/模型、自动改代码和生产授权均不在首批范围；复核写入口保持行为证据待补与生产 NO-GO |
 
