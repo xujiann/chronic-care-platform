@@ -6,7 +6,7 @@
 
 第一切片由 PR #309 合入 main@6e5ba723，冻结 e4a8d6b3 与合并文件树一致；PR CI35559351287/main CI35560034738 各九项成功，Pages35560034708 成功。仅关闭已交付代码任务；OPS-042 的运行能力仍保留观测和外部证据缺口，不晋升生产。
 
-后续 OPS-043 已独立准入，仅实施严格凭证、完整重放绑定及普通首版本 0/1 兼容，已实现并进入专项与独立审查验证；无 DDL、relay/checkpoint 或服务端接线。旧真实 PostgreSQL CI 只覆盖 auth/shadow，不作为 primary 重放证据。
+OPS-043 限定代码切片已由 PR #310 合并（main `85bfde7a`，冻结 `b3b6d8a8`，代码树一致），严格凭证、完整重放绑定及普通首版本 0/1 兼容已交付；PR/main CI 各九项及 Pages 成功。任务收尾不晋升运行能力，OPS-043 保持“已实现”，可观测性与真实环境证据仍缺；无 DDL、relay/checkpoint 或服务端接线。旧真实 PostgreSQL CI 只覆盖 auth/shadow，不作为 primary 重放证据。
 
 新增 SQLite v18 receipt 结构与未接线的合成库事务/只读装载组件；旧业务入口及旧 worker 仍使用原调用链，不自动生成凭证。全局 schema head 为 18，生产六域 NO-GO 不变。
 
