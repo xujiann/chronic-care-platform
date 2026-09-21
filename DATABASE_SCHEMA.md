@@ -44,6 +44,8 @@ v18 `add immutable PostgreSQL outbox commit receipts`：仅追加 `postgres_sync
 
 ## 3. PostgreSQL 台账
 
+2026-09-21 OPS-043 仅加固既有 primary_storage_batches 字段的严格输入与重放比较，以及普通空集合的首版本 0/1 兼容；不改 SQLite head 18、PG 表/列/索引/约束或迁移。committed_at 的亚毫秒历史差异须拒绝而不是在 Date 投影中丢失；历史不合规记录不自动补证/修复，源目标绑定与 checkpoint 仍未实施。
+
 | 文件 | Schema 责任 |
 |---|---|
 | `deploy/postgres-primary-storage-schema.sql` | collection 主存储 batch/state |

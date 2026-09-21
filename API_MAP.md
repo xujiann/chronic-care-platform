@@ -2,7 +2,11 @@
 
 > 状态层权威：当前基线、目标状态、差距任务和验收证据统一登记在 `config/lifecycle-governance.json#maps`；正文继续只陈述 AS-IS 事实。
 
-## 提交凭证第一切片（2026-09-21，实施中）
+## 提交凭证第一切片（2026-09-21，代码已集成）
+
+第一切片由 PR #309 合入 main@6e5ba723，冻结 e4a8d6b3 与合并文件树一致；PR CI35559351287/main CI35560034738 各九项成功，Pages35560034708 成功。仅关闭已交付代码任务；OPS-042 的运行能力仍保留观测和外部证据缺口，不晋升生产。
+
+后续 OPS-043 已独立准入，仅实施严格凭证、完整重放绑定及普通首版本 0/1 兼容，当前等待实现与验证；无 DDL、relay/checkpoint 或服务端接线。旧真实 PostgreSQL CI 只覆盖 auth/shadow，不作为 primary 重放证据。
 
 本切片不增加或改变 HTTP API。仅 schemaVersion 的既有元数据值从注册表派生为 18；receipt wrapper 和 loader 未接入 HTTP/server，不能解释为写入口已支持新凭证或 PostgreSQL 主存储。
 

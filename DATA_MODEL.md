@@ -2,7 +2,11 @@
 
 > 状态层权威：当前基线、目标状态、差距任务和验收证据统一登记在 `config/lifecycle-governance.json#maps`；正文继续只陈述 AS-IS 事实。
 
-## 提交凭证第一切片（2026-09-21，实施中）
+## 提交凭证第一切片（2026-09-21，代码已集成）
+
+第一切片由 PR #309 合入 main@6e5ba723，冻结 e4a8d6b3 与合并文件树一致；PR CI35559351287/main CI35560034738 各九项成功，Pages35560034708 成功。仅关闭已交付代码任务；OPS-042 的运行能力仍保留观测和外部证据缺口，不晋升生产。
+
+后续 OPS-043 已独立准入，仅实施严格凭证、完整重放绑定及普通首版本 0/1 兼容，当前等待实现与验证；无 DDL、relay/checkpoint 或服务端接线。旧真实 PostgreSQL CI 只覆盖 auth/shadow，不作为 primary 重放证据。
 
 v18 新表只存 outbox_sequence、batch_id、source_transaction_id、recorded_at 和两个摘要；UUID 在 BEGIN 后生成，业务/upsert、outbox、receipt、storage event 原子提交。历史不补证；记录时间不是精确 COMMIT 时刻。loader 核验完整原始批次与链，旧 delivered/failed 也读取，但不改变投递状态。
 

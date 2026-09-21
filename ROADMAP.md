@@ -1,5 +1,14 @@
 # 工程治理路线图
 
+## 重放合同加固 PLAN（2026-09-21）
+
+- 准入：用户批准限定范围；基线 origin/main@6e5ba723，工作树 process/t00-outbox-replay-contract-20260921。PR309 冻结 e4a8d6b3 与合并 tree 一致，PR CI35559351287/main CI35560034738 各九项及 Pages35560034708 成功；GOV-016/OPS-042 关闭已交付切片，不关闭生产缺口。
+- 目标与方案：按 ADR-OPS-043 加固六字段凭证、七字段精确重放与正式驱动无损时间校验；只对不存在集合兼容普通首版本 0/1，保留 expectedVersion=-1、已有 CAS 和 baseline 规则。不接 relay/checkpoint、不改 DDL/SQLite head/HTTP/worker/生产。
+- 单写者：开发 A 负责主合同、主合同测试及新增 SQLite receipt→内存主合同测试；开发 B 负责正式 driver 和其测试。协调者负责 GOV-017 治理与 OPS-043 接口/schema 文档；独立审查只读。精确路径见任务总账，先收口旧任务，WIP 4/5。
+- 验收：未知字段、getter、数字字符串、UUID/时间/摘要变体拒绝；七字段漂移均零写，规范 duplicate 不重复写集合或账本；真实 SQLite 生成首版本 1 证明，无手工事务 ID 冒充；首版本 0 与 baseline 兼容、后继 CAS、墓碑、SQL rollback 和亚毫秒漂移负测。
+- 测试与交付：专项→独立审查→冻结→串行 build/lint/typecheck/unit/integration/smoke/test:all、中央 process/routes/architecture/iterations/文档治理→保护 PR 与精确 CI→条件 squash 合并。旧真实 PG 门禁仅证明 auth/shadow，不能声称 primary 实测。
+- 回滚与风险：无数据迁移或 schema 变更，停止新增调用方并保留源/目标账本；不自动修复历史凭证，不用宽松比较绕过冲突。真实 PG primary、多实例、源目标绑定、checkpoint/relay、容量/灾备与现场准入继续外置，生产 NO-GO。
+
 ## 提交凭证第一切片 PLAN（2026-09-21）
 
 - 准入：用户回复“按照建议执行”。先前只读样本已由 PR #308 合并为 `70521f29`，与冻结 `17df11d7` 文件树一致；独立复审、本地必需门禁和 PR CI `35555853638` 九项成功。合并后 main CI `35556532283` 九项成功，自动 Pages `35556532287` 成功。GOV-015/OPS-041 仅关闭已交付的只读切片，不关闭真实迁移或生产门禁。
