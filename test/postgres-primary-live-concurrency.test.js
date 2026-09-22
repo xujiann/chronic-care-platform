@@ -3,8 +3,13 @@
 const assert = require("node:assert/strict");
 const test = require("node:test");
 const { createHash } = require("node:crypto");
+const { ADVISORY_LOCK_NAME } = require("../src/platform/storage/postgres-primary-driver");
 const { canonicalStringify } = require("../scripts/postgres-migration-package");
 const { createFixture, overlappingWriters } = require("./helpers/postgres-primary-live-fixture");
+
+// This direct lock probe remains in this file after extracting the overlap helper.
+// Validate its dependency even when local live cases are environment-skipped.
+assert.equal(ADVISORY_LOCK_NAME, "health-platform-postgres-primary-storage-v1");
 
 const applyOptions = (commitment) => ({ executionContext: "worker", commitment });
 
