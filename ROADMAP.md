@@ -2,6 +2,8 @@
 
 ## 真实 PostgreSQL 主存储验证 PLAN（2026-09-22）
 
+- 同轮收尾：PR #312 经独立审查、冻结本地串行门禁和 PR CI35689960332 九项成功，已保护 squash 合并为 `fbaab2a09ac170a3dfbee9114eafec86591a0d97`。冻结 `9cab86df9bf7b6123bb1012483259c89290f7ea8`、PR 合成提交及合并提交共享 tree `d497d2097abe5121ff563d6e7ad8c352460b7049`。真实 primary 专项 23pass/0fail/0skip/0cancel，清理钩子未报错（未单独做残留库盘点）。main CI35690591338 九项及 Pages35690591198 成功（Pages 仅静态演示）；main primary 同样 23/23 通过且零跳过。GOV-018/OPS-044 关闭限定测试交付、WIP 2/5；不晋升运行时或生产。本收尾仅总账、六图、路线图和合同事实同步，沿原单写范围独立复核、冻结并串行门禁，保护集成；不以 PR #312 的 CI 替代收尾提交证据。
+
 - 批准与基线：用户批准隔离合成 PostgreSQL primary 验证；origin/main@3474f43c，PR #311 已合并，精确 main CI35572286391 九项与 Pages35572286399 成功，无开放 PR。GOV-018/OPS-044 独立准入，WIP 4/5。
 - 范围：只增加真实驱动验证、测试夹具、环境拒绝负测、package 显式入口及既有 postgres-production-contract CI 作业内的串行步骤；复用现有 pg 依赖和未修改的正式 PG DDL，不变运行时/生产 schema/API/relay/checkpoint/生产激活。
 - 四角色：A 单写 test/helpers/postgres-primary-live-fixture.js 与 test/postgres-primary-live-contract.test.js；B 单写 test/postgres-primary-live-concurrency.test.js；协调者独占其余精确任务写范围和 CI；审查者只读。先登记再写，审查后冻结、重型门禁串行。
