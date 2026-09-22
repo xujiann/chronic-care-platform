@@ -112,6 +112,17 @@ test("PG identity partial metadata is not treated as an unmigrated legacy databa
   assert.equal(f.calls.some((sql) => sql.includes("-- OPS-045 v1")), false);
 });
 
+test("catalog constraint names use text arrays supported by the actual pg parser", async () => {
+  const { types } = require("pg");
+  assert.equal(typeof types.getTypeParser(1003)("{version}"), "string", "name[] has no default array parser");
+  assert.deepEqual(types.getTypeParser(1009)("{version}"), ["version"]);
+  const f = fixture();
+  await applyPostgresPrimaryIdentityMigrations(f.pool);
+  const query = f.calls.find((sql) => sql.includes("FROM pg_constraint"));
+  assert.match(query, /ARRAY\(SELECT a\.attname::text FROM unnest\(k\.conkey\)/);
+  assert.match(query, /ARRAY\(SELECT a\.attname::text FROM unnest\(k\.confkey\)/);
+});
+
 for (const [name, route, mutate] of [
   ["missing column", "FROM pg_class c JOIN pg_namespace", (rows) => rows.pop()],
   ["column type", "FROM pg_class c JOIN pg_namespace", (rows) => { rows[0].data_type = "bigint"; }],

@@ -41,11 +41,11 @@ async function verifyStructure(client) {
   })));
   if (JSON.stringify(columns) !== JSON.stringify(expectedColumns)) throw invalid();
   const constraints = (await client.query(`SELECT c.relname AS table_name,k.contype AS kind,
-    ARRAY(SELECT a.attname FROM unnest(k.conkey) WITH ORDINALITY u(num,ord)
+    ARRAY(SELECT a.attname::text FROM unnest(k.conkey) WITH ORDINALITY u(num,ord)
       JOIN pg_attribute a ON a.attrelid=k.conrelid AND a.attnum=u.num ORDER BY u.ord) AS columns,
     k.convalidated AS validated,k.condeferrable AS deferrable,k.condeferred AS deferred,
     pg_get_expr(k.conbin,k.conrelid) AS expression,r.relname AS reference_table,rn.nspname AS reference_schema,
-    ARRAY(SELECT a.attname FROM unnest(k.confkey) WITH ORDINALITY u(num,ord)
+    ARRAY(SELECT a.attname::text FROM unnest(k.confkey) WITH ORDINALITY u(num,ord)
       JOIN pg_attribute a ON a.attrelid=k.confrelid AND a.attnum=u.num ORDER BY u.ord) AS reference_columns,
     k.confupdtype AS update_action,k.confdeltype AS delete_action,k.confmatchtype AS match_type,
     COALESCE(i.indisvalid AND i.indisready AND i.indisunique,true) AS index_valid
