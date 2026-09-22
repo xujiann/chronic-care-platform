@@ -6,6 +6,31 @@ const { createHash, randomUUID } = require("node:crypto");
 const { DatabaseSync } = require("node:sqlite");
 const { buildCollectionChanges, enqueuePostgresSyncBatch, validatePostgresSyncBatch } = require("../../../postgres-runtime-sync");
 const { canonicalStringify } = require("../../../scripts/postgres-migration-package");
+const { readSqliteOutboxSourceIdentity } = require("./sqlite-outbox-source-identity");
+const brandedSources = new WeakMap();
+
+function deepFreeze(value) {
+  if (value && typeof value === "object") {
+    Object.values(value).forEach(deepFreeze);
+    Object.freeze(value);
+  }
+  return value;
+}
+
+function resolveBrandedSourceEnvelope(envelope) {
+  if (!envelope || !brandedSources.has(envelope)) {
+    const code = "SQLITE_OUTBOX_SOURCE_ENVELOPE_INVALID";
+    throw Object.assign(new Error(code), { code });
+  }
+  return brandedSources.get(envelope);
+}
+
+function checkGenesis(identity, all) {
+  if (!identity) return;
+  const first = all[0], genesis = identity.genesis;
+  insist(first ? genesis && genesis.outboxSequence === first.commitment.outboxSequence
+    && genesis.batchId === first.batch.batchId && genesis.chainHash === first.batch.chainHash : !genesis, "SOURCE_GENESIS_INVALID");
+}
 
 const MAX_ROWS = 1000;
 const MAX_BYTES = 1024 * 1024;
@@ -179,12 +204,20 @@ function scan(db) {
 }
 
 function safeError(error) {
-  return /^SQLITE_OUTBOX_RECEIPT_[A-Z_]+$/.test(error?.code || "") ? error : fail("STORAGE_FAILED");
+  return /^SQLITE_OUTBOX_(RECEIPT|SOURCE)_[A-Z_]+$/.test(error?.code || "") ? error : fail("STORAGE_FAILED");
 }
 
 // Partial upserts only: keys not listed in entries are retained, never deleted.
 // The synchronous wrapper owns BEGIN/COMMIT; callers cannot supply transaction IDs.
 function commitSqliteOutboxTransaction(db, input) {
+  return commitTransaction(db, input, false);
+}
+
+function commitSqliteBoundOutboxTransaction(db, input) {
+  return commitTransaction(db, input, true);
+}
+
+function commitTransaction(db, input, requireIdentity) {
   let begun = false;
   try {
     fields(input, ["entries", "expectedVersions", "sourceEvent"], "INVALID_INPUT");
@@ -209,7 +242,14 @@ function commitSqliteOutboxTransaction(db, input) {
     begun = true;
     const transactionId = randomUUID();
     const recordedAt = new Date().toISOString();
+    const identity = readSqliteOutboxSourceIdentity(db, { required: requireIdentity });
     const history = scan(db);
+    checkGenesis(identity, history);
+    if (identity && !identity.genesis) {
+      for (const table of ["state_collections", "storage_events"]) {
+        insist(!db.prepare(`SELECT 1 FROM ${table} LIMIT 1`).get(), "SOURCE_GENESIS_INVALID");
+      }
+    }
     const latest = new Map(history.flatMap(({ batch }) => batch.changes.map((change) => [change.collection, change])));
     const existing = [];
     const lookup = db.prepare("SELECT key, payload, version FROM state_collections WHERE key = ?");
@@ -253,6 +293,11 @@ function commitSqliteOutboxTransaction(db, input) {
       .run(randomUUID(), recordedAt, sourceEvent, "synthetic isolated outbox transaction persisted");
     const committed = scan(db).at(-1);
     insist(committed?.commitment.sourceTransactionId === transactionId);
+    if (identity && !identity.genesis) {
+      db.prepare("INSERT INTO source_genesis(singleton,source_instance_id,outbox_sequence,batch_id,chain_hash) VALUES(1,?,?,?,?)")
+        .run(identity.sourceInstanceId, row.sequence, batch.batchId, batch.chainHash);
+    }
+    checkGenesis(readSqliteOutboxSourceIdentity(db, { required: requireIdentity }), scan(db));
     db.exec("COMMIT");
     begun = false;
     return committed;
@@ -263,6 +308,14 @@ function commitSqliteOutboxTransaction(db, input) {
 }
 
 function loadCommittedSqliteOutboxBatches(sqliteFile, options = {}) {
+  return loadBatches(sqliteFile, options, false);
+}
+
+function loadBoundSqliteOutboxBatches(sqliteFile, options = {}) {
+  return loadBatches(sqliteFile, options, true);
+}
+
+function loadBatches(sqliteFile, options, requireIdentity) {
   let db;
   try {
     insist(text(sqliteFile, 4096) && object(options)
@@ -280,7 +333,9 @@ function loadCommittedSqliteOutboxBatches(sqliteFile, options = {}) {
     }
     db = new DatabaseSync(sqliteFile, { readOnly: true });
     db.exec("PRAGMA query_only = ON; BEGIN");
+    const identity = readSqliteOutboxSourceIdentity(db, { required: requireIdentity });
     const all = scan(db);
+    checkGenesis(identity, all);
     let start = 0;
     if (after !== null) {
       const index = all.findIndex(({ commitment }) => commitment.outboxSequence === after.outboxSequence);
@@ -288,7 +343,12 @@ function loadCommittedSqliteOutboxBatches(sqliteFile, options = {}) {
         && all[index].batch.payloadSha256 === after.payloadSha256 && all[index].batch.chainHash === after.chainHash, "CURSOR_INVALID");
       start = index + 1;
     }
-    const result = all.slice(start, start + limit);
+    const result = all.slice(start, start + limit).map((item) => {
+      if (!requireIdentity) return item;
+      const envelope = deepFreeze({ sourceIdentity: { ...identity, genesis: { ...identity.genesis } }, ...item });
+      brandedSources.set(envelope, envelope);
+      return envelope;
+    });
     db.exec("COMMIT");
     return result;
   } catch (error) {
@@ -298,4 +358,5 @@ function loadCommittedSqliteOutboxBatches(sqliteFile, options = {}) {
   }
 }
 
-module.exports = { createSqliteOutboxCommitReceiptSchema, commitSqliteOutboxTransaction, loadCommittedSqliteOutboxBatches };
+module.exports = { createSqliteOutboxCommitReceiptSchema, commitSqliteOutboxTransaction, loadCommittedSqliteOutboxBatches,
+  commitSqliteBoundOutboxTransaction, loadBoundSqliteOutboxBatches, resolveBrandedSourceEnvelope };

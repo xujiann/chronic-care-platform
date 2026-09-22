@@ -31,14 +31,14 @@ function ledgerRows(db) {
   return db.prepare("SELECT version, name, checksum, applied_at FROM schema_migrations ORDER BY version").all();
 }
 
-test("SQLite migration registry freezes v1-v14 and exposes continuous v18 head", { skip: !DatabaseSync }, () => {
+test("SQLite migration registry freezes v1-v14 and exposes continuous v19 head", { skip: !DatabaseSync }, () => {
   const report = validateSqliteMigrationRegistry(SQLITE_MIGRATIONS);
 
   assert.equal(FROZEN_LEGACY_MAX_VERSION, 14);
-  assert.equal(SQLITE_SCHEMA_HEAD, 18);
+  assert.equal(SQLITE_SCHEMA_HEAD, 19);
   assert.equal(report.head, SQLITE_SCHEMA_HEAD);
   assert.match(report.registryFingerprint, /^[a-f0-9]{64}$/);
-  assert.deepEqual(SQLITE_MIGRATIONS.map((migration) => migration.version), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18]);
+  assert.deepEqual(SQLITE_MIGRATIONS.map((migration) => migration.version), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]);
   SQLITE_MIGRATIONS.forEach((migration) => {
     assert.equal(migration.owner, "T00/data-governance");
     assert.match(migration.contentFingerprint, /^[a-f0-9]{64}$/);
@@ -67,7 +67,7 @@ test("SQLite migrations apply from an empty database to head and rerun without l
     assert.equal(first.applied, SQLITE_SCHEMA_HEAD);
     assert.equal(second.applied, 0);
     assert.deepEqual(after, before);
-    assert.deepEqual(after.map((row) => Number(row.version)), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18]);
+    assert.deepEqual(after.map((row) => Number(row.version)), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]);
     after.forEach((row, index) => {
       assert.equal(row.name, SQLITE_MIGRATIONS[index].name);
       assert.equal(
@@ -97,7 +97,7 @@ test("a deterministic legacy v11 fixture upgrades to head without rewriting hist
 
     assert.equal(upgraded.applied, SQLITE_SCHEMA_HEAD - 11);
     assert.deepEqual(upgradedRows.slice(0, 11), historicalRows);
-    assert.deepEqual(upgradedRows.slice(11).map((row) => Number(row.version)), [12, 13, 14, 15, 16, 17, 18]);
+    assert.deepEqual(upgradedRows.slice(11).map((row) => Number(row.version)), [12, 13, 14, 15, 16, 17, 18, 19]);
     assert.equal(readSqliteSchemaFingerprint(legacy), readSqliteSchemaFingerprint(fresh));
   } finally {
     legacy.close();

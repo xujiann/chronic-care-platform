@@ -1,5 +1,7 @@
 # 架构与治理入口
 
+源目标身份绑定（OPS-045 / ADR-OPS-045）仅作为未接线库级能力开发：SQLite 显式持久身份与事务 genesis，经同快照品牌 loader 交给 PG 显式目标身份/源绑定；所有已迁移目标写入口先核绑定再 duplicate/CAS。新版本迁移不补历史，legacy 未迁移模式不宣称绑定保护；不接 relay/checkpoint、业务请求或生产，生产 NO-GO。
+
 ## AI/CDSS 主线整合（2026-09-06）
 
 AI/CDSS 保留现有平台与临床两个中心，规则命令嵌入现有平台页面。统一规则状态机、可信机构/医生范围和回执协议；实现边界及回退见 [整合 ADR](docs/adr/2026-09-06-ai-cdss-reconciliation.md)。生产保持 NO-GO。

@@ -603,6 +603,16 @@ function createPostgresPrimaryStorageContract(options = {}) {
       });
     },
 
+    async applyBoundCommittedOutbox(envelope, applyOptions = {}) {
+      const { resolveBrandedSourceEnvelope } = require("./sqlite-outbox-commit-receipt");
+      const source = resolveBrandedSourceEnvelope(envelope);
+      if (driver.status?.().supportsBoundIdentity !== true) {
+        throw new PostgresPrimaryStorageContractError("Bound identity driver is required", "POSTGRES_PRIMARY_BOUND_DRIVER_REQUIRED", 409);
+      }
+      return this.applyCommittedOutbox(source.batch, { ...applyOptions, commitment: source.commitment,
+        binding: { expectedTargetId: applyOptions.expectedTargetId, namespace: applyOptions.namespace, sourceEnvelope: envelope } });
+    },
+
     async applyCommittedOutbox(batch, applyOptions = {}) {
       const capability = config.mode === STORAGE_MODES.SHADOW ? "shadowApply" : "primaryWriteRelay";
       requireCapability(config, capability);
@@ -614,7 +624,7 @@ function createPostgresPrimaryStorageContract(options = {}) {
         );
       }
       const normalized = normalizeCommittedBatch(batch, applyOptions.commitment);
-      return driver.transaction({ isolation: "serializable", readOnly: false }, async (tx) => {
+      return driver.transaction({ isolation: "serializable", readOnly: false, ...(applyOptions.binding ? { binding: applyOptions.binding } : {}) }, async (tx) => {
         assertTransaction(tx);
         const existing = await tx.getAppliedBatch(normalized.batchId);
         if (compareReplay(existing, normalized)) {

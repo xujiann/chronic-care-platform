@@ -7,7 +7,8 @@ const { readLiveConfig } = require("../test/helpers/postgres-primary-live-fixtur
 const ROOT = path.resolve(__dirname, "..");
 const TESTS = Object.freeze([
   "test/postgres-primary-live-contract.test.js",
-  "test/postgres-primary-live-concurrency.test.js"
+  "test/postgres-primary-live-concurrency.test.js",
+  "test/postgres-primary-identity-live.test.js"
 ]);
 
 function successfulLiveRun(result) {

@@ -1,5 +1,9 @@
 # MODULE MAP — 主线模块地图
 
+## 2026-09-22 源目标身份绑定准入（GOV-019 / OPS-045）
+
+用户批准的本轮切片仅涉及持久源目标身份、显式绑定、新增版本化迁移及隔离合成测试，详见 [ADR-OPS-045](docs/adr/2026-09-22-primary-source-target-identity.md)。A 单写 SQLite，B 单写 PG，T00 单写治理和集成，审查者只读；当前实施中，未预支验证结果。旧未迁移库只保留 legacy 语义，不宣称身份保护；已迁移目标必须在同一写事务内核验身份后再处理重复或 CAS，历史不补证。无 HTTP、relay/checkpoint、服务接线或生产激活；克隆/管理员/跨进程证明及现场签署保持外置，生产 NO-GO。
+
 > 状态层权威：当前基线、目标状态、差距任务和验收证据统一登记在 `config/lifecycle-governance.json#maps`；正文继续只陈述 AS-IS 事实。
 
 ## 真实主存储验证（2026-09-22，限定测试已集成）
@@ -305,7 +309,7 @@ QC 同样保留原 commission/institution、先查检查再读 body、FHIR 失�
 
 ## 9. SQLite migration 模块
 
-`src/platform/storage/sqlite-migrations.js` 是 T00 管理的单一注册表和执行入口。`server.js` 与部署/readiness/发布报告消费同一注册表结果。v1–v14 保持历史 ledger checksum 并冻结源码指纹；v15 追加 append-only 审计 source，v16 追加慢病随访 durable outbox，v17 追加对象存储耐久轨道，当前 head 为 17。任何后续 DDL 必须从 v18 连续追加，不允许领域模块绕过注册表。
+`src/platform/storage/sqlite-migrations.js` 是 T00 管理的单一注册表和执行入口。`server.js` 与部署/readiness/发布报告消费同一注册表结果。v1–v14 保持历史 ledger checksum 并冻结源码指纹；v15 追加 append-only 审计 source，v16 追加慢病随访 durable outbox，v17 追加对象存储耐久轨道，v18 追加 outbox receipt，v19 追加源身份与 genesis，当前 head 为 19。任何后续 DDL 必须从 v20 连续追加，不允许领域模块绕过注册表。
 
 ## 10. 标准工程门禁模块
 
@@ -463,7 +467,7 @@ owner、文件引用和 closed-world 核心概念匹配只是证据，不能自�
 |---|---|---|---|
 | `config/repository-governance.json` | T00 | 当前 workflow、Markdown 分类规则/闭集摘要、3 个 PDF 来源与 digest 的机器合同 | 不定义业务 owner，不包含 PDF 正文 |
 | `scripts/repository-governance.js` | T00 | 只读枚举 Git 路径，拒绝漏分/重叠/快照改写/旧 baseline/PDF 漂移 | 不生成或修改文档、PDF、报告和归档 |
-| `test/repository-governance.test.js` | T00 / TEST-001 | 锁定当前 288 份 Markdown、三类边界、当前 main 流程和 3 个 PDF 负向漂移 | 不证明 PDF 内容正确或生产可用 |
+| `test/repository-governance.test.js` | T00 / TEST-001 | 锁定当前 289 份 Markdown、三类边界、当前 main 流程和 3 个 PDF 负向漂移 | 不证明 PDF 内容正确或生产可用 |
 
 依赖方向为 `Git 跟踪路径 + ADR 状态 + 当前进程清单 + PDF bytes/source paths → repository governance
 verifier → governance-api/architecture:test`。snapshot 与 superseded 只提供历史证据，不得反向覆盖 current
