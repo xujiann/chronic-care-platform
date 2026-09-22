@@ -1,5 +1,15 @@
 # 工程治理路线图
 
+## 真实 PostgreSQL 主存储验证 PLAN（2026-09-22）
+
+- 批准与基线：用户批准隔离合成 PostgreSQL primary 验证；origin/main@3474f43c，PR #311 已合并，精确 main CI35572286391 九项与 Pages35572286399 成功，无开放 PR。GOV-018/OPS-044 独立准入，WIP 4/5。
+- 范围：只增加真实驱动验证、测试夹具、环境拒绝负测、package 显式入口及既有 postgres-production-contract CI 作业内的串行步骤；复用现有 pg 依赖和未修改的正式 PG DDL，不变运行时/生产 schema/API/relay/checkpoint/生产激活。
+- 四角色：A 单写 test/helpers/postgres-primary-live-fixture.js 与 test/postgres-primary-live-contract.test.js；B 单写 test/postgres-primary-live-concurrency.test.js；协调者独占其余精确任务写范围和 CI；审查者只读。先登记再写，审查后冻结、重型门禁串行。
+- 隔离：POSTGRES_PRIMARY_LIVE_TEST=1 与专用 POSTGRES_PRIMARY_LIVE_TEST_ADMIN_URL 双条件；连接前限制 loopback、contract_runner、health_platform_contract，拒绝生产 NODE_ENV、URL query/hash/别名及未知开关值，禁止回退通用 DATABASE_URL/POSTGRES_URL。仅创建并清理本轮成功创建的随机独立数据库，不删除既有 schema/库或终止无关连接。
+- 验收：真实 SQLite wrapper/loader 产生凭证后经正式 driver 写入 PG；七字段精确重放/冲突、三路纪元/微秒/bigint、集合/账本/延迟约束故障原子回滚；独立 pool/PID 与实际锁等待证明并发，同批唯一应用，有界显式重试仅允许真实序列化冲突。异载荷竞争只证明正式 driver 的底层 CAS，不伪造两条合法源链。
+- CI 与证据：保留原 auth/shadow 作业及 required checks，只追加必须执行的 primary 入口；显式启用时缺配置/连接失败/全部跳过必须失败。本地 Docker daemon 不可连接，不修改其配置或安装环境；通用本地发现可明确 skip，真实结果必须来自新精确 CI。
+- 交付与回滚：独立审查、冻结后按原必需门禁串行验证，精确 PR CI 后依原授权保护集成并收尾。测试或 runtime 缺陷不得以弱化断言解决；如需改变运行时合同或 schema，集中请求新增准入。撤销测试入口不影响业务，清理仅本轮自有随机库。生产 TLS、多进程服务、容量/灾备、源目标绑定和现场准入仍外置，生产 NO-GO。
+
 ## 重放合同加固 PLAN（2026-09-21）
 
 - 同轮交付收尾：PR #310 已保护 squash 合并为 `85bfde7a50a3f2997a941ee03903c39e724284a6`，与冻结 `b3b6d8a813c73f92a42ad195fdf798d723b17c16` 共享 tree `330475f13774b45ad9bc5a4859d3360db77929db`。PR CI `35568133300`、main CI `35568982001` 各九项及静态 Pages `35568981927` 成功。GOV-017/OPS-043 关闭已验收的限定代码切片，WIP 释放为 2/5；OPS-043 保持“已实现”及未闭合能力映射，不晋升生产。本收尾只改总账、路线图和六图，无运行时变化；沿原单写范围独立复核、冻结并运行必需门禁后保护集成，不用 PR #310 的 CI 替代收尾提交验证。
