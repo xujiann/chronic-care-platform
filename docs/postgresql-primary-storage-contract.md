@@ -4,6 +4,8 @@
 
 ### OPS-045 源目标身份绑定（库级切片）
 
+PR #314 已保护 squash 合并为 `6b10def4b0f3a39cb7eefd21b063acb92c3a5467`，与独立审查冻结 `f2fa372999a1b5dea345ce451de45608a1466e58` 和 PR 合成提交共享 tree `53e31652c91765109c1f89ec6f98e5f5897f2f18`。PR CI35712865240 九项成功，真实 primary 39/39、零跳过；完整本地串行门禁通过（全量 3726pass/40 环境 skip）。main CI35713934328 九项及 Pages35713934423 均成功（Pages 仅静态演示）；主线真实 primary 同样 39/39、零跳过。GOV-019 / OPS-045 关闭限定代码交付，WIP 2/5；OPS-045 运行能力仍为已实现，观测/跨进程/克隆/TLS/容量灾备和现场缺口保留。本收尾仅事实同步，仍需自身独审、冻结与门禁，生产 NO-GO。
+
 Accepted ADR-OPS-045 新增 SQLite v19 空身份/genesis 结构和 PG 独立 v1 身份迁移；旧 PG DDL 不变。仅隔离合成库显式执行 initializeSqliteOutboxSourceIdentity、initializeTargetIdentity 和 bindSource，不自动初始化、回填历史或绑定。
 
 applyBoundCommittedOutbox 只接受同进程真实 SQLite 只读 loader 返回的品牌 envelope，以及独立 expectedTargetId/namespace pin。PG 的写事务在 advisory lock 内核验 schema、实际目标和不可变源/genesis 绑定，再处理幂等/CAS；旧入口或直接事务在已迁移目标上缺 binding 均拒绝，载荷写入也必须完整匹配品牌批次。原六字段 commitment 不变。

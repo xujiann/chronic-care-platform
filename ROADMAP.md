@@ -2,6 +2,8 @@
 
 ## 源目标身份绑定 PLAN（2026-09-22）
 
+- 同轮收尾：PR #314 已保护 squash 合并为 `6b10def4b0f3a39cb7eefd21b063acb92c3a5467`，与独立审查冻结 `f2fa372999a1b5dea345ce451de45608a1466e58` 和 PR 合成提交共享 tree `53e31652c91765109c1f89ec6f98e5f5897f2f18`。PR CI35712865240 九项成功，真实 primary 39/39、零跳过；完整本地串行门禁通过（全量 3726pass/40 环境 skip）。main CI35713934328 九项及 Pages35713934423 均成功（Pages 仅静态演示）；主线真实 primary 同样 39/39、零跳过。GOV-019 / OPS-045 关闭限定代码交付，WIP 2/5；OPS-045 运行能力仍为已实现，观测/跨进程/克隆/TLS/容量灾备和现场缺口保留。本收尾仅事实同步，仍需自身独审、冻结与门禁，生产 NO-GO。
+
 - 用户批准 GOV-019 / OPS-045，WIP 4/5；基线 origin/main@828893ac，前轮 PR #313 与 main 精确 CI 已通过。
 - 范围、合同、风险、迁移/恢复及四角色单写见 Accepted [ADR-OPS-045](docs/adr/2026-09-22-primary-source-target-identity.md)。A 开发 SQLite，B 开发 PG，审查者只读，T00 协调集成。
 - 仅持久身份/绑定、新增版本迁移及隔离合成测试；不补历史，不接 relay/checkpoint/请求/生产。独立审查、冻结后串行门禁，精确 CI 后按已有授权保护集成。当前未完成实现/验证，生产 NO-GO。
