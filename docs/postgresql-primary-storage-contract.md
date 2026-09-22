@@ -106,6 +106,18 @@ ADR `2026-09-21-postgres-committed-replay-hardening.md` 只批准合同与正式
 
 本轮使用正式 SQLite 临时合成库、内存主合同与受控 SQL 驱动测试；SQL mock 不是实际 PostgreSQL。现有远端真实 PostgreSQL 门禁只覆盖 auth/shadow，不能替代 primary 真实数据库、并发和现场证据。无 DDL、relay/checkpoint 或服务端接线；生产及 worker 激活继续禁止。
 
+## 隔离真实主存储验证（2026-09-22）
+
+新增 `npm run postgres:primary-live-contract` 专用入口，顺序执行 20 项实际重放/精度/回滚测试与 3 项独立连接并发测试。输入必须是正式 SQLite wrapper/loader 产生的合成凭证；原样加载既有主存储 DDL，调用正式 pg 驱动，不使用 SQL mock 替代数据库。
+
+仅在隔离测试服务配置 `POSTGRES_PRIMARY_LIVE_TEST=1` 和专用 `POSTGRES_PRIMARY_LIVE_TEST_ADMIN_URL`。后者只接受 loopback（localhost、127.0.0.1、::1）、账号 `contract_runner`、管理库 `health_platform_contract` 及显式密码；不接受 URL 参数、片段或通用 DATABASE_URL/POSTGRES_URL 回退。NODE_ENV 为 production 时拒绝。该管理账号需要创建测试数据库的权限，不能用于生产。
+
+每例创建随机 `platform_primary_test_<uuid>` 数据库，只清理本次成功创建且 OID/owner 仍一致的目标；先关闭自有连接池，不强制删除或终止其他连接。SQLite 文件位于临时目录，仅含合成数据。故障触发器只安装于本例随机库，不改正式 DDL 文件。
+
+普通本地测试未启用开关时明确跳过；专用入口缺配置、执行失败、取消或任何跳过均失败。CI 在既有 PostgreSQL 16 隔离服务的 auth/shadow 步骤后串行执行此入口，不新增服务或放宽必需检查。本机数据库当前不可用，新增真实验证尚待 CI；本地跳过不是通过证据。
+
+并发测试以独立后端 PID 和实际 advisory-lock 等待证明连接重叠；只对明确的 40001 做一次重试。异载荷 CAS 用例验证低层竞争，不声称两条合法源链可同时推进。本测试服务禁用 TLS，驱动状态如实为 false；不提供生产 TLS、多进程、容量灾备、源目标绑定、relay/checkpoint 或上线审批证据。
+
 ## 驱动接入要求
 
 正式驱动已经实现以下受限接口；调用方不能取得原始 `pg` client：

@@ -91,6 +91,11 @@ jobs:
         run: npm ci
       - name: Verify real PostgreSQL authentication and shadow contracts
         run: npm run postgres:production-contract
+      - name: Verify real PostgreSQL primary replay and concurrent CAS
+        env:
+          POSTGRES_PRIMARY_LIVE_TEST: "1"
+          POSTGRES_PRIMARY_LIVE_TEST_ADMIN_URL: postgres://contract_runner:contract_runner_ci_only@127.0.0.1:5432/health_platform_contract
+        run: npm run postgres:primary-live-contract
 
   governance-api:
     runs-on: ubuntu-latest
