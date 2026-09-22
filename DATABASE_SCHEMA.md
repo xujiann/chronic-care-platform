@@ -4,13 +4,15 @@
 
 ## 1. Schema Head
 
-- SQLite migration 注册表：v1–v18，位于 `src/platform/storage/sqlite-migrations.js`。
-- 运行时公开常量：`STORAGE_SCHEMA_VERSION = SQLITE_SCHEMA_HEAD = 18`。
+- SQLite migration 注册表：v1–v19，位于 `src/platform/storage/sqlite-migrations.js`。
+- 运行时公开常量：`STORAGE_SCHEMA_VERSION = SQLITE_SCHEMA_HEAD = 19`。
 - migration ledger：`schema_migrations`。
 - v1–v14 ledger checksum 保持历史兼容，源码内容由冻结 SHA-256 保护；v15+ ledger checksum 为内容 SHA-256。
-- PostgreSQL：5 份跟踪 SQL，共 13 张显式候选表；另有脚本生成的迁移包/MPI 结构。
+- PostgreSQL：6 份跟踪 SQL，共 16 张显式候选表；另有脚本生成的迁移包/MPI 结构。
 
 ## 2. SQLite Migration 台账
+
+v19 新增 `source_identity` 与 `source_genesis` 两张不可变技术身份表，仅建空结构；显式空源初始化、首批事务固定 genesis，不补历史。当前共有 41 张非内部表；详见 ADR-OPS-045，未部署生产。
 
 | 版本 | 名称 | 主要对象 |
 |---:|---|---|
@@ -43,6 +45,8 @@ v18 `add immutable PostgreSQL outbox commit receipts`：仅追加 `postgres_sync
 回滚不自动 DROP：保留业务/outbox/receipt；已升级库不能直接运行旧 schema runtime，采用受控前滚修复或经验证的备份恢复。生产部署和真实数据升级仍需外部审批。
 
 ## 3. PostgreSQL 台账
+
+OPS-045 追加独立 `postgres-primary-identity-v1.sql` 与版本 runner，创建 `primary_identity_migrations`、`primary_target_identity`、`primary_source_binding`；旧 primary DDL 不变。仅显式合成隔离测试执行迁移/初始化/绑定，运行写入口逐次核验持久目标/源身份与 genesis。旧未迁移目标保留 legacy 模式，不等于绑定就绪；启用后缺身份/绑定即拒绝。无真实数据迁移、自动修复或生产部署。
 
 2026-09-21 OPS-043 仅加固既有 primary_storage_batches 字段的严格输入与重放比较，以及普通空集合的首版本 0/1 兼容；不改 SQLite head 18、PG 表/列/索引/约束或迁移。committed_at 的亚毫秒历史差异须拒绝而不是在 Date 投影中丢失；历史不合规记录不自动补证/修复，源目标绑定与 checkpoint 仍未实施。
 
@@ -94,7 +98,7 @@ provider/KMS/WORM/扫描证据仍未完成，因此 production promotion 保持 
 `research.dataset-aggregate.v1` 继续提供 `researchDatasets` 的详细逻辑写合同；源数据继续位于
 `state_collections[researchDatasets]`，SQLite v7 的 `research_dataset_records` 保持只读兼容投影；目标复用
 已存在的 PostgreSQL `health_platform.primary_collection_state`，以 `collection_name=researchDatasets`
-定位，不新增 SQLite/PostgreSQL DDL，该 portfolio 本身未改变 schema；当前 head 已由独立 receipt 切片推进至 v18。
+定位，不新增 SQLite/PostgreSQL DDL，该 portfolio 本身未改变 schema；当前 head 已由 receipt 与身份切片推进至 v19。
 
 整个 portfolio 只达到 repository-plan-ready/non-persistent 分类：没有创建 migration run、没有执行回填、没有激活 worker，也没有
 授权生产主库或生产写入。后续必须提供精确 count/digest、outbox checkpoint、零 mismatch/duplicate、

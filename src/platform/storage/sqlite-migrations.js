@@ -1,6 +1,7 @@
 "use strict";
 
 const { createHash } = require("node:crypto");
+const { createSqliteOutboxSourceIdentitySchema } = require("./sqlite-outbox-source-identity");
 const { createSqliteOutboxCommitReceiptSchema } = require("./sqlite-outbox-commit-receipt");
 const { createSqliteSessionSchema } = require("../../../session-store");
 const {
@@ -609,6 +610,14 @@ const MIGRATION_DEFINITIONS = [
     fingerprintDependencies: [createSqliteOutboxCommitReceiptSchema],
     apply(db) {
       createSqliteOutboxCommitReceiptSchema(db);
+    }
+  },
+  {
+    version: 19,
+    name: "add immutable SQLite outbox source identity and genesis",
+    fingerprintDependencies: [createSqliteOutboxSourceIdentitySchema],
+    apply(db) {
+      createSqliteOutboxSourceIdentitySchema(db);
     }
   }
 ].map((migration) => ({ ...migration, owner: MIGRATION_OWNER }));

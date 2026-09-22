@@ -2,54 +2,11 @@
 
 const assert = require("node:assert/strict");
 const test = require("node:test");
-const { setTimeout: pause } = require("node:timers/promises");
 const { createHash } = require("node:crypto");
-const { ADVISORY_LOCK_NAME } = require("../src/platform/storage/postgres-primary-driver");
 const { canonicalStringify } = require("../scripts/postgres-migration-package");
-const { createFixture } = require("./helpers/postgres-primary-live-fixture");
+const { createFixture, overlappingWriters } = require("./helpers/postgres-primary-live-fixture");
 
-const settle = (promise) => promise.then((value) => ({ status: "fulfilled", value }), (reason) => ({ status: "rejected", reason }));
 const applyOptions = (commitment) => ({ executionContext: "worker", commitment });
-
-// Four actual pools: two writers, one held transaction, and an independent observer.
-// Polling is bounded and succeeds only on server-reported overlapping lock waits.
-async function overlappingWriters(fixture, operations) {
-  const pools = [fixture.newPool(), fixture.newPool()];
-  const blockerPool = fixture.newPool(), observerPool = fixture.newPool();
-  const pids = await Promise.all(pools.map((pool) => fixture.backendPid(pool)));
-  const blocker = await blockerPool.connect();
-  let pending = [];
-  let released = false;
-  try {
-    const blockerPid = (await blocker.query("SELECT pg_backend_pid() AS pid")).rows[0].pid;
-    const observerPid = await fixture.backendPid(observerPool);
-    assert.equal(new Set([...pids, blockerPid, observerPid]).size, 4);
-    await blocker.query("BEGIN");
-    await blocker.query("SELECT pg_advisory_xact_lock(hashtext($1))", [ADVISORY_LOCK_NAME]);
-    pending = operations.map((operation, index) => settle(operation(pools[index])));
-    const deadline = Date.now() + 4000;
-    let observed = false;
-    while (Date.now() < deadline) {
-      const result = await observerPool.query(`SELECT pid, wait_event_type, wait_event, pg_blocking_pids(pid) AS blockers
-        FROM pg_stat_activity WHERE datname = current_database() AND pid = ANY($1::int[])`, [pids]);
-      if (result.rows.length === 2 && result.rows.every((row) => row.wait_event_type === "Lock"
-        && row.wait_event === "advisory" && row.blockers.length > 0)) {
-        observed = true;
-        break;
-      }
-      await pause(20);
-    }
-    assert.equal(observed, true, "both distinct writer backends must simultaneously wait for the real advisory lock");
-    await blocker.query("COMMIT");
-    released = true;
-    return { outcomes: await Promise.all(pending), pools, pids };
-  } finally {
-    if (!released) await blocker.query("ROLLBACK").catch(() => {});
-    blocker.release();
-    // Server-side statement/lock deadlines bound these waits even on assertion failure.
-    await Promise.all(pending);
-  }
-}
 
 test("live primary independent backends overlap one receipt and explicit serialization retry yields one ledger", { timeout: 45000 }, async (t) => {
   const f = await createFixture(t);

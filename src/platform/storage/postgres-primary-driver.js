@@ -2,12 +2,112 @@
 
 const fs = require("node:fs");
 const path = require("node:path");
-const { normalizeCommitReceipt } = require("./postgres-primary-storage-contract");
+const { normalizeCommitReceipt, normalizeCommittedBatch } = require("./postgres-primary-storage-contract");
+const { randomUUID } = require("node:crypto");
+const { canonicalStringify } = require("../../../scripts/postgres-migration-package");
+const { inspectPostgresPrimaryIdentityMigration } = require("./postgres-primary-identity-migrations");
 
 const COLLECTION_PATTERN = /^[A-Za-z][A-Za-z0-9_-]{0,239}$/;
 const SHA256_PATTERN = /^[a-f0-9]{64}$/;
 const BATCH_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{3,159}$/;
 const ADVISORY_LOCK_NAME = "health-platform-postgres-primary-storage-v1";
+const UUID_PATTERN = /^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/;
+
+function identityError(suffix = "INVALID") {
+  return new PostgresPrimaryDriverError("PostgreSQL primary identity validation failed", `POSTGRES_PRIMARY_IDENTITY_${suffix}`, 409);
+}
+
+function exactFields(value, keys) {
+  return value && typeof value === "object" && [Object.prototype, null].includes(Object.getPrototypeOf(value))
+    && Reflect.ownKeys(value).length === keys.length && keys.every((key) => {
+      const descriptor = Object.getOwnPropertyDescriptor(value, key);
+      return descriptor?.enumerable && Object.hasOwn(descriptor, "value");
+    });
+}
+
+function resolveBinding(value) {
+  if (!exactFields(value, ["expectedTargetId", "namespace", "sourceEnvelope"])
+    || typeof value.expectedTargetId !== "string" || !UUID_PATTERN.test(value.expectedTargetId)
+    || value.namespace !== "health_platform") throw identityError();
+  const { resolveBrandedSourceEnvelope } = require("./sqlite-outbox-commit-receipt");
+  const envelope = resolveBrandedSourceEnvelope(value.sourceEnvelope);
+  return { expectedTargetId: value.expectedTargetId, namespace: value.namespace, envelope };
+}
+
+async function targetIdentity(client) {
+  const rows = (await client.query("SELECT target_instance_id,namespace,created_at FROM health_platform.primary_target_identity FOR SHARE")).rows;
+  if (rows.length !== 1 || typeof rows[0].target_instance_id !== "string" || !UUID_PATTERN.test(rows[0].target_instance_id)
+    || rows[0].namespace !== "health_platform" || typeof rows[0].created_at !== "string"
+    || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(rows[0].created_at)
+    || !Number.isFinite(Date.parse(rows[0].created_at)) || new Date(rows[0].created_at).toISOString() !== rows[0].created_at) throw identityError("MISSING");
+  return { targetInstanceId: rows[0].target_instance_id, namespace: rows[0].namespace, createdAt: rows[0].created_at };
+}
+
+async function assertEmptyTarget(client) {
+  const row = (await client.query(`SELECT
+    EXISTS(SELECT 1 FROM health_platform.primary_storage_batches) AS batches,
+    EXISTS(SELECT 1 FROM health_platform.primary_collection_state) AS collections`)).rows[0];
+  if (!row || row.batches !== false || row.collections !== false) throw identityError("HISTORY_PRESENT");
+}
+
+async function checkBinding(client, input) {
+  const binding = resolveBinding(input);
+  const target = await targetIdentity(client);
+  if (target.targetInstanceId !== binding.expectedTargetId || target.namespace !== binding.namespace) throw identityError("MISMATCH");
+  const rows = (await client.query("SELECT target_instance_id,namespace,source_identity FROM health_platform.primary_source_binding FOR SHARE")).rows;
+  if (rows.length !== 1 || rows[0].target_instance_id !== target.targetInstanceId || rows[0].namespace !== target.namespace
+    || canonicalStringify(rows[0].source_identity) !== canonicalStringify(binding.envelope.sourceIdentity)) throw identityError("MISMATCH");
+  return binding.envelope;
+}
+
+// Bound callbacks cannot borrow a genuine source identity to write a different batch,
+// omit its ledger, repeat individual changes, or commit only part of its collections.
+async function restrictBoundTransaction(api, envelope) {
+  const batch = normalizeCommittedBatch(envelope.batch, envelope.commitment);
+  const expectedRecord = { batchId: batch.batchId, payloadSha256: batch.payloadSha256,
+    previousChainHash: batch.previousChainHash, chainHash: batch.chainHash,
+    sourceTransactionId: batch.commitment.sourceTransactionId, outboxSequence: batch.commitment.outboxSequence,
+    committedAt: batch.commitment.committedAt, appliedChanges: batch.changes.length };
+  const existing = await api.getAppliedBatch(batch.batchId);
+  if (existing) {
+    if (Object.entries(expectedRecord).some(([key, value]) => existing[key] !== value)) throw identityError("BATCH_MISMATCH");
+  } else {
+    const last = await api.getLastAppliedBatch();
+    if ((last?.chainHash || "") !== batch.previousChainHash) throw identityError("BATCH_MISMATCH");
+  }
+  const written = new Set();
+  let recorded = false;
+  let invalid = false;
+  function reject() { invalid = true; throw identityError("BATCH_MISMATCH"); }
+  const guarded = Object.freeze({ ...api,
+    async getAppliedBatch(batchId) {
+      if (batchId !== batch.batchId) return reject();
+      return api.getAppliedBatch(batchId);
+    },
+    async applyCollectionChange(change, options) {
+      const expected = batch.changes.find((item) => item.collection === change?.collection);
+      if (existing || !expected || written.has(expected.collection) || recorded
+        || !exactFields(change, Object.keys(expected)) || canonicalStringify(change) !== canonicalStringify(expected)
+        || !exactFields(options, ["expectedVersion", "batchId", "appliedAt"]) || options.batchId !== batch.batchId) return reject();
+      const current = await api.getCollection(expected.collection);
+      const version = current ? current.sourceVersion : -1;
+      if (options.expectedVersion !== version || expected.sourceVersion !== (current ? version + 1 : 1)) return reject();
+      const result = await api.applyCollectionChange(change, options);
+      written.add(expected.collection);
+      return result;
+    },
+    async recordAppliedBatch(record) {
+      if (existing || recorded || written.size !== batch.changes.length
+        || !exactFields(record, Object.keys(expectedRecord)) || canonicalStringify(record) !== canonicalStringify(expectedRecord)) return reject();
+      const result = await api.recordAppliedBatch(record);
+      recorded = true;
+      return result;
+    }
+  });
+  return { api: guarded, finish() {
+    if (invalid || (written.size && (!recorded || written.size !== batch.changes.length))) throw identityError("BATCH_MISMATCH");
+  } };
+}
 
 class PostgresPrimaryDriverError extends Error {
   constructor(message, code, statusCode = 400, details = undefined) {
@@ -397,8 +497,11 @@ function createPostgresPrimaryDriver(options = {}) {
     );
   }
   let closed = false;
+  let requireBoundIdentity = options.requireBoundIdentity === true;
+  const initializeMode = Symbol("initialize-target");
+  const bindMode = Symbol("bind-source");
 
-  return {
+  const driver = {
     status() {
       return {
         configured: true,
@@ -407,6 +510,8 @@ function createPostgresPrimaryDriver(options = {}) {
         controlledPool: options.pool ? options.controlledPool === true : true,
         ownsPool,
         closed,
+        requireBoundIdentity,
+        supportsBoundIdentity: true,
         productionPrimary: false,
         runtimeCutoverEnabled: false,
         credentialsPersisted: false
@@ -414,6 +519,45 @@ function createPostgresPrimaryDriver(options = {}) {
     },
 
     async transaction(transactionOptions = {}, operation) {
+      return runTransaction(transactionOptions, operation);
+    },
+
+    async initializeTargetIdentity() {
+      return runTransaction({ isolation: "serializable", readOnly: false }, async (client) => {
+        await assertEmptyTarget(client);
+        const target = (await client.query("SELECT target_instance_id FROM health_platform.primary_target_identity")).rows;
+        const bindings = (await client.query("SELECT target_instance_id FROM health_platform.primary_source_binding")).rows;
+        if (target.length || bindings.length) throw identityError("ALREADY_INITIALIZED");
+        const identity = { targetInstanceId: randomUUID(), namespace: "health_platform", createdAt: new Date().toISOString() };
+        await client.query("INSERT INTO health_platform.primary_target_identity(target_instance_id,namespace,created_at) VALUES ($1,$2,$3)",
+          [identity.targetInstanceId, identity.namespace, identity.createdAt]);
+        return identity;
+      }, initializeMode);
+    },
+
+    async bindSource(input) {
+      const binding = resolveBinding(input);
+      return runTransaction({ isolation: "serializable", readOnly: false }, async (client) => {
+        const target = await targetIdentity(client);
+        if (target.targetInstanceId !== binding.expectedTargetId || target.namespace !== binding.namespace) throw identityError("MISMATCH");
+        await assertEmptyTarget(client);
+        if ((await client.query("SELECT target_instance_id FROM health_platform.primary_source_binding")).rows.length) throw identityError("ALREADY_BOUND");
+        await client.query("INSERT INTO health_platform.primary_source_binding(target_instance_id,namespace,source_identity) VALUES ($1,$2,$3::jsonb)",
+          [target.targetInstanceId, target.namespace, canonicalStringify(binding.envelope.sourceIdentity)]);
+        return { targetInstanceId: target.targetInstanceId, namespace: target.namespace, sourceIdentity: binding.envelope.sourceIdentity };
+      }, bindMode);
+    },
+
+    async close() {
+      if (closed) return;
+      closed = true;
+      if (ownsPool && typeof pool.end === "function") {
+        try { await pool.end(); } catch (error) { throw safeDriverError(error, "POSTGRES_PRIMARY_POOL_CLOSE_FAILED"); }
+      }
+    }
+  };
+
+  async function runTransaction(transactionOptions, operation, mode) {
       if (closed) {
         throw new PostgresPrimaryDriverError(
           "PostgreSQL primary storage driver is closed",
@@ -458,7 +602,16 @@ function createPostgresPrimaryDriver(options = {}) {
             [ADVISORY_LOCK_NAME]
           );
         }
-        const result = await operation(buildTransactionApi(client, readOnly));
+        let envelope;
+        if (!readOnly) {
+          const migrated = await inspectPostgresPrimaryIdentityMigration(client);
+          if (migrated) requireBoundIdentity = true;
+          if (!migrated && (requireBoundIdentity || transactionOptions.binding || mode)) throw identityError("MISSING");
+          if (migrated && !mode) envelope = await checkBinding(client, transactionOptions.binding);
+        }
+        const restricted = envelope ? await restrictBoundTransaction(buildTransactionApi(client, readOnly), envelope) : null;
+        const result = await operation(mode ? client : restricted?.api || buildTransactionApi(client, readOnly));
+        restricted?.finish();
         await client.query("COMMIT");
         begun = false;
         return result;
@@ -472,20 +625,8 @@ function createPostgresPrimaryDriver(options = {}) {
       } finally {
         client?.release?.();
       }
-    },
-
-    async close() {
-      if (closed) return;
-      closed = true;
-      if (ownsPool && typeof pool.end === "function") {
-        try {
-          await pool.end();
-        } catch (error) {
-          throw safeDriverError(error, "POSTGRES_PRIMARY_POOL_CLOSE_FAILED");
-        }
-      }
     }
-  };
+  return driver;
 }
 
 module.exports = {

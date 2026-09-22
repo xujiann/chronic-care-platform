@@ -42,7 +42,7 @@ test("formal v17 file upgrades without changing historical ledger or fabricating
   const ledger = db.prepare("SELECT * FROM schema_migrations ORDER BY version").all();
   enqueuePostgresSyncBatch(db, [{ collection: "dataQualityIssues", operation: "upsert", sourceVersion: 1, payload: [] }]);
   const history = db.prepare("SELECT * FROM postgres_sync_outbox").all();
-  assert.equal(applySqliteMigrations(db).applied, 1);
+  assert.equal(applySqliteMigrations(db).applied, 2);
   assert.deepEqual(db.prepare("SELECT * FROM schema_migrations WHERE version<=17 ORDER BY version").all(), ledger);
   assert.deepEqual(db.prepare("SELECT * FROM postgres_sync_outbox").all(), history);
   assert.equal(db.prepare("SELECT COUNT(*) AS n FROM postgres_sync_commit_receipts").get().n, 0);

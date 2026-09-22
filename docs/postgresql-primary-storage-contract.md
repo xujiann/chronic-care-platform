@@ -2,6 +2,16 @@
 
 ## 当前结论
 
+### OPS-045 源目标身份绑定（库级切片）
+
+Accepted ADR-OPS-045 新增 SQLite v19 空身份/genesis 结构和 PG 独立 v1 身份迁移；旧 PG DDL 不变。仅隔离合成库显式执行 initializeSqliteOutboxSourceIdentity、initializeTargetIdentity 和 bindSource，不自动初始化、回填历史或绑定。
+
+applyBoundCommittedOutbox 只接受同进程真实 SQLite 只读 loader 返回的品牌 envelope，以及独立 expectedTargetId/namespace pin。PG 的写事务在 advisory lock 内核验 schema、实际目标和不可变源/genesis 绑定，再处理幂等/CAS；旧入口或直接事务在已迁移目标上缺 binding 均拒绝，载荷写入也必须完整匹配品牌批次。原六字段 commitment 不变。
+
+未迁移目标仅保留 legacy 兼容；requireBoundIdentity 必须在实例构造时固定，已观察迁移的实例也不得回落。完整物理克隆、管理员删除全部标记后未配置 bound 要求的新实例、恶意同进程代码和跨进程来源证明不能由本机制解决。品牌不支持 JSON/复制后恢复，不是签名。未接 relay/checkpoint/业务请求/生产，productionPrimary=false，runtimeCutoverEnabled=false。
+
+专项覆盖源/目标初始化、重启、错库/错源、旧入口、直接事务、重复返回、metadata 与实际 schema 漂移、迁移原子性及真实独立连接竞争；主入口串行保留既有 23 项 live 并追加身份用例。开发阶段结果不替代冻结提交的 CI，不以本地 skip 作为真实 PG 证据。升级后不自动 DROP/重绑，回滚必须保留事实并受控前滚或恢复备份。
+
 代码库已提供一个与主服务隔离的 PostgreSQL 主存储核心契约：
 
 - `disabled`：默认模式，不读、不写 PostgreSQL。

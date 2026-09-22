@@ -4,6 +4,9 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const { randomUUID } = require("node:crypto");
+const assert = require("node:assert/strict");
+const { setTimeout: pause } = require("node:timers/promises");
+const { ADVISORY_LOCK_NAME } = require("../../src/platform/storage/postgres-primary-driver");
 
 function invalid() {
   return Object.assign(new Error("PRIMARY_LIVE_CONFIG_INVALID"), { code: "PRIMARY_LIVE_CONFIG_INVALID" });
@@ -90,18 +93,18 @@ async function createFixture(t) {
   sqlite = new DatabaseSync(sqliteFile);
   sqlite.exec("PRAGMA foreign_keys=ON; PRAGMA journal_mode=WAL");
   applySqliteMigrations(sqlite);
-  function createDriver(selected = pool) {
+  function createDriver(selected = pool, options = {}) {
     if (!pools.includes(selected)) throw new Error("PRIMARY_LIVE_POOL_NOT_OWNED");
-    return createPostgresPrimaryDriver({ pool: selected, controlledPool: true, poolConfig });
+    return createPostgresPrimaryDriver({ ...options, pool: selected, controlledPool: true, poolConfig });
   }
-  function createContract(selected = pool) {
+  function createContract(selected = pool, options = {}) {
     const contractConfig = buildPostgresPrimaryStorageConfig({
       POSTGRES_PRIMARY_STORAGE_MODE: "shadow", DATABASE_URL: "postgresql://synthetic.invalid/fixture",
       POSTGRES_SSL_MODE: "verify-full", POSTGRES_SCHEMA_EVIDENCE_ID: "synthetic-schema",
       POSTGRES_MIGRATION_EVIDENCE_ID: "synthetic-migration"
     });
     // Above opens only the library gate; actual driver status truthfully reports ssl:false.
-    return createPostgresPrimaryStorageContract({ config: contractConfig, driver: createDriver(selected) });
+    return createPostgresPrimaryStorageContract({ config: contractConfig, driver: createDriver(selected, options) });
   }
   function commitBatch(entries, expectedVersions, sourceEvent = "synthetic-live-test") {
     const result = commitSqliteOutboxTransaction(sqlite, { entries, expectedVersions, sourceEvent });
@@ -127,8 +130,50 @@ async function createFixture(t) {
     } catch (error) { await client.query("ROLLBACK"); throw error; }
     finally { client.release(); }
   }
-  return { pool, newPool, createDriver, createContract, commitBatch, rawSnapshot, databaseName,
+  return { pool, newPool, createDriver, createContract, commitBatch, rawSnapshot, databaseName, sqlite, sqliteFile,
     async backendPid(selected = pool) { return (await selected.query("SELECT pg_backend_pid() AS pid")).rows[0].pid; } };
 }
 
-module.exports = { readLiveConfig, createFixture };
+const settle = (promise) => promise.then((value) => ({ status: "fulfilled", value }), (reason) => ({ status: "rejected", reason }));
+
+// Four actual pools: two writers, one held transaction, and an independent observer.
+// Polling is bounded and succeeds only on server-reported overlapping lock waits.
+async function overlappingWriters(fixture, operations) {
+  const pools = [fixture.newPool(), fixture.newPool()];
+  const blockerPool = fixture.newPool(), observerPool = fixture.newPool();
+  const pids = await Promise.all(pools.map((pool) => fixture.backendPid(pool)));
+  const blocker = await blockerPool.connect();
+  let pending = [];
+  let released = false;
+  try {
+    const blockerPid = (await blocker.query("SELECT pg_backend_pid() AS pid")).rows[0].pid;
+    const observerPid = await fixture.backendPid(observerPool);
+    assert.equal(new Set([...pids, blockerPid, observerPid]).size, 4);
+    await blocker.query("BEGIN");
+    await blocker.query("SELECT pg_advisory_xact_lock(hashtext($1))", [ADVISORY_LOCK_NAME]);
+    pending = operations.map((operation, index) => settle(operation(pools[index])));
+    const deadline = Date.now() + 4000;
+    let observed = false;
+    while (Date.now() < deadline) {
+      const result = await observerPool.query(`SELECT pid, wait_event_type, wait_event, pg_blocking_pids(pid) AS blockers
+        FROM pg_stat_activity WHERE datname = current_database() AND pid = ANY($1::int[])`, [pids]);
+      if (result.rows.length === 2 && result.rows.every((row) => row.wait_event_type === "Lock"
+        && row.wait_event === "advisory" && row.blockers.length > 0)) {
+        observed = true;
+        break;
+      }
+      await pause(20);
+    }
+    assert.equal(observed, true, "both distinct writer backends must simultaneously wait for the real advisory lock");
+    await blocker.query("COMMIT");
+    released = true;
+    return { outcomes: await Promise.all(pending), pools, pids };
+  } finally {
+    if (!released) await blocker.query("ROLLBACK").catch(() => {});
+    blocker.release();
+    // Server-side statement/lock deadlines bound these waits even on assertion failure.
+    await Promise.all(pending);
+  }
+}
+
+module.exports = { readLiveConfig, createFixture, overlappingWriters };

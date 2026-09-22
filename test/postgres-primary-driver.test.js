@@ -84,6 +84,9 @@ function fakePool(seed = {}) {
         if (/pg_advisory_xact_lock/.test(normalized)) {
           return { rowCount: 1, rows: [{ pg_advisory_xact_lock: null }] };
         }
+        if (/to_regclass\('health_platform.primary_identity_migrations'\)/.test(normalized)) {
+          return { rowCount: 1, rows: [{ ledger: null, identity: null, binding: null }] };
+        }
         if (/FROM health_platform\.primary_storage_batches WHERE batch_id = \$1/.test(normalized)) {
           const row = working.batches.get(params[0]);
           return { rowCount: row ? 1 : 0, rows: row ? [projectBatch(row, normalized)] : [] };

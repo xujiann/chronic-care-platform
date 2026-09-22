@@ -2,6 +2,7 @@
 
 | 新增决策 | 状态 | 范围 |
 |---|---|---|
+| [源目标持久身份与绑定](./2026-09-22-primary-source-target-identity.md) | Accepted | 显式初始化/不可变绑定、追加 SQLite/PG 版本迁移及隔离合成测试；不含 relay/checkpoint/请求/生产 |
 | [PostgreSQL 已提交批次重放合同加固](./2026-09-21-postgres-committed-replay-hardening.md) | Accepted | 严格凭证、七字段重放、普通首版本 0/1 兼容及必要 driver/测试；无 DDL、relay/checkpoint、接线或生产 |
 | [SQLite outbox 提交凭证与主存储样本投递边界](./2026-09-21-sqlite-outbox-commit-receipt.md) | Accepted（仅首切片） | receipt schema、受控事务包装器、只读 loader 及必要 head 兼容测试；relay/checkpoint/服务接线和生产未授权 |
 | [居民本人访问知晓声明首切片](./2026-09-14-resident-access-acknowledgement.md) | Accepted | 本人声明、原事件只读核验、完整幂等和原子提交；仅非生产，禁止泛化为合法性判断 |

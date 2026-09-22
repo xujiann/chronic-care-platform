@@ -64,7 +64,7 @@ test("dedicated live entry rejects empty, skipped, cancelled, failed or incomple
   ]) assert.equal(successfulLiveRun(result), false);
 });
 
-test("primary entry invokes both real files serially and preserves the inherited CI contract", () => {
+test("primary entry invokes all three real files serially and preserves the inherited CI contract", () => {
   let invocation;
   const result = run({ env: valid, spawn(executable, args, options) {
     invocation = { executable, args, options };
@@ -72,7 +72,7 @@ test("primary entry invokes both real files serially and preserves the inherited
   } });
   assert.equal(result.ok, true);
   assert.equal(invocation.executable, process.execPath);
-  assert.deepEqual(TESTS, ["test/postgres-primary-live-contract.test.js", "test/postgres-primary-live-concurrency.test.js"]);
+  assert.deepEqual(TESTS, ["test/postgres-primary-live-contract.test.js", "test/postgres-primary-live-concurrency.test.js", "test/postgres-primary-identity-live.test.js"]);
   assert.deepEqual(invocation.args, ["--test", "--test-concurrency=1", "--test-reporter=tap", ...TESTS]);
   assert.equal(invocation.options.env, valid);
   assert.equal(invocation.options.windowsHide, true);
