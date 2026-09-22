@@ -1,8 +1,10 @@
 # API MAP — 主线接口地图
 
-## 2026-09-22 源目标身份绑定准入（GOV-019 / OPS-045）
+## 2026-09-22 源目标身份绑定（限定代码已集成）
 
-用户批准的本轮切片仅涉及持久源目标身份、显式绑定、新增版本化迁移及隔离合成测试，详见 [ADR-OPS-045](docs/adr/2026-09-22-primary-source-target-identity.md)。A 单写 SQLite，B 单写 PG，T00 单写治理和集成，审查者只读；当前实施中，未预支验证结果。旧未迁移库只保留 legacy 语义，不宣称身份保护；已迁移目标必须在同一写事务内核验身份后再处理重复或 CAS，历史不补证。无 HTTP、relay/checkpoint、服务接线或生产激活；克隆/管理员/跨进程证明及现场签署保持外置，生产 NO-GO。
+PR #314 已保护 squash 合并为 `6b10def4b0f3a39cb7eefd21b063acb92c3a5467`，与独立审查冻结 `f2fa372999a1b5dea345ce451de45608a1466e58` 和 PR 合成提交共享 tree `53e31652c91765109c1f89ec6f98e5f5897f2f18`。PR CI35712865240 九项成功，真实 primary 39/39、零跳过；完整本地串行门禁通过（全量 3726pass/40 环境 skip）。main CI35713934328 九项及 Pages35713934423 均成功（Pages 仅静态演示）；主线真实 primary 同样 39/39、零跳过。GOV-019 / OPS-045 关闭限定代码交付，WIP 2/5；OPS-045 运行能力仍为已实现，观测/跨进程/克隆/TLS/容量灾备和现场缺口保留。本收尾仅事实同步，仍需自身独审、冻结与门禁，生产 NO-GO。
+
+本轮仅涉及持久源目标身份、显式绑定、新增版本化迁移及隔离合成测试，详见 [ADR-OPS-045](docs/adr/2026-09-22-primary-source-target-identity.md)。A 单写 SQLite，B 单写 PG，T00 单写治理和集成，审查者只读。旧未迁移库只保留 legacy 语义，不宣称身份保护；已迁移目标同一写事务内核验身份后再处理重复或 CAS，历史不补证。无 HTTP、relay/checkpoint、服务接线或生产激活，生产 NO-GO。
 
 > 状态层权威：当前基线、目标状态、差距任务和验收证据统一登记在 `config/lifecycle-governance.json#maps`；正文继续只陈述 AS-IS 事实。
 
