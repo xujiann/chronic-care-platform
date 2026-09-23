@@ -243,3 +243,9 @@ CLI 从已打开的文件描述符有界读取，并要求内容与必填的预�
 4. 完成影子连续核对后，才在隔离环境装配 `primary-read`。
 5. 完成容量、故障切换、原生恢复和切回演练后，再评审 `primary-write`。
 6. 生产启用属于独立现场变更，不能由环境变量或仓库测试自动批准。
+
+# 独立持久 checkpoint（合成首切片，2026-09-23）
+
+`createPrimaryDurableCheckpoint({checkpointFile, sourceFile, driver, expectedTargetId})` 是显式本地合成端口，不由服务、HTTP 或 worker 导入。调用方对全新隔离路径显式 `await initialize()` 一次；目标身份绑定且批次账本为空才可初始化，缺失的已用文件不会自动重建。独立 SQLite v1 文件只存技术身份、序号和摘要，不存集合 payload。调用方必须先经原有绑定合同提交目标批次；`advance(envelope)` 从源 loader 原始品牌对象和目标只读、身份绑定的已应用账本核对完整凭证，再以 `BEGIN IMMEDIATE` 单调追加。目标提交后 checkpoint 写入前中断，可再次核验并推进；已有最后批次精确重放返回原游标，不写新行。`await read()` 重新扫描源链，空进度也复核目标绑定；非空进度同时核验目标凭证。丢失/漂移、跳号、错身份或目标凭证不符均失败关闭，不自动补历史。
+
+此文件不是可信外部 anchor；完整文件回滚/克隆、跨主机并发、真实 TLS/容量/灾备和现场签署仍需独立方案。无自动 relay、业务请求或生产接线；六域生产继续 NO-GO。决策见 [ADR-OPS-046](adr/2026-09-23-primary-durable-checkpoint.md)。

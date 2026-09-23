@@ -1,5 +1,9 @@
 # DATA MODEL — 主线数据地图
 
+## 2026-09-23 独立 checkpoint 候选数据
+
+合成 checkpoint 文件的 `checkpoint_meta` 固定源/目标持久身份，`checkpoint_entries` 追加序号、批次及摘要，不含业务 payload；独立 `user_version=1`，不改变主 SQLite head v19 或 PostgreSQL 正式 schema。目标已应用批次账本仍是目标提交事实权威，checkpoint 只是本地进度；真实迁移和生产仍 NO-GO。
+
 ## 2026-09-22 源目标身份绑定（限定代码已集成）
 
 PR #314 已保护 squash 合并为 `6b10def4b0f3a39cb7eefd21b063acb92c3a5467`，与独立审查冻结 `f2fa372999a1b5dea345ce451de45608a1466e58` 和 PR 合成提交共享 tree `53e31652c91765109c1f89ec6f98e5f5897f2f18`。PR CI35712865240 九项成功，真实 primary 39/39、零跳过；完整本地串行门禁通过（全量 3726pass/40 环境 skip）。main CI35713934328 九项及 Pages35713934423 均成功（Pages 仅静态演示）；主线真实 primary 同样 39/39、零跳过。GOV-019 / OPS-045 关闭限定代码交付，WIP 2/5；OPS-045 运行能力仍为已实现，观测/跨进程/克隆/TLS/容量灾备和现场缺口保留。本收尾仅事实同步，仍需自身独审、冻结与门禁，生产 NO-GO。
