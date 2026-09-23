@@ -1,8 +1,8 @@
 # PostgreSQL 业务主存储核心契约
 
-## 真实目标 checkpoint 验证（ADR-OPS-047，在制）
+## 真实目标 checkpoint 验证（ADR-OPS-047，限定测试已集成）
 
-仅在隔离随机真实 PostgreSQL 测试库中，把已绑定主存储批次账本与独立合成 SQLite checkpoint 组合验证。目标提交后进度未写可从目标权威账本核对后重放；目标未提交、错误身份、跳号及非空初始化必须拒绝。专用 runner 的 CI 结果需零跳过；本地环境跳过不算真实证据。本切片无生产 DDL、运行接线、自动 relay 或多实例承诺，生产 NO-GO。
+PR #318 已在隔离随机真实 PostgreSQL 测试库中，把已绑定主存储批次账本与独立合成 SQLite checkpoint 组合验证；PR/main 专项各 41pass/0fail/0skip/0cancel。目标提交后进度未写可从目标权威账本核对后重放；目标未提交、错误身份、跳号及非空初始化必须拒绝。本地环境跳过不算真实证据。本切片无生产 DDL、运行接线、自动 relay 或多实例承诺，生产 NO-GO。
 
 ## 当前结论
 
