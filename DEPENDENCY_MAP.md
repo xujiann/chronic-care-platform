@@ -1,6 +1,6 @@
 # DEPENDENCY MAP — 主线依赖地图
 
-## 2026-09-23 checkpoint 候选依赖
+## 2026-09-23 checkpoint 已集成依赖
 
 人工合成调用 → 品牌源 loader → 绑定目标只读已应用账本 → 独立 SQLite checkpoint。无请求路径外部双写，无自动 relay/worker；目标与进度不共享事务，故先核对目标再单调推进，并以目标账本支持崩溃重放。
 
