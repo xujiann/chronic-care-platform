@@ -1,5 +1,9 @@
 # API MAP — 主线接口地图
 
+## 2026-09-23 真实目标 checkpoint 验证在制
+
+OPS-047 是隔离测试，不新增 HTTP method/path、身份授权、公开错误合同或请求路径写入；API 目录和生产准入不变。
+
 ## 2026-09-23 checkpoint 接口边界
 
 本切片只导出模块级 `initialize/read/advance` 合成端口；无 HTTP 路径、角色权限或业务 API 变更。不得将测试端口当作生产 relay/请求接线许可。

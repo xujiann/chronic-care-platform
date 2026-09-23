@@ -1,5 +1,9 @@
 # MODULE MAP — 主线模块地图
 
+## 2026-09-23 真实目标 checkpoint 验证在制
+
+T00 单写真实 PG 专项用例及既有专用 runner/guard；复用正式驱动与独立 checkpoint，不改运行时模块。GOV-021 / OPS-047 未经冻结和 CI 验收，不晋升能力状态。
+
 ## 2026-09-23 checkpoint 已集成模块
 
 `src/platform/storage/postgres-primary-durable-checkpoint.js` 是 T00 显式合成端口，仅依赖源端品牌 loader、目标 driver 只读绑定事务和独立 SQLite 文件；未从服务组合根、路由或 worker 导入。目标 driver 新只读绑定校验维持迁移 sticky 语义。
@@ -473,7 +477,7 @@ owner、文件引用和 closed-world 核心概念匹配只是证据，不能自�
 |---|---|---|---|
 | `config/repository-governance.json` | T00 | 当前 workflow、Markdown 分类规则/闭集摘要、3 个 PDF 来源与 digest 的机器合同 | 不定义业务 owner，不包含 PDF 正文 |
 | `scripts/repository-governance.js` | T00 | 只读枚举 Git 路径，拒绝漏分/重叠/快照改写/旧 baseline/PDF 漂移 | 不生成或修改文档、PDF、报告和归档 |
-| `test/repository-governance.test.js` | T00 / TEST-001 | 锁定当前 290 份 Markdown、三类边界、当前 main 流程和 3 个 PDF 负向漂移 | 不证明 PDF 内容正确或生产可用 |
+| `test/repository-governance.test.js` | T00 / TEST-001 | 锁定当前 291 份 Markdown、三类边界、当前 main 流程和 3 个 PDF 负向漂移 | 不证明 PDF 内容正确或生产可用 |
 
 依赖方向为 `Git 跟踪路径 + ADR 状态 + 当前进程清单 + PDF bytes/source paths → repository governance
 verifier → governance-api/architecture:test`。snapshot 与 superseded 只提供历史证据，不得反向覆盖 current

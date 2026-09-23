@@ -1,5 +1,9 @@
 # DEPENDENCY MAP — 主线依赖地图
 
+## 2026-09-23 真实目标 checkpoint 验证在制
+
+专用测试 runner → 隔离 fixture → 已绑定 SQLite 源、正式 PostgreSQL 目标驱动与独立 SQLite checkpoint；既有 CI PostgreSQL 作业内串行执行。不增加生产依赖或自动 relay。
+
 ## 2026-09-23 checkpoint 已集成依赖
 
 人工合成调用 → 品牌源 loader → 绑定目标只读已应用账本 → 独立 SQLite checkpoint。无请求路径外部双写，无自动 relay/worker；目标与进度不共享事务，故先核对目标再单调推进，并以目标账本支持崩溃重放。
