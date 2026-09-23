@@ -34,8 +34,8 @@ function resolveBinding(value) {
   return { expectedTargetId: value.expectedTargetId, namespace: value.namespace, envelope };
 }
 
-async function targetIdentity(client) {
-  const rows = (await client.query("SELECT target_instance_id,namespace,created_at FROM health_platform.primary_target_identity FOR SHARE")).rows;
+async function targetIdentity(client, readOnly = false) {
+  const rows = (await client.query(`SELECT target_instance_id,namespace,created_at FROM health_platform.primary_target_identity${readOnly ? "" : " FOR SHARE"}`)).rows;
   if (rows.length !== 1 || typeof rows[0].target_instance_id !== "string" || !UUID_PATTERN.test(rows[0].target_instance_id)
     || rows[0].namespace !== "health_platform" || typeof rows[0].created_at !== "string"
     || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(rows[0].created_at)
@@ -50,11 +50,11 @@ async function assertEmptyTarget(client) {
   if (!row || row.batches !== false || row.collections !== false) throw identityError("HISTORY_PRESENT");
 }
 
-async function checkBinding(client, input) {
+async function checkBinding(client, input, readOnly = false) {
   const binding = resolveBinding(input);
-  const target = await targetIdentity(client);
+  const target = await targetIdentity(client, readOnly);
   if (target.targetInstanceId !== binding.expectedTargetId || target.namespace !== binding.namespace) throw identityError("MISMATCH");
-  const rows = (await client.query("SELECT target_instance_id,namespace,source_identity FROM health_platform.primary_source_binding FOR SHARE")).rows;
+  const rows = (await client.query(`SELECT target_instance_id,namespace,source_identity FROM health_platform.primary_source_binding${readOnly ? "" : " FOR SHARE"}`)).rows;
   if (rows.length !== 1 || rows[0].target_instance_id !== target.targetInstanceId || rows[0].namespace !== target.namespace
     || canonicalStringify(rows[0].source_identity) !== canonicalStringify(binding.envelope.sourceIdentity)) throw identityError("MISMATCH");
   return binding.envelope;
@@ -603,6 +603,12 @@ function createPostgresPrimaryDriver(options = {}) {
           );
         }
         let envelope;
+        if (readOnly && transactionOptions.binding) {
+          const migrated = await inspectPostgresPrimaryIdentityMigration(client);
+          if (migrated) requireBoundIdentity = true;
+          if (!migrated) throw identityError("MISSING");
+          await checkBinding(client, transactionOptions.binding, true);
+        }
         if (!readOnly) {
           const migrated = await inspectPostgresPrimaryIdentityMigration(client);
           if (migrated) requireBoundIdentity = true;

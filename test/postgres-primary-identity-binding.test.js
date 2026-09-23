@@ -117,6 +117,28 @@ async function bound(t) {
   return { ...f, f, envelope, binding, options: { expectedTargetId: identity.targetInstanceId, namespace: identity.namespace } };
 }
 
+test("bound read-only transaction verifies target and source identity before checkpoint receipt access", async (t) => {
+  const { f, envelope, binding, options } = await bound(t);
+  await f.contract.applyBoundCommittedOutbox(envelope, options);
+  const stored = await f.driver.transaction({ isolation: "repeatable-read", readOnly: true, binding },
+    (tx) => tx.getAppliedBatch(envelope.batch.batchId));
+  assert.equal(stored.batchId, envelope.batch.batchId);
+  await assert.rejects(f.driver.transaction({ isolation: "repeatable-read", readOnly: true,
+    binding: { ...binding, expectedTargetId: "a23b4567-89ab-4cde-8f01-23456789abcd" } },
+  (tx) => tx.getAppliedBatch(envelope.batch.batchId)), { code: "POSTGRES_PRIMARY_IDENTITY_MISMATCH" });
+});
+
+test("read-only binding observation pins migrated driver against later marker loss", async (t) => {
+  const { f, binding } = await bound(t);
+  const freshDriver = createPostgresPrimaryDriver({ pool: f.pool, controlledPool: true,
+    poolConfig: { max: 1, ssl: false } });
+  await freshDriver.transaction({ isolation: "repeatable-read", readOnly: true, binding },
+    (tx) => tx.getLastAppliedBatch());
+  f.state.migrated = false;
+  await assert.rejects(freshDriver.transaction({ isolation: "serializable", readOnly: false },
+    async () => null), { code: "POSTGRES_PRIMARY_IDENTITY_MISSING" });
+});
+
 test("identity initialization and genuine branded source binding permit exact apply and repeat without writes", async (t) => {
   const { f, envelope, options, binding } = await bound(t);
   assert.equal((await f.contract.applyBoundCommittedOutbox(envelope, options)).status, "applied");
