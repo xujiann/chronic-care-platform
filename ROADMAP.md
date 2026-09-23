@@ -2,6 +2,8 @@
 
 ## 真实 PostgreSQL checkpoint 验证 PLAN（2026-09-23）
 
+- 集成收口：限定测试切片由 [PR #318](https://github.com/xujiann/chronic-care-platform/pull/318) 保护 squash 合并为 `d63d308a1cfdb6db3707a2f939d7b264fbe5af36`；冻结 `cf16168c7e4323b89ceeeaf53027435bc0bac28c` 与合并共享 tree `f7ca39ce0144dea8e72c9f48c3343e5dc1ae5ddd`。独立审查无剩余 P0–P2，冻结本地 build/lint/typecheck、unit 485 文件、integration 66 文件、smoke 6、test:all 14 批及中央门禁串行通过；PR CI35829246941 与 main CI35830448870 各九项成功，真实 PG 专项各 41pass/0fail/0skip/0cancel；Pages35830448915 成功且仅为静态演示。GOV-021／OPS-047 关闭限定测试交付，WIP 回到 2/5；OPS-046 运行能力仍为已实现，生产六域继续 NO-GO。本事实收口自身仍需独审、冻结与门禁，不复用 PR #318 结果替代自身验证。
+
 - 基线 `origin/main@7be0041e`；PR #317 已将上一合成 checkpoint 切片的事实收口合并，主线 CI/Pages 仍以实际结果为准。本轮用户批准独立 ADR 准入，T00 单写，GOV-021 / OPS-047，WIP 从 2/5 登记至 4/5。
 - 目标：在现有隔离真实 PostgreSQL 测试库、正式驱动与已绑定 SQLite 源上验证 checkpoint 的目标凭证核对、提交后崩溃窗口、重启/精确重放和错误身份失败关闭。采用复用既有 fixture/专用 runner 的方案；详见 Accepted [ADR-OPS-047](docs/adr/2026-09-23-primary-checkpoint-live-verification.md)。
 - 写范围仅为新专项测试、现有 runner/guard、ADR/索引、总账、路线图、六图、数据库合同和 Markdown 清单；不改运行时代码、生产 DDL、API、worker、relay 或生产配置。真实 PG 结果只来自 CI 显式零跳过执行，本地环境 skip 不作证据。

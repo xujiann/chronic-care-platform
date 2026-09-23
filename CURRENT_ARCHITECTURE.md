@@ -1,8 +1,8 @@
 # CURRENT ARCHITECTURE — 主线现状地图
 
-## 2026-09-23 真实目标 checkpoint 验证在制
+## 2026-09-23 真实目标 checkpoint 限定测试已集成
 
-GOV-021 / OPS-047 仅增加隔离真实 PostgreSQL 目标账本与现有合成 SQLite checkpoint 的组合测试，尚未形成 PR/CI 证据；运行时拓扑、生产 schema 和 NO-GO 均未改变。决策见 ADR-OPS-047。
+GOV-021 / OPS-047 仅增加隔离真实 PostgreSQL 目标账本与现有合成 SQLite checkpoint 的组合测试。PR #318 已合并至 `main@d63d308a`，与冻结 `cf16168c` 共享 tree；PR/main CI 各九项成功，真实 PG 专项各 41pass/0fail/0skip/0cancel。限定测试能力已集成；运行时拓扑、生产 schema 和 NO-GO 均未改变。决策见 ADR-OPS-047。
 
 ## 2026-09-23 独立持久 checkpoint（限定代码已集成）
 

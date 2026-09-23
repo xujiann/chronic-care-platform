@@ -1,8 +1,8 @@
 # API MAP — 主线接口地图
 
-## 2026-09-23 真实目标 checkpoint 验证在制
+## 2026-09-23 真实目标 checkpoint 限定测试已集成
 
-OPS-047 是隔离测试，不新增 HTTP method/path、身份授权、公开错误合同或请求路径写入；API 目录和生产准入不变。
+OPS-047 隔离测试已由 PR #318 集成；不新增 HTTP method/path、身份授权、公开错误合同或请求路径写入。API 目录和生产准入不变，生产 NO-GO。
 
 ## 2026-09-23 checkpoint 接口边界
 

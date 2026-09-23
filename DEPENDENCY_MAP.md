@@ -1,8 +1,8 @@
 # DEPENDENCY MAP — 主线依赖地图
 
-## 2026-09-23 真实目标 checkpoint 验证在制
+## 2026-09-23 真实目标 checkpoint 限定测试已集成
 
-专用测试 runner → 隔离 fixture → 已绑定 SQLite 源、正式 PostgreSQL 目标驱动与独立 SQLite checkpoint；既有 CI PostgreSQL 作业内串行执行。不增加生产依赖或自动 relay。
+专用测试 runner → 隔离 fixture → 已绑定 SQLite 源、正式 PostgreSQL 目标驱动与独立 SQLite checkpoint；PR #318 已保护合并，PR/main 真实 PG 专项各 41pass、零跳过。既有 CI PostgreSQL 作业内串行执行，不增加生产依赖或自动 relay。
 
 ## 2026-09-23 checkpoint 已集成依赖
 

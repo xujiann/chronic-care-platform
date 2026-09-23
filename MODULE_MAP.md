@@ -1,8 +1,8 @@
 # MODULE MAP — 主线模块地图
 
-## 2026-09-23 真实目标 checkpoint 验证在制
+## 2026-09-23 真实目标 checkpoint 限定测试已集成
 
-T00 单写真实 PG 专项用例及既有专用 runner/guard；复用正式驱动与独立 checkpoint，不改运行时模块。GOV-021 / OPS-047 未经冻结和 CI 验收，不晋升能力状态。
+T00 单写真实 PG 专项用例及既有专用 runner/guard；PR #318 已保护合并，PR/main 真实 PG 专项各 41pass/0fail/0skip/0cancel。复用正式驱动与独立 checkpoint，不改运行时模块；GOV-021 / OPS-047 仅关闭测试任务，不晋升 OPS-046 的运行能力或生产状态。
 
 ## 2026-09-23 checkpoint 已集成模块
 
