@@ -602,3 +602,6 @@ JSON/SQLite/state API 不能据 owner 登记自动成为生产写接口。
 全部既有 `/api/blood-system` method/path 已从两个混合 route segment 的业务分支迁入 `src/clinical-specialties/blood/http-handler.js`。`clinical-specialties-06` 与 `clinical-specialties-10` 仍在原 manifest 插槽按原顺序调用血液 handler 后再处理影像或体检，因此未新增、删除或重排公开 API；认证角色、body 读取时机、幂等键、状态码、响应和持久化条件保持原行为。
 
 跨域投影在兼容字段基础上新增 `projectionId`、`status`、`sourceSubdomain` 和 `subjectRef`，使 `blood-emergency-coordination.v1`、`blood-quality-signal.v1`、`clinical-quality-observation.v1` 的必需字段可机器验证。该变化为加法兼容，不授权 consumer 反向写血液数据。
+# 2026-09-23 增量
+
+隔离单批次 relay 不新增或修改 HTTP API，也不挂载业务请求路径。

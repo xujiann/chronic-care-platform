@@ -477,7 +477,7 @@ owner、文件引用和 closed-world 核心概念匹配只是证据，不能自�
 |---|---|---|---|
 | `config/repository-governance.json` | T00 | 当前 workflow、Markdown 分类规则/闭集摘要、3 个 PDF 来源与 digest 的机器合同 | 不定义业务 owner，不包含 PDF 正文 |
 | `scripts/repository-governance.js` | T00 | 只读枚举 Git 路径，拒绝漏分/重叠/快照改写/旧 baseline/PDF 漂移 | 不生成或修改文档、PDF、报告和归档 |
-| `test/repository-governance.test.js` | T00 / TEST-001 | 锁定当前 291 份 Markdown、三类边界、当前 main 流程和 3 个 PDF 负向漂移 | 不证明 PDF 内容正确或生产可用 |
+| `test/repository-governance.test.js` | T00 / TEST-001 | 锁定当前 292 份 Markdown、三类边界、当前 main 流程和 3 个 PDF 负向漂移 | 不证明 PDF 内容正确或生产可用 |
 
 依赖方向为 `Git 跟踪路径 + ADR 状态 + 当前进程清单 + PDF bytes/source paths → repository governance
 verifier → governance-api/architecture:test`。snapshot 与 superseded 只提供历史证据，不得反向覆盖 current
@@ -541,3 +541,6 @@ T10 的 `clinical-blood` 条目只表示机构级逻辑选择与受控演练，�
 ## T07 医保支付产品线模块边界（2026-08-30）
 
 T07 `insurance-payment` 继续是 B 类 KEEP + IMPROVE 领域，并新增“独立开发产品线”组织标签。产品线复用既有按病种付费、医保结算、在线退款、金融网关、凭证回调、运营模型、验收和证据模块，不创建第二套 service、utility、API 或数据 Owner。独立 Roadmap、Backlog、工作树和测试不改变模块依赖；跨域接线、组合根、CI 和发布仍归 T00。
+# 2026-09-23 增量
+
+`src/platform/storage/postgres-primary-single-batch-relay.js` 是 T00 单写、仅显式调用的 rehearsal 协调器，依赖现有源 loader、目标合同与 checkpoint；无 server/worker 挂载。
