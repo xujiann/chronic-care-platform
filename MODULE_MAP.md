@@ -1,6 +1,6 @@
 # MODULE MAP — 主线模块地图
 
-## 2026-09-23 checkpoint 候选模块
+## 2026-09-23 checkpoint 已集成模块
 
 `src/platform/storage/postgres-primary-durable-checkpoint.js` 是 T00 显式合成端口，仅依赖源端品牌 loader、目标 driver 只读绑定事务和独立 SQLite 文件；未从服务组合根、路由或 worker 导入。目标 driver 新只读绑定校验维持迁移 sticky 语义。
 

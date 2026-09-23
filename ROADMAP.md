@@ -2,6 +2,8 @@
 
 ## 独立持久 checkpoint PLAN（2026-09-23）
 
+- 限定代码切片已由 [PR #316](https://github.com/xujiann/chronic-care-platform/pull/316) 保护 squash 合并为 `cf88124fc3cbad21322ca9fd5de007165fd5ecb2`；冻结 `de23cf513179a2cb1c97302fee8a1e1c1b8cd266`、PR 合成提交与 main 共享 tree `f80571eb845c98622300c09e1266e88fc111a61a`。独立审查无 P0–P2，本地 build/lint/typecheck、单元 484、integration 66 文件、smoke 6、原始 test:all 14 批及中央门禁均通过；PR CI35815776009 九项成功，main CI35816498287 九项及 Pages35816498305 成功。GOV-020/OPS-046 关闭限定代码交付，WIP 2/5；OPS-046 能力仍为已实现，真实 PG checkpoint 新路径、观测、多实例和现场证据未闭合。此收尾不改变运行时或生产，仍需自身审查与门禁，生产 NO-GO。
+
 - 用户已批准限定切片；`GOV-020 / OPS-046` 已登记，基线 `origin/main@717550d9`，WIP 4/5。
 - T00 单写合成环境独立 checkpoint、测试及治理；决策见 Accepted [ADR-OPS-046](docs/adr/2026-09-23-primary-durable-checkpoint.md)。
 - 非目标：自动 relay/worker、业务请求、生产接线、历史补证、多实例和现场放行。先窄测，再独立审查、冻结与完整串行门禁；生产 NO-GO。
