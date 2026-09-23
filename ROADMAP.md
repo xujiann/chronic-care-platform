@@ -1,5 +1,12 @@
 # 工程治理路线图
 
+## 隔离单批次 relay PLAN（2026-09-23，实施中）
+
+- 用户批准限定切片；基线 `origin/main@27a0f5d1`，无开放 PR，main CI/Pages 成功。T00 单写 `GOV-022 / OPS-048`，WIP 4/5；决策见 [ADR-OPS-048](docs/adr/2026-09-23-primary-single-batch-relay.md)。
+- 仅新增显式 rehearsal 端口：读取已初始化的独立 checkpoint、加载下一份品牌化 SQLite 提交凭证、调用受绑定 PostgreSQL 主存储合同，并在目标精确成功/重复后推进进度。目标提交后进度未写须可重放。合成测试及隔离真实 PG 专项覆盖；本机真实 PG 跳过不作证据。
+- 非目标：业务请求、常驻/自动 worker、生产接线、真实数据、DDL、公共 API、多实例及现场放行。运行日志、指标、告警、TLS、容量和灾备仍未闭合，六域生产 NO-GO。
+- 顺序：窄测与治理 → 独立审查 → 冻结提交 → 重型测试串行 → 必要 PR CI 真实 PG 零跳过。失败返回修复重审；不以旧 PR #318 证据替代本轮验证。回滚停止显式调用并保留源、目标和 checkpoint 事实，不自动删除已提交数据。
+
 ## 真实 PostgreSQL checkpoint 验证 PLAN（2026-09-23）
 
 - 集成收口：限定测试切片由 [PR #318](https://github.com/xujiann/chronic-care-platform/pull/318) 保护 squash 合并为 `d63d308a1cfdb6db3707a2f939d7b264fbe5af36`；冻结 `cf16168c7e4323b89ceeeaf53027435bc0bac28c` 与合并共享 tree `f7ca39ce0144dea8e72c9f48c3343e5dc1ae5ddd`。独立审查无剩余 P0–P2，冻结本地 build/lint/typecheck、unit 485 文件、integration 66 文件、smoke 6、test:all 14 批及中央门禁串行通过；PR CI35829246941 与 main CI35830448870 各九项成功，真实 PG 专项各 41pass/0fail/0skip/0cancel；Pages35830448915 成功且仅为静态演示。GOV-021／OPS-047 关闭限定测试交付，WIP 回到 2/5；OPS-046 运行能力仍为已实现，生产六域继续 NO-GO。本事实收口自身仍需独审、冻结与门禁，不复用 PR #318 结果替代自身验证。
@@ -209,7 +216,7 @@
 | 12 | 对象存储结构化元数据与耐久命令轨道 | Accepted OBJ-ADR-002；T08 data owner、T00 technical owner、v1/v2 兼容策略、SQLite v17、回填冻结、异步 API、fenced worker、keyset 分页和持久 reconcile 的仓库实现均已完成，production promotion=false / P1 | 真实 provider status/abort capability、KMS/WORM/扫描、容量、备份、监控和现场验收继续 NO-GO；不得把仓库实现完成解释为 worker 已现场激活或生产晋级 |
 | 13 | 严格生产预检证据信任装配 | Accepted ADR；T00 pinned-anchor/Ed25519 双角色 provider、CLI 自动装配、deployment package/env/CI 和负向矩阵已形成 / P0 | 真实 anchor/envelope、独立 signer、权限/轮换、外部 evidence 与现场执行继续由生产环境提供；provider 成功不替代完整 preflight 或最终人类授权 |
 | 14 | 生产切换行动证据与受保护晋级 | Accepted ADR；definitions-only v2、14/14 共享 Ed25519 验证、strict preflight 门禁、main/manual/production/self-hosted workflow 与 digest-only receipt 已形成 / P0 | GitHub production environment reviewers、专用 runner、真实 14 份 envelope、受控路径、外部审批和实际部署/现场签收继续 NO-GO；receipt 只证明预检资格 |
-| 15 | 当前工作流、Markdown 与跟踪 PDF 闭集治理 | GOV-001、DOC-001、REPO-001 仓库内缺口已关闭：开发默认 `origin/main`，固定 tag 仅作证据；291 份 Markdown 唯一分类；3 个 PDF 绑定来源与 digest / P2 | snapshot/superseded 保持只读；新增文档同步清单。两个历史 PDF 与一个现行校验 PDF 均无跟踪生成器，替换前必须先补可复现生成源，不得手工编辑 |
+| 15 | 当前工作流、Markdown 与跟踪 PDF 闭集治理 | GOV-001、DOC-001、REPO-001 仓库内缺口已关闭：开发默认 `origin/main`，固定 tag 仅作证据；292 份 Markdown 唯一分类；3 个 PDF 绑定来源与 digest / P2 | snapshot/superseded 保持只读；新增文档同步清单。两个历史 PDF 与一个现行校验 PDF 均无跟踪生成器，替换前必须先补可复现生成源，不得手工编辑 |
 | 16 | 首批生产范围机器冻结 | Accepted ADR；`priority-eight-applications-v1` 冻结 8 应用、9 页面、32 API、38 数据引用、7 worker、14 外部依赖、16 应用证据与 14 切换动作；API/Owner 复核归零。新增迁移闭集把 21 个受阻引用分为 20 个唯一持久化计划与 1 个派生读模型，`collectionRepositoryPlanMissing=0` / P0 | 仓库计划完整不代表迁移完成；21 个引用仍无生产写资格，全部 API/数据晋级、真实外部证据、worker 激活、PG 主切换和现场验收继续 NO-GO |
 | 17 | 招标需求治理 v2 | Accepted ADR；2 份中性样本文档、5 条候选、27 个能力 ID、受控 PDF 指纹导入、人工复核覆盖层、差距分析与产品化工作台已形成 / P0 | 原始文件、全文、浏览器上传、OCR/模型、自动改代码和生产授权均不在首批范围；复核写入口保持行为证据待补与生产 NO-GO |
 
