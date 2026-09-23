@@ -1,5 +1,9 @@
 # CURRENT ARCHITECTURE — 主线现状地图
 
+## 2026-09-23 真实目标 checkpoint 验证在制
+
+GOV-021 / OPS-047 仅增加隔离真实 PostgreSQL 目标账本与现有合成 SQLite checkpoint 的组合测试，尚未形成 PR/CI 证据；运行时拓扑、生产 schema 和 NO-GO 均未改变。决策见 ADR-OPS-047。
+
 ## 2026-09-23 独立持久 checkpoint（限定代码已集成）
 
 T00 新增独立 SQLite v1 checkpoint 技术账本，显式初始化绑定源/目标身份且目标批次账本须为空；推进前只读复核源批次及已绑定目标凭证，目标提交后进度未写可重放。不接自动 relay、HTTP、业务请求或生产；本地组件不是外部信任锚，生产 NO-GO。
@@ -109,7 +113,7 @@ OPS-043 限定代码切片已由 PR #310 合并（main `85bfde7a`，冻结 `b3b6
 ## 2026-08-31 当前架构事实机器对账
 
 - `scripts/documentation-fact-drift.js` 现以生产 API 目录、首批生产范围、SQLite migration、仓库 Markdown/PDF 闭集和 Accepted ADR 注册表为机器权威，对 ROADMAP、ARCHITECTURE、六张架构地图和 ADR 索引共 9 份当前文档失败关闭。
-- 当前对账值为 SQLite head v19/41 张非内部表、生产 API 637 项/364 个写入口/324 个行为证明缺口/326 个总复核项、首批范围 `FROZEN-NO-GO` 且范围内 API/集合复核与仓库迁移计划缺口均为 0、Markdown 290 份（220 current、68 snapshot、2 superseded）。
+- 当前对账值为 SQLite head v19/41 张非内部表、生产 API 637 项/364 个写入口/324 个行为证明缺口/326 个总复核项、首批范围 `FROZEN-NO-GO` 且范围内 API/集合复核与仓库迁移计划缺口均为 0、Markdown 291 份（221 current、68 snapshot、2 superseded）。
 - 该验证仅在内存 SQLite 中重放既有 migration 并读取仓库权威；不写 `data/db.json`、运行时 SQLite、生产证据、生成报告或归档产物，不改变任何运行时行为。
 
 ## 2026-08-31 首发数据迁移计划闭集
@@ -396,7 +400,7 @@ Worker、外部数字医院注册及仍为 Proposed 的对象存储 v2 worker �
 `baseline/governance-20260817-enhancement-v1` 仅保留为可复现证据 tag。历史日期化路由/治理文档不再被
 `AGENTS.md` 作为当前工作流入口引用，原文和摘要保持不变。
 
-`repository-governance-v1` 从 Git 路径派生；当前闭集为 290 份 Markdown：220 份 `current`、68 份
+`repository-governance-v1` 从 Git 路径派生；当前闭集为 291 份 Markdown：221 份 `current`、68 份
 `snapshot`、2 份 `superseded`，每个路径必须唯一命中规则；snapshot 内容聚合摘要失败关闭。
 `output/pdf` 的 3 个 PDF 未修改，分别绑定 SHA-256、大小、页数、引入提交、来源与保留理由。现有仓库
 没有任何一个 PDF 的可复现生成器；医院运行脚本只是 verifier，不能被描述为 generator。机器门禁只读，

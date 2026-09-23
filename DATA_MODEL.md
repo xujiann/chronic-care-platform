@@ -1,5 +1,9 @@
 # DATA MODEL — 主线数据地图
 
+## 2026-09-23 真实目标 checkpoint 验证在制
+
+本切片只在临时随机 PostgreSQL 库及合成 SQLite 文件验证已应用批次账本和独立进度的关系；不新增表、迁移、业务事实源或生产数据。目标账本仍是应用凭证权威，checkpoint 仅为可恢复技术游标。
+
 ## 2026-09-23 独立 checkpoint 已集成技术数据
 
 合成 checkpoint 文件的 `checkpoint_meta` 固定源/目标持久身份，`checkpoint_entries` 追加序号、批次及摘要，不含业务 payload；独立 `user_version=1`，不改变主 SQLite head v19 或 PostgreSQL 正式 schema。目标已应用批次账本仍是目标提交事实权威，checkpoint 只是本地进度；真实迁移和生产仍 NO-GO。
