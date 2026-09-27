@@ -1,5 +1,9 @@
 # DEPENDENCY MAP — 主线依赖地图
 
+## 2026-09-27 隔离 relay 脱敏观测（开发验证中）
+
+依赖方向增加 `隔离relay → worker-observability-contract → 既有versioned inventory/node:crypto`。共同层不反向依赖relay；无新依赖、调度或日志/告警sink。新增profile未登记部署入口，不授权运行激活。
+
 ## 2026-09-23 真实目标 checkpoint 限定测试已集成
 
 专用测试 runner → 隔离 fixture → 已绑定 SQLite 源、正式 PostgreSQL 目标驱动与独立 SQLite checkpoint；PR #318 已保护合并，PR/main 真实 PG 专项各 41pass、零跳过。既有 CI PostgreSQL 作业内串行执行，不增加生产依赖或自动 relay。
