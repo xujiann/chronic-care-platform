@@ -560,3 +560,6 @@ classification、显式 fail-closed write policy 和实际源码证据。它们�
 ## 医保支付产品线数据边界（2026-08-30）
 
 产品线身份不创建或迁移任何数据结构。T07 继续通过 `config/domain-data-ownership.json` 消费既有医保支付 Owner/reader/write-policy 事实，核心 Resident、Institution、Practitioner、Record 等定义保持 closed-world；JSON/SQLite 兼容状态、PostgreSQL 目标、migration、事务/outbox 和生产写资格均未改变。独立数据库和数据自治仍须新的数据 ADR、版本化 migration、回填/核对/回滚及生产证据。
+# 2026-09-23 增量
+
+单批次 relay 不新增集合、表、migration 或第二事实源。源提交凭证、目标已应用账本和独立 SQLite checkpoint 各保留原权威边界；目标提交后进度未写以目标精确重放恢复。

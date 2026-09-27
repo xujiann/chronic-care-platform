@@ -253,3 +253,6 @@ CLI 从已打开的文件描述符有界读取，并要求内容与必填的预�
 `createPrimaryDurableCheckpoint({checkpointFile, sourceFile, driver, expectedTargetId})` 是显式本地合成端口，不由服务、HTTP 或 worker 导入。调用方对全新隔离路径显式 `await initialize()` 一次；目标身份绑定且批次账本为空才可初始化，缺失的已用文件不会自动重建。独立 SQLite v1 文件只存技术身份、序号和摘要，不存集合 payload。调用方必须先经原有绑定合同提交目标批次；`advance(envelope)` 从源 loader 原始品牌对象和目标只读、身份绑定的已应用账本核对完整凭证，再以 `BEGIN IMMEDIATE` 单调追加。目标提交后 checkpoint 写入前中断，可再次核验并推进；已有最后批次精确重放返回原游标，不写新行。`await read()` 重新扫描源链，空进度也复核目标绑定；非空进度同时核验目标凭证。丢失/漂移、跳号、错身份或目标凭证不符均失败关闭，不自动补历史。
 
 此文件不是可信外部 anchor；完整文件回滚/克隆、跨主机并发、真实 TLS/容量/灾备和现场签署仍需独立方案。无自动 relay、业务请求或生产接线；六域生产继续 NO-GO。决策见 [ADR-OPS-046](adr/2026-09-23-primary-durable-checkpoint.md)。
+# 隔离单批次 relay（2026-09-23 增量）
+
+`src/platform/storage/postgres-primary-single-batch-relay.js` 只提供显式 `runOnce` rehearsal：从已初始化 checkpoint 读取进度，装载下一份品牌化 SQLite 凭证，调用受绑定目标合同，在目标确认同一批次已应用或精确重复后推进独立进度。目标提交后进度未写可重复调用恢复。返回仅包含技术状态和序号；不自动初始化、重绑或补历史，不挂载服务/worker 或启用生产。真实 PostgreSQL 专项本轮 CI 零跳过之前不能宣称该组合已实测；生产仍 NO-GO。

@@ -2,6 +2,7 @@
 
 | 新增决策 | 状态 | 范围 |
 |---|---|---|
+| [隔离环境主存储单批次 relay](./2026-09-23-primary-single-batch-relay.md) | Accepted | 显式下一批投递与进度推进；不接请求、worker 或生产 |
 | [主存储独立持久 checkpoint](./2026-09-23-primary-durable-checkpoint.md) | Accepted | 合成环境进度账本与崩溃重放；不含自动 relay/请求/生产 |
 | [真实 PostgreSQL 目标账本下的 checkpoint 验证](./2026-09-23-primary-checkpoint-live-verification.md) | Accepted | 复用隔离真实 PG 目标和合成 SQLite 进度；不含生产接线或多实例声明 |
 | [源目标持久身份与绑定](./2026-09-22-primary-source-target-identity.md) | Accepted | 显式初始化/不可变绑定、追加 SQLite/PG 版本迁移及隔离合成测试；不含 relay/checkpoint/请求/生产 |

@@ -11,6 +11,7 @@ const { initializeSqliteOutboxSourceIdentity } = require("../src/platform/storag
 const { commitSqliteBoundOutboxTransaction, loadBoundSqliteOutboxBatches } = require("../src/platform/storage/sqlite-outbox-commit-receipt");
 const { applyPostgresPrimaryIdentityMigrations } = require("../src/platform/storage/postgres-primary-identity-migrations");
 const { createPrimaryDurableCheckpoint } = require("../src/platform/storage/postgres-primary-durable-checkpoint");
+const { createPrimarySingleBatchRelay } = require("../src/platform/storage/postgres-primary-single-batch-relay");
 
 const options = { timeout: 60000 };
 async function setup(t) {
@@ -96,4 +97,32 @@ test("live PG checkpoint refuses wrong target and nonempty initialization withou
     { code: "POSTGRES_PRIMARY_CHECKPOINT_TARGET_NOT_EMPTY" });
   assert.equal(fs.existsSync(secondFile), false);
   assert.equal((await checkpoint().advance(envelopes[0])).outboxSequence, 1);
+});
+
+test("live PG relay processes one committed batch per call and recovers after target commit", options, async (t) => {
+  const s = await setup(t); if (!s) return;
+  const { f, pin, checkpoint, checkpointFile, contract } = s;
+  const config = contract.status();
+  const driver = f.createDriver(f.pool, { requireBoundIdentity: true });
+  const relay = (selected = driver, targetId = pin.expectedTargetId) => createPrimarySingleBatchRelay({
+    sourceFile: f.sqliteFile, checkpointFile, driver: selected, contractConfig: config, expectedTargetId: targetId });
+  await assert.rejects(relay().runOnce(), { code: "POSTGRES_PRIMARY_CHECKPOINT_MISSING" });
+  await checkpoint().initialize();
+  await assert.rejects(relay(driver, randomUUID()).runOnce(),
+    { code: "POSTGRES_PRIMARY_CHECKPOINT_IDENTITY_MISMATCH" });
+  assert.equal((await f.rawSnapshot()).batches.length, 0);
+  let failAfterCommit = true;
+  const crashAfterCommit = { status: () => driver.status(),
+    async transaction(options, operation) {
+      const result = await driver.transaction(options, operation);
+      if (!options.readOnly && failAfterCommit) { failAfterCommit = false; throw new Error("synthetic-after-target-commit"); }
+      return result;
+    } };
+  await assert.rejects(relay(crashAfterCommit).runOnce(), /synthetic-after-target-commit/);
+  assert.equal((await f.rawSnapshot()).batches.length, 1);
+  assert.equal(await checkpoint().read(), null);
+  assert.deepEqual(await relay().runOnce(), { status: "duplicate", outboxSequence: 1 });
+  assert.deepEqual(await relay().runOnce(), { status: "applied", outboxSequence: 2 });
+  assert.deepEqual(await relay().runOnce(), { status: "idle", outboxSequence: 2 });
+  assert.equal((await f.rawSnapshot()).batches.length, 2);
 });
