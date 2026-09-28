@@ -22,6 +22,7 @@ const {
 const NOW = "2026-08-23T08:00:00.000Z";
 
 const REPORTS = Object.freeze({
+  "postgres-primary-rehearsal-relay": { ok: true, status: "applied", claimed: 1, succeeded: 1, failed: 0, errorCode: "" },
   "postgres-shadow-sync": { ok: true, processed: 3, delivered: 3, failed: 0 },
   "domain-shadow-relay": { ok: true, relayId: "referral-shadow", relayed: 2, outcomes: [] },
   "postgres-shadow-reconciliation": { ok: true, status: "matched", runId: "reconcile-1", checkedAt: NOW, summary: { localCollections: 4, matched: 4, mismatched: 0 } },

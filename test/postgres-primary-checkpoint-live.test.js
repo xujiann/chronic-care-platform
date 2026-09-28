@@ -126,3 +126,60 @@ test("live PG relay processes one committed batch per call and recovers after ta
   assert.deepEqual(await relay().runOnce(), { status: "idle", outboxSequence: 2 });
   assert.equal((await f.rawSnapshot()).batches.length, 2);
 });
+
+test("live PG observed relay preserves commit uncertainty and recovers checkpoint failure without duplicate writes", options, async (t) => {
+  const s = await setup(t); if (!s) return;
+  const { f, pin, checkpoint, checkpointFile, contract } = s;
+  const driver = f.createDriver(f.pool, { requireBoundIdentity: true });
+  const relay = (selected = driver, targetId = pin.expectedTargetId) => createPrimarySingleBatchRelay({
+    sourceFile: f.sqliteFile, checkpointFile, driver: selected, contractConfig: contract.status(), expectedTargetId: targetId });
+  const missing = await relay().runObservedOnce();
+  assert.equal(missing.errorCode, "POSTGRES_PRIMARY_CHECKPOINT_MISSING");
+  assert.equal(missing.targetCommit, "not-attempted");
+  await checkpoint().initialize();
+  const wrong = await relay(driver, randomUUID()).runObservedOnce();
+  assert.equal(wrong.errorCode, "POSTGRES_PRIMARY_CHECKPOINT_IDENTITY_MISMATCH");
+  assert.equal((await f.rawSnapshot()).batches.length, 0);
+  const crashAfterCommit = { status: () => driver.status(), async transaction(input, operation) {
+    const result = await driver.transaction(input, operation);
+    if (!input.readOnly) throw Object.assign(new Error("secret-token sensitive-name"), { code: "SECRET_TOKEN" });
+    return result;
+  } };
+  const unknown = await relay(crashAfterCommit).runObservedOnce();
+  assert.equal(unknown.phase, "target-apply");
+  assert.equal(unknown.targetCommit, "unknown");
+  assert.equal(unknown.checkpointCommit, "not-attempted");
+  assert.equal(unknown.workerObservability.outcome, "failed");
+  assert.equal((await f.rawSnapshot()).batches.length, 1);
+  assert.equal(await checkpoint().read(), null);
+  const targetBefore = await f.rawSnapshot();
+  const original = DatabaseSync.prototype.prepare;
+  DatabaseSync.prototype.prepare = function failCheckpointInsert(sql) {
+    const statement = original.call(this, sql);
+    if (!String(sql).includes("INSERT INTO checkpoint_entries(")) return statement;
+    return { run(...args) { statement.run(...args); throw new Error("secret-token checkpoint.sqlite"); } };
+  };
+  let progressFailure;
+  try { progressFailure = await relay().runObservedOnce(); }
+  finally { DatabaseSync.prototype.prepare = original; }
+  assert.equal(progressFailure.phase, "checkpoint-advance");
+  assert.equal(progressFailure.targetCommit, "confirmed");
+  assert.equal(progressFailure.checkpointCommit, "unknown");
+  assert.equal(progressFailure.succeeded, 0);
+  assert.equal(progressFailure.workerObservability.outcome, "failed");
+  assert.deepEqual(await f.rawSnapshot(), targetBefore);
+  assert.equal(await checkpoint().read(), null);
+  const fresh = relay(f.createDriver(f.newPool(), { requireBoundIdentity: true }));
+  const recovered = await fresh.runObservedOnce();
+  assert.equal(recovered.status, "duplicate");
+  assert.equal(recovered.checkpointCommit, "confirmed");
+  assert.deepEqual(await f.rawSnapshot(), targetBefore);
+  assert.equal((await checkpoint().read()).outboxSequence, 1);
+  assert.equal((await fresh.runObservedOnce()).status, "applied");
+  assert.equal((await fresh.runObservedOnce()).workerObservability.outcome, "idle");
+  assert.equal((await f.rawSnapshot()).batches.length, 2);
+  for (const report of [missing, wrong, unknown, progressFailure, recovered]) {
+    assert.doesNotMatch(JSON.stringify(report), /secret-token|sensitive-name|checkpoint\.sqlite|SECRET_TOKEN/);
+    assert.equal(report.workerObservability.productionAuthorization.productionReady, false);
+  }
+});

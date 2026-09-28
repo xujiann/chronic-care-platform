@@ -4,6 +4,27 @@
   "productionAuthorization": "never",
   "profiles": [
     {
+      "id": "postgres-primary-rehearsal-relay",
+      "ownerProcess": "T00",
+      "entrypoints": [],
+      "implementationSources": ["src/platform/storage/postgres-primary-single-batch-relay.js"],
+      "stateMachine": "explicit-single-batch-rehearsal-v1",
+      "deliveryGuarantee": "bound-idempotent-target-replay-not-exactly-once",
+      "retryModel": "explicit-caller-reinvocation-no-automatic-retry",
+      "leaseModel": "single-checkpoint-writer-no-lease",
+      "checkpointModel": "verified-target-receipt-before-durable-local-progress",
+      "terminalStates": ["idle", "applied", "duplicate", "failed"],
+      "observability": {
+        "workerIdentityPaths": [], "runIdentityPaths": [], "observedAtPaths": [],
+        "okPaths": ["ok"], "skippedPaths": [], "statusPaths": ["status"],
+        "countPaths": {
+          "claimed": ["claimed"], "succeeded": ["succeeded"], "retryScheduled": [],
+          "deadLettered": [], "persistenceRejected": [], "failed": ["failed"]
+        },
+        "errorCollections": [{ "path": "$", "codePaths": ["errorCode"] }]
+      }
+    },
+    {
       "id": "postgres-shadow-sync",
       "ownerProcess": "T00",
       "entrypoints": ["scripts/postgres-sync-worker.js"],
