@@ -1,5 +1,9 @@
 # MODULE MAP — 主线模块地图
 
+## 2026-09-28 隔离 relay 脱敏观测已保护集成
+
+T00 的隔离 relay 与既有共同观测 profile 已由 PR #321 合入主线；PR/main 真实 PostgreSQL 专项各43pass/0skip。只增加模块内显式方法、清单和测试；不改路由、worker入口、依赖或部署拓扑。任务代码交付已关闭，完整运行能力未晋升。
+
 ## 2026-09-27 隔离 relay 脱敏观测（开发验证中）
 
 T00 单写 `postgres-primary-single-batch-relay.js`，新增显式观测方法，保留旧返回/异常。只调用既有 worker-observability 适配器，新增 rehearsal profile、部署入口为空。共享观测清单现14个profile，10个部署入口；无新模块、域owner或服务。

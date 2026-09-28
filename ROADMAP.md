@@ -2,7 +2,9 @@
 
 ## 隔离 relay 观测 PLAN（2026-09-27，已批准）
 
-- 实施进度：加法 `runObservedOnce()` 与既有共同合同 profile 已实现，固定故障阶段和目标/checkpoint提交未知语义；旧调用不附加观测。组合窄测22pass/0fail/4skip，4项为未启用本机真实PG，不作现场或CI证据。独审、冻结完整串行门禁、真实PG零跳过CI和保护PR尚待完成；GOV-023/OPS-049验证中，运行能力不晋升。
+- 2026-09-28 集成收口：限定切片由 [PR #321](https://github.com/xujiann/chronic-care-platform/pull/321) 保护 squash 合并为 `7d5b2c517dc7ad66e4861667b9e0c7167a7a27a4`，与独立审查冻结 `1ff0ddef0c26ec67dfd47e2eea96ada0137f42e1` 共享 tree `9d2712fedd3a28b84a5121ac275c485f2cfe9b79`。独审无P0–P2，本地18项冻结串行门禁通过：全量3748pass/44环境skip/0fail，server及10组边界覆盖通过；PR CI36364784446/main CI36370896197各9项成功，真实PG专项各43pass/0skip；Pages36370896211成功且仅静态发布。GOV-023关闭并已集成，OPS-049关闭限定代码交付但能力仅已实现，WIP 2/5；监控投递、告警、SLO、多实例、TLS、容量灾备和现场证据仍缺，生产六域NO-GO。本收口自身仍需独审、冻结与门禁，不复用PR #321证据代替自身验证。
+
+- 2026-09-27 实施阶段记录：加法 `runObservedOnce()` 与既有共同合同 profile 已实现，固定故障阶段和目标/checkpoint提交未知语义；旧调用不附加观测。当时组合窄测22pass/0fail/4skip，4项为未启用本机真实PG，不作现场或CI证据；后续集成结果见上，运行能力未晋升。
 
 - PR #320 已保护 squash 合并为 `0875adaef53563146b1f5c0ac1bb6440b3cdd70f`，与冻结 `bee439d5` 共享 tree `8a8c165eadf183cef4d6fc4e12f623c7363eb200`；PR CI35847628139、main CI36301868053及静态Pages36301868020成功。PG专用入口强制零跳过，但本轮未独立取得详细计数。GOV-022关闭限定交付，OPS-048保留运行和现场能力缺口。
 - 用户批准GOV-023/OPS-049；新process工作树基于上述主线，T00单写，WIP4/5。复用共同观测合同，新增显式观测方法，保留runOnce兼容；阶段与目标提交未知窗口、稳定错误码和脱敏边界见Accepted ADR-OPS-049。

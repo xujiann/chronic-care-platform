@@ -257,7 +257,7 @@ CLI 从已打开的文件描述符有界读取，并要求内容与必填的预�
 
 `src/platform/storage/postgres-primary-single-batch-relay.js` 只提供显式 `runOnce` rehearsal：从已初始化 checkpoint 读取进度，装载下一份品牌化 SQLite 凭证，调用受绑定目标合同，在目标确认同一批次已应用或精确重复后推进独立进度。目标提交后进度未写可重复调用恢复。返回仅包含技术状态和序号；不自动初始化、重绑或补历史，不挂载服务/worker 或启用生产。真实 PostgreSQL 专项本轮 CI 零跳过之前不能宣称该组合已实测；生产仍 NO-GO。
 
-## 隔离 relay 脱敏观测（OPS-049，开发验证中）
+## 隔离 relay 脱敏观测（OPS-049，限定代码已集成）
 
 T00 加法端口 `await relay.runObservedOnce()` 复用同一单批次执行路径，成功或执行失败均返回冻结的技术报告；工厂输入校验仍抛错。旧 `runOnce()` 返回 `{status,outboxSequence}` 并保留原异常，不附加观测字段。两者不自动重试、不初始化 checkpoint、不接 HTTP/worker/生产。
 
@@ -275,5 +275,7 @@ claimed 表示本轮装载了一份批次，不是租约/抢占计数；succeede
 `POSTGRES_PRIMARY_RELAY_EXECUTION_FAILED`。没有原消息、stack、URL、路径、身份、批次正文或凭据。
 仅自建技术元数据传入既有 `platform-worker-observability.v1`，profile 为
 `postgres-primary-rehearsal-relay`，部署 entrypoints 为空；不新增第二观测协议或日志/告警 sink。
-报告是一次调用返回，不是持久监控或可信外部事实凭证；全量测试、独立审查与真实 PG 零跳过 CI
-尚待本候选完成。生产监控投递、SLO、多实例、TLS、容量、灾备、故障手册与现场证据未闭合，六域 NO-GO。
+报告是一次调用返回，不是持久监控或可信外部事实凭证。限定代码已由 PR #321 合并至
+`main@7d5b2c51`，与独立审查冻结候选共享文件树；PR/main CI 各9项成功，真实 PostgreSQL
+专项各43pass/0skip。生产监控投递、告警、SLO、多实例、TLS、容量、灾备、故障手册与现场证据
+未闭合，六域 NO-GO；仓库集成不授权生产运行。

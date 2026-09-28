@@ -1,5 +1,9 @@
 # DEPENDENCY MAP — 主线依赖地图
 
+## 2026-09-28 隔离 relay 脱敏观测已保护集成
+
+PR #321 后依赖仍为 `显式隔离relay → 既有worker-observability-contract → versioned inventory/node:crypto`；无反向依赖、自动调度或生产部署入口。共同观测14个profile、10个部署入口不改变运行状态机；主线 CI成功不等于监控投递或现场就绪。
+
 ## 2026-09-27 隔离 relay 脱敏观测（开发验证中）
 
 依赖方向增加 `隔离relay → worker-observability-contract → 既有versioned inventory/node:crypto`。共同层不反向依赖relay；无新依赖、调度或日志/告警sink。新增profile未登记部署入口，不授权运行激活。
