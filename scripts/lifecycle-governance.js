@@ -229,7 +229,28 @@ function validateLifecycleGovernance(config, options = {}) {
   for (const scenario of scenarios.values()) {
     if (!sameSet(new Set(scenario.pathTypes || []), REQUIRED_SCENARIO_PATHS)) throw new Error(`${scenario.id} must cover normal, failure, unauthorized and recovery paths`);
     if (!capabilityStatuses.includes(scenario.status) || !Array.isArray(scenario.ownerProcesses) || scenario.ownerProcesses.length === 0) throw new Error(`${scenario.id} lacks owners or lifecycle status`);
-    if (capabilityStatuses.indexOf(scenario.status) >= capabilityStatuses.indexOf("已验证") && (!(scenario.testIds || []).length || !(scenario.evidenceIds || []).length)) throw new Error(`${scenario.id} is verified without tests and evidence`);
+    const scenarioTestIds = scenario.testIds === undefined ? [] : scenario.testIds;
+    const scenarioEvidenceIds = scenario.evidenceIds === undefined ? [] : scenario.evidenceIds;
+    if (!Array.isArray(scenarioTestIds) || !Array.isArray(scenarioEvidenceIds)) throw new Error(`${scenario.id} test and evidence references must be arrays`);
+    assertReferences(scenarioTestIds, tests, scenario.id);
+    assertReferences(scenarioEvidenceIds, evidence, scenario.id);
+    const scenarioStatusIndex = capabilityStatuses.indexOf(scenario.status);
+    if (scenarioStatusIndex >= capabilityStatuses.indexOf("已验证")) {
+      if (!scenarioTestIds.length || !scenarioEvidenceIds.length) throw new Error(`${scenario.id} is verified without tests and evidence`);
+      for (const testId of scenarioTestIds) {
+        if (!scenarioEvidenceIds.some((id) => (evidence.get(id).testIds || []).includes(testId))) {
+          throw new Error(`${scenario.id} test ${testId} lacks matching evidence`);
+        }
+      }
+      for (const evidenceId of scenarioEvidenceIds) {
+        if (!(evidence.get(evidenceId).testIds || []).some((id) => scenarioTestIds.includes(id))) {
+          throw new Error(`${scenario.id} evidence ${evidenceId} lacks matching test`);
+        }
+      }
+    }
+    if (scenarioStatusIndex >= capabilityStatuses.indexOf("准生产") && [...admissions.values()].some((item) => item.status !== "GO")) {
+      throw new Error(`${scenario.id} cannot be production-ready while admission domains remain NO-GO`);
+    }
   }
   for (const admission of admissions.values()) {
     if (!["GO", "NO-GO"].includes(admission.status) || !admission.repositoryStatus || !admission.unblockCondition || !admission.responsibleParty || !admission.requiredEvidence?.length) throw new Error(`${admission.id} admission rule is incomplete`);

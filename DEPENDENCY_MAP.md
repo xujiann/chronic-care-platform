@@ -1,5 +1,13 @@
 # DEPENDENCY MAP — 主线依赖地图
 
+## 2026-09-29 OPS-051 体检页面身份初始化时序准入
+
+依赖保持 `既有 auth 初始化结果 → physical-examination.js 页面启动与角色渲染`；页面不修改 auth.js，也不新增反向依赖、外部服务、包、worker 或 CI 拓扑。T06 两文件单写，T00 仅治理登记；原 `92c3939e` 的 E2E 失败继续作为阻断证据，生产六域 NO-GO。
+
+## 2026-09-29 PR324集成与GS03限定验收（开发中）
+
+GS-03测试复用test/helpers/api-regression-runtime.js启动真实服务；不mock资源授权，不改共享helper或CI拓扑。治理脚本复用既有测试/证据注册与六域门禁，不新增schema、依赖或证据生成器。
+
 ## 2026-09-29 上线缺口修复（独立审查中）
 
 storage-admin 使用现有 node:sqlite 同步 VACUUM INTO 和完整性检查，不新增第三方依赖；证据校验要求非空字符串身份、规范化唯一性和有限数值，不修改外部签名信任链。T05 路由复用既有授权和公共投影。

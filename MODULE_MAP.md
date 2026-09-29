@@ -1,5 +1,13 @@
 # MODULE MAP — 主线模块地图
 
+## 2026-09-29 OPS-051 体检页面身份初始化时序准入
+
+OPS-051 由 T06 独占 `physical-examination.js` 与既有可信渲染 E2E 文件，等待现有身份授权就绪后再作角色控件渲染；不创建模块或修改共享认证。T00 独占总账与六图，旧 GOV-025/TEST-023 阻塞但能力不降级。T06 本地定向与完整体检文件各1项通过，仅为窄测；冻结 `92c3939e` 的 E2E 失败及六域 NO-GO 保留，新候选仍待独审和全门禁。
+
+## 2026-09-29 PR324集成与GS03限定验收（开发中）
+
+SEC-017/OPS-050/SEC-018由PR #324交付。GOV-025仅修改生命周期校验脚本与测试；TEST-023在T05独立工作树新增真实HTTP测试，复用既有测试夹具，不新增业务模块。T00负责总账、证据与集成，单写范围分离。
+
 ## 2026-09-29 上线缺口修复（独立审查中）
 
 T00 单写证据校验与 storage-admin；T05 独立工作树单写 care-coordination 路由。联调包复用 canAccessReferralTeleconsultation，SLA ack 复用 publicTeleconsultation；未新增公共模块或服务。
