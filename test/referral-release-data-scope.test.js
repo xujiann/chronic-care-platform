@@ -90,9 +90,18 @@ test("joint-test samples use the caller's referral scope before building the pac
   assert.deepEqual(insurance.body.samples.map((item) => item.payload.teleconsultationId), ["rtc-demo"]);
   assert.doesNotMatch(JSON.stringify(insurance.body), /private-referral-b|resident-b|allowed-referral-a|resident-a/);
 
+  const institutionWithoutScope = await request(f.baseUrl, "/api/referral-teleconsultations/joint-test-pack", "institution");
+  assert.equal(institutionWithoutScope.status, 200);
+  assert.deepEqual(institutionWithoutScope.body.samples.map((item) => item.payload.teleconsultationId), ["rtc-demo"]);
+  assert.doesNotMatch(JSON.stringify(institutionWithoutScope.body), /private-referral-b|resident-b|allowed-referral-a|resident-a/);
+
   const commission = await request(f.baseUrl, "/api/referral-teleconsultations/joint-test-pack", "commission");
   assert.equal(commission.status, 200);
   assert.equal(commission.body.samples[0].payload.teleconsultationId, "private-referral-b");
+
+  const county = await request(f.baseUrl, "/api/referral-teleconsultations/joint-test-pack", "county");
+  assert.equal(county.status, 200);
+  assert.equal(county.body.samples[0].payload.teleconsultationId, "private-referral-b");
 
   assert.equal((await request(f.baseUrl, "/api/referral-teleconsultations/joint-test-pack", "citizen")).status, 403);
   assert.equal(f.writes(), 0);
