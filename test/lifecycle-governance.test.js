@@ -277,6 +277,79 @@ test("every golden scenario retains normal, failure, unauthorized and recovery p
   assert.throws(() => validateLifecycleGovernance(invalid), /must cover normal, failure, unauthorized and recovery paths/);
 });
 
+test("golden scenario test and evidence references must exist, including before verification", () => {
+  const missingTest = copy();
+  missingTest.goldenScenarios[2].testIds = ["TEST-NOT-FOUND"];
+  assert.throws(() => validateLifecycleGovernance(missingTest), /GS-03 references unknown id TEST-NOT-FOUND/);
+
+  const missingEvidence = copy();
+  missingEvidence.goldenScenarios[2].evidenceIds = ["EVD-NOT-FOUND"];
+  assert.throws(() => validateLifecycleGovernance(missingEvidence), /GS-03 references unknown id EVD-NOT-FOUND/);
+
+  for (const [field, value] of [
+    ["testIds", "TEST-GOV-001"], ["evidenceIds", { id: "EVD-GOV-001" }],
+    ["testIds", null], ["evidenceIds", null]
+  ]) {
+    const malformed = copy();
+    malformed.goldenScenarios[2][field] = value;
+    assert.throws(() => validateLifecycleGovernance(malformed), /GS-03 test and evidence references must be arrays/);
+  }
+
+  assert.equal(validateLifecycleGovernance(copy()).summary.productionDecision, "NO-GO");
+});
+
+test("verified golden scenarios bind every listed test and evidence to each other", () => {
+  const verified = copy();
+  const scenario = verified.goldenScenarios[2];
+  scenario.status = "已验证";
+  scenario.testIds = ["TEST-GOV-001"];
+  scenario.evidenceIds = ["EVD-GOV-001"];
+  assert.equal(validateLifecycleGovernance(verified).summary.productionDecision, "NO-GO");
+  scenario.status = "已集成";
+  assert.equal(validateLifecycleGovernance(verified).summary.productionDecision, "NO-GO");
+  scenario.status = "已验证";
+
+  scenario.testIds.push("TEST-SEC-018");
+  assert.throws(() => validateLifecycleGovernance(verified), /GS-03 test TEST-SEC-018 lacks matching evidence/);
+  scenario.testIds.pop();
+  scenario.evidenceIds.push("EVD-TEST-012");
+  assert.throws(() => validateLifecycleGovernance(verified), /GS-03 evidence EVD-TEST-012 lacks matching test/);
+});
+
+test("golden scenarios cannot reach production states while any admission domain is NO-GO", () => {
+  for (const status of ["准生产", "已投产"]) {
+    const premature = copy();
+    const scenario = premature.goldenScenarios[2];
+    scenario.status = status;
+    scenario.testIds = ["TEST-GOV-001"];
+    scenario.evidenceIds = ["EVD-GOV-001"];
+    assert.throws(() => validateLifecycleGovernance(premature), /GS-03 cannot be production-ready while admission domains remain NO-GO/);
+
+    // Fixture-only external metadata isolates the one-NO-GO domain branch.
+    const fixtureEvidence = { ...premature.evidence.find((item) => item.id === "EVD-GOV-001"),
+      id: "EVD-FIXTURE-EXTERNAL", scope: "external", productionEvidence: true };
+    premature.evidence.push(fixtureEvidence);
+    for (const admission of premature.productionAdmission.slice(0, 5)) {
+      admission.status = "GO";
+      admission.evidenceIds = [fixtureEvidence.id];
+    }
+    scenario.status = "已集成";
+    assert.equal(validateLifecycleGovernance(premature).summary.productionDecision, "NO-GO");
+    scenario.status = status;
+    assert.throws(() => validateLifecycleGovernance(premature), /GS-03 cannot be production-ready while admission domains remain NO-GO/);
+  }
+
+  const fakeExternal = copy();
+  fakeExternal.goldenScenarios[2].status = "准生产";
+  fakeExternal.goldenScenarios[2].testIds = ["TEST-GOV-001"];
+  fakeExternal.goldenScenarios[2].evidenceIds = ["EVD-GOV-001"];
+  for (const admission of fakeExternal.productionAdmission) {
+    admission.status = "GO";
+    admission.evidenceIds = ["EVD-GOV-001"];
+  }
+  assert.throws(() => validateLifecycleGovernance(fakeExternal), /cannot be GO without external production evidence/);
+});
+
 test("implemented runtime work can expose observability gaps without claiming capability completion", () => {
   const runtimeTask = activeControlTowerFixture();
   runtimeTask.tasks[0].runtimeCapability = true;

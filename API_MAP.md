@@ -1,5 +1,9 @@
 # API MAP — 主线接口地图
 
+## 2026-09-29 PR324集成与GS03限定验收（开发中）
+
+TEST-023测试既有POST /api/registration-referral/commands的跨机构报告、撤销、续授权和恢复合同，不新增HTTP或权限。目标是四路径与幂等持久副作用，非外部签名回调验收。PR #324联调采样范围及公共回执投影修复已集成。
+
 ## 2026-09-29 上线缺口修复（独立审查中）
 
 GET /api/referral-teleconsultations/joint-test-pack 在采样前按当前用户权限过滤会诊来源，空范围不读取全库样本；POST /api/referral-teleconsultations/:id/escalations/ack 去除私有 _writeCommandReceipts，持久数据保留。角色和方法路径不变；隔离真实 handler 回归不替代完整上线验收。
