@@ -589,6 +589,9 @@ test("physical examination workbench keeps hostile API fields inert across all l
   await test.step("joint signoff controls match the service role boundary", async () => {
     await verifyJointSignoffRoleControls(page);
   });
+  await test.step("physical examination waits for the authenticated role before its first overview", async () => {
+    await verifyPhysicalExamAuthHydration(page);
+  });
   await test.step("initial HTTP failure fails closed and a retry recovers", async () => {
     await verifyInitialLoadFailureAndRecovery(page);
   });
@@ -807,3 +810,131 @@ test("physical examination workbench keeps hostile API fields inert across all l
   expect(pageErrors).toEqual([]);
   await page.unrouteAll({ behavior: "wait" });
 });
+
+async function verifyPhysicalExamAuthHydration(page) {
+  const jointTest = {
+    id: "hydrated-role-controls",
+    institutionName: "示范医院",
+    sourceType: "HIS",
+    signoffStatus: "submitted-awaiting-independent-verification",
+    siteSignoffVerified: false,
+    checks: [{ id: "network", name: "网络连通", status: "pending" }],
+    signoffSubmission: {
+      externalSigner: "现场负责人",
+      signerOrganization: "示范医院",
+      evidenceDigest: "a".repeat(64)
+    }
+  };
+
+  async function checkDelayedIdentity(username, canVerify) {
+    await loginUser(page, username);
+    await expect(page.locator("html")).toHaveAttribute("data-auth-resolved", "allowed");
+    await page.evaluate(() => localStorage.removeItem("health-city-auth-session"));
+    let releaseContext;
+    let contextRequested;
+    const contextGate = new Promise((resolve) => { releaseContext = resolve; });
+    const requested = new Promise((resolve) => { contextRequested = resolve; });
+    let contextRequests = 0;
+    let overviewRequests = 0;
+    const overviewRouteTasks = [];
+    await page.route("**/api/auth/context", async (route) => {
+      contextRequests += 1;
+      contextRequested();
+      await contextGate;
+      await route.continue();
+    });
+    await page.route("**/api/physical-exams", async (route) => {
+      overviewRequests += 1;
+      const task = (async () => {
+        const response = await route.fetch();
+        const overview = await response.json();
+        overview.jointTests = [jointTest];
+        await route.fulfill({ response, contentType: "application/json", body: JSON.stringify(overview) });
+      })();
+      overviewRouteTasks.push(task);
+      await task;
+    });
+    try {
+      await page.goto("/physical-examination.html", { waitUntil: "domcontentloaded" });
+      await requested;
+      const pending = await page.evaluate(() => ({
+        auth: document.documentElement.dataset.authResolved,
+        overviewSequence: physicalExamState.overviewRequestSequence,
+        cards: document.querySelectorAll("[data-joint-test]").length
+      }));
+      if (pending.overviewSequence > 0) await expect.poll(() => overviewRequests).toBeGreaterThan(0);
+      expect(pending).toEqual({ auth: "pending", overviewSequence: 0, cards: 0 });
+      expect(overviewRequests).toBe(0);
+      releaseContext();
+      await expect(page.locator("html")).toHaveAttribute("data-auth-resolved", "allowed");
+      const card = page.locator("[data-joint-test='hydrated-role-controls']");
+      await expect(card.locator("[data-joint-submit]")).toBeVisible();
+      if (canVerify) {
+        await expect(card.locator("[data-joint-verify]")).toBeVisible();
+        await expect(card.locator("[data-joint-reject]")).toBeVisible();
+      } else {
+        await expect(card.locator("[data-joint-verify], [data-joint-reject]")).toHaveCount(0);
+      }
+      expect(contextRequests).toBe(1);
+      expect(overviewRequests).toBe(1);
+      const afterDuplicate = await page.evaluate(async () => {
+        document.documentElement.setAttribute("data-auth-resolved", "pending");
+        document.documentElement.setAttribute("data-auth-resolved", "allowed");
+        await Promise.resolve();
+        return physicalExamState.overviewRequestSequence;
+      });
+      expect(afterDuplicate).toBe(1);
+      expect(overviewRequests).toBe(1);
+    } finally {
+      releaseContext();
+      try {
+        await Promise.all(overviewRouteTasks);
+      } finally {
+        await page.unrouteAll({ behavior: "wait" });
+      }
+    }
+  }
+
+  await test.step("commission waits for the real auth context and gets verification controls", async () => {
+    await checkDelayedIdentity("health", true);
+  });
+  await test.step("institution waits for the real auth context and cannot verify", async () => {
+    await checkDelayedIdentity("hospital", false);
+  });
+  await test.step("failed auth context never reads the physical examination overview", async () => {
+    await loginCommission(page);
+    await expect(page.locator("html")).toHaveAttribute("data-auth-resolved", "allowed");
+    await page.evaluate(() => localStorage.removeItem("health-city-auth-session"));
+    let releaseContext;
+    let contextRequested;
+    const contextGate = new Promise((resolve) => { releaseContext = resolve; });
+    const requested = new Promise((resolve) => { contextRequested = resolve; });
+    let overviewRequests = 0;
+    await page.route("**/api/auth/context", async (route) => {
+      contextRequested();
+      await contextGate;
+      await route.fulfill({ status: 401, contentType: "application/json", body: JSON.stringify({ ok: false }) });
+    });
+    await page.route("**/api/physical-exams", async (route) => {
+      overviewRequests += 1;
+      await route.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ error: "unexpected overview request" }) });
+    });
+    try {
+      await page.goto("/physical-examination.html", { waitUntil: "domcontentloaded" });
+      await requested;
+      const pending = await page.evaluate(() => ({
+        auth: document.documentElement.dataset.authResolved,
+        overviewSequence: physicalExamState.overviewRequestSequence
+      }));
+      if (pending.overviewSequence > 0) await expect.poll(() => overviewRequests).toBeGreaterThan(0);
+      expect(pending).toEqual({ auth: "pending", overviewSequence: 0 });
+      expect(overviewRequests).toBe(0);
+      releaseContext();
+      await expect(page).toHaveURL(/login\.html/);
+      expect(overviewRequests).toBe(0);
+    } finally {
+      releaseContext();
+      await page.unrouteAll({ behavior: "wait" });
+    }
+  });
+}

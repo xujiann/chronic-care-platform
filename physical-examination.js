@@ -16,6 +16,7 @@ const physicalExamState = {
   abnormalCaseLocks: new Map(),
   overviewRequestSequence: 0
 };
+let physicalExamInitializationStarted = false;
 const PHYSICAL_EXAM_OFFICIAL_SOURCE_ORIGINS = Object.freeze([
   "https://flk.npc.gov.cn",
   "https://std.samr.gov.cn",
@@ -82,8 +83,32 @@ function physicalExamClassName(baseClass, candidate, allowedClasses) {
   return allowedClasses.has(value) ? `${baseClass} ${value}` : baseClass;
 }
 
+function waitForPhysicalExamAuth() {
+  if (typeof window.HealthCityAuth?.getUser !== "function") return Promise.resolve(false);
+  const root = document.documentElement;
+  if (!root) return Promise.resolve(false);
+  if (root.dataset.authResolved === "allowed") return Promise.resolve(true);
+  return new Promise((resolve) => {
+    const observer = new MutationObserver(() => {
+      if (root.dataset.authResolved !== "allowed") return;
+      observer.disconnect();
+      resolve(true);
+    });
+    observer.observe(root, { attributes: true, attributeFilter: ["data-auth-resolved"] });
+    if (root.dataset.authResolved === "allowed") {
+      observer.disconnect();
+      resolve(true);
+    }
+  });
+}
+
 document.addEventListener("DOMContentLoaded", async () => {
+  if (physicalExamInitializationStarted) return;
+  physicalExamInitializationStarted = true;
+  const staticFilePreview = location.protocol === "file:";
+  if (!staticFilePreview && !await waitForPhysicalExamAuth()) return;
   const user = window.HealthCityAuth?.getUser?.();
+  if (!staticFilePreview && (!user || document.documentElement.dataset.authResolved !== "allowed")) return;
   physicalExamState.user = user;
   if (user?.role === "citizen") {
     document.querySelector("#physical-exam-import-panel")?.remove();
