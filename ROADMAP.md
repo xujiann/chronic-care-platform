@@ -1,5 +1,14 @@
 # 工程治理路线图
 
+## TEST-022 checkpoint commit recovery regression（2026-09-29）
+
+- 目标：补齐 ADR-OPS-049 已批准故障合同的真实 PostgreSQL 组合证据：checkpoint COMMIT 已完成后抛错时报告提交未知，重建连接后精确读取进度并推进下一批。现有合成测试覆盖此窗口，实库专项尚缺；本轮只补回归测试，不修改运行时合同。
+- 基线 origin/main@ef8abae5，工作区干净，无开放 PR，最新主线 CI 成功。用户继续开发授权及原 ADR 范围内由 T00 批准中风险 TEST-022，独立准入复核认可；WIP 3/5。
+- 单写范围：开发 A 独占 test/postgres-primary-checkpoint-live.test.js；开发 B 只读核对隔离夹具、故障注入及恢复断言；协调者独占 ROADMAP.md 与 config/lifecycle-governance.json；独立审查者只读。复用当前空闲 T00 工作树，新分支 process/t00-relay-commit-regression-20260929。
+- 方案：复用现有真实 PG fixture 与专用 runner，限定 checkpoint 连接在执行 COMMIT 后抛错，并在 finally 恢复测试注入。断言未知报告、实存第一批游标、全新连接推进第二批、最终 idle、目标第一批未改写及源事实不变。避免新增运行时注入端口或新依赖。
+- 风险与回滚：测试全局 prototype 注入必须限定连接和有效窗口、无并行重型任务；仅合成隔离库，沿用 fixture 自有随机库清理。撤销测试与登记增量即可回滚，无 schema、HTTP、worker、生产监控、多实例或部署变更。
+- 验证：用例已实现，合成窄测11通过；本地live文件加载5跳过，无实库证据。治理及入口/文档窄测通过，下一步独审、冻结后串行必需门禁；真实 PG 专项须显式零跳过才形成实库证据。生产六域 NO-GO，OPS-049 能力层级不晋升。
+
 ## 隔离 relay 观测 PLAN（2026-09-27，已批准）
 
 - 2026-09-28 集成收口：限定切片由 [PR #321](https://github.com/xujiann/chronic-care-platform/pull/321) 保护 squash 合并为 `7d5b2c517dc7ad66e4861667b9e0c7167a7a27a4`，与独立审查冻结 `1ff0ddef0c26ec67dfd47e2eea96ada0137f42e1` 共享 tree `9d2712fedd3a28b84a5121ac275c485f2cfe9b79`。独审无P0–P2，本地18项冻结串行门禁通过：全量3748pass/44环境skip/0fail，server及10组边界覆盖通过；PR CI36364784446/main CI36370896197各9项成功，真实PG专项各43pass/0skip；Pages36370896211成功且仅静态发布。GOV-023关闭并已集成，OPS-049关闭限定代码交付但能力仅已实现，WIP 2/5；监控投递、告警、SLO、多实例、TLS、容量灾备和现场证据仍缺，生产六域NO-GO。本收口自身仍需独审、冻结与门禁，不复用PR #321证据代替自身验证。
