@@ -183,3 +183,84 @@ test("live PG observed relay preserves commit uncertainty and recovers checkpoin
     assert.equal(report.workerObservability.productionAuthorization.productionReady, false);
   }
 });
+
+test("live PG observed relay recovers a checkpoint committed before its caller saw an exception", options, async (t) => {
+  const s = await setup(t); if (!s) return;
+  const { f, envelopes, pin, checkpoint, checkpointFile, contract } = s;
+  await checkpoint().initialize();
+  const sourceBefore = loadBoundSqliteOutboxBatches(f.sqliteFile);
+  const driver = f.createDriver(f.pool, { requireBoundIdentity: true });
+  const relay = (selected = driver) => createPrimarySingleBatchRelay({
+    sourceFile: f.sqliteFile, checkpointFile, driver: selected,
+    contractConfig: contract.status(), expectedTargetId: pin.expectedTargetId });
+
+  const originalPrepare = DatabaseSync.prototype.prepare;
+  const originalExec = DatabaseSync.prototype.exec;
+  const checkpointConnections = new WeakSet();
+  let injections = 0;
+  DatabaseSync.prototype.prepare = function trackCheckpointInsert(sql) {
+    if (String(sql).includes("INSERT INTO checkpoint_entries(")) checkpointConnections.add(this);
+    return originalPrepare.call(this, sql);
+  };
+  DatabaseSync.prototype.exec = function failAfterCheckpointCommit(sql) {
+    const checkpointCommit = sql === "COMMIT" && checkpointConnections.has(this)
+      && originalPrepare.call(this, "PRAGMA database_list").all()
+      .some((row) => row.name === "main" && path.resolve(row.file) === path.resolve(checkpointFile));
+    const result = originalExec.call(this, sql);
+    if (checkpointCommit && injections === 0) {
+      injections += 1;
+      throw new Error("secret-token checkpoint.sqlite");
+    }
+    return result;
+  };
+  let failed;
+  try { failed = await relay().runObservedOnce(); }
+  finally { DatabaseSync.prototype.prepare = originalPrepare; DatabaseSync.prototype.exec = originalExec; }
+
+  assert.equal(injections, 1);
+  assert.equal(failed.ok, false);
+  assert.equal(failed.status, "failed");
+  assert.equal(failed.phase, "checkpoint-advance");
+  assert.equal(failed.targetCommit, "confirmed");
+  assert.equal(failed.checkpointCommit, "unknown");
+  assert.equal(failed.claimed, 1);
+  assert.equal(failed.succeeded, 0);
+  assert.equal(failed.failed, 1);
+  assert.equal(failed.workerObservability.outcome, "failed");
+  assert.equal(failed.errorCode, "POSTGRES_PRIMARY_RELAY_EXECUTION_FAILED");
+  assert.doesNotMatch(JSON.stringify(failed), /secret-token|checkpoint\.sqlite/);
+
+  const afterCommit = await f.rawSnapshot();
+  assert.equal(afterCommit.batches.length, 1);
+  assert.equal(afterCommit.batches[0].batch_id, envelopes[0].batch.batchId);
+  assert.equal(afterCommit.batches[0].outbox_sequence, String(envelopes[0].commitment.outboxSequence));
+  assert.deepEqual(loadBoundSqliteOutboxBatches(f.sqliteFile), sourceBefore);
+  const freshDriver = f.createDriver(f.newPool(), { requireBoundIdentity: true });
+  const freshCheckpoint = checkpoint(freshDriver);
+  assert.deepEqual(await freshCheckpoint.read(), {
+    outboxSequence: envelopes[0].commitment.outboxSequence,
+    batchId: envelopes[0].batch.batchId,
+    payloadSha256: envelopes[0].batch.payloadSha256,
+    chainHash: envelopes[0].batch.chainHash
+  });
+  const freshRelay = relay(freshDriver);
+  const next = await freshRelay.runObservedOnce();
+  assert.equal(next.status, "applied");
+  assert.equal(next.checkpointCommit, "confirmed");
+  assert.deepEqual(await freshCheckpoint.read(), {
+    outboxSequence: envelopes[1].commitment.outboxSequence,
+    batchId: envelopes[1].batch.batchId,
+    payloadSha256: envelopes[1].batch.payloadSha256,
+    chainHash: envelopes[1].batch.chainHash
+  });
+  assert.equal((await freshRelay.runObservedOnce()).status, "idle");
+  const afterRecovery = await f.rawSnapshot();
+  assert.equal(afterRecovery.batches.length, 2);
+  assert.deepEqual(afterRecovery.batches.find((batch) => batch.batch_id === envelopes[0].batch.batchId),
+    afterCommit.batches[0]);
+  assert.deepEqual(afterRecovery.batches.map((batch) => batch.batch_id).sort(),
+    envelopes.map((envelope) => envelope.batch.batchId).sort());
+  assert.equal(new Set(afterRecovery.batches.map((batch) => batch.batch_id)).size, 2);
+  assert.deepEqual(afterRecovery.batches.map((batch) => batch.outbox_sequence).sort(), ["1", "2"]);
+  assert.deepEqual(loadBoundSqliteOutboxBatches(f.sqliteFile), sourceBefore);
+});
