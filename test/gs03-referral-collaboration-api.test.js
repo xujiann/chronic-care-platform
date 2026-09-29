@@ -67,6 +67,13 @@ test("GS-03 referral collaboration: scope, withdrawal, recovery and report retur
   };
   const consultation = (data) => data.referralTeleconsultations.find((item) => item.id === caseId);
   const reportRecords = (data) => data.personalRecords.filter((item) => item.category === "teleconsultation-report" && item.teleconsultationId === caseId);
+  const businessProjection = (data) => ({
+    teleconsultation: consultation(data),
+    referral: data.referralSystem.referrals.find((item) => item.id === "rf1"),
+    collaborationOrder: data.countyCollaborationOrders.find((item) => item.id === "cco-004"),
+    reportRecords: reportRecords(data),
+    closureEvents: data.registrationReferralClosureEvents
+  });
 
   const initial = await snapshot();
   assert.equal(consultation(initial).status, "scheduled");
@@ -79,8 +86,7 @@ test("GS-03 referral collaboration: scope, withdrawal, recovery and report retur
   assert.equal(denied.status, 403, JSON.stringify(denied.body));
   assert.match(denied.body.message, /institution scope denied/);
   const afterDenied = await snapshot();
-  assert.equal(consultation(afterDenied).status, "scheduled");
-  assert.equal(reportRecords(afterDenied).length, initialReports);
+  assert.deepEqual(businessProjection(afterDenied), businessProjection(initial));
 
   const revoked = await command(baseUrl, actors.citizen, "revoke-referral-authorization", {
     expectedVersion: 0,
@@ -102,8 +108,7 @@ test("GS-03 referral collaboration: scope, withdrawal, recovery and report retur
   assert.equal(blockedReport.status, 400, JSON.stringify(blockedReport.body));
   assert.match(blockedReport.body.message, /must be scheduled before report return/);
   const afterBlockedReport = await snapshot();
-  assert.equal(consultation(afterBlockedReport).status, "authorization-on-hold");
-  assert.equal(reportRecords(afterBlockedReport).length, initialReports);
+  assert.deepEqual(businessProjection(afterBlockedReport), businessProjection(afterRevocation));
 
   const granted = await command(baseUrl, actors.citizen, "grant-referral-authorization", {
     residentId: "r1",
@@ -146,12 +151,14 @@ test("GS-03 referral collaboration: scope, withdrawal, recovery and report retur
   assert.equal(returned.body.result.collaborationOrder.status, "report-returned");
   assert.equal(returned.body.result.reportRecord.category, "teleconsultation-report");
   assert.equal(returned.body.result.reportRecord.teleconsultationId, caseId);
+  const afterReturn = await snapshot();
 
   const replay = await command(baseUrl, actors.receiving, "return-referral-report", reportCommand, reportKey);
   assert.equal(replay.status, 200, JSON.stringify(replay.body));
   assert.equal(replay.body.idempotent, true);
   assert.equal(replay.body.event.id, returned.body.event.id);
   const completed = await snapshot();
+  assert.deepEqual(businessProjection(completed), businessProjection(afterReturn));
   assert.equal(consultation(completed).status, "report-returned");
   assert.equal(reportRecords(completed).length, initialReports + 1);
   assert.equal(completed.registrationReferralClosureEvents.filter((item) => item.commandId === reportKey).length, 1);
