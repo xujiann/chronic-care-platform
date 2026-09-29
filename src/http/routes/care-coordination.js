@@ -214,7 +214,10 @@ function createRouteSegments(runtime) {
       if (req.method === "GET" && url.pathname === "/api/referral-teleconsultations/joint-test-pack") {
         const user = requireApiRole(req, res, ["commission", "institution", "insurance", "county"], "/api/referral-teleconsultations/joint-test-pack");
         if (!user) return true;
-        sendJson(res, 200, buildReferralTeleconsultationJointTestPack(readDatabase()));
+        const data = readDatabase();
+        const scopedData = { ...data, referralTeleconsultations: (Array.isArray(data.referralTeleconsultations)
+          ? data.referralTeleconsultations : []).filter((item) => canAccessReferralTeleconsultation(user, item, data)) };
+        sendJson(res, 200, buildReferralTeleconsultationJointTestPack(scopedData));
         return true;
       }
 
@@ -343,7 +346,7 @@ function createRouteSegments(runtime) {
         ].slice(0, 120));
         appendDataAccessLog(data, user, rows[index].residentId, "referral teleconsultation", "SLA reminder acknowledgement", "allowed");
         writeDatabase(data);
-        sendJson(res, 200, { teleconsultation: rows[index], messages: data.taskMessages.filter((message) => message.collection === "referralTeleconsultations" && message.sourceId === rows[index].id) });
+        sendJson(res, 200, { teleconsultation: publicTeleconsultation(rows[index]), messages: data.taskMessages.filter((message) => message.collection === "referralTeleconsultations" && message.sourceId === rows[index].id) });
         return true;
       }
 

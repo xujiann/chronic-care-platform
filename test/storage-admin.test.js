@@ -1,7 +1,9 @@
 const assert = require("node:assert/strict");
+const { createHash } = require("node:crypto");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
+const { DatabaseSync } = require("node:sqlite");
 const test = require("node:test");
 
 const { assessRecoveryReadiness, createBackup, createSanitizedSnapshot, inspectStorageModel, rehearseRestore, restoreBackup, verifyBackup } = require("../scripts/storage-admin");
@@ -13,7 +15,9 @@ test("storage backup verifies checksums, rehearses restore, and restores with a 
   fs.mkdirSync(dataDir, { recursive: true });
   const original = { residents: [{ id: "r1", name: "backup-test-resident" }] };
   fs.writeFileSync(path.join(dataDir, "db.json"), JSON.stringify(original), "utf8");
-  fs.writeFileSync(path.join(dataDir, "health-city.sqlite"), Buffer.from("sqlite-test-content"));
+  const sqlite = new DatabaseSync(path.join(dataDir, "health-city.sqlite"));
+  try { sqlite.exec("CREATE TABLE backup_probe(value TEXT NOT NULL)"); }
+  finally { sqlite.close(); }
 
   try {
     const backup = createBackup({ dataDir, backupRoot, label: "test" });
@@ -99,6 +103,170 @@ test("storage backup verifies checksums, rehearses restore, and restores with a 
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
+});
+
+test("storage backup includes committed SQLite WAL data before checkpoint", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "health-platform-backup-wal-"));
+  const dataDir = path.join(root, "data");
+  const backupRoot = path.join(root, "backups");
+  fs.mkdirSync(dataDir);
+  fs.writeFileSync(path.join(dataDir, "db.json"), JSON.stringify({ residents: [] }), "utf8");
+  const sourceFile = path.join(dataDir, "health-city.sqlite");
+  const source = new DatabaseSync(sourceFile);
+  try {
+    source.exec("PRAGMA journal_mode=WAL; CREATE TABLE backup_probe(value TEXT NOT NULL); PRAGMA wal_checkpoint(TRUNCATE)");
+    source.prepare("INSERT INTO backup_probe(value) VALUES(?)").run("committed-synthetic-row");
+    assert.equal(source.prepare("SELECT count(*) AS count FROM backup_probe").get().count, 1);
+    assert.equal(fs.statSync(`${sourceFile}-wal`).size > 0, true);
+    const sourceMainBefore = fs.readFileSync(sourceFile);
+    const sourceWalBefore = fs.readFileSync(`${sourceFile}-wal`);
+
+    const backup = createBackup({ dataDir, backupRoot, label: "wal" });
+    assert.equal(verifyBackup(backup.destination).dataQuality.passed, true);
+    assert.deepEqual(fs.readFileSync(sourceFile), sourceMainBefore);
+    assert.deepEqual(fs.readFileSync(`${sourceFile}-wal`), sourceWalBefore);
+    for (const suffix of ["-wal", "-shm"]) {
+      assert.equal(fs.existsSync(path.join(backup.destination, `health-city.sqlite${suffix}`)), false);
+    }
+    const snapshot = new DatabaseSync(path.join(backup.destination, "health-city.sqlite"), { readOnly: true });
+    try { assert.equal(snapshot.prepare("SELECT count(*) AS count FROM backup_probe").get().count, 1); }
+    finally { snapshot.close(); }
+    assert.equal(rehearseRestore(backup.destination, { rehearsalRoot: path.join(root, "rehearsal") }).ok, true);
+  } finally {
+    source.close();
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("storage backup and verification reject corrupt SQLite even with matching file digest", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "health-platform-backup-corrupt-"));
+  const dataDir = path.join(root, "data");
+  const backupRoot = path.join(root, "backups");
+  fs.mkdirSync(dataDir);
+  fs.writeFileSync(path.join(dataDir, "db.json"), JSON.stringify({ residents: [] }), "utf8");
+  const sqliteFile = path.join(dataDir, "health-city.sqlite");
+  try {
+    fs.writeFileSync(sqliteFile, "");
+    assert.throws(() => createBackup({ dataDir, backupRoot, label: "empty" }), /SQLite integrity check failed/);
+    fs.writeFileSync(sqliteFile, "not-a-sqlite-database");
+    assert.throws(() => createBackup({ dataDir, backupRoot, label: "invalid" }), /SQLite|database|file|malformed|not/i);
+    fs.rmSync(sqliteFile);
+    const sqlite = new DatabaseSync(sqliteFile);
+    sqlite.exec("CREATE TABLE backup_probe(value TEXT NOT NULL)");
+    sqlite.close();
+    const backup = createBackup({ dataDir, backupRoot, label: "valid" });
+    const copied = path.join(backup.destination, "health-city.sqlite");
+    for (const suffix of ["-wal", "-shm"]) {
+      const sidecar = `${copied}${suffix}`;
+      fs.writeFileSync(sidecar, "synthetic-sidecar");
+      assert.throws(() => verifyBackup(backup.destination), /Backup verification requires SQLite WAL and SHM sidecars/);
+      assert.equal(fs.readFileSync(sidecar, "utf8"), "synthetic-sidecar");
+      fs.rmSync(sidecar);
+    }
+    fs.writeFileSync(copied, "not-a-sqlite-database");
+    const manifestFile = path.join(backup.destination, "manifest.json");
+    const manifest = JSON.parse(fs.readFileSync(manifestFile, "utf8"));
+    const entry = manifest.files.find((file) => file.name === "health-city.sqlite");
+    entry.bytes = fs.statSync(copied).size;
+    entry.sha256 = createHash("sha256").update(fs.readFileSync(copied)).digest("hex");
+    fs.writeFileSync(manifestFile, JSON.stringify(manifest), "utf8");
+    assert.throws(() => verifyBackup(backup.destination), /SQLite|database|file|malformed|not/i);
+  } finally { fs.rmSync(root, { recursive: true, force: true }); }
+});
+
+test("restore refuses existing SQLite WAL or SHM without changing target files", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "health-platform-restore-sidecar-"));
+  const dataDir = path.join(root, "data");
+  const backupRoot = path.join(root, "backups");
+  fs.mkdirSync(dataDir);
+  const jsonFile = path.join(dataDir, "db.json");
+  const sqliteFile = path.join(dataDir, "health-city.sqlite");
+  fs.writeFileSync(jsonFile, JSON.stringify({ residents: [{ id: "r1" }] }), "utf8");
+  const sqlite = new DatabaseSync(sqliteFile);
+  sqlite.exec("CREATE TABLE backup_probe(value TEXT NOT NULL)");
+  sqlite.close();
+  try {
+    const backup = createBackup({ dataDir, backupRoot, label: "before" });
+    fs.writeFileSync(jsonFile, JSON.stringify({ residents: [{ id: "r2" }] }), "utf8");
+    const expectedJson = fs.readFileSync(jsonFile);
+    const expectedSqlite = fs.readFileSync(sqliteFile);
+    const backupCount = fs.readdirSync(backupRoot).length;
+    for (const suffix of ["-wal", "-shm"]) {
+      const sidecar = `${sqliteFile}${suffix}`;
+      fs.writeFileSync(sidecar, "synthetic-sidecar");
+      assert.throws(() => restoreBackup(backup.destination, { dataDir, backupRoot, confirm: true }), /WAL and SHM sidecars/);
+      assert.deepEqual(fs.readFileSync(jsonFile), expectedJson);
+      assert.deepEqual(fs.readFileSync(sqliteFile), expectedSqlite);
+      assert.equal(fs.readFileSync(sidecar, "utf8"), "synthetic-sidecar");
+      assert.equal(fs.readdirSync(backupRoot).length, backupCount, "no safety backup after refusal");
+      fs.rmSync(sidecar);
+    }
+  } finally { fs.rmSync(root, { recursive: true, force: true }); }
+});
+
+test("restore quarantines corrupt current SQLite bytes before using a verified backup", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "health-platform-restore-corrupt-"));
+  const dataDir = path.join(root, "data");
+  const backupRoot = path.join(root, "backups");
+  fs.mkdirSync(dataDir);
+  const jsonFile = path.join(dataDir, "db.json");
+  const sqliteFile = path.join(dataDir, "health-city.sqlite");
+  const original = { residents: [{ id: "before-recovery" }] };
+  fs.writeFileSync(jsonFile, JSON.stringify(original), "utf8");
+  const sqlite = new DatabaseSync(sqliteFile);
+  sqlite.exec("CREATE TABLE backup_probe(value TEXT NOT NULL)");
+  sqlite.prepare("INSERT INTO backup_probe(value) VALUES(?)").run("verified-backup-row");
+  sqlite.close();
+  try {
+    const backup = createBackup({ dataDir, backupRoot, label: "verified" });
+    fs.writeFileSync(jsonFile, JSON.stringify({ residents: [{ id: "damaged-current" }] }), "utf8");
+    fs.writeFileSync(sqliteFile, "not-a-sqlite-database");
+    const damagedJson = fs.readFileSync(jsonFile);
+    const damagedSqlite = fs.readFileSync(sqliteFile);
+
+    const blockedRoot = path.join(root, "blocked-root");
+    fs.writeFileSync(blockedRoot, "not-a-directory");
+    assert.throws(() => restoreBackup(backup.destination, { dataDir, backupRoot: blockedRoot, confirm: true }));
+    assert.deepEqual(fs.readFileSync(jsonFile), damagedJson);
+    assert.deepEqual(fs.readFileSync(sqliteFile), damagedSqlite);
+
+    const restored = restoreBackup(backup.destination, { dataDir, backupRoot, confirm: true });
+    assert.equal(restored.safetyBackup, null);
+    assert.equal(restored.quarantine.validBackup, false);
+    assert.equal(fs.existsSync(path.join(restored.quarantine.directory, "manifest.json")), false);
+    assert.deepEqual(fs.readFileSync(path.join(restored.quarantine.directory, "db.json")), damagedJson);
+    assert.deepEqual(fs.readFileSync(path.join(restored.quarantine.directory, "health-city.sqlite")), damagedSqlite);
+    const quarantineRecord = JSON.parse(fs.readFileSync(path.join(restored.quarantine.directory, "quarantine.json"), "utf8"));
+    assert.equal(quarantineRecord.kind, "storage-restore-quarantine-v1");
+    assert.equal(quarantineRecord.validBackup, false);
+    assert.deepEqual(quarantineRecord.files.map((file) => file.sha256), restored.quarantine.files.map((file) => file.sha256));
+    assert.throws(() => verifyBackup(restored.quarantine.directory), /missing manifest.json/);
+    assert.deepEqual(JSON.parse(fs.readFileSync(jsonFile, "utf8")), original);
+    const recovered = new DatabaseSync(sqliteFile, { readOnly: true });
+    try { assert.equal(recovered.prepare("SELECT value FROM backup_probe").get().value, "verified-backup-row"); }
+    finally { recovered.close(); }
+  } finally { fs.rmSync(root, { recursive: true, force: true }); }
+});
+
+test("restore preserves damaged JSON bytes in the safety copy without blocking a valid restore", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "health-platform-restore-json-"));
+  const dataDir = path.join(root, "data");
+  const backupRoot = path.join(root, "backups");
+  fs.mkdirSync(dataDir);
+  const jsonFile = path.join(dataDir, "db.json");
+  const original = { residents: [{ id: "verified-resident" }] };
+  fs.writeFileSync(jsonFile, JSON.stringify(original), "utf8");
+  try {
+    const backup = createBackup({ dataDir, backupRoot, label: "verified" });
+    for (const damaged of ["{not-json", JSON.stringify({ residents: [{ id: "duplicate" }, { id: "duplicate" }] })]) {
+      fs.writeFileSync(jsonFile, damaged, "utf8");
+      const restored = restoreBackup(backup.destination, { dataDir, backupRoot, confirm: true });
+      assert.equal(restored.quarantine, null);
+      assert.equal(fs.readFileSync(path.join(restored.safetyBackup, "db.json"), "utf8"), damaged);
+      assert.throws(() => verifyBackup(restored.safetyBackup));
+      assert.deepEqual(JSON.parse(fs.readFileSync(jsonFile, "utf8")), original);
+    }
+  } finally { fs.rmSync(root, { recursive: true, force: true }); }
 });
 
 test("storage admin creates a sanitized JSON snapshot and report", () => {

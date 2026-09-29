@@ -1,5 +1,9 @@
 # DEPENDENCY MAP — 主线依赖地图
 
+## 2026-09-29 上线缺口修复（独立审查中）
+
+storage-admin 使用现有 node:sqlite 同步 VACUUM INTO 和完整性检查，不新增第三方依赖；证据校验要求非空字符串身份、规范化唯一性和有限数值，不修改外部签名信任链。T05 路由复用既有授权和公共投影。
+
 ## 2026-09-28 隔离 relay 脱敏观测已保护集成
 
 PR #321 后依赖仍为 `显式隔离relay → 既有worker-observability-contract → versioned inventory/node:crypto`；无反向依赖、自动调度或生产部署入口。共同观测14个profile、10个部署入口不改变运行状态机；主线 CI成功不等于监控投递或现场就绪。

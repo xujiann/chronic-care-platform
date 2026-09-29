@@ -1,5 +1,9 @@
 # DATA MODEL — 主线数据地图
 
+## 2026-09-29 上线缺口修复（独立审查中）
+
+SQLite 备份改用同步一致快照以包含已提交 WAL，校验真实完整性；恢复发现 WAL/SHM 旁文件即拒绝，保留原数据。当前 SQLite 明确损坏时，先逐字节复制并校验到隔离目录（quarantine.json、validBackup:false，不生成备份 manifest），成功后才从已验证备份恢复；权限或隔离失败不得修改目标。返回 quarantine 与 safetyBackup 明确区分。服务必须停止，不能自动删除旁文件；JSON 与 SQLite 不承诺跨文件同一时点，逐文件恢复非原子，真实灾备仍需现场证据；无数据结构变更。
+
 ## 2026-09-28 隔离 relay 脱敏观测已保护集成
 
 PR #321 合并不改变数据权威：SQLite 源提交凭证、PostgreSQL 已应用批次账本和独立 checkpoint 各保留原责任。观测仅投影自建技术元数据；43项真实PG专项在 PR/main 各零跳过，但不构成真实迁移、监控或现场证据。生产 NO-GO。
