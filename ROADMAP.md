@@ -1,5 +1,13 @@
 # 工程治理路线图
 
+## OPS-051 physical examination auth hydration repair 2026-09-29
+
+- 冻结候选 `92c3939e` 的本地串行门禁 1–16 通过，第 17 项 `test:e2e` 失败：平台套件 59 通过、1 失败，体检页面在已确认 commission 身份后未生成联合核验控件；居民和 PWA 套件未执行。原截图、context、trace 与失败摘要保留于 `.codex-platform-evidence/gs03-acceptance-20260929/`。该候选未重试、推送或合并，不能称为完整通过；独立严格 preflight 仍按预期 NO-GO。
+- GOV-025、TEST-023 因旧组合验收失败改为“已阻塞”，能力各保持“已实现”，窄测通过和原失败证据均保留；GOV-024 继续负责总账与协调，不伪关闭。独立 T06 中风险 OPS-051 已获用户批准并登记，WIP 4/5，基线仍为 `92c3939e`。
+- T06 单写 `physical-examination.js` 与 `test/e2e/physical-examination-trusted-rendering.spec.js`，复用 `.codex-platform-worktrees/process-v2/t06-physical-signoff-controls-20260910` 工作树的新分支 `process/t06-physical-exam-auth-hydration-20260929`。仅修复页面等待既有身份授权初始化的时序，未就绪时失败关闭；新增延迟身份正负 E2E 并保留既有可信渲染和角色合同。不改共享 auth、权限模型、API、schema、worker 或部署。
+- T06 已完成限定实现；延迟身份定向 E2E `1/1`（9.9s）与既有体检可信渲染文件全量 `1/1`（32.3s）本地通过，RED、修正和 GREEN 日志均保留在 `.codex-platform-evidence/physical-auth-hydration-20260929/`，旧页步骤计数不减。OPS-051 现为“验证中／已实现”；这只是窄测，不代表独审、冻结组合、完整门禁或远端 CI 成功。后续仍需从新候选精确 SHA 重新运行适用门禁；GS-03 只是 T05 局部子场景，十条黄金场景与生产六域均不晋升。回滚为撤销 OPS-051 两文件增量，保留旧失败与业务事实。
+- GOV-024 负责在 T06 修复后对“原 GOV-025/TEST-023 限定实现 + OPS-051”做新候选的组合独审与完整门禁；只验证届时精确候选 SHA，不将新候选通过倒填为旧 `92c3939e` 通过。GOV-025/TEST-023 自身写入与验收继续暂停，直到组合事实重新核对且 WIP/写范围获主控确认；沿用 GOV-012 的失败保留原则，不因暂时腾位而虚构完成。
+
 ## GS03 acceptance slice 2026-09-29
 
 - 基线 main@4ab4e439：PR324保护合并、与冻结1a9efcb4共享tree 11cd4602；18项本地串行门禁、PR/main九项CI、真实PG各44项零跳过及静态Pages通过。SEC-017/OPS-050/SEC-018仅关闭限定交付，现场和相邻遗留风险仍保留。
