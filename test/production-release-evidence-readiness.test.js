@@ -157,6 +157,74 @@ test("patient-data declarations and embedded secret material are hard blockers",
   assert.equal(report.checks.find((item) => item.id === "evidence:monitoring-drill:secretScan").passed, false);
 });
 
+function checkedRecords(records) {
+  records["go-no-go.json"].evidenceFingerprint = createEvidenceFingerprint(records);
+  return buildProductionReleaseEvidenceReadiness({ records });
+}
+
+test("all evidence signers require nonempty string accounts and normalized uniqueness", () => {
+  const groups = [
+    ["security-assessment.json", "securityOpinions", "evidence:security-assessment:opinions"],
+    ["monitoring-drill.json", "signoffs", "evidence:monitoring-drill:signoff"],
+    ["dr-rehearsal.json", "signoffs", "evidence:dr-rehearsal:signoff"],
+    ["site-acceptance.json", "signatures", "evidence:site-acceptance:signatures"],
+    ["go-no-go.json", "approvals", "evidence:go-no-go:approvals"]
+  ];
+  for (const [file, key, checkId] of groups) {
+    for (const value of [undefined, null, "", " \t", 7, false, {}, []]) {
+      const records = buildPassingRecords();
+      const rows = file === "site-acceptance.json" ? records[file].tasks[0][key] : records[file][key];
+      rows[0].account = value;
+      const report = checkedRecords(records);
+      assert.equal(report.checks.find((item) => item.id === checkId).passed, false, `${checkId}: ${typeof value}`);
+      assert.equal(report.ok, false);
+    }
+    const records = buildPassingRecords();
+    const rows = file === "site-acceptance.json" ? records[file].tasks[0][key] : records[file][key];
+    rows[1].account = ` ${rows[0].account} `;
+    assert.equal(checkedRecords(records).checks.find((item) => item.id === checkId).passed, false);
+  }
+});
+
+test("evidence ownership and final decision identities reject blank and coerced values", () => {
+  for (const value of [undefined, null, "", "  ", 17, true, {}, []]) {
+    for (const field of ["ownerDepartment", "independentVerifier"]) {
+      const records = buildPassingRecords();
+      records["security-assessment.json"][field] = value;
+      assert.equal(checkedRecords(records).checks.find((item) => item.id === "evidence:security-assessment:ownership").passed, false);
+    }
+    for (const field of ["account", "rollbackOwner"]) {
+      const records = buildPassingRecords();
+      records["go-no-go.json"].decision[field] = value;
+      assert.equal(checkedRecords(records).checks.find((item) => item.id === "evidence:go-no-go:decision").passed, false);
+    }
+  }
+  const records = buildPassingRecords();
+  records["security-assessment.json"].independentVerifier = ` ${records["security-assessment.json"].ownerDepartment} `;
+  assert.equal(checkedRecords(records).checks.find((item) => item.id === "evidence:security-assessment:ownership").passed, false);
+});
+
+test("security counts and DR measurements reject coercion and nonfinite values", () => {
+  for (const value of [undefined, null, "", "0", "Infinity", false, true, [], {}, NaN, Infinity, -Infinity, -1]) {
+    for (const field of ["openCritical", "openHigh"]) {
+      const records = buildPassingRecords();
+      records["security-assessment.json"].findings[field] = value;
+      assert.equal(checkedRecords(records).checks.find((item) => item.id === "evidence:security-assessment:findings").passed, false);
+    }
+    for (const group of ["objectives", "measurements"]) {
+      for (const field of ["rpoMinutes", "rtoMinutes"]) {
+        const records = buildPassingRecords();
+        records["dr-rehearsal.json"][group][field] = value;
+        assert.equal(checkedRecords(records).checks.find((item) => item.id === "evidence:dr-rehearsal:objectives").passed, false);
+      }
+    }
+  }
+  const records = buildPassingRecords();
+  records["dr-rehearsal.json"].objectives = { rpoMinutes: 0.5, rtoMinutes: 1.5 };
+  records["dr-rehearsal.json"].measurements = { rpoMinutes: 0, rtoMinutes: 1.25 };
+  assert.equal(checkedRecords(records).ok, true, "finite fractional durations and measured zero remain valid");
+});
+
 test("CLI parsing is read-only by default and writes only explicitly requested reports", (t) => {
   const flags = parseArgs(["--evidence-dir=D:/controlled/release-001"]);
   assert.equal(flags["evidence-dir"], "D:/controlled/release-001");

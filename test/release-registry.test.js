@@ -4,6 +4,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
+const { DatabaseSync } = require("node:sqlite");
 const test = require("node:test");
 
 const { buildProductionDeploymentPackage } = require("../scripts/production-deployment-package");
@@ -35,7 +36,9 @@ function fixture(t) {
     residents: [{ id: "r1", name: "Demo" }],
     careOrders: [{ id: "o1", residentId: "r1" }]
   }), "utf8");
-  fs.writeFileSync(path.join(root, "data", "health-city.sqlite"), "sqlite-fixture", "utf8");
+  const sqlite = new DatabaseSync(path.join(root, "data", "health-city.sqlite"));
+  try { sqlite.exec("CREATE TABLE release_probe(value TEXT NOT NULL)"); }
+  finally { sqlite.close(); }
   const backup = createBackup({
     dataDir: path.join(root, "data"),
     backupRoot: path.join(root, "data", "backups"),

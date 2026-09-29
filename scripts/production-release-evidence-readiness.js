@@ -120,9 +120,13 @@ function findSensitiveMaterial(value, currentPath = "$") {
   return findings;
 }
 
+function normalizedIdentity(value) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
 function uniqueAccounts(rows) {
-  const accounts = (Array.isArray(rows) ? rows : []).map((item) => String(item?.account || "").trim()).filter(Boolean);
-  return { accounts, unique: new Set(accounts).size === accounts.length };
+  const accounts = (Array.isArray(rows) ? rows : []).map((item) => normalizedIdentity(item?.account));
+  return { accounts: accounts.filter(Boolean), unique: accounts.length > 0 && accounts.every(Boolean) && new Set(accounts).size === accounts.length };
 }
 
 function rolesComplete(rows, roles) {
@@ -138,7 +142,7 @@ function commonChecks(definition, record) {
   return [
     check(`evidence:${definition.id}:identity`, /^[A-Za-z0-9][A-Za-z0-9._-]{5,}$/.test(String(record.evidenceId || "")) && record.gateId === definition.gateId, `${record.evidenceId || "missing evidenceId"}; gate ${record.gateId || "missing"}`),
     check(`evidence:${definition.id}:environment`, record.environment === definition.environment, `${record.environment || "missing"}; expected ${definition.environment}`),
-    check(`evidence:${definition.id}:ownership`, Boolean(record.ownerDepartment && record.independentVerifier && record.ownerDepartment !== record.independentVerifier), `${record.ownerDepartment || "missing owner"} / ${record.independentVerifier || "missing verifier"}`),
+    check(`evidence:${definition.id}:ownership`, Boolean(normalizedIdentity(record.ownerDepartment) && normalizedIdentity(record.independentVerifier) && normalizedIdentity(record.ownerDepartment) !== normalizedIdentity(record.independentVerifier)), `${record.ownerDepartment || "missing owner"} / ${record.independentVerifier || "missing verifier"}`),
     check(`evidence:${definition.id}:release`, Boolean(record.releaseId && isSha256(record.artifactDigest) && record.changeTicket), `${record.releaseId || "missing release"}; ${record.changeTicket || "missing change ticket"}`),
     check(`evidence:${definition.id}:execution`, isIsoDate(record.executedAt) && Boolean(record.target) && steps.length > 0 && steps.every((item) => typeof item === "string" && item.trim()), `${record.executedAt || "missing time"}; ${steps.length} steps`),
     check(`evidence:${definition.id}:result`, record.result === "passed" && Boolean(record.expectedResult) && Boolean(record.actualResult), record.result || "missing result"),
@@ -157,7 +161,7 @@ function securityChecks(record = {}) {
   const signers = uniqueAccounts(opinions);
   return [
     check("evidence:security-assessment:formalReports", assessments.length >= required.length && required.every((id) => assessmentIds.has(id)), `${assessmentIds.size}/${required.length} accepted formal reports`),
-    check("evidence:security-assessment:findings", Number(record.findings?.openCritical) === 0 && Number(record.findings?.openHigh) === 0, `critical=${record.findings?.openCritical}; high=${record.findings?.openHigh}`),
+    check("evidence:security-assessment:findings", record.findings?.openCritical === 0 && record.findings?.openHigh === 0, `critical=${record.findings?.openCritical}; high=${record.findings?.openHigh}`),
     check("evidence:security-assessment:opinions", opinions.length === 2 && signers.unique && opinions.every((item) => item.status === "approved" && isControlledReference(item.evidenceRef)), `${signers.accounts.length}/2 independent opinions`)
   ];
 }
@@ -187,14 +191,14 @@ function drChecks(record = {}) {
   const scenarios = Array.isArray(record.rehearsalScenarios) ? record.rehearsalScenarios : [];
   const required = ["backup", "restore", "failover", "rollback"];
   const passed = new Set(scenarios.filter((item) => item.passed === true && isControlledReference(item.receiptRef)).map((item) => item.id));
-  const rpoTarget = Number(record.objectives?.rpoMinutes);
-  const rtoTarget = Number(record.objectives?.rtoMinutes);
-  const rpoActual = Number(record.measurements?.rpoMinutes);
-  const rtoActual = Number(record.measurements?.rtoMinutes);
+  const rpoTarget = record.objectives?.rpoMinutes;
+  const rtoTarget = record.objectives?.rtoMinutes;
+  const rpoActual = record.measurements?.rpoMinutes;
+  const rtoActual = record.measurements?.rtoMinutes;
   const signoffs = Array.isArray(record.signoffs) ? record.signoffs : [];
   const signers = uniqueAccounts(signoffs);
   return [
-    check("evidence:dr-rehearsal:objectives", rpoTarget > 0 && rtoTarget > 0 && rpoActual >= 0 && rtoActual >= 0 && rpoActual <= rpoTarget && rtoActual <= rtoTarget, `RPO ${rpoActual}/${rpoTarget}m; RTO ${rtoActual}/${rtoTarget}m`),
+    check("evidence:dr-rehearsal:objectives", [rpoTarget, rtoTarget, rpoActual, rtoActual].every(Number.isFinite) && rpoTarget > 0 && rtoTarget > 0 && rpoActual >= 0 && rtoActual >= 0 && rpoActual <= rpoTarget && rtoActual <= rtoTarget, `RPO ${rpoActual}/${rpoTarget}m; RTO ${rtoActual}/${rtoTarget}m`),
     check("evidence:dr-rehearsal:scenarios", required.every((id) => passed.has(id)), `${passed.size}/${required.length} rehearsal scenarios`),
     check("evidence:dr-rehearsal:offsite", isControlledReference(record.offsiteReplicaRef) && isControlledReference(record.nativeBackupRef), "native backup and off-site replica references required"),
     check("evidence:dr-rehearsal:signoff", rolesComplete(signoffs, FOUR_PARTY_ROLES) && signers.unique, `${signers.accounts.length}/${FOUR_PARTY_ROLES.length} unique signers`)
@@ -219,12 +223,12 @@ function goNoGoChecks(record = {}, fingerprint) {
   const passed = new Set(prerequisites.filter((item) => item.passed === true && isControlledReference(item.evidenceRef)).map((item) => item.id));
   const approvals = Array.isArray(record.approvals) ? record.approvals : [];
   const signers = uniqueAccounts(approvals);
-  const decisionActor = String(record.decision?.account || "").trim();
+  const decisionActor = normalizedIdentity(record.decision?.account);
   return [
     check("evidence:go-no-go:prerequisites", REQUIRED_GO_PREREQUISITES.every((id) => passed.has(id)), `${passed.size}/${REQUIRED_GO_PREREQUISITES.length} current prerequisites`),
     check("evidence:go-no-go:approvals", rolesComplete(approvals, FOUR_PARTY_ROLES) && signers.unique && approvals.every((item) => item.status === "approved" && isControlledReference(item.evidenceRef)), `${signers.accounts.length}/${FOUR_PARTY_ROLES.length} unique approvals`),
     check("evidence:go-no-go:fingerprint", isSha256(record.evidenceFingerprint, false) && record.evidenceFingerprint === fingerprint, record.evidenceFingerprint === fingerprint ? "current evidence fingerprint" : "evidence drift detected"),
-    check("evidence:go-no-go:decision", record.decision?.value === "GO" && record.decision?.confirmation === "APPROVE PRODUCTION GO LIVE" && Boolean(decisionActor) && !signers.accounts.includes(decisionActor) && Boolean(record.decision?.rollbackOwner), `${record.decision?.value || "missing"}; decision owner ${decisionActor || "missing"}`)
+    check("evidence:go-no-go:decision", record.decision?.value === "GO" && record.decision?.confirmation === "APPROVE PRODUCTION GO LIVE" && Boolean(decisionActor) && !signers.accounts.includes(decisionActor) && Boolean(normalizedIdentity(record.decision?.rollbackOwner)), `${record.decision?.value || "missing"}; decision owner ${decisionActor || "missing"}`)
   ];
 }
 

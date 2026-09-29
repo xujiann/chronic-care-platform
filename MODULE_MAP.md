@@ -1,5 +1,9 @@
 # MODULE MAP — 主线模块地图
 
+## 2026-09-29 上线缺口修复（独立审查中）
+
+T00 单写证据校验与 storage-admin；T05 独立工作树单写 care-coordination 路由。联调包复用 canAccessReferralTeleconsultation，SLA ack 复用 publicTeleconsultation；未新增公共模块或服务。
+
 ## 2026-09-28 隔离 relay 脱敏观测已保护集成
 
 T00 的隔离 relay 与既有共同观测 profile 已由 PR #321 合入主线；PR/main 真实 PostgreSQL 专项各43pass/0skip。只增加模块内显式方法、清单和测试；不改路由、worker入口、依赖或部署拓扑。任务代码交付已关闭，完整运行能力未晋升。

@@ -1,5 +1,9 @@
 # API MAP — 主线接口地图
 
+## 2026-09-29 上线缺口修复（独立审查中）
+
+GET /api/referral-teleconsultations/joint-test-pack 在采样前按当前用户权限过滤会诊来源，空范围不读取全库样本；POST /api/referral-teleconsultations/:id/escalations/ack 去除私有 _writeCommandReceipts，持久数据保留。角色和方法路径不变；隔离真实 handler 回归不替代完整上线验收。
+
 ## 2026-09-28 隔离 relay 脱敏观测已保护集成
 
 PR #321 只交付隔离模块加法 `runObservedOnce()`；原 `runOnce()` 兼容。无 HTTP 方法、路径、鉴权、审计或业务请求行为变化。PR/main CI 各9项成功，仍不授权生产接线。

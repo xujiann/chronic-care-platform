@@ -1,10 +1,19 @@
 const { createHash, randomUUID } = require("node:crypto");
 const fs = require("node:fs");
 const path = require("node:path");
+const { DatabaseSync } = require("node:sqlite");
 const { sanitizeSnapshot } = require("../src/platform/data/public-demo-snapshot");
 
 const ROOT = path.resolve(__dirname, "..");
 const STORAGE_FILES = ["db.json", "health-city.sqlite"];
+const SQLITE_CORRUPTION_CODES = new Set([11, 26]);
+
+class SqliteIntegrityError extends Error {
+  constructor() {
+    super("SQLite integrity check failed");
+    this.name = "SqliteIntegrityError";
+  }
+}
 
 function sha256(file) {
   return createHash("sha256").update(fs.readFileSync(file)).digest("hex");
@@ -16,6 +25,46 @@ function timestamp() {
 
 function resolveDataDir(value) {
   return path.resolve(value || process.env.DATA_DIR || path.join(ROOT, "data"));
+}
+
+function assertNoSqliteSidecars(directory, operation) {
+  for (const suffix of ["-wal", "-shm"]) {
+    const sidecar = path.join(directory, `health-city.sqlite${suffix}`);
+    if (fs.lstatSync(sidecar, { throwIfNoEntry: false })) {
+      throw new Error(`${operation} requires SQLite WAL and SHM sidecars to be absent`);
+    }
+  }
+}
+
+function assertSqliteIntegrity(db) {
+  const result = db.prepare("PRAGMA integrity_check").all();
+  const pages = db.prepare("PRAGMA page_count").get()?.page_count;
+  if (result.length !== 1 || result[0].integrity_check !== "ok" || !Number.isSafeInteger(pages) || pages < 1) {
+    throw new SqliteIntegrityError();
+  }
+}
+
+function verifySqliteFile(file) {
+  let db;
+  try {
+    db = new DatabaseSync(file, { readOnly: true });
+    assertSqliteIntegrity(db);
+  } catch (error) {
+    if (error instanceof SqliteIntegrityError) throw error;
+    if (error?.code === "ERR_SQLITE_ERROR" && SQLITE_CORRUPTION_CODES.has(error.errcode & 0xff)) {
+      throw new SqliteIntegrityError();
+    }
+    throw error;
+  } finally { db?.close(); }
+}
+
+function createSqliteSnapshot(source, target) {
+  const db = new DatabaseSync(source, { readOnly: true });
+  try {
+    assertSqliteIntegrity(db);
+    db.exec(`VACUUM INTO '${target.replaceAll("'", "''")}'`);
+  } finally { db.close(); }
+  verifySqliteFile(target);
 }
 
 function createBackup(options = {}) {
@@ -30,7 +79,8 @@ function createBackup(options = {}) {
   const files = available.map((name) => {
     const source = path.join(dataDir, name);
     const target = path.join(destination, name);
-    fs.copyFileSync(source, target);
+    if (name === "health-city.sqlite") createSqliteSnapshot(source, target);
+    else fs.copyFileSync(source, target);
     return { name, bytes: fs.statSync(target).size, sha256: sha256(target) };
   });
   const manifest = { formatVersion: 1, createdAt: new Date().toISOString(), label, sourceDataDir: dataDir, files };
@@ -74,6 +124,7 @@ function createSanitizedSnapshot(options = {}) {
 
 function verifyBackup(backupDir) {
   const directory = path.resolve(backupDir);
+  assertNoSqliteSidecars(directory, "Backup verification");
   const manifestFile = path.join(directory, "manifest.json");
   if (!fs.existsSync(manifestFile)) throw new Error("Backup is missing manifest.json");
   const manifest = JSON.parse(fs.readFileSync(manifestFile, "utf8"));
@@ -85,6 +136,7 @@ function verifyBackup(backupDir) {
     if (fs.statSync(file).size !== entry.bytes) throw new Error(`Backup file size mismatch: ${entry.name}`);
     if (sha256(file) !== entry.sha256) throw new Error(`Backup checksum failed: ${entry.name}`);
     if (entry.name === "db.json") JSON.parse(fs.readFileSync(file, "utf8"));
+    if (entry.name === "health-city.sqlite") verifySqliteFile(file);
   });
   const dataQuality = verifyBackupDataQuality(manifest, directory);
   if (!dataQuality.passed) {
@@ -151,13 +203,53 @@ function findDanglingResidentRefs(snapshot) {
       .map((item) => ({ collection, id: String(item.id || ""), residentId: String(item.residentId) })));
 }
 
+function quarantineRestoreSource(dataDir, backupRoot) {
+  const files = STORAGE_FILES.filter((name) => fs.existsSync(path.join(dataDir, name)));
+  const directory = path.join(backupRoot, "quarantine", `${timestamp()}-${randomUUID().slice(0, 8)}`);
+  fs.mkdirSync(directory, { recursive: true });
+  const copies = files.map((name) => {
+    const source = path.join(dataDir, name);
+    const target = path.join(directory, name);
+    fs.copyFileSync(source, target);
+    const sourceBytes = fs.statSync(source).size;
+    const targetBytes = fs.statSync(target).size;
+    const sourceDigest = sha256(source);
+    const targetDigest = sha256(target);
+    if (sourceBytes !== targetBytes || sourceDigest !== targetDigest) {
+      throw new Error("Restore quarantine copy verification failed");
+    }
+    return { name, bytes: targetBytes, sha256: targetDigest };
+  });
+  const record = { kind: "storage-restore-quarantine-v1", validBackup: false,
+    createdAt: new Date().toISOString(), sourceDataDir: dataDir, files: copies };
+  fs.writeFileSync(path.join(directory, "quarantine.json"), JSON.stringify(record, null, 2), "utf8");
+  return { directory, validBackup: false, files: copies };
+}
+
 function restoreBackup(backupDir, options = {}) {
   const startedAt = Date.now();
   if (!options.confirm) throw new Error("Restore requires confirm=true and the service must be stopped");
   const dataDir = resolveDataDir(options.dataDir);
   const backupRoot = path.resolve(options.backupRoot || path.join(dataDir, "backups"));
+  assertNoSqliteSidecars(dataDir, "Restore");
   const manifest = verifyBackup(backupDir);
-  const safety = createBackup({ dataDir, backupRoot, label: "pre-restore" });
+  let currentSqliteCorrupt = false;
+  const currentSqlite = path.join(dataDir, "health-city.sqlite");
+  if (fs.existsSync(currentSqlite)) {
+    try { verifySqliteFile(currentSqlite); }
+    catch (error) {
+      if (!(error instanceof SqliteIntegrityError)) throw error;
+      currentSqliteCorrupt = true;
+    }
+  }
+  let safetyBackup = null;
+  let quarantine = null;
+  if (currentSqliteCorrupt) {
+    quarantine = quarantineRestoreSource(dataDir, backupRoot);
+  } else {
+    const safety = createBackup({ dataDir, backupRoot, label: "pre-restore" });
+    safetyBackup = safety.destination;
+  }
   manifest.files.forEach((entry) => {
     const source = path.join(path.resolve(backupDir), entry.name);
     const target = path.join(dataDir, entry.name);
@@ -168,7 +260,8 @@ function restoreBackup(backupDir, options = {}) {
   });
   return {
     restoredFrom: path.resolve(backupDir),
-    safetyBackup: safety.destination,
+    safetyBackup,
+    quarantine,
     files: manifest.files.map((item) => item.name),
     metrics: recoveryMetrics(manifest, startedAt)
   };
