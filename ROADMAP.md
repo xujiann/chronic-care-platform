@@ -1,5 +1,12 @@
 # 工程治理路线图
 
+## PR325 限定交付事实收口 PLAN（2026-09-30）
+
+- 目标与准入：在原 GOV-024 的 T00 总账与六图单写范围内，核实 [PR #325](https://github.com/xujiann/chronic-care-platform/pull/325) 的受保护合并和精确证据后，关闭 GOV-024、GOV-025、TEST-023、OPS-051 四项限定交付并释放 WIP。基线 `origin/main@2c96ee48`，本工作树起始干净，分支 `process/t00-pr325-closure-20260930`；不新增任务或业务运行时。
+- 事实：独审冻结 `4cba709e` 与合并 `2c96ee48` 共享 tree `d42e904b`；冻结候选本地19项串行门禁全过，原 `test:all` 3762pass/45环境skip/0fail，E2E平台60、居民13、PWA3通过。PR CI `36539718357` 和 main CI `36540868726` 各九项成功，真实 PostgreSQL 专项各44pass/0skip；静态 Pages `36540868719` 成功。证据见 `.codex-platform-evidence/physical-auth-hydration-20260929/VALIDATION.md`，不把静态发布或仓库验证当作生产授权。
+- 范围与所有权：仅更新 `config/lifecycle-governance.json`、本路线图及六张 AS-IS 地图的最新状态段；T00 唯一写者，T05/T06 原实现与测试文件保持主线 blob 不变。GOV-025/TEST-023 的先前阻塞只对旧候选有效，新同树组合已验证并集成；OPS-051 任务关闭但能力仅“已实现”，因本次只修页面竞态，未补共享 auth 的既有 file 预览异常、现场运行验收或生产准入，因此继续列模块 gap。本次元数据收口自身仍待独审、冻结及适用窄门禁，绝不复用 PR #325 绿灯声明新 SHA 已通过旧全量测试。
+- 保留边界与回滚：`92c3939e` 第17项 E2E 59pass/1fail 的截图、trace 与日志继续作为原始失败记录，不倒填通过；GS-03 仅 T05 本地 HTTP 子场景，T08 外部回调与现场联调未完成，整体仍“未建设”；生产六域继续 NO-GO。撤销本次八文件元数据增量即可回滚，不改业务事实、历史证据、权限、schema、依赖或部署。收口完成条件为独审及 `governance:lifecycle`、`repository:governance:verify`、`process:verify` 等适用门禁通过；不推送、合并或部署。
+
 ## OPS-051 physical examination auth hydration repair 2026-09-29
 
 - 冻结候选 `92c3939e` 的本地串行门禁 1–16 通过，第 17 项 `test:e2e` 失败：平台套件 59 通过、1 失败，体检页面在已确认 commission 身份后未生成联合核验控件；居民和 PWA 套件未执行。原截图、context、trace 与失败摘要保留于 `.codex-platform-evidence/gs03-acceptance-20260929/`。该候选未重试、推送或合并，不能称为完整通过；独立严格 preflight 仍按预期 NO-GO。

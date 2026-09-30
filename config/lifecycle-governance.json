@@ -508,10 +508,10 @@
     }
   ],
   "risks": [
-    {"id":"RISK-GOV-024","title":"错误晋升、虚假场景覆盖或合成测试污染","level":"中","owner":"T00","mitigation":"限定写范围，真实隔离测试，独立审查；禁止现场晋升","status":"open"},
-    {"id":"RISK-GOV-025","title":"错误晋升、虚假场景覆盖或合成测试污染","level":"中","owner":"T00","mitigation":"限定写范围，真实隔离测试，独立审查；禁止现场晋升","status":"open"},
-    {"id":"RISK-OPS-051","title":"页面过早缓存未就绪身份导致角色控件缺失或越权","level":"中","owner":"T06","mitigation":"仅等待既有授权就绪并失败关闭；延迟身份正负矩阵、可信渲染E2E及独审","status":"open"},
-    {"id":"RISK-TEST-023","title":"错误晋升、虚假场景覆盖或合成测试污染","level":"中","owner":"T05","mitigation":"限定写范围，真实隔离测试，独立审查；禁止现场晋升","status":"open"},
+    {"id":"RISK-GOV-024","title":"错误晋升、虚假场景覆盖或合成测试污染","level":"中","owner":"T00","mitigation":"EVD-PR325-INTEGRATION证明限定组合已独审、同树全门禁及保护集成；EVD-GS03-FROZEN-E2E-FAILURE保留旧失败。仅仓库交付风险有限缓解，GS-03整体及六域现场风险仍开放","status":"open","evidenceIds":["EVD-PR325-INTEGRATION","EVD-GS03-FROZEN-E2E-FAILURE"]},
+    {"id":"RISK-GOV-025","title":"错误晋升、虚假场景覆盖或合成测试污染","level":"中","owner":"T00","mitigation":"EVD-PR325-INTEGRATION证明黄金场景引用和晋升失败关闭校验已集成；旧候选失败见EVD-GS03-FROZEN-E2E-FAILURE。仅限定治理漏洞有限缓解，生产六域证据缺口仍开放","status":"open","evidenceIds":["EVD-PR325-INTEGRATION","EVD-GS03-FROZEN-E2E-FAILURE"]},
+    {"id":"RISK-OPS-051","title":"页面过早缓存未就绪身份导致角色控件缺失或越权","level":"中","owner":"T06","mitigation":"EVD-OPS-051-LOCAL与EVD-PR325-INTEGRATION证明延迟身份正负E2E、同树门禁及保护集成；仅页面竞态有限缓解，共享auth的file预览异常和现场运行能力未闭合","status":"open","evidenceIds":["EVD-OPS-051-LOCAL","EVD-PR325-INTEGRATION"]},
+    {"id":"RISK-TEST-023","title":"错误晋升、虚假场景覆盖或合成测试污染","level":"中","owner":"T05","mitigation":"EVD-GS03-REFERRAL-LOCAL与EVD-PR325-INTEGRATION证明T05本地HTTP四路径限定验收已集成；仅局部测试风险有限缓解，T08回调/现场联调与GS-03整体仍开放","status":"open","evidenceIds":["EVD-GS03-REFERRAL-LOCAL","EVD-PR325-INTEGRATION"]},
     {"id":"RISK-SEC-017","title":"空签署或强制类型转换使证据结构误报通过","level":"中","owner":"T00","mitigation":"先复现后补失败关闭，合成负测、独立审查和冻结串行门禁","status":"open"},
     {"id":"RISK-OPS-050","title":"直接复制主库丢失已提交数据；旧旁文件污染恢复","level":"中","owner":"T00","mitigation":"先复现后补失败关闭，合成负测、独立审查和冻结串行门禁","status":"open"},
     {"id":"RISK-SEC-018","title":"联调样本或响应泄漏无权居民数据及私有命令回执","level":"中","owner":"T05","mitigation":"先复现后补失败关闭，合成负测、独立审查和冻结串行门禁","status":"open"},
@@ -1356,6 +1356,7 @@
     {"id":"EVD-OPS-051-LOCAL","type":"isolated-browser-e2e-narrow-regression","scope":"T06 process/t06-physical-exam-auth-hydration-20260929；延迟身份定向green-auth-hydration-targeted-2.log 1pass/0skip (9.9s)，完整既有体检E2E文件green-auth-hydration-full-file-2.log 1pass/0skip (32.3s)；先前RED与后续兼容修正日志均保留，原页既有60/76步骤计数不减。仅本地窄测，不代表独审、冻结组合、全门禁、远端CI或生产准入。","ref":"C:/Users/drxuj/Projects/卫生健康信息平台/.codex-platform-evidence/physical-auth-hydration-20260929/VALIDATION.md","testIds":["TEST-OPS-051"],"productionEvidence":false},
     {"id":"EVD-GS03-FROZEN-E2E-FAILURE","type":"retained-failed-frozen-acceptance","scope":"92c3939e/tree3878525e；本地串行门禁1-16通过，第17项test:e2e平台59pass/1fail，体检commission核验控件15秒未出现；居民/PWA未执行。原截图、context、trace保留；未重试、推送或合并；strict preflight仍NO-GO。该失败阻断GOV-025/TEST-023整体集成，不抹除各自窄测通过事实。","ref":"C:/Users/drxuj/Projects/卫生健康信息平台/.codex-platform-evidence/gs03-acceptance-20260929/VALIDATION.md","testIds":["TEST-GOV-024","TEST-GOV-025","TEST-GS03-REFERRAL-HTTP","TEST-OPS-034"],"productionEvidence":false},
     {"id":"EVD-GS03-REFERRAL-LOCAL","type":"isolated-synthetic-real-http-test","scope":"TEST-023限定T05 registration-referral命令四路径；真实server/隔离JSON，不mock授权；2026-09-29窄测1pass/0skip。仅本地命令越权、撤销拒绝、恢复、报告与重放，不覆盖T08回调/现场，不晋升GS03整体。","ref":"test/gs03-referral-collaboration-api.test.js","testIds":["TEST-GS03-REFERRAL-HTTP"],"productionEvidence":false},
+    {"id":"EVD-PR325-INTEGRATION","type":"reviewed-frozen-local-gates-pr-main-ci-protected-merge","scope":"freeze 4cba709eca8f83b5b66ac2493ae7e301e8036ff0; protected merge 2c96ee48ca5448bb93d8ac2c0bed67b06811b793; shared tree d42e904b83e273afe7d5556ab415deb8f0134a17; independent review no P0-P2; 19 serial local gates passed, test:all 3762 pass/45 environment skip/0 fail, E2E platform60/resident13/PWA3 pass; PR CI36539718357 and main CI36540868726 nine jobs success each, live PostgreSQL 44 pass/0 skip each; static Pages36540868719 success. Original 92c3939e E2E failure remains failed; GS-03 only T05 local command slice, six production domains NO-GO. This evidence applies to the frozen/merged tree, not this subsequent metadata closure.","ref":"https://github.com/xujiann/chronic-care-platform/pull/325","testIds":["TEST-GOV-024","TEST-GOV-025","TEST-GS03-REFERRAL-HTTP","TEST-OPS-051"],"productionEvidence":false},
     {"id":"EVD-PR324-INTEGRATION","type":"reviewed-frozen-pr-main-ci-protected-merge","scope":"freeze 1a9efcb4; merge 4ab4e439; shared tree 11cd46026488dc1bd8f9f3c3d66ca388735df026; independent review no P0-P2; 18 serial gates; test:all 3758 pass/45 environment skip/0 fail; PR CI36516995272 and main CI36517811168 nine checks success each; live PG44 pass/0 skip each; Pages36517811296 success; no production authorization","ref":"https://github.com/xujiann/chronic-care-platform/pull/324","testIds":["TEST-SEC-017","TEST-OPS-050","TEST-SEC-018"],"productionEvidence":false},
     {"id":"EVD-PR323-INTEGRATION","type":"reviewed-frozen-pr-ci-protected-merge","scope":"freeze 60cbb71b; merge a27f0832; shared tree 9086fa54ddea7035b7c341ccfcbd196af2d30638; independent review no P0-P2; 14 serial local gates and nine PR CI checks passed; live PG 44 pass/0 skip; main CI 36511741203 nine checks passed, live PG 44 pass/0 skip, static Pages 36511741225 passed; no production authorization","ref":"https://github.com/xujiann/chronic-care-platform/pull/323","testIds":["TEST-OPS-049-LIVE"],"productionEvidence":false},
     {"id":"EVD-PR321-INTEGRATION","type":"reviewed-frozen-local-gates-pr-main-ci-protected-merge","scope":"freeze 1ff0ddef0c26ec67dfd47e2eea96ada0137f42e1; merge 7d5b2c517dc7ad66e4861667b9e0c7167a7a27a4; shared tree 9d2712fedd3a28b84a5121ac275c485f2cfe9b79. Independent review and governance rereview found no P0-P2. Frozen local 18 serial gates succeeded: test:all 3748 pass, 44 local environment skips, zero failures; main server coverage and ten boundary groups passed. PR CI36364784446 and main CI36370896197 each nine successful jobs; dedicated live PostgreSQL runner reported 43 pass, zero fail/skip/cancel on both heads. Pages36370896211 static-only successful. No production authorization; six domains NO-GO.","ref":"https://github.com/xujiann/chronic-care-platform/pull/321","testIds":["TEST-GOV-023","TEST-OPS-049-LOCAL","TEST-OPS-049-LIVE","TEST-OPS-049-OBS"],"productionEvidence":false},
@@ -1865,9 +1866,6 @@
       "target": "边界、状态和生产资格均可由控制塔追踪",
       "status": "已集成",
       "gapTaskIds": [
-        "GOV-024",
-        "GOV-025",
-        "TEST-023",
         "SEC-015",
         "GOV-002",
         "OPS-015",
@@ -1879,7 +1877,8 @@
       "evidenceIds": [
         "EVD-GOV-001",
         "EVD-GOV-002",
-        "EVD-PR305-INTEGRATION"
+        "EVD-PR305-INTEGRATION",
+        "EVD-PR325-INTEGRATION"
       ]
     },
     {
@@ -1898,7 +1897,8 @@
       ],
       "evidenceIds": [
         "EVD-GOV-001",
-        "EVD-GOV-002"
+        "EVD-GOV-002",
+        "EVD-PR325-INTEGRATION"
       ]
     },
     {
@@ -1926,7 +1926,8 @@
       ],
       "evidenceIds": [
         "EVD-GOV-001",
-        "EVD-GOV-002"
+        "EVD-GOV-002",
+        "EVD-PR325-INTEGRATION"
       ]
     },
     {
@@ -1943,7 +1944,8 @@
       ],
       "evidenceIds": [
         "EVD-GOV-001",
-        "EVD-GOV-002"
+        "EVD-GOV-002",
+        "EVD-PR325-INTEGRATION"
       ]
     },
     {
@@ -1961,7 +1963,8 @@
       "evidenceIds": [
         "EVD-GOV-001",
         "EVD-GOV-002",
-        "EVD-PR305-INTEGRATION"
+        "EVD-PR305-INTEGRATION",
+        "EVD-PR325-INTEGRATION"
       ]
     },
     {
@@ -1983,20 +1986,21 @@
       "evidenceIds": [
         "EVD-GOV-001",
         "EVD-GOV-002",
-        "EVD-PR305-INTEGRATION"
+        "EVD-PR305-INTEGRATION",
+        "EVD-PR325-INTEGRATION"
       ]
     }
   ],
   "tasks": [
-    {"id":"GOV-024","title":"PR324集成收口与GS03限定测试准入","ownerProcess":"T00","integrationOwner":"T00","taskStatus":"验证中","capabilityStatus":"已实现","riskLevel":"中","approval":{"state":"approved","mode":"T00-plan-approval","ref":"T00-GS03-2026-09-29-INDEPENDENT-ADMISSION","approvedScope":"config/lifecycle-governance.json, ROADMAP.md, CURRENT_ARCHITECTURE.md, MODULE_MAP.md, DATA_MODEL.md, API_MAP.md, DEPENDENCY_MAP.md, TECH_DEBT.md；仅测试与治理，无运行时或生产变更"},"requirementIds":["REQ-GOV-024"],"regulatoryControlIds":["REG-GOV-001"],"riskIds":["RISK-GOV-024"],"decisionIds":[],"dependencies":[],"affectedModules":["lifecycle-governance"],"dataSensitivity":"仅隔离合成数据与受控证据引用，无真实居民、凭据或现场输出","acceptanceCriteria":["核实PR324合并/冻结树/主线CI后释放三项WIP","限定GS03子场景不自动晋升生产或完整场景","OPS-051修复后以新精确候选SHA组合复验GOV-025/TEST-023与OPS-051，不倒填旧失败候选"],"testIds":["TEST-GOV-024"],"evidenceIds":["EVD-GS03-FROZEN-E2E-FAILURE"],"rollback":"撤销本轮测试/治理增量，保留历史证据与业务数据","unresolved":["冻结92c3939e第17项E2E失败已保留原始证据；继续登记和协调OPS-051，负责新候选精确SHA的组合独审与完整门禁，GOV-025/TEST-023自身验收暂停；旧92c3939e不得倒填通过，不晋升GS03整体或生产"],"worktree":".codex-platform-worktrees/process-v2/t00-primary-relay-observability-20260927","branch":"process/t00-gs03-acceptance-20260929","planRef":"ROADMAP.md#gs03-acceptance-slice-2026-09-29","writeScopes":["config/lifecycle-governance.json","ROADMAP.md","CURRENT_ARCHITECTURE.md","MODULE_MAP.md","DATA_MODEL.md","API_MAP.md","DEPENDENCY_MAP.md","TECH_DEBT.md"],"observability":{"applicable":false,"reason":"测试与治理修复，不新增运行时能力"},"runtimeCapability":false},
-    {"id":"GOV-025","title":"黄金场景测试证据引用与生产晋升失败关闭","ownerProcess":"T00","integrationOwner":"T00","taskStatus":"已阻塞","capabilityStatus":"已实现","riskLevel":"中","approval":{"state":"approved","mode":"T00-plan-approval","ref":"T00-GS03-2026-09-29-INDEPENDENT-ADMISSION","approvedScope":"scripts/lifecycle-governance.js, test/lifecycle-governance.test.js；仅测试与治理，无运行时或生产变更"},"requirementIds":["REQ-GOV-025"],"regulatoryControlIds":["REG-GOV-001"],"riskIds":["RISK-GOV-025"],"decisionIds":[],"dependencies":[],"affectedModules":["lifecycle-governance"],"dataSensitivity":"仅隔离合成数据与受控证据引用，无真实居民、凭据或现场输出","acceptanceCriteria":["未知测试和证据引用失败关闭","已验证起要求测试与证据关联，准生产起要求六域GO","未建设及合法仓库验证场景兼容"],"testIds":["TEST-GOV-025"],"evidenceIds":["EVD-GS03-FROZEN-E2E-FAILURE"],"rollback":"撤销本轮测试/治理增量，保留历史证据与业务数据","unresolved":["限定治理实现及窄测21项通过，冻结92c3939e第17项E2E失败阻断旧组合；保留原失败证据，待OPS-051修复后重新冻结全门禁与CI，不晋升GS03整体或生产"],"worktree":".codex-platform-worktrees/process-v2/t00-primary-relay-observability-20260927","branch":"process/t00-gs03-acceptance-20260929","planRef":"ROADMAP.md#gs03-acceptance-slice-2026-09-29","writeScopes":["scripts/lifecycle-governance.js","test/lifecycle-governance.test.js"],"observability":{"applicable":false,"reason":"测试与治理修复，不新增运行时能力"},"runtimeCapability":false},
-    {"id":"TEST-023","title":"GS03转诊授权恢复与跨机构报告限定HTTP验收","ownerProcess":"T05","integrationOwner":"T00","taskStatus":"已阻塞","capabilityStatus":"已实现","riskLevel":"中","approval":{"state":"approved","mode":"T00-plan-approval","ref":"T00-GS03-2026-09-29-INDEPENDENT-ADMISSION","approvedScope":"test/gs03-referral-collaboration-api.test.js；仅测试与治理，无运行时或生产变更"},"requirementIds":["REQ-TEST-023"],"regulatoryControlIds":["REG-GOV-001"],"riskIds":["RISK-TEST-023"],"decisionIds":[],"dependencies":[],"affectedModules":["gs03-referral-local-command"],"dataSensitivity":"仅隔离合成数据与受控证据引用，无真实居民、凭据或现场输出","acceptanceCriteria":["真实HTTP合成夹具四路径回归，不mock授权","越权/撤销拒绝、恢复、报告归档与幂等保持持久一致","仅T05子场景，不宣称T08回调或GS03完整验收"],"testIds":["TEST-GS03-REFERRAL-HTTP"],"evidenceIds":["EVD-GS03-REFERRAL-LOCAL","EVD-GS03-FROZEN-E2E-FAILURE"],"rollback":"撤销本轮测试/治理增量，保留历史证据与业务数据","unresolved":["限定T05真实HTTP窄测通过且仅为GS03局部；冻结92c3939e第17项E2E失败阻断旧组合，保留原失败证据；待OPS-051修复后重新冻结全门禁与CI，不晋升GS03整体或生产"],"worktree":".codex-platform-worktrees/process-v2/t05-referral-release-scope-20260929","branch":"process/t05-gs03-acceptance-20260929","planRef":"ROADMAP.md#gs03-acceptance-slice-2026-09-29","writeScopes":["test/gs03-referral-collaboration-api.test.js"],"observability":{"applicable":false,"reason":"测试与治理修复，不新增运行时能力"},"runtimeCapability":false},
+    {"id":"GOV-024","title":"PR324集成收口与GS03限定测试准入","ownerProcess":"T00","integrationOwner":"T00","taskStatus":"已关闭","capabilityStatus":"已集成","riskLevel":"中","approval":{"state":"approved","mode":"T00-plan-approval","ref":"T00-GS03-2026-09-29-INDEPENDENT-ADMISSION","approvedScope":"config/lifecycle-governance.json, ROADMAP.md, CURRENT_ARCHITECTURE.md, MODULE_MAP.md, DATA_MODEL.md, API_MAP.md, DEPENDENCY_MAP.md, TECH_DEBT.md；仅测试与治理，无运行时或生产变更"},"requirementIds":["REQ-GOV-024"],"regulatoryControlIds":["REG-GOV-001"],"riskIds":["RISK-GOV-024"],"decisionIds":[],"dependencies":[],"affectedModules":["lifecycle-governance"],"dataSensitivity":"仅隔离合成数据与受控证据引用，无真实居民、凭据或现场输出","acceptanceCriteria":["核实PR324合并/冻结树/主线CI后释放三项WIP","限定GS03子场景不自动晋升生产或完整场景","OPS-051修复后以新精确候选SHA组合复验GOV-025/TEST-023与OPS-051，不倒填旧失败候选"],"testIds":["TEST-GOV-024"],"evidenceIds":["EVD-GS03-FROZEN-E2E-FAILURE","EVD-PR325-INTEGRATION"],"rollback":"撤销本轮测试/治理增量，保留历史证据与业务数据","unresolved":[],"worktree":".codex-platform-worktrees/process-v2/t00-primary-relay-observability-20260927","branch":"process/t00-pr325-closure-20260930","planRef":"ROADMAP.md#pr325-限定交付事实收口-plan2026-09-30","writeScopes":["config/lifecycle-governance.json","ROADMAP.md","CURRENT_ARCHITECTURE.md","MODULE_MAP.md","DATA_MODEL.md","API_MAP.md","DEPENDENCY_MAP.md","TECH_DEBT.md"],"observability":{"applicable":false,"reason":"测试与治理修复，不新增运行时能力"},"runtimeCapability":false,"pullRequestRef":"https://github.com/xujiann/chronic-care-platform/pull/325","ciRef":"https://github.com/xujiann/chronic-care-platform/actions/runs/36539718357"},
+    {"id":"GOV-025","title":"黄金场景测试证据引用与生产晋升失败关闭","ownerProcess":"T00","integrationOwner":"T00","taskStatus":"已关闭","capabilityStatus":"已集成","riskLevel":"中","approval":{"state":"approved","mode":"T00-plan-approval","ref":"T00-GS03-2026-09-29-INDEPENDENT-ADMISSION","approvedScope":"scripts/lifecycle-governance.js, test/lifecycle-governance.test.js；仅测试与治理，无运行时或生产变更"},"requirementIds":["REQ-GOV-025"],"regulatoryControlIds":["REG-GOV-001"],"riskIds":["RISK-GOV-025"],"decisionIds":[],"dependencies":[],"affectedModules":["lifecycle-governance"],"dataSensitivity":"仅隔离合成数据与受控证据引用，无真实居民、凭据或现场输出","acceptanceCriteria":["未知测试和证据引用失败关闭","已验证起要求测试与证据关联，准生产起要求六域GO","未建设及合法仓库验证场景兼容"],"testIds":["TEST-GOV-025"],"evidenceIds":["EVD-GS03-FROZEN-E2E-FAILURE","EVD-PR325-INTEGRATION"],"rollback":"撤销本轮测试/治理增量，保留历史证据与业务数据","unresolved":[],"worktree":".codex-platform-worktrees/process-v2/t00-primary-relay-observability-20260927","branch":"process/t00-gs03-acceptance-20260929","planRef":"ROADMAP.md#gs03-acceptance-slice-2026-09-29","writeScopes":["scripts/lifecycle-governance.js","test/lifecycle-governance.test.js"],"observability":{"applicable":false,"reason":"测试与治理修复，不新增运行时能力"},"runtimeCapability":false,"pullRequestRef":"https://github.com/xujiann/chronic-care-platform/pull/325","ciRef":"https://github.com/xujiann/chronic-care-platform/actions/runs/36539718357"},
+    {"id":"TEST-023","title":"GS03转诊授权恢复与跨机构报告限定HTTP验收","ownerProcess":"T05","integrationOwner":"T00","taskStatus":"已关闭","capabilityStatus":"已集成","riskLevel":"中","approval":{"state":"approved","mode":"T00-plan-approval","ref":"T00-GS03-2026-09-29-INDEPENDENT-ADMISSION","approvedScope":"test/gs03-referral-collaboration-api.test.js；仅测试与治理，无运行时或生产变更"},"requirementIds":["REQ-TEST-023"],"regulatoryControlIds":["REG-GOV-001"],"riskIds":["RISK-TEST-023"],"decisionIds":[],"dependencies":[],"affectedModules":["gs03-referral-local-command"],"dataSensitivity":"仅隔离合成数据与受控证据引用，无真实居民、凭据或现场输出","acceptanceCriteria":["真实HTTP合成夹具四路径回归，不mock授权","越权/撤销拒绝、恢复、报告归档与幂等保持持久一致","仅T05子场景，不宣称T08回调或GS03完整验收"],"testIds":["TEST-GS03-REFERRAL-HTTP"],"evidenceIds":["EVD-GS03-REFERRAL-LOCAL","EVD-GS03-FROZEN-E2E-FAILURE","EVD-PR325-INTEGRATION"],"rollback":"撤销本轮测试/治理增量，保留历史证据与业务数据","unresolved":[],"worktree":".codex-platform-worktrees/process-v2/t05-referral-release-scope-20260929","branch":"process/t05-gs03-acceptance-20260929","planRef":"ROADMAP.md#gs03-acceptance-slice-2026-09-29","writeScopes":["test/gs03-referral-collaboration-api.test.js"],"observability":{"applicable":false,"reason":"测试与治理修复，不新增运行时能力"},"runtimeCapability":false,"pullRequestRef":"https://github.com/xujiann/chronic-care-platform/pull/325","ciRef":"https://github.com/xujiann/chronic-care-platform/actions/runs/36539718357"},
     {
       "id": "OPS-051",
       "title": "体检页面等待既有身份授权初始化后渲染角色控件",
       "ownerProcess": "T06",
       "integrationOwner": "T00",
-      "taskStatus": "验证中",
+      "taskStatus": "已关闭",
       "capabilityStatus": "已实现",
       "riskLevel": "中",
       "approval": {
@@ -2018,15 +2022,17 @@
         "延迟身份E2E及既有可信渲染回归通过；旧冻结E2E失败保留并重新冻结全门禁"
       ],
       "testIds": ["TEST-OPS-051"],
-      "evidenceIds": ["EVD-OPS-051-LOCAL"],
+      "evidenceIds": ["EVD-OPS-051-LOCAL", "EVD-PR325-INTEGRATION"],
       "rollback": "回退本任务两文件独立变更，保留原失败证据及业务数据；不回退服务端事实",
-      "unresolved": ["旧基线92c3939e的test:e2e第17门禁失败保留；T06延迟身份及完整体检文件本地窄测各1pass/0skip，仅限定实现，待独审、新冻结组合、全门禁及CI；生产NO-GO"],
+      "unresolved": ["T06限定页面修复经PR325同树集成，能力仍仅已实现；旧92c3939e第17门禁失败及原证据保留，不倒填通过；共享auth的既有file预览Safe URL异常未修复，生产六域NO-GO"],
       "worktree": ".codex-platform-worktrees/process-v2/t06-physical-signoff-controls-20260910",
       "branch": "process/t06-physical-exam-auth-hydration-20260929",
       "planRef": "ROADMAP.md#ops-051-physical-examination-auth-hydration-repair-2026-09-29",
       "writeScopes": ["physical-examination.js", "test/e2e/physical-examination-trusted-rendering.spec.js"],
       "observability": {"applicable": false, "reason": "既有浏览器初始化时序兼容修复，不新增独立生产运行能力或变更鉴权权威"},
-      "runtimeCapability": false
+      "runtimeCapability": false,
+      "pullRequestRef": "https://github.com/xujiann/chronic-care-platform/pull/325",
+      "ciRef": "https://github.com/xujiann/chronic-care-platform/actions/runs/36539718357"
     },
     {"id":"SEC-017","title":"发布证据签署身份与测量数值失败关闭","ownerProcess":"T00","integrationOwner":"T00","taskStatus":"已关闭","capabilityStatus":"已集成","riskLevel":"中","approval":{"state":"approved","mode":"T00-plan-approval","ref":"USER-RELEASE-GAP-DEVELOPMENT-2026-09-29","approvedScope":"scripts/production-release-evidence-readiness.js, test/production-release-evidence-readiness.test.js, config/lifecycle-governance.json, ROADMAP.md, CURRENT_ARCHITECTURE.md, MODULE_MAP.md, DATA_MODEL.md, API_MAP.md, DEPENDENCY_MAP.md, TECH_DEBT.md；仅既有合同缺陷修复，无新角色/schema/生产激活"},"requirementIds":["REQ-SEC-017"],"regulatoryControlIds":["REG-GOV-001"],"riskIds":["RISK-SEC-017"],"decisionIds":[],"dependencies":[],"affectedModules":["production-release-evidence"],"dataSensitivity":"仅隔离合成数据；验证脱敏与恢复边界，不读取真实业务或现场凭据","acceptanceCriteria":["每个签署账号必须有效且规范化唯一","安全问题数量和灾备目标/实测必须为有限合法数值，保留既有签名信任层"],"testIds":["TEST-SEC-017"],"evidenceIds":["EVD-PR324-INTEGRATION"],"rollback":"独立提交回退代码；保留原数据与备份；不运行现场恢复或删除数据库","unresolved":[],"worktree":".codex-platform-worktrees/process-v2/t00-primary-relay-observability-20260927","branch":"process/t00-release-gap-hardening-20260929","planRef":"ROADMAP.md#release-gap-hardening-2026-09-29","writeScopes":["scripts/production-release-evidence-readiness.js","test/production-release-evidence-readiness.test.js","config/lifecycle-governance.json","ROADMAP.md","CURRENT_ARCHITECTURE.md","MODULE_MAP.md","DATA_MODEL.md","API_MAP.md","DEPENDENCY_MAP.md","TECH_DEBT.md"],"observability":{"applicable":false,"reason":"既有校验与投影/备份正确性修复，不增加运行能力或生产放行"},"runtimeCapability":false,"pullRequestRef":"https://github.com/xujiann/chronic-care-platform/pull/324","ciRef":"https://github.com/xujiann/chronic-care-platform/actions/runs/36517811168"},
     {"id":"OPS-050","title":"SQLite备份包含已提交WAL与恢复旁文件拒绝","ownerProcess":"T00","integrationOwner":"T00","taskStatus":"已关闭","capabilityStatus":"已集成","riskLevel":"中","approval":{"state":"approved","mode":"T00-plan-approval","ref":"USER-RELEASE-GAP-DEVELOPMENT-2026-09-29","approvedScope":"scripts/storage-admin.js, test/storage-admin.test.js, test/release-registry.test.js（仅真实SQLite夹具）；仅既有合同缺陷修复，无新角色/schema/生产激活"},"requirementIds":["REQ-OPS-050"],"regulatoryControlIds":["REG-GOV-001"],"riskIds":["RISK-OPS-050"],"decisionIds":[],"dependencies":[],"affectedModules":["storage-admin-recovery"],"dataSensitivity":"仅隔离合成数据；验证脱敏与恢复边界，不读取真实业务或现场凭据","acceptanceCriteria":["同步备份生成包含WAL已提交数据的一致快照","损坏SQLite拒绝，存在旧WAL/SHM时恢复失败关闭且不改目标","JSON备份兼容，隔离真实SQLite回归"],"testIds":["TEST-OPS-050"],"evidenceIds":["EVD-PR324-INTEGRATION"],"rollback":"独立提交回退代码；保留原数据与备份；不运行现场恢复或删除数据库","unresolved":[],"worktree":".codex-platform-worktrees/process-v2/t00-primary-relay-observability-20260927","branch":"process/t00-release-gap-hardening-20260929","planRef":"ROADMAP.md#release-gap-hardening-2026-09-29","writeScopes":["scripts/storage-admin.js","test/storage-admin.test.js","test/release-registry.test.js"],"observability":{"applicable":false,"reason":"既有校验与投影/备份正确性修复，不增加运行能力或生产放行"},"runtimeCapability":false,"pullRequestRef":"https://github.com/xujiann/chronic-care-platform/pull/324","ciRef":"https://github.com/xujiann/chronic-care-platform/actions/runs/36517811168"},
