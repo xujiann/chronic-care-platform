@@ -1,5 +1,13 @@
 # 工程治理路线图
 
+## TEST-024 GS-03 v1回调现状测试 PLAN（2026-09-30）
+
+- 用户批准下一测试切片，基线 `origin/main@92179d2f`，T00 当前候选 `3b2c77a7`；T05 独立工作树 `.codex-platform-worktrees/process-v2/t05-gs03-callback-v1-20260930` 与分支 `process/t05-gs03-callback-v1-20260930` 已确认。独立中风险 `TEST-024` 登记后 WIP 4/5；T00 控制塔单写总账、路线图与必要地图，T05 单写新增 `test/gs03-referral-callback-v1-api.test.js`，双方不覆盖彼此文件。GOV-026 仍是设计任务，本轮用户测试授权独立登记，不借 Proposed ADR 作实现准入。
+- 目标与范围：隔离合成真实 HTTP，刻画 feedback、schedule、report 三类既有 v1 回调的当前允许/拒绝角色、body HMAC 正误签、`contractId + idempotencyKey` 同键精确及异意图重放、首次/重放/失败的会诊、居民档案、通知、网关事件及审计等实际持久副作用；测试要如实固定现状，不把 body-only 签名、异意图 200 或 200 项事件窗口描述为安全目标。复用既有夹具，新增文件自动进入 unit 发现，无需改 CI/测试发现配置。
+- 非目标与风险：不改运行时、API、权限、数据库、schema、合同版本、Proposed ADR、worker或部署；不造真实供应方、现场回执/凭据/患者数据。v1 测试仅为后续合同决策基线，五项未决及历史无 digest 回执不倒算、不自动接受；GS-03 仍未建设，生产六域 NO-GO。角色样本遵循现行来源/接诊机构、区县和主管部门分支，不把拟议 v2 收窄规则冒充现状。
+- 依赖、验收与退出：T05 测试文件存在后 T00 才补机器 tests 注册与 TEST-024 testId，核对真实 HTTP 专项零失败零跳过及持久副作用；独立审查、精确冻结与适用串行门禁由主控执行。测试引发预期差异时保留失败证据，不改生产合同来“修绿”。回滚仅撤销新增测试及本轮登记，不改旧回执、业务事实或运行时。本轮不推送、合并或部署。
+- 阶段结果：T05 独立提交 `1ae060cff8dd06d3c3f3d1e671c8dccf560e9eea` 经 T00 cherry-pick 为 `d50a8dc79aa7730ad337b3ac0a5696d28841e7be`，新增测试 blob `8d2af741c00d9f3670b099d00c7beba6488699f1`。T05 独审无 P0–P2，`narrow-test-review-fix.log` 为 1 个顶层真实 HTTP 测试通过、0 失败、0 跳过，耗时 13.3 秒；记录位于 `.codex-platform-evidence/gs03-callback-v1-20260930/`。TEST-024 仅进入“验证中／已实现”，T00 组合冻结及串行门禁仍待完成；不将 v1 现状测试误称为 GS-03 完成、v2 安全证明或生产证据。
+
 ## GOV-026 GS-03 回调合同设计 PLAN（2026-09-30）
 
 - 用户批准“进行下一步”仅指设计与准入评审；基线 `origin/main@92179d2f`，分支 `process/t00-gs03-callback-design-20260930` 起始干净。T00 登记中风险 GOV-026，WIP 由 2/5 至 3/5；本轮形成 Proposed `ADR-GS03-CALLBACK-001`，不能据此实施高风险运行时或生产接线。
