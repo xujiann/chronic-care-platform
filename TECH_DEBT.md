@@ -1,5 +1,9 @@
 # TECH DEBT — 主线技术债与风险台账
 
+## 2026-09-30 GOV-026 GS-03 回调设计剩余风险
+
+v1 回调声明与实际幂等键不一致，签名未绑定可信机构和重放窗口，有界集成事件列表不能证明耐久去重；Proposed v2 只提出修复方向。历史回执兼容、外部信任与密钥、跨域原子性、版本迁移和现场验收均未决，GS-03 与六域生产仍 NO-GO。
+
 ## 2026-09-30 PR325 限定交付后剩余风险
 
 PR #325 同树集成已修复 OPS-051 的体检页面身份初始化竞态，GOV-024/GOV-025/TEST-023/OPS-051 限定任务关闭；原 `92c3939e` 第17项 E2E 失败截图、trace 和日志继续保留，不解释为通过。共享 auth 的既有 file 预览 Safe URL 异常仍在范围外；GS-03 只有 T05 本地命令回归，T08 回调及现场联调缺失。六域生产 NO-GO、真实迁移/容量/灾备/签署等缺口不因 PR/main CI 成功消失。
@@ -245,7 +249,7 @@ T00 机器登记完成后，`production-release-scope` 中 17 个仓库内 API �
 | TEST-005 | 2026-09-08 | 本地/CI 统一 Playwright Chromium；在线根 60 项与居民 13 项继续阻止 Service Worker；PWA 3 项使用独立允许策略、动态端口和临时数据；新增 Pages 构建产物的 8 个入口、仓库子路径、静态登录、404 边界和 7 个管理页面左侧导航直接覆盖；Go/No-Go 与治理中心覆盖责任属性和恶意响应可信渲染 | 76 项唯一并集/漂移测试、居民同文件 13/13、PWA 重复 9/9、完整标准 E2E；不得把仓库浏览器测试解释为真实 HTTPS、托管安全头或现场验收 |
 | TEST-008 | 2026-09-08 | 专用 PWA/Service Worker E2E 验证居民登录后安装、v62→v63 激活清理并覆盖更早缓存、受控 update、离线 mobile/citizen 回退、API/源快照 404 缓存边界与逐项注销/清缓存 | 真实 HTTPS 终止、OS 安装提示/策略、浏览器设备矩阵、外部 Origin、现场缓存升级与独立安全验收继续外置；仓库测试不产生生产 GO |
 | GOV-001 | 2026-08-23 | `main`/`origin/main` 成为唯一当前集成与默认开发基线；固定 governance tag 仅作可复现证据，旧日期化 workflow 原文冻结 | process plan/verify 默认值、manifest/AGENTS/iteration program 漂移和 CI 目标分支负向测试 |
-| DOC-001 | 2026-08-24 | 关闭时为 267 份；当前 293 份 Markdown 以路径和 ADR 台账唯一分类为 223 current、68 snapshot、2 superseded；不删除历史证据 | 闭集路径/分类摘要、规则重叠、ADR status、当前事实和 snapshot 内容聚合摘要失败关闭 |
+| DOC-001 | 2026-08-24 | 关闭时为 267 份；当前 294 份 Markdown 以路径和 ADR 台账唯一分类为 224 current、68 snapshot、2 superseded；不删除历史证据 | 闭集路径/分类摘要、规则重叠、ADR status、当前事实和 snapshot 内容聚合摘要失败关闭 |
 | REPO-001 | 2026-08-23 | 3 个跟踪 PDF 均登记 SHA-256、大小、页数、引入提交、来源、保留理由和真实 generator 可用性；二进制本体未修改 | exact tracked inventory、digest/size/page/source 漂移负向测试；替换前必须补可复现生成源，禁止手工编辑 |
 
 ## 重复、死代码和命名结论
