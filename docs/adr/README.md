@@ -2,6 +2,7 @@
 
 | 新增决策 | 状态 | 范围 |
 |---|---|---|
+| [隔离 SQLite 回调原子性实验](./2026-10-01-referral-callback-sqlite-experiment.md) | Accepted | 仅 TEST-026 测试目录内合成新库、唯一回执/撤权竞态/恢复；不接 HTTP、现库 migration 或生产 |
 | [隔离 relay 观测与故障状态](./2026-09-27-primary-relay-observability.md) | Accepted | 加法观测、阶段与提交未知窗口；不接监控sink、worker或生产 |
 | [隔离环境主存储单批次 relay](./2026-09-23-primary-single-batch-relay.md) | Accepted | 显式下一批投递与进度推进；不接请求、worker 或生产 |
 | [主存储独立持久 checkpoint](./2026-09-23-primary-durable-checkpoint.md) | Accepted | 合成环境进度账本与崩溃重放；不含自动 relay/请求/生产 |

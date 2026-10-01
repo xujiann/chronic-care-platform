@@ -1,5 +1,9 @@
 # DEPENDENCY MAP — 主线依赖地图
 
+## 2026-10-01 TEST-026 测试专用依赖
+
+批准的依赖仅为实验测试/child → 测试 helper → Node 内置 SQLite/文件系统；不加载 server、正式 migration、业务数据库或外部 provider，不加包、worker 或 CI 拓扑。两份 Proposed 的正式前置不被跳过，仅独立 Accepted 实验例外有效。
+
 ## 2026-09-30 GOV-026 GS-03 回调设计准入
 
 拟议依赖为 T08 外部身份验真 → T05 资源范围与业务命令 → T00 跨域组合/证据；只是设计关系，未加入运行依赖、包、worker、CI 或部署入口。Proposed ADR 不构成实施前置已满足。

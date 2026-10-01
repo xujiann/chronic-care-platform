@@ -1,6 +1,7 @@
 # ADR-GS03-STORAGE-001：转诊回调入站回执与授权事实的同库原子边界
 
 - 状态：Proposed
+- 限域实验例外：用户已批准 `ADR-GS03-EXPERIMENT-001`（`2026-10-01-referral-callback-sqlite-experiment.md`）的 TEST-026 无 HTTP、一次性合成 SQLite 实验；只有此实验可依独立 Accepted 决策实施，不受下文父 ADR 未接受的正式实施前置阻断。本 ADR 及父 ADR 仍 Proposed，正式 repository、现库迁移、主权威选择与运行时接线仍须另审。
 - 日期：2026-10-01
 - Owner：T00 存储组合与事务端口；T05 会诊事实及消息；T04/`citizen-chronic` 授权和档案事实；T08 入站集成回执候选；平台治理审计 Owner。数据 Owner、隐私/留存 Owner 与真实调用方尚须分别审批。
 - 影响范围：GS-03 反馈、排期、报告三类入站回调的 receipt、确切居民授权、会诊、报告档案、应用内消息和成功审计的提交/重放；不改变父 ADR 的 provider 信任合同。
