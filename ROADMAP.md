@@ -1,5 +1,12 @@
 # 工程治理路线图
 
+## GOV-027 GS-03回调receipt与撤权原子提交设计 PLAN（2026-10-01）
+
+- 准入与事实：PR #329 的 Proposed 合同细化冻结 `29bd1a72` 与受保护合并 `b37e3ce9` 共享 tree `b836be04`；18项冻结本地门禁通过，PR CI `36873994691`、main CI `36875552422` 各九项成功，静态 Pages `36875552482` 成功。精确证据见 `.codex-platform-evidence/gs03-callback-repair-design-20261001/pr329-delivery.json`。GOV-026 只关闭已集成的限定设计文档交付，原 ADR 仍 Proposed、风险仍 open、五项外部待决由原 ADR/RISK 与新 GOV-027 继续承接，不解释为实施批准。WIP 先由 3/5 释放到 2/5，再登记独立中风险设计任务 GOV-027 回 3/5；本分支基线 `origin/main@b37e3ce9` 起始干净。
+- 目标、选项与所有权：仅评审入站回调 receipt 与撤权/续授权的同一事实提交边界。独立 Proposed `ADR-GS03-STORAGE-001` 比较现有 JSON 快照、SQLite 事务及已批准持久命令机制是否可承载资源/主体/意图/授权绑定的耐久 receipt；允许提出具体推荐（例如隔离 SQLite 候选），但存储权威、集合和迁移均未正式选定或获实施批准。GOV-027 依赖已有限关闭的 GOV-026 父协议设计交付，不把父 ADR 当 Accepted。T05 持有会诊业务事实，T04 持有居民授权事实，T08 持有外部来源，T00 协调存储/跨域合同；隐私与存储责任人须确认保留/删除和失败恢复。T00 唯一治理写者负责总账、ROADMAP、文档清单、DATA_MODEL/API_MAP及另三图必要当前库存数字；独立 ADR 作者只写新 ADR 正文与 `docs/adr/README.md`，不互改文件。
+- 风险、迁移与回滚：必须区分首次、精确重放、撤权与回调竞争、明确回滚、提交成功但响应丢失和提交结果未知；旧无 digest 回执不倒算或自动接受，200 项网关事件不当作耐久权威。新 ADR 只提出迁移/兼容/对账备选、前置条件和回滚策略，不执行 schema、runtime、权限、API、provider、worker 或生产变更。失败时撤销本轮设计和治理增量，已提交会诊、回执与审计事实保持原样；既有回调合同 ADR 继续 Proposed，GS-03 未建设、六域生产 NO-GO。
+- 验收与交接：任务、需求、风险、Owner、精确写范围及 MAP-DATA/MAP-API gap 已登记；作者新建的 ADR 仍为 Proposed，机器 decision 与当前文档闭集已同步，仅代表设计材料存在。独审→冻结→18 项适用本地串行门禁后才可称本候选验证通过；当前不写测试通过、PR/CI或用户已选存储权威。后续任何高风险实现、迁移或生产接线须另立 Accepted ADR/审批与任务。本轮不推送、合并或部署。
+
 ## PR327/PR328 GS-03 v1限定测试交付事实收口（2026-10-01）
 
 - TEST-024 的 [PR #327](https://github.com/xujiann/chronic-care-platform/pull/327) 冻结 `4d50c225` 与保护合并 `07d67bbe` 共享 tree `d8d68a5b`；冻结18项串行门禁通过、`test:all` 3763pass/45环境skip/0fail，PR CI `36744134039`、main CI `36745604162` 各九项成功，静态 Pages `36745604150` 成功。精确交付记录见 `.codex-platform-evidence/gs03-callback-v1-20260930/pr327-delivery.json`，不复用为 TEST-025 证据。
@@ -306,7 +313,7 @@
 | 12 | 对象存储结构化元数据与耐久命令轨道 | Accepted OBJ-ADR-002；T08 data owner、T00 technical owner、v1/v2 兼容策略、SQLite v17、回填冻结、异步 API、fenced worker、keyset 分页和持久 reconcile 的仓库实现均已完成，production promotion=false / P1 | 真实 provider status/abort capability、KMS/WORM/扫描、容量、备份、监控和现场验收继续 NO-GO；不得把仓库实现完成解释为 worker 已现场激活或生产晋级 |
 | 13 | 严格生产预检证据信任装配 | Accepted ADR；T00 pinned-anchor/Ed25519 双角色 provider、CLI 自动装配、deployment package/env/CI 和负向矩阵已形成 / P0 | 真实 anchor/envelope、独立 signer、权限/轮换、外部 evidence 与现场执行继续由生产环境提供；provider 成功不替代完整 preflight 或最终人类授权 |
 | 14 | 生产切换行动证据与受保护晋级 | Accepted ADR；definitions-only v2、14/14 共享 Ed25519 验证、strict preflight 门禁、main/manual/production/self-hosted workflow 与 digest-only receipt 已形成 / P0 | GitHub production environment reviewers、专用 runner、真实 14 份 envelope、受控路径、外部审批和实际部署/现场签收继续 NO-GO；receipt 只证明预检资格 |
-| 15 | 当前工作流、Markdown 与跟踪 PDF 闭集治理 | GOV-001、DOC-001、REPO-001 仓库内缺口已关闭：开发默认 `origin/main`，固定 tag 仅作证据；294 份 Markdown 唯一分类；3 个 PDF 绑定来源与 digest / P2 | snapshot/superseded 保持只读；新增文档同步清单。两个历史 PDF 与一个现行校验 PDF 均无跟踪生成器，替换前必须先补可复现生成源，不得手工编辑 |
+| 15 | 当前工作流、Markdown 与跟踪 PDF 闭集治理 | GOV-001、DOC-001、REPO-001 仓库内缺口已关闭：开发默认 `origin/main`，固定 tag 仅作证据；295 份 Markdown 唯一分类；3 个 PDF 绑定来源与 digest / P2 | snapshot/superseded 保持只读；新增文档同步清单。两个历史 PDF 与一个现行校验 PDF 均无跟踪生成器，替换前必须先补可复现生成源，不得手工编辑 |
 | 16 | 首批生产范围机器冻结 | Accepted ADR；`priority-eight-applications-v1` 冻结 8 应用、9 页面、32 API、38 数据引用、7 worker、14 外部依赖、16 应用证据与 14 切换动作；API/Owner 复核归零。新增迁移闭集把 21 个受阻引用分为 20 个唯一持久化计划与 1 个派生读模型，`collectionRepositoryPlanMissing=0` / P0 | 仓库计划完整不代表迁移完成；21 个引用仍无生产写资格，全部 API/数据晋级、真实外部证据、worker 激活、PG 主切换和现场验收继续 NO-GO |
 | 17 | 招标需求治理 v2 | Accepted ADR；2 份中性样本文档、5 条候选、27 个能力 ID、受控 PDF 指纹导入、人工复核覆盖层、差距分析与产品化工作台已形成 / P0 | 原始文件、全文、浏览器上传、OCR/模型、自动改代码和生产授权均不在首批范围；复核写入口保持行为证据待补与生产 NO-GO |
 

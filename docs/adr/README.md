@@ -13,6 +13,7 @@
 | [现有 AI/CDSS 中心与规则治理保护整合](./2026-09-06-ai-cdss-reconciliation.md) | Accepted | 保留主线两中心，统一规则审批、漂移、范围和回执保护 |
 | [居民服务评价投诉消息按角色与订单机构失败关闭](./2026-09-08-resident-service-message-authorization.md) | Accepted | 护理与陪诊评价消息的目标角色、订单机构、历史兼容和回执状态 |
 | [跨机构转诊回调的资源、授权与回执合同](./2026-09-30-referral-callback-contract.md) | Proposed | GS-03 三类回调的调用方、资源签名、精确授权与耐久回执待决；不授权实施 |
+| [转诊回调入站回执与授权事实的同库原子边界](./2026-10-01-referral-callback-storage-atomicity.md) | Proposed | GS-03 入站 receipt 唯一权威、确切授权共事务与失败恢复候选；不授权实现或迁移 |
 
 ## 状态
 
