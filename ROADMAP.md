@@ -1,5 +1,13 @@
 # 工程治理路线图
 
+## TEST-025 GS-03 v1回调边界现状测试 PLAN（2026-10-01）
+
+- 准入与基线：用户仅批准下一测试/治理切片。PR #327 已保护合并至 `origin/main@07d67bbe`，PR CI `36744134039`、main CI `36745604162` 各九项成功，静态 Pages `36745604150` 成功；最新 main Lifecycle `36779524950` 成功。本 T00 分支 `process/t00-gs03-callback-boundaries-20261001` 起始干净；机器在制从 4/5 登记为 5/5，TEST-024 和 GOV-026 均不伪关闭。T00 唯一写者负责总账、路线图及 API 地图最小准入，T05 在独立工作树 `.codex-platform-worktrees/process-v2/t05-gs03-callback-boundaries-20261001`、同名分支单写新测试 `test/gs03-referral-callback-boundaries-api.test.js`。
+- 目标与选择：补齐 v1 现状的三个未定边界：同一已签 body 换会诊 URL 的跨资源提交、不同当前可访问主体复用同一 `contractId + idempotencyKey` 的回执、授权撤销后的首次提交与旧键重放。复用隔离合成真实 HTTP 和既有角色/签名夹具，新建独立专项文件以隔离 TEST-024 的已交付基线；不扩写旧文件。按当前实现分别断言状态码、现行响应中的回执/事件字段及资源绑定、会诊/报告档案/消息/网关事件与拒绝审计的实际变化，不能预设拟议 v2 应有的 403/409 或零审计写。
+- 非目标、风险与回滚：不修改运行时、API、授权、签名、幂等、数据库、schema、CI、worker、ADR 或生产接线；不接真实供应方、凭据或患者数据。body-only HMAC、跨主体全局键、旧无 digest 回执与 200 项窗口仍是风险，Proposed `ADR-GS03-CALLBACK-001` 不授权修复。测试如发现脆弱现状，保留失败/差异证据并交后续高风险决策，不在本切片改语义；回滚只撤销单一新测试与本轮治理登记，旧业务/审计事实不动。GS-03 未建设、生产六域 NO-GO。
+- 验收与交接：先登记 TASK/需求/风险/写范围/地图 gap 并通过生命周期及所有权窄门禁再放行 T05；新测试路径实际存在后再注册机器 testId 和受控窄测证据。T05 独立审查与专项零失败零跳过、T00 组合冻结及适用串行门禁均以各自精确 SHA 证明；PR #327 的绿灯不得替代本切片验证。本轮不推送、合并或部署。
+- 阶段结果：T05 提交 `9d5b013e` 经 T00 cherry-pick 为 `dfdfe9da4bc4b504f36a0b3baf7814800d3ba4be`，新测试 blob `4a4d6562e3c60f32aedf732a165b03fb877975d3`；独审无 P0–P2。受控 `narrow-test-2.log` 记录一个顶层测试 1pass/0fail/0skip、6.76 秒，覆盖三合同 27 次 callback 请求及一次真实授权撤销；只证明隔离合成 v1 现状。TEST-025 暂为“验证中／已实现”，T00 组合冻结及串行门禁未完成，旧 TEST-024/GOV-026、GS-03 和六域生产状态不晋升。
+
 ## TEST-024 GS-03 v1回调现状测试 PLAN（2026-09-30）
 
 - 用户批准下一测试切片，基线 `origin/main@92179d2f`，T00 当前候选 `3b2c77a7`；T05 独立工作树 `.codex-platform-worktrees/process-v2/t05-gs03-callback-v1-20260930` 与分支 `process/t05-gs03-callback-v1-20260930` 已确认。独立中风险 `TEST-024` 登记后 WIP 4/5；T00 控制塔单写总账、路线图与必要地图，T05 单写新增 `test/gs03-referral-callback-v1-api.test.js`，双方不覆盖彼此文件。GOV-026 仍是设计任务，本轮用户测试授权独立登记，不借 Proposed ADR 作实现准入。
