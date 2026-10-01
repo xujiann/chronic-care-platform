@@ -2,7 +2,7 @@
 
 ## 2026-10-01 TEST-026 隔离实验单写范围
 
-T08 独立 worktree：A 只写 `test/helpers/gs03-sqlite-experiment.js`，B 只写 `test/gs03-sqlite-experiment.test.js` 与 child helper；两开发者停笔后 T00 接管两处测试预期修正，并沿 GOV-027 写治理。三文件候选已准备到T00，17项专项通过，代码独审与冻结完整门禁未完成。没有正式业务模块或 Owner 变更。
+T08 独立 worktree：A 只写 `test/helpers/gs03-sqlite-experiment.js`，B 只写 `test/gs03-sqlite-experiment.test.js` 与 child helper；两开发者停笔后 T00 曾接管两处测试预期修正，并沿 GOV-027 写治理。独审恢复后B重新单写既有测试文件补齐两类P2，20项专项通过，helper/child不变；复审及冻结完整门禁以新候选证据为准。没有正式业务模块或 Owner 变更。
 
 ## 2026-09-30 GOV-026 GS-03 回调设计准入
 
