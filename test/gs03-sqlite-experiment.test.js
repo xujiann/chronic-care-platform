@@ -5,6 +5,7 @@
 const assert = require("node:assert/strict");
 const test = require("node:test");
 const fs = require("node:fs");
+const os = require("node:os");
 const path = require("node:path");
 const { createHash } = require("node:crypto");
 const { fork } = require("node:child_process");
@@ -66,29 +67,82 @@ function count(snapshot, name) {
   return snapshot[name].length;
 }
 
+function assertCompleteCallbackFacts(before, after, input, result) {
+  const { contract, targetId, authorizationId, principal } = input;
+  const receipt = result.receipt;
+  assert.equal(result.state, "confirmed");
+  assert.equal(result.outcome, "first");
+  assert.equal(receipt.targetId, targetId);
+  assert.equal(receipt.authorizationId, authorizationId);
+  assert.equal(receipt.contract, contract);
+  assert.equal(receipt.version, 2);
+  assert.match(receipt.intentDigest, /^[0-9a-f]{64}$/);
+  const oldCase = before.cases.find((row) => row.id === targetId);
+  const nextCase = after.cases.find((row) => row.id === targetId);
+  assert.ok(oldCase && nextCase);
+  assert.equal(nextCase.version, oldCase.version + 1);
+  assert.equal(nextCase.status, { feedback: "feedback-received", schedule: "scheduled", report: "report-returned" }[contract]);
+  if (contract === "feedback") assert.equal(nextCase.feedback_text, input.intent.feedbackText);
+  if (contract === "schedule") {
+    assert.equal(nextCase.meeting_window, input.intent.meetingWindow);
+    assert.equal(nextCase.receiving_doctor, input.intent.receivingDoctor);
+  }
+  if (contract === "report") {
+    assert.equal(nextCase.report_summary, input.intent.reportSummary);
+    assert.equal(nextCase.external_report_id, input.intent.externalReportId);
+  }
+
+  assert.equal(count(after, "receipts"), count(before, "receipts") + 1);
+  assert.equal(count(after, "events"), count(before, "events") + 1);
+  assert.equal(count(after, "reports"), count(before, "reports") + (contract === "report" ? 1 : 0));
+  assert.equal(count(after, "messages"), count(before, "messages") + 2);
+  assert.equal(count(after, "audit"), count(before, "audit") + 2);
+  assert.equal(count(after, "auditSource"), count(before, "auditSource") + 2);
+  const persistedReceipt = after.receipts.find((row) => row.id === receipt.id);
+  assert.ok(persistedReceipt);
+  assert.equal(persistedReceipt.contract, contract);
+  assert.equal(persistedReceipt.version, 2);
+  assert.equal(persistedReceipt.target_id, targetId);
+  assert.equal(persistedReceipt.authorization_id, authorizationId);
+  assert.equal(persistedReceipt.idempotency_key, input.key);
+  assert.equal(persistedReceipt.intent_digest, receipt.intentDigest);
+  const event = after.events.find((row) => row.receipt_id === receipt.id);
+  assert.ok(event);
+  assert.equal(event.target_id, targetId);
+  assert.equal(event.contract, contract);
+  assert.equal(event.principal_id, principal.id);
+  assert.equal(event.intent_digest, receipt.intentDigest);
+  const messages = after.messages.filter((row) => row.receipt_id === receipt.id);
+  assert.equal(messages.length, 2);
+  assert.deepEqual(messages.map((row) => row.target_role).sort(), ["citizen", "institution"]);
+  assert.ok(messages.every((row) => row.target_id === targetId));
+  if (contract === "report") {
+    const report = after.reports.find((row) => row.receipt_id === receipt.id);
+    assert.ok(report);
+    assert.equal(report.target_id, targetId);
+    assert.equal(report.report_summary, input.intent.reportSummary);
+    assert.equal(report.external_report_id, input.intent.externalReportId);
+  } else {
+    assert.equal(after.reports.some((row) => row.receipt_id === receipt.id), false);
+  }
+  const audits = after.audit.filter((row) => row.receipt_id === receipt.id);
+  assert.equal(audits.length, 2);
+  assert.deepEqual(audits.map((row) => row.kind).sort(), ["access-success", "security-success"]);
+  assert.ok(audits.every((row) => row.target_id === targetId && row.actor_id === principal.id));
+  assert.equal(persistedReceipt.audit_ref, audits.find((row) => row.kind === "security-success").id);
+  const sources = after.auditSource.filter((row) => audits.some((audit) => audit.id === row.audit_id));
+  assert.equal(sources.length, 2);
+  assert.ok(sources.every((row) => /^[0-9a-f]{64}$/.test(row.source_hash)), "synthetic source hashes are not platform v15 evidence");
+}
+
 for (const contract of ["feedback", "schedule", "report"]) {
   test(`${contract}: first commit persists complete facts; exact replay is zero-write`, (t) => {
     const { experiment } = fixture(t);
     const input = command(contract);
     const before = experiment.snapshot();
     const first = experiment.applyCallback(input);
-    assert.equal(first.state, "confirmed");
-    assert.equal(first.outcome, "first");
-    assert.equal(first.receipt.targetId, CASE.id);
-    assert.equal(first.receipt.authorizationId, AUTH.id);
-    assert.equal(first.receipt.contract, contract);
-    assert.equal(first.receipt.version, 2);
-    assert.match(first.receipt.intentDigest, /^[0-9a-f]{64}$/);
     const after = experiment.snapshot();
-    assert.equal(count(after, "receipts"), count(before, "receipts") + 1);
-    assert.equal(count(after, "messages"), count(before, "messages") + 2);
-    assert.equal(count(after, "events"), count(before, "events") + 1);
-    assert.equal(count(after, "audit"), count(before, "audit") + 2);
-    assert.equal(count(after, "auditSource"), count(before, "auditSource") + 2);
-    assert.deepEqual(after.audit.map((row) => row.kind).sort(), ["access-success", "security-success"]);
-    assert.ok(after.auditSource.every((row) => after.audit.some((audit) => audit.id === row.audit_id)), "synthetic source rows bind both success audits; not the platform v15 source");
-    assert.equal(count(after, "reports"), count(before, "reports") + (contract === "report" ? 1 : 0));
-    assert.notDeepEqual(after.cases, before.cases);
+    assertCompleteCallbackFacts(before, after, input, first);
     const replay = experiment.applyCallback(input);
     assert.equal(replay.state, "confirmed");
     assert.equal(replay.outcome, "replay");
@@ -118,6 +172,33 @@ test("receipt namespace separates contracts and trusted principals; one namespac
   denial(() => alternate.applyCallback(command("feedback", "target-bound-key", { targetId: "case-synthetic-2" })), "RECEIPT_CONFLICT");
   assert.deepEqual(alternate.snapshot(), targetBound);
 });
+
+for (const contract of ["feedback", "schedule", "report"]) {
+  test(`${contract}: every canonical intent field and legal alternate target conflict, while another trusted principal has its own namespace`, (t) => {
+    const { experiment } = fixture(t);
+    const original = command(contract, `matrix-${contract}`);
+    const first = experiment.applyCallback(original);
+    const stable = externalSnapshot(experiment);
+    for (const field of Object.keys(INTENT[contract])) {
+      const altered = command(contract, `matrix-${contract}`, { intent: { ...INTENT[contract], [field]: `different synthetic ${field}` } });
+      denial(() => experiment.applyCallback(altered), "RECEIPT_CONFLICT");
+      assert.deepEqual(externalSnapshot(experiment), stable, field);
+    }
+    const secondPrincipal = command(contract, `matrix-${contract}`, { principal: { ...PRINCIPAL, id: "principal-synthetic-2" } });
+    const separate = experiment.applyCallback(secondPrincipal);
+    assert.equal(separate.outcome, "first");
+    assert.notEqual(separate.receipt.id, first.receipt.id);
+    assert.equal(count(externalSnapshot(experiment), "receipts"), 2);
+
+    const alternate = createExperiment({ clock: () => NOW });
+    t.after(() => { alternate.close(); alternate.cleanup(); });
+    alternate.seed({ authorizations: [AUTH], cases: [CASE, { ...CASE, id: "case-synthetic-2" }] });
+    alternate.applyCallback(command(contract, `target-${contract}`));
+    const targetStable = externalSnapshot(alternate);
+    denial(() => alternate.applyCallback(command(contract, `target-${contract}`, { targetId: "case-synthetic-2" })), "RECEIPT_CONFLICT");
+    assert.deepEqual(externalSnapshot(alternate), targetStable);
+  });
+}
 
 test("exact authorization binding fails closed for missing, resident, purpose, institution, scope, revoked and expired facts", (t) => {
   const { experiment } = fixture(t);
@@ -272,6 +353,25 @@ test("an unmarked database or wrong identity cannot be opened as this experiment
   denial(() => openExperiment({ dbPath: alien, identity: experiment.identity, clock: () => NOW }), "FOREIGN_DATABASE");
   assert.equal(digest(), beforeDigest);
   assert.deepEqual(fs.readdirSync(alienDirectory).sort(), beforeFiles, "foreign DB must gain no WAL, SHM or other file");
+
+  const narrowerRoot = path.join(experiment.directory, "synthetic-narrower-temp-root");
+  fs.mkdirSync(narrowerRoot);
+  const originalEnvironment = Object.fromEntries(["TEMP", "TMP", "TMPDIR"].map((key) => [key, process.env[key]]));
+  const knownDigest = createHash("sha256").update(fs.readFileSync(experiment.dbPath)).digest("hex");
+  const knownFiles = fs.readdirSync(experiment.directory).sort();
+  try {
+    for (const key of ["TEMP", "TMP", "TMPDIR"]) process.env[key] = narrowerRoot;
+    assert.equal(fs.realpathSync(os.tmpdir()), fs.realpathSync(narrowerRoot));
+    denial(() => openExperiment({ dbPath: experiment.dbPath, identity: experiment.identity, clock: () => NOW }), "FOREIGN_FILE");
+  } finally {
+    for (const [key, value] of Object.entries(originalEnvironment)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  }
+  assert.equal(createHash("sha256").update(fs.readFileSync(experiment.dbPath)).digest("hex"), knownDigest);
+  assert.deepEqual(fs.readdirSync(experiment.directory).sort(), knownFiles, "out-of-root refusal must not create files");
+  assert.deepEqual(externalSnapshot(experiment), known);
 });
 
 function spawnWorker(experiment, operation, request, { holdPhase = "", gateName = "" } = {}) {
@@ -325,6 +425,7 @@ function callerObservation(worker) {
 test("two real processes competing for one key produce one first and one zero-write replay", async (t) => {
   const { experiment } = fixture(t);
   const input = command("report", "race-key");
+  const before = externalSnapshot(experiment);
   const first = spawnWorker(experiment, "callback", input, { holdPhase: "beforeCommit" });
   await first.waitAtGate();
   const second = spawnWorker(experiment, "callback", input);
@@ -334,8 +435,10 @@ test("two real processes competing for one key produce one first and one zero-wr
   const b = await second.wait((message) => message.type === "result");
   await Promise.all([first.exited, second.exited]);
   assert.deepEqual([a.result.outcome, b.result.outcome].sort(), ["first", "replay"]);
-  assert.equal(count(experiment.snapshot(), "receipts"), 1);
-  assert.equal(count(experiment.snapshot(), "messages"), 2);
+  assert.deepEqual(a.result.receipt, b.result.receipt);
+  const after = externalSnapshot(experiment);
+  assertCompleteCallbackFacts(before, after, input, a.result.outcome === "first" ? a.result : b.result);
+  assert.equal(after.cases.find((row) => row.id === input.targetId).version, 1);
 });
 
 test("controlled revoke-before-callback and callback-before-revoke commit orders are serialized across processes", async (t) => {
