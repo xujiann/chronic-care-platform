@@ -1,5 +1,18 @@
 # 工程治理路线图
 
+## PR327/PR328 GS-03 v1限定测试交付事实收口（2026-10-01）
+
+- TEST-024 的 [PR #327](https://github.com/xujiann/chronic-care-platform/pull/327) 冻结 `4d50c225` 与保护合并 `07d67bbe` 共享 tree `d8d68a5b`；冻结18项串行门禁通过、`test:all` 3763pass/45环境skip/0fail，PR CI `36744134039`、main CI `36745604162` 各九项成功，静态 Pages `36745604150` 成功。精确交付记录见 `.codex-platform-evidence/gs03-callback-v1-20260930/pr327-delivery.json`，不复用为 TEST-025 证据。
+- TEST-025 的 [PR #328](https://github.com/xujiann/chronic-care-platform/pull/328) 冻结 `afac898d` 与保护合并 `028801cd` 共享 tree `a937f62f`；冻结18项串行门禁通过、`test:all` 3764pass/45环境skip/0fail，PR CI `36826912177`、main CI `36827895768` 各九项成功，静态 Pages `36827895752` 成功。精确交付记录见 `.codex-platform-evidence/gs03-callback-boundaries-20261001/pr328-delivery.json`，不复用为 TEST-024 证据。
+- 两项仅关闭 v1 隔离合成真实 HTTP 现状测试交付，状态“已关闭／已集成”，WIP 从 5/5 降为 3/5（GOV-026、OPS-040、SEC-016）。风险保留 open：跨 URL 签名、跨主体同键、撤权后回调和旧回执/200项窗口均未修复；GOV-026 继续细化 Proposed ADR，GS-03 仍未建设，生产六域 NO-GO。本三文件元数据收口及同期 ADR 细化是新候选，仍须自身独审→冻结→18 项适用串行门禁，不把 PR #327/#328 绿灯自证为本候选通过，也不推送、合并或部署。
+
+## GOV-026 GS-03 回调修复合同细化 PLAN（2026-10-01）
+
+- 用户新增授权仅为既有 Proposed `ADR-GS03-CALLBACK-001` 的设计细化，不是 Accepted 或高风险实现批准。基线 `origin/main@028801cd`，本 T00 分支 `process/t00-gs03-callback-repair-design-20261001` 起始干净。GOV-026 沿原编号转“实施中／已实现”（只指已有设计文档）；T00 单写 `config/lifecycle-governance.json`、`ROADMAP.md`、`API_MAP.md`，独立 ADR 作者单写既有 ADR 与 `docs/adr/README.md`，不创建新 Markdown。TEST-024/025 在主线 CI 精确核验和另行事实收口前仍为“验证中／已实现”，WIP 仍 5/5，不预支释放。
+- 目标与方案：以 TEST-024 的三合同角色/签名/副作用现状和 TEST-025 的跨 URL 签名、跨主体同键、撤权首次/重放现状为反例与迁移输入，细化五项待决及拟议 v2 资源签名、可信 principal 命名空间、精确授权、回执/副作用原子性和历史兼容。维持 ADR 原三选项顺序：方案1仅刻画 v1 不晋升；方案2分阶段 A+B 为待评审推荐方向；方案3完整中继/独立账本为高代价备选。不得将现状断言、推荐方向或本轮批准写成已接受协议、已验证修复或现场信任。
+- 风险与非目标：五项调用方、存储/原子提交、旧无 digest 回执迁移、供应方信任与生产现场决策继续待外部 Owner/用户裁定；旧回执不倒算、不自动接受，200 项事件窗口不证明耐久。仅编辑既有设计/索引及三份治理文件；不改 source、test、API、签名、权限、schema、CI、worker、部署或生产。GS-03 仍未建设，生产六域 NO-GO。
+- 验收与退出：ADR 明确 v1 事实和 v2 提案、五项未决、Owner、迁移/回滚、安全负测与失败/越权/恢复矩阵；本轮新候选须独审→冻结→18 项本地串行门禁，完成前不写为通过，之后才交用户决策，不推送、合并或部署。回滚仅撤销本轮设计细化和治理增量，保留 TEST-024/025 的已集成测试及历史回执/审计；PR #327/#328 的成功不能替代本轮文档与元数据候选自身验证。
+
 ## TEST-025 GS-03 v1回调边界现状测试 PLAN（2026-10-01）
 
 - 准入与基线：用户仅批准下一测试/治理切片。PR #327 已保护合并至 `origin/main@07d67bbe`，PR CI `36744134039`、main CI `36745604162` 各九项成功，静态 Pages `36745604150` 成功；最新 main Lifecycle `36779524950` 成功。本 T00 分支 `process/t00-gs03-callback-boundaries-20261001` 起始干净；机器在制从 4/5 登记为 5/5，TEST-024 和 GOV-026 均不伪关闭。T00 唯一写者负责总账、路线图及 API 地图最小准入，T05 在独立工作树 `.codex-platform-worktrees/process-v2/t05-gs03-callback-boundaries-20261001`、同名分支单写新测试 `test/gs03-referral-callback-boundaries-api.test.js`。
