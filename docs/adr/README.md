@@ -2,6 +2,7 @@
 
 | 新增决策 | 状态 | 范围 |
 |---|---|---|
+| [隔离 SQLite 回调原子性实验](./2026-10-01-referral-callback-sqlite-experiment.md) | Accepted | 仅 TEST-026 测试目录内合成新库、唯一回执/撤权竞态/恢复；不接 HTTP、现库 migration 或生产 |
 | [隔离 relay 观测与故障状态](./2026-09-27-primary-relay-observability.md) | Accepted | 加法观测、阶段与提交未知窗口；不接监控sink、worker或生产 |
 | [隔离环境主存储单批次 relay](./2026-09-23-primary-single-batch-relay.md) | Accepted | 显式下一批投递与进度推进；不接请求、worker 或生产 |
 | [主存储独立持久 checkpoint](./2026-09-23-primary-durable-checkpoint.md) | Accepted | 合成环境进度账本与崩溃重放；不含自动 relay/请求/生产 |
@@ -13,6 +14,7 @@
 | [现有 AI/CDSS 中心与规则治理保护整合](./2026-09-06-ai-cdss-reconciliation.md) | Accepted | 保留主线两中心，统一规则审批、漂移、范围和回执保护 |
 | [居民服务评价投诉消息按角色与订单机构失败关闭](./2026-09-08-resident-service-message-authorization.md) | Accepted | 护理与陪诊评价消息的目标角色、订单机构、历史兼容和回执状态 |
 | [跨机构转诊回调的资源、授权与回执合同](./2026-09-30-referral-callback-contract.md) | Proposed | GS-03 三类回调的调用方、资源签名、精确授权与耐久回执待决；不授权实施 |
+| [转诊回调入站回执与授权事实的同库原子边界](./2026-10-01-referral-callback-storage-atomicity.md) | Proposed | GS-03 入站 receipt 唯一权威、确切授权共事务与失败恢复候选；不授权实现或迁移 |
 
 ## 状态
 
