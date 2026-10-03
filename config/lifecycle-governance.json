@@ -1090,6 +1090,7 @@
     }
   ],
   "tests": [
+    {"id":"TEST-GS03-S1-MIGRATION","kind":"isolated-synthetic-real-sqlite-migration","path":"test/gs03-callback-receipt-migration.test.js","command":"node --test test/gs03-callback-receipt-migration.test.js"},
     {"id":"TEST-GS03-SQLITE-EXPERIMENT","kind":"isolated-synthetic-sqlite","path":"test/gs03-sqlite-experiment.test.js","command":"node --test test/gs03-sqlite-experiment.test.js"},
     {"id":"TEST-GOV-027","kind":"design-governance","path":"test/lifecycle-governance.test.js","command":"npm run governance:lifecycle"},
     {"id":"TEST-GS03-CALLBACK-BOUNDARIES-HTTP","kind":"isolated-synthetic-real-http-v1-boundary-characterization","path":"test/gs03-referral-callback-boundaries-api.test.js","command":"node --test test/gs03-referral-callback-boundaries-api.test.js"},
@@ -1419,6 +1420,7 @@
     }
   ],
   "evidence": [
+    {"id":"EVD-GS03-S1-NARROW","type":"independently-reviewed-isolated-sqlite-narrow","scope":"2026-10-03最终专项14pass/0fail/0skip；源码blob75c0f8a296fa6cbacd5629016aba4a8161773818、测试blob3945fc79c5e551c32b4c1cf01fda97adc63ca1a6，独审无剩余P0-P2。narrow1/2各一失败保留，narrow3为修前13pass，不能替代最终narrow4；仅本地未装配定义，完整冻结门禁另验，不证明生产或正式回调能力。","ref":"C:/Users/drxuj/Projects/卫生健康信息平台/.codex-platform-evidence/gs03-s1-migration-20261003/narrow-4.log","testIds":["TEST-GS03-S1-MIGRATION"],"productionEvidence":false},
     {
       "id": "EVD-PR330-INTEGRATION",
       "type": "reviewed-frozen-pr-main-ci-protected-merge",
@@ -2084,8 +2086,8 @@
   "tasks": [
     {
       "integrationOwner": "T00",
-      "taskStatus": "实施中",
-      "capabilityStatus": "未建设",
+      "taskStatus": "验证中",
+      "capabilityStatus": "已实现",
       "regulatoryControlIds": [
         "REG-GOV-001"
       ],
@@ -2156,8 +2158,8 @@
     },
     {
       "integrationOwner": "T00",
-      "taskStatus": "实施中",
-      "capabilityStatus": "未建设",
+      "taskStatus": "验证中",
+      "capabilityStatus": "已实现",
       "regulatoryControlIds": [
         "REG-GOV-001"
       ],
@@ -2204,7 +2206,7 @@
         "gs03-receipt-migration-definition"
       ],
       "testIds": [
-        "TEST-GOV-027"
+        "TEST-GS03-S1-MIGRATION"
       ],
       "worktree": ".codex-platform-worktrees/process-v2/t00-gs03-s1-schema-20261003",
       "branch": "process/t00-gs03-s1-schema-20261003",

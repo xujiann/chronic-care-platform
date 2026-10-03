@@ -51,7 +51,15 @@ TEST-026 合成模型经 PR330 集成，不能证明平台真实 migration、led
 
 namespace_digest 与 key_digest 均为 SHA-256 的小写 hex 输出；intent_digest_version=2 声明拟议 v2 意图算法标识，摘要字段同为 SHA-256。DDL只检查存储形状，规范化输入和真实 principal 映射由后续正式合同与端口负责。
 
+bounded ID首尾空白集合明确包括ASCII 9–13/32、U+0085、NBSP、U+1680、U+2000–200A、U+2028/2029、U+202F、U+205F、U+3000、FEFF。定义与测试均按UTF8字节边界核验，摘要不能借NUL截断通过。
+
+创建和验证前须确认真实v15父表存在、stream/source_event_id两列类型与NOT NULL符合要求，并具有可被复合外键引用的唯一键；拒绝损坏结构，不创建或修复父表。现行共享runner在已应用时只验证ledger并跳过apply，因此候选的每次显式使用都必须在runner后调用verify，含重跑；不宣称runner单独检测已应用结构漂移，不改共享runner。
+
 ## Risk
+
+父唯一索引须为 BINARY 真实 key 列，显式 verify 同时执行 foreign_key_check，拒绝准备失败或孤儿引用。最终专项 narrow-4 为14pass/0fail/0skip；独审绑定源码75c0f8a、测试3945fc79，无剩余P0-P2。先前失败日志保留，完整门禁尚须在组合冻结后验证。
+
+共享 schema fingerprint 的历史 NOT LIKE 过滤会遗漏 sqlitex 名称对象；本候选使用精确对象集合拒绝额外触发器，未修改共享算法。其他调用者的历史风险保留，不据本片宣称全平台修复。
 
 FK 只证明审计引用存在，不证明其业务主体、成功语义、真实授权或同事务写入；后续必须另验。身份和外部 scope、全部写者接线、正式保留/隐私删除、legacy 名单/截止、历史对账和恢复目标继续阻断相应正式阶段。候选库不得交给旧 runtime。回滚停止验证并清理自有测试目录，保留失败日志；不 DROP 现库、不删业务/审计/回执。
 

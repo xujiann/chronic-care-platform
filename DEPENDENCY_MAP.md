@@ -1,5 +1,7 @@
 # DEPENDENCY MAP — 主线依赖地图
 
+S1拟议依赖为隔离专项→未装配回执migration定义→现有SQLite migration内容指纹；仅专项显式追加候选注册表。不存在server/HTTP→新定义的运行边；真实审计source作为结构外键前置，不代表已完成业务hook接线。
+
 ## 2026-10-01 TEST-026 测试专用依赖
 
 批准的依赖仅为实验测试/child → 测试 helper → Node 内置 SQLite/文件系统；不加载 server、正式 migration、业务数据库或外部 provider，不加包、worker 或 CI 拓扑。两份 Proposed 的正式前置不被跳过，仅独立 Accepted 实验例外有效。

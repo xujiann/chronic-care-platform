@@ -1,5 +1,7 @@
 # MODULE MAP — 主线模块地图
 
+DATA-009的未装配迁移定义位于 `src/platform/storage/gs03-callback-receipt-migration.js`；它仅提供schema创建/验证与候选定义，不提供receipt repository或回调命令。专项 `test/gs03-callback-receipt-migration.test.js` 由另一作者单写，正式注册表与server不接此模块。
+
 ## 2026-10-01 TEST-026 隔离实验单写范围
 
 T08 独立 worktree：A 只写 `test/helpers/gs03-sqlite-experiment.js`，B 只写 `test/gs03-sqlite-experiment.test.js` 与 child helper；两开发者停笔后 T00 曾接管两处测试预期修正，并沿 GOV-027 写治理。独审恢复后B重新单写既有测试文件补齐两类P2，20项专项通过，helper/child不变；复审及冻结完整门禁以新候选证据为准。没有正式业务模块或 Owner 变更。
