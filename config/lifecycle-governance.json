@@ -39,6 +39,30 @@
     "高": "accepted-adr-human-review-special-validation"
   },
   "requirements": [
+    {
+      "id": "REQ-GOV-028",
+      "title": "PR330实验收尾与GS03 S1迁移准入",
+      "sourceType": "approved-human-plan",
+      "sourceRef": "USER-GS03-S1-CONTINUE-2026-10-03",
+      "acceptance": [
+        "未装配迁移定义、正式head19不变，无HTTP/server/现库/自动注册",
+        "真实迁移runner空库/升级/重跑/失败/checksum/schema漂移验收",
+        "唯一不可变回执、REPLACE旁路及真实v15外键和历史链保全",
+        "独审后冻结串行适用门禁，生产NO-GO"
+      ]
+    },
+    {
+      "id": "REQ-DATA-009",
+      "title": "GS03未装配回执迁移定义与隔离验证",
+      "sourceType": "approved-human-plan",
+      "sourceRef": "USER-GS03-S1-CONTINUE-2026-10-03",
+      "acceptance": [
+        "未装配迁移定义、正式head19不变，无HTTP/server/现库/自动注册",
+        "真实迁移runner空库/升级/重跑/失败/checksum/schema漂移验收",
+        "唯一不可变回执、REPLACE旁路及真实v15外键和历史链保全",
+        "独审后冻结串行适用门禁，生产NO-GO"
+      ]
+    },
     {"id":"REQ-TEST-026","title":"GS-03无HTTP隔离SQLite回调原子性实验","sourceType":"approved-human-plan","sourceRef":"USER-GS03-SQLITE-EXPERIMENT-2026-10-01","acceptance":["隔离新库、拒绝陌生现库和路径逃逸，不改变正式schema或HTTP","三合同receipt唯一与确定性绑定，当前确切授权和重放同事务检查","真实多进程/双连接竞争、撤权排序、逐副作用回滚、提交前退出/提交后响应丢失/未知结果重启核验","receipt在实验库存续期不可更新删除/TTL或复用key；超过200条保持","专项无失败/跳过、独审后冻结并串行适用18门禁；不推送合并上线"]},
     {"id":"REQ-GOV-027","title":"GS-03回调receipt与撤权原子提交权威设计准入","sourceType":"approved-t00-plan","sourceRef":"USER-GS03-CALLBACK-STORAGE-DESIGN-2026-10-01","acceptance":["独立Proposed ADR比较既有JSON/SQLite与可复用持久命令机制的回调receipt和确切授权提交边界，允许提出推荐但不视作已正式选定或获实施批准","明确首次、精确重放、撤权并发、明确回滚、提交成功响应丢失和结果未知的业务/receipt/审计一致性、历史无digest兼容及恢复选择","仅设计与本地文档治理，不实施runtime、schema/migration、权限、外部provider或生产接线"]},
     {"id":"REQ-TEST-025","title":"GS-03 v1回调跨资源签名、跨主体键与撤权重放现状测试","sourceType":"approved-t00-plan","sourceRef":"USER-GS03-CALLBACK-BOUNDARIES-2026-10-01","acceptance":["隔离合成真实HTTP刻画同一已签body用于不同会诊URL的当前响应及持久副作用","刻画不同当前可访问主体复用同一contractId与idempotencyKey的现行回执/资源边界","刻画授权撤销后首次回调与旧键重放的现行结果及业务投影/拒绝审计；不预写拟议v2安全结论"]},
@@ -513,6 +537,22 @@
     }
   ],
   "risks": [
+    {
+      "id": "RISK-GOV-028",
+      "title": "S1结构验证被误作正式回调或现库迁移授权",
+      "level": "中",
+      "owner": "T00",
+      "mitigation": "未装配闭集、独立ADR、测试及审查，保留父Proposed与NO-GO",
+      "status": "open"
+    },
+    {
+      "id": "RISK-DATA-009",
+      "title": "S1结构验证被误作正式回调或现库迁移授权",
+      "level": "高",
+      "owner": "T00",
+      "mitigation": "未装配闭集、独立ADR、测试及审查，保留父Proposed与NO-GO",
+      "status": "open"
+    },
     {"id":"RISK-TEST-026","title":"隔离实验被误作正式回调修复、权威迁移或现场原子性证据","level":"高","owner":"T08","mitigation":"仅合成新库；实验Accepted不替代两份Proposed正式决策；真实SQLite并发/崩溃与独审，保持生产NO-GO","status":"open"},
     {"id":"RISK-GOV-027","title":"把Proposed存储原子性方案误写为已选权威、可实施迁移或生产保证","level":"中","owner":"T00","mitigation":"独立ADR仅比较选择与缺失输入；T05业务、T04授权事实、T08外部来源、T00存储/组合及隐私责任边界待确认；旧无digest回执不倒算，200项事件窗口不冒充耐久，后续高风险实现需Accepted决策与独立准入","status":"open"},
     {"id":"RISK-TEST-025","title":"将跨资源、跨主体或撤权v1现状误判为已获安全保护","level":"中","owner":"T05","mitigation":"EVD-GS03-CALLBACK-BOUNDARIES-LOCAL与EVD-PR328-INTEGRATION证明限定v1边界现状测试经独审、冻结门禁和保护合并；只缓解测试交付风险，跨资源签名、跨主体回执、撤权和现场风险仍开放，不把Proposed目标当生产证据","status":"open","evidenceIds":["EVD-GS03-CALLBACK-BOUNDARIES-LOCAL","EVD-PR328-INTEGRATION"]},
@@ -1039,7 +1079,15 @@
     {"id":"ADR-OPS-049","status":"Accepted","path":"docs/adr/2026-09-27-primary-relay-observability.md","effectiveScope":"isolated-relay-metadata-observability-only","reviewDue":"2027-03-27","supersedes":[]},
     {"id":"ADR-GS03-CALLBACK-001","status":"Proposed","path":"docs/adr/2026-09-30-referral-callback-contract.md","effectiveScope":"GS03 external callback v2 contract design and admission review only; no runtime, migration or production authority","reviewDue":"2026-10-30","supersedes":[]},
     {"id":"ADR-GS03-STORAGE-001","status":"Proposed","path":"docs/adr/2026-10-01-referral-callback-storage-atomicity.md","effectiveScope":"GS03 inbound callback receipt and exact-authorization atomicity design only; no storage authority selected, runtime, schema, migration or production authority","reviewDue":"2026-11-01","supersedes":[]},
-    {"id":"ADR-GS03-EXPERIMENT-001","status":"Accepted","path":"docs/adr/2026-10-01-referral-callback-sqlite-experiment.md","effectiveScope":"TEST-026 only: test-directory synthetic disposable SQLite experiment; no HTTP, existing database, platform migration, runtime or production authorization","reviewDue":"2026-11-01","supersedes":[]}
+    {"id":"ADR-GS03-EXPERIMENT-001","status":"Accepted","path":"docs/adr/2026-10-01-referral-callback-sqlite-experiment.md","effectiveScope":"TEST-026 only: test-directory synthetic disposable SQLite experiment; no HTTP, existing database, platform migration, runtime or production authorization","reviewDue":"2026-11-01","supersedes":[]},
+    {
+      "id": "ADR-GS03-S1-001",
+      "status": "Accepted",
+      "path": "docs/adr/2026-10-03-gs03-receipt-migration-definition.md",
+      "effectiveScope": "DATA-009 unregistered migration definition and isolated synthetic tests only; not formal registry, runtime or existing database execution",
+      "reviewDue": "2026-11-03",
+      "supersedes": []
+    }
   ],
   "tests": [
     {"id":"TEST-GS03-SQLITE-EXPERIMENT","kind":"isolated-synthetic-sqlite","path":"test/gs03-sqlite-experiment.test.js","command":"node --test test/gs03-sqlite-experiment.test.js"},
@@ -1371,6 +1419,17 @@
     }
   ],
   "evidence": [
+    {
+      "id": "EVD-PR330-INTEGRATION",
+      "type": "reviewed-frozen-pr-main-ci-protected-merge",
+      "scope": "GOV027/TEST026限定交付；c100a9f6与merge1abd8a40同treeea5df539，18本地门禁、PR36914859615/main36916486213各9成功，Pages36916486215成功；GS03未建设，父ADR仍Proposed",
+      "ref": "C:/Users/drxuj/Projects/卫生健康信息平台/.codex-platform-evidence/gs03-sqlite-experiment-20261001/pr330-delivery.json",
+      "testIds": [
+        "TEST-GOV-027",
+        "TEST-GS03-SQLITE-EXPERIMENT"
+      ],
+      "productionEvidence": false
+    },
     {"id":"EVD-GS03-SQLITE-EXPERIMENT-REVIEW-FIX","type":"local-synthetic-sqlite-review-fix-narrow","scope":"2026-10-02：只修改实验测试文件补三合同完整持久事实/并发零重复写、三合同逐字段冲突和合成tempRoot外拒绝；narrow-review-fix.log为20pass/0fail/0skip。旧458fc4d1独审两类P2和原17项证据保留；新候选复审、冻结及完整门禁分别登记，不复用旧结论。","ref":"C:/Users/drxuj/Projects/卫生健康信息平台/.codex-platform-evidence/gs03-sqlite-experiment-20261001/review-fix.json","testIds":["TEST-GS03-SQLITE-EXPERIMENT"],"productionEvidence":false},
     {"id":"EVD-GS03-SQLITE-EXPERIMENT-NARROW","type":"local-synthetic-sqlite-narrow-test","scope":"2026-10-02：T08候选194d29a2经T00准备为fd068f68，同三文件blobs；narrow-1为15pass/2fail，修正两处测试预期后narrow-2为17pass/0fail/0skip。仅专项及准入独审通过，代码独审因agent额度耗尽未完成；未冻结、未跑完整门禁/CI、未推送合并。","ref":"C:/Users/drxuj/Projects/卫生健康信息平台/.codex-platform-evidence/gs03-sqlite-experiment-20261001/candidate.json","testIds":["TEST-GS03-SQLITE-EXPERIMENT"],"productionEvidence":false},
     {"id":"EVD-PR329-INTEGRATION","type":"reviewed-frozen-design-pr-main-ci-protected-merge","scope":"GOV-026限定Proposed回调修复合同细化交付：冻结29bd1a7219e99b1e826c4daa1734a263b749a7a3与2026-10-01受保护合并b37e3ce97fe832119e626cb6044be295ba83f8e7共享tree b836be047ef5ea8429f3fb1d119ec49be435b11c；独审与18项本地串行门禁通过，test:all 3764pass/45环境skip/0fail；PR CI36873994691及main CI36875552422各九项success，静态Pages36875552482 success。仅设计文档交付已集成，ADR仍Proposed、五项外部待决、GS-03未建设、生产六域NO-GO；本轮后续治理收口及新存储ADR另待自身独审/冻结/门禁。","ref":"C:/Users/drxuj/Projects/卫生健康信息平台/.codex-platform-evidence/gs03-callback-repair-design-20261001/pr329-delivery.json","testIds":["TEST-GOV-026"],"productionEvidence":false},
@@ -1934,8 +1993,6 @@
       "target": "数据敏感级别和迁移证据进入每项任务追踪链",
       "status": "已集成",
       "gapTaskIds": [
-        "GOV-027",
-        "TEST-026",
         "OPS-048",
         "OPS-049",
         "OPS-047",
@@ -1950,7 +2007,9 @@
         "OPS-015",
         "OPS-016",
         "OPS-017",
-        "OPS-018"
+        "OPS-018",
+        "GOV-028",
+        "DATA-009"
       ],
       "evidenceIds": [
         "EVD-GOV-001",
@@ -1965,7 +2024,6 @@
       "target": "接口变更由任务风险和影响范围选择门禁",
       "status": "已集成",
       "gapTaskIds": [
-        "GOV-027",
         "OPS-015",
         "OPS-016",
         "OPS-018",
@@ -2024,8 +2082,279 @@
     }
   ],
   "tasks": [
-    {"id":"GOV-027","title":"GS-03回调存储设计与隔离实验准入治理","ownerProcess":"T00","integrationOwner":"T00","taskStatus":"实施中","capabilityStatus":"已实现","riskLevel":"中","approval":{"state":"approved","mode":"T00-plan-approval","ref":"USER-GS03-SQLITE-EXPERIMENT-2026-10-01","approvedScope":"沿用原设计单写范围并增加隔离实验Accepted ADR、父合同ADR限域例外、DEPENDENCY_MAP；仅设计/准入/事实与测试证据登记。TEST-026实验代码独立T08任务，不含HTTP/runtime/现库schema或migration/生产/推送合并"},"requirementIds":["REQ-GOV-027"],"regulatoryControlIds":["REG-GOV-001"],"riskIds":["RISK-GOV-027"],"decisionIds":["ADR-GS03-STORAGE-001","ADR-GS03-EXPERIMENT-001"],"dependencies":["GOV-026"],"affectedModules":["gs03-callback-receipt-atomicity-design","lifecycle-governance"],"dataSensitivity":"仅合同元数据、合成示例与受控证据引用；不得包含真实患者、供应方凭据或原始回调报文","acceptanceCriteria":["独立Proposed ADR比较现有持久化/命令机制对receipt与确切授权同一提交边界的可行性、成本及失效模式，可提出推荐但不视作正式选定或获实施批准","明确首次、精确重放、撤权并发、回滚已确认、提交成功响应丢失和结果未知的状态矩阵与旧无digest回执保留/对账选择","标明T05业务Owner、T04授权事实Owner、T08外部来源、T00存储/组合和隐私责任人的待审批输入及历史兼容/回滚条件","独审后冻结并运行18项适用本地串行门禁；Proposed不授权runtime/schema/migration或生产，GS-03与六域仍NO-GO"],"testIds":["TEST-GOV-027"],"evidenceIds":[],"rollback":"撤销本轮新增Proposed设计、索引及治理登记，不改旧回执、已提交业务/审计事实或运行时","unresolved":["正式协议与存储ADR仍Proposed；本次仅限域合成实验获得Accepted。真实Owner/调用方、正式迁移/留存/现网全写者和现场仍待决；073a25a4设计候选未推送"],"worktree":".codex-platform-worktrees/process-v2/t00-primary-relay-observability-20260927","branch":"process/t00-gs03-callback-storage-design-20261001","planRef":"ROADMAP.md#gov-027-gs-03回调receipt与撤权原子提交设计-plan2026-10-01","writeScopes":["config/lifecycle-governance.json","ROADMAP.md","config/repository-governance.json","DATA_MODEL.md","API_MAP.md","CURRENT_ARCHITECTURE.md","MODULE_MAP.md","TECH_DEBT.md","docs/adr/2026-10-01-referral-callback-storage-atomicity.md","docs/adr/README.md","docs/adr/2026-10-01-referral-callback-sqlite-experiment.md","docs/adr/2026-09-30-referral-callback-contract.md","DEPENDENCY_MAP.md"],"observability":{"applicable":false,"reason":"仅Proposed存储/授权原子性设计，不交付运行时能力"},"runtimeCapability":false},
-    {"id":"TEST-026","title":"GS-03无HTTP隔离SQLite回调原子性实验","ownerProcess":"T08","integrationOwner":"T00","taskStatus":"验证中","capabilityStatus":"已实现","riskLevel":"高","approval":{"state":"approved","mode":"accepted-adr-human-review-special-validation","ref":"USER-GS03-SQLITE-EXPERIMENT-2026-10-01","approvedScope":"仅test/helpers/gs03-sqlite-experiment.js、test/helpers/gs03-sqlite-experiment-child.js、test/gs03-sqlite-experiment.test.js；新建一次性合成SQLite临时DDL/唯一回执/授权竞态/四态实验；无HTTP、server、现库/平台migration/schemahead、生产、推送合并"},"requirementIds":["REQ-TEST-026"],"regulatoryControlIds":["REG-GOV-001"],"riskIds":["RISK-TEST-026"],"decisionIds":["ADR-GS03-EXPERIMENT-001"],"dependencies":["GOV-027"],"affectedModules":["gs03-sqlite-test-experiment"],"dataSensitivity":"仅合成主体/授权/案例和受控摘要，不使用患者数据、凭据或provider报文","acceptanceCriteria":["隔离新库、拒绝陌生现库和路径逃逸，不改变正式schema或HTTP","三合同receipt唯一与确定性绑定，当前确切授权和重放同事务检查","真实多进程/双连接竞争、撤权排序、逐副作用回滚、提交前退出/提交后响应丢失/未知结果重启核验","receipt在实验库存续期不可更新删除/TTL或复用key；超过200条保持","专项无失败/跳过、独审后冻结并串行适用18门禁；不推送合并上线"],"testIds":["TEST-GS03-SQLITE-EXPERIMENT"],"evidenceIds":["EVD-GS03-SQLITE-EXPERIMENT-NARROW","EVD-GS03-SQLITE-EXPERIMENT-REVIEW-FIX"],"rollback":"停止实验并仅清理已确认自有合成临时目录；撤销测试增量，不触及既有数据/审计/运行时；失败日志保留","unresolved":["独审恢复发现两类P2；补强候选20项专项通过，新候选复审/冻结18项门禁以精确SHA证据为准，不据专项晋升已验证","正式协议、现网旁路/迁移/provider/留存及生产不在实验完成范围；本轮不推送合并"],"worktree":".codex-platform-worktrees/process-v2/t08-gs03-sqlite-experiment-20261001","branch":"process/t08-gs03-sqlite-experiment-20261001","planRef":"docs/adr/2026-10-01-referral-callback-sqlite-experiment.md#plan-与单写者","writeScopes":["test/helpers/gs03-sqlite-experiment.js","test/helpers/gs03-sqlite-experiment-child.js","test/gs03-sqlite-experiment.test.js"],"observability":{"applicable":false,"reason":"仅测试目录隔离实验，不交付运行时能力"},"runtimeCapability":false},
+    {
+      "integrationOwner": "T00",
+      "taskStatus": "实施中",
+      "capabilityStatus": "未建设",
+      "regulatoryControlIds": [
+        "REG-GOV-001"
+      ],
+      "dataSensitivity": "仅合成记录及受控摘要；无患者/凭据/原始报文",
+      "acceptanceCriteria": [
+        "未装配迁移定义、正式head19不变，无HTTP/server/现库/自动注册",
+        "真实迁移runner空库/升级/重跑/失败/checksum/schema漂移验收",
+        "唯一不可变回执、REPLACE旁路及真实v15外键和历史链保全",
+        "独审后冻结串行适用门禁，生产NO-GO"
+      ],
+      "evidenceIds": [],
+      "rollback": "停止未装配定义验证；仅清理自有合成目录，保留失败日志；不触及现库与业务审计",
+      "unresolved": [
+        "S1只交付结构，正式事务/全写者/HTTP/provider/留存/现场仍需后续决策"
+      ],
+      "observability": {
+        "applicable": false,
+        "reason": "未装配schema定义和隔离验证，不交付运行能力"
+      },
+      "runtimeCapability": false,
+      "id": "GOV-028",
+      "title": "PR330实验收尾与GS03 S1迁移准入",
+      "ownerProcess": "T00",
+      "riskLevel": "中",
+      "approval": {
+        "state": "approved",
+        "mode": "T00-plan-approval",
+        "ref": "USER-GS03-S1-CONTINUE-2026-10-03",
+        "approvedScope": "仅中央准入、Accepted S1例外及PR330既成事实收尾"
+      },
+      "requirementIds": [
+        "REQ-GOV-028"
+      ],
+      "riskIds": [
+        "RISK-GOV-028"
+      ],
+      "decisionIds": [
+        "ADR-GS03-S1-001"
+      ],
+      "dependencies": [
+        "GOV-027"
+      ],
+      "affectedModules": [
+        "lifecycle-governance",
+        "gs03-s1-admission"
+      ],
+      "testIds": [
+        "TEST-GOV-027"
+      ],
+      "worktree": ".codex-platform-worktrees/process-v2/t00-gs03-s1-admission-20261003",
+      "branch": "process/t00-gs03-s1-admission-20261003",
+      "planRef": "docs/adr/2026-10-03-gs03-receipt-migration-definition.md#plan",
+      "writeScopes": [
+        "config/lifecycle-governance.json",
+        "config/repository-governance.json",
+        "ROADMAP.md",
+        "docs/adr/README.md",
+        "docs/adr/2026-10-03-gs03-receipt-migration-definition.md",
+        "docs/adr/2026-09-30-referral-callback-contract.md",
+        "docs/adr/2026-10-01-referral-callback-storage-atomicity.md",
+        "CURRENT_ARCHITECTURE.md",
+        "MODULE_MAP.md",
+        "DATA_MODEL.md",
+        "API_MAP.md",
+        "DEPENDENCY_MAP.md",
+        "TECH_DEBT.md"
+      ]
+    },
+    {
+      "integrationOwner": "T00",
+      "taskStatus": "实施中",
+      "capabilityStatus": "未建设",
+      "regulatoryControlIds": [
+        "REG-GOV-001"
+      ],
+      "dataSensitivity": "仅合成记录及受控摘要；无患者/凭据/原始报文",
+      "acceptanceCriteria": [
+        "未装配迁移定义、正式head19不变，无HTTP/server/现库/自动注册",
+        "真实迁移runner空库/升级/重跑/失败/checksum/schema漂移验收",
+        "唯一不可变回执、REPLACE旁路及真实v15外键和历史链保全",
+        "独审后冻结串行适用门禁，生产NO-GO"
+      ],
+      "evidenceIds": [],
+      "rollback": "停止未装配定义验证；仅清理自有合成目录，保留失败日志；不触及现库与业务审计",
+      "unresolved": [
+        "S1只交付结构，正式事务/全写者/HTTP/provider/留存/现场仍需后续决策"
+      ],
+      "observability": {
+        "applicable": false,
+        "reason": "未装配schema定义和隔离验证，不交付运行能力"
+      },
+      "runtimeCapability": false,
+      "id": "DATA-009",
+      "title": "GS03未装配回执迁移定义与隔离验证",
+      "ownerProcess": "T00",
+      "riskLevel": "高",
+      "approval": {
+        "state": "approved",
+        "mode": "accepted-adr-human-review-special-validation",
+        "ref": "USER-GS03-S1-CONTINUE-2026-10-03",
+        "approvedScope": "仅未装配src/platform/storage/gs03-callback-receipt-migration.js和test/gs03-callback-receipt-migration.test.js；无现库、自动注册、HTTP和生产"
+      },
+      "requirementIds": [
+        "REQ-DATA-009"
+      ],
+      "riskIds": [
+        "RISK-DATA-009"
+      ],
+      "decisionIds": [
+        "ADR-GS03-S1-001"
+      ],
+      "dependencies": [
+        "GOV-028"
+      ],
+      "affectedModules": [
+        "gs03-receipt-migration-definition"
+      ],
+      "testIds": [
+        "TEST-GOV-027"
+      ],
+      "worktree": ".codex-platform-worktrees/process-v2/t00-gs03-s1-schema-20261003",
+      "branch": "process/t00-gs03-s1-schema-20261003",
+      "planRef": "docs/adr/2026-10-03-gs03-receipt-migration-definition.md#plan",
+      "writeScopes": [
+        "src/platform/storage/gs03-callback-receipt-migration.js",
+        "test/gs03-callback-receipt-migration.test.js"
+      ]
+    },
+    {
+      "id": "GOV-027",
+      "title": "GS-03回调存储设计与隔离实验准入治理",
+      "ownerProcess": "T00",
+      "integrationOwner": "T00",
+      "taskStatus": "已关闭",
+      "capabilityStatus": "已集成",
+      "riskLevel": "中",
+      "approval": {
+        "state": "approved",
+        "mode": "T00-plan-approval",
+        "ref": "USER-GS03-SQLITE-EXPERIMENT-2026-10-01",
+        "approvedScope": "沿用原设计单写范围并增加隔离实验Accepted ADR、父合同ADR限域例外、DEPENDENCY_MAP；仅设计/准入/事实与测试证据登记。TEST-026实验代码独立T08任务，不含HTTP/runtime/现库schema或migration/生产/推送合并"
+      },
+      "requirementIds": [
+        "REQ-GOV-027"
+      ],
+      "regulatoryControlIds": [
+        "REG-GOV-001"
+      ],
+      "riskIds": [
+        "RISK-GOV-027"
+      ],
+      "decisionIds": [
+        "ADR-GS03-STORAGE-001",
+        "ADR-GS03-EXPERIMENT-001"
+      ],
+      "dependencies": [
+        "GOV-026"
+      ],
+      "affectedModules": [
+        "gs03-callback-receipt-atomicity-design",
+        "lifecycle-governance"
+      ],
+      "dataSensitivity": "仅合同元数据、合成示例与受控证据引用；不得包含真实患者、供应方凭据或原始回调报文",
+      "acceptanceCriteria": [
+        "独立Proposed ADR比较现有持久化/命令机制对receipt与确切授权同一提交边界的可行性、成本及失效模式，可提出推荐但不视作正式选定或获实施批准",
+        "明确首次、精确重放、撤权并发、回滚已确认、提交成功响应丢失和结果未知的状态矩阵与旧无digest回执保留/对账选择",
+        "标明T05业务Owner、T04授权事实Owner、T08外部来源、T00存储/组合和隐私责任人的待审批输入及历史兼容/回滚条件",
+        "独审后冻结并运行18项适用本地串行门禁；Proposed不授权runtime/schema/migration或生产，GS-03与六域仍NO-GO"
+      ],
+      "testIds": [
+        "TEST-GOV-027"
+      ],
+      "evidenceIds": [
+        "EVD-PR330-INTEGRATION"
+      ],
+      "rollback": "撤销本轮新增Proposed设计、索引及治理登记，不改旧回执、已提交业务/审计事实或运行时",
+      "unresolved": [],
+      "worktree": ".codex-platform-worktrees/process-v2/t00-primary-relay-observability-20260927",
+      "branch": "process/t00-gs03-callback-storage-design-20261001",
+      "planRef": "ROADMAP.md#gov-027-gs-03回调receipt与撤权原子提交设计-plan2026-10-01",
+      "writeScopes": [
+        "config/lifecycle-governance.json",
+        "ROADMAP.md",
+        "config/repository-governance.json",
+        "DATA_MODEL.md",
+        "API_MAP.md",
+        "CURRENT_ARCHITECTURE.md",
+        "MODULE_MAP.md",
+        "TECH_DEBT.md",
+        "docs/adr/2026-10-01-referral-callback-storage-atomicity.md",
+        "docs/adr/README.md",
+        "docs/adr/2026-10-01-referral-callback-sqlite-experiment.md",
+        "docs/adr/2026-09-30-referral-callback-contract.md",
+        "DEPENDENCY_MAP.md"
+      ],
+      "observability": {
+        "applicable": false,
+        "reason": "仅Proposed存储/授权原子性设计，不交付运行时能力"
+      },
+      "runtimeCapability": false,
+      "pullRequestRef": "https://github.com/xujiann/chronic-care-platform/pull/330",
+      "ciRef": "https://github.com/xujiann/chronic-care-platform/actions/runs/36916486213"
+    },
+    {
+      "id": "TEST-026",
+      "title": "GS-03无HTTP隔离SQLite回调原子性实验",
+      "ownerProcess": "T08",
+      "integrationOwner": "T00",
+      "taskStatus": "已关闭",
+      "capabilityStatus": "已集成",
+      "riskLevel": "高",
+      "approval": {
+        "state": "approved",
+        "mode": "accepted-adr-human-review-special-validation",
+        "ref": "USER-GS03-SQLITE-EXPERIMENT-2026-10-01",
+        "approvedScope": "仅test/helpers/gs03-sqlite-experiment.js、test/helpers/gs03-sqlite-experiment-child.js、test/gs03-sqlite-experiment.test.js；新建一次性合成SQLite临时DDL/唯一回执/授权竞态/四态实验；无HTTP、server、现库/平台migration/schemahead、生产、推送合并"
+      },
+      "requirementIds": [
+        "REQ-TEST-026"
+      ],
+      "regulatoryControlIds": [
+        "REG-GOV-001"
+      ],
+      "riskIds": [
+        "RISK-TEST-026"
+      ],
+      "decisionIds": [
+        "ADR-GS03-EXPERIMENT-001"
+      ],
+      "dependencies": [
+        "GOV-027"
+      ],
+      "affectedModules": [
+        "gs03-sqlite-test-experiment"
+      ],
+      "dataSensitivity": "仅合成主体/授权/案例和受控摘要，不使用患者数据、凭据或provider报文",
+      "acceptanceCriteria": [
+        "隔离新库、拒绝陌生现库和路径逃逸，不改变正式schema或HTTP",
+        "三合同receipt唯一与确定性绑定，当前确切授权和重放同事务检查",
+        "真实多进程/双连接竞争、撤权排序、逐副作用回滚、提交前退出/提交后响应丢失/未知结果重启核验",
+        "receipt在实验库存续期不可更新删除/TTL或复用key；超过200条保持",
+        "专项无失败/跳过、独审后冻结并串行适用18门禁；不推送合并上线"
+      ],
+      "testIds": [
+        "TEST-GS03-SQLITE-EXPERIMENT"
+      ],
+      "evidenceIds": [
+        "EVD-GS03-SQLITE-EXPERIMENT-NARROW",
+        "EVD-GS03-SQLITE-EXPERIMENT-REVIEW-FIX",
+        "EVD-PR330-INTEGRATION"
+      ],
+      "rollback": "停止实验并仅清理已确认自有合成临时目录；撤销测试增量，不触及既有数据/审计/运行时；失败日志保留",
+      "unresolved": [],
+      "worktree": ".codex-platform-worktrees/process-v2/t08-gs03-sqlite-experiment-20261001",
+      "branch": "process/t08-gs03-sqlite-experiment-20261001",
+      "planRef": "docs/adr/2026-10-01-referral-callback-sqlite-experiment.md#plan-与单写者",
+      "writeScopes": [
+        "test/helpers/gs03-sqlite-experiment.js",
+        "test/helpers/gs03-sqlite-experiment-child.js",
+        "test/gs03-sqlite-experiment.test.js"
+      ],
+      "observability": {
+        "applicable": false,
+        "reason": "仅测试目录隔离实验，不交付运行时能力"
+      },
+      "runtimeCapability": false,
+      "pullRequestRef": "https://github.com/xujiann/chronic-care-platform/pull/330",
+      "ciRef": "https://github.com/xujiann/chronic-care-platform/actions/runs/36916486213"
+    },
     {"id":"TEST-025","title":"GS-03 v1回调资源、主体和撤权边界真实HTTP现状测试","ownerProcess":"T05","integrationOwner":"T00","taskStatus":"已关闭","capabilityStatus":"已集成","riskLevel":"中","approval":{"state":"approved","mode":"T00-plan-approval","ref":"USER-GS03-CALLBACK-BOUNDARIES-2026-10-01","approvedScope":"仅新增test/gs03-referral-callback-boundaries-api.test.js，隔离合成真实HTTP刻画跨资源签名、跨主体同键及撤权后首次/重放；不改runtime/API/权限/数据库/CI/部署"},"requirementIds":["REQ-TEST-025"],"regulatoryControlIds":["REG-GOV-001"],"riskIds":["RISK-TEST-025"],"decisionIds":[],"dependencies":[],"affectedModules":["gs03-referral-callback-v1-boundary-characterization"],"dataSensitivity":"仅隔离合成居民、机构与授权；不读取或保存真实患者、现场凭据及原始供应方报文","acceptanceCriteria":["三类既有v1回调中选取足以证明跨资源签名和跨主体同键边界的代表路径，使用真实HTTP与当前授权/签名，不mock权限","撤销前建立真实授权与回执，分别刻画撤销后首次提交及旧键重放；检查当前响应与会诊、报告档案、消息、网关事件和拒绝审计的实际变化","现状断言不把拟议v2的资源绑定、主体命名空间、撤权失败关闭或耐久receipt误写为已实现；保留无digest旧回执和200项有界窗口风险","T05独立窄测与独审、T00组合冻结和适用串行门禁后仅归档仓库行为证据；GS-03仍未建设，生产六域NO-GO"],"testIds":["TEST-GS03-CALLBACK-BOUNDARIES-HTTP"],"evidenceIds":["EVD-GS03-CALLBACK-BOUNDARIES-LOCAL","EVD-PR328-INTEGRATION"],"pullRequestRef":"https://github.com/xujiann/chronic-care-platform/pull/328","ciRef":"https://github.com/xujiann/chronic-care-platform/actions/runs/36826912177","rollback":"撤销唯一新增测试及本轮治理登记，不改变运行时、业务事实、旧回执或安全审计","unresolved":[],"worktree":".codex-platform-worktrees/process-v2/t05-gs03-callback-boundaries-20261001","branch":"process/t05-gs03-callback-boundaries-20261001","planRef":"ROADMAP.md#test-025-gs-03-v1回调边界现状测试-plan2026-10-01","writeScopes":["test/gs03-referral-callback-boundaries-api.test.js"],"observability":{"applicable":false,"reason":"仅既有v1回调的隔离合成行为测试，不新增运行时能力"},"runtimeCapability":false},
     {"id":"TEST-024","title":"GS-03三类既有v1回调真实HTTP现状测试","ownerProcess":"T05","integrationOwner":"T00","taskStatus":"已关闭","capabilityStatus":"已集成","riskLevel":"中","approval":{"state":"approved","mode":"T00-plan-approval","ref":"USER-GS03-V1-CALLBACK-TEST-SLICE-2026-09-30","approvedScope":"仅新增test/gs03-referral-callback-v1-api.test.js；隔离合成真实HTTP，刻画feedback/schedule/report既有v1角色、签名、重复与副作用；不改runtime/API/权限/数据库/CI/部署"},"requirementIds":["REQ-TEST-024"],"regulatoryControlIds":["REG-GOV-001"],"riskIds":["RISK-TEST-024"],"decisionIds":[],"dependencies":[],"affectedModules":["gs03-referral-callback-v1-characterization"],"dataSensitivity":"仅隔离合成居民与机构；不读取或保存真实患者、现场凭据及原始供应方报文","acceptanceCriteria":["feedback、schedule、report三类v1回调通过真实HTTP与隔离合成持久层运行，角色覆盖现有允许与拒绝边界","刻画现行body HMAC及缺签/错签，现行contractId+idempotencyKey重复与异意图行为；不把v1缺陷断言为v2目标","检查首次及重放的会诊、报告归档、通知、网关事件与审计等实际副作用；无权/失败时业务投影零新增（会诊、报告档案、消息、网关事件），允许并检查既有拒绝安全审计","测试独立执行并经T05审查、T00组合冻结门禁；GS-03仍未建设且生产六域NO-GO"],"testIds":["TEST-GS03-CALLBACK-V1-HTTP"],"evidenceIds":["EVD-GS03-CALLBACK-V1-LOCAL","EVD-PR327-INTEGRATION"],"pullRequestRef":"https://github.com/xujiann/chronic-care-platform/pull/327","ciRef":"https://github.com/xujiann/chronic-care-platform/actions/runs/36744134039","rollback":"撤销唯一新增测试及本次治理登记，不改运行时、业务数据或历史回执","unresolved":[],"worktree":".codex-platform-worktrees/process-v2/t05-gs03-callback-v1-20260930","branch":"process/t05-gs03-callback-v1-20260930","planRef":"ROADMAP.md#test-024-gs-03-v1回调现状测试-plan2026-09-30","writeScopes":["test/gs03-referral-callback-v1-api.test.js"],"observability":{"applicable":false,"reason":"仅既有v1合同的隔离回归测试，不新增运行时能力"},"runtimeCapability":false},
     {"id":"GOV-026","title":"GS-03外部回调v2合同设计与实施准入评审","ownerProcess":"T00","integrationOwner":"T00","taskStatus":"已关闭","capabilityStatus":"已集成","riskLevel":"中","approval":{"state":"approved","mode":"T00-plan-approval","ref":"USER-GS03-CALLBACK-REPAIR-DESIGN-2026-10-01","approvedScope":"仅细化既有Proposed docs/adr/2026-09-30-referral-callback-contract.md及docs/adr/README.md，并最小更新config/lifecycle-governance.json、ROADMAP.md、API_MAP.md；不新增Markdown，不改runtime/test/schema/权限/CI/部署或生产"},"requirementIds":["REQ-GOV-026"],"regulatoryControlIds":["REG-GOV-001"],"riskIds":["RISK-GOV-026"],"decisionIds":["ADR-GS03-CALLBACK-001"],"dependencies":[],"affectedModules":["gs03-callback-contract-design","lifecycle-governance"],"dataSensitivity":"仅合同元数据、合成示例与受控证据引用；不得包含真实患者、凭据或原始回调报文","acceptanceCriteria":["Proposed ADR完整列出问题、选项、优势劣势、迁移成本、风险、推荐与五项未决","v1现状不晋升；拟v2绑定资源、可信机构、intent与摘要，旧无digest回执不倒算不自动接受","明确T08/T05/T00所有权、历史兼容、回滚及正常/失败/越权/恢复验收矩阵","以TEST-024/025的v1现状测试区分跨URL签名、跨主体key和撤权首次/重放事实与拟议v2目标；五项外部未决不虚构已获选择","仅本地治理与文档门禁，不批准高风险runtime或生产"],"testIds":["TEST-GOV-026"],"evidenceIds":["EVD-PR329-INTEGRATION"],"pullRequestRef":"https://github.com/xujiann/chronic-care-platform/pull/329","ciRef":"https://github.com/xujiann/chronic-care-platform/actions/runs/36873994691","rollback":"撤销本轮设计文档与治理登记，不改变运行时、旧回执或业务事实","unresolved":[],"worktree":".codex-platform-worktrees/process-v2/t00-primary-relay-observability-20260927","branch":"process/t00-gs03-callback-repair-design-20261001","planRef":"ROADMAP.md#gov-026-gs-03-回调修复合同细化-plan2026-10-01","writeScopes":["config/lifecycle-governance.json","ROADMAP.md","API_MAP.md","docs/adr/2026-09-30-referral-callback-contract.md","docs/adr/README.md"],"observability":{"applicable":false,"reason":"仅Proposed协议设计和准入材料，不交付运行时能力"},"runtimeCapability":false},

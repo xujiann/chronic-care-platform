@@ -1,6 +1,7 @@
 # ADR-GS03-CALLBACK-001：跨机构转诊回调的资源、授权与回执合同
 
 - 状态：Proposed
+- S1限域例外：ADR-GS03-S1-001仅授权未装配migration定义与隔离合成专项，不接受本父ADR，不授权现库、自动注册、事务端口、HTTP或生产。
 - 限域实验例外：用户已批准 `ADR-GS03-EXPERIMENT-001`（`2026-10-01-referral-callback-sqlite-experiment.md`）的 TEST-026 无 HTTP、一次性合成 SQLite 实验；仅该实验由独立 Accepted 决策准入，不接受本 ADR 的正式合同，不授权现库迁移或运行时接线。下文实施前置继续约束正式实现。
 - 说明：设计评审；不授权实施
 - 日期：2026-09-30
