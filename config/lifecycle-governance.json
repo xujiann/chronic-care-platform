@@ -2100,19 +2100,19 @@
   "tasks": [
     {
       "id":"GOV-030","title":"GS03隔离存储事务验证准入","ownerProcess":"T00","integrationOwner":"T00",
-      "taskStatus":"实施中","capabilityStatus":"未建设","riskLevel":"中",
+      "taskStatus":"实施中","capabilityStatus":"已实现","riskLevel":"中",
       "approval":{"state":"approved","mode":"T00-plan-approval","ref":"USER-GS03-STORAGE-EXPERIMENT-2026-10-04","approvedScope":"仅独立隔离实验Accepted ADR/任务/索引/路线图/六图事实与证据治理；允许开发测试，不推送合并上线，不改父Proposed为Accepted"},
       "requirementIds":["REQ-GOV-030"],"regulatoryControlIds":["REG-GOV-001"],"riskIds":["RISK-GOV-030"],"decisionIds":["ADR-GS03-S3-EXPERIMENT-001"],"dependencies":["GOV-029","DATA-009"],
       "affectedModules":["lifecycle-governance","gs03-isolated-storage-experiment-admission"],"dataSensitivity":"源码与受控合成技术摘要，无患者/凭据/原始报文",
       "acceptanceCriteria":["独立限域Accepted、T08编号与精确单写范围","父Proposed、默认schema与生产NO-GO不变，独审及18项冻结串行门禁"],
       "testIds":["TEST-GOV-030-ADMISSION"],"evidenceIds":[],"rollback":"仅撤回本轮治理增量，既有设计/数据/历史证据不动",
-      "unresolved":["本候选准入独审与专项及冻结门禁未完成；推送合并另需授权"],"observability":{"applicable":false,"reason":"技术准入治理，无运行能力"},"runtimeCapability":false,
+      "unresolved":["准入专项44pass及独审无剩余P0-P2已完成，仅放行隔离实验开发；组合代码独审/冻结门禁待验，推送合并另需授权"],"observability":{"applicable":false,"reason":"技术准入治理，无运行能力"},"runtimeCapability":false,
       "worktree":".codex-platform-worktrees/process-v2/t00-gs03-storage-experiment-admission-20261004","branch":"process/t00-gs03-storage-experiment-admission-20261004","planRef":"docs/adr/2026-10-04-gs03-isolated-storage-transaction-validation.md",
       "writeScopes":["config/lifecycle-governance.json","config/repository-governance.json","ROADMAP.md","docs/adr/README.md","docs/adr/2026-10-04-gs03-isolated-storage-transaction-validation.md","CURRENT_ARCHITECTURE.md","MODULE_MAP.md","DATA_MODEL.md","API_MAP.md","DEPENDENCY_MAP.md","TECH_DEBT.md"]
     },
     {
       "id":"TEST-027","title":"GS03真实迁移与v15审计同事务隔离验证","ownerProcess":"T08","integrationOwner":"T00",
-      "taskStatus":"已批准","capabilityStatus":"未建设","riskLevel":"高",
+      "taskStatus":"实施中","capabilityStatus":"未建设","riskLevel":"高",
       "approval":{"state":"approved","mode":"accepted-adr-human-review-special-validation","ref":"USER-GS03-STORAGE-EXPERIMENT-2026-10-04","approvedScope":"仅新test/helpers/gs03-storage-transaction-experiment.js、test/helpers/gs03-storage-transaction-experiment-child.js及test/gs03-storage-transaction-experiment.test.js；合成新库显式runner/S1候选/真实v15hook事务验证。无源码/HTTP/默认registry/现库/生产/推送合并"},
       "requirementIds":["REQ-TEST-027"],"regulatoryControlIds":["REG-GOV-001"],"riskIds":["RISK-TEST-027"],"decisionIds":["ADR-GS03-S3-EXPERIMENT-001"],"dependencies":["GOV-030","DATA-009"],
       "affectedModules":["gs03-storage-transaction-test-harness"],"dataSensitivity":"仅合成主体/授权/案例/消息及受控摘要，不使用患者/凭据/provider报文",
