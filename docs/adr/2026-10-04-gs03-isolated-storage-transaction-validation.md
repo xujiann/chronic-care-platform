@@ -26,7 +26,7 @@ TEST-026 使用模拟 audit source，S1 只证明真实 v15 外键结构；两�
 
 只新增三份测试文件：`test/helpers/gs03-storage-transaction-experiment.js`、同目录 `gs03-storage-transaction-experiment-child.js`、`test/gs03-storage-transaction-experiment.test.js`。无新依赖、HTTP、运行模块、CI 拓扑或正式 schema 变化。
 
-创建函数只能在已解析、非 OneDrive 的系统临时根下建立自有随机目录与新空库。操作函数在任何写入前核路径、符号链接、随机身份、应用标记、精确对象结构和 migration ledger；陌生现库、应用库、失配身份、额外对象或结构漂移均拒绝，不以打开或自动迁移修复。不得覆盖已有文件或接受任意 dbPath。清理只允许核实属于本次实验的整个临时目录，不删除单条回执。
+创建函数只能在明确批准、已解析且非 OneDrive 的临时根下建立自有随机目录与新空库：Windows 使用 `C:/Users/drxuj/Temp` 或工作树内项目专用 tmp，Linux CI 可用系统临时根。由fixture或当前测试子进程配置指定，不修改全局环境，不默认采用Windows的AppData临时目录。操作函数在任何写入前核路径、符号链接、随机身份、应用标记、精确对象结构和 migration ledger；陌生现库、应用库、失配身份、额外对象或结构漂移均拒绝，不以打开或自动迁移修复。不得覆盖已有文件或接受任意 dbPath。清理只允许核实属于本次实验的整个临时目录，不删除单条回执。
 
 新空库显式调用 `applySqliteMigrations`，拼接默认注册表与未注册 S1 候选，再独立 `verifyGs03CallbackReceiptSchema`。默认仍 v19/41 表，只有实验库到候选 v20/42 表；不修改历史 migration、S1 定义、默认注册表、真实 hook 或共享 runner。业务合成事实复用 `state_collections` 的既有授权/会诊/档案/消息及审计集合，不新造同义生产实体或 fake audit_source。
 
@@ -45,6 +45,8 @@ TEST-026 使用模拟 audit source，S1 只证明真实 v15 外键结构；两�
 ## 失败四态与 Risk
 
 确认提交才返回最小成功；确认 rollback 才断言本次所有事实零写。提交成功但响应丢失和 COMMIT 结果未知均不换 key 或补成功审计；调用方 unknown 必须由重新打开同一权威并以当前授权同 key 核验区分 committed/rolled-back，无法确定则继续 unknown。进程在 COMMIT 前后退出不得由退出码推断事实。撤权后重放和核验不得披露旧 receipt。
+
+核验必须先证明原连接/子进程终结且事务收束，或由新连接取得覆盖原writer的 `BEGIN IMMEDIATE`，从此序列化点的新快照核当前授权与同key。原writer仍持锁时，即使普通读能看到receipt缺失也不能判rolled-back；锁忙、超时或无法排除在途事务均返回unknown。验收需确定性交错原writer暂停在COMMIT前，恢复不得提前报回滚或披露结果，随后原事务分别commit/rollback，再核终态；不以一次absence替代串行化证明。
 
 故障 seam 仅测试调用，可在每事实写后、每真实 source 追加后、receipt 前后及 COMMIT 前后抛错或同步子进程；不暴露到应用。测试必须证明真实回滚而非仅错误码。拒绝策略为本片零业务/成功审计，不交付正式拒绝审计政策。
 
