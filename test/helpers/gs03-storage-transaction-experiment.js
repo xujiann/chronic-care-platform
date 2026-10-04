@@ -137,6 +137,14 @@ function openConnection(dbPath, readOnly, busyTimeoutMs = 150) {
     return db;
   } catch (error) { db.close(); throw error; }
 }
+function cleanupPreflightScratch(root, scratch) {
+  if (!within(root, scratch) || fs.lstatSync(scratch).isSymbolicLink()) throw fail("UNSAFE_TEMP_ROOT");
+  const allowed = new Set([FILE_NAME, `${FILE_NAME}-wal`, `${FILE_NAME}-shm`, `${FILE_NAME}-journal`]);
+  const entries = fs.readdirSync(scratch);
+  if (entries.some((entry) => !allowed.has(entry) || !fs.lstatSync(path.join(scratch, entry)).isFile())) throw fail("UNSAFE_TEMP_ROOT");
+  for (const entry of entries) fs.unlinkSync(path.join(scratch, entry));
+  fs.rmdirSync(scratch);
+}
 function preflightWithoutSourceSidecars(location, identity) {
   // node:sqlite on this runtime has no immutable URI open option. Even its
   // read-only WAL connection may create -shm/-wal beside the supplied file.
@@ -144,6 +152,7 @@ function preflightWithoutSourceSidecars(location, identity) {
   // receipt decisions, or proof that an in-flight writer has completed.
   const scratch = fs.mkdtempSync(path.join(location.root, "gs03-preflight-"));
   const copyPath = path.join(scratch, FILE_NAME);
+  let preflightError;
   try {
     fs.copyFileSync(location.dbPath, copyPath, fs.constants.COPYFILE_EXCL);
     const walPath = `${location.dbPath}-wal`;
@@ -154,14 +163,17 @@ function preflightWithoutSourceSidecars(location, identity) {
     }
     const db = openConnection(copyPath, true);
     try { verifyDatabase(db, identity); } finally { db.close(); }
-  } finally {
-    if (!within(location.root, scratch) || fs.lstatSync(scratch).isSymbolicLink()) throw fail("UNSAFE_TEMP_ROOT");
-    const allowed = new Set([FILE_NAME, `${FILE_NAME}-wal`, `${FILE_NAME}-shm`, `${FILE_NAME}-journal`]);
-    const entries = fs.readdirSync(scratch);
-    if (entries.some((entry) => !allowed.has(entry) || !fs.lstatSync(path.join(scratch, entry)).isFile())) throw fail("UNSAFE_TEMP_ROOT");
-    for (const entry of entries) fs.unlinkSync(path.join(scratch, entry));
-    fs.rmdirSync(scratch);
+  } catch (error) { preflightError = error; }
+  let cleanupError;
+  try { cleanupPreflightScratch(location.root, scratch); }
+  catch (error) { cleanupError = error; }
+  if (preflightError && cleanupError) {
+    const combined = new AggregateError([preflightError, cleanupError], "GS03 preflight and scratch cleanup both failed");
+    combined.code = "PREFLIGHT_CLEANUP_FAILED";
+    throw combined;
   }
+  if (cleanupError) throw cleanupError;
+  if (preflightError) throw preflightError;
 }
 function fileIdentity(dbPath) {
   const stat = fs.statSync(dbPath);
