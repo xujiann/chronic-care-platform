@@ -2,6 +2,7 @@
 
 - 状态：Proposed
 - S1限域例外：ADR-GS03-S1-001仅授权未装配migration定义与隔离合成专项，不接受本父ADR，不授权现库、自动注册、事务端口、HTTP或生产。
+- S2设计交叉引用：`ADR-GS03-S2-001`（`2026-10-04-gs03-shared-transaction-contract.md`）细化拟议共同事务端口、全写者提交围栏与失败四态；它仍是 Proposed，不接受本父 ADR，也不授权 HTTP、事务端口源码、现库或生产接线。下表是 GOV-029 的源码候选盘点，不代表数据/身份/审计 Owner 签字或全仓穷尽。
 - 限域实验例外：用户已批准 `ADR-GS03-EXPERIMENT-001`（`2026-10-01-referral-callback-sqlite-experiment.md`）的 TEST-026 无 HTTP、一次性合成 SQLite 实验；只有此实验可依独立 Accepted 决策实施，不受下文父 ADR 未接受的正式实施前置阻断。本 ADR 及父 ADR 仍 Proposed，正式 repository、现库迁移、主权威选择与运行时接线仍须另审。
 - 日期：2026-10-01
 - Owner：T00 存储组合与事务端口；T05 会诊事实及消息；T04/`citizen-chronic` 授权和档案事实；T08 入站集成回执候选；平台治理审计 Owner。数据 Owner、隐私/留存 Owner 与真实调用方尚须分别审批。
@@ -25,6 +26,26 @@ v1 回调读取平台快照，在验签和案例范围后，以 `contractId + id
 | 入站观测与拟议 receipt | `integrationGatewayEvents`；`integration`（同配置 `:950`），现行列表截断 200。 | 推荐由 integration/T08 提名并经数据 Owner 批准一个**唯一入站 receipt 权威**，仅存受控 principal 命名空间、合同/版本/key 摘要、目标/确切授权 ID、版本化意图摘要、最小结果及审计引用；不复用观测事件为权威，不复制原始 provider payload、患者正文或凭据。 |
 | 成功安全/访问审计 | `securityEvents`、`dataAccessLogs` 为 `platform-governance` 系统集合（`src/platform/data/collection-governance.js:8-11`）。SQLite v15 append-only audit source 由已接受 ADR 治理。 | 成功审计与业务一起提交并保持既有 append-only source hook；拒绝审计可走独立受控写入，不得生成成功 receipt，也不得把未知提交误记为已拒绝。 |
 | 外部通知 | 当前三回调仅生成两条 `in_app` `taskMessages`（`server.js:21884-21892`），无已证实的回调外部 pending outbox。 | 若另批外部投递，须先批准其 owner、待投递事实及 worker；事务最多原子写入同库 pending intent，不能覆盖提交后的网络发送或外部收件。 |
+
+### S2 已核对的写入口候选与激活前处置（非穷尽）
+
+表中的 Owner 是现行进程/机器数据归属，不等于跨域写入批准；末列均为**提议的激活前策略**，不是已接线或已封堵的事实。`readDatabase()` 先读取 SQLite 集合，再另取 `storageMeta.collectionVersions`，两者没有已证明的同一锁内快照（`server.js:6588-6597,8003-8019,8618-8653`）。`writeSqliteState()` 自行 `BEGIN`，仅核传入的版本键，并将规范化全状态同步到集合表，甚至删除输入中缺失的键（`server.js:8022-8037,8107-8157,8190-8207`）；已有 CAS 可能保护多集合，却不能据此证明各写者的业务读集或外部 scope 与提交共用一个线性化点。
+
+| 已核对入口及源码锚点 | 现行 Owner、读取/版本时点与旁路风险 | 提议的激活前策略 |
+|---|---|---|
+| `feedback/schedule/report` 三回调（`src/http/routes/care-coordination.js:489-614`） | T05 路由/T08 入站语义；`readDatabase` 在签名后、业务判定前执行，按最多 200 条 `integrationGatewayEvents` 查键，未核案例的确切授权；报告把 `personalRecords` 截到 500。随后一次全状态写，无回调共享事务端口。 | T05/T08/档案/审计 Owner 在同一权威写事务锁内重读案例、确切授权和 receipt；首次/重放均复核，成功事实和真实 v15 审计源同提交；未接线时新 lane 关闭。 |
+| 会诊直接 create/actions（`src/http/routes/care-coordination.js:353-476`；`server.js:21655-21678,21729-21755`） | T05，`readDatabase` 位于 `withStateCommandLock` 的进程内队列内，`prepareCollectionCas` 在写前复制所读版本（`src/platform/storage/state-command-consistency.js:59-94`）。显式列表没有单列 `personalRecords`，但可能继承全量版本；create 在 ID 为空时可借任一授权，actions 的标量 `updates` 可修改 `residentAuthorizationId`。 | 与回调共用案例/授权围栏，禁止无确切 ID 或未经核准的重绑；现有命令回执及 CAS 仅作 legacy 保护，不作新 lane 的事务证明。 |
+| `/api/workflow-actions` 的会诊更新及 SLA 确认（`src/http/routes/care-coordination.js:315-348,2275-2373`；`server.js:975,20774-20781,21729-21755`） | T05；先读完整状态再更新、写回。`WORKFLOW_PROTECTED_FIELDS` 未列授权引用，标量 `updates` 可进入会诊 action；workflow 的 `expectedVersion` 可选且只覆指定集合。SLA 确认亦直接修改会诊；两者均不持回调共同锁。 | 对授权引用/案例状态纳入共同端口，或在新 lane 激活前拒绝冲突更新；SLA 与一般 workflow 不得以角色检查替代围栏。 |
+| 闭环命令 grant/revoke/resume/reassign、创建/排期/回报（`src/http/routes/care-coordination.js:2405-2454`；`registration-referral-service.js:991-1104`；`registration-referral-standalone.js:200-213,258-293,432-538`） | T05 路由及案例，`personalRecords` 机器 Owner 为 `citizen-chronic`、授权语义 Owner 待签。`readDatabase` 后用聚合 `workflowVersion` 和命令事件判断，再 `normalizeState`/全状态写；不是共同事务内的授权版本判定。grant 的 `appendById(...,500)` 及报告归档（`registration-referral-service.js:546-575`）可逐出旧授权；revoke 同时改档案与未终结案例。 | 授权记录、案例引用、关联 referral 和消息由各 Owner 以同一权威写事务或可证明的共同提交围栏串行；授权的新增/删除/裁剪也在保护范围。未覆盖任一命令则新 lane 不激活。 |
+| 独立授权撤销 `/api/authorizations/:id/revoke`（`src/http/routes/identity-security.js:978-1023`） | T01 路由，`citizen-chronic` 数据 Owner；读档案和居民 scope 后改状态，`expectedVersion` 仅在提交时可选覆盖为 `personalRecords` 版本，没有与回调共享的授权/案例判定点。 | 授权 Owner 确认该路径与共同围栏接线，或拒绝其与新 lane 冲突的写入；保留现有居民 scope 门禁。 |
+| 档案 `POST/PATCH /api/personal-records`（`src/http/routes/citizen-chronic.js:1114-1229`；`server.js:976`） | T04/`citizen-chronic`；POST 可建授权，PATCH 的 `safePatch` 保留 `status` 与 `meta` 可变。两者先读状态，`expectedVersion` 可选且仅携档案版本；居民 PATCH 限 `resident-upload`，机构/主管部门仍受居民 scope。 | 对 `category=authorizations` 的创建、状态/用途/期限/目标修改与删除语义实行共同围栏或拒绝冲突写；不把现有角色限制误写为任意人可改。 |
+| 其他档案新增/导入（`server.js:18992,19150,19323,19490`；`src/http/routes/citizen-chronic.js:316-371`；`src/http/routes/clinical-specialties/clinical-blood.js:166-188`；`src/http/routes/clinical-specialties/mutual-recognition-ingest.js:9-42`） | T04/T06 调用各自领域路径，`personalRecords` 数据 Owner 仍为 `citizen-chronic`。这些路径把旧档案前插后截到 500，可能在未主动撤权时逐出仍被案例引用的授权；读/写仍经旧全状态快照。 | 数据 Owner 决定无损容量、授权保留或明确失败策略；任何可使确切授权消失的裁剪/导入先纳入共同围栏或在新 lane 激活前停写。 |
+| `PUT /api/state` 与 `PUT /api/state-collections/personalRecords`（`src/http/routes/state-data.js:137-154,179-397`；`server.js:980-993`） | T02 兼容入口，集合事实仍归各数据 Owner；`commission`/经理门禁后可提交全量或替换档案集合。全量版本检查仅对请求携带的已改集合版本生效；集合保存若不带 `expectedVersion` 则版本 map 为空。均不共享回调提交点。 | 在存储层拒绝任何可覆盖授权、案例或 receipt 的 legacy 全量/集合写，或经各 Owner 批准改由共同端口；先核字段、集合与版本，不依赖 UI 或管理角色约束。 |
+| 非生产 `/api/reset` 与启动归一化/JSON→SQLite 种子（`src/http/routes/state-data.js:406-445`；`server.js:6588-6597,7998-7999,11878`） | T02/T00；reset 有生产禁止、经理和访问声明空集门禁，但 `seedState` 后可重置相关事实。归一化/种子、旧快照导入也可改变授权与案例投影，未形成与入站 receipt 的共同恢复世代。 | 维护/种子窗口停新 lane，经数据 Owner 核准同源世代及 receipt/授权/案例一致性后恢复；无法证明时失败关闭，不自动用旧快照覆盖。 |
+| 文件级备份恢复/回滚（`scripts/storage-admin.js:229-259`；`scripts/rollback-snapshot.js:8,37-43`） | T00 存储/运维；restore 要求显式确认并检查 sidecar/备份，然后替换 JSON/SQLite 文件，但代码本身不证明全部写者已停，也不证明源身份、receipt 与业务恢复世代一致。 | 由运维、数据和审计 Owner 批准停写、快照/源身份/世代核对、恢复后同 key 对账与重新开放条件；新 lane 在核对前保持关闭。 |
+| 外部账号/机构/居民 scope 变更写者与成功审计（`server.js:15353,15567-15604,8114-8121`） | T01 身份与 `platform-governance` 审计事实跨边界；本地 SQLite 锁不覆盖另一权威的撤销/归属变更，v15 append-only source 现随旧 `writeSqliteState` 工作。单次外部版本复读仍留 TOCTOU。 | 外部事实 Owner 提供覆盖其**全部变更写者**、持续至回调线性化提交的 `authorityFence`；审计 Owner 验真实 v15 hook 与业务/receipt 同事务。任一无法证明则新 lane 关闭。 |
+
+该表按当前可见调用链列出直接写者及可通过全状态同步覆盖事实的类别，仍须由 T00 静态枚举剩余 `readDatabase`/`writeDatabase`、迁移、管理脚本及恢复调用，并由 T01/T02/T04/T05/T06/T08、机器数据/授权语义/身份 scope/审计/留存 Owner 对各自读集、写集、停写或接线策略逐项签认。尤其 `personalRecords` 的 500 条截断和会诊授权引用变更不能因“不是撤权路由”而排除。入口、Owner 和外部事实若有未签或未封堵项，新 lane 的激活条件不成立。详见 [S2 共同事务合同](2026-10-04-gs03-shared-transaction-contract.md) 的拟议端口与故障四态。
 
 ## Options
 
@@ -51,7 +72,7 @@ v1 回调读取平台快照，在验签和案例范围后，以 `contractId + id
 
 ### 推荐候选端口的必要不变量
 
-1. **同一事实源与读集。** 所有 grant/revoke/resume/reassign、直接会诊 create/actions、三类 callback，以及任何可更改授权记录或会诊授权引用的通用状态/档案导入、集合保存、reset、管理脚本和恢复路径，须先完成精确入口 inventory。已知但尚未穷尽的旁路还包括直接授权撤销 `POST /api/authorizations/:id/revoke`（`src/http/routes/identity-security.js:978-1023`）和档案 `POST /api/personal-records` 与 `PATCH /api/personal-records/:id`（`src/http/routes/citizen-chronic.js:1114-1229`）；后者的居民 PATCH 限 `resident-upload`，机构/主管部门仍受居民 scope，不能说任意角色可随意改授权。`PUT /api/state` 与 `PUT /api/state-collections/personalRecords` 要求 `commission` 且经理门禁；非生产 `/api/reset` 也要求两者且 `accessAcknowledgements` 为空才可执行（`src/http/routes/state-data.js:179-455`；`server.js:980-993`）。这些现有限制并不等于共同事务保护。实施时所有冲突写者要么改由共同端口串行化，要么在新 lane 激活前拒绝冲突写入；不能声称当前 inventory 已完成或旁路已封堵。
+1. **同一事实源与读集。** 上述 S2 源码候选盘点不是全仓穷尽或 Owner 签收；所有 grant/revoke/resume/reassign、直接会诊 create/actions、三类 callback，以及任何可更改授权记录、会诊授权引用或通过裁剪逐出授权的通用状态/档案导入、集合保存、reset、管理脚本和恢复路径，仍须完成精确入口 inventory 与逐 Owner 确认。直接授权撤销、档案 POST/PATCH、`PUT /api/state`、`PUT /api/state-collections/personalRecords` 和非生产 `/api/reset` 均有既存角色/经理/居民范围门禁（`src/http/routes/identity-security.js:978-1023`；`src/http/routes/citizen-chronic.js:1114-1229`；`src/http/routes/state-data.js:179-455`）；这些限制不等于共同事务保护。实施时所有冲突写者要么进入同一权威提交围栏，要么在新 lane 激活前拒绝冲突写入；不能声称旁路已封堵。
 2. **从锁内新快照决策。** 候选 SQLite 端口在同一连接上获得受控写事务/序列化点后，才读取案例、确切 `personalRecords` 授权、receipt 和相关版本，规范化并决定首次或重放。禁止在事务外用旧业务快照计算更新，再取新版本拼成写入。每个写者须证明授权与案例业务读取依赖受保护：即使反馈/排期不修改 `personalRecords`，也必须在提交前验证确切授权记录或所属集合版本未被撤权/续权改变；不能仅假定继承的全量 metadata 与业务读取同快照，也不能只显式列脏集合。授权用途、居民、目标机构、状态、到期均以服务端受控时钟在决策/提交边界复核；无已批准的时间容差数值。
 3. **首次提交与唯一回执。** 在同一事务内以批准的稳定 principal 命名空间 + 合同/版本 + key 唯一定位 receipt，比较目标、确切授权 ID 和父 ADR 规定的版本化 `intentDigest`。首次成功以数据库唯一约束原子写入入站 receipt 自身（受控 namespace、目标/授权 ID、摘要、最小结果和审计引用）、会诊、必要的报告档案、两条应用内消息、成功安全/访问审计及 append-only audit source；如外部投递另获批准，只提交同库 pending intent。任何一步失败必须回滚这些同库事实，不能先写业务再异步补 receipt。`integrationGatewayEvents` 只作可截断观测投影。receipt 最小结果不得包含旧事件的完整 payload、患者正文或跨目标 `receivedBy`。
 4. **重放与撤权线性化。** 旧键重放虽不改业务，也在同一一致快照/序列化点重新核当前主体 scope、案例绑定的确切授权、有效期及 receipt 摘要后才投影最小结果；若撤权先提交，首次和重放均失败关闭且不泄露旧 receipt；若回调/合法重放先线性化，已提交事实保留，后续撤权再生效。排序取事务判定/提交点，不以 HTTP 到达或网络响应完成时刻定义。若当前 scope/机构身份来自事务外目录或另一数据库，SQLite 锁不能覆盖它，单次复读版本也仍有 TOCTOU：必须沿用父 ADR 的可信认证前提，由该外部事实权威批准并与所有撤销/变更写者共同实行可验证的提交协议，使身份/scope 证据或 fence 持续有效直到回调线性化完成；无法证明这一点则新 lane 失败关闭。本 ADR 不创建新认证服务。

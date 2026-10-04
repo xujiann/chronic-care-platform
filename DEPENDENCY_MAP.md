@@ -1,5 +1,9 @@
 # DEPENDENCY MAP — 主线依赖地图
 
+## 2026-10-04 GS03 事务合同设计依赖
+
+设计依赖为父CALLBACK/STORAGE Proposed合同、全写入口清单、真实数据Owner及外部身份/scope提交协议。S1已保护集成但未装配，不能由它推出共同事务存在；现有DomainUnitOfWork、进程锁/CAS和全状态写入不构成经证明的同一锁内读集。没有新增runtime→候选migration/UoW边；故障验收只是后续待实现矩阵。
+
 S1拟议依赖为隔离专项→未装配回执migration定义→现有SQLite migration内容指纹；仅专项显式追加候选注册表。不存在server/HTTP→新定义的运行边；真实审计source作为结构外键前置，不代表已完成业务hook接线。
 
 ## 2026-10-01 TEST-026 测试专用依赖
