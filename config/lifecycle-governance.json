@@ -1098,6 +1098,7 @@
     {"id":"ADR-GS03-S3-EXPERIMENT-001","status":"Accepted","path":"docs/adr/2026-10-04-gs03-isolated-storage-transaction-validation.md","effectiveScope":"TEST027 synthetic disposable test-directory validation only, explicitly real migration runner/unregistered S1 candidate/real v15 audit hook; no formal protocol, HTTP, runtime, registry, existing DB, production, push or merge","reviewDue":"2026-11-04","supersedes":[]}
   ],
   "tests": [
+    {"id":"TEST-GS03-STORAGE-EXPERIMENT","kind":"isolated-synthetic-real-runner-storage-transaction","path":"test/gs03-storage-transaction-experiment.test.js","command":"node --test test/gs03-storage-transaction-experiment.test.js"},
     {"id":"TEST-GOV-030-ADMISSION","kind":"admission-governance","path":"test/lifecycle-governance.test.js","command":"node --test test/lifecycle-governance.test.js test/repository-governance.test.js"},
     {"id":"TEST-GS03-STORAGE-ADMISSION","kind":"existing-precondition-validation-not-new-experiment-proof","path":"test/gs03-callback-receipt-migration.test.js","command":"node --test test/gs03-callback-receipt-migration.test.js test/audit-delivery-source.test.js"},
     {"id":"TEST-GOV-029-DESIGN","kind":"design-governance","path":"test/lifecycle-governance.test.js","command":"node --test test/lifecycle-governance.test.js test/repository-governance.test.js"},
@@ -1431,6 +1432,7 @@
     }
   ],
   "evidence": [
+    {"id":"EVD-GS03-STORAGE-EXPERIMENT-NARROW","type":"local-synthetic-storage-transaction-narrow","scope":"T08 cf24895cf9149de22df37e02301d33a5b7ea14ca三测试文件；narrow-3为16pass/0fail/0skip，Windows目录junction实际执行，Linux分支未在本机执行。narrow-1为12pass/4fail、narrow-2为14pass/2fail，原日志保留。仅合成真实runner/S1候选/v15hook专项，代码独审与组合冻结18门禁另验；无正式runtime/外部scope/现场/生产/推送合并证明。","ref":"C:/Users/drxuj/Projects/卫生健康信息平台/.codex-platform-evidence/gs03-storage-experiment-20261004/narrow-3.log","testIds":["TEST-GS03-STORAGE-EXPERIMENT"],"productionEvidence":false},
     {"id":"EVD-GS03-S2-NARROW","type":"local-design-governance-narrow","scope":"2026-10-04修正CAS现状两行后的narrow-2.log：27pass/0fail/0skip，仅生命周期与仓库治理；narrow-1同27通过但不能代替修后内容，旧09de6478独审P2记录保留。两份Proposed文档的语义正确性需独立复审，冻结全门禁另验。不证明事务实现、全部Owner签认、现场或生产。准入早写/重叠/缺直接CI字段失败记录保留。","ref":"C:/Users/drxuj/Projects/卫生健康信息平台/.codex-platform-evidence/gs03-s2-contract-20261004/narrow-2.log","testIds":["TEST-GOV-029-DESIGN"],"productionEvidence":false},
     {"id":"EVD-GS03-S2-INTEGRATED","type":"protected-design-delivery","scope":"PR332精确head2791aa191a551b7579467bb1775e3d517c0a11d4经独审无P0-P2和18项冻结串行门禁后保护合并为713ab5d046a03137d30cb530fcf2dc6f8840ff09，同tree c49f56e2c3f8d4b859cebaa93a98a5a37d027cc2；PR CI37176589829/main CI37177140686各9success，PR真实PG44pass/0skip；本地test:all3798pass/45环境skip/0fail。仅限定设计集成，不证明共同事务运行、Owner签认或生产；本三文件闭合候选须自身独审/冻结/18项门禁/CI，不能复用PR332自证。","ref":"C:/Users/drxuj/Projects/卫生健康信息平台/.codex-platform-evidence/gs03-s2-contract-20261004/pr332-delivery.json","testIds":["TEST-GOV-029-DESIGN"],"productionEvidence":false},
     {"id":"EVD-PR331-INTEGRATION","type":"reviewed-frozen-pr-main-ci-protected-merge","scope":"S1未装配定义限定交付：freeze b74a2136、merge5134be76同tree8ac26212；18本地门禁、PR37171948143/main37172517261各9success，真实PG各44pass/0skip，Pages37172517393静态success；父Proposed、正式head19/41表、GS03未建设和六域NO-GO不变。","ref":"C:/Users/drxuj/Projects/卫生健康信息平台/.codex-platform-evidence/gs03-s1-migration-20261003/pr331-delivery.json","testIds":["TEST-GOV-027","TEST-GS03-S1-MIGRATION"],"productionEvidence":false},
@@ -2100,7 +2102,7 @@
   "tasks": [
     {
       "id":"GOV-030","title":"GS03隔离存储事务验证准入","ownerProcess":"T00","integrationOwner":"T00",
-      "taskStatus":"实施中","capabilityStatus":"已实现","riskLevel":"中",
+      "taskStatus":"验证中","capabilityStatus":"已实现","riskLevel":"中",
       "approval":{"state":"approved","mode":"T00-plan-approval","ref":"USER-GS03-STORAGE-EXPERIMENT-2026-10-04","approvedScope":"仅独立隔离实验Accepted ADR/任务/索引/路线图/六图事实与证据治理；允许开发测试，不推送合并上线，不改父Proposed为Accepted"},
       "requirementIds":["REQ-GOV-030"],"regulatoryControlIds":["REG-GOV-001"],"riskIds":["RISK-GOV-030"],"decisionIds":["ADR-GS03-S3-EXPERIMENT-001"],"dependencies":["GOV-029","DATA-009"],
       "affectedModules":["lifecycle-governance","gs03-isolated-storage-experiment-admission"],"dataSensitivity":"源码与受控合成技术摘要，无患者/凭据/原始报文",
@@ -2112,13 +2114,13 @@
     },
     {
       "id":"TEST-027","title":"GS03真实迁移与v15审计同事务隔离验证","ownerProcess":"T08","integrationOwner":"T00",
-      "taskStatus":"实施中","capabilityStatus":"未建设","riskLevel":"高",
+      "taskStatus":"验证中","capabilityStatus":"已实现","riskLevel":"高",
       "approval":{"state":"approved","mode":"accepted-adr-human-review-special-validation","ref":"USER-GS03-STORAGE-EXPERIMENT-2026-10-04","approvedScope":"仅新test/helpers/gs03-storage-transaction-experiment.js、test/helpers/gs03-storage-transaction-experiment-child.js及test/gs03-storage-transaction-experiment.test.js；合成新库显式runner/S1候选/真实v15hook事务验证。无源码/HTTP/默认registry/现库/生产/推送合并"},
       "requirementIds":["REQ-TEST-027"],"regulatoryControlIds":["REG-GOV-001"],"riskIds":["RISK-TEST-027"],"decisionIds":["ADR-GS03-S3-EXPERIMENT-001"],"dependencies":["GOV-030","DATA-009"],
       "affectedModules":["gs03-storage-transaction-test-harness"],"dataSensitivity":"仅合成主体/授权/案例/消息及受控摘要，不使用患者/凭据/provider报文",
       "acceptanceCriteria":["真实runner/S1未注册候选与v15hook，路径身份结构failclosed","三合同首次/重放/冲突及同事务所有事实与审计source精确绑定","双进程竞争/撤权排序/expiry/逐副作用回滚/提交前后退出与unknown核验","独审后冻结串行18门禁；不接运行时、现库或生产，不推送合并"],
-      "testIds":["TEST-GS03-STORAGE-ADMISSION"],"evidenceIds":[],"rollback":"停止实验并只清理已核实自有合成临时目录，保留失败日志；不改现库/旧证据",
-      "unresolved":["仅准入前置测试登记，实际新专项须文件存在后注册；实施/独审/冻结门禁未完成"],"observability":{"applicable":false,"reason":"仅测试目录harness，无运行能力"},"runtimeCapability":false,
+      "testIds":["TEST-GS03-STORAGE-ADMISSION","TEST-GS03-STORAGE-EXPERIMENT"],"evidenceIds":["EVD-GS03-STORAGE-EXPERIMENT-NARROW"],"rollback":"停止实验并只清理已核实自有合成临时目录，保留失败日志；不改现库/旧证据",
+      "unresolved":["专项16pass/0fail/0skip；独立代码审查、组合冻结18门禁待完成；无远端CI，推送合并另需授权；预检副本不作授权决策，敌对并发文件替换不在合成实验边界内"],"observability":{"applicable":false,"reason":"仅测试目录harness，无运行能力"},"runtimeCapability":false,
       "worktree":".codex-platform-worktrees/process-v2/t08-gs03-storage-experiment-20261004","branch":"process/t08-gs03-storage-experiment-20261004","planRef":"docs/adr/2026-10-04-gs03-isolated-storage-transaction-validation.md",
       "writeScopes":["test/helpers/gs03-storage-transaction-experiment.js","test/helpers/gs03-storage-transaction-experiment-child.js","test/gs03-storage-transaction-experiment.test.js"]
     },
