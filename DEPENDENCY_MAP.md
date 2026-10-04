@@ -1,5 +1,9 @@
 # DEPENDENCY MAP — 主线依赖地图
 
+## 2026-10-04 GS03 隔离存储事务验证准入
+
+测试/child→新测试harness→既有migration runner/S1候选/audit-chain/真实v15hook/Node内置SQLite；没有server/HTTP→harness依赖、包或CI拓扑变化。不复用fake auditSource作证明。
+
 ## 2026-10-04 GS03 事务合同设计依赖
 
 设计依赖为父CALLBACK/STORAGE Proposed合同、全写入口清单、真实数据Owner及外部身份/scope提交协议。S1已保护集成但未装配，不能由它推出共同事务存在；现有DomainUnitOfWork、进程锁/CAS和全状态写入不构成经证明的同一锁内读集。没有新增runtime→候选migration/UoW边；故障验收只是后续待实现矩阵。
