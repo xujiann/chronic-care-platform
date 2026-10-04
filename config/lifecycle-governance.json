@@ -538,7 +538,7 @@
     }
   ],
   "risks": [
-    {"id":"RISK-GOV-029","title":"文档设计被误作事务实现、全写者封禁或Owner正式批准","level":"中","owner":"T00","mitigation":"事实与提议分层、源码锚点、Proposed状态、独立审查和实施前置清单；无runtime/现库/生产授权","status":"open"},
+    {"id":"RISK-GOV-029","title":"文档设计被误作事务实现、全写者封禁或Owner正式批准","level":"中","owner":"T00","mitigation":"GOV029仅关闭PR332限定设计交付。正式Owner、共同事务权威、外部scope协议、历史留存与恢复仍需人工批准，由本开放风险及ADR-GS03-STORAGE-001/ADR-GS03-S2-001的Proposed前置清单承接；事实与提议分层、源码锚点、独立审查保持；无runtime/现库/生产授权，任何实施须独立Accepted ADR和准入PLAN","status":"open"},
     {
       "id": "RISK-GOV-028",
       "title": "S1结构验证被误作正式回调或现库迁移授权",
@@ -1425,6 +1425,7 @@
   ],
   "evidence": [
     {"id":"EVD-GS03-S2-NARROW","type":"local-design-governance-narrow","scope":"2026-10-04修正CAS现状两行后的narrow-2.log：27pass/0fail/0skip，仅生命周期与仓库治理；narrow-1同27通过但不能代替修后内容，旧09de6478独审P2记录保留。两份Proposed文档的语义正确性需独立复审，冻结全门禁另验。不证明事务实现、全部Owner签认、现场或生产。准入早写/重叠/缺直接CI字段失败记录保留。","ref":"C:/Users/drxuj/Projects/卫生健康信息平台/.codex-platform-evidence/gs03-s2-contract-20261004/narrow-2.log","testIds":["TEST-GOV-029-DESIGN"],"productionEvidence":false},
+    {"id":"EVD-GS03-S2-INTEGRATED","type":"protected-design-delivery","scope":"PR332精确head2791aa191a551b7579467bb1775e3d517c0a11d4经独审无P0-P2和18项冻结串行门禁后保护合并为713ab5d046a03137d30cb530fcf2dc6f8840ff09，同tree c49f56e2c3f8d4b859cebaa93a98a5a37d027cc2；PR CI37176589829/main CI37177140686各9success，PR真实PG44pass/0skip；本地test:all3798pass/45环境skip/0fail。仅限定设计集成，不证明共同事务运行、Owner签认或生产；本三文件闭合候选须自身独审/冻结/18项门禁/CI，不能复用PR332自证。","ref":"C:/Users/drxuj/Projects/卫生健康信息平台/.codex-platform-evidence/gs03-s2-contract-20261004/pr332-delivery.json","testIds":["TEST-GOV-029-DESIGN"],"productionEvidence":false},
     {"id":"EVD-PR331-INTEGRATION","type":"reviewed-frozen-pr-main-ci-protected-merge","scope":"S1未装配定义限定交付：freeze b74a2136、merge5134be76同tree8ac26212；18本地门禁、PR37171948143/main37172517261各9success，真实PG各44pass/0skip，Pages37172517393静态success；父Proposed、正式head19/41表、GS03未建设和六域NO-GO不变。","ref":"C:/Users/drxuj/Projects/卫生健康信息平台/.codex-platform-evidence/gs03-s1-migration-20261003/pr331-delivery.json","testIds":["TEST-GOV-027","TEST-GS03-S1-MIGRATION"],"productionEvidence":false},
     {"id":"EVD-GS03-S1-NARROW","type":"independently-reviewed-isolated-sqlite-narrow","scope":"2026-10-03最终专项14pass/0fail/0skip；源码blob75c0f8a296fa6cbacd5629016aba4a8161773818、测试blob3945fc79c5e551c32b4c1cf01fda97adc63ca1a6，独审无剩余P0-P2。narrow1/2各一失败保留，narrow3为修前13pass，不能替代最终narrow4；仅本地未装配定义，完整冻结门禁另验，不证明生产或正式回调能力。","ref":"C:/Users/drxuj/Projects/卫生健康信息平台/.codex-platform-evidence/gs03-s1-migration-20261003/narrow-4.log","testIds":["TEST-GS03-S1-MIGRATION"],"productionEvidence":false},
     {
@@ -2015,8 +2016,7 @@
         "OPS-015",
         "OPS-016",
         "OPS-017",
-        "OPS-018",
-        "GOV-029"
+        "OPS-018"
       ],
       "evidenceIds": [
         "EVD-GOV-001",
@@ -2094,10 +2094,10 @@
       "title":"GS03全写入口盘点与共同事务合同设计",
       "ownerProcess":"T00",
       "integrationOwner":"T00",
-      "taskStatus":"验证中",
-      "capabilityStatus":"已实现",
+      "taskStatus":"已关闭",
+      "capabilityStatus":"已集成",
       "riskLevel":"中",
-      "approval":{"state":"approved","mode":"T00-plan-approval","ref":"USER-GS03-S1-MERGE-S2-DESIGN-2026-10-04","approvedScope":"仅S1保护集成事实收尾及S2文档/合同/准入设计；无HTTP/UoW实现、现库、生产或S2推送合并"},
+      "approval":{"state":"approved","mode":"T00-plan-approval","ref":"USER-GS03-S2-CLOSEOUT-2026-10-04","approvedScope":"原USER-GS03-S1-MERGE-S2-DESIGN-2026-10-04仅批准S1收尾和S2设计；用户2026-10-04批准并闭合追加授权冻结S2推送、精确CI后保护合并与本三文件治理闭合（含自身独审冻结测试CI保护合并）；无HTTP/UoW实现、现库、默认注册或生产权限，Proposed不变"},
       "requirementIds":["REQ-GOV-029"],
       "regulatoryControlIds":["REG-GOV-001"],
       "riskIds":["RISK-GOV-029"],
@@ -2107,9 +2107,11 @@
       "dataSensitivity":"仅源码定位和受控证据摘要，无真实患者/凭据/原始报文",
       "acceptanceCriteria":["inventory逐入口标事实源/Owner/快照与版本/锁/CAS/事务及旁路策略","Proposed合同区分同库事实、外部身份fence、失败四态、留存历史与后续实施准入","无runtime/schema/registry变化；独审后冻结串行适用门禁；生产NO-GO"],
       "testIds":["TEST-GOV-029-DESIGN"],
-      "evidenceIds":["EVD-GS03-S2-NARROW"],
+      "evidenceIds":["EVD-GS03-S2-NARROW","EVD-GS03-S2-INTEGRATED"],
+      "pullRequestRef":"https://github.com/xujiann/chronic-care-platform/pull/332",
+      "ciRef":"https://github.com/xujiann/chronic-care-platform/actions/runs/37177140686",
       "rollback":"仅撤回自有设计文档及任务登记；不修改业务/审计/回执、现库或旧证据",
-      "unresolved":["正式Owner/共同事务权威/外部scope协议/历史留存与恢复仍需人工批准"],
+      "unresolved":[],
       "observability":{"applicable":false,"reason":"设计文档，不交付运行能力"},
       "runtimeCapability":false,
       "worktree":".codex-platform-worktrees/process-v2/t00-gs03-s2-contract-20261004",
