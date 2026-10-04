@@ -1,5 +1,7 @@
 # DATA MODEL — 主线数据地图
 
+DATA-009 / ADR-GS03-S1-001仅实施未装配的 `gs03_callback_receipts` migration定义与隔离验证，T08持本片语义、T00持迁移技术。正式注册表仍v19/41表；receipt拟议后继不占已装配版本。真实v15双审计外键仅约束引用存在，不证明回调业务原子提交；全写者、授权、保留及HTTP仍待后续准入。
+
 ## 2026-10-01 TEST-026 合成新库实验准入
 
 只允许自有临时空库的实验 receipt、确切授权、案例、报告、消息及审计投影；不读写现库、不调用正式 migration，schema head 仍19。实验 source 不是正式 v15 hook；生命周期内不 TTL、删除单条 receipt 或复用 key，不回填旧200项事件。正式存储权威和保留政策仍待决。

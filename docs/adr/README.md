@@ -16,6 +16,8 @@
 | [跨机构转诊回调的资源、授权与回执合同](./2026-09-30-referral-callback-contract.md) | Proposed | GS-03 三类回调的调用方、资源签名、精确授权与耐久回执待决；不授权实施 |
 | [转诊回调入站回执与授权事实的同库原子边界](./2026-10-01-referral-callback-storage-atomicity.md) | Proposed | GS-03 入站 receipt 唯一权威、确切授权共事务与失败恢复候选；不授权实现或迁移 |
 
+| [转诊回调回执迁移定义与隔离验证](./2026-10-03-gs03-receipt-migration-definition.md) | Accepted（仅S1） | 未装配定义与合成迁移专项；不含现库、自动注册、端口或HTTP |
+
 ## 状态
 
 | 状态 | 含义 | 可实施 |
