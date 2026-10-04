@@ -1,5 +1,9 @@
 # DATA MODEL — 主线数据地图
 
+## 2026-10-04 GS03 S2 数据边界设计
+
+PR331只集成未装配receipt候选，正式schema仍v19/41表。GOV029盘点personalRecords授权/档案、referralTeleconsultations、taskMessages及真实v15审计源的共同提交依赖；非授权业务的slice(0,500)、全快照保存和恢复同样可能影响授权事实。拟议共同事务、恢复世代与历史/留存政策仍Proposed；没有新增事实源、现库迁移或Owner正式审批。
+
 DATA-009 / ADR-GS03-S1-001仅实施未装配的 `gs03_callback_receipts` migration定义与隔离验证，T08持本片语义、T00持迁移技术。正式注册表仍v19/41表；receipt拟议后继不占已装配版本。真实v15双审计外键仅约束引用存在，不证明回调业务原子提交；全写者、授权、保留及HTTP仍待后续准入。
 
 ## 2026-10-01 TEST-026 合成新库实验准入

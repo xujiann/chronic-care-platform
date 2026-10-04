@@ -82,5 +82,6 @@
 | [慢病随访耐久 outbox 与独立 worker](./2026-08-22-chronic-followup-durable-dispatch-outbox.md) | Accepted | SQLite v16 同事务 enqueue、租约 fencing、重试/死信/replay、请求路径隔离与生产 NO-GO |
 | [转诊写操作统一进入单一命令轨道](./2026-08-21-referral-single-command-track.md) | Accepted | 三条兼容 API、T05 owner command、CAS/幂等与资源范围 |
 | [科研合规导出职责分离与版本化命令](./2026-08-21-research-export-separation-of-duties.md) | Accepted | 导出申请、独立审核、发布证据、CAS、幂等与历史兼容 |
+| [GS03共同事务端口与全写入口提交围栏](./2026-10-04-gs03-shared-transaction-contract.md) | Proposed | GOV029仅设计写者清单、接口和故障验收，不授权UoW/HTTP/现库或生产 |
 
 模板见 [ADR_TEMPLATE.md](./ADR_TEMPLATE.md)。

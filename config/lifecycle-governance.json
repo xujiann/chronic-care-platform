@@ -39,6 +39,7 @@
     "高": "accepted-adr-human-review-special-validation"
   },
   "requirements": [
+    {"id":"REQ-GOV-029","title":"GS03全写入口盘点与共同事务合同设计","sourceType":"approved-human-plan","sourceRef":"USER-GS03-S1-MERGE-S2-DESIGN-2026-10-04","acceptance":["以真实源码和数据Owner盘点授权/会诊/档案/消息/审计及全状态/导入/恢复旁路，不宣称Owner签字或穷尽","形成Proposed事务合同、失败四态和后续独立Accepted实施PLAN，无HTTP/UoW源码/现库","S1仅在精确CI和保护合并后收口；S2独审后冻结串行门禁，不复用S1证据"]},
     {
       "id": "REQ-GOV-028",
       "title": "PR330实验收尾与GS03 S1迁移准入",
@@ -537,6 +538,7 @@
     }
   ],
   "risks": [
+    {"id":"RISK-GOV-029","title":"文档设计被误作事务实现、全写者封禁或Owner正式批准","level":"中","owner":"T00","mitigation":"事实与提议分层、源码锚点、Proposed状态、独立审查和实施前置清单；无runtime/现库/生产授权","status":"open"},
     {
       "id": "RISK-GOV-028",
       "title": "S1结构验证被误作正式回调或现库迁移授权",
@@ -1087,9 +1089,11 @@
       "effectiveScope": "DATA-009 unregistered migration definition and isolated synthetic tests only; not formal registry, runtime or existing database execution",
       "reviewDue": "2026-11-03",
       "supersedes": []
-    }
+    },
+    {"id":"ADR-GS03-S2-001","status":"Proposed","path":"docs/adr/2026-10-04-gs03-shared-transaction-contract.md","effectiveScope":"Approved design only; no transaction implementation, runtime, registry, existing database or production authority","reviewDue":"2026-11-04","supersedes":[]}
   ],
   "tests": [
+    {"id":"TEST-GOV-029-DESIGN","kind":"design-governance","path":"test/lifecycle-governance.test.js","command":"node --test test/lifecycle-governance.test.js test/repository-governance.test.js"},
     {"id":"TEST-GS03-S1-MIGRATION","kind":"isolated-synthetic-real-sqlite-migration","path":"test/gs03-callback-receipt-migration.test.js","command":"node --test test/gs03-callback-receipt-migration.test.js"},
     {"id":"TEST-GS03-SQLITE-EXPERIMENT","kind":"isolated-synthetic-sqlite","path":"test/gs03-sqlite-experiment.test.js","command":"node --test test/gs03-sqlite-experiment.test.js"},
     {"id":"TEST-GOV-027","kind":"design-governance","path":"test/lifecycle-governance.test.js","command":"npm run governance:lifecycle"},
@@ -1420,6 +1424,8 @@
     }
   ],
   "evidence": [
+    {"id":"EVD-GS03-S2-NARROW","type":"local-design-governance-narrow","scope":"2026-10-04修正CAS现状两行后的narrow-2.log：27pass/0fail/0skip，仅生命周期与仓库治理；narrow-1同27通过但不能代替修后内容，旧09de6478独审P2记录保留。两份Proposed文档的语义正确性需独立复审，冻结全门禁另验。不证明事务实现、全部Owner签认、现场或生产。准入早写/重叠/缺直接CI字段失败记录保留。","ref":"C:/Users/drxuj/Projects/卫生健康信息平台/.codex-platform-evidence/gs03-s2-contract-20261004/narrow-2.log","testIds":["TEST-GOV-029-DESIGN"],"productionEvidence":false},
+    {"id":"EVD-PR331-INTEGRATION","type":"reviewed-frozen-pr-main-ci-protected-merge","scope":"S1未装配定义限定交付：freeze b74a2136、merge5134be76同tree8ac26212；18本地门禁、PR37171948143/main37172517261各9success，真实PG各44pass/0skip，Pages37172517393静态success；父Proposed、正式head19/41表、GS03未建设和六域NO-GO不变。","ref":"C:/Users/drxuj/Projects/卫生健康信息平台/.codex-platform-evidence/gs03-s1-migration-20261003/pr331-delivery.json","testIds":["TEST-GOV-027","TEST-GS03-S1-MIGRATION"],"productionEvidence":false},
     {"id":"EVD-GS03-S1-NARROW","type":"independently-reviewed-isolated-sqlite-narrow","scope":"2026-10-03最终专项14pass/0fail/0skip；源码blob75c0f8a296fa6cbacd5629016aba4a8161773818、测试blob3945fc79c5e551c32b4c1cf01fda97adc63ca1a6，独审无剩余P0-P2。narrow1/2各一失败保留，narrow3为修前13pass，不能替代最终narrow4；仅本地未装配定义，完整冻结门禁另验，不证明生产或正式回调能力。","ref":"C:/Users/drxuj/Projects/卫生健康信息平台/.codex-platform-evidence/gs03-s1-migration-20261003/narrow-4.log","testIds":["TEST-GS03-S1-MIGRATION"],"productionEvidence":false},
     {
       "id": "EVD-PR330-INTEGRATION",
@@ -2010,8 +2016,7 @@
         "OPS-016",
         "OPS-017",
         "OPS-018",
-        "GOV-028",
-        "DATA-009"
+        "GOV-029"
       ],
       "evidenceIds": [
         "EVD-GOV-001",
@@ -2085,9 +2090,37 @@
   ],
   "tasks": [
     {
+      "id":"GOV-029",
+      "title":"GS03全写入口盘点与共同事务合同设计",
+      "ownerProcess":"T00",
+      "integrationOwner":"T00",
+      "taskStatus":"验证中",
+      "capabilityStatus":"已实现",
+      "riskLevel":"中",
+      "approval":{"state":"approved","mode":"T00-plan-approval","ref":"USER-GS03-S1-MERGE-S2-DESIGN-2026-10-04","approvedScope":"仅S1保护集成事实收尾及S2文档/合同/准入设计；无HTTP/UoW实现、现库、生产或S2推送合并"},
+      "requirementIds":["REQ-GOV-029"],
+      "regulatoryControlIds":["REG-GOV-001"],
+      "riskIds":["RISK-GOV-029"],
+      "decisionIds":["ADR-GS03-STORAGE-001","ADR-GS03-S2-001"],
+      "dependencies":["GOV-028","DATA-009"],
+      "affectedModules":["gs03-writer-inventory-and-transaction-contract-design","lifecycle-governance"],
+      "dataSensitivity":"仅源码定位和受控证据摘要，无真实患者/凭据/原始报文",
+      "acceptanceCriteria":["inventory逐入口标事实源/Owner/快照与版本/锁/CAS/事务及旁路策略","Proposed合同区分同库事实、外部身份fence、失败四态、留存历史与后续实施准入","无runtime/schema/registry变化；独审后冻结串行适用门禁；生产NO-GO"],
+      "testIds":["TEST-GOV-029-DESIGN"],
+      "evidenceIds":["EVD-GS03-S2-NARROW"],
+      "rollback":"仅撤回自有设计文档及任务登记；不修改业务/审计/回执、现库或旧证据",
+      "unresolved":["正式Owner/共同事务权威/外部scope协议/历史留存与恢复仍需人工批准"],
+      "observability":{"applicable":false,"reason":"设计文档，不交付运行能力"},
+      "runtimeCapability":false,
+      "worktree":".codex-platform-worktrees/process-v2/t00-gs03-s2-contract-20261004",
+      "branch":"process/t00-gs03-s2-contract-20261004",
+      "planRef":"ROADMAP.md",
+      "writeScopes":["config/lifecycle-governance.json","config/repository-governance.json","ROADMAP.md","docs/adr/README.md","docs/adr/2026-10-04-gs03-shared-transaction-contract.md","docs/adr/2026-10-01-referral-callback-storage-atomicity.md","CURRENT_ARCHITECTURE.md","MODULE_MAP.md","DATA_MODEL.md","API_MAP.md","DEPENDENCY_MAP.md","TECH_DEBT.md"]
+    },
+    {
       "integrationOwner": "T00",
-      "taskStatus": "验证中",
-      "capabilityStatus": "已实现",
+      "taskStatus": "已关闭",
+      "capabilityStatus": "已集成",
       "regulatoryControlIds": [
         "REG-GOV-001"
       ],
@@ -2098,17 +2131,19 @@
         "唯一不可变回执、REPLACE旁路及真实v15外键和历史链保全",
         "独审后冻结串行适用门禁，生产NO-GO"
       ],
-      "evidenceIds": [],
-      "rollback": "停止未装配定义验证；仅清理自有合成目录，保留失败日志；不触及现库与业务审计",
-      "unresolved": [
-        "S1只交付结构，正式事务/全写者/HTTP/provider/留存/现场仍需后续决策"
+      "evidenceIds": [
+        "EVD-PR331-INTEGRATION"
       ],
+      "rollback": "停止未装配定义验证；仅清理自有合成目录，保留失败日志；不触及现库与业务审计",
+      "unresolved": [],
       "observability": {
         "applicable": false,
         "reason": "未装配schema定义和隔离验证，不交付运行能力"
       },
       "runtimeCapability": false,
       "id": "GOV-028",
+      "pullRequestRef": "https://github.com/xujiann/chronic-care-platform/pull/331",
+      "ciRef": "https://github.com/xujiann/chronic-care-platform/actions/runs/37172517261",
       "title": "PR330实验收尾与GS03 S1迁移准入",
       "ownerProcess": "T00",
       "riskLevel": "中",
@@ -2158,8 +2193,8 @@
     },
     {
       "integrationOwner": "T00",
-      "taskStatus": "验证中",
-      "capabilityStatus": "已实现",
+      "taskStatus": "已关闭",
+      "capabilityStatus": "已集成",
       "regulatoryControlIds": [
         "REG-GOV-001"
       ],
@@ -2170,17 +2205,19 @@
         "唯一不可变回执、REPLACE旁路及真实v15外键和历史链保全",
         "独审后冻结串行适用门禁，生产NO-GO"
       ],
-      "evidenceIds": [],
-      "rollback": "停止未装配定义验证；仅清理自有合成目录，保留失败日志；不触及现库与业务审计",
-      "unresolved": [
-        "S1只交付结构，正式事务/全写者/HTTP/provider/留存/现场仍需后续决策"
+      "evidenceIds": [
+        "EVD-PR331-INTEGRATION"
       ],
+      "rollback": "停止未装配定义验证；仅清理自有合成目录，保留失败日志；不触及现库与业务审计",
+      "unresolved": [],
       "observability": {
         "applicable": false,
         "reason": "未装配schema定义和隔离验证，不交付运行能力"
       },
       "runtimeCapability": false,
       "id": "DATA-009",
+      "pullRequestRef": "https://github.com/xujiann/chronic-care-platform/pull/331",
+      "ciRef": "https://github.com/xujiann/chronic-care-platform/actions/runs/37172517261",
       "title": "GS03未装配回执迁移定义与隔离验证",
       "ownerProcess": "T00",
       "riskLevel": "高",
