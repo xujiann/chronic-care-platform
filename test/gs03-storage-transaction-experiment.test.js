@@ -102,6 +102,30 @@ function cloneOwnDatabase(t, experiment) {
   return { directory, dbPath };
 }
 
+function rebindSyntheticCase(experiment, caseId, authorizationId) {
+  // Test-only competing writer: keep the case, collection version and exact
+  // authorization reference mutually consistent before retrying the old key.
+  const db = new DatabaseSync(experiment.dbPath);
+  try {
+    db.exec("PRAGMA foreign_keys=ON");
+    db.exec("BEGIN IMMEDIATE");
+    const row = db.prepare("SELECT payload, version FROM state_collections WHERE key='referralTeleconsultations'").get();
+    assert.ok(row);
+    const cases = JSON.parse(row.payload);
+    const item = cases.find((entry) => entry.id === caseId);
+    assert.ok(item);
+    item.residentAuthorizationId = authorizationId;
+    item.version += 1;
+    const updated = db.prepare("UPDATE state_collections SET payload=?, version=version+1, updated_at=? WHERE key='referralTeleconsultations' AND version=?")
+      .run(JSON.stringify(cases), NOW, row.version);
+    assert.equal(updated.changes, 1);
+    db.exec("COMMIT");
+  } catch (error) {
+    try { db.exec("ROLLBACK"); } catch { /* preserve the setup failure */ }
+    throw error;
+  } finally { db.close(); }
+}
+
 function collection(snapshot, name) {
   const rows = snapshot.collections?.[name];
   assert.ok(Array.isArray(rows), `${name} must be a real state_collections projection`);
@@ -315,10 +339,14 @@ test("same namespace conflicts do not leak old receipt; another authorized princ
     const input = command(contract, `scope-${contract}`);
     const first = experiment.applyCallback(input);
     const stable = observed(experiment);
-    const changedIntent = { ...INTENT[contract] };
-    const changedField = Object.keys(changedIntent)[0];
-    changedIntent[changedField] = `${changedIntent[changedField]}-different`;
-    denied(() => experiment.applyCallback({ ...input, intent: changedIntent }), "RECEIPT_CONFLICT");
+    for (const changedField of Object.keys(INTENT[contract])) {
+      const changedIntent = { ...INTENT[contract] };
+      changedIntent[changedField] = changedField === "meetingWindow"
+        ? "2026-10-05T10:00:00.000Z"
+        : `${changedIntent[changedField]}-different`;
+      denied(() => experiment.applyCallback({ ...input, intent: changedIntent }), "RECEIPT_CONFLICT");
+      assert.deepEqual(observed(experiment), stable, `${contract}.${changedField} conflict must be zero-write`);
+    }
     denied(() => experiment.applyCallback({ ...input, targetId: second.id }), "RECEIPT_CONFLICT");
     denied(() => experiment.applyCallback({ ...input, authorizationId: "another-authorization" }), "AUTHORIZATION_REJECTED");
     assert.deepEqual(observed(experiment), stable);
@@ -328,6 +356,19 @@ test("same namespace conflicts do not leak old receipt; another authorized princ
     assert.notEqual(otherFirst.receipt.receiptId, first.receipt.receiptId);
     assert.equal(experiment.applyCallback(other).outcome, "replay");
     assert.equal(observed(experiment).receipts.length, stable.receipts.length + 1);
+  }
+});
+
+test("a valid new exact authorization on the same case conflicts with its old receipt key", (t) => {
+  const successor = { ...AUTH, id: "auth-synthetic-successor" };
+  for (const contract of ["feedback", "schedule", "report"]) {
+    const { experiment } = fixture(t, { authorizations: [AUTH, successor] });
+    const input = command(contract, `rebound-${contract}`);
+    experiment.applyCallback(input);
+    rebindSyntheticCase(experiment, CASE.id, successor.id);
+    const beforeConflict = observed(experiment);
+    denied(() => experiment.applyCallback({ ...input, authorizationId: successor.id }), "RECEIPT_CONFLICT");
+    assert.deepEqual(observed(experiment), beforeConflict, `${contract} new valid authorization must not change facts/source`);
   }
 });
 
@@ -345,6 +386,23 @@ test("current exact authorization and scope gate first arrival, replay and recon
   denied(() => experiment.applyCallback(command("report", "expired-first")), "AUTHORIZATION_REJECTED");
   assert.deepEqual(observed(experiment), committed);
   assert.ok(first.receipt.receiptId);
+});
+
+test("reconciliation rechecks expiry before COMMIT and never discloses an old receipt", (t) => {
+  const { experiment } = fixture(t, { authorizations: [{ ...AUTH, expiresAt: LATER }] });
+  const input = command("report", "reconcile-expiry-crossing");
+  experiment.applyCallback(input);
+  const committed = observed(experiment);
+  let clockReads = 0;
+  const verifier = openExperiment({
+    directory: experiment.directory, identity: experiment.identity,
+    clock() { clockReads += 1; return clockReads === 1 ? NOW : LATER; }
+  });
+  try {
+    denied(() => verifier.reconcile(input), "AUTHORIZATION_REJECTED");
+  } finally { verifier.close(); }
+  assert.ok(clockReads >= 2, "reconcile must read the clock again before committing its decision");
+  assert.deepEqual(observed(experiment), committed, "failed reconciliation must leave all facts/source unchanged");
 });
 
 test("missing or changed exact authorization fails without substituting another grant", (t) => {

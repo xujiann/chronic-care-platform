@@ -441,6 +441,9 @@ function instance(location, identity, options = {}) {
         authorization(fresh, command, nowFrom(clock));
         const row = receiptFor(fresh, command);
         if (row) matchReceipt(row, command);
+        // The controlled clock may cross expiry after the first locked read.
+        // Never disclose a previously committed receipt from a now-invalid scope.
+        authorization(fresh, command, nowFrom(clock));
         fresh.exec("COMMIT");
         return row ? { state: "confirmed", outcome: "replay", receipt: projectReceipt(row) } : { state: "not-found" };
       } catch (error) {
