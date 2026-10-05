@@ -1,5 +1,13 @@
 # 工程治理路线图
 
+## GS03 Linux CI 修复与保护集成 PLAN（2026-10-05）
+
+- 用户确认原切片内修复、独审、重新冻结及完整18项串行门禁后推送新提交，在该提交CI全通过时按既有保护规则合并PR334。批准标识为USER-GS03-STORAGE-CI-REPAIR-MERGE-2026-10-05；不授权部署、生产或新增业务范围，原实验ADR与父Proposed边界不变。
+- 旧冻结da556bb3本地18门禁通过、全发现3816通过/45环境跳过/0失败，但PR334 CI37253921134在Linux真实文件符号链接负测失败：期望UNSAFE_LINK，helper却分类FOREIGN_FILE。该run其余8作业成功仍不能抵消独立required单元全集失败；旧日志和摘要保留，不重试原错误换绿灯。
+- A在原T08单写helper，只把文件链接拒绝与普通foreign条件分离，须在stat/realpath/数据库打开前拒绝；B只读核原测试真实分支及目标摘要/目录不变断言。T00单写审批、事实与证据；独审只读。默认schema19/41、实验20/42、运行时/HTTP/现库/CI拓扑均不变。
+- 原GOV030/TEST027继续验证中／已实现，WIP4/5，不提前关闭或释放gap。新专项、组合独审、冻结全18门禁及新head远端CI必须分别完成；Linux本机未执行须如实列出，只由新CI确认。合并限定实验交付后核精确merge/tree及主线CI，不把仓库证据解释为GS03完整或生产GO。
+- A最小修复T08提交741ebae6，helper先lstat链接拒绝UNSAFE_LINK，之后才普通stat/realpath；测试/child不变，narrow-6-linux-ci-fix本机18通过/0失败/0跳过，Windowsjunction分支实际执行。Linux分支、新组合独审与冻结门禁以及新head CI待验；旧失败不能由本机通过覆盖。
+
 ## GS03 隔离存储事务验证 PLAN（2026-10-04）
 
 - 用户批准限定开发测试，独立Accepted ADR只授权新测试harness；父Proposed、正式Owner/协议/外部scope/留存/恢复不变。本轮不推送、合并或上线。
