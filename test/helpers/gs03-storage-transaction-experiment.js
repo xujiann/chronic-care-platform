@@ -81,7 +81,8 @@ function locationOf(directoryValue, rootValue) {
   const realDirectory = fs.realpathSync(directory);
   if (directory !== realDirectory || !within(root, realDirectory) || !fs.statSync(directory).isDirectory()) throw fail("FOREIGN_FILE");
   const dbPath = path.join(directory, FILE_NAME);
-  if (fs.lstatSync(dbPath).isSymbolicLink() || !fs.statSync(dbPath).isFile() || fs.realpathSync(dbPath) !== dbPath) throw fail("FOREIGN_FILE");
+  if (fs.lstatSync(dbPath).isSymbolicLink()) throw fail("UNSAFE_LINK");
+  if (!fs.statSync(dbPath).isFile() || fs.realpathSync(dbPath) !== dbPath) throw fail("FOREIGN_FILE");
   const entries = fs.readdirSync(directory).sort();
   if (entries.some((entry) => ![FILE_NAME, `${FILE_NAME}-wal`, `${FILE_NAME}-shm`].includes(entry))) throw fail("FOREIGN_FILE");
   for (const entry of entries) {
