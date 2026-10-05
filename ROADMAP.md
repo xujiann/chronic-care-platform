@@ -10,7 +10,7 @@
 
 ## GS03 隔离存储事务验证 PLAN（2026-10-04）
 
-- 用户批准限定开发测试，独立Accepted ADR只授权新测试harness；父Proposed、正式Owner/协议/外部scope/留存/恢复不变。本轮不推送、合并或上线。
+- 2026-10-04原准入历史：用户仅批准限定开发测试，独立Accepted ADR只授权新测试harness；父Proposed、正式Owner/协议/外部scope/留存/恢复不变。当时不推送、合并或上线；2026-10-05的当前交付权限和顺序以本页上方追加PLAN为准，仍不部署上线。
 - PR333已保护同树集成eeb7730e，PR/main各九项CI成功、真实PG各44项零跳过；上一片限定闭合，不作为本片证据。最新fetched origin/main为本T00/T08工作树共同基线，WIP2登记为4（GOV030/TEST027与OPS040/SEC016），原两任务不变。
 - T00单写治理及独立ADR/六图，A只写新harness，B只写新专项和child。先准入独审及专项再放行T08，复用真实runner、未注册S1、严格audit-chain与真实v15 appendAuditDeliverySourceChanges，不改生产模块或默认schema19/41表。
 - 验收与回滚以新ADR为准：三合同精确事实/source关联、双进程撤权与同键、expiry、逐副作用回滚及四态恢复、审计错绑与路径拒绝。只测试合成同库身份，不宣称正式外部scope fence或全写者修复；实验库禁止交旧runtime。

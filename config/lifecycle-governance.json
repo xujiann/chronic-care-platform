@@ -2106,7 +2106,7 @@
     {
       "id":"GOV-030","title":"GS03隔离存储事务验证准入","ownerProcess":"T00","integrationOwner":"T00",
       "taskStatus":"验证中","capabilityStatus":"已实现","riskLevel":"中",
-      "approval":{"state":"approved","mode":"T00-plan-approval","ref":"USER-GS03-STORAGE-CI-REPAIR-MERGE-2026-10-05","approvedScope":"原2026-10-04批准限定隔离实验技术准入；2026-10-05追加原范围Linux CI修复、独审重新冻结18门禁与新head CI全通过后推送保护合并。无新增业务范围、部署上线、现库或父Proposed接受"},
+      "approval":{"state":"approved","mode":"T00-plan-approval","ref":"USER-GS03-STORAGE-CI-REPAIR-MERGE-2026-10-05","approvedScope":"原2026-10-04批准限定隔离实验技术准入；2026-10-05追加原范围Linux CI修复，依次独审、重新冻结完整18门禁通过、推送精确新head、该head CI全通过、保护合并。无新增业务范围、部署上线、现库或父Proposed接受"},
       "requirementIds":["REQ-GOV-030"],"regulatoryControlIds":["REG-GOV-001"],"riskIds":["RISK-GOV-030"],"decisionIds":["ADR-GS03-S3-EXPERIMENT-001"],"dependencies":["GOV-029","DATA-009"],
       "affectedModules":["lifecycle-governance","gs03-isolated-storage-experiment-admission"],"dataSensitivity":"源码与受控合成技术摘要，无患者/凭据/原始报文",
       "acceptanceCriteria":["独立限域Accepted、T08编号与精确单写范围","父Proposed、默认schema与生产NO-GO不变，独审及18项冻结串行门禁"],
@@ -2118,10 +2118,10 @@
     {
       "id":"TEST-027","title":"GS03真实迁移与v15审计同事务隔离验证","ownerProcess":"T08","integrationOwner":"T00",
       "taskStatus":"验证中","capabilityStatus":"已实现","riskLevel":"高",
-      "approval":{"state":"approved","mode":"accepted-adr-human-review-special-validation","ref":"USER-GS03-STORAGE-CI-REPAIR-MERGE-2026-10-05","approvedScope":"原2026-10-04仅三测试文件合成库真实runner/S1候选/v15hook；2026-10-05追加原范围Linux链接分类修复、独审重新冻结18门禁及精确新head CI全通过后推送保护合并。无正式源码/HTTP/默认registry/现库/部署生产或新增业务范围"},
+      "approval":{"state":"approved","mode":"accepted-adr-human-review-special-validation","ref":"USER-GS03-STORAGE-CI-REPAIR-MERGE-2026-10-05","approvedScope":"原2026-10-04仅三测试文件合成库真实runner/S1候选/v15hook；2026-10-05追加原范围Linux链接分类修复，依次独审、重新冻结完整18门禁通过、推送精确新head、该head CI全通过、保护合并。无正式源码/HTTP/默认registry/现库/部署生产或新增业务范围"},
       "requirementIds":["REQ-TEST-027"],"regulatoryControlIds":["REG-GOV-001"],"riskIds":["RISK-TEST-027"],"decisionIds":["ADR-GS03-S3-EXPERIMENT-001"],"dependencies":["GOV-030","DATA-009"],
       "affectedModules":["gs03-storage-transaction-test-harness"],"dataSensitivity":"仅合成主体/授权/案例/消息及受控摘要，不使用患者/凭据/provider报文",
-      "acceptanceCriteria":["真实runner/S1未注册候选与v15hook，路径身份结构failclosed","三合同首次/重放/冲突及同事务所有事实与审计source精确绑定","双进程竞争/撤权排序/expiry/逐副作用回滚/提交前后退出与unknown核验","独审后冻结串行18门禁；不接运行时、现库或生产，不推送合并"],
+      "acceptanceCriteria":["真实runner/S1未注册候选与v15hook，路径身份结构failclosed","三合同首次/重放/冲突及同事务所有事实与审计source精确绑定","双进程竞争/撤权排序/expiry/逐副作用回滚/提交前后退出与unknown核验","独审后冻结完整串行18门禁通过，推送精确head后CI全通过才保护合并；不接运行时、现库或生产，不部署上线"],
       "testIds":["TEST-GS03-STORAGE-ADMISSION","TEST-GS03-STORAGE-EXPERIMENT"],"evidenceIds":["EVD-GS03-STORAGE-EXPERIMENT-NARROW","EVD-GS03-STORAGE-EXPERIMENT-REVIEW-FIX","EVD-GS03-STORAGE-EXPERIMENT-LINT-FIX","EVD-GS03-STORAGE-LINUX-CI-FIX"],"rollback":"停止实验并只清理已核实自有合成临时目录，保留失败日志；不改现库/旧证据",
       "unresolved":["旧候选18本地门禁通过但PR334 Linux真实文件链接负测错误分类，当前新修复专项/独审/冻结18门禁/新head CI及保护合并待验；预检副本不作授权决策，敌对并发文件替换不在合成实验边界内"],"observability":{"applicable":false,"reason":"仅测试目录harness，无运行能力"},"runtimeCapability":false,
       "worktree":".codex-platform-worktrees/process-v2/t08-gs03-storage-experiment-20261004","branch":"process/t08-gs03-storage-experiment-20261004","planRef":"docs/adr/2026-10-04-gs03-isolated-storage-transaction-validation.md",
