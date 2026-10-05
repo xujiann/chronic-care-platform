@@ -1,5 +1,9 @@
 # MODULE MAP — 主线模块地图
 
+## 2026-10-05 GS03 离线准入资料校验
+
+T00 独占 scripts/gs03-admission.js、空模板及 test/gs03-admission.test.js；这是跨域治理工具，不是 T05/T08 业务命令，不创建新 Owner 或回执权威。
+
 ## 2026-10-04 GS03 隔离存储事务验证准入
 
 TEST027在独立T08工作树：A只写gs03-storage-transaction-experiment.js，B只写新专项与child；T00单写治理，独审只读。不新建正式repository/UoW，不改Owner、源码或旧实验。

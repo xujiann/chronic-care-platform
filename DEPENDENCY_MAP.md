@@ -1,5 +1,9 @@
 # DEPENDENCY MAP — 主线依赖地图
 
+## 2026-10-05 GS03 离线准入资料校验
+
+依赖仅专项→scripts/gs03-admission.js→Node fs/path；不导入 server/存储/provider，不联网、不写文件，无依赖包与 CI 拓扑变化。
+
 ## 2026-10-04 GS03 隔离存储事务验证准入
 
 测试/child→新测试harness→既有migration runner/S1候选/audit-chain/真实v15hook/Node内置SQLite；没有server/HTTP→harness依赖、包或CI拓扑变化。不复用fake auditSource作证明。
