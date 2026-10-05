@@ -1,5 +1,24 @@
 # 工程治理路线图
 
+## GS03 Linux CI 修复与保护集成 PLAN（2026-10-05）
+
+- 用户确认原切片内修复、独审、重新冻结及完整18项串行门禁后推送新提交，在该提交CI全通过时按既有保护规则合并PR334。批准标识为USER-GS03-STORAGE-CI-REPAIR-MERGE-2026-10-05；不授权部署、生产或新增业务范围，原实验ADR与父Proposed边界不变。
+- 旧冻结da556bb3本地18门禁通过、全发现3816通过/45环境跳过/0失败，但PR334 CI37253921134在Linux真实文件符号链接负测失败：期望UNSAFE_LINK，helper却分类FOREIGN_FILE。该run其余8作业成功仍不能抵消独立required单元全集失败；旧日志和摘要保留，不重试原错误换绿灯。
+- A在原T08单写helper，只把文件链接拒绝与普通foreign条件分离，须在stat/realpath/数据库打开前拒绝；B只读核原测试真实分支及目标摘要/目录不变断言。T00单写审批、事实与证据；独审只读。默认schema19/41、实验20/42、运行时/HTTP/现库/CI拓扑均不变。
+- 原GOV030/TEST027继续验证中／已实现，WIP4/5，不提前关闭或释放gap。新专项、组合独审、冻结全18门禁及新head远端CI必须分别完成；Linux本机未执行须如实列出，只由新CI确认。合并限定实验交付后核精确merge/tree及主线CI，不把仓库证据解释为GS03完整或生产GO。
+- A最小修复T08提交741ebae6，helper先lstat链接拒绝UNSAFE_LINK，之后才普通stat/realpath；测试/child不变，narrow-6-linux-ci-fix本机18通过/0失败/0跳过，Windowsjunction分支实际执行。Linux分支、新组合独审与冻结门禁以及新head CI待验；旧失败不能由本机通过覆盖。
+
+## GS03 隔离存储事务验证 PLAN（2026-10-04）
+
+- 2026-10-04原准入历史：用户仅批准限定开发测试，独立Accepted ADR只授权新测试harness；父Proposed、正式Owner/协议/外部scope/留存/恢复不变。当时不推送、合并或上线；2026-10-05的当前交付权限和顺序以本页上方追加PLAN为准，仍不部署上线。
+- PR333已保护同树集成eeb7730e，PR/main各九项CI成功、真实PG各44项零跳过；上一片限定闭合，不作为本片证据。最新fetched origin/main为本T00/T08工作树共同基线，WIP2登记为4（GOV030/TEST027与OPS040/SEC016），原两任务不变。
+- T00单写治理及独立ADR/六图，A只写新harness，B只写新专项和child。先准入独审及专项再放行T08，复用真实runner、未注册S1、严格audit-chain与真实v15 appendAuditDeliverySourceChanges，不改生产模块或默认schema19/41表。
+- 验收与回滚以新ADR为准：三合同精确事实/source关联、双进程撤权与同键、expiry、逐副作用回滚及四态恢复、审计错绑与路径拒绝。只测试合成同库身份，不宣称正式外部scope fence或全写者修复；实验库禁止交旧runtime。
+- 三份新测试文件已由T08提交cf24895c并准备到T00；实际专项已登记，第三轮16通过/0失败/0跳过，前两轮12通过/4失败与14通过/2失败日志保留。Windows junction分支实际执行，Linux分支未在本机执行。GOV030/TEST027为验证中／已实现，非已集成；代码独审后组合冻结并串行执行18项门禁，不预支独审/全门禁/PR/CI。GS03未建设、六域生产NO-GO。
+- 修复使用新库WAL模式、真实锁忙unknown，以及自有临时副本的身份/schema/ledger预检；副本绝不参与授权、回执或提交判断。预检后敌对并发替换源文件的TOCTOU不在受控合成实验边界内，须独审确认限域说明，不将本方案用作生产现库接入。
+- ed3c9def独审发现两P2，原记录保留：reconcile提交前缺expiry复核、冲突负测缺逐字段及合法授权重绑。A/B各在原单写范围修复，T08提交5678f6d1，narrow-4-review-fix为18通过/0失败/0跳过；新组合需独立复审后冻结，不复用旧候选放行结论。
+- 1febf3b5复审通过后冻结；串行前10门禁通过，第11 lint发现预检finally不安全throw，后7项未执行，旧冻结失败证据保留。原A修清理错误保留结构，T08 a1c46a44，narrow-5-lint-fix为18通过/0失败/0跳过，单文件eslint通过；新组合需独审后重新冻结并完整重跑18门禁，旧10项不替代新提交验证。
+
 ## GS03 S2 限定设计交付闭合 PLAN（2026-10-04）
 
 - 用户“批准并闭合”追加授权 `USER-GS03-S2-CLOSEOUT-2026-10-04`：推送冻结S2、精确CI成功后保护合并及限定治理闭合。原设计授权 `USER-GS03-S1-MERGE-S2-DESIGN-2026-10-04` 保留为历史来源，不扩大为HTTP/UoW、现库、默认迁移注册或生产授权。
@@ -355,7 +374,7 @@
 | 12 | 对象存储结构化元数据与耐久命令轨道 | Accepted OBJ-ADR-002；T08 data owner、T00 technical owner、v1/v2 兼容策略、SQLite v17、回填冻结、异步 API、fenced worker、keyset 分页和持久 reconcile 的仓库实现均已完成，production promotion=false / P1 | 真实 provider status/abort capability、KMS/WORM/扫描、容量、备份、监控和现场验收继续 NO-GO；不得把仓库实现完成解释为 worker 已现场激活或生产晋级 |
 | 13 | 严格生产预检证据信任装配 | Accepted ADR；T00 pinned-anchor/Ed25519 双角色 provider、CLI 自动装配、deployment package/env/CI 和负向矩阵已形成 / P0 | 真实 anchor/envelope、独立 signer、权限/轮换、外部 evidence 与现场执行继续由生产环境提供；provider 成功不替代完整 preflight 或最终人类授权 |
 | 14 | 生产切换行动证据与受保护晋级 | Accepted ADR；definitions-only v2、14/14 共享 Ed25519 验证、strict preflight 门禁、main/manual/production/self-hosted workflow 与 digest-only receipt 已形成 / P0 | GitHub production environment reviewers、专用 runner、真实 14 份 envelope、受控路径、外部审批和实际部署/现场签收继续 NO-GO；receipt 只证明预检资格 |
-| 15 | 当前工作流、Markdown 与跟踪 PDF 闭集治理 | GOV-001、DOC-001、REPO-001 仓库内缺口已关闭：开发默认 `origin/main`，固定 tag 仅作证据；298 份 Markdown 唯一分类；3 个 PDF 绑定来源与 digest / P2 | snapshot/superseded 保持只读；新增文档同步清单。两个历史 PDF 与一个现行校验 PDF 均无跟踪生成器，替换前必须先补可复现生成源，不得手工编辑 |
+| 15 | 当前工作流、Markdown 与跟踪 PDF 闭集治理 | GOV-001、DOC-001、REPO-001 仓库内缺口已关闭：开发默认 `origin/main`，固定 tag 仅作证据；299 份 Markdown 唯一分类；3 个 PDF 绑定来源与 digest / P2 | snapshot/superseded 保持只读；新增文档同步清单。两个历史 PDF 与一个现行校验 PDF 均无跟踪生成器，替换前必须先补可复现生成源，不得手工编辑 |
 | 16 | 首批生产范围机器冻结 | Accepted ADR；`priority-eight-applications-v1` 冻结 8 应用、9 页面、32 API、38 数据引用、7 worker、14 外部依赖、16 应用证据与 14 切换动作；API/Owner 复核归零。新增迁移闭集把 21 个受阻引用分为 20 个唯一持久化计划与 1 个派生读模型，`collectionRepositoryPlanMissing=0` / P0 | 仓库计划完整不代表迁移完成；21 个引用仍无生产写资格，全部 API/数据晋级、真实外部证据、worker 激活、PG 主切换和现场验收继续 NO-GO |
 | 17 | 招标需求治理 v2 | Accepted ADR；2 份中性样本文档、5 条候选、27 个能力 ID、受控 PDF 指纹导入、人工复核覆盖层、差距分析与产品化工作台已形成 / P0 | 原始文件、全文、浏览器上传、OCR/模型、自动改代码和生产授权均不在首批范围；复核写入口保持行为证据待补与生产 NO-GO |
 

@@ -1,5 +1,9 @@
 # DATA MODEL — 主线数据地图
 
+## 2026-10-04 GS03 隔离存储事务验证准入
+
+只在自有合成空库显式真实runner追加未注册S1候选，到实验20/42表；默认仍19/41。复用state_collections与真实v15审计源，不新增生产事实源、metadata表或fake审计。正式Owner、外部scope、历史留存与恢复仍待决。
+
 ## 2026-10-04 GS03 S2 限定设计已保护集成
 
 PR332冻结2791aa19与保护合并713ab5d0同tree c49f56e2，PR/main精确CI各九项成功；GOV029只关闭写入口盘点与Proposed共同事务合同的设计交付。正式schema仍v19/41表，无新事实源、默认注册、HTTP/UoW接线或现库迁移；正式Owner、共同事务权威、外部scope协议、历史留存与恢复仍由开放RISK-GOV029及两份Proposed ADR承接，另需人工准入。GS03未建设、六域生产NO-GO；本三文件治理收口自身验证与集成另以精确提交证明。
