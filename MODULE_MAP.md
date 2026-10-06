@@ -1,5 +1,9 @@
 # MODULE MAP — 主线模块地图
 
+## 2026-10-05 GS03 离线准入资料校验
+
+T00 独占 scripts/gs03-admission.js、空模板及 test/gs03-admission.test.js；这是跨域治理工具，不是 T05/T08 业务命令，不创建新 Owner 或回执权威。
+
 ## 2026-10-04 GS03 隔离存储事务验证准入
 
 TEST027在独立T08工作树：A只写gs03-storage-transaction-experiment.js，B只写新专项与child；T00单写治理，独审只读。不新建正式repository/UoW，不改Owner、源码或旧实验。
@@ -519,7 +523,7 @@ owner、文件引用和 closed-world 核心概念匹配只是证据，不能自�
 |---|---|---|---|
 | `config/repository-governance.json` | T00 | 当前 workflow、Markdown 分类规则/闭集摘要、3 个 PDF 来源与 digest 的机器合同 | 不定义业务 owner，不包含 PDF 正文 |
 | `scripts/repository-governance.js` | T00 | 只读枚举 Git 路径，拒绝漏分/重叠/快照改写/旧 baseline/PDF 漂移 | 不生成或修改文档、PDF、报告和归档 |
-| `test/repository-governance.test.js` | T00 / TEST-001 | 锁定当前 299 份 Markdown、三类边界、当前 main 流程和 3 个 PDF 负向漂移 | 不证明 PDF 内容正确或生产可用 |
+| `test/repository-governance.test.js` | T00 / TEST-001 | 锁定当前 300 份 Markdown、三类边界、当前 main 流程和 3 个 PDF 负向漂移 | 不证明 PDF 内容正确或生产可用 |
 
 依赖方向为 `Git 跟踪路径 + ADR 状态 + 当前进程清单 + PDF bytes/source paths → repository governance
 verifier → governance-api/architecture:test`。snapshot 与 superseded 只提供历史证据，不得反向覆盖 current

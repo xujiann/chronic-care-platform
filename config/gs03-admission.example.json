@@ -1,0 +1,50 @@
+{
+  "schemaVersion": "gs03-admission-input.v1",
+  "environment": "test",
+  "owners": {
+    "status": "pending",
+    "authorizationRef": null,
+    "identityRef": null,
+    "storageRef": null,
+    "privacyRef": null,
+    "recoveryRef": null,
+    "decisionRef": null
+  },
+  "identity": {
+    "status": "pending",
+    "principalNamespaceRef": null,
+    "accountInstitutionBindingRef": null,
+    "crossPrincipalPolicyRef": null
+  },
+  "protocol": {
+    "status": "pending",
+    "version": null,
+    "contracts": null,
+    "canonicalizationRef": null,
+    "signatureRef": null,
+    "receiptProjectionRef": null
+  },
+  "transaction": {
+    "status": "pending",
+    "authorityRef": null,
+    "writerInventoryRef": null,
+    "ownerResponsibilitiesRef": null,
+    "externalScopeFenceRef": null
+  },
+  "retention": {
+    "status": "pending",
+    "policyRef": null,
+    "periodDays": null,
+    "keyExpiryPolicyRef": null,
+    "privacyDeletionPolicyRef": null,
+    "capacityRef": null
+  },
+  "recovery": {
+    "status": "pending",
+    "policyRef": null,
+    "rpoSeconds": null,
+    "rtoSeconds": null,
+    "sourceGenerationRef": null,
+    "reconciliationRef": null
+  }
+}
