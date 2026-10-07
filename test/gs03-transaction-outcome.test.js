@@ -132,3 +132,53 @@ test("result is fixed and does not expose arbitrary business objects", async (t)
     { status: "rolled-back", phase: "apply", productionReady: false });
   assert.equal(f.count(), 0);
 });
+
+test("method getter reentry is busy before a second begin", async (t) => {
+  const f = fixture(t);
+  const begin = f.port.begin;
+  let nested;
+  Object.defineProperty(f.port, "begin", { get() {
+    nested = runGs03Transaction({ environment: "test", port: f.port });
+    return begin;
+  } });
+  assert.equal((await runGs03Transaction({ environment: "test", port: f.port })).status, "confirmed-first");
+  assert.equal((await nested).status, "busy");
+  assert.equal(f.calls.filter((s) => s === "begin").length, 1);
+  assert.equal(f.count(), 1);
+});
+
+for (const malformed of ["missing", "getter"]) {
+  test("admission rejection releases occupancy after " + malformed, async (t) => {
+    const f = fixture(t);
+    const commit = f.port.commit;
+    if (malformed === "missing") delete f.port.commit;
+    else Object.defineProperty(f.port, "commit", { configurable: true, get() { throw new Error("private"); } });
+    assert.equal((await runGs03Transaction({ environment: "test", port: f.port })).status, "rejected");
+    Object.defineProperty(f.port, "commit", { configurable: true, value: commit });
+    assert.equal((await runGs03Transaction({ environment: "test", port: f.port })).status, "confirmed-first");
+    assert.equal(f.count(), 1);
+  });
+}
+
+test("async commit rejection after actual commit stays unknown", async (t) => {
+  const f = fixture(t);
+  f.port.commit = async () => { f.db.exec("COMMIT"); throw new Error("private"); };
+  assert.equal((await runGs03Transaction({ environment: "test", port: f.port })).status, "unknown");
+  assert.equal(f.count(), 1);
+});
+
+test("occupancy spans asynchronous rollback rejection", async (t) => {
+  const f = fixture(t);
+  let release, entered;
+  const waiting = new Promise((resolve) => { release = resolve; });
+  const rollbackEntered = new Promise((resolve) => { entered = resolve; });
+  f.port.verify = () => false;
+  f.port.rollback = async () => { entered(); await waiting; throw new Error("private"); };
+  const first = runGs03Transaction({ environment: "test", port: f.port });
+  await rollbackEntered;
+  assert.equal((await runGs03Transaction({ environment: "test", port: f.port })).status, "busy");
+  release();
+  assert.equal((await first).status, "unknown");
+  assert.equal(f.count(), 1);
+  f.db.exec("ROLLBACK");
+});

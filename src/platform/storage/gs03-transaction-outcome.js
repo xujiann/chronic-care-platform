@@ -16,16 +16,18 @@ async function runGs03Transaction({ environment, port } = {}) {
   }
   if (active.has(port)) return report("busy", "admission");
   if (uncertain.has(port)) return report("unknown", "admission");
+  active.add(port); // Occupy before reading methods: a getter can reenter.
   let methods;
   try {
     methods = Object.fromEntries(stages.map((name) => [name, port[name]]));
     if (stages.some((name) => typeof methods[name] !== "function")) {
+      active.delete(port);
       return report("rejected", "admission");
     }
   } catch {
+    active.delete(port);
     return report("rejected", "admission");
   }
-  active.add(port);
   let phase = "begin";
   let commitAttempted = false;
   try {
