@@ -1,5 +1,9 @@
 # DEPENDENCY MAP — 主线依赖地图
 
+## 2026-10-07 GS03 非生产提交结果判定
+
+新专项导入组件；组件无文件、网络、server或测试helper依赖，不接默认启动，无新包或CI拓扑变化。
+
 ## 2026-10-05 GS03 离线准入资料校验
 
 依赖仅专项→scripts/gs03-admission.js→Node fs/path；不导入 server/存储/provider，不联网、不写文件，无依赖包与 CI 拓扑变化。
