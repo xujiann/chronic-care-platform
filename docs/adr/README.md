@@ -2,6 +2,7 @@
 
 | 新增决策 | 状态 | 范围 |
 |---|---|---|
+| [GS03内存事务适配](./2026-10-07-gs03-memory-transaction.md) | Accepted | 仅自建内存SQLite、租约与异常隔离，无持久业务和HTTP |
 | [GS03非生产提交结果判定](./2026-10-07-gs03-transaction-outcome.md) | Accepted | 仅未接线阶段执行器与专项，专业签署和父Proposed不变 |
 | [GS03离线准入资料校验](./2026-10-05-gs03-admission-validator.md) | Accepted | 仅非生产只读校验与负向测试，不授予正式实施或生产权限 |
 | [GS03隔离存储事务验证](./2026-10-04-gs03-isolated-storage-transaction-validation.md) | Accepted | 仅TEST027合成新库显式真实runner/S1候选/v15审计hook；无HTTP/现库/默认注册/生产/推送合并 |
