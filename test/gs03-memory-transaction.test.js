@@ -3,6 +3,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const Module = require("node:module");
+const { spawnSync } = require("node:child_process");
 const { runGs03Transaction } = require("../src/platform/storage/gs03-transaction-outcome");
 const { createGs03MemoryTransactionSession } = require("../src/platform/storage/gs03-memory-transaction");
 
@@ -151,6 +152,34 @@ test("normal synchronous apply and verify errors roll back real writes", async (
   }
 });
 
+for (const phase of ["apply", "verify"]) {
+  for (const swallowed of [false, true]) {
+    test(`${phase} reentry isolates even when its error is ${swallowed ? "caught" : "uncaught"}`, async (t) => {
+      const f = await fixture(t);
+      let p;
+      function reenter() {
+        if (swallowed) {
+          try { p[phase](); } catch (error) { assert.equal(error.code, "GS03_MEMORY_SEQUENCE"); }
+        } else {
+          p[phase]();
+        }
+      }
+      p = port(f.session, (db) => {
+        db.exec("INSERT INTO facts VALUES (1, 'synthetic')");
+        if (phase === "apply") reenter();
+        return "first";
+      }, () => { if (phase === "verify") reenter(); return true; });
+      assert.deepEqual(await runGs03Transaction({ environment: "test", port: p }),
+        { status: "unknown", phase, productionReady: false });
+      assert.equal(f.db.isTransaction, true);
+      assert.equal(f.count(), 1);
+      assert.equal((await runGs03Transaction({ environment: "test", port: port(f.session, () => "replay") })).status,
+        "unknown");
+      assert.equal(f.session.close(), true);
+    });
+  }
+}
+
 test("invalid callback results roll back and cannot be mistaken for confirmation", async (t) => {
   const f = await fixture(t);
   for (const bad of [false, { kind: "first" }]) {
@@ -192,6 +221,33 @@ test("async and thenable callbacks isolate even if they wrote before returning",
       "unknown");
     assert.equal(f.session.close(), true);
   }
+});
+
+test("cross-realm rejected Promise is consumed without an unhandled rejection or raw error", () => {
+  const adapterPath = JSON.stringify(require.resolve("../src/platform/storage/gs03-memory-transaction"));
+  const runnerPath = JSON.stringify(require.resolve("../src/platform/storage/gs03-transaction-outcome"));
+  const script = `
+    const vm = require('node:vm');
+    const { createGs03MemoryTransactionSession } = require(${adapterPath});
+    const { runGs03Transaction } = require(${runnerPath});
+    const session = createGs03MemoryTransactionSession({ environment: 'test' });
+    const port = session.createPort({
+      apply(db) {
+        db.exec('CREATE TABLE synthetic (id INTEGER)');
+        return vm.runInNewContext("Promise.reject(new Error('private vm rejection'))");
+      },
+      verify() { return true; }
+    });
+    runGs03Transaction({ environment: 'test', port }).then((result) => {
+      process.stdout.write(result.status);
+      session.close();
+    });
+  `;
+  const child = spawnSync(process.execPath, ["-e", script], { encoding: "utf8" });
+  assert.equal(child.status, 0, child.stderr);
+  assert.equal(child.stdout, "unknown");
+  assert.equal(child.stderr.includes("private vm rejection"), false);
+  assert.equal(child.stderr.includes("unhandledRejection"), false);
 });
 
 test("rollback response loss isolates even after SQLite actually rolled back", async (t) => {

@@ -2,6 +2,7 @@
 
 // T08 synthetic, non-production adapter. Callbacks are trusted synchronous code.
 const { DatabaseSync } = require("node:sqlite");
+const { types: { isPromise } } = require("node:util");
 
 function fault(code) {
   const error = new Error(code);
@@ -78,9 +79,11 @@ function createGs03MemoryTransactionSession(options) {
     soleMain();
   }
 
-  function callback(port, fn, expected, next, state) {
+  function callback(port, fn, expected, running, next, state) {
     owned(port);
     let result;
+    state.value = running;
+    state.inCallback = true;
     try {
       result = fn(db);
     } catch {
@@ -88,11 +91,13 @@ function createGs03MemoryTransactionSession(options) {
       // letting the runner request a normal rollback.
       owned(port);
       throw fault("GS03_MEMORY_CALLBACK");
+    } finally {
+      state.inCallback = false;
     }
     try {
       if (result !== null && (typeof result === "object" || typeof result === "function") &&
           typeof result.then === "function") {
-        if (result instanceof Promise) Promise.prototype.then.call(result, undefined, () => {});
+        if (isPromise(result)) Promise.prototype.then.call(result, undefined, () => {});
         isolated = true;
         throw fault("GS03_MEMORY_ASYNC");
       }
@@ -114,7 +119,12 @@ function createGs03MemoryTransactionSession(options) {
     }
     const apply = input.apply.value;
     const verify = input.verify.value;
-    const state = { value: "fresh" };
+    const state = { value: "fresh", inCallback: false };
+    function rejectReentry() {
+      if (!state.inCallback) return;
+      isolated = true;
+      throw fault("GS03_MEMORY_SEQUENCE");
+    }
     const port = {
       begin() {
         if (state.value !== "fresh") {
@@ -137,14 +147,17 @@ function createGs03MemoryTransactionSession(options) {
         }
       },
       apply() {
+        rejectReentry();
         if (state.value !== "begun") throw fault("GS03_MEMORY_SEQUENCE");
-        return callback(port, apply, (value) => value === "first" || value === "replay", "applied", state);
+        return callback(port, apply, (value) => value === "first" || value === "replay", "applying", "applied", state);
       },
       verify() {
+        rejectReentry();
         if (state.value !== "applied") throw fault("GS03_MEMORY_SEQUENCE");
-        return callback(port, verify, (value) => value === true, "verified", state);
+        return callback(port, verify, (value) => value === true, "verifying", "verified", state);
       },
       commit() {
+        rejectReentry();
         if (state.value !== "verified") throw fault("GS03_MEMORY_SEQUENCE");
         owned(port);
         try {
@@ -160,6 +173,10 @@ function createGs03MemoryTransactionSession(options) {
         }
       },
       rollback() {
+        if (state.inCallback) {
+          isolated = true;
+          return false;
+        }
         if (state.value === "begin-rejected") {
           state.value = "rejected-cleaned";
           return !isolated && !closed;
@@ -169,7 +186,7 @@ function createGs03MemoryTransactionSession(options) {
           isolated = true;
           return false;
         }
-        if (!["begun", "applied", "verified"].includes(state.value)) return false;
+        if (!["begun", "applying", "applied", "verifying", "verified"].includes(state.value)) return false;
         if (isolated || closed || lease !== port) return false;
         try {
           owned(port);
