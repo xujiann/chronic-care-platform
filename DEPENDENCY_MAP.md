@@ -1,5 +1,9 @@
 # DEPENDENCY MAP — 主线依赖地图
 
+## 2026-10-08 GS03 事务组件组合验收
+
+新专项→测试helper→既有结果执行器和内存事务适配器→Node内置SQLite/util。无server/HTTP反向装配、外部包、网络、文件库或CI拓扑变化；与旧隔离实验的真实S1/v15证据保持分离。
+
 ## 2026-10-07 GS03 内存事务适配
 
 候选适配器仅依赖Node内置SQLite与util原生Promise识别；专项组合既有结果执行器，不改其实现。原生isTransaction能力失败关闭，不提升项目Node最低版本，无新增包、CI拓扑或默认启动依赖。
