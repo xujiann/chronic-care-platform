@@ -1,5 +1,9 @@
 # DEPENDENCY MAP — 主线依赖地图
 
+## 2026-10-08 GS03 未接线回执读写组件
+
+候选receipt-store→既有S1 schema验证器→现有migration指纹依赖；调用方提供可信SQLite连接，组件不打开文件/网络/连接。专项真实内存runner追加S1、真实v15 hook合成父行，无默认启动装配、新包、CI拓扑或现库变更。
+
 ## 2026-10-08 GS03 事务组件组合验收
 
 新专项→测试helper→既有结果执行器和内存事务适配器→Node内置SQLite/util。无server/HTTP反向装配、外部包、网络、文件库或CI拓扑变化；与旧隔离实验的真实S1/v15证据保持分离。

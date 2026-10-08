@@ -2,6 +2,7 @@
 
 | 新增决策 | 状态 | 范围 |
 |---|---|---|
+| [GS03未接线回执读写组件](./2026-10-08-gs03-receipt-store.md) | Accepted | 仅可信连接现有事务内S1读写，固定namespace；不认证身份、不证明提交、不接HTTP现库 |
 | [GS03事务组件组合验收](./2026-10-08-gs03-transaction-composition.md) | Accepted | 仅测试目录组合既有执行器与内存适配器、多类合成事实；无正式业务接线 |
 | [GS03内存事务适配](./2026-10-07-gs03-memory-transaction.md) | Accepted | 仅自建内存SQLite、租约与异常隔离，无持久业务和HTTP |
 | [GS03非生产提交结果判定](./2026-10-07-gs03-transaction-outcome.md) | Accepted | 仅未接线阶段执行器与专项，专业签署和父Proposed不变 |
