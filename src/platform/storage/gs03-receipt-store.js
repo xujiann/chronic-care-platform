@@ -36,9 +36,11 @@ function failure(code) {
 }
 
 function exactData(value, names, code) {
-  if (!value || typeof value !== "object" || Array.isArray(value)) throw failure(code);
   let descriptors;
-  try { descriptors = Object.getOwnPropertyDescriptors(value); } catch { throw failure(code); }
+  try {
+    if (!value || typeof value !== "object" || Array.isArray(value)) throw failure(code);
+    descriptors = Object.getOwnPropertyDescriptors(value);
+  } catch { throw failure(code); }
   if (Reflect.ownKeys(descriptors).length !== names.length ||
       names.some((name) => !Object.hasOwn(descriptors, name) ||
         !Object.hasOwn(descriptors[name], "value"))) throw failure(code);
