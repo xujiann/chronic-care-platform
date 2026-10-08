@@ -68,7 +68,7 @@ function validId(value, maxBytes) {
 }
 
 function validDigest(value) {
-  return typeof value === "string" && HEX.test(value);
+  return typeof value === "string" && value.length === 64 && HEX.test(value);
 }
 
 function validateSelector(value) {
