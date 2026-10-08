@@ -1,5 +1,9 @@
 # API MAP — 主线接口地图
 
+## 2026-10-07 GS03 内存事务适配
+
+新候选库接口createGs03MemoryTransactionSession({environment})返回createPort({apply,verify})、close及productionReady=false。可信同步合成回调，单次port兼容既有五阶段runner；不提供HTTP、授权、正式回执或生产事务API。
+
 ## 2026-10-07 GS03 非生产提交结果判定
 
 库函数runGs03Transaction仅运行可信端口阶段并返回固定状态；不改变HTTP、正式协议、鉴权或业务幂等。
