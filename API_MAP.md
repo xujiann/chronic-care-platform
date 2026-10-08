@@ -1,5 +1,9 @@
 # API MAP — 主线接口地图
 
+## 2026-10-08 GS03 未接线回执读写组件
+
+库接口createGs03ReceiptStore({environment,db,namespaceDigest})固定可信namespace；lookup精确selector返回absent/conflict/matched最小投影，insert返回staged。无HTTP改变，不提供认证/授权、事务控制或恢复；所有结果productionReady=false，命名空间分离不是身份验真。
+
 ## 2026-10-08 GS03 事务组件组合验收
 
 无HTTP/API变更。测试helper只组合既有runGs03Transaction与createGs03MemoryTransactionSession；合成namespace/key/目标/意图不代表可信身份或正式协议，输出不作生产放行。
