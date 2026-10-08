@@ -287,6 +287,53 @@ test("factory, selector and record reject exact-key violations before any receip
   db.exec("ROLLBACK");
 });
 
+test("revoked and throwing Proxy inputs return stable errors before SQL or fact changes", (t) => {
+  const { db, store } = fixture(t);
+  begin(db);
+  store.insert(record());
+  const beforeReceipts = rows(db);
+  const beforeAudit = auditRows(db);
+  const hostile = [
+    (value) => {
+      const handle = Proxy.revocable(value, {});
+      handle.revoke();
+      return handle.proxy;
+    },
+    (value) => new Proxy(value, { ownKeys() { throw Error("private ownKeys"); } }),
+    (value) => new Proxy(value, {
+      getOwnPropertyDescriptor() { throw Error("private getOwnPropertyDescriptor"); }
+    })
+  ];
+  const nativePrepare = db.prepare;
+  const nativeExec = db.exec;
+  let sqlCalls = 0;
+  db.prepare = function (...args) {
+    sqlCalls += 1;
+    return nativePrepare.apply(this, args);
+  };
+  db.exec = function (...args) {
+    sqlCalls += 1;
+    return nativeExec.apply(this, args);
+  };
+  try {
+    for (const makeHostile of hostile) {
+      fails(() => createGs03ReceiptStore(makeHostile({ environment: "test", db, namespaceDigest: NAMESPACE_A })),
+        "GS03_RECEIPT_STORE_ADMISSION");
+      fails(() => store.lookup(makeHostile(selector())), "GS03_RECEIPT_STORE_INPUT");
+      fails(() => store.insert(makeHostile(record({ receipt_id: "receipt-synthetic-2", key_digest: KEY_B }))),
+        "GS03_RECEIPT_STORE_INPUT");
+      assert.equal(sqlCalls, 0);
+    }
+  } finally {
+    db.prepare = nativePrepare;
+    db.exec = nativeExec;
+  }
+  assert.deepEqual(rows(db), beforeReceipts);
+  assert.deepEqual(auditRows(db), beforeAudit);
+  assert.equal(db.isTransaction, true);
+  db.exec("ROLLBACK");
+});
+
 test("every selector and record field enforces S1 types, bytes and exact enums", (t) => {
   const { db, store } = fixture(t);
   begin(db);
