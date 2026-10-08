@@ -68,11 +68,11 @@
       }
     ],
     "expected": {
-      "total": 302,
-      "pathDigest": "47d4989b20ef83c54fcae448a690992a61fb99bdefbc371edd93b8caaf2fa2d7",
+      "total": 303,
+      "pathDigest": "6ee0a1732518246b67f5fb3ae835a1a23c50088b350c2cbfdc6fe4b61cb90d4c",
       "snapshotContentDigest": "1d62eda18ad189b7a41f3e4f7108b53be2803bc7853a025889fe0effd2782665",
       "byClassification": {
-        "current": { "count": 232, "pathDigest": "8e87a9dcac5155729e02b00cb317b3c84b230c575f426635de9e31f4a06bd95c" },
+        "current": { "count": 233, "pathDigest": "1c771d638eceb5a7f990f5827caeffc63ed278d5913164895538a48d7981af08" },
         "snapshot": { "count": 68, "pathDigest": "8bf6f19f5171f4adafee4d1abea0f3d8c842669c91cbb926ce37b024d5668179" },
         "superseded": { "count": 2, "pathDigest": "e8951bece87246a618c61ca29f2e49c56d622d28881edacf815bc889a895a62d" }
       }

@@ -2,6 +2,7 @@
 
 | 新增决策 | 状态 | 范围 |
 |---|---|---|
+| [GS03事务组件组合验收](./2026-10-08-gs03-transaction-composition.md) | Accepted | 仅测试目录组合既有执行器与内存适配器、多类合成事实；无正式业务接线 |
 | [GS03内存事务适配](./2026-10-07-gs03-memory-transaction.md) | Accepted | 仅自建内存SQLite、租约与异常隔离，无持久业务和HTTP |
 | [GS03非生产提交结果判定](./2026-10-07-gs03-transaction-outcome.md) | Accepted | 仅未接线阶段执行器与专项，专业签署和父Proposed不变 |
 | [GS03离线准入资料校验](./2026-10-05-gs03-admission-validator.md) | Accepted | 仅非生产只读校验与负向测试，不授予正式实施或生产权限 |

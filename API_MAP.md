@@ -1,5 +1,9 @@
 # API MAP — 主线接口地图
 
+## 2026-10-08 GS03 事务组件组合验收
+
+无HTTP/API变更。测试helper只组合既有runGs03Transaction与createGs03MemoryTransactionSession；合成namespace/key/目标/意图不代表可信身份或正式协议，输出不作生产放行。
+
 ## 2026-10-07 GS03 内存事务适配
 
 新候选库接口createGs03MemoryTransactionSession({environment})返回createPort({apply,verify})、close及productionReady=false。可信同步合成回调，单次port兼容既有五阶段runner；不提供HTTP、授权、正式回执或生产事务API。
