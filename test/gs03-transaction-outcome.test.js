@@ -25,6 +25,97 @@ function fixture(t, kind = "first") {
   return { db, port, calls, count };
 }
 
+function assertAdmissionReport(result) {
+  assert.deepEqual(result, { status: "rejected", phase: "admission", productionReady: false });
+  assert.deepEqual(Object.keys(result).sort(), ["phase", "productionReady", "status"]);
+  assert.equal(Object.isFrozen(result), true);
+  assert.doesNotMatch(JSON.stringify(result), /private|secret|patient|provider/i);
+}
+
+test("null and revoked options fail closed as fixed reports, without port calls", async (t) => {
+  const f = fixture(t);
+  assertAdmissionReport(await runGs03Transaction(null));
+  const revoked = Proxy.revocable({ environment: "test", port: f.port }, {});
+  revoked.revoke();
+  assertAdmissionReport(await runGs03Transaction(revoked.proxy));
+  assert.deepEqual(f.calls, []);
+  assert.equal(f.count(), 0);
+  assert.equal((await runGs03Transaction({ environment: "test", port: f.port })).status,
+    "confirmed-first", "invalid options must not occupy the valid port");
+});
+
+test("environment access faults are sanitized before the port property is read", async (t) => {
+  const f = fixture(t);
+  let portReads = 0;
+  const getterOptions = {
+    get environment() { throw new Error("private environment payload"); },
+    get port() { portReads += 1; return f.port; }
+  };
+  assertAdmissionReport(await runGs03Transaction(getterOptions));
+  const proxyOptions = new Proxy({ port: f.port }, {
+    get(target, key) {
+      if (key === "environment") throw new Error("secret proxy environment");
+      if (key === "port") portReads += 1;
+      return Reflect.get(target, key);
+    }
+  });
+  assertAdmissionReport(await runGs03Transaction(proxyOptions));
+  assert.equal(portReads, 0);
+  assert.deepEqual(f.calls, []);
+  assert.equal((await runGs03Transaction({ environment: "test", port: f.port })).status,
+    "confirmed-first");
+});
+
+test("valid environment with throwing port getter or Proxy read rejects without acquiring a lease", async (t) => {
+  const f = fixture(t);
+  assertAdmissionReport(await runGs03Transaction({
+    environment: "test", get port() { throw new Error("private port payload"); }
+  }));
+  const options = new Proxy({ environment: "development" }, {
+    get(target, key) {
+      if (key === "port") throw new Error("secret proxy port");
+      return Reflect.get(target, key);
+    }
+  });
+  assertAdmissionReport(await runGs03Transaction(options));
+  assert.deepEqual(f.calls, []);
+  assert.equal((await runGs03Transaction({ environment: "test", port: f.port })).status,
+    "confirmed-first");
+});
+
+test("invalid and production environments never read a port property", async (t) => {
+  const f = fixture(t);
+  let reads = 0;
+  for (const environment of ["production", "", null, undefined, "TEST"]) {
+    assertAdmissionReport(await runGs03Transaction({
+      environment,
+      get port() { reads += 1; throw new Error("private port must not be read"); }
+    }));
+  }
+  assert.equal(reads, 0);
+  assert.deepEqual(f.calls, []);
+  assert.equal((await runGs03Transaction({ environment: "test", port: f.port })).status,
+    "confirmed-first");
+});
+
+test("legacy getter, inherited fields and extra options remain accepted", async (t) => {
+  const getter = fixture(t);
+  const withGetters = {
+    get environment() { return "test"; }, get port() { return getter.port; },
+    unrelated: "legacy-extra"
+  };
+  assert.deepEqual(await runGs03Transaction(withGetters),
+    { status: "confirmed-first", phase: "commit", productionReady: false });
+  const inherited = fixture(t, "replay");
+  const inheritedPort = Object.create(inherited.port);
+  const inheritedOptions = Object.assign(Object.create({
+    environment: "development", port: inheritedPort
+  }), { unrelated: "legacy-extra" });
+  assert.deepEqual(await runGs03Transaction(inheritedOptions),
+    { status: "confirmed-replay", phase: "commit", productionReady: false });
+  assert.deepEqual(inherited.calls, ["begin", "apply", "verify", "commit"]);
+});
+
 for (const kind of ["first", "replay"]) {
   test("real SQLite confirmed " + kind, async (t) => {
     const f = fixture(t, kind);
