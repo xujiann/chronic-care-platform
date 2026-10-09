@@ -491,6 +491,25 @@ test("an empty TEMP schema is accepted, while TEMP objects and attached database
   attached.db.exec("ROLLBACK");
 });
 
+test("lookup and insert leave native main-only database_list unchanged", (t) => {
+  const { db, store } = fixture(t);
+  const databaseList = () => db.prepare("PRAGMA database_list").all().map((row) => ({ ...row }));
+  const mainOnly = databaseList();
+  assert.deepEqual(mainOnly.map((row) => row.name), ["main"]);
+  begin(db);
+  assert.deepEqual(store.lookup(selector()), { status: "absent", productionReady: false });
+  assert.deepEqual(databaseList(), mainOnly);
+  assert.deepEqual(store.insert(record()), { status: "staged", productionReady: false });
+  assert.deepEqual(databaseList(), mainOnly);
+  assert.deepEqual(store.lookup(selector()), {
+    status: "matched", receipt: { receiptId: "receipt-synthetic-1", recordedAtMs: 1791417600000 },
+    productionReady: false
+  });
+  assert.deepEqual(databaseList(), mainOnly);
+  db.exec("COMMIT");
+  assert.deepEqual(databaseList(), mainOnly);
+});
+
 test("S1 prevents UPDATE, DELETE and REPLACE of an inserted receipt", (t) => {
   const { db, store } = fixture(t);
   begin(db);
