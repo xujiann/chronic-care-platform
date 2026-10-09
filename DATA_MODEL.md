@@ -1,5 +1,9 @@
 # DATA MODEL — 主线数据地图
 
+## 2026-10-09 合成反馈预检数据边界
+
+OPS058仅内存primitive投影：显式合成案例/居民/授权/外部系统/幂等键、专用状态、epoch毫秒与有界正文。syntheticIntentDigest带 synthetic:sha256: 前缀，不是S1 intent_digest_version=2；无表、现库、receipt或审计变化，默认19/41不变。
+
 ## 2026-10-09 GS03 内存候选迁移初始化
 
 默认registry与应用schema仍v19/41表；显式新工厂仅自有空内存运行固定v1–v19+未注册S1候选v20/42表，真实runner拥有逐版事务与ledger。重跑完整ledger不变、S1显式复验，无历史升级/现库/注册变更；清理失败单独报告未确认，不声称全迁移原子回滚。PR341只闭合既有分层组合交付，风险仍开放。
