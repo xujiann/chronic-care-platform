@@ -102,7 +102,12 @@ function assertReady(db) {
     const databases = db.prepare("PRAGMA database_list").all();
     if (!Array.isArray(databases) || databases.length < 1 || databases.length > 2 ||
         databases.filter((row) => row.name === "main").length !== 1 ||
-        databases.some((row) => row.name !== "main" && row.name !== "temp") ||
+        databases.some((row) => row.name !== "main" && row.name !== "temp")) {
+      throw failure("GS03_RECEIPT_STORE_UNAVAILABLE");
+    }
+    // Addressing temp.sqlite_master creates an empty TEMP database on a
+    // main-only connection, which breaks the memory adapter's sole-main lease.
+    if (databases.some((row) => row.name === "temp") &&
         db.prepare("SELECT 1 AS present FROM temp.sqlite_master LIMIT 1").get()) {
       throw failure("GS03_RECEIPT_STORE_UNAVAILABLE");
     }
