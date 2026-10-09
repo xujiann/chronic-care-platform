@@ -1,5 +1,9 @@
 # DATA MODEL — 主线数据地图
 
+## 2026-10-09 GS03 分层组合证据
+
+新内存夹具在适配器setup事务内直接调用原生v15/S1 schema函数，source来自真实hook，回执用既有store；明确synthetic_状态/消息/审计链状态仅测试夹具。此结构不是完整runner初始化或正式schema head；独立迁移专项保留，默认仍19/41，现库及历史ledger不变。
+
 ## 2026-10-08 GS03 未接线回执读写组件
 
 新候选仅读写既有未装配S1表main.gs03_callback_receipts；固定namespace、不可变INSERT，无新schema、TTL或历史回填。每操作要求已有事务、S1复验、无TEMP对象或附加库，INSERT实际一行才staged；不证明提交。默认仍19/41表，显式候选合成内存库20/42表；FK存在不证明真实审计业务语义。

@@ -1,5 +1,9 @@
 # API MAP — 主线接口地图
 
+## 2026-10-09 GS03 TEMP检查无副作用
+
+既有store输入/输出和错误合同不变，只在database_list已列temp时检查TEMP对象，仍拒绝TEMP对象和附加数据库。无HTTP、认证/授权或bootstrap新接口；组合helper为测试专用，未知结果由既有执行器和session语义表达。
+
 ## 2026-10-08 GS03 未接线回执读写组件
 
 库接口createGs03ReceiptStore({environment,db,namespaceDigest})固定可信namespace；lookup精确selector返回absent/conflict/matched最小投影，insert返回staged。无HTTP改变，不提供认证/授权、事务控制或恢复；所有结果productionReady=false，命名空间分离不是身份验真。

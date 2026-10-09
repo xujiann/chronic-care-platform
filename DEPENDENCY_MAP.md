@@ -1,5 +1,9 @@
 # DEPENDENCY MAP — 主线依赖地图
 
+## 2026-10-09 GS03 分层组合依赖
+
+测试helper→既有结果执行器/内存适配器/回执store→原生SQLite；setup显式v15/S1 schema，apply使用真实审计hook。真实migration runner会开启自己的事务，与adapter已有事务冲突，保持独立验证；不新增运行时依赖、包或跨域生产写边。
+
 ## 2026-10-08 GS03 未接线回执读写组件
 
 候选receipt-store→既有S1 schema验证器→现有migration指纹依赖；调用方提供可信SQLite连接，组件不打开文件/网络/连接。专项真实内存runner追加S1、真实v15 hook合成父行，无默认启动装配、新包、CI拓扑或现库变更。
