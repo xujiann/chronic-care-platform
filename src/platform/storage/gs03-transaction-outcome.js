@@ -10,8 +10,17 @@ function report(status, phase) {
   return Object.freeze({ status, phase, productionReady: false });
 }
 
-async function runGs03Transaction({ environment, port } = {}) {
-  if (!["development", "test"].includes(environment) || !port || typeof port !== "object") {
+async function runGs03Transaction(options = {}) {
+  let port;
+  try {
+    if (!["development", "test"].includes(options.environment)) {
+      return report("rejected", "admission");
+    }
+    port = options.port;
+    if (!port || typeof port !== "object") {
+      return report("rejected", "admission");
+    }
+  } catch {
     return report("rejected", "admission");
   }
   if (active.has(port)) return report("busy", "admission");
