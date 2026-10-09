@@ -1,5 +1,9 @@
 # MODULE MAP — 主线模块地图
 
+## 2026-10-09 GS03 输入边界修复单写范围
+
+GOV038/T00仅写台账、ROADMAP及架构/模块地图；OPS057/T08由A独占src/platform/storage/gs03-transaction-outcome.js，B独占test/gs03-transaction-outcome.test.js。沿既有Accepted OUTCOME合同修复输入读取及回归，不新增组件、复制状态机或装配业务入口；独审只读，Git及重型门禁串行。
+
 ## 2026-10-09 GS03 非生产初始化所有权
 
 GOV037/T00单写ADR/治理，OPS056/T08由A唯一写src/platform/storage/gs03-memory-transaction.js，B唯一写test/gs03-memory-bootstrap.test.js。只增加显式非生产工厂及私有初始化，不导出外部连接或任意initializer、不复制事务引擎；无业务接线，父Proposed和NO-GO不变。
