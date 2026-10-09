@@ -22,7 +22,57 @@ function dataOptions(value, names) {
   }
 }
 
-function createGs03MemoryTransactionSession(options) {
+function bootstrapMigratedMemoryDatabase(db) {
+  // Load only for the explicit migrated factory. The default factory remains
+  // an empty, internally owned memory database with no migration dependency.
+  const {
+    SQLITE_MIGRATIONS, SQLITE_SCHEMA_HEAD, applySqliteMigrations,
+    validateSqliteMigrationRegistry
+  } = require("./sqlite-migrations");
+  const {
+    GS03_CALLBACK_RECEIPT_MIGRATION, verifyGs03CallbackReceiptSchema
+  } = require("./gs03-callback-receipt-migration");
+  const soleMain = () => {
+    const databases = db.prepare("PRAGMA database_list").all();
+    return databases.length === 1 && databases[0].name === "main";
+  };
+  const foreignKeysOn = () => db.prepare("PRAGMA foreign_keys").get()?.foreign_keys === 1;
+  const ledger = () => db.prepare(`SELECT version,name,checksum,applied_at
+    FROM schema_migrations ORDER BY version`).all();
+
+  if (db.isTransaction !== false || !soleMain()) throw new Error("bootstrap admission");
+  db.exec("PRAGMA foreign_keys=ON");
+  if (!foreignKeysOn()) throw new Error("foreign keys unavailable");
+  if (SQLITE_SCHEMA_HEAD !== 19 || !Array.isArray(SQLITE_MIGRATIONS) ||
+      SQLITE_MIGRATIONS.length !== 19 ||
+      SQLITE_MIGRATIONS.some((migration, index) => migration.version !== index + 1) ||
+      GS03_CALLBACK_RECEIPT_MIGRATION.version !== 20 ||
+      SQLITE_MIGRATIONS.includes(GS03_CALLBACK_RECEIPT_MIGRATION) ||
+      validateSqliteMigrationRegistry(SQLITE_MIGRATIONS).head !== 19) {
+    throw new Error("fixed registry unavailable");
+  }
+  const migrations = [...SQLITE_MIGRATIONS, GS03_CALLBACK_RECEIPT_MIGRATION];
+  const expectedRegistryFingerprint = validateSqliteMigrationRegistry(migrations).registryFingerprint;
+  const first = applySqliteMigrations(db, { migrations });
+  if (first.head !== 20 || first.applied !== 20 ||
+      first.registryFingerprint !== expectedRegistryFingerprint ||
+      verifyGs03CallbackReceiptSchema(db) !== true || !soleMain() ||
+      db.isTransaction !== false) throw new Error("initial migration incomplete");
+  const before = ledger();
+  if (before.length !== 20 || before.some((row, index) => row.version !== index + 1)) {
+    throw new Error("initial ledger incomplete");
+  }
+  const again = applySqliteMigrations(db, { migrations });
+  if (again.head !== 20 || again.applied !== 0 ||
+      again.registryFingerprint !== first.registryFingerprint ||
+      JSON.stringify(ledger()) !== JSON.stringify(before) ||
+      verifyGs03CallbackReceiptSchema(db) !== true || !foreignKeysOn() ||
+      !soleMain() || db.isTransaction !== false) {
+    throw new Error("repeated migration inconsistent");
+  }
+}
+
+function createSession(options, migrated) {
   const input = dataOptions(options, ["environment"]);
   if (!input || !["development", "test"].includes(input.environment.value)) {
     throw fault("GS03_MEMORY_ADMISSION");
@@ -41,6 +91,14 @@ function createGs03MemoryTransactionSession(options) {
   } catch {
     try { db.close(); } catch { /* The owned connection is already unusable. */ }
     throw fault("GS03_MEMORY_CAPABILITY");
+  }
+  if (migrated) {
+    try {
+      bootstrapMigratedMemoryDatabase(db);
+    } catch {
+      try { db.close(); } catch { throw fault("GS03_MEMORY_BOOTSTRAP_CLOSE"); }
+      throw fault("GS03_MEMORY_BOOTSTRAP");
+    }
   }
 
   let closed = false;
@@ -225,4 +283,12 @@ function createGs03MemoryTransactionSession(options) {
   return Object.freeze({ createPort, close, productionReady: false });
 }
 
-module.exports = { createGs03MemoryTransactionSession };
+function createGs03MemoryTransactionSession(options) {
+  return createSession(options, false);
+}
+
+function createGs03MigratedMemoryTransactionSession(options) {
+  return createSession(options, true);
+}
+
+module.exports = { createGs03MemoryTransactionSession, createGs03MigratedMemoryTransactionSession };
