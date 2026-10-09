@@ -1,5 +1,9 @@
 # DEPENDENCY MAP — 主线依赖地图
 
+## 2026-10-09 GS03 私有初始化依赖
+
+显式内存工厂复用原生node:sqlite、现有sqlite-migrations真实runner与gs03-callback-receipt-migration未注册S1；默认head漂移拒绝，不截断注册表、不增第三方依赖或应用装配。模块加载只服务显式非生产调用，不代替现场依赖证据。
+
 ## 2026-10-09 GS03 分层组合依赖
 
 测试helper→既有结果执行器/内存适配器/回执store→原生SQLite；setup显式v15/S1 schema，apply使用真实审计hook。真实migration runner会开启自己的事务，与adapter已有事务冲突，保持独立验证；不新增运行时依赖、包或跨域生产写边。
