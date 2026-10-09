@@ -2,6 +2,7 @@
 
 | 新增决策 | 状态 | 范围 |
 |---|---|---|
+| [GS03非生产内存初始化](./2026-10-09-gs03-memory-bootstrap.md) | Accepted | 显式自有内存固定真实runner/S1初始化、原租约引擎复用，旧空库兼容，无现库/HTTP/默认注册/生产 |
 | [GS03回执检查修复与组件组合](./2026-10-09-gs03-receipt-composition.md) | Accepted | 合同内TEMP观察无副作用修复及三组件与原生v15/S1真实hook分层测试，正式初始化与业务另审 |
 | [GS03未接线回执读写组件](./2026-10-08-gs03-receipt-store.md) | Accepted | 仅可信连接现有事务内S1读写，固定namespace；不认证身份、不证明提交、不接HTTP现库 |
 | [GS03事务组件组合验收](./2026-10-08-gs03-transaction-composition.md) | Accepted | 仅测试目录组合既有执行器与内存适配器、多类合成事实；无正式业务接线 |

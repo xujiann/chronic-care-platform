@@ -1,5 +1,9 @@
 # API MAP — 主线接口地图
 
+## 2026-10-09 GS03 非生产内存工厂
+
+新增候选createGs03MigratedMemoryTransactionSession({environment})，仅development/test且精确输入；返回原冻结createPort/close/productionReady=false。旧工厂仍空库，不接受新选项，无public initialize/db/path/SQL或HTTP；可信回调仍须遵守原租约合同，不提供正式身份授权。
+
 ## 2026-10-09 GS03 TEMP检查无副作用
 
 既有store输入/输出和错误合同不变，只在database_list已列temp时检查TEMP对象，仍拒绝TEMP对象和附加数据库。无HTTP、认证/授权或bootstrap新接口；组合helper为测试专用，未知结果由既有执行器和session语义表达。
