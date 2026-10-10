@@ -1,5 +1,9 @@
 # MODULE MAP — 主线模块地图
 
+## 2026-10-10 预检合同测试保护
+
+GOV040/T00单写四份治理文件，TEST029/T05单写既有gs03-feedback-precheck专项；另一开发仅仓库外mutation探针，独立审查者只读。PR344已集成原纯预检组件，新增候选仅补16字段描述符拒绝与冻结输入兼容，不修改src/共享helper或形成新运行时能力；独审、冻结及本候选门禁单独验证。
+
 ## 2026-10-09 合成反馈预检单写
 
 GOV039/T00独占治理和地图；OPS058/T05 A独占 src/care-coordination/gs03-feedback-precheck.js，B独占 test/gs03-feedback-precheck.test.js。只复用纯 technical-evidence.sha256，不复用宽泛反馈normalizer、不新建通用canonical，不改既有模块或路由；Git索引与重型门禁串行。

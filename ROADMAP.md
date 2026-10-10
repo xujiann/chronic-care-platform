@@ -1,5 +1,17 @@
 # 工程治理路线图
 
+## GS03 预检测试保护 PLAN（2026-10-10）
+
+阶段结果：初版独审发现P2描述符深比较漏掉等内容对象替换，A补严格value/get/set身份断言及两个oracle反例，T05修复7fb72c4c经T00串行cherry为39c5a942。最终仅追加94行，旧13组不变；修后专项15/15、八文件组合162/162，零失败零跳过。外置run-QgXhIb证明旧13组在原版及mutant均通过，增强原版15通过、mutant14通过/1个指定新增组失败；16字段逐项原INPUT/变ACCEPTED，源与测试摘要不变。旧P2及run-tMmmIp解析失败保留；预期mutant失败不是门禁失败或通过。GOV040/TEST029仍验证中/已实现，最终独审、冻结18门禁及远端集成另以精确新证据证明。
+
+用户要求完成台账收口并登记实施下一测试切片。PR344冻结90621078与保护合并71b7f0a8同tree66df893b，18本地串行门禁、PR38014750414及main38015479057各9成功；全发现3985pass/45环境skip/0fail，Pages仅静态发布。仅关闭GOV039/OPS058限定非生产合成预检交付；原风险仍open、GS03未建设、六域NO-GO。精确证据见受控main-verification-344.json，不替代本候选验证。
+
+最新fetched origin/main@71b7f0a8为T00/T05共同基线；WIP先4降2，再登记GOV040/TEST029回4/5，OPS040/SEC016保持原范围。复用Accepted ADR-GS03-FEEDBACK-PRECHECK-001；旧非枚举负测添加未知hidden字段，即使删除enumerable检查仍会因字段集合拒绝，缺少独立回归保护，未发现运行时缺陷。
+
+选择仅补既有专项，不改实现或另建正式协议。开发A独占test/gs03-feedback-precheck.test.js，覆盖3+9+4已知字段分别非枚举、合法值getter及setter-only拒绝/零调用，三层普通或null原型的冻结合法输入及原golden摘要，接纳/拒绝路径原型和描述符不变；保留旧13组。开发B只写仓库外受控mutation探针/证据，在独立child内存编译唯一删enumerable判定的mutant，旧冻结13组应通过而新增矩阵明确失败；核具体失败名/计数/退出与timeout、原源码和测试摘要不变，不将预期mutant失败算门禁通过。无宽泛纯度guard。
+
+T00唯一写台账、本PLAN、架构及模块图，唯一操作Git索引与串行集成；两开发不互改文件，独立审查者只读。先治理窄门禁及独立准入，再实施和窄测；最终独审通过后冻结精确SHA/tree，串行18必需门禁；失败回修重审重冻，历史日志保留。本轮不推送、合并、上线；新冻结需独立授权。回滚只撤本片测试/治理增量，不动已集成组件、库或业务事实。无src/helper、HTTP、授权签名、S1/default schema、依赖或CI拓扑变化；专业仍另签。
+
 ## GS03 非生产反馈协议预检 PLAN（2026-10-09）
 
 用户批准 GOV-039/OPS-058 合成纯函数与负测，详见 docs/adr/2026-10-09-gs03-feedback-precheck.md。基线 main@5929fe18，PR343旧执行器限定交付已同树保护集成、PR/main各9成功；只关闭 GOV038/OPS057，风险open，WIP4降2再增4。T00治理单写；T05 A新src、B新test互不交叉，独审准入后实现、复审后冻结，18必需门禁串行。本片不推送合并上线；无 HTTP、真实身份授权、签名、现库/S1/default schema改变；专业另签、GS03未建设、六域NO-GO不变。
