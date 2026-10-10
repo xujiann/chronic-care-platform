@@ -1,5 +1,9 @@
 # DATA MODEL — 主线数据地图
 
+## 2026-10-10 反馈-only数据设计未接线
+
+GOV041仅Proposed设计：客户端反馈意图必须覆盖全部获批持久字段，服务端派生时间/事件ID另由受控读集与审计绑定约束；synthetic摘要不能变S1正式digest。反馈候选不归档报告，唯一receipt只存受控摘要/最小结果/审计引用，不复制患者正文。授权记录仍personalRecords、案例仍referralTeleconsultations；正式字段、状态、purpose/dataScopes、retention/tombstone/源世代及机器数据Owner批准未完成。无表/迁移/现库变更，默认schema19/41不变。
+
 ## 2026-10-09 合成反馈预检数据边界
 
 OPS058仅内存primitive投影：显式合成案例/居民/授权/外部系统/幂等键、专用状态、epoch毫秒与有界正文。syntheticIntentDigest带 synthetic:sha256: 前缀，不是S1 intent_digest_version=2；无表、现库、receipt或审计变化，默认19/41不变。

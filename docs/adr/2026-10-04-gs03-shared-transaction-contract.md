@@ -1,6 +1,7 @@
 # ADR-GS03-S2-001：回调共同事务端口与全写入口提交围栏
 
 - 状态：Proposed
+- GOV-041（2026-10-10）：仅反馈-only设计准入，三父ADR仍Proposed，未新增正式端口实现、身份/签名协议或写者接线。S1及非生产内存组件的Accepted限域不外推至本合同。
 - 日期：2026-10-04。用户批准本 S2 **设计**，不等于接受本 ADR 或授权实现。
 - 任务/责任：GOV-029；T00 负责跨域事务技术合同及集成，T05 负责会诊业务，T08 负责入站协议与回执语义；`personalRecords` 的机器数据 Owner 为 `citizen-chronic`，`referralTeleconsultations`/`taskMessages` 为 `care-coordination`，审计为 `platform-governance`。授权语义、外部身份/scope 和留存 Owner 须在接受前确认。
 - 本文只设计接口、旁路处置和验收。无 HTTP、UoW 代码、migration 注册、现库操作、生产接线或 schema head 变更；GS-03 未建设、生产六域 `NO-GO`。
@@ -61,6 +62,22 @@ transaction.commit() -> confirmed | unknown
 | 审计 source、观测事件、外部身份/scope | `server.js:8118`、`src/identity-security/audit-delivery-source.js:256`；审计/身份 Owner | 成功审计同库事务；观测不作权威；外部事实需上述提交 fence |
 
 ## 失败四态与恢复
+
+### GOV-041 反馈-only提交前置和未来验收
+
+反馈子合同沿用上文拟议端口，不新建 executeFeedback 或第二UoW。正式输入及签名/namespace/digest先由CALLBACK Owner批准；T00存储与各数据Owner须为下面每类输入提交逐入口证据：文件/调用链、机器数据及语义Owner、事实源、实际读集/版本时点、冲突写集、同端口串行化或激活前拒绝策略、测试/停写/恢复证据、未签事项。当前只形成待填模板，不宣称全仓inventory已穷尽或旁路已封堵。
+
+| 反馈必须保护的输入/写者 | 准入所需决策及未来负测 |
+|---|---|
+| case、绑定授权ID/目标/业务状态 | 会诊create/actions、workflow/SLA、grant/revoke/resume/reassign及三类callback共同围栏或拒绝冲突写；旧snapshot拼新版本、重绑/终态倒退必须拒绝，不仅保护反馈自身写集。 |
+| personalRecords确切授权只读依赖 | 独立撤权、POST/PATCH、报告归档、所有新增/导入/500裁剪、state/collection保存/reset共同保护；无关新增逐出第500条授权及仅授权版本改变时反馈不得按旧读集成功。scope/purpose/dataScopes/root-meta策略待授权Owner签认。 |
+| 当前principal/机构/医生/居民scope | 同库事实锁内复验；事务外目录须身份/scope Owner签覆盖**全部变更写者**且持续到线性化完成的共同提交协议，单次版本复读不是fence。缺失/失效或变更交错时新lane失败关闭。 |
+| 两消息、审计/v15源、receipt和观测 | 数据Owner同连接受控写入；逐项失败回滚全部同库事实，精确重放零追加；真实存在但属于别的主体/目标/成功事件的source引用拒绝。观测可截断，不影响receipt权威。 |
+| 全状态同步、管理/备份恢复和源世代 | T00与数据/身份/存储Owner核所有间接覆盖入口、停写/接线/恢复策略；旧备份回放/世代倒退不得抹receipt或使旧key成为新首次。未签不得启动新lane或静默JSON/v1回退。 |
+
+反馈首次只写获批案例字段、两类应用内消息、观测、唯一receipt与本次成功审计/真实v15源；**不归档报告**，不写未经批准outbox或外部网络。确切重放在当前权限/授权与同意图下只投影最小结果，服务端生成时间/事件ID不参与客户端重试摘要。撤权先线性化则首次/重放拒绝，先反馈则提交事实保留，后撤权生效；续权新ID不能替旧key的确切授权。
+
+未来验收除逐入口正负外，须用真实双连接/进程交错撤权、续权、scope变更、提交前到期；在案例、每条消息、安全/访问审计、真实v15源、receipt、COMMIT前后分点注入失败。核四态各自的事实及恢复原key，unknown或响应丢失不推断零写、不另发key、不伪补成功/拒绝审计；当前授权已失效则公共接口不泄露旧receipt，授权对账渠道另签。既有非生产结果/租约组件只证明其限域输入与结果，不证明这些正式业务步骤或全写者fence已实现。
 
 | 观察态 | 公共行为与持久含义 |
 |---|---|

@@ -1,5 +1,9 @@
 # DEPENDENCY MAP — 主线依赖地图
 
+## 2026-10-10 GOV041准入依赖
+
+GOV040/TEST029仅限定测试已闭合；PR346收口登记已保护同树集成且PR/main各9成功。GOV041设计专属批准不接受CALLBACK/STORAGE/S2，不把内存事务/receipt/合成预检升级为正式依赖。正式实现须另立Accepted及领域PLAN，依赖调用方目录、反馈专业字段/授权purpose与dataScopes、唯一receipt Owner/留存/legacy窗口、全部写者及外部scope fence、源世代和未知对账签署；无新包/运行边/默认注册，本设计新提交发布另授权。
+
 ## 2026-10-09 合成反馈预检依赖
 
 OPS058/T05依赖 GOV039/T00 的限域 Accepted ADR；仅依赖既有纯 technical-evidence.sha256，未导入数据库、请求运行时或PG。T00/T05新worktree从main@5929fe18创建，无新依赖；A源/B测试单写，独审后T00集成与18门禁串行。
