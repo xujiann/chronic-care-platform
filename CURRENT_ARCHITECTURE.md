@@ -1,5 +1,9 @@
 # CURRENT ARCHITECTURE — 主线现状地图
 
+## 2026-10-10 反馈-only设计准入
+
+PR346冻结84f00b99与保护合并10722a08同tree79f4ec15，PR CI38028884124/main CI38029582040各9成功，保护不变；旧四文件治理交付已闭合。GOV041获批仅三父Proposed的反馈合同设计及Owner准入，不新增运行能力或接受正式合同。可信principal、签名/严格摘要、确切授权purpose/dataScopes、唯一receipt及全写者/外部scope fence仍待签，现有API和组件未改变，GS03未建设、生产六域NO-GO。设计自身独审/冻结/18门禁另验，Pages仅静态。
+
 ## 2026-10-10 PR345 限定测试交付收口
 
 PR345冻结bbf2dab3与保护合并a75563f1同tree4b9121a8；最终独审及18本地门禁通过，PR/main各9成功，仅关闭GOV040/TEST029测试保护交付，原风险open、WIP2/5。现有合成预检及内存事务/结果/回执组件依旧未接HTTP或现库，synthetic摘要不得充当S1正式摘要。GOV041仅待批准合同设计候选，父CALLBACK/STORAGE/S2仍Proposed；本次四文件治理候选另行独审冻结验证，不据PR345预支自身通过。GS03未建设、六域NO-GO，Pages不是生产部署。

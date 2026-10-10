@@ -1,6 +1,7 @@
 # ADR-GS03-STORAGE-001：转诊回调入站回执与授权事实的同库原子边界
 
 - 状态：Proposed
+- GOV-041（2026-10-10）：仅获批反馈-only合同设计与Owner准入梳理；本父ADR仍未接受。以下反馈读写矩阵是拟议边界，不是事务/现库/S1正式注册实施授权。
 - S1限域例外：ADR-GS03-S1-001仅授权未装配migration定义与隔离合成专项，不接受本父ADR，不授权现库、自动注册、事务端口、HTTP或生产。
 - S2设计交叉引用：`ADR-GS03-S2-001`（`2026-10-04-gs03-shared-transaction-contract.md`）细化拟议共同事务端口、全写者提交围栏与失败四态；它仍是 Proposed，不接受本父 ADR，也不授权 HTTP、事务端口源码、现库或生产接线。下表是 GOV-029 的源码候选盘点，不代表数据/身份/审计 Owner 签字或全仓穷尽。
 - 限域实验例外：用户已批准 `ADR-GS03-EXPERIMENT-001`（`2026-10-01-referral-callback-sqlite-experiment.md`）的 TEST-026 无 HTTP、一次性合成 SQLite 实验；只有此实验可依独立 Accepted 决策实施，不受下文父 ADR 未接受的正式实施前置阻断。本 ADR 及父 ADR 仍 Proposed，正式 repository、现库迁移、主权威选择与运行时接线仍须另审。
@@ -48,6 +49,24 @@ v1 回调读取平台快照，在验签和案例范围后，以 `contractId + id
 该表按当前可见调用链列出直接写者及可通过全状态同步覆盖事实的类别，仍须由 T00 静态枚举剩余 `readDatabase`/`writeDatabase`、迁移、管理脚本及恢复调用，并由 T01/T02/T04/T05/T06/T08、机器数据/授权语义/身份 scope/审计/留存 Owner 对各自读集、写集、停写或接线策略逐项签认。尤其 `personalRecords` 的 500 条截断和会诊授权引用变更不能因“不是撤权路由”而排除。入口、Owner 和外部事实若有未签或未封堵项，新 lane 的激活条件不成立。详见 [S2 共同事务合同](2026-10-04-gs03-shared-transaction-contract.md) 的拟议端口与故障四态。
 
 ## Options
+
+### GOV-041 反馈-only读写与Owner待签矩阵
+
+当前首次反馈通过 `applyReferralTeleconsultationAction` 改案例status/receivingFeedback/lastUpdated/updatedBy/auditTrail，再赋feedbackAt、可merge任意performance；追加网关事件、两条in_app消息、成功安全/访问审计，最后writeDatabase。反馈不创建personalRecord，报告才归档（`src/http/routes/care-coordination.js:532-614`）。反馈normalizer有嵌套/别名及时间、居民、externalId、sourceSystem回退；状态已知别名映射，未知字符串trim后保留，空值回退requested（`server.js:21704-21720,21778-21795`）；这些是现状，正式字段与转移待CALLBACK批准。
+
+| 事实/副作用 | 反馈首次候选、精确重放与失败约束 | Owner及接受前输入 |
+|---|---|---|
+| 当前案例与确切授权读集 | 锁内读同ID的案例授权、resident/目标/状态/用途/数据范围/到期及版本；反馈不改personalRecords也保护所读授权。重放先同样核当前权限，不能借另一授权。 | T05与授权语义/citizen-chronic数据Owner：字段及合法转移、root/meta冲突、purpose/dataScopes、空授权历史策略、续权和裁剪。 |
+| 案例写集 | 仅正式白名单反馈字段及获批状态转移；服务端时间/审计trail在同一受控提交生成，不能放进重试意图摘要；同key冲突不写。 | T05：feedbackStatus/performance逐字段及终态/hold规则；未经批准不沿用宽merge或状态倒退。 |
+| 两类应用内消息 | 首次按经批准收件角色/资源绑定/隐私投影写；重放不追加。v1 notificationKey含case/kind/key/role，跨principal同key可能碰撞（`server.js:21848-21900`）。 | T05/消息与隐私Owner：命名空间、两收件规则、正文是否进入消息、留存；status=sent不是外部送达。外部通知/报告归档均不在反馈-only片。 |
+| receipt及观测 | 首次唯一约束receipt与同事务业务关联；只存受控摘要、最小结果与审计引用，禁止provider原文/患者反馈正文复制。观测事件仍非权威，不受200截断影响receipt。 | T08提名且数据Owner签唯一入站权威、最小公共投影、命名空间/key/正式digest、retention/到期tombstone/key复用及容量。S1结构不是上述批准。 |
+| 成功审计与真实v15源 | 首次成功安全/访问事件及原生v15 append-only source同事务，引用必须属于本次principal/目标/receipt，不只验证FK存在；精确重放不补成功审计。 | platform-governance审计Owner：真实hook、受控来源和隐私投影；拒绝审计另定，不创建成功receipt，unknown不伪记已拒绝。 |
+
+推荐继续评审同库单提交候选，不新建JSON集合、平行反馈账本、第二个授权源或跨库请求双写；若无法覆盖事实源与外部scope，停在设计或另审迁移。完整共同写者清单仍以本ADR前述非穷尽inventory及S2为基础；缩为反馈-only不能排除排期/报告、授权/档案/通用状态/导入裁剪/恢复等冲突写者。
+
+接受前存储/身份/数据Owner还须签认恢复源身份/世代与principal namespace、key、audit source绑定。S1没有epoch列，不能暗改摘要或补历史receipt。超过200观测、旧无digest/冲突及空授权历史只能另批失败关闭/人工对账；legacy allowlist/期限、receipt保留与隐私删除/备份恢复目标不填生产值。合同算法冻结后按最新head另立Accepted实施片；本设计不注册候选v20或变更默认19/41。
+
+未来反馈专项须逐步故障注入案例、两消息、观测、成功安全/访问审计、真实v15源、receipt和COMMIT前后；明确回滚才断言本次零写，丢响应/unknown用原主体/合同/版本/同key/同意图在当前授权下恢复。无法确认则受控对账，撤权后公共receipt隐藏且既有事实保留。受控对账Owner/权限/留痕/期限待签，不能以换key或删回执修复未知结果。以上不是本轮已运行的事务或HTTP验收。
 
 1. **维持 JSON/SQLite 快照写与 200 项事件窗口。** 不新增权威或改变写入口。成本低，但无法承诺长期去重、确切授权竞态或跨实例原子性；只适于继续刻画 legacy 风险。
 2. **推荐评审：隔离 SQLite 同库事务端口 + 独立入站 receipt 权威。** 先限合成隔离环境，所有会影响确切授权/案例绑定的写者都进入同一受控端口；在同一 SQLite 事务中读取并验证授权、案例与 receipt，再以唯一约束原子提交入站 receipt 的最小结果/审计引用、业务、档案、应用内消息、成功审计及经批准的待投递意图。JSON 新 lane 失败关闭。若需新表/索引，必须另有 Accepted 迁移 ADR 和实施 PLAN；不预占 migration 版本。

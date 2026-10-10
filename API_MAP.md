@@ -1,5 +1,9 @@
 # API MAP — 主线接口地图
 
+## 2026-10-10 反馈-only接口合同设计
+
+GOV041仅细化现有Proposed反馈子合同，当前feedback/schedule/report v1路径、目录与宽normalizer行为不变。未来显式版本、方法/规范路径/目标/principal/body签名、严格字段、当前权限先于最小receipt、无降级及四态响应均待Owner接受，不新增HTTP或查询接口；推荐409不是现状v1通过事实。四类主体可读/可写/重放投影分别待签，真实provider信任B片另审。
+
 ## 2026-10-09 未接线合成预检
 
 OPS058新增模块纯函数 precheckSyntheticFeedback(options)，只development/test、自有数据属性、精确目标相等及脱敏冻结结果，productionReady/Primary=false。它不是HTTP API，没有真实身份、签名或scope可信保证，现有三类回调API/行为不变。

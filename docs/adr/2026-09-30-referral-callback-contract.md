@@ -1,6 +1,7 @@
 # ADR-GS03-CALLBACK-001：跨机构转诊回调的资源、授权与回执合同
 
 - 状态：Proposed
+- GOV-041（2026-10-10）：用户仅批准反馈-only合同设计与准入梳理；以下专项仍为拟议合同，未批准正式字段、算法或实现。schedule/report不在本片，三父ADR不转Accepted，专业事项由用户协调另签。
 - S1限域例外：ADR-GS03-S1-001仅授权未装配migration定义与隔离合成专项，不接受本父ADR，不授权现库、自动注册、事务端口、HTTP或生产。
 - 限域实验例外：用户已批准 `ADR-GS03-EXPERIMENT-001`（`2026-10-01-referral-callback-sqlite-experiment.md`）的 TEST-026 无 HTTP、一次性合成 SQLite 实验；仅该实验由独立 Accepted 决策准入，不接受本 ADR 的正式合同，不授权现库迁移或运行时接线。下文实施前置继续约束正式实现。
 - 说明：设计评审；不授权实施
@@ -25,6 +26,55 @@ GS-03 现已用 TEST-024/025 对反馈、排期、报告三类 v1 回调补齐�
 | 撤权与证明边界 | 撤权命令可将绑定的确切授权置为 revoked、非终态会诊置为 `authorization-on-hold`。TEST-025 在真实 HTTP 撤权且该状态仍在时，三类旧键重放仍 200、无新增回调业务副作用；随后三类新键首次仍 200 并写入业务。TEST-024 另核现有四类允许主体（来源机构、接诊机构、区县、主管部门；三种 role）、签名拒绝、成功档案/两类消息与访问/安全审计。仓库证据不证明并发序列化、长期去重或外部现场接入。 | `registration-referral-standalone.js:481-510`；`src/http/routes/care-coordination.js:489-614`；`test/gs03-referral-callback-v1-api.test.js`；`test/gs03-referral-callback-boundaries-api.test.js` |
 
 须先选择可复核的调用方身份、幂等作用域、授权事实和持久回执权威。若这些前提未定，添加测试或一个新的回调服务名称均不能建立安全合同。
+
+## GOV-041 反馈-only 设计与Owner决策表
+
+本节细化现有方案2的反馈子集；不创造新的正式合同ID、API或摘要版本定义。下表均为推荐/备选/待签，不改变v1，更不把未接线 `precheckSyntheticFeedback` 的 accepted/declined/completed 状态、epoch时间或 `synthetic:sha256:` 摘要当正式协议（`src/care-coordination/gs03-feedback-precheck.js:8-22,92-111`）。TEST-024/025仍仅v1刻画；本轮testIds仅治理门禁。
+
+### 业务主体及确切授权
+
+当前四类允许主体是来源机构、接诊机构、区县、主管部门（对应三种role为 institution/county/commission，不是四种role）；来源/接诊是institution的两种业务身份。居民及无关机构拒绝。当前机构scope还结合医生匹配，县/委分支不同；不能把现有可访问自动变为v2反馈写权（`test/gs03-referral-callback-v1-api.test.js:123-156,190-212`；`server.js:15627-15634`）。
+
+| 调用主体 | 推荐供Owner选择的反馈用途 | 必须分别签认的权限格 |
+|---|---|---|
+| 接诊机构 | 实际接诊反馈提交候选，不预定唯一可写者 | 可读案例、反馈写权限、最小重放投影；可信机构/医生与案例目标绑定、居民scope和用途 |
+| 来源机构 | 可能代报或受控重试；不能未经迁移审批自行改为403 | 来源关系是否足以写、代报责任、原principal与key是否可沿用；不可据可读推定可写 |
+| 区县 | 监督读取或经批准的代报，业务用途未提供 | 管辖范围与确切案例绑定、是否可写、重放可见字段 |
+| 主管部门 | 监督读取或经批准的代报，业务用途未提供 | 管理范围、是否可写及最小回执；不能把commission角色当全局provider身份 |
+
+四格由T05资源Owner、T01 scope/身份Owner、T08调用方Owner及四类真实调用方逐项签认；机构使用稳定ID/码或医生绑定的正式选择亦未定，不继承v1展示名称比较作为可信证明。
+
+授权参考 `registration-referral-standalone.js:196-216,432-538`：现有闭环按ID、居民、root/meta状态及到期、teleconsultation scopes、目标机构核授权；grant另要求clinical-summary/referral-report dataScopes，但activeAuthorization没有同等dataScopes检查或独立purpose检查。正式反馈应锁内只读案例绑定的**同ID**授权，核resident/目标/有效状态/用途/数据范围，hold或缺失失败关闭。T04授权语义与citizen-chronic数据Owner须决定哪些teleconsultation scope覆盖“反馈写入及通知”、是否需独立purpose/dataScopes、root/meta不一致如何拒绝、时钟和到期边界；不在本设计代签这些值。
+
+直会诊创建可借任一有效授权并保存空ID（`server.js:21655-21678`）；历史空引用只能失败关闭或另批人工映射，不自动补绑。resume/reassign可换授权/目标；推荐新授权新ID、新意图新key，旧key不得借续权返回旧结果。T05/T04须另签已反馈后撤权/续权、终态案例恢复及旧请求对账政策，公共接口撤权后不披露receipt。
+
+### 字段、版本、签名与意图：尚未定稿
+
+| 决策 | 反馈-only推荐与副作用约束 | 备选、Owner及缺失输入 |
+|---|---|---|
+| 严格显式字段 | 候选显式contractId/version、teleconsultationId、residentId、residentAuthorizationId、idempotencyKey、externalId、receivingFeedback、feedbackAt；URL/body/case目标和授权精确一致。拒绝未知/嵌套别名，不用当前时间或item回退。 | 是否必填、表示形式、类型/UTF8上限、反馈专业含义、时间格式/时区/有效范围待T05与真实调用方；沿用v1宽normalizer会掩盖缺失和重试变值。 |
+| 状态/可选元数据 | feedbackStatus是否需要及允许值/状态转移另签；performance若允许，必须逐字段类型/白名单/摘要覆盖，不接受任意merge；sourceSystem只诊断标签。 | T05/专业责任方决定，尤其report-returned/closed/hold等反馈转移不能默认倒退。外部ID是业务标识还是与key映射待T08/调用方确认，目录externalId与实际idempotencyKey差异不得掩盖。 |
+| 可信principal | 推荐由认证上下文及受控目录构造稳定账号主体+机构/管理域；role、展示用户名、sourceSystem和body不作身份。 | 账号单独/机构共享粒度改变key归属及迁移，待身份/T08/T05/调用方目录签认。现有session仅平台认证，共享body-HMAC不证明provider（`server.js:15353-15399,13631-13643`）。 |
+| 资源签名 | 推荐绑定固定HTTP方法、含目标ID的canonical路径、合同ID/显式版本、服务端重建principal namespace及严格body；body目标必须等于URL。 | 原始URL受代理改写影响，body-only仍可首次跨目标重定位。T08/入口运维/调用方须批准编码、query、斜杠、代理保真、keyId/密钥分配及轮换，不编造正式签名字节。 |
+| 意图摘要 | 覆盖全部影响持久业务/receipt/消息/审计的**客户端意图**，包括目标/居民/确切授权/外部ID、反馈正文/显式时间和任何获准状态、performance、sourceSystem；严格算法版本随receipt保存。 | T05/T08/存储Owner须签字段顺序、类型、规范化及digest_version=2。服务端生成时间/事件ID/审计ID不得进入重试摘要；派生事实另由锁内读集/版本/审计关联保护。无已批可变纯追踪字段；排除字段须证明无任何持久影响。 |
+| key与回执 | 推荐namespace+合同ID/version+key唯一；当前权限与确切授权先于查/投影旧receipt。同目标/授权/意图精确重放零业务写；同namespace异目标/授权/意图建议409且不回显旧值。 | 全局key泄露跨主体结果，资源局部key可隐藏误投。T05/T08/调用方定稳定主体迁移、key生成/重试及跨principal同逻辑事件归属；不同namespace独立并不等于跨主体业务去重。 |
+| 版本与legacy | 新lane显式版本入签名；缺/未知版本、新lane校验失败不回退。legacy仅经批准未迁移主体allowlist+期限，已迁移主体不能去版本回流。 | T08/调用方/T00签名单、迁移状态、期限、关停及回滚；历史200项无正式digest不能自动转正式receipt，也不得以永久双轨回避审批。 |
+
+推荐判定顺序仅供后续Accepted设计：严格版本/字段及可信身份验签，获取唯一权威与共同fence，锁内读取当前案例/确切授权/当前scope并核状态/到期，然后查唯一receipt；精确重放只投影当前获批最小字段，冲突不泄露旧值；首次以同事务提交案例、两类应用内消息、观测、receipt、成功安全/访问审计及真实v15源。锁外预检不能决定成功；外部scope必须有覆盖全部变更写者且持续到线性化的协议。具体HTTP错误映射仍待Owner决定，以上拟议409不是当前v1测试通过事实。
+
+### 签名字节样本与未来验收矩阵（不是本轮已执行测试）
+
+算法接受后才生成known-vector：自有合成非生产key/keyId、可信目录投影、method、原路径和canonical路径字节、contractId/version、canonical UTF8 body字节及独立两种实现算得的MAC。当前不填正式MAC或从演示密钥推导provider信任；重排字段是否同字节必须服从届时批准的规则。
+
+| 未来验证族 | 最低正负场景与证明边界 |
+|---|---|
+| 字段与签名 | 逐项缺失/未知/别名/类型/正文时间边界；每次只改method、URL目标/编码、版本、principal、body目标/业务字段/key一项均拒绝。%2F/双编码/dot段/大小写/尾斜杠/query、重复/缺失签名头、错key/轮换覆盖；拒绝无成功副作用。 |
+| 四主体与授权 | 四主体各可读/写反馈/最小重放三格正负，外机构/居民/医生不匹配；空/错授权ID、错resident/目标、root/meta撤销/到期/不一致、scope/purpose/dataScopes不符、hold；续权新ID旧key拒绝。 |
+| key及迁移 | 精确重放零案例/消息/成功审计写；同主体每个持久意图字段变值冲突不回显旧值；跨namespace同key独立授权与跨主体逻辑事件政策；已迁移去版本、legacy到期及新lane失败无降级。 |
+| 状态与副作用 | 正式反馈状态转移正负、两收件角色与去重命名空间、正文隐私投影、反馈不归档报告；server生成时间不改变同意图。逐步失败无部分事实、真实v15 source和receipt指向本次目标/主体/审计。 |
+| 并发与恢复 | 撤权/续权先后、提交前到期、授权只读版本改变及500裁剪、丢响应/unknown原key重启核权威、撤权后隐藏旧回执；全部写者/外部scope fence、超200观测/历史无digest、留存/源世代/恢复与旁路按STORAGE/S2验收。 |
+
+该矩阵是未来正式协议和共同提交的验收设计，须在另批范围用真实HTTP/连接/进程及故障注入执行；不能将现有合成预检、S1定义、TEST-024/025/026或本轮治理绿灯标作上述用例已通过。
 
 ## Options
 

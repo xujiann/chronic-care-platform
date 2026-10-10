@@ -1,5 +1,7 @@
 # 架构决策记录（ADR）
 
+GOV-041（2026-10-10）仅批准下列三份既有 Proposed ADR 的反馈-only合同设计与Owner准入梳理：[CALLBACK](./2026-09-30-referral-callback-contract.md)、[STORAGE](./2026-10-01-referral-callback-storage-atomicity.md)、[S2](./2026-10-04-gs03-shared-transaction-contract.md)。新增内容为已证现状、推荐/备选、待专业签署及未来验收矩阵；不接受三父合同，不授予正式字段/算法、实现/HTTP/现库/生产或新冻结推送合并权限。既有合成预检及S1限域不代替正式准入，专业事项由用户协调另签。
+
 | 新增决策 | 状态 | 范围 |
 |---|---|---|
 | [GS03非生产反馈协议预检](./2026-10-09-gs03-feedback-precheck.md) | Accepted | 仅纯合成字段、目标一致性与独立synthetic摘要负测；无正式授权签名/S1/HTTP/现库/生产/推送合并 |
