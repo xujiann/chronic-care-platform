@@ -261,3 +261,75 @@ test("no implicit get/coercion, cycles or raw private text in public reports", (
   withMarker.request.summary = marker + "\n";
   assert.doesNotMatch(JSON.stringify(rejected(withMarker, "INPUT")), /PRIVATE|PATIENT|TOKEN|cause/);
 });
+
+function snapshotLayers(objects) {
+  return objects.map((object) => ({
+    prototype: Object.getPrototypeOf(object),
+    keys: Reflect.ownKeys(object),
+    descriptors: Object.getOwnPropertyDescriptors(object)
+  }));
+}
+
+function assertLayersUnchanged(objects, before, label) {
+  for (let index = 0; index < objects.length; index += 1) {
+    assert.equal(Object.getPrototypeOf(objects[index]), before[index].prototype, `${label}: prototype ${index}`);
+    assert.deepEqual(Reflect.ownKeys(objects[index]), before[index].keys, `${label}: keys ${index}`);
+    assert.deepEqual(Object.getOwnPropertyDescriptors(objects[index]), before[index].descriptors,
+      `${label}: descriptors and values ${index}`);
+  }
+}
+
+test("all 16 existing fields reject nonenumerable, getter-only and setter-only descriptors without input mutation", () => {
+  const layers = [
+    ["outer", ["environment", "request", "target"]],
+    ["request", REQUEST_FIELDS],
+    ["target", TARGET_FIELDS]
+  ];
+  for (const [layer, fields] of layers) {
+    for (const field of fields) {
+      for (const kind of ["nonenumerable", "getter-only", "setter-only"]) {
+        const input = validInput();
+        const objects = [input, input.request, input.target];
+        const object = layer === "outer" ? objects[0] : layer === "request" ? objects[1] : objects[2];
+        const value = Object.getOwnPropertyDescriptor(object, field).value;
+        let calls = 0;
+        if (kind === "nonenumerable") {
+          Object.defineProperty(object, field, { value, enumerable: false, configurable: true, writable: true });
+        } else if (kind === "getter-only") {
+          Object.defineProperty(object, field, {
+            enumerable: true, configurable: true,
+            get() { calls += 1; return value; }
+          });
+        } else {
+          Object.defineProperty(object, field, {
+            enumerable: true, configurable: true,
+            set(received) { calls += 1; assert.equal(received, value); }
+          });
+        }
+        const label = `${layer}.${field} ${kind}`;
+        const before = snapshotLayers(objects);
+        rejected(input, "INPUT");
+        assert.equal(calls, 0, `${label}: accessor must not execute`);
+        assertLayersUnchanged(objects, before, label);
+      }
+    }
+  }
+});
+
+test("all eight ordinary/null prototype combinations keep frozen inputs and golden digest in both environments", () => {
+  for (let mask = 0; mask < 8; mask += 1) {
+    for (const environment of ["test", "development"]) {
+      const original = validInput(environment);
+      const input = Object.assign(Object.create(mask & 1 ? null : Object.prototype), original);
+      input.request = Object.assign(Object.create(mask & 2 ? null : Object.prototype), original.request);
+      input.target = Object.assign(Object.create(mask & 4 ? null : Object.prototype), original.target);
+      const objects = [input, input.request, input.target];
+      objects.forEach((object) => Object.freeze(object));
+      const before = snapshotLayers(objects);
+      const label = `prototype mask ${mask}, ${environment}`;
+      accepted(input, "synthetic:sha256:" + GOLDEN_HEX);
+      assertLayersUnchanged(objects, before, label);
+      objects.forEach((object, index) => assert.equal(Object.isFrozen(object), true, `${label}: frozen ${index}`));
+    }
+  }
+});
