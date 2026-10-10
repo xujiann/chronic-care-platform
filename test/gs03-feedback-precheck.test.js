@@ -274,8 +274,19 @@ function assertLayersUnchanged(objects, before, label) {
   for (let index = 0; index < objects.length; index += 1) {
     assert.equal(Object.getPrototypeOf(objects[index]), before[index].prototype, `${label}: prototype ${index}`);
     assert.deepEqual(Reflect.ownKeys(objects[index]), before[index].keys, `${label}: keys ${index}`);
-    assert.deepEqual(Object.getOwnPropertyDescriptors(objects[index]), before[index].descriptors,
+    const descriptors = Object.getOwnPropertyDescriptors(objects[index]);
+    assert.deepEqual(descriptors, before[index].descriptors,
       `${label}: descriptors and values ${index}`);
+    for (const key of Reflect.ownKeys(before[index].descriptors)) {
+      const previous = before[index].descriptors[key];
+      const current = descriptors[key];
+      for (const member of ["value", "get", "set"]) {
+        if (Object.hasOwn(previous, member)) {
+          assert.ok(Object.hasOwn(current, member) && Object.is(current[member], previous[member]),
+            `${label}: identity ${index}.${String(key)}.${member}`);
+        }
+      }
+    }
   }
 }
 
@@ -313,6 +324,17 @@ test("all 16 existing fields reject nonenumerable, getter-only and setter-only d
         assertLayersUnchanged(objects, before, label);
       }
     }
+  }
+  for (const field of ["request", "target"]) {
+    const input = validInput();
+    const objects = [input, input.request, input.target];
+    const before = snapshotLayers(objects);
+    input[field] = { ...input[field] }; // Deep-equal content must not hide reference replacement.
+    assert.throws(() => assertLayersUnchanged(objects, before, `oracle ${field}`), (error) => {
+      assert.equal(error.code, "ERR_ASSERTION");
+      assert.match(error.message, /identity/);
+      return true;
+    });
   }
 });
 
