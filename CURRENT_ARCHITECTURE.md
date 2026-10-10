@@ -1,5 +1,9 @@
 # CURRENT ARCHITECTURE — 主线现状地图
 
+## 2026-10-09 GS03 合成反馈预检
+
+GOV039/OPS058新增未接线纯预检；精确字段、显式合成目标、synthetic域摘要，无HTTP/存储/授权/签名。输入一致性不等于业务原子性或生产能力；父Proposed不变。PR343仅旧执行器限定交付已集成。
+
 ## 2026-10-09 GS03 执行器输入边界修复
 
 GOV038/OPS057只修复未接线结果执行器的输入访问异常逃逸：环境先验、固定拒绝输出，不扩公共参数规则或事务语义。PR342内存初始化限定交付已同tree集成8942e1c2，PR/main各9成功；父Proposed、正式业务接线及生产NO-GO不变。
@@ -185,7 +189,7 @@ OPS-043 限定代码切片已由 PR #310 合并（main `85bfde7a`，冻结 `b3b6
 ## 2026-08-31 当前架构事实机器对账
 
 - `scripts/documentation-fact-drift.js` 现以生产 API 目录、首批生产范围、SQLite migration、仓库 Markdown/PDF 闭集和 Accepted ADR 注册表为机器权威，对 ROADMAP、ARCHITECTURE、六张架构地图和 ADR 索引共 9 份当前文档失败关闭。
-- 当前对账值为 SQLite head v19/41 张非内部表、生产 API 637 项/364 个写入口/324 个行为证明缺口/326 个总复核项、首批范围 `FROZEN-NO-GO` 且范围内 API/集合复核与仓库迁移计划缺口均为 0、Markdown 306 份（236 current、68 snapshot、2 superseded）。
+- 当前对账值为 SQLite head v19/41 张非内部表、生产 API 637 项/364 个写入口/324 个行为证明缺口/326 个总复核项、首批范围 `FROZEN-NO-GO` 且范围内 API/集合复核与仓库迁移计划缺口均为 0、Markdown 307 份（237 current、68 snapshot、2 superseded）。
 - 该验证仅在内存 SQLite 中重放既有 migration 并读取仓库权威；不写 `data/db.json`、运行时 SQLite、生产证据、生成报告或归档产物，不改变任何运行时行为。
 
 ## 2026-08-31 首发数据迁移计划闭集
@@ -472,7 +476,7 @@ Worker、外部数字医院注册及仍为 Proposed 的对象存储 v2 worker �
 `baseline/governance-20260817-enhancement-v1` 仅保留为可复现证据 tag。历史日期化路由/治理文档不再被
 `AGENTS.md` 作为当前工作流入口引用，原文和摘要保持不变。
 
-`repository-governance-v1` 从 Git 路径派生；当前闭集为 306 份 Markdown：236 份 `current`、68 份
+`repository-governance-v1` 从 Git 路径派生；当前闭集为 307 份 Markdown：237 份 `current`、68 份
 `snapshot`、2 份 `superseded`，每个路径必须唯一命中规则；snapshot 内容聚合摘要失败关闭。
 `output/pdf` 的 3 个 PDF 未修改，分别绑定 SHA-256、大小、页数、引入提交、来源与保留理由。现有仓库
 没有任何一个 PDF 的可复现生成器；医院运行脚本只是 verifier，不能被描述为 generator。机器门禁只读，

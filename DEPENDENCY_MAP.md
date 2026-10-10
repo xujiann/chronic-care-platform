@@ -1,5 +1,9 @@
 # DEPENDENCY MAP — 主线依赖地图
 
+## 2026-10-09 合成反馈预检依赖
+
+OPS058/T05依赖 GOV039/T00 的限域 Accepted ADR；仅依赖既有纯 technical-evidence.sha256，未导入数据库、请求运行时或PG。T00/T05新worktree从main@5929fe18创建，无新依赖；A源/B测试单写，独审后T00集成与18门禁串行。
+
 ## 2026-10-09 GS03 私有初始化依赖
 
 显式内存工厂复用原生node:sqlite、现有sqlite-migrations真实runner与gs03-callback-receipt-migration未注册S1；默认head漂移拒绝，不截断注册表、不增第三方依赖或应用装配。模块加载只服务显式非生产调用，不代替现场依赖证据。
