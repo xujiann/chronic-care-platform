@@ -1,6 +1,7 @@
 # ADR-GS03-STORAGE-001：转诊回调入站回执与授权事实的同库原子边界
 
 - 状态：Proposed
+- GOV-042（2026-10-12）：仅获批逐写者/事实源盘点设计，22项已发现入口不是穷尽或共同围栏证明；专业接受、正式实现和生产仍另行准入。
 - GOV-041（2026-10-10）：仅获批反馈-only合同设计与Owner准入梳理；本父ADR仍未接受。以下反馈读写矩阵是拟议边界，不是事务/现库/S1正式注册实施授权。
 - S1限域例外：ADR-GS03-S1-001仅授权未装配migration定义与隔离合成专项，不接受本父ADR，不授权现库、自动注册、事务端口、HTTP或生产。
 - S2设计交叉引用：`ADR-GS03-S2-001`（`2026-10-04-gs03-shared-transaction-contract.md`）细化拟议共同事务端口、全写者提交围栏与失败四态；它仍是 Proposed，不接受本父 ADR，也不授权 HTTP、事务端口源码、现库或生产接线。下表是 GOV-029 的源码候选盘点，不代表数据/身份/审计 Owner 签字或全仓穷尽。
@@ -47,6 +48,62 @@ v1 回调读取平台快照，在验签和案例范围后，以 `contractId + id
 | 外部账号/机构/居民 scope 变更写者与成功审计（`server.js:15353,15567-15604,8114-8121`） | T01 身份与 `platform-governance` 审计事实跨边界；本地 SQLite 锁不覆盖另一权威的撤销/归属变更，v15 append-only source 现随旧 `writeSqliteState` 工作。单次外部版本复读仍留 TOCTOU。 | 外部事实 Owner 提供覆盖其**全部变更写者**、持续至回调线性化提交的 `authorityFence`；审计 Owner 验真实 v15 hook 与业务/receipt 同事务。任一无法证明则新 lane 关闭。 |
 
 该表按当前可见调用链列出直接写者及可通过全状态同步覆盖事实的类别，仍须由 T00 静态枚举剩余 `readDatabase`/`writeDatabase`、迁移、管理脚本及恢复调用，并由 T01/T02/T04/T05/T06/T08、机器数据/授权语义/身份 scope/审计/留存 Owner 对各自读集、写集、停写或接线策略逐项签认。尤其 `personalRecords` 的 500 条截断和会诊授权引用变更不能因“不是撤权路由”而排除。入口、Owner 和外部事实若有未签或未封堵项，新 lane 的激活条件不成立。详见 [S2 共同事务合同](2026-10-04-gs03-shared-transaction-contract.md) 的拟议端口与故障四态。
+
+## GOV-042 逐写入口事实盘点（2026-10-12）
+
+本轮仅批准对共同提交前置作代码盘点设计。以下将 GOV029 的入口类别细化为22项已发现的调用链、读写集、版本时点和旁路；并非全仓或真实外部写者穷尽证明，也没有接线/封堵任何入口。代码基线为 main@e64835fed38561ee8232296c7aaffd84aec1ef81（PR348，源码与原冻结42567e38一致）；源码摘要及搜索边界受控记录在 .codex-platform-evidence/gs03-writer-inventory-20261012/source-inventory.json。本表只证明静态可见实现，未执行正式交易或并发验收。
+
+### 事实源与共享读写时点
+
+机器数据归属仍以 config/domain-data-ownership.json 为准：personalRecords为citizen-chronic，referralTeleconsultations/referralSystem.referrals/taskMessages为care-coordination，integrationGatewayEvents为integration，accounts/authOrganizations/authUsers/residents为identity-security（该配置:453-467,510-518,560-570,630-633,950-953）。安全/访问审计不是该配置的普通集合条目，而由 src/platform/data/collection-governance.js:8-12 的 SYSTEM_COLLECTIONS 指定platform-governance；这不是专业签署或receipt权威选择。路由进程Owner亦不能替代数据/语义/留存Owner接受。
+
+共享时点S0：readDatabase先读并normalize业务状态，再另采SQLite collectionVersions（server.js:6588-6597,8652）；未证明二者在同一受控锁内快照。prepareCollectionCas复制已读metadata，并非重新锁内读取（src/platform/storage/state-command-consistency.js:86-98）。共享时点S1：writeSqliteState自己BEGIN，仅核传入的版本键，随后全量同步/删除缺键、真实v15审计源及身份镜像，最后COMMIT/ROLLBACK（server.js:8022-8160,8190-8207）。携全量版本不等于业务读集同快照；空版本map不能提供该CAS。withStateCommandLock只是本进程key队列（同helper:59-70），不同锁或单次事务不构成共同线性化点。auto仍可能走JSON（server.js:7876-7885），新lane不能将其解释为SQLite权威。
+
+### 服务与授权入口
+
+末列均是接线前拟议策略，尚未实现或由真实Owner签认。当前角色、资源scope、幂等回执与版本限制必须保留，不能概括为无保护。
+
+| 编号与实际入口链 | 读集及版本时点 | 写集/裁剪与现有保护 | 拟议处置与待签责任 |
+| --- | --- | --- | --- |
+| W01 feedback-callback：care-coordination.js:489-614 | 签名/role后S0；案例、居民scope、contractId+key观测查重，不核确切授权业务条件 | 案例反馈/时间/performance、最多两条按notificationKey去重的in_app消息、观测/双审计；网关最多200；无共同key锁，但SQLite可携全量版本 | T05/T08/授权/审计同端口锁内重读；正式receipt/签名/字段待签，无接线则关闭新lane |
+| W02 schedule-callback：同文件:489-614 | 同W01，当前scope后查旧观测 | 案例状态/窗口/接收机构/医生及最多两条去重消息、观测/双审计；同S1局部保护 | 排期可改反馈读集，不能因反馈-only排除；T05/授权Owner签共同围栏或冲突拒绝 |
+| W03 report-callback：同文件:489-614，特别:592 | 同W01；报告使用案例/居民/档案快照 | 案例报告、personalRecords前插截500、最多两条去重消息、观测/双审计；无确切授权共同判定 | 档案Owner签容量/授权保留，报告写者纳入共同端口或拒绝冲突写 |
+| W04 会诊create：care-coordination.js:353-414→server.js:21655-21677 | 进程key锁内S0，读personalRecords；空授权ID仍可借任一有效记录，不证明purpose/dataScopes/到期严格检查 | case最多300、单条行内命令回执及安全/访问审计，不写消息；prepareCollectionCas可能携全量版本 | T05/授权Owner签确切ID、历史空引用、保留/容量及共同锁内决策；不替用户选历史授权 |
+| W05 case actions：care-coordination.js:415-476→server.js:21729-21755 | key锁内S0、案例/居民scope/版本 | cleanWorkflowUpdates可改residentAuthorizationId（保护集:975,20774-20781未列此字段）；行内回执最多20，局部回执/CAS不是共同围栏 | T05签重绑及状态转移，授权Owner签新旧授权关联；同端口或新lane前拒绝冲突 |
+| W06 workflow-actions会诊分支：care-coordination.js:2275-2374 | S0案例/居民scope；expectedVersion可选，只覆目标集合版本 | applyAction后payload.status可再覆状态、成功安全审计；无共同锁 | T05签所有updates/status与授权引用冲突面，不以可选版本代替共同提交 |
+| W07 SLA run/ack：care-coordination.js:278-348 | S0案例、消息与scope | run消息截300/安全事件截120；ack改slaDisposition、消息receipts及双审计；直接S1无共同锁 | T05/消息/审计Owner签每个冲突字段及接线/拒绝策略 |
+| W08 闭环命令：care-coordination.js:2405-2454→registration-referral-service.js:1073-1112→standalone.js:432-538 | 单次S0、clone、聚合workflowVersion及命令指纹；既有聚合需expectedVersion，非锁内授权版本决策 | grant档案截500；revoke授权+未终态案例hold/消息；resume确切授权；reassign目标/授权并同步referral/order；建案/排期/报告另见service:265-345,475-576；事件截300 | T05/档案/授权Owner逐命令签读写集；聚合事件不是成功v15审计，也不替正式receipt |
+| W09 独立授权revoke：identity-security.js:978-1023 | S0授权/居民scope；expectedVersion仅可选personalRecords | 授权状态、双审计；直接S1，无共同锁且不同步case hold | T01路由/档案数据/授权语义Owner签共用围栏及案例语义，不削弱现有居民scope |
+
+表内未带目录前缀的care-coordination.js、identity-security.js均在src/http/routes；standalone.js指registration-referral-standalone.js。源文件归属不自动授予T00领域实现权。
+
+### 档案、通用状态、身份与维护入口
+
+| 编号与实际入口链 | 读集及版本时点 | 写集/裁剪与现有保护 | 拟议处置与待签责任 |
+| --- | --- | --- | --- |
+| W10 personalRecords POST：citizen-chronic.js:1114-1184 | S0档案/residents/scope；expectedVersion有则仅档案，无则保留S0全量metadata | normalizePersonalRecord/push档案及访问审计；角色/居民scope限制仍在，可建authorizations | T04路由/citizen-chronic数据/授权语义Owner签授权新增与同围栏，非任意人可写 |
+| W11 personalRecords PATCH：citizen-chronic.js:1190-1229→server.js:976 | S0按ID找记录并核scope；版本同W10 | safePatch不排除status/meta；居民仅resident-upload，机构/主管部门亦受scope；无反馈共同锁 | 签authorizations状态、用途、目标、到期、root/meta变更及冲突拒绝，不扩大已有角色权限 |
+| W12 T04非授权新增：citizen-chronic.js:316-371→server.js:18992,19150,19323,19490 | 慢病反馈、checkin、家医闭环、转诊连续性读各领域旧快照；慢病反馈另有进程锁/prepareCollectionCas | 新档案前插截500及各领域消息/审计，可逐出案例引用授权；局部锁不覆盖全部裁剪 | 档案/各领域Owner签无损容量或明确拒绝策略，无关新增亦须保护确切授权 |
+| W13 临床导入：clinical-specialties/clinical-blood.js:166-188、mutual-recognition-ingest.js:9-42 | S0报告/居民/档案及各自业务范围 | 前者影像ingest mergeByKey后截500，后者互认报告前插截500；文件历史名称不决定数据Owner | T06/档案Owner签导入、裁剪及授权保留；同端口或激活前拒绝冲突 |
+| W14 PUT state：state-data.js:179-313,:137-154 | commission+manager，withLock('clinical-assist:state')内S0；预检只查改动且携版本集合 | normalize全状态并采用payload.storageMeta；S1再核全部携版本键，不仅已改集合；可覆盖授权/案例 | T02兼容路由/T00及数据Owner逐集合核存储层不可绕过围栏；管理权限不是共同锁 |
+| W15 PUT state-collections：state-data.js:315-395 | 同角色/本进程锁；S0后替集合；expectedVersion有则仅该集合，无则明确空map | personalRecords可被替换；部分server-managed身份集合拒绝，不能说任意集合可写 | 逐COLLECTION_WRITE_KEYS与scope依赖集合签冲突处置；受保护事实未核不得激活 |
+| W16 非生产reset：state-data.js:406-445 | 禁production、commission manager、accessAcknowledgements空集门禁 | seedState→writeDatabase重置相关事实；无已证receipt/授权/案例共同恢复世代 | T02/T00与数据Owner签停写、重置用途、恢复核验，新lane维护时关闭 |
+| W17 normalize/空库seed：server.js:6580-6597,7980-8000,11878,12243-12308 | readDatabase会normalize投影；SQLite读后normalize不自动写盘，JSON changed可写回；空SQLite可从JSON seed | 补演示档案/授权投影；实际持久变更需对应ensure/seed或后续writeDatabase路径核实 | 不把每次读或启动称写盘；源/数据Owner逐实际写入口核seed/normalize持久化及停新lane策略 |
+| W18 文件恢复/回滚：scripts/storage-admin.js:225-259、rollback-snapshot.js:8-43 | restore需confirm、sidecar不存在、checksum/integrity/质量检查及安全备份；rollback保存pre-rollback | 替换JSON/SQLite文件，未证明所有进程停写或receipt/key/审计源同恢复世代 | T00运维/存储/身份/数据/审计Owner签停写、源身份/世代、同key对账及重开；confirm不等于fence |
+| W19 账号生命周期/目录应用：identity-security/account-lifecycle.js:71-104→account-lifecycle-service.js:153-176；identity-security.js:714-766→server.js:14679,14725 | 生命周期路由S0进入自身withLock后写；目录bind/apply从外部目录及本地authUsers决策 | 建/改role、orgCode、permissions、disable/restore及主体绑定，目录apply亦撤session；局部锁不同于反馈锁 | T01/外部目录权威签全部变更写者及持续至提交的authorityFence，不能用一次复读替代 |
+| W20 PATCH residents：citizen-chronic.js:491-520 | commission/institution+canManageResidentProfile；S0；expectedVersion有仅residents，无空map | 更新residents归属等scope来源；T04路由但数据Owner为identity-security | 身份/scope与居民资料Owner签scope字段变更、同围栏或冲突拒绝；不能假定缺省全量CAS |
+| W21 泛型/派生scope来源：server.js:17743-17778,15532-15560,15353及W14-W18 | 当前用户/authUsers、residents、accounts.members、county业务集合、组织别名及doctor/nurse关联、referralSystem均可能影响scope | 泛型集合、业务命令、seed/恢复可能改变来源；尚未逐个证明所有实际写者闭集 | 身份/scope Owner逐来源列动态/间接/外部写者和受控凭据；未检出不能写“不存在”，缺签/缺fence新lane关闭 |
+| W22 真实v15 source：server.js:8114-8124→src/identity-security/audit-delivery-source.js:256-286 | 在S1同连接读取旧/新securityEvents、dataAccessLogs链 | 按事件/摘要append-only及冲突拒绝，身份镜像随后同步；确有旧事务hook，尚无正式receipt语义绑定 | platform-governance系统归属及真实审计责任方签本次principal/目标/成功事件/receipt绑定；FK存在和fake源均不证明该语义 |
+
+citizen-chronic.js、state-data.js及identity-security子目录路径均相对src/http/routes；account-lifecycle-service.js在src/identity-security。W19-W21涉及真实外部权威，其变更入口、审批凭据与停写协议未提供，不能由本地源码替代。
+
+### 搜索边界、未决项与交付标准
+
+本次定向搜索src/http/routes、src/identity-security、server.js、上述两个管理脚本，核personalRecords赋值/前插/裁剪、authUsers/residents写式、通用read/writeDatabase、命令锁/CAS及审计hook。没有逐一审完全仓动态引用、所有scripts、所有业务数组的scope派生写者、provider目录及部署进程，也没有真实Owner逐入口签认；22项是已发现事实，不是“全部写者已穷尽”的结论。新增入口或外部写者变化须补清单并重新审查，不通过grep数量、角色限制、模拟测试或离线校验器宣布围栏成立。
+
+专业待签仍集中在ROADMAP九组清单：四主体用途与最小重放、专业字段/消息隐私、确切授权、正式签名/摘要及跨principal同逻辑事件责任、唯一receipt/审计绑定、留存/隐私删除/容量/到期及legacy、源身份/恢复世代、全部scope写者与持续fence、unknown受控对账。真实Owner、批准值、期限和受控签署凭据均未提供；本盘点交付可以完成，不代表任何专业项接受或风险销项。
+
+正式接线前，逐入口须提交可执行同源锁内读取/冲突保护或不可绕过拒绝、真实多连接/多进程交错、到期/裁剪/恢复、v15语义绑定和故障四态证据，且全部外部authorityFence持续到线性化。缺任一关键写者证明则不激活新lane，不静默v1/JSON回退。验收方案见S2增补；本轮只运行治理及既有仓库门禁，不执行这些未来正式专项。
 
 ## Options
 
