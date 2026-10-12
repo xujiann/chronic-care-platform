@@ -1,5 +1,9 @@
 # MODULE MAP — 主线模块地图
 
+## 2026-10-12 GOV041设计收口单写
+
+GOV041设计已由PR347集成，本轮T00唯一写台账、ROADMAP、CURRENT_ARCHITECTURE、MODULE_MAP四文件；A/B只读证据与候选盘点，独审只读，Git及重型门禁串行。专业未决保留并转待批准GOV042及集中清单，原风险open；OPS040/SEC016不变，活动WIP2/5。GOV042未来拟单写上述四文件及既有STORAGE/S2两份Proposed ADR，仅盘点设计待另批，非当前ADR写入授权；不重做协议/校验器，不新增src/test/helper、服务或正式共同写者接线。三父仍Proposed，正式实现另立Accepted及高风险领域准入，生产NO-GO。
+
 ## 2026-10-10 GOV041设计单写
 
 GOV041在独立T00工作树登记获批设计，T00唯一写12份现有合同/治理文件；开发A只读T05业务与授权，B只读T08身份签名，独审只读，Git及18门禁串行。三父ADR仍Proposed，不新增src/test/helper、模块、UoW或HTTP；四类既有主体的反馈写用途和最小重放投影待Owner逐格签认，正式领域实现另登记Accepted限域任务。OPS040/SEC016不变，活动WIP3/5。

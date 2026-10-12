@@ -1,5 +1,43 @@
 # 工程治理路线图
 
+## GS03 设计收口与写者盘点候选 PLAN（2026-10-12）
+
+本轮仅批准 GOV-041 台账收口、下一切片梳理登记及专业待签事项集中提交。基线为 origin/main@a704be427f29968ee6981bdf11b0b7848be0313b；独立工作树 process-v2/t00-gs03-design-closeout-20261012，分支 process/t00-gs03-design-closeout-20261012。原脏主目录保留不动。T00 唯一写 config/lifecycle-governance.json、ROADMAP.md、CURRENT_ARCHITECTURE.md、MODULE_MAP.md 四文件，开发 A/B 与独审只读；不修改源码、测试、schema 或 ADR，不递归创建收口任务。
+
+GOV-041 限定反馈合同设计由冻结 b6c8fb00751e6439c11c2b85e72e976253738f27 经 PR347 保护合并为上述基线，同 tree 12a43e8ae00bb6003f97d766bd5a76852a1f7491。旧交付18串行本地门禁成功；unit 3601通过/45跳过，integration 386通过，smoke 6通过，all 3987通过/45跳过，失败和取消均0，不累加重叠套件。PR CI38032848795、main CI38033530133 各9成功，保护规则不变；Pages 38033530157 仅静态。受控证据为 .codex-platform-evidence/gs03-feedback-contract-20261010/main-verification-347.json，SHA256 2bf21cf8cc8ad51deb90f6b68c05fdb6217915036a686585135bac3a362d20aa。今天复核主线未变，后续生命周期检查成功；这些旧证据不替代本轮四文件验证。
+
+关闭 GOV-041 仅表示设计交付已集成；其专业未决完整承接至待批准 GOV-042、仍 open 的 RISK-GOV-041 和下列集中待签清单，不表示问题解决或三父 ADR Accepted。GOV-041 unresolved 清空仅用于限定设计闭合，专业缺口没有销项。OPS040/SEC016 保持原状，活动 WIP 从3/5降为2/5；待批准候选不占活动 WIP。默认 schema19/41表、GS03未建设及生产六域NO-GO不变。
+
+### 下一候选：GOV-042（待批准，不实施）
+
+推荐仅做共同提交的逐写入口与事实源准入盘点：逐入口列实际文件/调用链、机器事实源与语义/数据/路由责任域、读集及采样/版本时点、写集及裁剪、CAS/锁/事务、反馈冲突、外部 scope 变更写者、拟议共同端口或接线前拒绝策略，以及证据、待签状态与未知项。按“已证现状/拟议处置/待签/未知”分离，不凭非穷尽清单宣称围栏完整。
+
+盘点至少涵盖三类 callback、直接建案及 case actions、workflow-actions/SLA、授权 grant/revoke/resume/reassign 与独立撤权、personalRecords POST/PATCH 和其他新增/导入及500条裁剪、状态集合/reset/启动seed、管理脚本/备份恢复/源世代、principal/机构/居民scope全部变更入口，以及真实v15审计接点。现有 GOV029/S2 端口设计与非穷尽写者表、GOV041反馈协议、GOV031六节离线校验器不重做；合成预检及未接线组件不升级为正式能力。
+
+GOV-042 实施须另获仅盘点设计准入。拟由 T00 单写六份既有文件：config/lifecycle-governance.json、ROADMAP.md、docs/adr/2026-10-01-referral-callback-storage-atomicity.md、docs/adr/2026-10-04-gs03-shared-transaction-contract.md、CURRENT_ARCHITECTURE.md、MODULE_MAP.md；这些未来范围并非本轮授权，当前不改 ADR。不新建 Markdown、服务、模型、校验器或合成组合，不接正式命令/HTTP/共同写者，不启用默认S1注册或provider信任。事实与责任输入齐备后，正式实现另立限域 Accepted 决策和高风险领域任务。
+
+### 集中专业待签清单
+
+以下均为未决输入；协作责任域只是候选，不是已任命的真实 Owner。由用户统一协调，各专业事项另行签署；真实签署人、批准值、期限及受控凭据均未提供，不代填或用一般聊天批准替代。
+
+| 决策组 | 候选协作责任域 | 必需签署输入 | 当前状态 |
+| --- | --- | --- | --- |
+| 四类真实主体与用途 | T05/T08/T01、真实调用方 | 接收机构、源机构、县级及行政部门的业务用途、稳定principal与账号机构目录、读写/最小重放逐格权限 | 待签 |
+| 专业字段与消息隐私 | T05、业务及隐私责任方 | 专业字段、状态转换、效能口径、两类应用消息的最小投影与隐私约束 | 待签 |
+| 确切授权 | T04、语义及慢病数据责任方 | 授权ID、purpose、teleconsultation/dataScopes、root/meta、到期、续权/恢复、历史空ID政策 | 待签 |
+| 正式签名与摘要 | T08、身份及真实调用方 | method/path/version、canonical字节、keyId及轮换、v2字段顺序/类型、独立已知向量；不沿用合成摘要 | 待签 |
+| 唯一receipt与审计事实源 | T08提名、存储/数据/审计责任方 | 单一入站receipt权威、最小投影、真实v15源与当前principal/目标/事件绑定 | 待签 |
+| 留存与历史兼容 | 隐私、留存及调用方 | 留存天数、tombstone/key复用、legacy白名单/期限、无摘要历史冲突和人工对账 | 待签 |
+| 源身份及恢复世代 | T00、存储/数据/身份责任方 | 源身份/恢复世代、namespace/key/审计源绑定、停写与恢复批准 | 待签 |
+| 全写者及外部scope围栏 | T01、身份scope及全部写者责任方 | 穷尽变更入口、共同fence连续覆盖至线性化、停写/恢复与接线前拒绝策略；一次重读版本不等于围栏 | 待签 |
+| unknown受控对账 | 获授权对账、隐私及审计责任方 | 丢失响应后的原key/当前授权、读权限、隐私与审计、响应时限；撤权后不公开receipt | 待签 |
+
+### 验证、回退与授权边界
+
+本轮先完成窄测与四文件范围核验，独审无P0-P2后冻结精确SHA/tree，再串行运行18必需门禁；本轮日志与证据独立绑定，不预写通过或借用旧绿灯。失败保留日志并回修、复审、重冻。45项真实PG环境跳过不作通过，CI环境证据不代替现场/生产验收。回退仅撤治理文档增量，保留源码、现库、旧风险和历史证据，不删除receipt或重置key。
+
+旧 b6c8fb00 推送/合并授权已执行，不外推。本轮新冻结推送及CI后保护合并须另授权；GOV-042盘点设计须另批准；正式实现、上线及各专业接受仍分别准入。
+
 ## GS03 反馈-only 合同设计 PLAN（2026-10-10）
 
 用户明确批准 GOV-041 仅合同设计与准入梳理，不含正式实现或上线；精确 84f00b99 推送/保护合并授权仅用于上一治理冻结，不外推至本片。T00 从 fetched origin/main@10722a08f17618ad32af02efc97c3585d0cd5d41 建立 process/t00-gs03-feedback-contract-20261010，原工作树和脏主目录不动。上一 PR346 的主线验证另由仓库外精确证据闭合，不用旧 CI 代替本片门禁。
