@@ -1,5 +1,21 @@
 # 工程治理路线图
 
+## GS03 写者与事实源盘点设计 PLAN（2026-10-12）
+
+用户已批准GOV-042仅逐写者/事实源盘点设计与Owner决策收集，正式实现另准入。上一冻结42567e3864f7bde6b123feeac6bcc6b579869796经PR348保护合并为e64835fed38561ee8232296c7aaffd84aec1ef81，同tree c7d7c0646b9c0541f4429f49c05de3d42a01054b；PR38203379624/main38204090520各9成功、保护不变，Pages38204090497仅静态。受控main-verification-348.json只证明旧四文件交付，不替本设计测试。
+
+新独立T00工作树process-v2/t00-gs03-writer-inventory-20261012/分支process/t00-gs03-writer-inventory-20261012来自上述最新主线。T00唯一写台账、ROADMAP、既有STORAGE/S2两ADR、CURRENT_ARCHITECTURE、MODULE_MAP六文件；A只读服务/授权调用链，B只读档案/身份scope/状态/恢复/审计，独审只读，Git与18重型门禁串行。原脏主目录及旧工作树不动。GOV042验证中只表示文档形成；OPS040/SEC016不变，活动WIP3/5，不预支验证或集成。
+
+目标为将GOV029入口类别补成可复核逐入口证据。单一详表落在STORAGE的GOV042段，22项W01-W22分列调用链、事实源/读集、版本采集/检查/提交时点、写集/裁剪、局部锁/CAS及拟议处置/待签；S2引用它并列共同提交依赖和未来验证。受控source-inventory.json绑定18份源码/机器合同摘要、两开发只读发现及搜索边界。选项中，重复协议设计或合成组合不解决旁路；推荐先盘点并显式暴露未知，专业决策齐备后再审正式实现。不新增模型/服务/校验器/Markdown，不改GOV041协议或GOV031离线校验器。
+
+当前发现：S0业务读与metadata采样未证明同一锁内快照；S1仅检查传入版本键；进程key锁/可选CAS与角色限制不等于共同围栏；500裁剪会影响授权只读依赖；SQLite读后normalize不能直接称立即写盘；真实v15 hook在旧事务内不证明未来receipt成功语义。安全/访问审计机器归属来自SYSTEM_COLLECTIONS而非普通domain-data-ownership条目，仍待真实审计责任接受。动态/间接引用、全部scripts/部署维护、派生scope数组写者及真实外部目录尚未穷尽，不凭22项或静态搜索宣布全写者已封堵。
+
+专业事项继续由用户统一协调、分别签署，沿用下方九组集中清单，补明确跨principal同逻辑事件责任及receipt隐私删除/容量/到期政策亦未定。真实Owner、批准值、期限及签署凭据不代填。RISK-GOV041/042仍open，三父Proposed、GS03未建设、schema19/41及六域生产NO-GO不变；盘点设计可以限域交付，不把专业未决销项。
+
+先治理窄测及六文件/源码不变审计，独审无P0-P2后冻结SHA/tree，串行18必需门禁并复核原始日志计数/摘要/退出码；失败保留证据后回修、复审、重冻。既有testIds仅治理验证，W01-W22的正式交错/fence/故障矩阵是未来验收，不称本轮已运行。PG环境跳过不作通过，不累加重叠套件。
+
+回退仅撤本设计文档增量，保留源码、数据库、旧风险及证据，不删receipt/重置key。42567e38精确发布授权已执行，不能外推至本设计新冻结推送合并。正式命令/HTTP/现库/S1默认注册、全部写者接线、身份provider信任、专业接受及上线均须分别准入。
+
 ## GS03 设计收口与写者盘点候选 PLAN（2026-10-12）
 
 本轮仅批准 GOV-041 台账收口、下一切片梳理登记及专业待签事项集中提交。基线为 origin/main@a704be427f29968ee6981bdf11b0b7848be0313b；独立工作树 process-v2/t00-gs03-design-closeout-20261012，分支 process/t00-gs03-design-closeout-20261012。原脏主目录保留不动。T00 唯一写 config/lifecycle-governance.json、ROADMAP.md、CURRENT_ARCHITECTURE.md、MODULE_MAP.md 四文件，开发 A/B 与独审只读；不修改源码、测试、schema 或 ADR，不递归创建收口任务。

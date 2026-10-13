@@ -1,6 +1,7 @@
 # ADR-GS03-S2-001：回调共同事务端口与全写入口提交围栏
 
 - 状态：Proposed
+- GOV-042（2026-10-12）：仅获批写者/事实源盘点设计，详表统一在STORAGE，本合同仅补依赖缺口；不接受父ADR或授权端口/共同写者实现。
 - GOV-041（2026-10-10）：仅反馈-only设计准入，三父ADR仍Proposed，未新增正式端口实现、身份/签名协议或写者接线。S1及非生产内存组件的Accepted限域不外推至本合同。
 - 日期：2026-10-04。用户批准本 S2 **设计**，不等于接受本 ADR 或授权实现。
 - 任务/责任：GOV-029；T00 负责跨域事务技术合同及集成，T05 负责会诊业务，T08 负责入站协议与回执语义；`personalRecords` 的机器数据 Owner 为 `citizen-chronic`，`referralTeleconsultations`/`taskMessages` 为 `care-coordination`，审计为 `platform-governance`。授权语义、外部身份/scope 和留存 Owner 须在接受前确认。
@@ -60,6 +61,22 @@ transaction.commit() -> confirmed | unknown
 | 档案 POST/PATCH、报告归档、通用导入/集合保存 | `src/http/routes/citizen-chronic.js:1114-1229`、`src/http/routes/state-data.js:179-455`；档案/状态 Owner | 拒绝改写授权绑定的旁路，或共同端口；现有角色限制继续生效 |
 | `PUT /api/state`、`PUT /api/state-collections/*`、非生产 reset、管理脚本/恢复/备份回放 | `src/http/routes/state-data.js:179-455`、`server.js:980-993`；T00 与数据 Owner | 对受保护集合加不可绕过的存储层 fence；维护模式停新 lane 并核已提交账本，不以旧快照覆盖 |
 | 审计 source、观测事件、外部身份/scope | `server.js:8118`、`src/identity-security/audit-delivery-source.js:256`；审计/身份 Owner | 成功审计同库事务；观测不作权威；外部事实需上述提交 fence |
+
+## GOV-042 共同提交依赖与待签缺口（2026-10-12）
+
+本轮仅批准逐写者/事实源盘点设计，不改拟议executeGs03Callback端口或失败四态，不接受三父ADR。单一事实详表在[STORAGE的GOV-042盘点](2026-10-01-referral-callback-storage-atomicity.md#gov-042-逐写入口事实盘点2026-10-12)，以main@e64835fed38561ee8232296c7aaffd84aec1ef81及受控源码摘要定位W01-W22；这里仅列提交前置和后续验收依赖，避免第二份入口清单。
+
+| 已发现依赖 | 正式接线前须证明的边界 | 当前缺口/未来验证，不是本轮通过证据 |
+| --- | --- | --- |
+| W01-W09案例与授权写者 | 共同端口锁内重读确切案例/授权/当前scope，所有状态、重绑及撤权/续权命令同围栏或不可绕过拒绝 | 现有局部key锁、聚合版本、行内命令回执与全量metadata都不能证明共同线性化；需真实交错旧快照/新版本、revoke/resume/reassign、workflow/SLA与三callback |
+| W03/W08/W10-W13档案/裁剪 | 授权即使只读也在同受控读集受保护，任何新增/报告/导入使其消失都不能借另一授权通过 | 500裁剪、status/meta和历史空ID策略待档案/授权Owner；未来测第500条被无关新增逐出、仅授权版本变化、当前授权重放 |
+| W14-W18通用状态/维护 | 存储层保护全量/集合覆盖与种子/恢复，全部进程停写，receipt/业务/授权/真实审计源同身份和恢复世代 | 现有管理角色、可选/空CAS、confirm及文件checksum不证明共同fence；normalize投影是否写盘按实际链判定，未穷尽scripts/动态写者 |
+| W19-W21当前主体和外部scope | 每个权威的全部变更写者在提交前至线性化持续受authorityFence，绑定本次principal/机构/居民scope | 本地session复核、目录apply、身份镜像和一次外部版本复读仍留TOCTOU；外部目录及所有派生scope数组写者、真实Owner/协议待签 |
+| W22及本次receipt/两消息 | 单连接真实v15 hook与当前principal/目标/成功事件/receipt绑定；重放零追加，COMMIT结果未知保留四态 | 旧hook同事务是代码事实，不证明新receipt语义；未来测有效但属于其他目标/主体的源引用、逐消息/审计/source/receipt/COMMIT前后失败 |
+
+每条后续准入记录应含真实路由与数据/语义Owner、事实源/读集、采样/版本检查/提交时点、所有冲突写者、同端口或拒绝策略、可执行证据、停写/恢复与受控签署引用。目录不存在于本地或静态搜索未检出的来源写为“未知/待权威提交”，不写“不存在”；未知入口与未签事项阻断激活，但不能伪造专业齐备来关闭本设计任务。
+
+推荐仍只是评审同源锁内读写、唯一入站receipt与真实审计候选；未批准SQLite/PG主权威、源世代算法、正式签名/digest、留存天数或legacy期限。不新建端口/第二UoW/服务/认证源或receipt账本，不改S1/default registry/schema，不实现接线或运行正式故障矩阵。专业由用户统一协调另签；正式领域实施另立Accepted及高风险限域PLAN。
 
 ## 失败四态与恢复
 
