@@ -1,5 +1,33 @@
 # 工程治理路线图
 
+## GOV-042 盘点设计收口与候选登记
+
+本轮批准范围仅为台账收口及下一正式实现候选登记，日期为2026-10-14。基线为origin/main@3c652f5827044380d253063a3c7c90342045d060；独立工作树process-v2/t00-gs03-inventory-closeout-20261014，分支process/t00-gs03-inventory-closeout-20261014。T00唯一写config/lifecycle-governance.json、ROADMAP.md、CURRENT_ARCHITECTURE.md、MODULE_MAP.md四文件；独立审查只读，Git与重型测试串行。原脏主目录及已交付工作树保持不动，不新建收口任务、Markdown、源码、测试或ADR。
+
+GOV-042的盘点设计已由冻结be5a0944d36095efb1a4f69266d425450c6ad1d0经PR349保护合并至上述主线，同tree2cc631668dead261f304ef43cdc74dc721bffd4f。独审及旧18串行门禁成功；unit3601通过/45跳过、integration386通过、smoke6通过、all3987通过/45跳过，失败取消均0，套件不累加。PR CI38328776115、main CI38333268125各9成功，保护规则未改变；Pages38333268261仅静态。受控main-verification-349.json的SHA256为80d40fcd9431258c1a7ea101db07db0ce42d47a779b05151a1c9f7f527032f8e，路径为.codex-platform-evidence/gs03-writer-inventory-20261012；旧证据只支持盘点交付，不替本次四文件门禁。今天复核主线未变、无开放PR，最新夜间Lifecycle gates38473877623成功。
+
+GOV-042仅关闭限定设计交付、能力为已集成；原四组unresolved完整保留并关联OPS-059及下方集中专业待签清单。RISK-GOV041/042仍open，22项已发现入口与18源码摘要不证明穷尽、专业齐备或共同围栏成立。OPS040/SEC016保持原状，活动WIP从3/5降为2/5，候选不占WIP。三父CALLBACK/STORAGE/S2仍Proposed；GS03未建设、默认schema19/41表、生产六域NO-GO不变。以下2026-10-12及此前段落是当轮记录，不覆盖本节当前状态。
+
+### 下一正式实现候选 OPS-059
+
+OPS-059仅登记为待批准/未建设、高风险，由T05负责反馈业务命令，T00负责集成。候选目标是反馈-only业务命令首切片，复用已存在的S1候选、receipt组件、真实v15 hook及父合同拟议共同事务，不重做GOV041协议或GOV042清单，不以追加合成实验代替正式前置。选项比较：直接启用HTTP/现库会跨越未签边界；重复内存组合不能证明真实授权与全写者围栏；推荐前置齐备后按限域Accepted ADR及高风险PLAN实施业务命令，排期/报告及后续接线独立准入。
+
+未来拟议单写路径为src/care-coordination/gs03-feedback-command.js与test/gs03-feedback-command.test.js，工作树/分支仅登记拟议名称，未创建或授权写入。输入版本、具体端口、正式测试ID及命令须在准入时冻结。T00正式存储/全写者/恢复围栏、T08可信身份签名各需另立限域任务和审批；本候选不授予其源码写权，不在T00任务中夹带领域实现。
+
+正式实施准入至少须满足：
+
+- 用户协调真实Owner分别签署四主体用途/principal/最小重放、专业字段状态/消息隐私、确切授权purpose/dataScopes/root-meta/到期续权、正式canonical字节/摘要/key及跨主体事件责任。
+- 唯一receipt Owner、真实v15当前目标/principal/成功事件绑定、留存/tombstone/key复用/legacy窗口/历史冲突、源身份恢复世代和unknown受控对账已有受控决策。
+- 逐入口覆盖全部冲突与外部scope变更写者，共同fence持续至线性化；未知/未签来源不作不存在，一次版本复读不作围栏证明。停写恢复与激活前拒绝策略须可验证。
+- 独立限域Accepted决策、人工高风险PLAN、可执行正式测试及接入命令齐备；当前testIds/evidenceIds为空，不把既有治理或合成实验当正式业务验收。
+- 窄测及未来完整门禁证明当前授权优先于重放、撤权/500裁剪/重绑/旧快照交错、业务/两消息/审计/source/receipt同事务、失败回滚及COMMIT未知四态；日志、指标、追踪、健康、SLO、告警/手册、降级补偿须随运行能力交付。
+
+本候选不含排期/报告HTTP、现库升级、默认S1注册、provider信任、专业代签或生产激活。正式实施审批及专业签署均未授予；风险保持open，生产NO-GO。
+
+### 本轮门禁与回退
+
+四文件范围与台账状态先窄测，独审无P0-P2后冻结精确SHA/tree，再串行执行18项必需门禁；本轮证据独立绑定，不预写通过。门禁失败保留原始日志，回修、复审、重新冻结；45项本地PG环境跳过不作通过。回退仅撤治理增量，保留原设计、历史证据和全部业务数据，不删除receipt或重置key。be5a0944精确推送合并授权已执行，不外推；本次新冻结推送、合并与上线均未授权。
+
 ## GS03 写者与事实源盘点设计 PLAN（2026-10-12）
 
 用户已批准GOV-042仅逐写者/事实源盘点设计与Owner决策收集，正式实现另准入。上一冻结42567e3864f7bde6b123feeac6bcc6b579869796经PR348保护合并为e64835fed38561ee8232296c7aaffd84aec1ef81，同tree c7d7c0646b9c0541f4429f49c05de3d42a01054b；PR38203379624/main38204090520各9成功、保护不变，Pages38204090497仅静态。受控main-verification-348.json只证明旧四文件交付，不替本设计测试。
