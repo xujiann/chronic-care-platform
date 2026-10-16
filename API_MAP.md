@@ -1,5 +1,9 @@
 # API MAP — 主线接口地图
 
+## 2026年10月16日 反馈材料离线核验
+
+GOV044仅新增显式node scripts/gs03-feedback-materials.js --input <json-file>离线入口，退出0/1/2分别为格式齐备、资料缺失或不合法、输入失败，均不授权实施。无HTTP方法、路径、鉴权、角色、审计或业务协议变化；旧GOV031三合同CLI兼容。输出只有固定布尔、字段路径和错误码，不回显输入引用或文件路径。
+
 ## 2026-10-10 反馈-only接口合同设计
 
 GOV041仅细化现有Proposed反馈子合同，当前feedback/schedule/report v1路径、目录与宽normalizer行为不变。未来显式版本、方法/规范路径/目标/principal/body签名、严格字段、当前权限先于最小receipt、无降级及四态响应均待Owner接受，不新增HTTP或查询接口；推荐409不是现状v1通过事实。四类主体可读/可写/重放投影分别待签，真实provider信任B片另审。

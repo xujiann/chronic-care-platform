@@ -1,5 +1,13 @@
 # 工程治理路线图
 
+## 2026年10月16日 反馈材料离线核验
+
+用户批准GOV-044，仅登记并实施反馈材料索引的必填项、版本与摘要格式、跨组引用和缺失检查。基线origin/main@f5fb989000fbb6695e533079d5c6b665bd058e8c，主线CI38835820511成功且无开放PR。T00独立process/t00-feedback-material-index-20261016单写15个登记路径，WIP2增3；独审只读，冻结后18门禁串行，失败回修复审重冻。
+
+新增独立反馈格式，不伪填排期/报告；旧GOV031三合同语义不改，仅加法导出其有界只读读取函数。输入只含受控引用与摘要元数据，不读取原件/引用目标，不联网、不核专业签署有效性；输出固定专业签署、原文匹配、实施与生产未授权。完整索引也不能自动批准、销项或晋升候选。
+
+详细字段、接口、验收及回滚见[限域ADR](docs/adr/2026-10-16-gs03-feedback-materials.md)。OPS059整条候选、S01至S09待签、三父Proposed、GS03未建设、默认schema19/41及生产六域NO-GO不变。专业签署由用户协调，正式业务实现、推送、合并和上线另行批准。本节不预支本轮测试、独审或集成结果。
+
 ## GOV-043 台账收口与 OPS-059 后续准入
 
 2026-10-15本轮仅获批GOV-043台账收口及OPS-059下一准入事项梳理。基线为origin/main@bd029dda7fee442a2649a2d1000f509abc9e7c08；T00在process/t00-ops059-admission-closeout-20261015独立工作树唯一写台账、ROADMAP、CURRENT_ARCHITECTURE、MODULE_MAP四文件，独审只读，Git与重型门禁串行。原脏主目录和已交付工作树不动；不新增收口任务、专业合同、实施工作树、源码、测试、校验器或ADR。
@@ -639,7 +647,7 @@ GOV-033/OPS-053沿用户确认的非生产路线实施自建内存连接的事�
 | 12 | 对象存储结构化元数据与耐久命令轨道 | Accepted OBJ-ADR-002；T08 data owner、T00 technical owner、v1/v2 兼容策略、SQLite v17、回填冻结、异步 API、fenced worker、keyset 分页和持久 reconcile 的仓库实现均已完成，production promotion=false / P1 | 真实 provider status/abort capability、KMS/WORM/扫描、容量、备份、监控和现场验收继续 NO-GO；不得把仓库实现完成解释为 worker 已现场激活或生产晋级 |
 | 13 | 严格生产预检证据信任装配 | Accepted ADR；T00 pinned-anchor/Ed25519 双角色 provider、CLI 自动装配、deployment package/env/CI 和负向矩阵已形成 / P0 | 真实 anchor/envelope、独立 signer、权限/轮换、外部 evidence 与现场执行继续由生产环境提供；provider 成功不替代完整 preflight 或最终人类授权 |
 | 14 | 生产切换行动证据与受保护晋级 | Accepted ADR；definitions-only v2、14/14 共享 Ed25519 验证、strict preflight 门禁、main/manual/production/self-hosted workflow 与 digest-only receipt 已形成 / P0 | GitHub production environment reviewers、专用 runner、真实 14 份 envelope、受控路径、外部审批和实际部署/现场签收继续 NO-GO；receipt 只证明预检资格 |
-| 15 | 当前工作流、Markdown 与跟踪 PDF 闭集治理 | GOV-001、DOC-001、REPO-001 仓库内缺口已关闭：开发默认 `origin/main`，固定 tag 仅作证据；307 份 Markdown 唯一分类；3 个 PDF 绑定来源与 digest / P2 | snapshot/superseded 保持只读；新增文档同步清单。两个历史 PDF 与一个现行校验 PDF 均无跟踪生成器，替换前必须先补可复现生成源，不得手工编辑 |
+| 15 | 当前工作流、Markdown 与跟踪 PDF 闭集治理 | GOV-001、DOC-001、REPO-001 仓库内缺口已关闭：开发默认 `origin/main`，固定 tag 仅作证据；308 份 Markdown 唯一分类；3 个 PDF 绑定来源与 digest / P2 | snapshot/superseded 保持只读；新增文档同步清单。两个历史 PDF 与一个现行校验 PDF 均无跟踪生成器，替换前必须先补可复现生成源，不得手工编辑 |
 | 16 | 首批生产范围机器冻结 | Accepted ADR；`priority-eight-applications-v1` 冻结 8 应用、9 页面、32 API、38 数据引用、7 worker、14 外部依赖、16 应用证据与 14 切换动作；API/Owner 复核归零。新增迁移闭集把 21 个受阻引用分为 20 个唯一持久化计划与 1 个派生读模型，`collectionRepositoryPlanMissing=0` / P0 | 仓库计划完整不代表迁移完成；21 个引用仍无生产写资格，全部 API/数据晋级、真实外部证据、worker 激活、PG 主切换和现场验收继续 NO-GO |
 | 17 | 招标需求治理 v2 | Accepted ADR；2 份中性样本文档、5 条候选、27 个能力 ID、受控 PDF 指纹导入、人工复核覆盖层、差距分析与产品化工作台已形成 / P0 | 原始文件、全文、浏览器上传、OCR/模型、自动改代码和生产授权均不在首批范围；复核写入口保持行为证据待补与生产 NO-GO |
 

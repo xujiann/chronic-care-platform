@@ -1,5 +1,9 @@
 # DEPENDENCY MAP — 主线依赖地图
 
+## 2026年10月16日 反馈材料离线核验
+
+GOV044专项→反馈材料CLI→既有gs03-admission.readInput→Node fs/path/util，纯逻辑只检查JSON形状和声明引用图。无server、HTTP、数据库、provider、网络或第三方新依赖；不加载签署原件或材料目标。WIP2增3，独立工作树T00单写，独审只读；冻结后重型门禁串行。
+
 ## 2026-10-10 GOV041准入依赖
 
 GOV040/TEST029仅限定测试已闭合；PR346收口登记已保护同树集成且PR/main各9成功。GOV041设计专属批准不接受CALLBACK/STORAGE/S2，不把内存事务/receipt/合成预检升级为正式依赖。正式实现须另立Accepted及领域PLAN，依赖调用方目录、反馈专业字段/授权purpose与dataScopes、唯一receipt Owner/留存/legacy窗口、全部写者及外部scope fence、源世代和未知对账签署；无新包/运行边/默认注册，本设计新提交发布另授权。
