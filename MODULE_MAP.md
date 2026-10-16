@@ -1,5 +1,9 @@
 # MODULE MAP — 主线模块地图
 
+## 2026-10-15 GOV043收口单写
+
+T00从bd029dda创建独立收口工作树，仅单写台账、ROADMAP、CURRENT_ARCHITECTURE、MODULE_MAP四文件，独审只读，Git及重型门禁串行。GOV043限定规划已由PR351集成，关闭交付但保留原未决/地图gap/开放风险；OPS059及其他任务整条不变，活动WIP2/5。后续专业提交由用户协调，T00仅核授权材料，未来T01/T04/T08/T00/T05正式单写分片均另准入，不创建新实施任务/工作树、不授予源码或数据Owner权限。无src/test/helper、ADR、校验器、schema或部署变更，三父Proposed及生产NO-GO不变。
+
 ## 2026-10-15 OPS059准入计划单写
 
 GOV043由T00在新规划工作树独占台账、ROADMAP、CURRENT_ARCHITECTURE、MODULE_MAP四文件，独审只读，Git及重型门禁串行，不修改源代码/测试/ADR/校验器或创建实施工作树。OPS059原候选条目及拟议T05两路径保持不变，正式单写职责仍须另批：T01身份scope、T04确切授权、T08协议与T00存储/审计技术集成先形成准入前置，T05仅领域命令；本表不改变机器Owner或授予跨域写权。专业由用户协调另签，活动WIP3/5仅新增规划治理，三父Proposed及生产NO-GO不变。
