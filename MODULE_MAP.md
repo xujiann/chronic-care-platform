@@ -1,5 +1,9 @@
 # MODULE MAP — 主线模块地图
 
+## 2026-10-17 GOV044收口与测试候选单写
+
+T00在process/t00-feedback-material-closeout-20261017仅单写台账、ROADMAP、CURRENT_ARCHITECTURE、MODULE_MAP四文件；独审只读，Git和重型门禁串行。GOV044工具已由PR353同树保护集成，限定任务关闭，专业未决/开放风险继续保留；OPS040/SEC016及OPS059整条不变，活动WIP2/5。TEST030只待批准/未建设，未来拟由T00唯一写test/gs03-feedback-materials.test.js；现有testIds只作基线定位，不是新属性/变异验收，实施工作树未创建，不授予脚本/源码/helper/模板/CI写权。未来变异仅仓库外副本，若发现需改工具另准入。本轮不实施候选，不代签或运行正式业务，专业由用户协调，推送合并上线另批，生产NO-GO。
+
 ## 2026年10月16日 反馈材料离线核验
 
 GOV044/T00拥有scripts/gs03-feedback-materials.js离线CLI和纯validateFeedbackMaterials，复用gs03-admission.readInput；属于B类治理增量，无业务运行接线。独立九组材料索引不替代专业权威，旧三合同工具语义保留。只核必填、版本摘要格式及归属依赖关系，签署/原文/实施/生产投影固定false。
