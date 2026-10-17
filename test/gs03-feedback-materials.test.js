@@ -235,3 +235,224 @@ test("CLI accepts the exact 64 KiB boundary and rejects one additional byte", (t
   fs.writeFileSync(file, oversized); assert.equal(invoke(["--input", file]).code, 2);
   assert.deepEqual(fs.readFileSync(file), oversized);
 });
+
+// TEST-030: finite synthetic examples, independent of validator internals.
+// Each later group depends on earlier groups; its second material also depends
+// on its first. This construction, not a second graph checker, supplies the oracle.
+function graph(seed) {
+  const input = complete();
+  input.materials = [];
+  for (let i = 0; i < 9; i++) {
+    const group = input.groups[i], first = "s" + seed + "g" + i + "a", second = "s" + seed + "g" + i + "b";
+    group.materialIds = [first, second];
+    group.dependsOn = input.groups.slice(0, i).map((row) => row.id);
+    for (const [id, dependencies] of [
+      [first, input.materials.filter((_, index) => index % 2 === 1).map((row) => row.recordId)],
+      [second, [first]]
+    ]) {
+      const row = complete().materials[0];
+      row.recordId = id; row.groupId = group.id; row.dependencyIds = dependencies;
+      input.materials.push(row);
+    }
+  }
+  return input;
+}
+function dataSnapshot(input) {
+  const seen = new Set(), snapshot = [];
+  function visit(value) {
+    if (value === null || typeof value !== "object" || seen.has(value)) return;
+    seen.add(value);
+    const descriptors = Object.getOwnPropertyDescriptors(value);
+    snapshot.push({ value, prototype: Object.getPrototypeOf(value), descriptors });
+    for (const descriptor of Object.values(descriptors)) if (Object.hasOwn(descriptor, "value")) visit(descriptor.value);
+  }
+  visit(input);
+  return snapshot;
+}
+function checked(input, expectedCode) {
+  // Only called for non-Proxy data; descriptors never execute getters.
+  const snapshot = dataSnapshot(input), output = validateFeedbackMaterials(input);
+  assert.equal(output.metadataComplete, expectedCode === undefined, expectedCode || "valid graph accepted");
+  if (expectedCode !== undefined) assert.ok(output.issues.some((issue) => issue.code === expectedCode), expectedCode);
+  else assert.deepEqual(output.issues, []);
+  denied(output);
+  for (const issue of output.issues) assert.deepEqual(Object.keys(issue).sort(), ["code", "path"]);
+  assert.doesNotMatch(JSON.stringify(output), /synthetic:|s23g|s7g|s1g|private-test030/);
+  for (const entry of snapshot) {
+    assert.equal(Object.getPrototypeOf(entry.value), entry.prototype);
+    assert.deepEqual(Object.getOwnPropertyDescriptors(entry.value), entry.descriptors);
+  }
+  return output;
+}
+function permute(input, seed) {
+  const rotate = (rows) => {
+    if (!rows.length) return rows;
+    const offset = seed % rows.length;
+    return rows.slice(offset).concat(rows.slice(0, offset)).reverse();
+  };
+  input.groups = rotate(input.groups); input.materials = rotate(input.materials);
+  for (const row of input.groups) {
+    row.materialIds = rotate(row.materialIds); row.dependsOn = rotate(row.dependsOn);
+  }
+  for (const row of input.materials) row.dependencyIds = rotate(row.dependencyIds);
+}
+for (const seed of [1, 7, 23]) {
+  test("TEST030 DAG transformations seed " + seed, () => {
+    const input = graph(seed); checked(input);
+    permute(input, seed); checked(input);
+    const renamed = new Map(input.materials.map((row, index) => [row.recordId, "renamed-" + seed + "-" + index]));
+    for (const row of input.groups) row.materialIds = row.materialIds.map((id) => renamed.get(id));
+    for (const row of input.materials) {
+      row.recordId = renamed.get(row.recordId); row.dependencyIds = row.dependencyIds.map((id) => renamed.get(id));
+    }
+    checked(input);
+    const ordinaryFrozen = structuredClone(input);
+    for (const entry of dataSnapshot(ordinaryFrozen)) Object.freeze(entry.value);
+    checked(ordinaryFrozen);
+    for (const entry of dataSnapshot(input)) if (!Array.isArray(entry.value)) Object.setPrototypeOf(entry.value, null);
+    checked(input);
+    for (const entry of dataSnapshot(input)) {
+      Object.freeze(entry.value);
+    }
+    checked(input);
+  });
+}
+for (const [name, code, mutate] of [
+  ["dangling", "DANGLING_REFERENCE", (x) => { x.materials[17].dependencyIds.push("missing-node"); }],
+  ["ownership", "GROUP_MISMATCH", (x) => { x.groups[0].materialIds[0] = x.materials[2].recordId; }],
+  ["duplicate", "DUPLICATE_REFERENCE", (x) => { x.materials[17].dependencyIds.push(x.materials[17].dependencyIds[0]); }],
+  ["undeclared", "GROUP_DEPENDENCY_UNDECLARED", (x) => { x.groups[8].dependsOn.pop(); }]
+]) {
+  test("TEST030 edge corruption " + name, () => {
+    for (const seed of [1, 7, 23]) {
+      const input = graph(seed); checked(input); mutate(input);
+      checked(input, code); permute(input, seed); checked(input, code);
+    }
+  });
+}
+test("TEST030 independent group cycle", () => {
+  const input = complete(); checked(input);
+  input.groups[0].dependsOn = ["S02"]; input.groups[1].dependsOn = ["S03"]; checked(input);
+  input.groups[2].dependsOn = ["S01"];
+  const output = checked(input, "DEPENDENCY_CYCLE");
+  assert.deepEqual(output.issues, [{ path: "groups", code: "DEPENDENCY_CYCLE" }]);
+});
+test("TEST030 independent material cycle", () => {
+  const input = complete();
+  for (const id of ["second-node", "third-node"]) {
+    const row = structuredClone(input.materials[0]); row.recordId = id;
+    input.materials.push(row); input.groups[0].materialIds.push(id);
+  }
+  checked(input);
+  input.materials[0].dependencyIds = ["second-node"];
+  input.materials[9].dependencyIds = ["third-node"];
+  checked(input); // Still a DAG before the single closing edge.
+  input.materials[10].dependencyIds = ["material0"];
+  const output = checked(input, "DEPENDENCY_CYCLE");
+  assert.deepEqual(output.issues, [{ path: "materials", code: "DEPENDENCY_CYCLE" }]);
+});
+for (const section of ["root", "baseline", "group", "material"]) {
+  const sample = complete();
+  const select = (input) => section === "root" ? [input] : section === "baseline" ? [input.baseline]
+    : section === "group" ? input.groups : input.materials;
+  for (const key of Object.keys(select(sample)[0])) {
+    test("TEST030 descriptor " + section + "." + key, () => {
+      for (let index = 0; index < select(sample).length; index++) {
+        for (const mode of ["getter", "hidden"]) {
+          const input = complete(), target = select(input)[index]; let calls = 0;
+          Object.defineProperty(target, key, mode === "getter"
+            ? { configurable: true, enumerable: true, get() { calls++; throw Error("private-test030"); } }
+            : { configurable: true, enumerable: false, value: target[key], writable: true });
+          checked(input, "INVALID_DATA_PROPERTIES"); assert.equal(calls, 0, section + "." + key);
+        }
+      }
+    });
+  }
+}
+function arraySlots(input) {
+  return [[input, "groups"], [input, "materials"],
+    ...input.groups.flatMap((row) => [[row, "materialIds"], [row, "dependsOn"]]),
+    ...input.materials.map((row) => [row, "dependencyIds"])];
+}
+test("TEST030 every array index rejects accessors and hidden data", () => {
+  const sample = graph(23);
+  for (let slot = 0; slot < arraySlots(sample).length; slot++) {
+    const [owner, key] = arraySlots(sample)[slot];
+    for (let index = 0; index < owner[key].length; index++) {
+      for (const mode of ["getter", "hidden"]) {
+        const input = graph(23), [targetOwner, targetKey] = arraySlots(input)[slot], array = targetOwner[targetKey]; let calls = 0;
+        Object.defineProperty(array, index, mode === "getter"
+          ? { enumerable: true, get() { calls++; throw Error("private-test030"); } }
+          : { enumerable: false, value: array[index] });
+        checked(input, "INVALID_ARRAY"); assert.equal(calls, 0);
+      }
+    }
+  }
+});
+test("TEST030 every nested proxy is rejected without any trap", () => {
+  const slots = (input) => [[{ root: input }, "root"], [input, "baseline"], ...arraySlots(input),
+    ...input.groups.map((_, i) => [input.groups, i]), ...input.materials.map((_, i) => [input.materials, i])];
+  for (let index = 0; index < slots(graph(23)).length; index++) {
+    for (const revoked of [false, true]) {
+      const input = graph(23), [owner, key] = slots(input)[index], target = owner[key]; let calls = 0;
+      const handler = Object.fromEntries(["get", "set", "has", "ownKeys", "getOwnPropertyDescriptor", "getPrototypeOf",
+        "setPrototypeOf", "defineProperty", "deleteProperty", "isExtensible", "preventExtensions"]
+        .map((trap) => [trap, () => { calls++; throw Error("private-test030"); }]));
+      const wrapped = Proxy.revocable(target, handler); owner[key] = wrapped.proxy;
+      if (revoked) wrapped.revoke();
+      const output = invalid(index === 0 ? owner[key] : input);
+      assert.equal(calls, 0, "proxy slot " + index);
+      assert.ok(output.issues.some((issue) => ["INVALID_OBJECT", "INVALID_ARRAY"].includes(issue.code)));
+      assert.equal(owner[key], wrapped.proxy);
+      assert.doesNotMatch(JSON.stringify(output), /private-test030|synthetic:/);
+    }
+  }
+});
+test("TEST030 all array prototypes remain restricted", () => {
+  for (let slot = 0; slot < arraySlots(graph(23)).length; slot++) {
+    for (const prototype of [null, {}]) {
+      const input = graph(23), [owner, key] = arraySlots(input)[slot];
+      Object.setPrototypeOf(owner[key], prototype); checked(input, "INVALID_ARRAY");
+    }
+  }
+});
+test("TEST030 exact reference and identifier lengths", () => {
+  for (const section of ["baseline", "group", "material"]) {
+    const input = complete(), target = section === "baseline" ? input.baseline : section === "group" ? input.groups[0] : input.materials[0];
+    const fields = section === "baseline" ? ["contractRef"] : section === "group"
+      ? ["decisionVersion", "ownerAuthorizationRef", "signoffRef"]
+      : ["nameRef", "version", "ownerAuthorizationRef", "controlledRef", "digestObjectRef", "signoffRef", "accessRef", "scopeRef", "validityRef", "submissionRef"];
+    for (const key of fields) {
+      const original = target[key];
+      for (const length of [1, 160]) { target[key] = "x".repeat(length); checked(input); }
+      target[key] = "x".repeat(161); checked(input, "INVALID_REFERENCE");
+      target[key] = original;
+    }
+  }
+  for (const length of [1, 64, 65]) {
+    const input = complete(), id = "x".repeat(length);
+    input.materials[0].recordId = id; input.groups[0].materialIds = [id]; input.materials[1].dependencyIds = [id]; input.groups[1].dependsOn = ["S01"];
+    checked(input, length === 65 ? "INVALID_IDENTIFIER" : undefined);
+  }
+});
+function maximumGraph(count) {
+  const input = complete();
+  while (input.materials.length < count) {
+    const row = structuredClone(input.materials[8]);
+    row.recordId = "bounded-" + input.materials.length;
+    input.materials.push(row); input.groups[8].materialIds.push(row.recordId);
+  }
+  input.groups[8].dependsOn = input.groups.slice(0, 8).map((row) => row.id);
+  input.materials.at(-1).dependencyIds = input.materials.slice(0, -1).map((row) => row.recordId);
+  return input;
+}
+test("TEST030 exact material row and reference list bounds", () => {
+  const input = maximumGraph(128);
+  assert.equal(input.materials.length, 128); assert.equal(input.materials.at(-1).dependencyIds.length, 127); checked(input);
+  // 128 unique existing dependencies necessarily include self: semantic, not size, rejection.
+  input.materials.at(-1).dependencyIds.push(input.materials.at(-1).recordId);
+  checked(input, "SELF_DEPENDENCY");
+  input.materials.at(-1).dependencyIds.push("missing-node");
+  checked(input, "INVALID_ARRAY"); // 129 exceeds the independent list resource limit.
+  checked(maximumGraph(129), "INVALID_ARRAY"); // All rows owned/referenced; only row cap is exceeded.
+});
