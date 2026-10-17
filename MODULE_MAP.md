@@ -1,5 +1,9 @@
 # MODULE MAP — 主线模块地图
 
+## 2026年10月16日 反馈材料离线核验
+
+GOV044/T00拥有scripts/gs03-feedback-materials.js离线CLI和纯validateFeedbackMaterials，复用gs03-admission.readInput；属于B类治理增量，无业务运行接线。独立九组材料索引不替代专业权威，旧三合同工具语义保留。只核必填、版本摘要格式及归属依赖关系，签署/原文/实施/生产投影固定false。
+
 ## 2026-10-15 GOV043收口单写
 
 T00从bd029dda创建独立收口工作树，仅单写台账、ROADMAP、CURRENT_ARCHITECTURE、MODULE_MAP四文件，独审只读，Git及重型门禁串行。GOV043限定规划已由PR351集成，关闭交付但保留原未决/地图gap/开放风险；OPS059及其他任务整条不变，活动WIP2/5。后续专业提交由用户协调，T00仅核授权材料，未来T01/T04/T08/T00/T05正式单写分片均另准入，不创建新实施任务/工作树、不授予源码或数据Owner权限。无src/test/helper、ADR、校验器、schema或部署变更，三父Proposed及生产NO-GO不变。
@@ -587,7 +591,7 @@ owner、文件引用和 closed-world 核心概念匹配只是证据，不能自�
 |---|---|---|---|
 | `config/repository-governance.json` | T00 | 当前 workflow、Markdown 分类规则/闭集摘要、3 个 PDF 来源与 digest 的机器合同 | 不定义业务 owner，不包含 PDF 正文 |
 | `scripts/repository-governance.js` | T00 | 只读枚举 Git 路径，拒绝漏分/重叠/快照改写/旧 baseline/PDF 漂移 | 不生成或修改文档、PDF、报告和归档 |
-| `test/repository-governance.test.js` | T00 / TEST-001 | 锁定当前 307 份 Markdown、三类边界、当前 main 流程和 3 个 PDF 负向漂移 | 不证明 PDF 内容正确或生产可用 |
+| `test/repository-governance.test.js` | T00 / TEST-001 | 锁定当前 308 份 Markdown、三类边界、当前 main 流程和 3 个 PDF 负向漂移 | 不证明 PDF 内容正确或生产可用 |
 
 依赖方向为 `Git 跟踪路径 + ADR 状态 + 当前进程清单 + PDF bytes/source paths → repository governance
 verifier → governance-api/architecture:test`。snapshot 与 superseded 只提供历史证据，不得反向覆盖 current

@@ -1,0 +1,85 @@
+{
+  "schemaVersion": "gs03-feedback-materials-input.v1",
+  "environment": "test",
+  "scope": "feedback-only",
+  "baseline": {
+    "commit": null,
+    "contractRef": null,
+    "contractSha256": null
+  },
+  "groups": [
+    {
+      "id": "S01",
+      "decisionVersion": null,
+      "ownerAuthorizationRef": null,
+      "signoffRef": null,
+      "materialIds": [],
+      "dependsOn": []
+    },
+    {
+      "id": "S02",
+      "decisionVersion": null,
+      "ownerAuthorizationRef": null,
+      "signoffRef": null,
+      "materialIds": [],
+      "dependsOn": []
+    },
+    {
+      "id": "S03",
+      "decisionVersion": null,
+      "ownerAuthorizationRef": null,
+      "signoffRef": null,
+      "materialIds": [],
+      "dependsOn": []
+    },
+    {
+      "id": "S04",
+      "decisionVersion": null,
+      "ownerAuthorizationRef": null,
+      "signoffRef": null,
+      "materialIds": [],
+      "dependsOn": []
+    },
+    {
+      "id": "S05",
+      "decisionVersion": null,
+      "ownerAuthorizationRef": null,
+      "signoffRef": null,
+      "materialIds": [],
+      "dependsOn": []
+    },
+    {
+      "id": "S06",
+      "decisionVersion": null,
+      "ownerAuthorizationRef": null,
+      "signoffRef": null,
+      "materialIds": [],
+      "dependsOn": []
+    },
+    {
+      "id": "S07",
+      "decisionVersion": null,
+      "ownerAuthorizationRef": null,
+      "signoffRef": null,
+      "materialIds": [],
+      "dependsOn": []
+    },
+    {
+      "id": "S08",
+      "decisionVersion": null,
+      "ownerAuthorizationRef": null,
+      "signoffRef": null,
+      "materialIds": [],
+      "dependsOn": []
+    },
+    {
+      "id": "S09",
+      "decisionVersion": null,
+      "ownerAuthorizationRef": null,
+      "signoffRef": null,
+      "materialIds": [],
+      "dependsOn": []
+    }
+  ],
+  "materials": []
+}

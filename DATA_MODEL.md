@@ -1,5 +1,9 @@
 # DATA MODEL — 主线数据地图
 
+## 2026年10月16日 反馈材料离线核验
+
+GOV044只读gs03-feedback-materials-input.v1元数据：baseline、S01至S09组及受控材料索引，引用、版本和声明摘要不构成真实签署事实源。原件、真实责任人及批准参数不进入仓库；本片不打开引用目标、不校验内容摘要匹配，不新建业务模型/集合/数据库或迁移。默认schema19/41与生产NO-GO不变。
+
 ## 2026-10-10 反馈-only数据设计未接线
 
 GOV041仅Proposed设计：客户端反馈意图必须覆盖全部获批持久字段，服务端派生时间/事件ID另由受控读集与审计绑定约束；synthetic摘要不能变S1正式digest。反馈候选不归档报告，唯一receipt只存受控摘要/最小结果/审计引用，不复制患者正文。授权记录仍personalRecords、案例仍referralTeleconsultations；正式字段、状态、purpose/dataScopes、retention/tombstone/源世代及机器数据Owner批准未完成。无表/迁移/现库变更，默认schema19/41不变。

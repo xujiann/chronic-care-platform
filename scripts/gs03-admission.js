@@ -118,4 +118,4 @@ if (require.main === module) {
   process.exitCode = result.exitCode;
 }
 
-module.exports = { validateAdmission, runCli, REQUIRED, INPUT_VERSION, MAX_BYTES };
+module.exports = { validateAdmission, runCli, readInput, REQUIRED, INPUT_VERSION, MAX_BYTES };
