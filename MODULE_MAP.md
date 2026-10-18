@@ -1,5 +1,13 @@
 # MODULE MAP — 主线模块地图
 
+## 2026-10-18 TEST030台账收口与观测候选单写
+
+T00经process:plan/create在process/t00-access-observability-closeout-20261018建立独立工作树，仅协调者单写台账、ROADMAP、CURRENT_ARCHITECTURE、MODULE_MAP四文件，独审只读，Git与重型门禁串行；原测试、工具、业务及旧工作树不动。TEST030测试交付已由PR355同树保护集成、PR/main各9成功，限定任务已关闭/已集成，专业未决/风险open/地图gap保留。WIP3降2/5，OPS040/SEC016整条和OPS015阻塞不变，不新建递归收口任务。当前收口提交自身独审、冻结及18门禁另验，旧结果不替新候选；下方为历史阶段记录。
+
+观测盘点复用src/platform/observability/request-context.js、platform-request-handler、既有metrics/health与SIEM边界；不新增平行collector、worker profile或日志平台。命令/事件核验/专属存储适配只作只读事实源，不改其权限、回执、事务、坏链拒绝或生产拒绝。通用慢请求原路径和客户端correlation的隐私/信任边界如实保留，业务securityEvents不外送作遥测。
+
+GOV045只登记中风险非运行时观测合同设计候选，待批准/未建设、测试和证据为空、拟议分支/写范围不生效，不创建实施树或ADR。GOV014仅已集成合同盘点基线；候选不获原高风险下游实现权，后续设计不能自动准入运行时。未来须由原Owner核定T04声明、T01核验、T00共享观测与组合的独立单写范围，T02审计数据Owner不迁移，并先处理OPS040/SEC016开放高风险与交接。专业签署由用户协调，OPS059、候选实施及推送合并上线另批，六域生产NO-GO不变。
+
 ## 2026-10-17 TEST030单写实施
 
 T00协调者唯一写既有test/gs03-feedback-materials.test.js、台账、ROADMAP及两地图，独审只读；不增工具/helper/框架或运行接线，不改scripts/src/模板/CI/schema/依赖。TEST030由待批准转实施中，WIP3/5；其他任务整条不变。变异只在仓库外副本，原件SHA/新旧结果与目标断言归因留证；需改工具另准入。独审后冻结并18串行门禁，不预支结果；专业由用户协调，OPS059正式实现/推送合并上线另批，六域NO-GO。
