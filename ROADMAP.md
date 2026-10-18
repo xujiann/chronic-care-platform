@@ -1,5 +1,52 @@
 # 工程治理路线图
 
+## 2026-10-18 TEST-030 台账收口与访问知晓观测规划
+
+用户本轮仅批准TEST-030台账收口、OPS-040/SEC-016运行观测缺口梳理和下一候选登记（USER-TEST030-CLOSEOUT-OBSERVABILITY-CANDIDATE-PLAN-2026-10-18）。基线为最新fetched origin/main@9c6f7b8e49087a3ea8bb9dc7ce276c36430c2840，主线CI39090689988九项成功、无开放PR。T00经process:plan/create建立process/t00-access-observability-closeout-20261018，仅协调者单写config/lifecycle-governance.json、ROADMAP.md、CURRENT_ARCHITECTURE.md、MODULE_MAP.md四文件；独审只读，Git及重型门禁串行。原脏主目录、已交付工作树和历史证据不动，不修改源码、测试、工具、helper、ADR、CI、依赖、schema或部署。
+
+### 已核交付与本轮收口边界
+
+TEST-030冻结94d7eeedef1f8d84db7dee2dd6f569a28435d5a7已由[PR355](https://github.com/xujiann/chronic-care-platform/pull/355)保护squash合并为上述主线，同tree8efef30aaf7b523bd7b0a9263f20659bd88b0387。独审无遗留P0-P2，18项本地串行门禁通过；专项88pass（新增43）、治理窄测173pass，9个指定语义变异由目标断言检出，其中4个新增检出、5个旧新均检出，不解释为穷尽证明。本地unit3689pass/45环境skip、integration386pass、smoke6pass、all4075pass/45环境skip，均0fail/cancel；重叠套件不累加，skip不作通过。
+
+[PR CI39082878010](https://github.com/xujiann/chronic-care-platform/actions/runs/39082878010)与[main CI39090689988](https://github.com/xujiann/chronic-care-platform/actions/runs/39090689988)各九项成功；每轮独立真实PG1+44pass/0skip、Chromium60+13+3pass、依赖审计passed。保护未变、无admin/force绕过；Pages39090689951只是静态预览。受控交付证据为.codex-platform-evidence/feedback-material-test-protection-20261017/publication-20261018/delivery-publication-final.json，SHA256=e85dc93db37c1441e191c4ac7cd9ff1ced76974dab4b0dce2faa1f8ab699ca23，本轮重核其202份绑定证据；这些结果只证明旧交付，不替本轮四文件验证。
+
+本轮仅把TEST-030限定测试任务置已关闭/已集成并关联EVD-PR355-INTEGRATION，移除已经兑现的“独审/冻结门禁待执行”阶段未决；原专业未决逐字保留，RISK-TEST-030仍open，MAP-MODULE仍保留其专业边界gap。OPS-040、SEC-016、OPS-059整条记录及其旧证据/风险不变；活动WIP3/5降为2/5，OPS-015原阻塞继续保留，不为凑推荐WIP启动候选。不新增递归收口任务。以下日期段落为各轮历史，当前TEST-030集成状态以本节和台账为准；本轮新治理提交尚未推送、合并或通过远端CI。
+
+### OPS-040／SEC-016 运行观测缺口盘点
+
+盘点只读既有实现，不运行现场探测、不读取真实审计/居民/监控材料。声明语义仍仅本人知晓，不追认访问合法性；生产/不支持的存储与PG会话配置拒绝不变。两项原高风险任务仍验证中/已实现，已集成代码与运行能力完成分开记录。
+
+已有通用能力：src/http/platform-request-handler.js接入PlatformObservability；src/platform/observability/request-context.js提供请求相关ID及domain/subdomain/method计数、5xx错误和时长，server.js的recordRequestMetrics/buildRuntimeMetrics提供总体计数、慢请求、/api/metrics与Prometheus投影。相关ID可来自客户端，不作为可信身份或耐久命令标识。既有慢请求保留去query后的原路径，可能含事件标识，不能称为模板化脱敏日志；本轮不复制真实路径或修复共享实现。通用SIEM/Webhook及docs/production-observability-alerting.md已存在，但不能证明本声明专属告警和现场闭环完成，也不另建平行观测平台或套用worker合同。
+
+| 交付项 | 当前可核事实 | 专属缺口与下一合同需明确的验收 |
+| --- | --- | --- |
+| structuredLogs | access-acknowledgement-command.js生成稳定错误码与同事务securityEvents；这是业务审计，不是可外送遥测，成功审计含actor/target | 固定事件/结果分类、字段白名单、脱敏与有界输出，区分新建、重放、拒绝及存储失败；禁止居民/actor/事件/回执/幂等键/载荷和原路径进入标签或日志，不把简单哈希自动视为匿名 |
+| metricsAndAlerts | 通用HTTP聚合与既有SIEM适配存在；专属路由只返回状态与错误，没有按声明结果验收的指标链 | 低基数结果、错误、时长、容量/存储风险及告警复用方式；不能以普通HTTP200或只计5xx代表业务成功，阈值/窗口/接收责任及投递实证待批准 |
+| tracing | 请求相关ID在壳层存在，声明调用未传专属关联端口 | 信任来源、有界关联与命令阶段边界及失败归因；不将客户端相关ID、业务ID、摘要或审计引用直接外送；不引入第二身份或持久回执权威 |
+| healthCheck | /api/live与/api/health有通用存活/会话/存储信息，命令按环境与存储准入 | 明确专属不可用/拒绝/未知与通用存活区别；只读、不扫描或输出居民事实，不调用会追加访问审计的GET，不以探测补链/规范化/修复或开生产 |
+| sloAndErrorBudget | 已有HTTP计数/累计与最大时长，没有本声明经批准的分母、窗口和预算合同 | 成功、重放、合法拒绝、故障及未知分别归类，明确样本缺失/重启/窗口；业务/运维批准SLO数值与误差预算后才可验收，本轮不代填数值 |
+| runbook | 通用生产观测手册存在，命令已有容量拒绝、坏链拒绝、CAS冲突、生产拒绝 | 专属诊断/告警/升级/恢复步骤及权限、证据引用；区分已提交但响应丢失、明确失败与无法确认，不承诺未经证明的零写或跨实例exactly-once |
+| degradation | 原命令遇环境、会话、坏链、容量与存储问题失败关闭 | 遥测sink缺失/抛错/超时/缓冲满不得改变原事务/回执/响应、再写成功或失败审计、自动重试命令、放宽授权或降级至JSON；精确隔离策略待合同准入 |
+| compensation | 精确重放返回既有回执，冲突与容量拒绝均保留历史；没有自动撤销声明方案 | 只提出受控核验与人工恢复合同，未知结果不自动重发；不得删除声明/receipt/key、重封审计或还原整库来“补偿”；合法同键重放仍须当前身份/事件/环境重验 |
+
+上述八项是待设计/待验证清单，不向OPS-040/SEC-016.observability八个完成字段填入规划文字。原真实PG/多实例、长期审计/容量、现场及高风险API目录元数据边界继续保留，通用PG绿灯不作为本声明生产适配证据。
+
+### GOV-045 访问知晓声明观测合同设计候选
+
+仅登记T00中风险非运行时设计候选，待批准/未建设，testIds/evidenceIds为空；本轮不创建候选工作树、ADR、测试或实现。拟议工作树/分支为process/t00-access-observability-design-20261018，未来拟仅写本轮同四份治理文件细化合同设计；若需要新ADR或其他路径须重新核准，不重写Accepted历史。
+
+选项比较：直接增加专属遥测会跨入开放高风险源码及隐私/失败语义，当前未准入；只把通用HTTP与业务审计当完成会误关缺口；推荐后续另批限域合同设计，先冻结结果分类、敏感字段禁令、复用端口、失败隔离、八项证据边界与Owner拆分，再决定是否准入实施。设计本身无新运行能力或数据迁移，回退只撤设计/登记增量，保留原声明、审计、回执、旁路保护和全部旧证据。
+
+候选dependencies仅GOV-014，含义是已闭合幂等行为合同的只读盘点基线，不是以无高风险依赖边规避门禁。OPS-040/SEC-016仍开放高风险任务，现行机器规则禁止从其扩展任何下游实施；GOV-045不能授予运行时权限，也不能由其关闭自动解除这些阻断。任何实现须先由原Owner处理任务边界/单写交接、高风险状态与依赖准入，接受明确限域设计和人工高风险PLAN，再登记真正可执行的测试和验证证据。T04负责声明语义，T01核验身份/原事件，T00负责共享观测/组合技术，T02原审计数据Owner不迁移；这些是待确认责任域，不代填真实签署人。
+
+未来合同应提出合成验收矩阵：201新建、200精确重放、403当前撤权/越权、409重复/异载荷/CAS/容量/坏链、503环境/存储拒绝及已提交响应丢失/未知恢复；日志/指标/追踪零敏感回显、低基数、只读health、sink缺失/失败不改变原业务/审计/重放。届时先搜索并复用现有专项和HTTP基础设施，实际文件、测试ID和接入命令随高风险实施PLAN冻结，不在本轮制造新通过证据或替代真实监控投递。
+
+### 本轮验证与后续授权
+
+先执行治理窄测和四文件/原记录不变审计，独审无P0-P2后冻结精确提交/tree；再串行governance:lifecycle、repository:governance:verify、documentation-facts:verify、process:verify、routes:check、routes:test、architecture:test、process:test、platform:iterations:test、build、lint、typecheck、test:unit、test:integration、test:smoke、test:all、security:browser:verify、static:test共18门禁，复核原始日志、计数、SHA及最终证据。失败留证回修复审重冻，不改变预算/断言。旧18门禁与CI不替本轮，环境skip单列，重叠套件不累加；本节不预支本轮通过或集成结果。
+
+本轮仅本地待集成，推送/PR/合并/上线另获授权。专业签署由用户协调，不代填责任人、参数、阈值或签署结果。OPS-059整条候选、S01-S09待签、三父Proposed、GS03未建设、默认schema19/41与六域生产NO-GO不变；不把观测规划当正式业务或生产准入。
+
 ## TEST-030 测试保护实施 PLAN
 
 2026-10-17用户批准既有专项的离线元数据属性与变异测试实施（USER-TEST030-TEST-PROTECTION-2026-10-17）。基线origin/main@fe4822cbc3df05c206a297df4a3bf27948654335，PR354已闭合，main CI39013459334成功且无开放PR。T00通过process:plan/create建立process/t00-feedback-material-test-protection-20261017，协调者唯一写既有test/gs03-feedback-materials.test.js及必要台账、本PLAN、CURRENT_ARCHITECTURE、MODULE_MAP五路径；独审只读，其他工作树不动。WIP2增3/5，OPS040/SEC016及OPS059整条保持不变。下方候选段落保留登记时历史，本节及台账为当前授权状态。
