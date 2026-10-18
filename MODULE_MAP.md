@@ -1,5 +1,11 @@
 # MODULE MAP — 主线模块地图
 
+## 2026-10-18 GOV045设计准入准备单写
+
+本轮T00在process/t00-access-observability-admission-plan-20261018规划树唯一写config/lifecycle-governance.json、ROADMAP.md、CURRENT_ARCHITECTURE.md、MODULE_MAP.md，独审只读，Git及18门禁串行；不动原脏主目录、已交付树、源码/测试/helper/工具/ADR/CI/schema/依赖。PR356已同tree保护集成前轮治理，主线d62aa8b4各项CI成功；本轮准备另行验证，不以旧结果替代。
+
+仅细化待批准GOV045的设计范围/专业输入清单，OBS01–OBS08为人工协调索引，不建新任务/接口/观测协议或签署工具，不使用GS03 S01-S09校验器处理OBS。候选design树仍未创建，approval.pending、未建设、空测试证据及WIP2/5不变；原任务和风险不改。T04声明、T01核验、T00共享组合、T02审计数据是待确认责任域，不是已签真实Owner或新写权。任何后续实施先核原高风险任务准入和Owner单写交接，限域Accepted及人工PLAN；专业由用户协调，合同设计/OPS059正式实现/新推送合并/上线另批，生产NO-GO。
+
 ## 2026-10-18 TEST030台账收口与观测候选单写
 
 T00经process:plan/create在process/t00-access-observability-closeout-20261018建立独立工作树，仅协调者单写台账、ROADMAP、CURRENT_ARCHITECTURE、MODULE_MAP四文件，独审只读，Git与重型门禁串行；原测试、工具、业务及旧工作树不动。TEST030测试交付已由PR355同树保护集成、PR/main各9成功，限定任务已关闭/已集成，专业未决/风险open/地图gap保留。WIP3降2/5，OPS040/SEC016整条和OPS015阻塞不变，不新建递归收口任务。当前收口提交自身独审、冻结及18门禁另验，旧结果不替新候选；下方为历史阶段记录。
