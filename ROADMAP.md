@@ -1,5 +1,23 @@
 # 工程治理路线图
 
+## TEST-030 测试保护实施 PLAN
+
+2026-10-17用户批准既有专项的离线元数据属性与变异测试实施（USER-TEST030-TEST-PROTECTION-2026-10-17）。基线origin/main@fe4822cbc3df05c206a297df4a3bf27948654335，PR354已闭合，main CI39013459334成功且无开放PR。T00通过process:plan/create建立process/t00-feedback-material-test-protection-20261017，协调者唯一写既有test/gs03-feedback-materials.test.js及必要台账、本PLAN、CURRENT_ARCHITECTURE、MODULE_MAP五路径；独审只读，其他工作树不动。WIP2增3/5，OPS040/SEC016及OPS059整条保持不变。下方候选段落保留登记时历史，本节及台账为当前授权状态。
+
+目标与选项：补强既有Accepted离线合同，不新建校验器、通用生成框架或helper。仅测试保护和治理同步，不改scripts/src/模板/API/schema/CI/依赖，不读取真实签署或材料，不代填批准参数。若发现需改工具，保留失败和最小复现，另提准入。
+
+实施前固定有限矩阵：种子1、7、23各构造每组两份材料的独立有向无环图，依赖仅指向较早组/同组较早材料；对组、材料及引用逆序和种子旋转、材料ID双射重命名验证接受且关系保真。单边破坏分别断言悬空、错属、重复、未声明跨组和组/材料三节点环错误码，不要求排列后错误索引路径一致。所有接受/拒绝均固定五项false与NO-GO，验证零回显、输入值/所有层描述符/原型不变。
+
+对象矩阵覆盖root/baseline/每组/每材料普通与null原型以及全层冻结（数组仍为Array.prototype）；每个自有字段的访问器、非枚举，以及全部根数组/三种引用数组的索引描述符、Proxy及revoked Proxy，断言零getter/trap调用。资源矩阵对纯函数精确材料行128/129、ID64/65字符、引用160/161字符及依赖链验证，分别记录128行/引用边界的接受与越界拒绝；纯函数大输入不冒充CLI64KiB边界（旧专项另保护CLI）。
+
+仓库外固定9变异点：M01引用上限159改158；M02标识符上限63改62；M03材料行上限128改127；M04关闭组环检测；M05关闭材料环检测；M06移除错属判定；M07移除重复引用判定；M08仅submissionRef非枚举绕过；M09引用数组Proxy检测移除。原件及旧专项先绿、新专项再绿；每变异检查精确单锚点替换、node --check及导入，再分别运行旧整专项与新目标命名测试。仅目标ERR_ASSERTION失败算检出；解析/导入/非目标异常不算，旧已检出与新增检出分列，不制造“新测试独占”结论。副本、runner和日志仅放工作树外.codex-platform-evidence/feedback-material-test-protection-20261017，记录来源/新旧测试/副本SHA、退出码、计数及原件前后不变。
+
+先运行node --test --test-concurrency=1 test/gs03-feedback-materials.test.js test/gs03-admission.test.js及治理窄测；独审无P0-P2后冻结精确提交/tree，再串行governance:lifecycle、repository:governance:verify、documentation-facts:verify、process:verify、routes:check、routes:test、architecture:test、process:test、platform:iterations:test、build、lint、typecheck、test:unit、test:integration、test:smoke、test:all、security:browser:verify、static:test共18门禁。失败留证回修复审重冻；环境skip不算通过，重叠套件不累加，最终证据另独审。当前未预支任何测试或门禁结果。
+
+回退只撤本片测试/治理增量，无迁移，不改业务事实或旧证据。签署真实性、材料内容与OPS059共同写者/正式限域Accepted/高风险PLAN缺口保持；三父Proposed、GS03未建设、schema19/41和六域NO-GO不变。完成仅本地待集成，不推送、创建PR、合并或上线。
+
+实施结果（冻结前）：原45项保留，新专项88pass（新增43项），治理窄测173pass，均0fail/cancel/skip。外置mutation-results-v2.json记录9个语义变异目标断言检出，M01/M02/M03/M08为旧未检出而新增检出，另5个旧新均检出；不解释为全部缺陷可被发现。M08原短锚点出现两次，首次运行在创建该变异前安全中止；改为唯一shape描述符声明后重新隔离复跑，前次不完整结果保留。原件SHA未变。引用列表127项合法，128个唯一现有依赖必含self（语义拒绝），129项由资源上限拒绝；不虚造合法128依赖。组/材料三环分离、描述符及原型不变已测；冻结后18门禁和最终证据独审仍待执行，未集成。
+
 ## GOV-044 台账收口与下一测试候选
 
 2026-10-17用户仅批准GOV-044台账收口及下一切片梳理登记。基线origin/main@112652379d233d0e1591608068414b5c506808a2，主线CI38994117630成功、无开放PR。T00在process/t00-feedback-material-closeout-20261017独立工作树唯一写config/lifecycle-governance.json、ROADMAP.md、CURRENT_ARCHITECTURE.md、MODULE_MAP.md四文件；独审只读，Git和重型门禁串行。不新增递归收口任务、源码、测试、helper、ADR或工具，不动脏主目录和已交付工作树。
