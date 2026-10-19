@@ -1,5 +1,14 @@
 # MODULE MAP — 主线模块地图
 
+## 2026-10-19 GOV045限定设计收口与实施准入PLAN
+
+PR358冻结4545466a与主线467080f2同tree69b5eed7，双轮CI各9成功、保护未变；仅合同设计交付已集成，本轮据此关闭GOV045。原六条未决、开放风险与模块gap保留，不把设计、CI或通用HTTP/业务审计当作专属运行观测完成；WIP3降2/5，不创建递归收口任务。
+
+下一PLAN只引用原命令、请求观测/组合、适配/只读事件核验及既有专项的只读锚点，不新增模块、工具、helper、公共合同registry或实施写权。T04语义、T01核验、T00共享/组合和T02审计数据责任域均未迁移；实际Owner交接、必要Accepted/高风险PLAN、准确文件/测试/DAG、资源隔离和OBS签署仍待另批，不能从开放高风险任务扩展下游或借设计关闭绕过依赖。
+
+本轮仅四文件台账收口及下一切片准入规划，自身独审冻结/18门禁另验，不预支通过或集成；未来C01–C16未实现未执行，旧专业/真实PG多实例/长期审计及原路径风险仍开放。OPS059整条、三父Proposed、GS03未建设、schema19/41和六域NO-GO不变，专业由用户协调，新规划推送合并/运行时/正式实现/上线另批。以下日期段落保留历史。
+
+
 ## 2026-10-19 GOV045四文件合同设计单写
 
 process/t00-access-observability-design-20261019仅T00协调者写config/lifecycle-governance.json、ROADMAP.md、CURRENT_ARCHITECTURE.md、MODULE_MAP.md，独审只读，Git和18门禁串行；原拟议18日期设计树未用，按今日实际树登记。GOV045中风险仅文档草案验证中/已实现，runtimeCapability=false，WIP3/5；不增源码/测试/helper/工具/ADR/接口schema/CI/依赖/数据库或部署，不动脏主目录/既往树。

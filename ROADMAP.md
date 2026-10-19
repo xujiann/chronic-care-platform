@@ -1,5 +1,58 @@
 # 工程治理路线图
 
+## GOV-045 设计交付收口与下一实现切片准入规划（2026-10-19）
+
+### 授权、基线和限定收口
+
+用户本轮确认精确冻结4545466a的推送/CI后保护合并/主线CI核验，并仅批准原四文件台账收口及下一实现切片准入规划（USER-GOV045-CLOSEOUT-IMPLEMENTATION-ADMISSION-PLAN-2026-10-19）。当前最新fetched origin/main为467080f22363e0b4fa61b875a4988ec91452c352，前轮[PR358](https://github.com/xujiann/chronic-care-platform/pull/358)受保护squash集成该冻结，同tree69b5eed77c597e798e1c1e06316aa70735b34f38，parent fa93877f。PR CI39188292597/main CI39190196947各九项成功，每轮真实PG45pass/0skip、Chromium76pass、依赖审计passed；完整保护及rulesets未变，无force/admin bypass，Pages仅静态预览。
+
+旧本地18串行门禁、151项窄测、unit3689pass/45环境skip、integration386pass、smoke6pass、all4075pass/45环境skip均单独保留，重叠不累加、skip不改写为通过。受控发布最终证据.codex-platform-evidence/access-observability-design-20261019/publication-20261019/delivery-publication-final.json，SHA256=d8b9a0f114f860ad1e38ae41debe764cd912a8f27a791e60a8040e98fa8b71ad，本轮先重核其全部绑定。原网络观察/采集及两轮写前GET中断、读取器P2修复与复审均留证，实际仅一次sha-bound合并PUT，未重跑CI。这些旧结果不替本轮四文件验证或专业/运行验收。
+
+T00经process:plan/create建立process/t00-access-observability-implementation-plan-20261019独立规划树，协调者唯一写config/lifecycle-governance.json、ROADMAP.md、CURRENT_ARCHITECTURE.md、MODULE_MAP.md；独审只读，Git及重型门禁串行。不改源码、测试、工具、ADR、注册表、CI、schema、依赖或部署，不动脏主目录和旧冻结树。仅将GOV045限定文档设计交付置已关闭/已集成，追加EVD-PR358-INTEGRATION和实际PR/mainCI引用；原六条未决逐字保留，RISK-GOV045仍open、地图gap不删，运行观测完成字段不填规划。原OPS040/SEC016/OPS059整条及其风险、其他台账完整不变，活动WIP3降2/5。不为达到建议WIP新增递归治理任务或启动候选。
+
+### 下一实现切片准入 PLAN（未准入实施）
+
+人读规划标识PLAN-ACCESS-OBS-IMPLEMENTATION-ADMISSION-20261019，仅作为已交付GOV045设计和原六条未决的追踪入口，不是新task/schema/Accepted协议或可执行测试ID；本轮没有登记可执行运行时任务、没有创建其实施工作树，也没有授予以下源码写权。下方历史各日期为原阶段快照，GOV045当前集成/关闭仅以本节和机器台账为准，不解除任何专业或高风险阻断。
+
+比较三个方向：直接完成八项并接外部sink，会越过未签隔离/隐私/值守及跨域边界；先建平行collector/worker或套用worker观测合同，也不能解决请求命令语义或取得新拓扑权。推荐在原高风险任务治理下，先评审三轴结果映射、覆盖点与有界最小技术投影/隔离端口，再决定最小非生产实现切片；不默认外送、持久化、相关ID传播、专属HTTP探测或SLO数值。没有可靠有界隔离和完整适用批准就不接线，不以try/catch、非await、定时器或“响应后”名称承诺资源隔离。
+
+推荐首切片只能作为待审范围：保留本人/当前身份事件重验、原锁/CAS/事务、同事务审计、稳定回执与重放及生产/PG配置拒绝；仅在获批受审终点构造D-META最小primitive技术投影，不把503或丢响应当零写，不把重放计新建业务。若共享原路径/客户端相关信任风险仍会传播，不得声称全链路脱敏完成或启用相应出口；具体修复是否纳入首切片须原Owner及必要决策另批。此局部方向不能证明八项运行观测交付，更不能关闭OPS040/SEC016或晋级已验证。
+
+| 准入项 | 必须形成的可核输入/决定 | 当前结论 |
+| --- | --- | --- |
+| P01 原高风险任务与单写交接 | 原Owner确认OPS040/SEC016状态、停写/交接、联合验收和真正依赖；选择原任务内限域推进还是合规移交，保留开放未决 | 未接受，不可从开放高风险任务扩展下游；不得删依赖或假关闭以过校验 |
+| P02 必要决策与人工高风险PLAN | 评审新信任/字段合同/隔离端口/跨域运行边及是否需独立限域Accepted；原ADR-OPS040只覆盖已批准首切片；冻结scope/non-goals/rollback/验收层次 | 尚未形成可授权实施的决策和PLAN，本轮不新增/改写ADR |
+| P03 适用专业接受 | OBS01–OBS08逐项核真实Owner权责、材料版本/摘要原文匹配、范围/有效期/冲突及批准参数；专业由用户协调 | 全部仍待提供/待签/待核，不以未提供推断不存在，不代填或豁免 |
+| P04 准确源码/测试与任务DAG | 明确实际端口、调用方、source/test准确路径、单写handoff、测试ID/命令、跨域组合顺序；依赖必须真实可满足 | 仅有下表只读锚点，不登记旁路runtime任务或预授写范围 |
+| P05 故障隔离与合成证据计划 | C01–C16按实际端口定位，覆盖提交未知/丢响应/撤权/重放、敏感字段、畸形对象/时钟/资源满/阻塞等；数值预算按适用专业决定 | 未来用例尚未实现/执行；已有基线回归不证明遥测断言 |
+| P06 正式实施与后续发布 | 用户另批准确高风险实施范围、必要Accepted/签署和单写登记后，方可建实施树；代码独审冻结、串行门禁、精确CI及发布另授权 | 当前仅规划，新规划提交也未获推送/合并授权，生产NO-GO |
+
+现行机器规则禁止任何任务通过依赖边扩展开放高风险任务，包括仅pending的伪“实施候选”。本轮因此不建立新runtime任务，不将GOV045这个已关闭设计输入当成唯一依赖以绕过OPS040/SEC016。后续必须先诚实解决原高风险状态/移交与真正DAG，再按批准登记；如做不到，保持阻断，不改验证器或审批规则。
+
+### 只读实现锚点与待交接责任域
+
+| 责任域（不是已签真实人员） | 可复用的既有只读锚点 | 下轮必须另批的边界 |
+| --- | --- | --- |
+| T04 原声明语义 | src/citizen-chronic/access-acknowledgement-command.js；test/citizen-access-acknowledgement.test.js；test/citizen-access-acknowledgement-api.test.js | 三轴/终点映射及声明回归由原任务单写交接，不能绕开当前身份/事件/环境重验 |
+| T00 共享请求/组合技术 | src/platform/observability/request-context.js；src/http/platform-request-handler.js；test/observability-alerting.test.js | 既有采集/出口、资源及失败隔离的实际端口；共享改动与调用方影响单独冻结，不能注入任意sink |
+| T00 原SEC016适配与T01核验 | src/http/resident-access-acknowledgement-runtime.js；src/identity-security/resident-access-event-query.js及既有专项；server.js原慢路径 | 原适配/原事件只读权威不改，是否涉及路由/组合/原路径修复须准确再批准，不借只读锚点授写权 |
+| T02 审计与专业/运维/隐私方 | 既有dataAccessLogs/securityEvents Owner与docs/production-observability-alerting.md | 不迁移审计权威、不复制正文为遥测；字段/采样留存/告警/SLO/健康权限/恢复签署及真实投递另核 |
+
+以上不是最终文件白名单或新Owner事实源，未确定的新模块/端口/输出政策不编造路径或默认值。未来最小切片即使获批，也不包含新schema、现库/迁移、PG/多实例适配、公共API扩张、外部投递、生产激活、新collector/线程进程拓扑，除非对应事项另获准确准入。
+
+### 专业材料和未来验证分层
+
+沿用下方OBS01–OBS08原待签与受控材料格式，不建立第二套签署清单/工具，不把OBS写入GOV044固定S01-S09格式或改用GS03校验器。优先由用户协调用途/结果语义OBS01、信任OBS02、隐私/审计OBS03和责任交接OBS08，再结合实际首切片核OBS04–07的指标/告警、健康、隔离及恢复约束；这是协调顺序，不是省略任一适用签署。未知或冲突保持待核，真实人员、数值、期限、签署意见及结果均不代填。
+
+合成边界、标准回归、真实PG/Chromium、实际告警投递/值守、长时容量/多实例/灾备现场分别留证，不能互相替代。零分母/缺窗/drop/重启/时钟异常保留unknown；C01–C16只是未来索引，不新增本轮testIds或通过数。OPS059及S01–S09整条不变，OBS接受不替GS03签署、正式反馈业务实现或上线批准。
+
+### 本轮单写、独审、冻结与串行门禁
+
+本轮先核四文件及旧记录/历史正文/源码测试不变，执行既有九文件窄测，独审无P0–P2后冻结精确SHA/tree，再串行governance:lifecycle、repository:governance:verify、documentation-facts:verify、process:verify、routes:check、routes:test、architecture:test、process:test、platform:iterations:test、build、lint、typecheck、test:unit、test:integration、test:smoke、test:all、security:browser:verify、static:test共18门禁。核原日志、实际退出码/计数/摘要和时序后最终证据再独审，不预支自身通过/PR/CI或生产；失败留证回修复审重冻，不降断言/预算。旧设计和CI结果不替新规划提交。
+
+回退仅撤本轮四文件收口/规划增量，保留声明/回执/审计、原合同/源码/测试、专业未决及受控证据，无数据迁移或业务恢复。新提交仅本地待授权集成；任何运行时实现、OPS059正式实现、专业代签及上线均未授权，三父Proposed、GS03未建设、schema19/41和生产六域NO-GO不变。
+
+
 ## GOV-045 访问知晓声明观测合同设计（2026-10-19）
 
 ### 授权、基线与交付状态
