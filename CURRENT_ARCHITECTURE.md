@@ -1,5 +1,13 @@
 # CURRENT ARCHITECTURE — 主线现状地图
 
+## 2026-10-19 原任务内限域续作高风险PLAN待审
+
+PR359已将冻结375d822d保护同tree集成至5a1ac2f5，PR/main各9成功、真实PG45零skip/Chromium76/依赖审计passed，保护未变、Pages仅静态；受控旧发布证据及SHA见ROADMAP本节，旧证据不替本轮规划或专业/runtime验收。
+
+本轮用户仅批准把PLAN-ACCESS-OBS-HIGH-RISK-20261019、单写交接与OBS待签整理进原四文件，T00单写，独审/冻结/18串行门禁另验。原OPS040/SEC016高风险验证中/已实现整条不改；GOV045已关闭仅设计交付，六未决/风险open/mapgap保留，WIP2/5，无新task或实施树。未来九文件仅拟议，F02新共享端口须原SEC016范围增补及必要限域Accepted另批；实际Owner停写/接受、预算/隔离、OBS01–OBS08及实施授权未完成。
+
+拟议首片仅command样本，业务/提交/响应三轴分离、response固定unobserved不等于交付失败或零写，503/丢响应不推回滚；只构造有界非持久最小primitive投影，不默认出口/关联/health/SLO，不改原锁/CAS/事务/审计/回执/环境拒绝。原路径/客户端相关信任风险未修，未证明隔离不接线；无新运行边、端口注册、模块、API、schema、ADR或拓扑。本轮不代签、不正式实现或推送合并上线，OPS059/S01-S09、三父Proposed/GS03未建设/schema19/41/六域NO-GO不变。下方历史保留。
+
 ## 2026-10-19 GOV045设计已集成与下一准入规划
 
 PR358已将冻结4545466a保护squash集成为467080f2，同tree69b5eed7；PR/main各9成功，每轮真实PG45零skip/Chromium76/依赖审计passed，保护未变、Pages仅静态。旧发布最终证据和摘要见ROADMAP当前节，原网络中断及读取器修复独审留存；只证明旧设计交付，不替本轮四文件验证。

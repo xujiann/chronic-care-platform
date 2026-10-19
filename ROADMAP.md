@@ -1,5 +1,129 @@
 # 工程治理路线图
 
+## OPS-040／SEC-016 原任务内限域续作高风险 PLAN（仅待审规划，2026-10-19）
+
+### 本轮授权与可核基线
+
+用户确认原任务内限域续作为待审方向，并仅批准把高风险PLAN、单写交接和专业待签整理进原四文件（USER-OPS040-SEC016-HIGH-RISK-PLAN-DOCUMENTATION-ONLY-2026-10-19）。人读规划标识PLAN-ACCESS-OBS-HIGH-RISK-20261019，不是新task、运行协议、测试ID或已Accepted决策。本稿可供后续评审，但高风险实现PLAN尚未获实施批准，实际Owner交接及适用专业接受均未完成。
+
+最新fetched origin/main为5a1ac2f5135ae0ba9c5231a39d6961101dd84be2；冻结375d822d经[PR359](https://github.com/xujiann/chronic-care-platform/pull/359)保护squash集成，同tree10f99a929803be23c2eebe1cd304ae7d21c07273、parent467080f2。PR CI39194928982/main CI39195982510各9成功、各真实PG45零skip/Chromium76/依赖审计passed；保护未变，Pages仅静态。旧发布最终证据.codex-platform-evidence/access-observability-implementation-plan-20261019/publication-20261019/delivery-publication-final.json，SHA256=ec6b2d4bb5b6c4924869bfdd5a29f133e3c1b10edaa9b8a0f2a2e9a1be0ad7a4，212个发布绑定及原本地传递证据已重核。四次PR和两次main观察TLS故障、真实成功观察及唯一sha-bound PUT均保留，没有CI rerun；这些只证明旧规划发布，不替本轮验证或专业/运行验收。
+
+T00经process:plan/create建立process/t00-access-observability-high-risk-plan-20261019独立规划树，协调者唯一写config/lifecycle-governance.json、ROADMAP.md、CURRENT_ARCHITECTURE.md、MODULE_MAP.md；独审只读，Git和重型测试串行。原脏主目录、既往冻结树和证据不改。机器台账只追加旧PR359的证据引用、GOV045 evidenceIds及RISK-GOV045的本PLAN追踪；GOV045仍已关闭/已集成且非runtime、六条未决逐字不变，风险open/mapgap保留。OPS040/SEC016/OPS059及其风险、审批、Owner、writeScopes、testIds、依赖整条不变；WIP仍OPS040/SEC016两项、2/5，不新增递归治理或运行时任务。
+
+### Problem、方案比较与限定推荐
+
+原命令已有本人重验、锁/CAS、同事务审计和稳定回执，但业务结果、本次写提交确认及响应交付不能从HTTP码推导；write异常可能统一为503，壳层未知异常也可能映射400。通用HTTP统计和业务审计不构成专属运行观测，当前客户端相关ID与慢请求原路径风险未修。
+
+选项A：保持原实现，仅继续整理；改动成本最低，但不关闭运行缺口。选项B：在原两高风险任务内，经另批准入后，仅按受审控制流形成三轴映射与有界非持久最小本地技术投影；复用原组合，不接外部出口，影响面可限域，但端口/容量/隔离及专业约束必须先获接受。选项C：直接完成八项观测、接外部sink或新增collector/worker；会扩大信任/数据/拓扑及专业边界，本PLAN不采用。推荐B仅为已确认待审方向，不是实现方案或端口已被Accepted。
+
+目标是保持原业务/身份/锁/CAS/事务/回执语义不变，为获批终点构造D-META最小primitive投影；不传req/res/user/session/payload/receipt/error对象、居民/机构/事件/回执/幂等标识及其摘要、原path/query/header/错误正文/客户端correlation。不改变原dataAccessLogs/securityEvents权威，T02仍是数据责任域。投影不是事实源，不用于恢复业务、身份判断或对账账本。
+
+本首切片拟仅coverage=command，命令前认证、解析及环境壳层拒绝不冒称已覆盖；responseKnowledge固定unobserved，不新接finish/close，不改原响应或回执字段。unobserved不等于交付失败、业务失败、未写或已回滚。原路径/相关信任修复、公共snapshot/buildRuntimeMetrics出口、对外HTTP/日志/告警投递、追踪传播、专属health、SLO计算、持久化/回填、PG/多实例、schema/现库/迁移、依赖/CI/部署和新服务/线程进程拓扑均不在此拟议首片。现有隐私风险仍开放；没有获签输出政策和可靠隔离，不把新投影并入既有出口，不宣称全链路脱敏。
+
+### 三轴、覆盖与不变量（仅待审逻辑映射）
+
+| 受审控制流 | resultClass拟议 | commitKnowledge拟议 | responseKnowledge与限制 |
+| --- | --- | --- | --- |
+| 本次写成功返回且确认来自原受审提交端口 | new-ack | confirmed-committed | unobserved；201不证明客户收到 |
+| 当前身份/事件/环境重验后的精确旧回执 | replay | not-attempted | unobserved；不否认旧声明已提交，不计本次新建 |
+| 原明确业务/授权/输入/完整性/容量拒绝且未开始本次写 | rejected | not-attempted | unobserved；只描述本次声明写尝试，不泛称整个HTTP零副作用 |
+| 读取、准备或其他受审写前故障 | fault或unknown，按明确阶段审查 | not-attempted（须确证未开始写） | unobserved；不按400/503或错误前缀分类 |
+| 已进入写尝试后抛错或确认不足 | fault或unknown，按阶段审查 | unknown | unobserved；含无可靠证明的冲突，不由409/503推出回滚 |
+| 有受审端口提供可靠未提交/回滚确认 | 待逐码逐阶段核验 | confirmed-not-committed仅在证明成立时允许 | 当前不预设现有通用异常能提供此证明 |
+| 已确认提交后响应丢失或未观察响应终点 | 保留已证业务结果 | 保留已证提交状态 | 仍unobserved，不补写、不新key重发、不反向撤销提交 |
+
+三轴来源须落到真实命令分支及适配端口，不能只给纯mapper喂枚举后称实际路径覆盖。非受信错误、未覆盖分支或证明不足保留unknown，不扩大原错误协议。原本人/当前会话和事件重验、重放零声明/零审计追加、原锁/CAS与一次事务、稳定回执、2000条业务容量及历史保全、生产/未知环境/PG或不支持会话配置拒绝均不改变；业务2000上限不是新观测容量批准。缺样/重启/时钟异常不填0或算成功，不自动建立SLO。duration是否采集及单调计时须另核，当前不以既有Date.now墙钟默认生成获准耗时。
+
+### 单写交接与原任务治理（均未实际完成）
+
+| 拟议责任域，不是真实已签人员 | 未来拟议写责任 | 准入前必须取得 |
+| --- | --- | --- |
+| T04／OPS040单写者 | 下表F01/F05/F06；原声明语义和真实命令回归 | 原源码与测试Owner逐项停写/接受、精确基线及未决移交，不假定原developer_a/b安排已变更 |
+| T00／SEC016单写者兼集成协调 | 下表F02/F03/F04/F07/F08/F09 | 原SEC016/共享T00责任接受，尤其F02及相关测试的准确范围增补与必要限域Accepted |
+| T01核验责任方 | 只读审查当前身份与原访问事件核验 | 保留事件只读权威，不写声明或改授权；确认联合验收边界 |
+| T02审计数据及适用专业责任方 | 只读确认审计/隐私/输出政策 | 不迁移dataAccessLogs/securityEvents Owner，不以技术Owner替专业接受 |
+| 独立审查者 | 只读源码、变更与证据审查 | 不与写者共享写责任，不代专业签署 |
+
+实际交接每个写者须在用户指定受控渠道提交：原任务ID/源与目标责任方及授权依据、精确commit/tree/材料版本、逐文件单写范围、原写者停写与新写者接受、未决和必要ADR/专业依赖、测试/回滚/联合验收责任及生效/撤销条件。真实人员、签署、日期及批准值待提供/待核，不代填。未收到材料不推断外部不存在；没有有效交接不实施。
+
+原任务内限域续作不是原审批自动扩围。本轮不修改原两任务审批或writeScopes。未来须先按原任务治理更新获批范围与交接，必要限域Accepted不能靠改写原ADR-OPS040历史来获得。依赖必须真实，不新建依赖GOV045而绕过开放高风险任务的旁路任务；不改验证器、WIP上限或测试规则。未来如创建原任务续作工作树，须另获实施批准后从当时最新origin/main经process:plan/create建立；本轮创建的只是四文件规划树。
+
+### 准确拟议文件清单（不是本轮或已批准的实现白名单）
+
+| 索引 | 既有准确路径 | 未来拟议限制 |
+| --- | --- | --- |
+| F01 | src/citizen-chronic/access-acknowledgement-command.js | 受审终点/阶段与最小投影；不改锁、CAS、事务、回执或公共错误 |
+| F02 | src/platform/observability/request-context.js | 有界闭集本地接收/投影；不改通用run/correlation语义，不自动并入snapshot/公共指标 |
+| F03 | src/http/resident-access-acknowledgement-runtime.js | 只传递获批端口，不改read/write/身份/存储与环境策略 |
+| F04 | server.js | 仅既有createResidentAccessAcknowledgementRuntime调用处的端口接线；不改路由/slowRequests/buildRuntimeMetrics或server require预算 |
+| F05 | test/citizen-access-acknowledgement.test.js | 真实命令的三轴/拒绝/重放/故障及业务不变量 |
+| F06 | test/citizen-access-acknowledgement-api.test.js | 原真实HTTP/身份/慢body/事务/回执兼容和丢响应不二次写，不能冒称新响应观察已实现 |
+| F07 | test/resident-access-acknowledgement-runtime.test.js | 适配传递、真实故障点与原持久边界，不把模拟证明泛化至生产 |
+| F08 | test/platform-architecture-foundation.test.js | 既有PlatformObservability的最小投影、畸形输入/有界约束及隔离边界 |
+| F09 | test/platform-runtime-composition.test.js | 既有组合/端口关系与不扩大路由、公共协议或部署的回归 |
+
+九文件仅未来待批最大范围，不保证九份都需修改，也不是当前writeScopes。F02及相关测试不因原SEC016高风险批准而自动获写；若范围增补/共享边界及必要决策未获接受则保持只读、不接线。若实际端口需要其他文件、新helper/API/缓存查询出口或生命周期合同，暂停并提交准确扩围，不借名单预授新模块。src/http/routes/citizen-chronic.js、src/http/runtime-contexts/citizen-chronic.js、src/http/platform-runtime-composition.js、src/http/platform-request-handler.js、src/identity-security/resident-access-event-query.js及原数据/策略合同均为只读调用链锚点，不在拟议实现写范围。本轮绝不修改上述九文件、任何源码测试、ADR或其他地图。
+
+未来治理同步仍拟限当前四文件；新限域ADR如确需形成，须独立批准其准确路径、ADR索引及文档分类等范围后再创建，不能将本PLAN当Accepted或扩写当前四文件。
+
+### 端口与失败隔离准入
+
+本PLAN只规定约束，不选定可执行hook、任意sink/回调、新collector、队列或线程方案。受审本地端口如何构造/识别、每样本及总状态/基数的有界容量、计数溢出/满载/丢弃/清理/重启、时钟与生命周期、CPU/内存影响、输出权限及验证责任，均待P02和OBS适用专业接受；不编造接口名、数值、期限或默认开关。
+
+未来只能从可信本地控制流直接构造闭集primitive；不得在命令锁/提交关键路径调用任意外部sink、进行网络/磁盘/flush、附带原请求对象或遍历任意getter/Proxy/错误属性。即使移至锁外/响应后也必须证明资源边界，try/catch、非await、定时器名称不是隔离证明；正常投影开销也必须纳入批准预算。缺失/畸形端口、异常、资源满或不可证明隔离时不启用/放弃观测，不能反向改变业务控制流、补审计/重试命令/放宽授权或fallback JSON。不把有限合成mock测试说成任意恶意同进程代码的沙箱保证；若只能依赖新拓扑才能证明隔离，必须另行准入而不是暗中添加。
+
+### P01–P06 本轮归档与正式实施前关口
+
+| 项 | 本轮形成的待审输入 | 仍阻断正式实施的事项 |
+| --- | --- | --- |
+| P01 | 已确认原任务内限域续作方向与上表交接清单 | 真实Owner授权/停写接受/联合验收未核；原高风险与六未决不解除 |
+| P02 | 本待审PLAN含problem/options/范围/非目标/成本/风险/回滚 | 限域Accepted、F02共享端口范围增补及人工高风险实施批准未完成 |
+| P03 | 沿用唯一OBS01–OBS08及下表本切片核验问题 | 各组真实专业意见/权限/版本/摘要匹配/适用性均待签待核 |
+| P04 | F01–F09准确拟议路径和只读调用链 | 实际端口/交接、原任务机器范围及真实依赖更新须另批，不靠删除依赖过门禁 |
+| P05 | C01–C16未来测试分层及命令见下 | 新遥测断言、实际隔离/预算与现场验收未实现未运行 |
+| P06 | 本轮仅四文件独审/冻结/18串行门禁 | 实施、任何新推送/合并、OPS059正式实现和上线仍另批，生产NO-GO |
+
+### OBS01–OBS08 本切片待签追踪与受控交接
+
+不建立第二套签署事实源；沿用下方“专业待签事项 OBS01–OBS08”和“受控材料提交与核验指引”，本表只是本PLAN适用问题追踪，八组全部仍待提供/待签/待核。原文、真实人员授权及签署保存在用户指定受控渠道，Git只记获准最小不透明引用/版本/SHA-256；不自动打开引用或建立生产连接，不使用GOV044/GS03 S01-S09格式与校验器处理OBS。
+
+| 组 | 需用户协调有权责任方给出的专业输入 | 当前状态 |
+| --- | --- | --- |
+| OBS01 | 本人知晓不追认合法性；三轴业务解释、新建/重放/拒绝/未知和command覆盖口径 | 待签/待核，不按HTTP码预设接受 |
+| OBS02 | 首片不关联/不透传客户端ID的信任边界；若需内部关联须另审来源/生命周期/输出 | 待签/待核，不引入第二身份或命令标识 |
+| OBS03 | 最小字段/原路径风险/访问输出限制、审计隔离及采样/留存/销毁政策 | 待签/待核，无出口不等于全链路隐私已完成 |
+| OBS04 | 本地样本/unknown/drop/重启口径、SLO/告警本切片的适用处置和批准参数 | 待签/待核，不计算SLO、不自行豁免 |
+| OBS05 | 不新增健康探测的首片范围、诊断权限与只读约束、后续适用验收 | 待签/待核，保留健康缺口、不伪健康 |
+| OBS06 | 端口/资源预算、隔离/故障/满载/溢出/重启策略及验证责任 | 待签/待核，未证明有界隔离不接线 |
+| OBS07 | 提交未知/丢响应的受控核验、恢复与值守边界；本片不自动业务补偿 | 待签/待核，不删除回执/key或重封审计 |
+| OBS08 | 原源码/测试Owner授权、真实停写/接受、跨域及T02数据责任、联合验收与回滚 | 待提供/待签/待核，不把拟议角色当已签人 |
+
+每组材料须有OBS编号、明确版本、适用设计/基线/环境/范围、真实提交/签署权限依据的受控引用、专业意见及限制/依赖/冲突/必要参数、不透明controlledRef和内容SHA-256、关联签署凭据、生效/失效/重签条件，以及有权复核者的匹配与处置记录。原文、敏感身份列表、患者/审计正文、凭据/连接串/私钥或原始provider/告警内容不入库。意见可批准/不同意/有条件/仍未决，但不能预选批准；引用摘要齐备不等于真实性、签署有效或专业接受，冲突/过期/范围不符保持待核并退回。任何“不适用/延期”须有权专业方明确接受及界限，技术人员不能代签或豁免。优先协调OBS01/02/03/08，其余可并行收集但不省略任何适用前置；OPS059 S01-S09及其前置整条不变。
+
+### 未来实现测试、验收与回滚（本轮不实现、不运行新用例）
+
+| 既有未来索引 | 对应拟议测试锚点 | 未来必须证明／保留的边界 |
+| --- | --- | --- |
+| C01–C02 | F05/F06/F07 | 真实新建与重放/当前身份重验/稳定旧回执；投影与原一次提交及审计相符，重放不计新建 |
+| C03–C07 | F05/F06/F07及只读event-query专项 | 撤权/慢body/等锁、冲突、业务容量、坏链/畸形、production/PG/会话拒绝；原公共协议和旁路保护不退化，承认命令前缺样 |
+| C08–C09 | F05/F06/F07 | 写前/写中/提交阶段故障及已提交丢响应；按真实控制流判提交未知，不二次写/补审计；首片response仍unobserved，不冒称finish/close覆盖 |
+| C10–C13 | F05/F07/F08/F09 | 真实端口边界的缺失/畸形/超限/不可用与有限受控故障、敏感字段/未知对象、时钟/零样本/重启/重复终点；预算和隔离未证明即不启用 |
+| C14 | 只读健康/原环境拒绝回归 | 首片不新增health，保留unknown/权限与探测缺口，不以无新写测试冒称专属健康完成 |
+| C15 | 未来另准入的受控现场联调 | 真实告警投递/回执/接收值守，不在本片执行，不由CI替代 |
+| C16 | F05/F06既有合法重放回归及未来专业受控对账 | 不自动补偿或新key重发，不删声明/receipt/审计；人工unknown核验/恢复与现场证据仍未交付 |
+
+正式实现若另获准，先以node --test --test-reporter=tap --test-concurrency=1执行F05–F09五个既有文件以及test/resident-access-event-query.test.js、test/citizen-care-workspace-session.test.js等原安全回归；准确新增断言须在实施登记中关联真实文件/命令，C编号不是已执行testId。不得只测纯mapper、删减断言、放宽超时/覆盖率或把受控mock当任意阻塞代码隔离证据。临时数据使用C:/Users/drxuj/Temp合成隔离目录，不读真实库。
+
+原任务实现需要独审无P0–P2后冻结精确commit/tree，再串行执行既有18门禁；因拟涉及组合根/安全端口，另串行npm run test:coverage:boundaries和npm run test:e2e，保持原server覆盖阈值及Chromium root/resident/PWA拓扑/超时/端口与清理规则。真实PG专项沿用既有CI入口，但其成功不证明本声明允许PG或多实例；HTTP/业务、合成边界、真实PG/Chromium、实际告警/长时容量/多实例/恢复现场分别留证。未来新增断言/计数按实际记录，不预定旧151/4075为新通过数；skip不作通过、重叠不累加。局部首片验收不能将OPS040/SEC016置已关闭/已验证，或补全八项observability完成字段。
+
+未来运行改动回滚先撤新增本地投影接线并回退本片增量至上一验证版本，原声明业务保持原语义；禁止因遥测失败回退原安全边界。保留已提交声明、receipt、幂等绑定和审计，不删记录、不重置key、不重封审计、不还原整库，也不自动重发提交未知结果。无需schema/数据迁移或回填；若现实需要这些，须暂停扩围。实际触发条件、执行/验证权限和获批版本由原Owner及OBS07/08在实施前确认，不代填人员/参数或提前执行回滚。
+
+### 本轮四文件规划验证及结束条件
+
+本轮只交付待审PLAN、交接/专业未决追踪及旧发布引用，不创建上述runtime工件、实施树、ADR、源码/测试/工具/API/schema/新依赖或部署改变。先审计恰好四文件差异、全部其他台账/历史正文/未来九文件及只读锚点保持，再执行既有九文件窄测，独审无P0–P2后冻结；串行governance:lifecycle、repository:governance:verify、documentation-facts:verify、process:verify、routes:check、routes:test、architecture:test、process:test、platform:iterations:test、build、lint、typecheck、test:unit、test:integration、test:smoke、test:all、security:browser:verify、static:test共18门禁。核原日志、实际退出/计数/批次/摘要及串行时序后最终证据再独审；本轮不运行未来实现所需的新遥测、覆盖率或E2E验收，也不预支本轮通过、PR或远端CI。失败留证回修复审重冻，不降门禁。
+
+本轮回退仅撤四文件规划增量，保留全部历史/原六未决/开放风险、源码与受控证据；无业务回滚。本轮新规划仅本地待授权推送/合并；专业签署由用户协调，原任务运行实现、OPS059正式实现、专业代签及上线均未授权。三父Proposed、GS03未建设、默认schema19/41和生产六域NO-GO不变。下方既往阶段原文保留为历史，当前授权与本轮状态以本节及机器台账真实字段为准。
+
 ## GOV-045 设计交付收口与下一实现切片准入规划（2026-10-19）
 
 ### 授权、基线和限定收口
