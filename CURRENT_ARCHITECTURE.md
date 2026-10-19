@@ -1,5 +1,15 @@
 # CURRENT ARCHITECTURE — 主线现状地图
 
+## 2026-10-19 高风险PLAN规划发布收口与实施准入缺口
+
+PR360已将冻结08d77fac保护squash合入main79332887，同tree2041245b、parent5a1ac2f5；PR39208104596/main39209507509各attempt1九成功、各4075pass/45skip、独立PG45零skip/Chromium76/审计通过。保护与rulesets未变，网络读取失败原件保留、无CIrerun；Pages仅静态。186绑定旧发布证据及SHA见ROADMAP本次收口节，只证明旧规划交付，不替本轮或现场验收。
+
+本轮仅原四文件台账收口及既有PLAN-ACCESS-OBS-HIGH-RISK-20261019的P01–P06/单写交接/OBS01–OBS08受控材料归并，准确路径和三轴不重定义。GOV045仍仅设计已关闭/已集成、非runtime，六未决逐字保留、风险open/mapgap及WIP2/5保持；OPS040/SEC016/OPS059整条和原Owner/审批/写范围/依赖不动，不建新任务/运行边/模块/ADR/拓扑。
+
+原任务内限域续作仍只是待审方向；F01–F09不是当前写权，F02共享端口及相关测试须范围增补和必要限域Accepted另批，真实Owner停写/接受、专业意见/参数、预算及隔离均未核。首片拟command、response=unobserved，未知不等于零写/回滚；原路径/客户端ID风险未修，不能证明隔离不接线。材料读取范围由用户明确提供，格式/引用摘要不证接受；专业由用户协调，不代填或代签。原GS03 S01–S09不与OBS互认。
+
+T00在process/t00-access-observability-admission-closeout-20261019仅单写台账/ROADMAP/本图/MODULE_MAP，独审只读，冻结后18门禁串行且最终独审；新候选尚未推送或集成。运行时、OPS059正式实现、推送/合并和上线另批，三父Proposed/GS03未建设/schema19/41/六域NO-GO不变。下方保留各轮历史状态。
+
 ## 2026-10-19 原任务内限域续作高风险PLAN待审
 
 PR359已将冻结375d822d保护同tree集成至5a1ac2f5，PR/main各9成功、真实PG45零skip/Chromium76/依赖审计passed，保护未变、Pages仅静态；受控旧发布证据及SHA见ROADMAP本节，旧证据不替本轮规划或专业/runtime验收。
