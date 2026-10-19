@@ -1,5 +1,15 @@
 # MODULE MAP — 主线模块地图
 
+## 2026-10-19 规划交付收口与原任务单写准入材料
+
+PR360冻结08d77fac与main79332887同tree2041245b，双轮CI各attempt1九成功、保护未变；仅旧高风险PLAN规划交付闭合。最终证据186绑定及SHA、当前实施准入P01–P06和受控材料集中清单见ROADMAP本次收口节；不新建平行PLAN/签署工具或运行组件。
+
+本轮T00经process:plan/create建立process/t00-access-observability-admission-closeout-20261019，只单写原四文件，独审只读、Git与18重型门禁串行。机器只补EVD-PR360-INTEGRATION、GOV045 evidenceIds和风险追踪，其余台账/历史不改；GOV045六未决、风险open/mapgap、原三任务和WIP2/5保持，当前新候选不冒称已集成或已通过门禁。
+
+未来拟议T04/OPS040负责F01/F05/F06，T00/SEC016负责F02/F03/F04/F07/F08/F09，T01核验/T02原审计数据责任域只读协同；真实Owner授权、原方停写/新方接受与联合验收待核，旧developer_a/b安排不自动改变。九文件只是准确拟议上界，F02共享范围/相关测试与必要Accepted另批，名单外路径/新helper先扩围，不改原任务或借关闭GOV045绕高风险依赖。
+
+PLAN-ACCESS-OBS-HIGH-RISK-20261019继续唯一引用源；C01–C16未来断言未实施，OBS01–OBS08全待签/待核，不与OPS059 S01–S09混用或互认。首片拟有界最小非持久command投影、response固定unobserved，不形成身份/审计权威、持久账本或输出/health/SLO新边；隔离未证明不接线，原路径/客户端ID风险保留。专业用户协调，运行时/OPS059正式实现/推送合并上线另批，三父Proposed/GS03未建设/schema19/41/六域NO-GO不变。下方历史保留。
+
 ## 2026-10-19 原OPS040／SEC016限域续作待审规划
 
 PR359与冻结375d822d同tree10f99a92集成至5a1ac2f5，双轮CI九成功/保护未变，仅旧规划交付闭合。当前仅原四文件整理高风险待审PLAN；完整正文、F01–F09准确拟议路径、交接、OBS与未来C01–C16追踪唯一见ROADMAP的PLAN-ACCESS-OBS-HIGH-RISK-20261019，本图只引用，不形成平行合同/签署工具。
