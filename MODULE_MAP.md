@@ -1,5 +1,11 @@
 # MODULE MAP — 主线模块地图
 
+## 2026-10-19 GOV045四文件合同设计单写
+
+process/t00-access-observability-design-20261019仅T00协调者写config/lifecycle-governance.json、ROADMAP.md、CURRENT_ARCHITECTURE.md、MODULE_MAP.md，独审只读，Git和18门禁串行；原拟议18日期设计树未用，按今日实际树登记。GOV045中风险仅文档草案验证中/已实现，runtimeCapability=false，WIP3/5；不增源码/测试/helper/工具/ADR/接口schema/CI/依赖/数据库或部署，不动脏主目录/既往树。
+
+ROADMAP承载唯一D-META/D01–D08合同及C01–C16未来用例，其他地图只引用边界，不形成平行观测平台或签署系统。T04语义、T01核验/健康、T00共享投影/组合、T02原审计数据责任域只是待签后续拆分，不授予当前源码写权。原五未决历史保留逐项承接，OBS全待签/原高风险任务与OPS059整条不改，原路径隐私/失败隔离/PG多实例和现场缺口仍在；未来实施先Accepted/高风险PLAN及Owner单写交接。本轮独审、冻结、18门禁和证据另验，专业由用户协调，正式实现/推送合并上线另批，生产NO-GO。
+
 ## 2026-10-18 GOV045设计准入准备单写
 
 本轮T00在process/t00-access-observability-admission-plan-20261018规划树唯一写config/lifecycle-governance.json、ROADMAP.md、CURRENT_ARCHITECTURE.md、MODULE_MAP.md，独审只读，Git及18门禁串行；不动原脏主目录、已交付树、源码/测试/helper/工具/ADR/CI/schema/依赖。PR356已同tree保护集成前轮治理，主线d62aa8b4各项CI成功；本轮准备另行验证，不以旧结果替代。
