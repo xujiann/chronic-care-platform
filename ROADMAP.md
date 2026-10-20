@@ -1,5 +1,47 @@
 # 工程治理路线图
 
+## TEST-031 标准测试运行器失败路径测试保护（2026-10-20）
+
+用户批准 `USER-TEST031-THREE-FILE-IMPLEMENTATION-2026-10-20` 仅本三文件测试切片实施，非运行时；专业签署由用户协调，运行时实现、OPS-059正式实现、推送、合并和上线另行批准。该授权不覆盖文档/PDF负测备选，不新增递归GOV任务。
+
+### 基线、依赖与单写交接
+
+新树 `process/t00-standard-runner-failure-tests-20261020` 从最新 fetched `origin/main` 的 `e1e3cc4a378ba86c1ee7c13f304d982edbd9d2e6` 创建，同原规划冻结树 `66f24174312f943b71f46aadd1fdfdaf32767905`。开工核对主线CI39222672635及Lifecycle gates39328721182成功、开放PR为空、strict required checks `complete-unit-test`/`test` 不变；旧冻结树和脏主工作区不改。普通fetch曾报告旧工作树元数据自动清理权限警告，未手工清理，主线SHA以只读API再次核实。
+
+本片保护 `scripts/run-standard-test-suite.js` 既有技术行为，文字基础线是 `ENGINEERING_GOVERNANCE.md` 的标准测试合同；机器台账没有TEST-001，不虚构依赖，也不任意挂已关闭任务。`dependencies=[]` 因不调用业务/专业能力，不是删除真实业务依赖；OPS-040/SEC-016/OPS-059及GOV-045整条、六条专业未决、风险和生产矩阵保持。无公共接口、数据Owner、schema、运行边或拓扑变化，不新建ADR或机械修改六张地图；MAP-MODULE仅增加本任务gap。批准登记WIP由2变3/5，不解除开放高风险阻断。
+
+| 准确文件 | 唯一写者与允许变化 |
+| --- | --- |
+| `test/standard-engineering-gates.test.js` | 开发agent，保留旧断言，仅新增下列三组六场景 |
+| `config/lifecycle-governance.json` | T00主控，新增本任务/需求/风险/可执行testId/本片证据与gap，不改旧记录 |
+| `ROADMAP.md` | T00主控，仅本PLAN和本片真实验证记录 |
+
+开发agent不改治理，第二开发角色只读核对证据设计；独立审查角色全程只读。主控登记完成后明确交付单文件写权，开发结束后停写并返回diff；审查无未决P0-P2再由T00冻结，任何后续修改撤销冻结并重新独审和门禁。工作树本地无 `.codex/config.toml`，不宣称自动继承模型配置；子agent按项目显式角色配置选择。
+
+### 六个确定性场景与独立预期
+
+1. 四个配置负例：规范化后重复integration路径、smoke缺失文件、未知isolated套件、isolated.unit包含属于integration的API。每例使用独立内存配置，断言validation失败及具体错误，`listStandardSuite("unit", config)`抛错，不写配置文件。
+2. 中段隔离：合成a/b/c/d/e，c隔离，批大小**3**；严格得到 `[a,b] / [c] / [d,e]` 和 `false/true/false`，展开等于原序列且不重复。此批大小使隔离前pending未满，保护隔离前flush分支，而非仅保护满批逻辑。
+3. 第二批失败：仅现有`spawnSync`/`now`/`batchSize`注入，integration批大小2，首批0、第二批7；严格两次准确Node argv/execPath/cwd/stdio/windowsHide，无后续或真实子进程。当前66文件/API首位且唯一隔离，计划批数独立数学预期`1+ceil((66-1)/2)=34`，基线变化须先重验。`tests/batches`是计划总数，不冒充实际执行数；假时钟初100、每次+5，批耗时`[5,5]`、总耗时25，`ok=false/failedBatch=2`且仅一条metrics与返回对应，不要求status7透传。
+
+不调用被测batch builder计算失败用例预期，不做源码替换/模块monkeypatch，不新增helper、依赖、磁盘fixture或真实子进程。stdout捕获沿用现有模式并`finally`恢复；假时钟不设置真实耗时阈值，不改变标准runner默认批大小、成员顺序、断言、超时或CI预算。
+
+### 验证、冻结与回滚
+
+先执行专项原基线，再执行新增后的同一命令：`node --test --test-reporter=tap --test-concurrency=1 test/standard-engineering-gates.test.js`。执行治理/所有权/仓库窄门禁，实际结果和跳过项才进入本片外置证据，不预填通过，不以旧CI替代。独立源码审查通过后冻结准确commit/tree及三文件SHA-256，再严格串行执行：
+
+`governance:lifecycle` → `repository:governance:verify` → `documentation-facts:verify` → `process:verify` → `routes:check` → `routes:test` → `architecture:test` → `process:test` → `platform:iterations:test` → `build` → `lint` → `typecheck` → `test:unit` → `test:integration` → `test:smoke` → `test:all` → `security:browser:verify` → `static:test`。
+
+最终独审核对冻结完整性、18项顺序/退出码/原始日志及摘要、专项实际场景和跳过项；重叠套件不累加，未执行项不报成功。外置证据位于项目内仓库外 `.codex-platform-evidence/standard-runner-failure-tests-20261020/`，只记录本片开发与合成测试元数据；无生产连接或专业原件读取。
+
+若发现工具真缺陷、需第四文件/helper/新行为/预算或CI改动，停止本片扩展并提交复现另批，不改工具或弱化预期。回滚仅撤新增断言及两份治理对应增量，保留旧断言、任务、未决、风险和历史证据；无数据库/schema/回执/key变更。冻结后改动必须重新审查、冻结和必要门禁。本PLAN登记时尚未实施或运行本片新测试；后续真实结果以外置精确冻结证据为准，未获推送、合并或上线授权，六域生产NO-GO不变。
+
+### 实施与窄验证记录（冻结前）
+
+开发单写交接完成，仅既有测试文件新增125行、三组六场景，原断言未删改。主控执行原专项9/9通过，新增后12/12通过，均0失败/0跳过；计数是顶层Node测试，四配置场景在一个参数化循环内，不冒充新增六个顶层测试。`governance:lifecycle`、`process:verify`、`repository:governance:verify`窄门禁均exit0；本树`npm ci`成功，锁文件未变。TEST031仅记验证中/已实现并绑定本片专项证据，不预支冻结18门禁或集成。
+
+原始`narrow.log` SHA-256为`5564387edc8494f4384ae599f52ca62cbb4394463da5d730a110958759bfac29`，命令/起止/退出码/日志字节和摘要见本片外置`narrow.json`；原基线与安装证据各独立保留。全部旧台账记录保持，仅MAP-MODULE新增本片gap，WIP3/5、六域NO-GO不变。完整源码独审、准确冻结及18串行门禁与最终证据独审随后另验，不以本段预报通过；本轮无推送、合并或上线授权。
+
 ## 规划交付收口与高风险PLAN准入材料汇总（2026-10-19）
 
 ### 本次收口的事实与边界

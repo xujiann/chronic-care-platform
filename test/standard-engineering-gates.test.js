@@ -76,6 +76,59 @@ test("the API hotspot is isolated without changing integration membership or ord
   assert.equal(batches.slice(1).every((batch) => batch.files.length <= 40), true);
 });
 
+test("invalid standard suite configurations fail validation and unit listing", () => {
+  const {
+    listStandardSuite,
+    loadStandardTestSuites,
+    validateStandardTestSuites
+  } = require("../scripts/run-standard-test-suite");
+  const config = loadStandardTestSuites();
+  const invalidCases = [
+    {
+      config: { ...config, integration: [...config.integration, "test\\api.test.js"] },
+      error: "integration suite contains duplicates: test/api.test.js"
+    },
+    {
+      config: { ...config, smoke: [...config.smoke, "test/missing-standard-smoke.test.js"] },
+      error: "smoke suite references missing tests: test/missing-standard-smoke.test.js"
+    },
+    {
+      config: { ...config, isolated: { ...config.isolated, unknown: [] } },
+      error: "isolated suite is unknown: unknown"
+    },
+    {
+      config: { ...config, isolated: { ...config.isolated, unit: ["test/api.test.js"] } },
+      error: "isolated unit files are outside the suite: test/api.test.js"
+    }
+  ];
+
+  for (const { config: badConfig, error: expectedError } of invalidCases) {
+    const validation = validateStandardTestSuites(badConfig);
+    assert.equal(validation.ok, false, expectedError);
+    assert.equal(validation.errors.includes(expectedError), true, expectedError);
+    assert.throws(
+      () => listStandardSuite("unit", badConfig),
+      (error) => error.message.includes(expectedError),
+      expectedError
+    );
+  }
+});
+
+test("an isolated file between partial batches preserves every file and batch boundary", () => {
+  const { buildStandardTestBatches } = require("../scripts/run-standard-test-suite");
+  const files = ["test/a.test.js", "test/b.test.js", "test/c.test.js", "test/d.test.js", "test/e.test.js"];
+  const config = { isolated: { integration: ["test/c.test.js"] } };
+  const batches = buildStandardTestBatches("integration", files, config, 3);
+
+  assert.deepEqual(batches, [
+    { files: ["test/a.test.js", "test/b.test.js"], isolated: false },
+    { files: ["test/c.test.js"], isolated: true },
+    { files: ["test/d.test.js", "test/e.test.js"], isolated: false }
+  ]);
+  assert.deepEqual(batches.flatMap((batch) => batch.files), files);
+  assert.equal(new Set(batches.flatMap((batch) => batch.files)).size, files.length);
+});
+
 test("the API hotspot keeps extracted lifecycles and the exact subtest order", () => {
   const apiTest = read("test/api.test.js");
   const alertMockHelper = read("test/helpers/alert-delivery-mock-runtime.js");
@@ -194,6 +247,78 @@ test("standard suite metrics are emitted for success without a time threshold", 
   assert.equal(metrics.batches, 1);
   assert.deepEqual(metrics.batchDurationsMs, [5]);
   assert.equal("maxDurationMs" in metrics, false);
+});
+
+test("integration stops after the second failed batch and reports one complete plan metric", () => {
+  const { loadStandardTestSuites, runStandardSuite } = require("../scripts/run-standard-test-suite");
+  const config = loadStandardTestSuites();
+  const expectedBatchCount = 1 + Math.ceil(65 / 2);
+  const originalWrite = process.stdout.write;
+  const output = [];
+  const calls = [];
+  let currentTime = 100;
+  let result;
+
+  assert.equal(config.integration.length, 66);
+  assert.equal(config.integration[0], "test/api.test.js");
+  assert.deepEqual(config.isolated.integration, ["test/api.test.js"]);
+  process.stdout.write = (chunk) => {
+    output.push(String(chunk));
+    return true;
+  };
+  try {
+    result = runStandardSuite("integration", {
+      batchSize: 2,
+      now: () => {
+        currentTime += 5;
+        return currentTime;
+      },
+      spawnSync: (executable, args, options) => {
+        calls.push({ executable, args, options });
+        return { status: calls.length === 2 ? 7 : 0 };
+      }
+    });
+  } finally {
+    process.stdout.write = originalWrite;
+  }
+
+  assert.deepEqual(calls, [
+    {
+      executable: process.execPath,
+      args: ["--test", "--test-concurrency=1", "test/api.test.js"],
+      options: { cwd: ROOT, stdio: "inherit", windowsHide: true }
+    },
+    {
+      executable: process.execPath,
+      args: [
+        "--test",
+        "--test-concurrency=1",
+        "test/ai-governance-runtime-api.test.js",
+        "test/audit-retention.test.js"
+      ],
+      options: { cwd: ROOT, stdio: "inherit", windowsHide: true }
+    }
+  ]);
+  assert.equal(result.ok, false);
+  assert.equal(result.failedBatch, 2);
+  assert.equal(result.suite, "integration");
+  assert.equal(result.tests, 66);
+  assert.equal(result.batches, expectedBatchCount);
+  assert.deepEqual(result.batchDurationsMs, [5, 5]);
+  assert.equal(result.durationMs, 25);
+
+  const metricLines = output.filter((line) => line.startsWith("[standard-test:metrics] "));
+  assert.equal(metricLines.length, 1);
+  const metrics = JSON.parse(metricLines[0].slice("[standard-test:metrics] ".length));
+  assert.deepEqual(metrics, {
+    suite: "integration",
+    tests: 66,
+    batches: expectedBatchCount,
+    durationMs: 25,
+    batchDurationsMs: [5, 5],
+    failedBatch: 2
+  });
+  assert.deepEqual(result, { ok: false, ...metrics });
 });
 
 function pkgTestFiles(command) {
