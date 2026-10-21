@@ -1,5 +1,58 @@
 # 工程治理路线图
 
+## 2026-10-21 TEST-032台账收口与下一测试切片规划
+
+用户仅批准本次TEST032台账收口及下一独立切片梳理、登记供审批。当前源范围仅本路线图和 `config/lifecycle-governance.json` 两文件，T00协调者唯一写者、独立审查者只读；本候选自身仍须窄验证、独审、冻结、18项串行门禁及最终证据独审，不复用旧绿灯。专业签署由用户协调，运行时实现、OPS-059正式实施及本次新提交推送、合并和上线均另行批准。下方旧日期和阶段记录保留，不解释为当前授权。
+
+### TEST032限定交付收口依据与边界
+
+[PR363](https://github.com/xujiann/chronic-care-platform/pull/363) 将冻结 `356917c04de454e2d9ed1e46330e416d88f55d15` 依保护规则squash集成为 `a47a9e8ebb57bf6563c50d5a43d20f1cd3232d41`，同tree `866291761946ba36ae0f3f29056d4c52d1cb18d3`、单parent `88090d92e0795951572cd0ba01f241118379882e`。源码独审、18项本地串行门禁和最终证据独审通过；PR CI39543658323/main CI39550003419各attempt1、九项成功，每轮单测与集成4083通过/45环境跳过，独立真实PG45零跳过、Chromium76、依赖审计passed。重复套件及两轮结果不累加，跳过不算通过；Pages39550003381只为静态预览，不是生产上线。
+
+旧封存证据 `.codex-platform-evidence/repository-governance-negative-tests-20261020/publication-20261021/delivery-publication-final.json`，SHA-256 `31275620bf53989db8414d1932e371868ab2fa7db3a3e72b26d4c99d9916293b`。本轮已重核191发布、101合并前与113本地传递绑定，并重新GET核实PR已合并、main精确SHA、九绿CI、保护/rulesets及开放PR零。原本地integration执行中断及PR观察进程中断没有完整退出回执，未知值保留、部分日志不覆盖；各自恢复单独记真实退出。main前两次观察因TLS读取失败退出1，第三次观察同run成功，未重跑CI、未重复合并。不把恢复命名或文件时间补造为旧进程成功。
+
+仅将TEST032限定测试交付改为已关闭/已集成，补EVD-PR363-INTEGRATION与PR/CI引用，原需求、断言、验收及开放风险保留。OPS-040/SEC-016/OPS-059/GOV-045等所有其他旧任务、专业未决、三父Proposed、黄金场景及六域NO-GO整条不改。WIP从3降为2/5；TEST033待批准不占WIP。MAP-MODULE仅增加TEST033 gap，原gap保留，无新运行模块或接口，不新增递归GOV收口任务。
+
+### 本轮单写、验证及回滚
+
+从最新fetched `origin/main@a47a9e8e` 经process:plan/create建立 `process/t00-test032-closeout-next-test-plan-20261021`，原脏主目录、旧冻结树及历史证据不改。新树无 `.codex/config.toml`，不宣称自动继承模型配置；独审使用项目显式审查角色。批准范围是两文件治理事实及待审PLAN，不是未来三文件测试实施。
+
+窄验证为既有生命周期、仓库治理与文档事实漂移测试，以及process:verify/documentation-facts:verify；不新增断言或伪填TEST033结果。独审无未决P0-P2后冻结精确commit/tree/两文件SHA-256，串行执行 governance:lifecycle → repository:governance:verify → documentation-facts:verify → process:verify → routes:check → routes:test → architecture:test → process:test → platform:iterations:test → build → lint → typecheck → test:unit → test:integration → test:smoke → test:all → security:browser:verify → static:test。原始命令、起止、退出码、日志及跳过绑定外置 `.codex-platform-evidence/test032-closeout-next-test-plan-20261021/`，最终证据再独审；冻结后源变化必须重新审查/冻结/验证。
+
+本轮回滚只撤两文件本次增量，恢复旧台账状态；不修改已集成的TEST032测试、PDF/来源、工具、CI、业务或历史证据。未来若单独撤TEST033候选规划，不撤已核实的TEST032收口。本轮登记时自身门禁尚未完成，不预填结果；本次冻结待用户另行决定推送/合并。
+
+## TEST-033 文档事实漂移单因素拒绝测试保护（待审）
+
+### 准入、选项和准确范围
+
+本候选为中风险、待批准/未建设、approval.pending，不占WIP；仅本PLAN登记获准，测试实施须用户另批。复用现有 `scripts/documentation-fact-drift.js` 的只读导出和既有 `test/documentation-fact-drift.test.js`，不新增工具、模块、依赖、helper、磁盘fixture或模块替换，不改六图正文/机器权威/测试分区/CI。它不消费OPS040/SEC016/OPS059/GOV045的运行或专业能力；dependencies为空表示技术保护独立，不是绕开高风险DAG。
+
+已确认缺口是测试粒度而非已发现的工具缺陷：现有SQLite两数值和migration两值同时漂移、API proof/review组合变更，不能分别证明各条件；对象存储权威目前只有productionReady拒绝专项，首发范围权威六条件尚无分别负例。选项是维持组合保护、修改工具或补独立负例；推荐只补独立负例。仍未覆盖的migration其他字段及相邻拒绝条件留作后续，不宣称全工具覆盖。
+
+| 未来准确文件 | 未来写权和允许变化 |
+| --- | --- |
+| `test/documentation-fact-drift.test.js` | T00唯一开发写者，仅下列四组新增顶层测试，保留全部旧断言 |
+| `config/lifecycle-governance.json` | T00，仅本候选审批后实施状态、可执行testId、真实证据与必要gap |
+| `ROADMAP.md` | T00，仅本候选PLAN和实际验证事实 |
+
+拟议实施树/分支 `process/t00-documentation-fact-negative-tests-20261021` 尚未创建；获批后须重查main/CI/PR/保护/WIP和单写交接，再经process工具建立，日期调整同步登记。实施开发者完成后停写交给只读独审；任何源变化重新审查冻结。本轮不交付该测试文件写权。
+
+### 四组19个拟议单因素场景
+
+| 组 | 独立变更（每例仅一因素） | 精确目标检查 |
+| --- | --- | --- |
+| A，4例 | 仅唯一受管文档章节的SQLite head、table数、migration当前版本及空库迁移目标各自漂移；不改sqliteSchemaFacts权威 | `dataModel:sqliteSchemaFacts` 两例、`dataModel:migrationFacts` 两例 |
+| B，6例 | roadmap/moduleMap各自唯一受管API行的write、proof、review数值分别漂移；entries和其他字段不变 | `roadmap:apiCatalogFacts` 与 `moduleMap:apiCatalogFacts` 各三例 |
+| C，3例 | objectStorageReport的ok、summary.decisionStatus、implementationAuthorized分别改变；不重复已有productionReady负例 | `authority:objectStorageDecision` |
+| D，6例 | productionReleaseScopeReport的ok、status、productionReady及repositoryReview中apiReviewRequired/collectionReviewRequired/collectionRepositoryPlanMissing三数组分别置为合成非空 | `authority:firstReleaseScope` |
+
+每例从合法repositoryState独立clone：先确认基线report.ok及目标check为true；A/B只在唯一受管局部替换一个token，断言命中一次且确实变化，不能用全局replace掩盖多改；C/D只改一个字段，其余前置保持。变更后report.ok=false且精确目标check.passed=false；不能由前序无关错误代替目标拒绝，不复用buildReport结果计算预期。四个顶层测试/19个循环场景不冒充19个顶层测试。
+
+### 未来测试、验收和回滚（均待批准）
+
+批准实施后先运行既有 `node --test --test-reporter=tap --test-concurrency=1 test/documentation-fact-drift.test.js` 基线，新增后同命令零失败零跳过；再登记实际testId和窄证据。保留所有旧断言，合法正向仍通过。窄治理→只读独审→精确冻结→上述18项串行门禁→最终证据独审；本次两文件治理测试或PR363旧绿均不替未来三文件候选。
+
+若暴露工具缺陷、需要第四文件、改变权威合同/运行器/CI/预算或专业决定，保留复现并停止扩围，集中另批，不弱化断言修绿。未来测试回滚只撤新增断言与对应治理增量，保留全部旧断言、机器权威、TEST032已核实交付和受控历史证据；无数据库/schema/数据/运行状态迁移或回退。专业签署由用户协调，运行时实现、OPS059正式实施、推送、合并和上线始终另行批准。
+
 ## TEST-032 文档与PDF治理拒绝路径测试保护（2026-10-20）
 
 用户批准 `USER-TEST031-CLOSEOUT-TEST032-THREE-FILE-IMPLEMENTATION-2026-10-20`：TEST-031台账收口及本片测试实施，总源范围仅 `test/repository-governance.test.js`、`config/lifecycle-governance.json`、`ROADMAP.md`。本轮不推送、合并或上线，不修改工具、PDF、业务运行时或CI；专业签署仍由用户协调，运行时实现与OPS-059正式实现另批。下方旧日期/阶段记录保留，不重写为当前授权。
