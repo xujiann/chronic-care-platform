@@ -39,6 +39,7 @@
     "高": "accepted-adr-human-review-special-validation"
   },
   "requirements": [
+    {"id":"REQ-TEST-032","title":"文档与PDF治理拒绝路径测试保护及TEST031收口","sourceType":"human-approved-three-file-test-only-implementation","sourceRef":"USER-TEST031-CLOSEOUT-TEST032-THREE-FILE-IMPLEMENTATION-2026-10-20","acceptance":["据PR362冻结/同tree主线及精确双轮CI、独审和受控证据关闭TEST031，仅限定测试能力集成，不关闭专业或生产风险","仅既有test/repository-governance.test.js加法保护Markdown总数/路径及各分类count/pathDigest单因素漂移，保留旧断言","PDF清单不一致、手改禁止、来源说明/文件缺失以及bytes/pages独立漂移精确拒绝；仅内存克隆与现有只读导出，不写PDF或改工具/配置/运行时/CI","T00三文件单写、独审后冻结精确commit/tree/摘要，18项门禁严格串行并最终证据独审；本片推送合并上线另批，专业由用户协调"]},
     {"id":"REQ-TEST-031","title":"标准测试运行器失败路径测试保护","sourceType":"human-approved-test-only-implementation","sourceRef":"USER-TEST031-THREE-FILE-IMPLEMENTATION-2026-10-20","acceptance":["仅既有标准工程专项新增四类坏配置、中段隔离及第二批失败停止六场景，保留全部既有断言","只用现有导出及内存注入，准确批次/时钟/指标独立预期；无真实子进程、磁盘fixture或模块替换","仅测试及两份T00治理文件，不修改运行器、业务运行时、套件配置、CI、依赖、预算或超时","独立审查后冻结精确提交/tree/文件摘要，18项门禁串行执行并最终证据独审；专业、运行实现、OPS059正式实现及推送合并上线仍另批"]},
     {"id":"REQ-GOV-045","title":"访问知晓声明运行观测合同与Owner准入设计","sourceType":"human-approved-design-only","sourceRef":"USER-GOV045-CONTRACT-DESIGN-ONLY-2026-10-19","acceptance":["仅形成四文件非运行时合同草案，现状/推荐/专业未决分层；不注册新schema/端口/运行边或改变Accepted历史","D-META闭集和业务结果/本次提交确认/响应交付三轴明确，覆盖八项观测、低基数/隐私与失败隔离，503/缺日志不作零提交证明","原五条未决保留登记历史并逐条承接，OBS01-OBS08全部待签；不代填真实责任人、批准值或签署，不能以catch/非await承诺资源隔离","复用现有治理测试和基线回归，不把未来C01-C16变成已执行testIds；独审后精确冻结并串行18门禁，旧CI不替本轮","原OPS040/SEC016/OPS059整条、风险及生产矩阵不变，未来Accepted/人工高风险PLAN/Owner单写交接及专业签署另准入，本轮不推送合并上线"]},
     {"id":"REQ-TEST-030","title":"反馈材料离线校验属性与变异测试保护","sourceType":"human-approved-test-only-implementation","sourceRef":"USER-TEST030-TEST-PROTECTION-2026-10-17","acceptance":["用户已批准仅在既有test/gs03-feedback-materials.test.js加法测试；必要T00治理同步，不新增工具、helper、依赖或业务运行接线","获批后以独立合成图和确定性变换补引用一致性、排列/等价重命名、深度冻结/原型/描述符与资源边界保护；具体样例及变异点先冻结PLAN","变异副本与日志仅仓库外，变异前原专项必须通过，目标变异须因预期断言失败而非解析/导入错误；新旧专项结果及SHA分别绑定","不以合成/属性/变异证据验证真实签署或材料内容，不授予OPS059实施/推送合并/生产；单写独审冻结与18门禁另验"]},
@@ -567,6 +568,7 @@
     }
   ],
   "risks": [
+    {"id":"RISK-TEST-032","title":"组合拒绝断言掩盖独立漂移或历史PDF证据被过度解读","level":"中","owner":"T00","mitigation":"每例从合法基线独立克隆且只改一个因素，精确错误并保留前序条件；bytes/pages分别保持正确SHA和另一数值。只读历史PDF与本地源存在性，不宣称内容正确、生成器可用、专业签署或现场生产；若发现工具缺陷或需第四文件则停止另批，独审冻结和18串行门禁不放宽","status":"open"},
     {"id":"RISK-TEST-031","title":"失败路径测试自证、漏检或被误作运行及生产验收","level":"中","owner":"T00","mitigation":"用明确独立预期校验坏配置和中段未满批次隔离；模拟第二批失败核对两次准确调用和唯一指标，区分计划批数与实际执行数。只用既有注入且finally恢复stdout，不启动真实子进程；发现工具缺陷或需第四文件即停并另批，不弱化测试。外置证据绑定冻结SHA，旧CI不替本轮，生产NO-GO不变","status":"open"},
     {"id":"RISK-GOV-045","title":"通用观测被误作专属完成或高风险设计绕过及敏感路径传播","level":"中","owner":"T00","mitigation":"2026-10-19仅文档合同设计已批准，专业待签和运行实现未准入；原路径可能含事件标识及客户端相关ID信任风险未修。设计区分业务/提交/响应，503或缺日志不证零写；最小技术投影、低基数和原审计隔离，不把catch/非await当资源保证。未来若需安全/公共接口/权威/拓扑改变另批ADR，原高风险任务与专业/生产边界不解除；2026-10-19 PR358已保护同树集成且两轮CI通过，仅关闭GOV045文档设计交付，原六条未决逐字保留、风险open和地图gap不删。下一实施准入PLAN仅规划，原高风险/Owner交接/必要Accepted/专业接受仍阻断，不新增递归任务或绕依赖；新规划发布、运行实现和生产另批；2026-10-19仅四文件归档PLAN-ACCESS-OBS-HIGH-RISK-20261019，原任务内限域续作为待审方向，F01-F09仅拟议且F02共享端口/原SEC016范围与限域Accepted另批；交接、OBS01-OBS08/预算隔离均未接受，不改原任务/Owner/writeScopes，不扩下游，正式实现及本轮新推送合并上线另批；2026-10-19 PR360仅高风险待审PLAN规划交付已保护同树集成并闭合，本轮只在原四文件收口证据及汇总P01-P06/单写交接/OBS01-OBS08受控材料，原任务/六未决/风险open/mapgap与WIP2/5不变。未来高风险实施批准、F02共享范围及必要限域Accepted、真实停写/接受、专业及资源隔离仍阻断，不把引用摘要齐备当接受；本轮运行时、OPS059正式实现、推送合并及上线另批","status":"open"},
     {"id":"RISK-TEST-030","title":"测试保护被误作专业准入或变异错误被误作检出","level":"中","owner":"T00","mitigation":"用户仅批准既有专项测试；T00单写测试/必要治理同步，用独立合成预期、有限确定性种子、原件SHA和唯一变异锚点控制仓库外副本；解析/导入/非目标异常不计检出。专业签署、OPS059正式实施及推送合并生产仍独立","status":"open"},
@@ -1161,6 +1163,7 @@
     {"id":"ADR-GS03-S3-EXPERIMENT-001","status":"Accepted","path":"docs/adr/2026-10-04-gs03-isolated-storage-transaction-validation.md","effectiveScope":"TEST027 synthetic disposable test-directory validation only, explicitly real migration runner/unregistered S1 candidate/real v15 audit hook; no formal protocol, HTTP, runtime, registry, existing DB, production, push or merge","reviewDue":"2026-11-04","supersedes":[]}
   ],
   "tests": [
+    {"id":"TEST-REPOSITORY-GOVERNANCE-REJECTION-PROTECTION","kind":"read-only-single-factor-markdown-pdf-rejection-protection","path":"test/repository-governance.test.js","command":"node --test --test-reporter=tap --test-concurrency=1 test/repository-governance.test.js"},
     {"id":"TEST-STANDARD-RUNNER-FAILURE-PROTECTION","kind":"deterministic-test-runner-failure-protection","path":"test/standard-engineering-gates.test.js","command":"node --test --test-reporter=tap --test-concurrency=1 test/standard-engineering-gates.test.js"},
     {"id":"TEST-GS03-FEEDBACK-MATERIAL-PROTECTION","kind":"offline-deterministic-property-mutation-protection","path":"test/gs03-feedback-materials.test.js","command":"node --test --test-concurrency=1 --test-name-pattern=TEST030 test/gs03-feedback-materials.test.js"},
     {"id":"TEST-GS03-FEEDBACK-MATERIALS","kind":"offline-metadata-validation","path":"test/gs03-feedback-materials.test.js","command":"node --test --test-concurrency=1 test/gs03-feedback-materials.test.js test/gs03-admission.test.js"},
@@ -1506,6 +1509,8 @@
     }
   ],
   "evidence": [
+    {"id":"EVD-TEST032-NARROW","type":"local-single-factor-markdown-pdf-rejection-protection","scope":"仅本片原专项6pass/新增后11pass均0fail/0skip，新增五顶层测试覆盖20个单因素场景，保留旧断言；PDF本体、工具及治理清单未改。narrow.log SHA256=a15e9480089bca505125a9b983bb9ebb724c1051d21de53a409a5c56e8c50bd7，实际命令/起止/退出码见narrow.json。只证明本地专项，不预支后续源码独审、冻结18串行门禁、远端CI或专业/生产验收","ref":"C:/Users/drxuj/Projects/卫生健康信息平台/.codex-platform-evidence/repository-governance-negative-tests-20261020/narrow.json","testIds":["TEST-REPOSITORY-GOVERNANCE-REJECTION-PROTECTION"],"productionEvidence":false},
+    {"id":"EVD-PR362-INTEGRATION","type":"protected-integration-and-exact-main-ci","scope":"仅TEST031三文件测试交付：冻结44096097abe420b9a183179a260b7361a438be10经PR362保护squash合并88090d92e0795951572cd0ba01f241118379882e，同tree15ac2cbe87e532577ddc361d06c68e3e956e0419、parent e1e3cc4a。独审及18本地门禁通过；PR39357661190/main39358907256均attempt1、各9成功，各单元/集成4078pass/45环境skip，独立真实PG45零skip/Chromium76/依赖审计passed；重叠不累加，Pages仅静态。原main观察退出/完成未知保留，日志birthtime/mtime非精确进程/CI时刻，第二观察同run成功、无CIrerun；保护未变，唯一sha-bound PUT。最终证据SHA256=9d4f7a0dd70521e4379b675bbefe11cff55d3b2b61167072070983fd1ed0c46b，本轮重核183发布/90合并前/87本地绑定。只证旧TEST031交付，不替本轮TEST032新门禁、专业或生产","ref":"C:/Users/drxuj/Projects/卫生健康信息平台/.codex-platform-evidence/standard-runner-failure-tests-20261020/publication-20261020/delivery-publication-final.json","testIds":["TEST-STANDARD-RUNNER-FAILURE-PROTECTION"],"productionEvidence":false},
     {"id":"EVD-TEST031-NARROW","type":"local-deterministic-test-protection","scope":"仅TEST031原专项9pass和新增后三组12pass均0fail/0skip；六个场景含四配置负例、中段未满批次隔离和第二批失败/准确调用/指标，未修改运行器或业务。专项narrow.log SHA256=5564387edc8494f4384ae599f52ca62cbb4394463da5d730a110958759bfac29；治理/所有权/仓库窄门禁exit0。只证明本地专项，不替后续精确冻结18门禁、CI、专业或生产验收","ref":"C:/Users/drxuj/Projects/卫生健康信息平台/.codex-platform-evidence/standard-runner-failure-tests-20261020/narrow.json","testIds":["TEST-STANDARD-RUNNER-FAILURE-PROTECTION"],"productionEvidence":false},
     {"id":"EVD-PR358-INTEGRATION","type":"protected-integration-and-exact-main-ci","scope":"仅GOV045四文件合同设计交付：冻结4545466a与main467080f2同tree69b5eed7；PR39188292597/main39190196947各9成功，每轮真实PG45零skip/Chromium76/依赖审计passed，保护未变，最终独审通过。网络中断、两轮写前GET及读取器P2修复/复审保留，实际仅一次sha-bound PUT、无CIrerun。SHA256=d8b9a0f114f860ad1e38ae41debe764cd912a8f27a791e60a8040e98fa8b71ad。不替本轮收口/下一准入规划验证、专业接受或运行观测/生产","ref":"C:/Users/drxuj/Projects/卫生健康信息平台/.codex-platform-evidence/access-observability-design-20261019/publication-20261019/delivery-publication-final.json","testIds":["TEST-GOV-001","TEST-GOV-029-DESIGN"],"productionEvidence":false},
     {"id":"EVD-PR359-INTEGRATION","type":"protected-integration-and-exact-main-ci","scope":"仅GOV045设计台账收口及下一准入规划旧交付：冻结375d822d与main5a1ac2f5同tree10f99a92，PR39194928982/main39195982510各9成功、各真实PG45零skip/Chromium76/依赖审计passed，保护未变、最终独审通过。PR四次/main两次观察TLS失败原件及成功观察保留，无CIrerun，唯一sha-bound PUT。SHA256=ec6b2d4bb5b6c4924869bfdd5a29f133e3c1b10edaa9b8a0f2a2e9a1be0ad7a4；不替本轮高风险待审PLAN验证、专业接受或runtime/生产","ref":"C:/Users/drxuj/Projects/卫生健康信息平台/.codex-platform-evidence/access-observability-implementation-plan-20261019/publication-20261019/delivery-publication-final.json","testIds":["TEST-GOV-001","TEST-GOV-029-DESIGN"],"productionEvidence":false},
@@ -2103,6 +2108,7 @@
       "target": "模块写入冲突和跨任务依赖自动失败关闭",
       "status": "已集成",
       "gapTaskIds": [
+        "TEST-032",
         "TEST-031",
       "GOV-045",
         "TEST-030",
@@ -2214,18 +2220,52 @@
   ],
   "tasks": [
     {
-      "id": "TEST-031",
-      "title": "标准测试运行器失败路径测试保护",
+      "id": "TEST-032",
+      "title": "文档与PDF治理拒绝路径测试保护",
       "ownerProcess": "T00",
       "integrationOwner": "T00",
       "taskStatus": "验证中",
       "capabilityStatus": "已实现",
       "riskLevel": "中",
+      "approval": {"state": "approved", "mode": "T00-plan-approval", "ref": "USER-TEST031-CLOSEOUT-TEST032-THREE-FILE-IMPLEMENTATION-2026-10-20", "approvedScope": "用户批准TEST031台账收口与TEST032测试实施，总源范围仅test/repository-governance.test.js、config/lifecycle-governance.json、ROADMAP.md；T00单写、独审、冻结及18串行门禁，不改工具/PDF/业务运行时/CI，专业由用户协调，推送合并上线另批"},
+      "requirementIds": ["REQ-TEST-032"],
+      "regulatoryControlIds": ["REG-GOV-001"],
+      "riskIds": ["RISK-TEST-032"],
+      "decisionIds": [],
+      "dependencies": [],
+      "affectedModules": ["repository-governance-test-protection", "lifecycle-governance"],
+      "dataSensitivity": "仅仓库清单与合成内存配置，已有历史PDF本体及声明源文件存在性只读；不读取真实专业签署、居民、凭据或外部材料",
+      "acceptanceCriteria": [
+        "Markdown总数、总路径摘要和三个分类各自count/pathDigest分别单因素改变，精确命中对应拒绝，保留全部旧断言",
+        "PDF清单缺项/多项、手改禁止和来源说明/引入提交/声明文件缺失分别拒绝，不将空sourcePaths误说为当前必填",
+        "bytes/pages各自独立改变且保留正确SHA及另一数值，分别拒绝；不写PDF/fixture，不改工具或治理清单，不引入helper、依赖或模块替换",
+        "原专项与新增专项实际运行，独审后精确冻结并18门禁串行与最终证据独审；旧PR362证据只关闭TEST031，不替本轮验证",
+        "其他旧任务、风险、专业未决及六域NO-GO保持，无运行时/OPS059正式实现或推送合并上线授权"
+      ],
+      "testIds": ["TEST-REPOSITORY-GOVERNANCE-REJECTION-PROTECTION", "TEST-GOV-001"],
+      "evidenceIds": ["EVD-TEST032-NARROW"],
+      "rollback": "仅撤本轮新增测试与两份治理对应增量，保留全部原断言、历史PDF/来源/摘要、旧任务未决及受控证据；无数据库/schema/运行状态回退，冻结后修改重新独审和门禁",
+      "unresolved": ["本片仅既有治理工具的回归保护，不证明PDF内容正确或生成器可用、专业签署有效或生产就绪；本片新冻结推送合并上线另批"],
+      "observability": {"applicable": false, "reason": "仅仓库只读回归测试与台账同步，无新运行能力或业务遥测"},
+      "runtimeCapability": false,
+      "worktree": ".codex-platform-worktrees/process-v2/t00-repository-governance-negative-tests-20261020",
+      "branch": "process/t00-repository-governance-negative-tests-20261020",
+      "planRef": "ROADMAP.md#test-032-文档与pdf治理拒绝路径测试保护2026-10-20",
+      "writeScopes": ["test/repository-governance.test.js", "config/lifecycle-governance.json", "ROADMAP.md"]
+    },
+    {
+      "id": "TEST-031",
+      "title": "标准测试运行器失败路径测试保护",
+      "ownerProcess": "T00",
+      "integrationOwner": "T00",
+      "taskStatus": "已关闭",
+      "capabilityStatus": "已集成",
+      "riskLevel": "中",
       "approval": {
         "state": "approved",
         "mode": "T00-plan-approval",
-        "ref": "USER-TEST031-THREE-FILE-IMPLEMENTATION-2026-10-20",
-        "approvedScope": "用户批准TEST031三文件测试切片实施及单写/独审/冻结/18串行门禁；不改运行器、业务运行时或CI配置。专业由用户协调，运行时实现、OPS059正式实现、推送、合并和上线另行批准"
+        "ref": "USER-TEST031-THREE-FILE-IMPLEMENTATION-2026-10-20; USER-AUTHORIZED-44096097-PUSH-MERGE-2026-10-20; USER-TEST031-CLOSEOUT-TEST032-THREE-FILE-IMPLEMENTATION-2026-10-20",
+        "approvedScope": "原TEST031限定测试经冻结44096097/PR362保护同tree合并主线88090d92，独审、18本地门禁及精确PR/main各9项CI成功；本轮据受控证据收口为已关闭/已集成，仅测试保护能力。用户另批准TEST032三文件测试，原运行器/业务/CI不改；专业由用户协调，运行时/OPS059正式实现和生产仍未准入，本次新提交推送合并另批"
       },
       "requirementIds": ["REQ-TEST-031"],
       "regulatoryControlIds": ["REG-GOV-001"],
@@ -2242,14 +2282,16 @@
         "仅保护既有独立技术运行器；不依赖或修改OPS040/SEC016/OPS059/GOV045整条及原专业未决，无运行时或生产准入"
       ],
       "testIds": ["TEST-STANDARD-RUNNER-FAILURE-PROTECTION", "TEST-GOV-001"],
-      "evidenceIds": ["EVD-TEST031-NARROW"],
+      "evidenceIds": ["EVD-TEST031-NARROW", "EVD-PR362-INTEGRATION"],
       "rollback": "仅撤本切片新增测试断言和两份治理文件对应增量，保留全部旧断言、任务、专业未决及历史证据；冻结后任何修改重新独审/冻结/重跑必要门禁，无数据/schema/回执/key回退",
-      "unresolved": ["本切片仅仓库测试保护，不替专业签署或生产验收；新冻结提交的推送、合并与上线尚未授权"],
+      "unresolved": ["冻结44096097推送及条件合并已获用户单独授权且经PR362完成，本轮仅收口该交付；本切片只提供仓库测试保护，不替专业签署或生产验收，开放风险及运行时/OPS059正式实现/生产限制保留"],
       "observability": {"applicable": false, "reason": "仅标准测试运行器的合成回归保护，无新增运行能力；测试指标断言不是业务遥测交付"},
       "runtimeCapability": false,
       "worktree": ".codex-platform-worktrees/process-v2/t00-standard-runner-failure-tests-20261020",
       "branch": "process/t00-standard-runner-failure-tests-20261020",
       "planRef": "ROADMAP.md#test-031-标准测试运行器失败路径测试保护2026-10-20",
+      "pullRequestRef": "https://github.com/xujiann/chronic-care-platform/pull/362",
+      "ciRef": "https://github.com/xujiann/chronic-care-platform/actions/runs/39358907256",
       "writeScopes": ["test/standard-engineering-gates.test.js", "config/lifecycle-governance.json", "ROADMAP.md"]
     },
 {"id":"GOV-044","title":"反馈业务受控材料离线核验","ownerProcess":"T00","integrationOwner":"T00","taskStatus":"已关闭","capabilityStatus":"已集成","riskLevel":"中","approval":{"state":"approved","mode":"T00-plan-approval","ref":"USER-FEEDBACK-MATERIALS-OFFLINE-2026-10-16; USER-AUTHORIZED-A4FC4BB4-PUSH-MERGE-2026-10-17; USER-GOV044-CLOSEOUT-CANDIDATE-ONLY-2026-10-17","approvedScope":"GOV044离线元数据工具经冻结a4fc4bb4/PR353保护合并11265237，主线CI已核9成功；本轮仅四文件台账收口及TEST030待批准候选登记，不实施候选。专业签署由用户协调，OPS059正式实现、新冻结推送合并及上线另批；原两条专业未决、开放风险和三父Proposed/GS03未建设/六域NO-GO不变"},"requirementIds":["REQ-GOV-044"],"regulatoryControlIds":["REG-GOV-001"],"riskIds":["RISK-GOV-044"],"decisionIds":["ADR-GS03-FEEDBACK-MATERIALS-001"],"dependencies":["GOV-043","GOV-031"],"affectedModules":["feedback-materials-offline-governance"],"dataSensitivity":"仅不透明受控引用与摘要元数据，测试使用合成材料，不读取签署原件/患者/provider正文","acceptanceCriteria":["必填与版本摘要格式、九组材料归属、唯一和依赖引用缺失失败关闭","完整输入也不判专业签署/原文一致，不批准实施上线，输出零回显且只读","GOV031旧语义、OPS059及所有旧任务风险ADR和生产边界不变；独审冻结后18串行门禁"],"testIds":["TEST-GS03-FEEDBACK-MATERIALS","TEST-GS03-ADMISSION"],"evidenceIds":["EVD-GOV044-NARROW","EVD-PR353-INTEGRATION"],"rollback":"仅撤新增离线工具模板测试与治理增量，保留旧工具接口兼容、原业务签署证据和全部未决","unresolved":["S01至S09仍待真实有权责任方签署及材料核验，格式检查不能解除","正式限域Accepted架构、高风险PLAN及OPS059实际实现仍另准入","TEST-030仅待批准的离线元数据属性与变异测试保护候选，未实施；不改变工具或专业准入"],"observability":{"applicable":false,"reason":"仅离线元数据核验，不交付业务运行能力或后台服务"},"runtimeCapability":false,"worktree":".codex-platform-worktrees/process-v2/t00-feedback-material-index-20261016","branch":"process/t00-feedback-material-index-20261016","planRef":"docs/adr/2026-10-16-gs03-feedback-materials.md","writeScopes":["scripts/gs03-admission.js","scripts/gs03-feedback-materials.js","config/gs03-feedback-materials.example.json","test/gs03-feedback-materials.test.js","config/lifecycle-governance.json","config/repository-governance.json","ROADMAP.md","docs/adr/README.md","docs/adr/2026-10-16-gs03-feedback-materials.md","CURRENT_ARCHITECTURE.md","MODULE_MAP.md","DATA_MODEL.md","API_MAP.md","DEPENDENCY_MAP.md","TECH_DEBT.md"],"pullRequestRef":"https://github.com/xujiann/chronic-care-platform/pull/353","ciRef":"https://github.com/xujiann/chronic-care-platform/actions/runs/38994117630"},

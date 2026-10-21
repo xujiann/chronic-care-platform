@@ -1,5 +1,51 @@
 # 工程治理路线图
 
+## TEST-032 文档与PDF治理拒绝路径测试保护（2026-10-20）
+
+用户批准 `USER-TEST031-CLOSEOUT-TEST032-THREE-FILE-IMPLEMENTATION-2026-10-20`：TEST-031台账收口及本片测试实施，总源范围仅 `test/repository-governance.test.js`、`config/lifecycle-governance.json`、`ROADMAP.md`。本轮不推送、合并或上线，不修改工具、PDF、业务运行时或CI；专业签署仍由用户协调，运行时实现与OPS-059正式实现另批。下方旧日期/阶段记录保留，不重写为当前授权。
+
+### TEST-031交付收口依据
+
+[PR362](https://github.com/xujiann/chronic-care-platform/pull/362)已将冻结 `44096097abe420b9a183179a260b7361a438be10` 按保护规则squash合并为 `88090d92e0795951572cd0ba01f241118379882e`，同tree `15ac2cbe87e532577ddc361d06c68e3e956e0419`、parent `e1e3cc4a378ba86c1ee7c13f304d982edbd9d2e6`。本地源码独审、18串行门禁及最终证据独审通过；PR CI39357661190与main CI39358907256均attempt1、各9作业成功。每轮单元/集成4078通过、45环境跳过，独立真实PG45零跳过、Chromium76和依赖审计passed，不跨轮或重叠累加。Pages成功仅静态预览，不是生产上线。
+
+旧最终发布证据 `.codex-platform-evidence/standard-runner-failure-tests-20261020/publication-20261020/delivery-publication-final.json`，SHA-256 `9d4f7a0dd70521e4379b675bbefe11cff55d3b2b61167072070983fd1ed0c46b`。本轮重核183发布绑定、90合并前绑定及87本地传递绑定，并重新GET核实PR已合并、当前main及九绿CI；保护/rulesets未变、开放PR为空。原main首次观察退出/完成仍未知；其startedAt源自日志birthtime、lastObservedAt源自mtime，均非精确进程/CI时刻；第二观察同run实际成功，未重跑CI、未重复合并。
+
+仅将TEST-031限定测试交付关闭/已集成，补EVD-PR362-INTEGRATION与PR/CI引用，保留原需求/范围/验收和开放风险；不把旧证据当本片TEST-032通过。其他旧任务（含OPS-040/SEC-016/OPS-059/GOV-045）整条、专业未决、三父Proposed、黄金场景及六域NO-GO保持，不新增递归GOV任务。先释放TEST031治理写范围，WIP3降2，再登记独立TEST032回3/5；MAP-MODULE只新增本任务gap，保留旧gap。
+
+### 基线、选项和单写范围
+
+从最新fetched `origin/main@88090d92` 经 `process:plan/create` 建立 `process/t00-repository-governance-negative-tests-20261020`；本树无 `.codex/config.toml`，不宣称自动继承模型配置。原脏主目录、冻结树和证据不改。协调者T00是三文件唯一写者，独立审查者只读；不并行重型测试，冻结后修改须撤销冻结、重新审查和验证。
+
+本片复用Accepted `docs/adr/2026-08-23-repository-documentation-and-artifact-governance.md`及既有导出，仅加强测试安全网，不改公共合同、安全模型或部署拓扑，不新建ADR/模块/运行边，不机械改六张地图正文。机器台账无对应历史TEST-001任务，不虚构依赖；`dependencies=[]` 表示独立技术测试不消费业务/专业能力，不删除真实依赖。
+
+选项：维持仅现有组合负例会漏检独立分支；修改工具/制品不在授权内。采用现有测试文件加法、合法基线独立克隆及精确错误；不新增helper/依赖/磁盘fixture或模块替换，不调用外部材料，不宣称已发现工具缺陷。
+
+| 准确文件 | 唯一写者与允许变化 |
+| --- | --- |
+| `test/repository-governance.test.js` | T00，仅下列五组新增测试，全部旧断言保留 |
+| `config/lifecycle-governance.json` | T00，仅TEST031收口、本任务/需求/风险/testId/实际证据及MAP-MODULE新增gap |
+| `ROADMAP.md` | T00，仅本PLAN、旧片收口事实及本片实际窄验证记录 |
+
+### 拟实施的五组单因素拒绝保护
+
+1. Markdown八例：总数、总路径摘要、current/snapshot/superseded三分类各自count和pathDigest。每例只改一个值，合法前序字段保持，精确错误；原snapshot内容负例继续保留，不重复宣称新增。
+2. PDF清单两例：现有路径缺一项或增加一个合成未登记路径，使用现有options.paths并保持排序；合法清单先验证，测试不创建/删除PDF。
+3. PDF政策与来源元数据六例：manualEditAllowed、retentionReason、introducedCommit、generation.status、producer、provenanceEvidence分别单独改变，精确错误，不能由前一校验掩盖。
+4. PDF声明文件两例：verifier或sourcePaths各替换为明确不存在的合成路径，精确source is missing错误；不打开引用目标、不清空sourcePaths冒充当前必填规则，不改源文件。
+5. PDF二进制指标两例：bytes或pages分别偏移，正确sha和另一数值不变，分别命中共享漂移错误。仅证明当前实现的字节/声明页数门禁，不证明PDF语义、布局、生成器可用性或专业接受。
+
+### 测试、冻结、验收与回滚
+
+已建立的新树原专项基线为6/6通过、0失败/0跳过；`npm ci`成功、锁文件未变。实施后同命令 `node --test --test-reporter=tap --test-concurrency=1 test/repository-governance.test.js`，五组共20个循环场景，不冒充20个顶层测试。窄治理依次运行governance:lifecycle、process:verify、repository:governance:verify和documentation-facts:verify；旧PR362不替本轮结果。
+
+源码独审无未决P0-P2后冻结精确commit/tree/三文件SHA-256，严格串行执行：governance:lifecycle → repository:governance:verify → documentation-facts:verify → process:verify → routes:check → routes:test → architecture:test → process:test → platform:iterations:test → build → lint → typecheck → test:unit → test:integration → test:smoke → test:all → security:browser:verify → static:test。最终独审核对准确冻结、原始日志/退出码/摘要、顺序及环境跳过；未执行项不报通过，重叠不累加。外置证据目录 `.codex-platform-evidence/repository-governance-negative-tests-20261020/`，不进入源码/制品。
+
+回滚仅撤本轮新增断言和两治理文件对应增量，保留全部旧断言、PDF本体/来源/摘要、历史证据、原业务/专业未决及生产限制；无数据/schema/回执/key或运行状态回退。发现工具缺陷、需要第四源文件、改清单/预算/CI或专业决定即停在复现并另批，不弱化测试。本PLAN登记时新增测试与冻结后门禁尚未执行，结果随后如实记录；本次新冻结推送合并上线另批。
+
+### 本片实施与窄验证记录（冻结前）
+
+三文件单写实施完成，既有测试仅加法新增五个顶层测试、20个单因素场景，原断言全保留；原专项6/6、新专项11/11，均0失败/0跳过。`narrow.log` SHA-256为 `a15e9480089bca505125a9b983bb9ebb724c1051d21de53a409a5c56e8c50bd7`，实际命令、起止、退出码和日志字节见外置 `narrow.json`。只记TEST032验证中/已实现和本片专项证据，不预支后续源码独审、冻结18门禁或集成；TEST031仅按旧精确交付收口，其余旧任务/风险/专业未决、六域NO-GO和WIP3/5保持。源码独审和准确冻结后的完整门禁随后另验，本次新提交无推送合并上线授权。
+
 ## TEST-031 标准测试运行器失败路径测试保护（2026-10-20）
 
 用户批准 `USER-TEST031-THREE-FILE-IMPLEMENTATION-2026-10-20` 仅本三文件测试切片实施，非运行时；专业签署由用户协调，运行时实现、OPS-059正式实现、推送、合并和上线另行批准。该授权不覆盖文档/PDF负测备选，不新增递归GOV任务。
