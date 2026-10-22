@@ -300,3 +300,151 @@ test("ADR index cannot regress the accepted object-storage decision to Proposed"
   assert.equal(report.ok, false);
   assert.equal(failed(report, "adrIndex:objectStorageAcceptedNoGo"), true);
 });
+
+test("TEST033 SQLite document facts reject four independent numeric drifts", () => {
+  const head = repositoryState.sqliteSchemaFacts.head;
+  const tables = repositoryState.sqliteSchemaFacts.tableCount;
+  const scenarios = [
+    ["schema head", "## 2. SQLite Schema", "### 关系主链", `当前实际与公开 head 均为 v${head}`, `当前实际与公开 head 均为 v${head - 1}`, "dataModel:sqliteSchemaFacts"],
+    ["table count", "## 2. SQLite Schema", "### 关系主链", `创建 ${tables} 张表`, `创建 ${tables - 1} 张表`, "dataModel:sqliteSchemaFacts"],
+    ["migration version", "## 3. Migration 现状", "## 4. JSON 集合与实际使用", `当前为 ${head}`, `当前为 ${head - 1}`, "dataModel:migrationFacts"],
+    ["empty migration target", "## 3. Migration 现状", "## 4. JSON 集合与实际使用", `空库 0→${head}`, `空库 0→${head - 1}`, "dataModel:migrationFacts"]
+  ];
+  assert.equal(scenarios.length, 4);
+  for (const [label, heading, nextHeading, original, changed, checkId] of scenarios) {
+    const state = cloneRepositoryState();
+    const baseline = governance.buildReport(state);
+    assert.equal(baseline.ok, true, label);
+    assert.deepEqual(baseline.checks.filter((item) => item.id === checkId).map((item) => item.passed), [true], label);
+    const source = state.documents.dataModel;
+    const lines = [...source.matchAll(/^.*$/gm)];
+    const starts = lines.filter((line) => line[0].trim() === heading);
+    const ends = lines.filter((line) => line[0].trim() === nextHeading);
+    assert.equal(starts.length, 1, label);
+    assert.equal(ends.length, 1, label);
+    const start = starts[0].index;
+    const end = ends[0].index;
+    assert.ok(end > start, label);
+    const section = source.slice(start, end);
+    assert.notEqual(original, changed, label);
+    assert.equal(section.split(original).length - 1, 1, label);
+    const mutated = section.replace(original, changed);
+    assert.notEqual(mutated, section, label);
+    state.documents.dataModel = source.slice(0, start) + mutated + source.slice(end);
+    const report = governance.buildReport(state);
+    assert.equal(report.ok, false, label);
+    assert.deepEqual(report.checks.filter((item) => item.id === checkId).map((item) => item.passed), [false], label);
+    const restored = structuredClone(state);
+    const actual = restored.documents.dataModel;
+    assert.equal(actual.slice(0, start), source.slice(0, start), label);
+    assert.equal(actual.slice(start + mutated.length), source.slice(end), label);
+    const actualSection = actual.slice(start, start + mutated.length);
+    assert.equal(actualSection.split(changed).length - 1, 1, label);
+    restored.documents.dataModel = actual.slice(0, start) + actualSection.replace(changed, original) + actual.slice(start + mutated.length);
+    assert.deepEqual(restored, repositoryState, label);
+  }
+});
+
+test("TEST033 governed API rows reject six independent numeric drifts", () => {
+  const writes = repositoryState.catalogSummary.writeRoutes;
+  const proof = repositoryState.catalogSummary.writeIdempotencyBehaviorProofRequired;
+  const review = repositoryState.catalogSummary.reviewRequired;
+  const scenarios = [
+    ["roadmap", "| 7C | 生产 API 机器目录 |", `${writes} 个写接口`, `${writes - 1} 个写接口`, "roadmap:apiCatalogFacts"],
+    ["roadmap", "| 7C | 生产 API 机器目录 |", `${proof} 个仍缺 endpoint 级证明`, `${proof - 1} 个仍缺 endpoint 级证明`, "roadmap:apiCatalogFacts"],
+    ["roadmap", "| 7C | 生产 API 机器目录 |", `总复核为 ${review}`, `总复核为 ${review - 1}`, "roadmap:apiCatalogFacts"],
+    ["moduleMap", "| API 生产目录 |", `${writes} 个写接口`, `${writes - 1} 个写接口`, "moduleMap:apiCatalogFacts"],
+    ["moduleMap", "| API 生产目录 |", `${proof} 个仍缺 endpoint 级行为证明`, `${proof - 1} 个仍缺 endpoint 级行为证明`, "moduleMap:apiCatalogFacts"],
+    ["moduleMap", "| API 生产目录 |", `使 ${review} 项保持复核`, `使 ${review - 1} 项保持复核`, "moduleMap:apiCatalogFacts"]
+  ];
+  assert.equal(scenarios.length, 6);
+  for (const [documentId, marker, original, changed, checkId] of scenarios) {
+    const label = documentId + ":" + original;
+    const state = cloneRepositoryState();
+    const baseline = governance.buildReport(state);
+    assert.equal(baseline.ok, true, label);
+    assert.deepEqual(baseline.checks.filter((item) => item.id === checkId).map((item) => item.passed), [true], label);
+    const source = state.documents[documentId];
+    const matches = [...source.matchAll(/^.*$/gm)].filter((line) => line[0].includes(marker));
+    assert.equal(matches.length, 1, label);
+    const start = matches[0].index;
+    const row = matches[0][0];
+    assert.notEqual(original, changed, label);
+    assert.equal(row.split(original).length - 1, 1, label);
+    const mutated = row.replace(original, changed);
+    assert.notEqual(mutated, row, label);
+    state.documents[documentId] = source.slice(0, start) + mutated + source.slice(start + row.length);
+    const report = governance.buildReport(state);
+    assert.equal(report.ok, false, label);
+    assert.deepEqual(report.checks.filter((item) => item.id === checkId).map((item) => item.passed), [false], label);
+    const restored = structuredClone(state);
+    const actual = restored.documents[documentId];
+    assert.equal(actual.slice(0, start), source.slice(0, start), label);
+    assert.equal(actual.slice(start + mutated.length), source.slice(start + row.length), label);
+    const actualRow = actual.slice(start, start + mutated.length);
+    assert.equal(actualRow.split(changed).length - 1, 1, label);
+    restored.documents[documentId] = actual.slice(0, start) + actualRow.replace(changed, original) + actual.slice(start + mutated.length);
+    assert.deepEqual(restored, repositoryState, label);
+  }
+});
+
+test("TEST033 object storage authority rejects three independent field changes", () => {
+  const scenarios = [
+    [["ok"], true, false],
+    [["summary", "decisionStatus"], "accepted", "proposed"],
+    [["implementationAuthorized"], true, false]
+  ];
+  assert.equal(scenarios.length, 3);
+  for (const [fields, expected, changed] of scenarios) {
+    const label = fields.join(".");
+    const state = cloneRepositoryState();
+    const baseline = governance.buildReport(state);
+    assert.equal(baseline.ok, true, label);
+    assert.deepEqual(baseline.checks.filter((item) => item.id === "authority:objectStorageDecision").map((item) => item.passed), [true], label);
+    const parent = fields.slice(0, -1).reduce((value, field) => value[field], state.objectStorageReport);
+    const field = fields.at(-1);
+    assert.equal(parent[field], expected, label);
+    assert.notEqual(expected, changed, label);
+    parent[field] = changed;
+    const report = governance.buildReport(state);
+    assert.equal(report.ok, false, label);
+    assert.deepEqual(report.checks.filter((item) => item.id === "authority:objectStorageDecision").map((item) => item.passed), [false], label);
+    const restored = structuredClone(state);
+    const restoreParent = fields.slice(0, -1).reduce((value, key) => value[key], restored.objectStorageReport);
+    assert.equal(restoreParent[field], changed, label);
+    restoreParent[field] = expected;
+    assert.deepEqual(restored, repositoryState, label);
+  }
+});
+
+test("TEST033 first release authority rejects six independent field changes", () => {
+  const scenarios = [
+    [["ok"], true, false],
+    [["status"], "FROZEN-NO-GO", "DRAFT"],
+    [["productionReady"], false, true],
+    [["repositoryReview", "apiReviewRequired"], [], ["synthetic-api-review"]],
+    [["repositoryReview", "collectionReviewRequired"], [], ["synthetic-collection-review"]],
+    [["repositoryReview", "collectionRepositoryPlanMissing"], [], ["synthetic-plan-gap"]]
+  ];
+  assert.equal(scenarios.length, 6);
+  for (const [fields, expected, changed] of scenarios) {
+    const label = fields.join(".");
+    const state = cloneRepositoryState();
+    const baseline = governance.buildReport(state);
+    assert.equal(baseline.ok, true, label);
+    assert.deepEqual(baseline.checks.filter((item) => item.id === "authority:firstReleaseScope").map((item) => item.passed), [true], label);
+    const parent = fields.slice(0, -1).reduce((value, field) => value[field], state.productionReleaseScopeReport);
+    const field = fields.at(-1);
+    assert.deepEqual(parent[field], expected, label);
+    assert.notDeepEqual(expected, changed, label);
+    parent[field] = structuredClone(changed);
+    const report = governance.buildReport(state);
+    assert.equal(report.ok, false, label);
+    assert.deepEqual(report.checks.filter((item) => item.id === "authority:firstReleaseScope").map((item) => item.passed), [false], label);
+    const restored = structuredClone(state);
+    const restoreParent = fields.slice(0, -1).reduce((value, key) => value[key], restored.productionReleaseScopeReport);
+    assert.deepEqual(restoreParent[field], changed, label);
+    restoreParent[field] = structuredClone(expected);
+    assert.deepEqual(restored, repositoryState, label);
+  }
+});

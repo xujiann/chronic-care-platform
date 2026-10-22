@@ -1,5 +1,26 @@
 # 工程治理路线图
 
+## TEST-033 批准实施与证据（2026-10-22）
+
+用户批准原三文件测试实施，四组19个单因素场景。仅取代下方待审PLAN的实施状态，历史原日期和事实保留。准确写范围为 `test/documentation-fact-drift.test.js`、`config/lifecycle-governance.json`、`ROADMAP.md`；T00协调者唯一写者，独审只读。不改工具、机器权威、运行器、业务运行时、CI、依赖或测试分区。专业签署由用户协调；运行时实现、OPS-059正式实施、推送、合并和上线另行批准。
+
+在最新主线 `7e9d238a26a0c888d78b3adf2421383357af7b64` 经process建立的已登记树/分支 `process/t00-documentation-fact-negative-tests-20261021` 继续；原脏主目录和旧冻结树不动。主线CI39565755105 attempt1九作业成功、开放PR零且保护有效，仅作基线，不替本片验证。新树无本地Codex配置，不宣称自动继承配置或切换模型。TEST033验证中/已实现、WIP3/5，未关闭或集成；其他任务、专业未决及六域NO-GO不改。
+
+### 实际单因素保护和窄验证
+
+A四例覆盖DATA_MODEL受管章节的head、table、migration当前版本及空库目标；B六例覆盖两份唯一API行的write/proof/review值；C三例覆盖对象存储权威ok/decisionStatus/implementationAuthorized；D六例覆盖首发权威ok/status/productionReady和三review数组。四个新增顶层测试、19循环场景，不冒充19个顶层测试，不宣称全部工具条件覆盖。每例独立合法clone、目标检查恰一项先真后假；A/B局部token命中一次且变化、保留章节外文本和CRLF；仅反转被改单token或字段后完整state与原状态深相等，保留旧断言。
+
+实际专项命令 `node --test --test-reporter=tap --test-concurrency=1 test/documentation-fact-drift.test.js`：变更前18通过，变更后22通过，均零失败零跳过。外置 `.codex-platform-evidence/documentation-fact-negative-tests-20261021/` 保留baseline-tests/narrow原始日志、真实命令/时刻/退出回执；narrow.log SHA-256 `6bdee025c5e3751eb7a82a5ae20498352c431b9393c9581041d617c3f43ed183`。process和文档事实窄验证实际退出0；不是最终18门禁、独审或生产证据。
+
+### 单写交接、冻结、串行门禁和回滚
+
+T00完成三文件后停写交只读独审，无未决P0–P2后冻结commit/tree/三文件摘要。18项严格串行：governance:lifecycle → repository:governance:verify → documentation-facts:verify → process:verify → routes:check → routes:test → architecture:test → process:test → platform:iterations:test → build → lint → typecheck → test:unit → test:integration → test:smoke → test:all → security:browser:verify → static:test。重型不并行，冻结后源变化重新独审冻结及验证，最终原始证据再独审；此段不预填通过。重叠套件不累加、环境跳过不算通过，不宣称本地真实PG或Chromium E2E。
+
+旧PR364封存中的“未来TEST033树不存在”仅为当时事实。本次批准合法建树后保留旧封存，以固定摘要核对178发布、92合并前及82本地绑定；仅为不可变历史证据完整性，不是旧完整验证器重放，也不验证本片。
+
+回滚仅撤本片新增四测试及对应TEST033治理增量，保留旧测试、权威、工具和历史证据；无数据/schema迁移。若需第四文件、工具/运行时/CI修复或专业决定，保留复现并停扩围、集中另批，不弱化断言。
+
+
 ## 2026-10-21 TEST-032台账收口与下一测试切片规划
 
 用户仅批准本次TEST032台账收口及下一独立切片梳理、登记供审批。当前源范围仅本路线图和 `config/lifecycle-governance.json` 两文件，T00协调者唯一写者、独立审查者只读；本候选自身仍须窄验证、独审、冻结、18项串行门禁及最终证据独审，不复用旧绿灯。专业签署由用户协调，运行时实现、OPS-059正式实施及本次新提交推送、合并和上线均另行批准。下方旧日期和阶段记录保留，不解释为当前授权。
