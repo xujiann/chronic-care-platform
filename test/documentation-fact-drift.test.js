@@ -448,3 +448,125 @@ test("TEST033 first release authority rejects six independent field changes", ()
     assert.deepEqual(restored, repositoryState, label);
   }
 });
+
+test("TEST034 API authority rejects seven independent field changes", () => {
+  const scenarios = [
+    [["catalogSummary","entries"], repositoryState.catalogSummary.entries + 0.5],
+    [["catalogSummary","writeRoutes"], String(repositoryState.catalogSummary.writeRoutes)],
+    [["catalogSummary","writeRoutes"], 0],
+    [["catalogSummary","writeIdempotencyBehaviorProofRequired"], -1],
+    [["catalogSummary","reviewRequired"], repositoryState.catalogSummary.writeIdempotencyBehaviorProofRequired - 1],
+    [["catalogSummary","productionNoGo"], repositoryState.catalogSummary.entries - 1],
+    [["catalogErrors"], ["synthetic-catalog-error"]]
+  ];
+  assert.equal(scenarios.length, 7);
+  for (const [fields, changed] of scenarios) {
+    const label = fields.join(".") + ":" + JSON.stringify(changed);
+    const state = cloneRepositoryState();
+    const baseline = governance.buildReport(state);
+    assert.equal(baseline.ok, true, label);
+    assert.deepEqual(baseline.checks.filter((item) => item.id === "authority:apiCatalog").map((item) => item.passed), [true], label);
+    const parent = fields.slice(0, -1).reduce((value, field) => value[field], state);
+    const field = fields.at(-1);
+    const expected = structuredClone(parent[field]);
+    assert.notDeepEqual(expected, changed, label);
+    parent[field] = structuredClone(changed);
+    const report = governance.buildReport(state);
+    assert.equal(report.ok, false, label);
+    assert.deepEqual(report.checks.filter((item) => item.id === "authority:apiCatalog").map((item) => item.passed), [false], label);
+    const restored = structuredClone(state);
+    const restoreParent = fields.slice(0, -1).reduce((value, key) => value[key], restored);
+    assert.deepEqual(restoreParent[field], changed, label);
+    restoreParent[field] = structuredClone(expected);
+    assert.deepEqual(restored, repositoryState, label);
+  }
+});
+
+test("TEST034 repository authority rejects two independent field changes", () => {
+  const scenarios = [
+    [["repositoryGovernanceReport","ok"], false],
+    [["repositoryGovernanceReport","markdown","total"], String(repositoryState.repositoryGovernanceReport.markdown.total)]
+  ];
+  assert.equal(scenarios.length, 2);
+  for (const [fields, changed] of scenarios) {
+    const label = fields.join(".") + ":" + JSON.stringify(changed);
+    const state = cloneRepositoryState();
+    const baseline = governance.buildReport(state);
+    assert.equal(baseline.ok, true, label);
+    assert.deepEqual(baseline.checks.filter((item) => item.id === "authority:repositoryGovernance").map((item) => item.passed), [true], label);
+    const parent = fields.slice(0, -1).reduce((value, field) => value[field], state);
+    const field = fields.at(-1);
+    const expected = structuredClone(parent[field]);
+    assert.notDeepEqual(expected, changed, label);
+    parent[field] = structuredClone(changed);
+    const report = governance.buildReport(state);
+    assert.equal(report.ok, false, label);
+    assert.deepEqual(report.checks.filter((item) => item.id === "authority:repositoryGovernance").map((item) => item.passed), [false], label);
+    const restored = structuredClone(state);
+    const restoreParent = fields.slice(0, -1).reduce((value, key) => value[key], restored);
+    assert.deepEqual(restoreParent[field], changed, label);
+    restoreParent[field] = structuredClone(expected);
+    assert.deepEqual(restored, repositoryState, label);
+  }
+});
+
+test("TEST034 SQLite authority rejects four independent field changes", () => {
+  const scenarios = [
+    [["sqliteSchemaFacts","head"], repositoryState.sqliteSchemaFacts.head - 1],
+    [["sqliteSchemaFacts","tableCount"], String(repositoryState.sqliteSchemaFacts.tableCount)],
+    [["sqliteSchemaFacts","tables"], null],
+    [["sqliteSchemaFacts","tables"], repositoryState.sqliteSchemaFacts.tables.slice(0, -1)]
+  ];
+  assert.equal(scenarios.length, 4);
+  for (const [fields, changed] of scenarios) {
+    const label = fields.join(".") + ":" + JSON.stringify(changed);
+    const state = cloneRepositoryState();
+    const baseline = governance.buildReport(state);
+    assert.equal(baseline.ok, true, label);
+    assert.deepEqual(baseline.checks.filter((item) => item.id === "authority:sqliteSchema").map((item) => item.passed), [true], label);
+    const parent = fields.slice(0, -1).reduce((value, field) => value[field], state);
+    const field = fields.at(-1);
+    const expected = structuredClone(parent[field]);
+    assert.notDeepEqual(expected, changed, label);
+    parent[field] = structuredClone(changed);
+    const report = governance.buildReport(state);
+    assert.equal(report.ok, false, label);
+    assert.deepEqual(report.checks.filter((item) => item.id === "authority:sqliteSchema").map((item) => item.passed), [false], label);
+    const restored = structuredClone(state);
+    const restoreParent = fields.slice(0, -1).reduce((value, key) => value[key], restored);
+    assert.deepEqual(restoreParent[field], changed, label);
+    restoreParent[field] = structuredClone(expected);
+    assert.deepEqual(restored, repositoryState, label);
+  }
+});
+
+test("TEST034 E2E authority rejects five independent field changes", () => {
+  const scenarios = [
+    [["e2eFacts","root"], 0],
+    [["e2eFacts","resident"], 0],
+    [["e2eFacts","pwa"], 0],
+    [["e2eFacts","total"], repositoryState.e2eFacts.total + 1],
+    [["e2eFacts","specFiles"], String(repositoryState.e2eFacts.specFiles)]
+  ];
+  assert.equal(scenarios.length, 5);
+  for (const [fields, changed] of scenarios) {
+    const label = fields.join(".") + ":" + JSON.stringify(changed);
+    const state = cloneRepositoryState();
+    const baseline = governance.buildReport(state);
+    assert.equal(baseline.ok, true, label);
+    assert.deepEqual(baseline.checks.filter((item) => item.id === "authority:e2eInventory").map((item) => item.passed), [true], label);
+    const parent = fields.slice(0, -1).reduce((value, field) => value[field], state);
+    const field = fields.at(-1);
+    const expected = structuredClone(parent[field]);
+    assert.notDeepEqual(expected, changed, label);
+    parent[field] = structuredClone(changed);
+    const report = governance.buildReport(state);
+    assert.equal(report.ok, false, label);
+    assert.deepEqual(report.checks.filter((item) => item.id === "authority:e2eInventory").map((item) => item.passed), [false], label);
+    const restored = structuredClone(state);
+    const restoreParent = fields.slice(0, -1).reduce((value, key) => value[key], restored);
+    assert.deepEqual(restoreParent[field], changed, label);
+    restoreParent[field] = structuredClone(expected);
+    assert.deepEqual(restored, repositoryState, label);
+  }
+});

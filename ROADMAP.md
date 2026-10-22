@@ -1,5 +1,18 @@
 # 工程治理路线图
 
+## TEST034-IMPLEMENTATION-20261022
+
+用户批准TEST-034原三文件测试实施，取代下方待审PLAN的实施状态；原日期与历史事实保留。T00协调者唯一写者、独审只读，准确范围仅 `test/documentation-fact-drift.test.js`、`config/lifecycle-governance.json`、`ROADMAP.md`。不改工具、权威文件、业务运行时、运行器、CI、依赖、预算或测试分区。专业签署由用户协调；运行时、OPS059正式实施、推送、合并和上线另批。
+
+从最新fetched `origin/main@293b9aaaf75ccf5e643863468d580baf4a8191c2` 经process:plan/create建立 `process/t00-documentation-fact-authority-tests-20261022`。主线CI39731217395 attempt1九成功、开放PR零、保护/rulesets有效，仅作基线不替本片验证。原脏主目录、旧冻结树和历史证据不动；新树无本地Codex配置，不宣称自动继承或切换模型。TEST034验证中/已实现仅为测试保护，WIP3/5；其他任务、风险、专业未决、黄金场景和六域NO-GO不变。
+
+四个新增顶层测试保护四组18循环场景，准确字段/目标沿用下方表：API7、仓库2、SQLite4、E2E5。每例合法独立clone，report先真且精确目标恰一项先真后假，report后假；仅还原所改字段/数组后完整state深相等，不重置对象或文档掩盖变化，不用buildReport计算预期。允许其它检查同时失败；单因素不等于MC/DC、独立内部子条件或全部工具覆盖。保留旧22项及对象存储/首发负例。
+
+真实窄验证：同一 `node --test --test-reporter=tap --test-concurrency=1 test/documentation-fact-drift.test.js` 基线22通过/0跳过，变更后26通过/0跳过；narrow.log SHA-256 `7523399eadd147c88ae48ae257e12e0400d2d51283f0f01e3cf393abde23e790`，退出及原始日志外置 `.codex-platform-evidence/documentation-fact-authority-tests-20261022/`。登记TEST-DOC-FACT-AUTHORITY-REJECTION-PROTECTION/EVD-TEST034-NARROW，不能当最终门禁或生产证据。
+
+源独审无未决P0–P2后冻结精确commit/tree/三文件摘要，严格串行：governance:lifecycle → repository:governance:verify → documentation-facts:verify → process:verify → routes:check → routes:test → architecture:test → process:test → platform:iterations:test → build → lint → typecheck → test:unit → test:integration → test:smoke → test:all → security:browser:verify → static:test，起止/退出/日志/跳过均绑定外置，最终证据再独审。不预填尚未运行结果，不跨套件/轮次累加；冻结后修改必须复审、重冻和重验。暴露工具缺陷、第四文件或专业决定须保留复现、停并另批。回滚仅撤本轮四测试及相应治理增量，保留旧22项、TEST033收口、权威和历史证据，无数据/schema/运行回退。
+
+
 ## 2026-10-22 TEST-033台账收口与下一独立切片规划
 
 本轮用户仅批准TEST033台账收口和下一独立切片梳理登记供审批。准确源范围仅本路线图和 `config/lifecycle-governance.json`；T00协调者唯一写者、独审只读。不实施TEST034，不改测试、工具、运行器、CI、依赖、权威或业务运行时；专业签署由用户协调，运行时实现、OPS-059正式实施及本次新提交推送、合并和上线另行批准。旧日期/阶段文字作为历史保留，不当作当前授权。

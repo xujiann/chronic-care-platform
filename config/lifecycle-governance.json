@@ -39,7 +39,7 @@
     "高": "accepted-adr-human-review-special-validation"
   },
   "requirements": [
-    {"id":"REQ-TEST-034","title":"文档事实权威拒绝路径测试保护待审","sourceType":"human-approved-planning-only","sourceRef":"USER-TEST033-CLOSEOUT-TEST034-PLAN-2026-10-22","acceptance":["当前仅待审PLAN登记，不实施未来测试或工具；未来准确范围仅test/documentation-fact-drift.test.js、config/lifecycle-governance.json、ROADMAP.md","拟A组API权威七例：entries+0.5、writeRoutes字符串/0、proofRequired=-1、reviewRequired=proof-1、productionNoGo=entries-1、catalogErrors为单一合成错误数组；目标authority:apiCatalog","拟B组仓库权威两例：ok=false、markdown.total字符串；C组SQLite四例：head-1、tableCount字符串、tables=null、tables少一项；各目标authority:repositoryGovernance及authority:sqliteSchema","拟D组E2E五例：root/resident/pwa分别0、total+1、specFiles字符串，目标authority:e2eInventory；拟四个顶层测试18循环场景，非18个顶层测试","每例合法独立clone，目标check唯一且先true后false、report后false；仅反转已改字段/数组后完整state深相等；其它检查可同时失败，单因素不等于MC/DC或独立子条件/全部工具覆盖；保留已有22测试","用户批准后才另建独立process实施树、登记可执行testId/真实窄证据；不加工具/helper/磁盘fixture/模块替换/依赖/CI，不改业务或权威文件；工具缺陷或第四文件停并另批，专业与生产NO-GO保留"]},
+    {"id":"REQ-TEST-034","title":"文档事实权威拒绝路径测试保护","sourceType":"human-approved-test-implementation","sourceRef":"USER-TEST034-THREE-FILE-IMPLEMENTATION-2026-10-22","acceptance":["用户批准测试实施，准确范围仅test/documentation-fact-drift.test.js、config/lifecycle-governance.json、ROADMAP.md","A组API权威七例：entries+0.5、writeRoutes字符串/0、proofRequired=-1、reviewRequired=proof-1、productionNoGo=entries-1、catalogErrors为单一合成错误数组；目标authority:apiCatalog","B组仓库权威两例：ok=false、markdown.total字符串；C组SQLite四例：head-1、tableCount字符串、tables=null、tables少一项；各目标authority:repositoryGovernance及authority:sqliteSchema","D组E2E五例：root/resident/pwa分别0、total+1、specFiles字符串，目标authority:e2eInventory；四个顶层测试18循环场景，非18个顶层测试","每例合法独立clone，目标check唯一且先true后false、report后false；仅反转已改字段/数组后完整state深相等；其它检查可同时失败，单因素不等于MC/DC或独立子条件/全部工具覆盖；保留已有22测试","获批后独立process实施树、真实testId/窄证据；源独审、冻结和18串行门禁及最终证据独审；不加工具/helper/磁盘fixture/模块替换/依赖/CI，不改业务或权威文件；工具缺陷或第四文件停并另批，专业与生产NO-GO保留"]},
     {"id":"REQ-TEST-033","title":"文档事实漂移单因素拒绝测试保护","sourceType":"human-approved-three-file-test-only-implementation","sourceRef":"USER-TEST032-CLOSEOUT-TEST033-PLAN-2026-10-21; USER-TEST033-THREE-FILE-IMPLEMENTATION-2026-10-21; USER-TEST033-CONTINUE-2026-10-22","acceptance":["仅test/documentation-fact-drift.test.js、config/lifecycle-governance.json和ROADMAP.md；保留全部旧测试，不改工具/权威文件/运行时/CI","A四例仅受管文档SQLite head/table/migration当前版本/空库目标；B六例仅两唯一API行write/proof/review值，entries不变","C三例仅对象存储ok/summary.decisionStatus/implementationAuthorized；D六例仅首发ok/status/productionReady及三review数组合成非空；原负例保留","四个顶层测试19循环场景，每例独立合法clone；精确目标唯一且先真后假，A/B局部token恰一次且变化，反转该token/字段后完整state深相等，CRLF及外文不变","基线18/18，专项22/22零跳过；只读独审后冻结精确SHA/tree/三文件摘要，18串行门禁及最终证据独审，不预填通过或生产准入"]},
     {"id":"REQ-TEST-032","title":"文档与PDF治理拒绝路径测试保护及TEST031收口","sourceType":"human-approved-three-file-test-only-implementation","sourceRef":"USER-TEST031-CLOSEOUT-TEST032-THREE-FILE-IMPLEMENTATION-2026-10-20","acceptance":["据PR362冻结/同tree主线及精确双轮CI、独审和受控证据关闭TEST031，仅限定测试能力集成，不关闭专业或生产风险","仅既有test/repository-governance.test.js加法保护Markdown总数/路径及各分类count/pathDigest单因素漂移，保留旧断言","PDF清单不一致、手改禁止、来源说明/文件缺失以及bytes/pages独立漂移精确拒绝；仅内存克隆与现有只读导出，不写PDF或改工具/配置/运行时/CI","T00三文件单写、独审后冻结精确commit/tree/摘要，18项门禁严格串行并最终证据独审；本片推送合并上线另批，专业由用户协调"]},
     {"id":"REQ-TEST-031","title":"标准测试运行器失败路径测试保护","sourceType":"human-approved-test-only-implementation","sourceRef":"USER-TEST031-THREE-FILE-IMPLEMENTATION-2026-10-20","acceptance":["仅既有标准工程专项新增四类坏配置、中段隔离及第二批失败停止六场景，保留全部既有断言","只用现有导出及内存注入，准确批次/时钟/指标独立预期；无真实子进程、磁盘fixture或模块替换","仅测试及两份T00治理文件，不修改运行器、业务运行时、套件配置、CI、依赖、预算或超时","独立审查后冻结精确提交/tree/文件摘要，18项门禁串行执行并最终证据独审；专业、运行实现、OPS059正式实现及推送合并上线仍另批"]},
@@ -570,7 +570,7 @@
     }
   ],
   "risks": [
-    {"id":"RISK-TEST-034","title":"单字段负例被误读为独立子条件全覆盖或规划被误作运行准入","level":"中","owner":"T00","mitigation":"当前仅待审；未来每例合法独立clone，精确目标唯一先真后假、完整state仅反转改单字段复原；entries小数/tableCount字符串/分区0可能同时破坏同目标多个条件，不宣称MC/DC、内部条件或工具全覆盖。保留旧22测试及对象存储/首发负例，不改工具或专业/生产边界；需扩第四文件停并另批","status":"open"},
+    {"id":"RISK-TEST-034","title":"单字段负例被误读为独立子条件全覆盖或规划被误作运行准入","level":"中","owner":"T00","mitigation":"本轮已批准三文件测试；每例合法独立clone，精确目标唯一先真后假、完整state仅反转改单字段复原；entries小数/tableCount字符串/分区0可能同时破坏同目标多个条件，不宣称MC/DC、内部条件或工具全覆盖。保留旧22测试及对象存储/首发负例，不改工具或专业/生产边界；需扩第四文件停并另批","status":"open"},
     {"id":"RISK-TEST-033","title":"多因素负例掩盖文档事实独立条件或把测试规划误作运行准入","level":"中","owner":"T00","mitigation":"仅批准三文件测试；每例从合法状态独立克隆，A/B仅唯一受管局部token且恰替换一次并确实变化，精确目标check先true后false；C/D仅一个权威字段改变，其余前置保持。保留全部旧断言、不以组合负例代替单因素、不宣称全部迁移字段或全部工具拒绝覆盖；工具缺陷或第四文件另批，专业和生产NO-GO保留；仅反转被改单token/字段后完整state深相等，不重置文档或子对象","status":"open"},
     {"id":"RISK-TEST-032","title":"组合拒绝断言掩盖独立漂移或历史PDF证据被过度解读","level":"中","owner":"T00","mitigation":"每例从合法基线独立克隆且只改一个因素，精确错误并保留前序条件；bytes/pages分别保持正确SHA和另一数值。只读历史PDF与本地源存在性，不宣称内容正确、生成器可用、专业签署或现场生产；若发现工具缺陷或需第四文件则停止另批，独审冻结和18串行门禁不放宽","status":"open"},
     {"id":"RISK-TEST-031","title":"失败路径测试自证、漏检或被误作运行及生产验收","level":"中","owner":"T00","mitigation":"用明确独立预期校验坏配置和中段未满批次隔离；模拟第二批失败核对两次准确调用和唯一指标，区分计划批数与实际执行数。只用既有注入且finally恢复stdout，不启动真实子进程；发现工具缺陷或需第四文件即停并另批，不弱化测试。外置证据绑定冻结SHA，旧CI不替本轮，生产NO-GO不变","status":"open"},
@@ -1167,6 +1167,7 @@
     {"id":"ADR-GS03-S3-EXPERIMENT-001","status":"Accepted","path":"docs/adr/2026-10-04-gs03-isolated-storage-transaction-validation.md","effectiveScope":"TEST027 synthetic disposable test-directory validation only, explicitly real migration runner/unregistered S1 candidate/real v15 audit hook; no formal protocol, HTTP, runtime, registry, existing DB, production, push or merge","reviewDue":"2026-11-04","supersedes":[]}
   ],
   "tests": [
+    {"id":"TEST-DOC-FACT-AUTHORITY-REJECTION-PROTECTION","kind":"readonly-authority-rejection-test-protection","path":"test/documentation-fact-drift.test.js","command":"node --test --test-reporter=tap --test-concurrency=1 test/documentation-fact-drift.test.js"},
     {"id":"TEST-DOC-FACT-SINGLE-FACTOR-PROTECTION","kind":"readonly-single-factor-test-protection","path":"test/documentation-fact-drift.test.js","command":"node --test --test-reporter=tap --test-concurrency=1 test/documentation-fact-drift.test.js"},
     {"id":"TEST-REPOSITORY-GOVERNANCE-REJECTION-PROTECTION","kind":"read-only-single-factor-markdown-pdf-rejection-protection","path":"test/repository-governance.test.js","command":"node --test --test-reporter=tap --test-concurrency=1 test/repository-governance.test.js"},
     {"id":"TEST-STANDARD-RUNNER-FAILURE-PROTECTION","kind":"deterministic-test-runner-failure-protection","path":"test/standard-engineering-gates.test.js","command":"node --test --test-reporter=tap --test-concurrency=1 test/standard-engineering-gates.test.js"},
@@ -1514,6 +1515,7 @@
     }
   ],
   "evidence": [
+    {"id":"EVD-TEST034-NARROW","scope":"local-test-only","type":"test-command-log","ref":".codex-platform-evidence/documentation-fact-authority-tests-20261022/narrow.log; SHA-256 7523399eadd147c88ae48ae257e12e0400d2d51283f0f01e3cf393abde23e790; narrow.json真实退出0，基线22/22、变更后26/26零跳过；四组18场景；非最终门禁或生产证据","testIds":["TEST-DOC-FACT-AUTHORITY-REJECTION-PROTECTION"],"productionEvidence":false},
     {"id":"EVD-PR365-INTEGRATION","type":"reviewed-frozen-local-gates-pr-main-ci-protected-merge","scope":"仅TEST033四组19场景/四新增顶层测试交付：冻结9854982fd6a5825d3d80ff8f0625f313d9bbfeff经PR365保护squash集成39fbb69ed5a7e2ec339f56bdcf21e29a1cbe8a27，同tree52e96762632fb423c64e79ddd11257ca35c6be61、parent7e9d238a26a0c888d78b3adf2421383357af7b64。源码/18本地串行门禁/最终独审通过；PR39713202509/main39715448924各attempt1九成功，每轮单元集成4087pass45skip、独立真实PG45零skip、Chromium76，重叠不累加。PR依赖审计两次超时unavailable不算passed，按原CI非生产合同复核；原v1汇总退出1、原字节、v2修正及方向/实施/合并前独审保留，main审计passed不倒写PR。最终发布封存SHA256=1ee9839171feddbdca57a5529fe4c05a26870f1c35473031edc851526bdad52d，210发布/112合并前/84本地绑定复核。保护/rulesets未变，开放PR0；Pages成功仅静态。只支持旧限定测试收口，不替本轮两文件验证或未来TEST034实施，不构成专业/生产证据","ref":"C:/Users/drxuj/Projects/卫生健康信息平台/.codex-platform-evidence/documentation-fact-negative-tests-20261021/publication-20261022/delivery-publication-final.json","testIds":["TEST-DOC-FACT-SINGLE-FACTOR-PROTECTION"],"productionEvidence":false},
     {"id":"EVD-TEST033-NARROW","scope":"local-test-only","type":"test-command-log","ref":".codex-platform-evidence/documentation-fact-negative-tests-20261021/narrow.log; SHA-256 6bdee025c5e3751eb7a82a5ae20498352c431b9393c9581041d617c3f43ed183; narrow.json真实退出0，基线18/18、变更后22/22零跳过，四组19循环场景；不是最终门禁或生产证据","testIds":["TEST-DOC-FACT-SINGLE-FACTOR-PROTECTION"],"productionEvidence":false},
     {"id":"EVD-PR363-INTEGRATION","type":"reviewed-frozen-local-gates-pr-main-ci-protected-merge","scope":"TEST032冻结356917c04de454e2d9ed1e46330e416d88f55d15经PR363受保护squash集成至a47a9e8ebb57bf6563c50d5a43d20f1cd3232d41，同tree866291761946ba36ae0f3f29056d4c52d1cb18d3、parent88090d92e0795951572cd0ba01f241118379882e；源码及最终独审无P0-P2，18本地串行门禁通过。PR39543658323/main39550003419各attempt1九成功，每轮单测/集成4083pass45skip、独立真实PG45零skip、Chromium76、审计passed，不累加重叠或跨轮计数。最终发布封存SHA256=31275620bf53989db8414d1932e371868ab2fa7db3a3e72b26d4c99d9916293b，191发布/101合并前/113本地绑定复核。原本地integration及PR观察中断状态未知和部分日志保留，恢复独立记录；main两次网络观察失败后同run成功，无CIrerun。Pages仅静态，保护未变、开放PR0。只支持旧限定测试交付收口，不替本次两文件候选或未来TEST033验证，不构成专业或生产证据","ref":"C:/Users/drxuj/Projects/卫生健康信息平台/.codex-platform-evidence/repository-governance-negative-tests-20261020/publication-20261021/delivery-publication-final.json","testIds":["TEST-REPOSITORY-GOVERNANCE-REJECTION-PROTECTION"],"productionEvidence":false},
@@ -2234,14 +2236,14 @@
       "title": "文档事实权威拒绝路径测试保护",
       "ownerProcess": "T00",
       "integrationOwner": "T00",
-      "taskStatus": "待批准",
-      "capabilityStatus": "未建设",
+      "taskStatus": "验证中",
+      "capabilityStatus": "已实现",
       "riskLevel": "中",
       "approval": {
-        "state": "pending",
+        "state": "approved",
         "mode": "T00-plan-approval",
-        "ref": "PENDING-TEST034-THREE-FILE-TEST-IMPLEMENTATION",
-        "approvedScope": "用户仅批准TEST033台账收口及下一切片梳理登记；TEST034未来三文件测试实施未批准，无实施树，不占WIP，不改工具/运行时/CI"
+        "ref": "USER-TEST034-THREE-FILE-IMPLEMENTATION-2026-10-22",
+        "approvedScope": "用户批准TEST034原三文件、四组18单因素场景；T00单写，独审只读、冻结后18项串行门禁及最终证据独审；不改工具、业务运行时或CI。专业用户协调；运行时、OPS059正式实施、推送、合并、上线另批"
       },
       "requirementIds": [
         "REQ-TEST-034"
@@ -2260,28 +2262,33 @@
       ],
       "dataSensitivity": "仅既有仓库文档/机器事实的内存克隆与合成错误数组；不消费真实专业材料、居民、凭据或外部provider数据",
       "acceptanceCriteria": [
-        "当前仅待审PLAN登记，不实施未来测试或工具；未来准确范围仅test/documentation-fact-drift.test.js、config/lifecycle-governance.json、ROADMAP.md",
-        "拟A组API权威七例：entries+0.5、writeRoutes字符串/0、proofRequired=-1、reviewRequired=proof-1、productionNoGo=entries-1、catalogErrors为单一合成错误数组；目标authority:apiCatalog",
-        "拟B组仓库权威两例：ok=false、markdown.total字符串；C组SQLite四例：head-1、tableCount字符串、tables=null、tables少一项；各目标authority:repositoryGovernance及authority:sqliteSchema",
-        "拟D组E2E五例：root/resident/pwa分别0、total+1、specFiles字符串，目标authority:e2eInventory；拟四个顶层测试18循环场景，非18个顶层测试",
+        "用户批准测试实施，准确范围仅test/documentation-fact-drift.test.js、config/lifecycle-governance.json、ROADMAP.md",
+        "A组API权威七例：entries+0.5、writeRoutes字符串/0、proofRequired=-1、reviewRequired=proof-1、productionNoGo=entries-1、catalogErrors为单一合成错误数组；目标authority:apiCatalog",
+        "B组仓库权威两例：ok=false、markdown.total字符串；C组SQLite四例：head-1、tableCount字符串、tables=null、tables少一项；各目标authority:repositoryGovernance及authority:sqliteSchema",
+        "D组E2E五例：root/resident/pwa分别0、total+1、specFiles字符串，目标authority:e2eInventory；四个顶层测试18循环场景，非18个顶层测试",
         "每例合法独立clone，目标check唯一且先true后false、report后false；仅反转已改字段/数组后完整state深相等；其它检查可同时失败，单因素不等于MC/DC或独立子条件/全部工具覆盖；保留已有22测试",
-        "用户批准后才另建独立process实施树、登记可执行testId/真实窄证据；不加工具/helper/磁盘fixture/模块替换/依赖/CI，不改业务或权威文件；工具缺陷或第四文件停并另批，专业与生产NO-GO保留"
+        "获批后独立process实施树、真实testId/窄证据；源独审、冻结和18串行门禁及最终证据独审；不加工具/helper/磁盘fixture/模块替换/依赖/CI，不改业务或权威文件；工具缺陷或第四文件停并另批，专业与生产NO-GO保留"
       ],
-      "testIds": [],
-      "evidenceIds": [],
-      "rollback": "当前仅撤TEST034待审登记及ROADMAP对应PLAN，不撤已核实TEST033收口；未来实施回滚只撤新增四测试与对应治理增量，保留已有22项、权威与历史证据，无数据/schema/运行回退",
+      "testIds": [
+        "TEST-DOC-FACT-AUTHORITY-REJECTION-PROTECTION",
+        "TEST-GOV-001"
+      ],
+      "evidenceIds": [
+        "EVD-TEST034-NARROW"
+      ],
+      "rollback": "仅撤本轮新增四个顶层测试及相应治理增量；保留旧22项、TEST033收口、权威及历史证据，无数据/schema/运行回退",
       "unresolved": [
-        "TEST034测试实施待用户另批；四目标authority检查的合法正向已有，部分负向尚未独立保护；本轮未实施未来18场景，不填执行结果",
-        "空dependencies只表示本技术保护不消费OPS040/SEC016/GOV045/OPS059运行能力，不构成绕过高风险DAG；专业签署由用户协调，运行时/OPS059正式实施及新推送合并上线另批"
+        "单字段/数组负例不等于MC/DC、内部条件独立或全部工具覆盖；四组18场景外输入未扩展验证",
+        "本地测试已实现，冻结串行门禁及最终证据独审另验；未推送或远端集成；空dependencies不绕过高风险DAG，专业由用户协调，运行时/OPS059正式实施及推送合并上线另批"
       ],
       "observability": {
         "applicable": false,
-        "reason": "仅待审规划及未来只读内存测试，不新增业务运行能力"
+        "reason": "仅既有专项内存测试保护，不新增业务运行能力"
       },
       "runtimeCapability": false,
       "worktree": ".codex-platform-worktrees/process-v2/t00-documentation-fact-authority-tests-20261022",
       "branch": "process/t00-documentation-fact-authority-tests-20261022",
-      "planRef": "ROADMAP.md#test-034-文档事实权威拒绝路径测试保护待审",
+      "planRef": "ROADMAP.md#test034-implementation-20261022",
       "writeScopes": [
         "test/documentation-fact-drift.test.js",
         "config/lifecycle-governance.json",
