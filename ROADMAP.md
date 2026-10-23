@@ -1,5 +1,19 @@
 # 工程治理路线图
 
+## TEST035-IMPLEMENTATION-20261023
+
+用户2026-10-23确认“推送。批准。”并续令开发，批准TEST035原三文件、四组12场景本地测试实施，取代下方待审PLAN的当前实施状态；旧文字作为历史保留。准确范围仅 `test/documentation-fact-drift.test.js`、`config/lifecycle-governance.json`、本路线图。T00协调者唯一写者，独审只读；不改工具、机器权威、运行器、CI、预算、依赖、ADR、六图正文、业务/API/schema。专业由用户协调，运行时、OPS059、本片新冻结推送合并及上线另批。
+
+先前两文件收口已由PR368保护squash合并为 `0ed13c4ed58d1fc64922b6d5bd93becf1109d689`，同冻结1674611f的tree；PR39906639298/main39907953977各attempt1九成功，main首次watch的EOF退出1及同run恢复观察退出0均保留，无CIrerun。最终出版摘要 `0125332ba7fe34415001b65e17bca54021b3012237abe3ba20548e5e809c5c31`，246发布/102合并前/94本地绑定及完整只读验证通过，仅作本片基线、不替本片验证。
+
+经process:plan/create从最新fetched origin/main建 `process/t00-documentation-e2e-fact-tests-20261023`；日期由原待审PLAN的20261022同步为20261023。旧冻结树/脏主目录/历史证据不动，单写交接到本树；根治理/六图/相关ADR与已读冻结树零差异。新树无本地Codex配置，不宣称自动继承；本轮按用户续令采用已说明的临时gpt-6-sol/high独审，不写模型配置。TEST035验证中/已实现仅指测试代码，WIP3/5；其他任务、旧风险、专业未决、黄金场景和六域NO-GO不变。
+
+四个新增顶层测试保护四组12循环场景，准确文档/目标沿用下方PLAN：roadmap、moduleMap唯一现有行，apiMap唯一有界E2E节，adrIndex唯一E2E决策行；每组分别居民/PWA/总数原值减一。每例独立合法clone，报告及唯一目标先真后假，定位与短语恰一处且修改非空；只反转所改数字span后完整state深相等，保持其余文档/机器权威。允许其它检查同时失败，不以无关错误代目标拒绝，不用buildReport产生预期。保留原26项（包括九文档根数量与TEST034权威负例），不宣称MC/DC、全部子条件/工具/地图、实际浏览器或现场验收。
+
+原样基线真实26通过/0跳过，退出及原始日志外置 `.codex-platform-evidence/documentation-e2e-fact-tests-20261023/`。同一专项命令变更后真实30通过/0跳过，narrow.log SHA-256 `7ccad195cec811859adc7fa99d987b03da24988cbb356702d84277c70fffd44a`，登记TEST-DOC-E2E-DOCUMENT-COUNT-PROTECTION/EVD-TEST035-NARROW；这里只记窄测，不预填最终门禁。源独审无P0–P2后冻结精确commit/tree/三文件及四外置证据执行器摘要；严格串行governance:lifecycle → repository:governance:verify → documentation-facts:verify → process:verify → routes:check → routes:test → architecture:test → process:test → platform:iterations:test → build → lint → typecheck → test:unit → test:integration → test:smoke → test:all → security:browser:verify → static:test；保留命令/起止/真实退出/日志hash/跳过，最终证据再独审，不跨套件或CI轮次累加。冻结后修改须复审、重冻和重验。
+
+工具缺陷、异常逃逸、定位不唯一、需第四文件、权威/CI/预算/运行时或专业决定，保留复现并停止扩围另批，不改工具修绿。回滚仅撤四新增测试及TEST035治理增量，保留原26项、TEST034收口、机器权威和历史证据；无数据/schema/运行回退。外置证据执行器不是产品helper，不进入工具/业务运行时。
+
 ## 2026-10-22 TEST-034台账收口与下一独立切片规划
 
 本轮用户仅批准TEST034台账收口和下一独立切片梳理登记供审批。准确源范围仅本路线图及 `config/lifecycle-governance.json`；T00协调者唯一写者，独审只读。不实施TEST035，不改测试、工具、运行器、机器权威、CI、预算、依赖、ADR、六图正文或业务运行时。专业签署由用户协调；运行时实现、OPS059正式实施及本轮新推送、合并和上线另批。下方旧日期/阶段文字保留历史，不当作当前权限。
