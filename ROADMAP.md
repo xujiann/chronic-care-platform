@@ -1,5 +1,19 @@
 # 工程治理路线图
 
+## TEST036-IMPLEMENTATION-20261024
+
+用户2026-10-24明确批准原三文件TEST036、1组3单因素本地测试实施，取代下方待审PLAN的当前权限；旧文字保留历史。准确范围仅 `test/documentation-fact-drift.test.js`、`config/lifecycle-governance.json`、本路线图；T00协调者唯一写者，独审只读。不改工具/机器权威/运行器/CI/预算/依赖/ADR/六图正文/业务/API/schema。专业由用户协调，运行时/OPS059正式实施及本片新冻结推送合并上线另批。
+
+前轮PR370将冻结ac0c451f保护同tree集成为 `42093d8ffb5dcb0c40acb3aa712871ae3d1a30a0`；PR40086252620/main40087194959各attempt1九成功，每轮unit3709pass45skip、integration386零skip、独立PG45零skip/Chromium76/auditpassed。watch各首次exit0，无CIrerun、无force/bypass；保护/rulesets未变，开放PR0、Pages仅静态。最终发布摘要 `6d73f0e24df26306b7d4baac75faeec2fcf784dd14415d13e23b2204024ae9d4`，本轮重核246发布/126合并前/94本地绑定并实际完整只读复验；仅作本片基线，不替本候选或现场验证。
+
+经process:plan/create从latest fetched main42093d8f建立 `process/t00-documentation-governance-e2e-fact-tests-20261024`；旧冻结树、脏主目录和历史证据不动，单写交接到本树。已读治理/六图/相关ADR与原基线零差异；本树无本地Codex配置，不宣称继承/切换模型，独审显式platform_reviewer。TEST036验证中/已实现只指测试代码，WIP2增3/5；其它任务含TEST035收口、旧风险/专业/黄金场景/六域NO-GO不动。
+
+新增一个顶层测试/1组3循环场景，仅模拟documents.engineeringGovernance唯一TEST005有界E2E段落中居民/PWA/总数原数字减一，目标唯一engineeringGovernance:e2eFacts；起止锚点和段内短语均唯一且有序。每例独立合法clone，报告及唯一目标先真，只改单数字span，报告及目标后假；仅逆改该span完整state深等，不重置文档/对象或从buildReport导出预期。允许其它检查同时失败，不以无关错误代替目标拒绝，不称MC/DC/内部条件/全工具全地图/真实浏览器或现场验收。原30项、九文档root/TEST034权威/TEST035四组12场景原样保留，root不重复计缺口。
+
+原样专项基线真实30通过/零跳过，回执和日志外置 `.codex-platform-evidence/documentation-governance-e2e-fact-tests-20261024/`。变更后真实31通过/零跳过，narrow.log SHA-256 `2db208a3ca0ee8d230f3f841925039cf60cbb67996b5a843ab182d2b200d299d`，登记TEST-DOC-ENGINEERING-E2E-COUNT-PROTECTION/EVD-TEST036-NARROW；这里只记录窄测，不预填18门禁。源码独审后冻结精确commit/tree/三文件及四外置证据helper摘要，严格串行governance:lifecycle → repository:governance:verify → documentation-facts:verify → process:verify → routes:check → routes:test → architecture:test → process:test → platform:iterations:test → build → lint → typecheck → test:unit → test:integration → test:smoke → test:all → security:browser:verify → static:test；保留起止/真实退出/日志hash/跳过，最终证据再独审。旧绿及不同套件/CI轮次不累加，冻结后修改复审/重冻/重验。
+
+工具缺陷/异常逃逸、定位非唯一、需第四文件/新工具或专业/架构决定，保留复现停并另批，不改工具修绿。回滚只撤新增一个测试及TEST036治理增量，保留旧30项、TEST035收口、权威和历史证据，无数据/schema/运行回退；外置证据执行器不进入产品工具或业务运行时。
+
 ## 2026-10-24 TEST-035台账收口与下一独立切片规划
 
 本轮仅批准TEST035台账收口和下一切片梳理登记供审批；准确源范围仅本路线图与 `config/lifecycle-governance.json`，T00协调者唯一写者、独审只读。不实施TEST036，不改测试/工具/机器权威/运行器/CI/预算/依赖/ADR/六图正文/业务/API/schema；专业由用户协调，运行时/OPS059正式实施、本次新推送合并上线另批。下方旧日期及阶段文字保留历史。
