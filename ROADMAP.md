@@ -1,5 +1,43 @@
 # 工程治理路线图
 
+## 2026-10-24 TEST-035台账收口与下一独立切片规划
+
+本轮仅批准TEST035台账收口和下一切片梳理登记供审批；准确源范围仅本路线图与 `config/lifecycle-governance.json`，T00协调者唯一写者、独审只读。不实施TEST036，不改测试/工具/机器权威/运行器/CI/预算/依赖/ADR/六图正文/业务/API/schema；专业由用户协调，运行时/OPS059正式实施、本次新推送合并上线另批。下方旧日期及阶段文字保留历史。
+
+### TEST035限定交付收口依据
+
+[PR369](https://github.com/xujiann/chronic-care-platform/pull/369)把冻结 `8e289eb1265fbf6d1aca81664257bccbe3aee208` 保护squash集成为 `5ac690d94394717fc9b408f72be97d873e0f6e5c`，同tree `1c97480d48fba0e74ef505144a60a25ab1c583f3`、单parent `0ed13c4ed58d1fc64922b6d5bd93becf1109d689`。四新增顶层/四组12循环、旧26项保留；窄测30零跳过、18本地串行门禁及最终独审通过。PR40051520833/main40052313374各attempt1九成功，每轮unit3709通过/45环境跳过、integration386零跳过、独立真实PG45零跳过、Chromium76（60/13/3）、audit均passed；重叠套件/轮次不相加，CI不替专业或现场验收。
+
+发布独审发现并修正外置GET成功回执选择，冻结源码未改、失败尝试保留、写请求不自动重试。两轮watch均首次真实exit0、无CIrerun；fresh和合并前独审后唯一绑定head的PUT真实exit0，无force/保护绕过，保护/rulesets未变、开放PR0；Pages40052313427成功仅静态预览，不是生产。
+
+最终证据 `.codex-platform-evidence/documentation-e2e-fact-tests-20261023/publication-20261024/delivery-publication-final.json`，SHA-256 `cb8aecdaf0917621fa17de5b1148b0d8df1c330eef1481305a3ed209be656b9c`。本轮重核246发布/126合并前/99本地绑定并实际重放完整只读验证，仅把TEST035限定测试改已关闭/已集成，追加EVD-PR369-INTEGRATION及PR/CI引用。原需求/验收、首条覆盖局限、open风险不改；其余任务含OPS040/SEC016/GOV045/OPS059、专业未决、三父Proposed、黄金场景、六域NO-GO整条不动。WIP3降2/5，MAP-MODULE仅加TEST036待审gap，旧gap全保留，不建递归GOV任务。
+
+### 单写交接、冻结、门禁与回滚
+
+从最新fetched origin/main@5ac690d9经process:plan/create建 `process/t00-test035-closeout-next-test-plan-20261024`，旧冻结树、脏主目录及历史证据不动，唯一写者交接到本树。已读治理/六图/相关ADR与原基线零差异；新树无本地Codex配置，不宣称自动继承或切换模型，独审显式platform_reviewer。当前窄验证复用生命周期/仓库治理/文档事实三专项及process/documentation-facts，不增断言或预填TEST036结果。
+
+源独审无P0–P2后冻结准确commit/tree/两文件及四外置证据helper摘要，严格串行governance:lifecycle → repository:governance:verify → documentation-facts:verify → process:verify → routes:check → routes:test → architecture:test → process:test → platform:iterations:test → build → lint → typecheck → test:unit → test:integration → test:smoke → test:all → security:browser:verify → static:test。真实起止/退出/日志hash/跳过外置 `.codex-platform-evidence/test035-closeout-next-test-plan-20261024/`，最终证据再独审，旧绿不替本候选。冻结后变更复审/重冻/重验；回滚仅撤两文件收口/规划增量，保留TEST035测试和历史证据，无数据/schema/运行回退。
+
+## TEST036-PENDING-PLAN-20261024
+
+### 目标、选项与准确范围
+
+候选TEST-036：工程治理文档E2E三类数量定向拒绝测试保护，中风险、待批准/未建设、approval.pending。本轮只登记供人类审批，不是实施批准。旧九文档矩阵已保护工程治理root数量，TEST034有机器权威负例，TEST035有四文档12例；旧30项全保留，root不计新缺口。现有engineeringGovernance:e2eFacts已校验居民/PWA/总数，但尚缺每数字明确目标的定向负例，拟1组3循环/1新增顶层测试，不称工具功能未测。
+
+未来仅 `test/documentation-fact-drift.test.js`、`config/lifecycle-governance.json`、本路线图三文件，T00单写。复用既有导出/内存clone，不新增helper/fixture/模块替换/工具/机器权威/依赖/CI/预算/分区/业务/API/schema，不改工程治理、地图或ADR正文。另一选项为等待专业准入推进运行切片，当前未授权。空dependencies仅表示只读候选不消费高风险能力，不绕过OPS040/SEC016/GOV045/OPS059真实DAG。
+
+### 1组3单因素及未来验收
+
+唯一文档documents.engineeringGovernance，唯一目标engineeringGovernance:e2eFacts。使用现有句首“TEST-005 规定标准 E2E 只能使用 Playwright Chromium”至句尾“该门禁不证明真实 HTTPS、OS 安装策略、外部 Origin 或现场浏览器验收。”的有界段落，双锚点唯一且有序。三例仅将“居民 {e2eFacts.resident} 项”“PWA {e2eFacts.pwa} 项”“三套必须形成 {e2eFacts.total} 项”的数字分别减一，期望来自原机器state，不从buildReport输出推导；root已有保护不新增。获批后基线重核准确字段名、锚点及短语唯一性。
+
+未来每例独立合法clone，报告及唯一精确目标先true；有界段内短语恰一处、数字安全可减、改动非空，只改单数字span，报告及目标后false；其它检查可以同时失败，不以无关错误代目标拒绝。仅逆改同数字span后完整state深等，不重置文档/子对象。旧30项保留，不称MC/DC、内部子条件、全工具/文档或真实浏览器/现场覆盖。
+
+拟实施树/分支 `process/t00-documentation-governance-e2e-fact-tests-20261024` 尚未创建。另批后重核main/CI/开放PR/保护/WIP和单写交接，经process工具建独立树，日期变化同步登记。本轮testIds/evidenceIds为空，不预填执行事实；未来先原样基线与变更窄测，再登记真实testId/证据，源独审/冻结/18串行门禁/最终独审；实施及其未来推送合并上线另批。
+
+### 停止条件、回滚和专业边界
+
+工具缺陷/异常逃逸、定位非唯一/短语缺失或重复、需第四文件/工具/权威/专业或架构决定时，保留复现并停止扩围另批，不改工具修绿。未来仅撤拟新增一个测试及TEST036治理增量，保留旧30项、TEST035收口/权威/历史，无数据/schema/运行回退。本候选不消费真实责任人/批准参数/签署结果；OBS01–OBS08与GS03 S01–S09仍区分并由用户协调，运行时、OPS059正式实施及生产NO-GO不因本PLAN解除。
+
 ## TEST035-IMPLEMENTATION-20261023
 
 用户2026-10-23确认“推送。批准。”并续令开发，批准TEST035原三文件、四组12场景本地测试实施，取代下方待审PLAN的当前实施状态；旧文字作为历史保留。准确范围仅 `test/documentation-fact-drift.test.js`、`config/lifecycle-governance.json`、本路线图。T00协调者唯一写者，独审只读；不改工具、机器权威、运行器、CI、预算、依赖、ADR、六图正文、业务/API/schema。专业由用户协调，运行时、OPS059、本片新冻结推送合并及上线另批。
