@@ -339,7 +339,8 @@ function buildReport(input) {
     check("currentArchitecture:e2eFacts", hasOneNumericFact(documents.currentArchitecture, /当前根 (\d+) \+ 居民/g, e2eRoot)
       && hasOneNumericFact(documents.currentArchitecture, /当前根 \d+ \+ 居民 (\d+) \+ PWA/g, e2eResident)
       && hasOneNumericFact(documents.currentArchitecture, /当前根 \d+ \+ 居民 \d+ \+ PWA (\d+) =/g, e2ePwa)
-      && hasOneNumericFact(documents.currentArchitecture, /当前根 \d+ \+ 居民 \d+ \+ PWA \d+ = (\d+) 项/g, e2eTotal), "current architecture E2E partition"),
+      && hasOneNumericFact(documents.currentArchitecture, /当前根 \d+ \+ 居民 \d+ \+ PWA \d+ = (\d+) 项/g, e2eTotal)
+      && hasOneNumericFact(documents.currentArchitecture, /在线 (\d+) 项并集\/唯一性/g, e2eRoot + e2eResident), "current architecture E2E partition"),
     check("dataModel:e2eFacts", hasOneNumericFact(documents.dataModel, /Playwright E2E[^\n]*根 (\d+) 项/g, e2eRoot)
       && hasOneNumericFact(documents.dataModel, /根 \d+ 项和居民 (\d+) 项/g, e2eResident)
       && hasOneNumericFact(documents.dataModel, /PWA 专项 (\d+) 项/g, e2ePwa)

@@ -1,5 +1,22 @@
 # 工程治理路线图
 
+## TEST037-IMPLEMENTATION-20261025
+
+用户2026-10-25明确批准TEST037原五文件实施，取代下方待审PLAN的当前权限；旧文字保留历史。准确范围仅 `scripts/documentation-fact-drift.js`、`test/documentation-fact-drift.test.js`、`CURRENT_ARCHITECTURE.md`、`config/lifecycle-governance.json`、本路线图。T00协调者是五文件唯一写者，开发子agent只提供外置测试草稿，独审只读。仅指定声明事实纠错及既有只读检查增量，保持检查ID/详情/公开报告JSON/CLI/退出语义和机器权威形状；不新增业务能力、运行器、CI、预算、依赖、API/schema或其它地图/ADR变更。专业由用户协调，运行时/OPS059正式实施、本片推送合并上线另批。
+
+前轮PR372将冻结522eeebd保护squash集成为 `a9c05fcc5e86d6f193f280150a210395173c57dd`，同tree1edfe8177bba02742b95e7f7cbaa455eef909bc7。PR40166606851/main40167427590各attempt1九成功，每轮unit3710通过/45环境跳过、integration386零跳过、独立PG45零跳过/Chromium76/auditpassed，套件和轮次不相加。PR/main分别3次/4次同run网络观察、主线2次日志采集，失败原件保留，无CI重跑；Pages仅静态预览。最终发布摘要 `a4efa7da97ae795ee7d248c4c351ebe84ecfed6aa0b565385398544104f0e4ce`，本轮重核287发布/148预合并/115本地绑定并实际完整只读复验；仅作基线，不替本片验证。
+
+准入首次HTTP/1.1只读保护查询三次TLS失败保留，切回CLI默认传输后新一轮main/CI/PR/保护/rulesets全部核过，经process:plan/create从latest fetched main@a9c05fcc建立 `process/t00-documentation-online-e2e-fact-guard-20261025`。旧冻结树、脏主目录和历史证据不动；本树无本地Codex配置，不宣称自动继承或切换模型，独审显式platform_reviewer。已读治理/六图/相关ADR与原基线零差异；只对本片在线声明作准入范围内纠错，其它权威和地图正文保持。TEST037已批准、实施中，WIP2增3/5；TEST036收口及其它任务/风险/专业未决/高风险DAG/黄金场景和六域NO-GO不变。
+
+原样专项基线实际31通过/零跳过，机器root60+resident13=73、PWA3/总76，当前声明72而报告及唯一currentArchitecture:e2eFacts仍真，已留原始复现。下一步先仅将指定声明校正为73形成合法基线，追加两个顶层/2组4场景在旧工具实际RED，再只追加hasOneNumericFact在线唯一数值检查取得GREEN。数值组为73减一、误含PWA；存在唯一性组为删除/重复完整在线声明，不删除含PWA的整行。每例独立合法clone、唯一有界双锚点与声明、报告及唯一精确目标先真后假；每组收集两例实际结果、完成只逆转原span后的完整state深等，再统一断言，避免首个RED掩盖后续例。旧31源原样保留，无新helper/fixture/模块替换或test子测试，不从报告导出预期，不称MC/DC/全工具全地图或真实浏览器现场覆盖。
+
+实际RED：33测试、31通过/2失败/零跳过，四场景均输出reportOK=true及唯一目标[true]；完成各自复原后两组统一断言失败。只追加既有检查的在线数值唯一性后，实际GREEN：33通过/零跳过，四场景均reportOK=false及唯一目标[false]。RED/GREEN除工具外四源摘要一致，旧31源前缀逐字节（含CRLF）保留；登记TEST-DOC-ONLINE-E2E-FACT-GUARD/EVD-TEST037-RED-GREEN，RED日志SHA-256 `c1955680ac08db049e11ee9c9abef42ddf515b093b7cc5986fc89e6952285189`，GREEN日志SHA-256 `4dd00dd00641ec4ca6e8fbc4497a93f0541e907fdadd921cfcb90e16555a3481`。这只记录窄测，不预填18门禁或集成；TEST037验证中/已实现仅指本地限定只读工具和测试。
+
+本轮真实执行回执、起止/退出/日志SHA-256及失败保留在 `.codex-platform-evidence/documentation-online-e2e-fact-guard-20261025/`。RED/GREEN后登记实际testId与证据，再源独审、冻结精确commit/tree/五文件与四外置证据helpers摘要；严格串行governance:lifecycle → repository:governance:verify → documentation-facts:verify → process:verify → routes:check → routes:test → architecture:test → process:test → platform:iterations:test → build → lint → typecheck → test:unit → test:integration → test:smoke → test:all → security:browser:verify → static:test，最终证据再独审。冻结后变更重审重冻重验；旧绿和历史交付不替本候选。
+
+回滚仅撤五文件内在线声明纠错、既有检查增量、两个TEST037顶层及相应治理增量，保留旧31项、TEST036收口、机器权威和历史证据，无数据/schema/业务运行回退。需第六文件、新helper/权威/公开契约或专业架构决定时，保留复现停止扩围并重新准入；OBS01–OBS08与GS03 S01–S09分别由用户协调，不代填责任人、批准参数或签署结果。
+
+
 ## 2026-10-25 TEST-036台账收口与下一独立切片规划
 
 本轮仅批准TEST036台账收口及下一独立切片梳理登记，准确源范围仅本路线图与 `config/lifecycle-governance.json`；T00协调者唯一写者、独审只读。TEST037五文件实施须另批，本轮不修改其工具、测试或当前架构正文。专业由用户协调，运行时/OPS059正式实施、本次新冻结推送合并上线另批；下方旧阶段文字保留历史。
