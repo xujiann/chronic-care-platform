@@ -1,5 +1,34 @@
 # 工程治理路线图
 
+## 2026-10-25 TEST-036台账收口与下一独立切片规划
+
+本轮仅批准TEST036台账收口及下一独立切片梳理登记，准确源范围仅本路线图与 `config/lifecycle-governance.json`；T00协调者唯一写者、独审只读。TEST037五文件实施须另批，本轮不修改其工具、测试或当前架构正文。专业由用户协调，运行时/OPS059正式实施、本次新冻结推送合并上线另批；下方旧阶段文字保留历史。
+
+[PR371](https://github.com/xujiann/chronic-care-platform/pull/371)将冻结 `348951cea88cda293c7f01d8de391f575f0a78a3` 保护squash集成为 `26b2654f1c5d81a78f05c1641d4f81fe2da3b4f6`，同tree `64a444bffa4a62c898a06f4da1dd801759daa86d`、单parent `42093d8ffb5dcb0c40acb3aa712871ae3d1a30a0`。TEST036一新增顶层/一组3单因素、旧30项保留；窄测31零跳过，源独审/18本地串行门禁/最终证据独审通过。PR40158005731/main40158971284各attempt1九成功，每轮unit3710通过/45环境跳过、integration386零跳过、独立真实PG45零跳过、Chromium76（60/13/3）、auditpassed；重叠套件/轮次不相加，CI不替专业或现场验收。
+
+发布独审修正外置分套件计数校验，冻结源码未改。首次合并前fresh三次GET TLS失败、第二次完整fresh及独审后唯一SHA-bound PUT真实exit0；PRwatch一次/mainwatch两次同run观察，无CIrerun/force/bypass/写请求重放。主线捕获前两轮TLS失败、第三轮完整成功；post-fetch exit128连接重置保留，经独审的只读恢复helper SHA-256 `6845c44c7ac5d112f4824a1dcd3edbf04017f07d11a9afda04d52b7155534251` 真实exit0，原失败回执不覆盖。保护/rulesets未变、开放PR0，Pages40158971281成功仅静态。
+
+最终发布证据 `.codex-platform-evidence/documentation-governance-e2e-fact-tests-20261024/publication-20261025/delivery-publication-final.json`，SHA-256 `cd5199b73721392a88bec6f894100764f41dcaae873c5067c457688b0e648e1c`。本轮重核291发布/145预合并/103本地绑定，并实际运行完整只读验证。仅将TEST036限定测试改已关闭/已集成，追加EVD-PR371-INTEGRATION、PR/CI及真实授权引用；原需求/验收、首条覆盖局限及open风险原样保留。其它任务含OPS040/SEC016/GOV045/OPS059、专业未决、三父Proposed、黄金场景、六域NO-GO不变。WIP3降2/5，MAP-MODULE仅加TEST037待审gap，旧gap全保留，不建递归GOV任务。
+
+从最新fetched origin/main@26b2654f经process:plan/create建立 `process/t00-test036-closeout-next-test-plan-20261025`，旧冻结树、脏主目录和历史证据不动，单写交接到本树。治理/六图/相关ADR与已读基线零差异；本树无本地Codex配置，不宣称继承或切换模型，独审显式platform_reviewer。当前窄验证复用生命周期/仓库治理/文档事实三专项及process/documentation-facts，不增断言、不预填TEST037执行结果。
+
+源独审无P0–P2后冻结准确commit/tree/两文件及四外置证据helper摘要，严格串行governance:lifecycle → repository:governance:verify → documentation-facts:verify → process:verify → routes:check → routes:test → architecture:test → process:test → platform:iterations:test → build → lint → typecheck → test:unit → test:integration → test:smoke → test:all → security:browser:verify → static:test。真实起止/退出/日志hash/跳过外置 `.codex-platform-evidence/test036-closeout-next-test-plan-20261025/`，最终证据再独审；旧绿不替本候选。冻结后变更复审/重冻/重验；本轮回滚仅撤两文件收口/规划增量，保留TEST036实现、权威和历史证据，无数据/schema/业务运行回退。
+
+## TEST037-PENDING-PLAN-20261025
+
+候选TEST-037：当前架构在线E2E数量事实纠错与失败关闭保护，中风险、待批准/未建设、approval.pending。本轮只规划，五文件实施尚未批准。只读诊断 `.codex-platform-evidence/test036-closeout-next-test-plan-20261025/planning-online-fact-observation.log`（SHA-256 `9371d52143689535a66a95a5084fe275fb9f98ceefa44268221fbeb43a10e5cc`）显示：机器root60+resident13＝在线73，PWA3、总76；当前架构却声明“在线 72 项并集/唯一性”，现有报告ok与唯一currentArchitecture:e2eFacts均为true。这是尚未修复的事实漂移及漏检，诊断不是TEST037实施/RED/GREEN或验收证据。
+
+优先方案由仅补当前架构三数字负例，调整为纠正已发现在线事实并增加失败关闭保护。仅补三数字负例无法修复这处漏检；等待专业准入推进运行切片另需授权。未来准确范围仅 `scripts/documentation-fact-drift.js`、`test/documentation-fact-drift.test.js`、`CURRENT_ARCHITECTURE.md`、`config/lifecycle-governance.json`、本路线图五文件；T00唯一写者，独审只读。工具仅扩展既有只读检查、复用hasOneNumericFact/currentArchitecture:e2eFacts；online从现有e2eFacts.root+resident派生并排除PWA，不新增机器权威字段或修改e2eFacts形状。保持既有检查ID、公开报告JSON/CLI/退出语义；仅纠正当前错误声明，不改无关或历史数量，不新增业务能力、运行器、CI、预算、依赖或API/schema，不改其它地图/ADR正文；CURRENT_ARCHITECTURE.md只允许指定在线声明事实纠错。
+
+拟2组4单因素、2新增顶层测试：第一组数值语义，在线数减一（当前73→72）及错误包含PWA（当前73→76）；第二组存在唯一性，删除唯一在线声明及重复该声明。旧31项及旧九文档root/TEST034机器权威/TEST035四组12例/TEST036一组3例全部原样保留，root不重复计新缺口。数量预期来自机器state，不由buildReport导出，也不是专业批准参数。
+
+未来先保留旧工具的实际漏检诊断，再将限定文档声明校正为合法基线，在旧工具上记录新增定向测试RED，随后扩展既有检查并取得GREEN。每例独立合法clone、基线报告及唯一精确目标先true，唯一有界段落/声明及有序锚点前置；数值仅改数字span，删除/重复仅改同一完整声明span且不牵连其它事实。错误状态报告及目标必须false，其它检查可同时失败；仅逆转该数字/删除/插入后完整state深等，不重置整文档/对象、不以无关失败替目标拒绝。获批后重核准确锚点/短语唯一性，明确合法声明和边界，缺失/重复必须失败关闭。不称MC/DC、内部子条件、全工具/全地图或真实浏览器/现场覆盖。
+
+拟实施树 `.codex-platform-worktrees/process-v2/t00-documentation-online-e2e-fact-guard-20261025`、分支 `process/t00-documentation-online-e2e-fact-guard-20261025` 尚未创建。另批后重核main/CI/开放PR/保护/WIP/唯一写者，经process工具建独立树，日期变化同步登记；本轮testIds/evidenceIds为空，不预填执行。未来依次记录原样基线、实际RED和GREEN窄测、真实testId/证据，源独审/冻结/同18串行门禁/最终证据独审；发现新问题保留原始失败，不通过修改测试预期掩盖工具漏检。
+
+若需第六文件、新模块/helper/fixture、机器权威变更、公开报告契约变化、CI/运行器/ADR或专业架构决定，保留复现停止扩围并重新准入。未来回滚仅撤上述五文件内纠错、检查、两个新增顶层测试及治理增量，保留旧31项、TEST036收口、权威和历史证据；无数据/schema/业务运行回退。空dependencies仅表示候选不消费高风险运行能力，不绕过OPS040/SEC016/GOV045/OPS059真实DAG。OBS01–OBS08与GS03 S01–S09仍分别由用户协调专业签署，不代填真实责任人/批准参数/签署结果；专业未决、运行时、OPS059正式实施及生产NO-GO不因本PLAN解除。
+
+
 ## TEST036-IMPLEMENTATION-20261024
 
 用户2026-10-24明确批准原三文件TEST036、1组3单因素本地测试实施，取代下方待审PLAN的当前权限；旧文字保留历史。准确范围仅 `test/documentation-fact-drift.test.js`、`config/lifecycle-governance.json`、本路线图；T00协调者唯一写者，独审只读。不改工具/机器权威/运行器/CI/预算/依赖/ADR/六图正文/业务/API/schema。专业由用户协调，运行时/OPS059正式实施及本片新冻结推送合并上线另批。
