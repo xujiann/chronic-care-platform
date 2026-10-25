@@ -746,3 +746,50 @@ test("TEST035 ADR index E2E facts reject three bounded numeric drifts", () => {
     assert.deepEqual(restored, repositoryState, label);
   }
 });
+
+test("TEST036 engineering governance E2E facts reject three bounded numeric drifts", () => {
+  const scenarios = [["resident", "居民 ", " 项"], ["pwa", "PWA ", " 项"], ["total", "三套必须形成 ", " 项"]];
+  assert.equal(scenarios.length, 3);
+  for (const [field, prefix, suffix] of scenarios) {
+    const expected = repositoryState.e2eFacts[field];
+    assert.ok(Number.isSafeInteger(expected) && expected > 1, field);
+    const originalNumber = String(expected);
+    const changedNumber = String(expected - 1);
+    const original = prefix + originalNumber + suffix;
+    const changed = prefix + changedNumber + suffix;
+    const label = "engineeringGovernance:" + field;
+    const state = cloneRepositoryState();
+    const baseline = governance.buildReport(state);
+    const checkId = "engineeringGovernance:e2eFacts";
+    assert.equal(baseline.ok, true, label);
+    assert.deepEqual(baseline.checks.filter((item) => item.id === checkId).map((item) => item.passed), [true], label);
+    const source = state.documents.engineeringGovernance;
+    const startMarker = "TEST-005 规定标准 E2E 只能使用 Playwright Chromium";
+    const endMarker = "该门禁不证明真实 HTTPS、OS 安装策略、外部 Origin 或现场浏览器验收。";
+    assert.equal(source.split(startMarker).length - 1, 1, label);
+    assert.equal(source.split(endMarker).length - 1, 1, label);
+    const start = source.indexOf(startMarker);
+    const endStart = source.indexOf(endMarker);
+    assert.ok(endStart > start, label);
+    const end = endStart + endMarker.length;
+    const region = source.slice(start, end);
+    assert.equal(region.split(original).length - 1, 1, label);
+    assert.notEqual(originalNumber, changedNumber, label);
+    const offset = start + region.indexOf(original) + prefix.length;
+    assert.equal(source.slice(offset, offset + originalNumber.length), originalNumber, label);
+    state.documents.engineeringGovernance = source.slice(0, offset) + changedNumber + source.slice(offset + originalNumber.length);
+    assert.notEqual(state.documents.engineeringGovernance, source, label);
+    const mutatedRegion = state.documents.engineeringGovernance.slice(start, end - originalNumber.length + changedNumber.length);
+    assert.equal(mutatedRegion.split(changed).length - 1, 1, label);
+    const report = governance.buildReport(state);
+    assert.equal(report.ok, false, label);
+    assert.deepEqual(report.checks.filter((item) => item.id === checkId).map((item) => item.passed), [false], label);
+    const restored = structuredClone(state);
+    const actual = restored.documents.engineeringGovernance;
+    assert.equal(actual.slice(0, offset), source.slice(0, offset), label);
+    assert.equal(actual.slice(offset, offset + changedNumber.length), changedNumber, label);
+    assert.equal(actual.slice(offset + changedNumber.length), source.slice(offset + originalNumber.length), label);
+    restored.documents.engineeringGovernance = actual.slice(0, offset) + originalNumber + actual.slice(offset + changedNumber.length);
+    assert.deepEqual(restored, repositoryState, label);
+  }
+});
