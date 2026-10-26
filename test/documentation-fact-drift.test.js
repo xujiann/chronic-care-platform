@@ -917,3 +917,75 @@ test("TEST037 current architecture online E2E fact requires one declaration", (t
   }
   assert.deepEqual(outcomes, scenarios.map(([scenario]) => ({ scenario, reportOK: false, targetPassed: [false] })));
 });
+
+test("TEST038 current architecture E2E partition facts reject three bounded numeric drifts", (t) => {
+  const { root, resident, pwa, total } = repositoryState.e2eFacts;
+  for (const [field, value] of Object.entries({ root, resident, pwa, total })) {
+    assert.ok(Number.isSafeInteger(value) && value > 0, field);
+  }
+  assert.ok(resident > 1 && pwa > 1 && total > 1);
+  assert.ok(Number.isSafeInteger(root + resident + pwa));
+  assert.equal(total, root + resident + pwa);
+  const declaration = `当前根 ${root} + 居民 ${resident} + PWA ${pwa} = ${total} 项`;
+  const scenarios = [
+    ["resident", `当前根 ${root} + 居民 `, `居民 ${resident} + PWA ${pwa}`],
+    ["pwa", `当前根 ${root} + 居民 ${resident} + PWA `, `PWA ${pwa} = ${total} 项`],
+    ["total", `当前根 ${root} + 居民 ${resident} + PWA ${pwa} = `, `PWA ${pwa} = ${total} 项`]
+  ];
+  assert.equal(scenarios.length, 3);
+  const outcomes = [];
+  for (const [field, fieldPrefix, phrase] of scenarios) {
+    const label = "currentArchitecture:" + field;
+    const expected = repositoryState.e2eFacts[field];
+    assert.ok(Number.isSafeInteger(expected) && expected > 1, label);
+    const originalNumber = String(expected);
+    const changedNumber = String(expected - 1);
+    assert.notEqual(changedNumber, originalNumber, label);
+    const state = cloneRepositoryState();
+    const baseline = governance.buildReport(state);
+    const checkId = "currentArchitecture:e2eFacts";
+    assert.equal(baseline.ok, true, label);
+    assert.deepEqual(baseline.checks.filter((item) => item.id === checkId).map((item) => item.passed), [true], label);
+    const source = state.documents.currentArchitecture;
+    const startMarker = "TEST-005 将浏览器 E2E 精确分为根";
+    const endMarker = "标准在线 context 仍保持阻止 Service Worker。";
+    assert.equal(source.split(startMarker).length - 1, 1, label);
+    assert.equal(source.split(endMarker).length - 1, 1, label);
+    const start = source.indexOf(startMarker);
+    const endStart = source.indexOf(endMarker);
+    assert.ok(start >= 0 && endStart > start, label);
+    const end = endStart + endMarker.length;
+    const region = source.slice(start, end);
+    assert.equal(region.split(declaration).length - 1, 1, label);
+    assert.equal(region.split(phrase).length - 1, 1, label);
+    assert.ok(declaration.startsWith(fieldPrefix + originalNumber), label);
+    const declarationOffset = start + region.indexOf(declaration);
+    const offset = declarationOffset + fieldPrefix.length;
+    assert.equal(source.slice(offset, offset + originalNumber.length), originalNumber, label);
+    const changedDeclaration = declaration.slice(0, fieldPrefix.length) + changedNumber
+      + declaration.slice(fieldPrefix.length + originalNumber.length);
+    state.documents.currentArchitecture = source.slice(0, offset) + changedNumber + source.slice(offset + originalNumber.length);
+    assert.notEqual(state.documents.currentArchitecture, source, label);
+    const mutatedRegion = state.documents.currentArchitecture.slice(start, end - originalNumber.length + changedNumber.length);
+    assert.equal(mutatedRegion.split(changedDeclaration).length - 1, 1, label);
+    const report = governance.buildReport(state);
+    outcomes.push({
+      scenario: field + "-minus-one",
+      reportOK: report.ok,
+      targetPassed: report.checks.filter((item) => item.id === checkId).map((item) => item.passed)
+    });
+    const restored = structuredClone(state);
+    const actual = restored.documents.currentArchitecture;
+    assert.equal(actual.slice(0, offset), source.slice(0, offset), label);
+    assert.equal(actual.slice(offset, offset + changedNumber.length), changedNumber, label);
+    assert.equal(actual.slice(offset + changedNumber.length), source.slice(offset + originalNumber.length), label);
+    restored.documents.currentArchitecture = actual.slice(0, offset) + originalNumber + actual.slice(offset + changedNumber.length);
+    assert.deepEqual(restored, repositoryState, label);
+    t.diagnostic("TEST038_RESULT " + JSON.stringify(outcomes.at(-1)));
+  }
+  assert.deepEqual(outcomes, scenarios.map(([field]) => ({
+    scenario: field + "-minus-one",
+    reportOK: false,
+    targetPassed: [false]
+  })));
+});

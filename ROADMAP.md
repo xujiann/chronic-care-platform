@@ -1,5 +1,22 @@
 # 工程治理路线图
 
+## TEST038-IMPLEMENTATION-20261026
+
+实际窄测与登记：原样基线33通过/零跳过，新增后专项34及联合66均通过/零跳过。三条TEST038_RESULT分别为resident-minus-one、pwa-minus-one、total-minus-one，报告及唯一目标均false，各自复原深等断言通过；仅补已有拒绝逻辑的测试保护，不制造RED。真实专项日志SHA-256 `e3c31393ae5d91a5b23bdd3201ef4ef2b316f9e19f52f50c9e7b8ac35362e470`，联合日志SHA-256 `cb8ec63a0dc9d5e534b11bd401302b8ac21a1da268daaa599b090cbc04409217`；结果先执行后登记TEST-DOC-CURRENT-E2E-PARTITION-COUNT-PROTECTION/EVD-TEST038-NARROW，TASK038现验证中/已实现，WIP3/5。上述只记录窄证据，冻结后18门禁与最终独审自身另验；新冻结未推送/未集成。
+
+用户2026-10-26明确批准TEST038原三文件测试切片实施，取代下方旧待审PLAN的当前权限，历史文字保留。准确源范围仅 `test/documentation-fact-drift.test.js`、`config/lifecycle-governance.json`、本路线图；T00协调者为三文件唯一写者，开发agent仅提供外置草稿，独审只读。仅1组3单因素/1新增顶层，旧33及TEST037四场景源逐字节含CRLF保留；工具、CURRENT_ARCHITECTURE.md及其它地图/ADR/权威、运行器、业务运行时、CI/预算/依赖或API/schema均不改。专业签署由用户协调，TEST038新冻结推合、业务运行时/OPS059正式实施及生产上线另批。
+
+前轮[PR374](https://github.com/xujiann/chronic-care-platform/pull/374)已将冻结 `8e1783676f892320254ee2556adefca648211249` 保护MCP squash集成为 `ccae2e1667853827449d44aa1d0f01efb0113edf`，同tree `5da63cca814c7f3f55c7d960e1b2987d90bcd1c2`、唯一parent `dac26b5086a4b7fc9cf43b5e33d4abf7693ae097`。PR CI40280367949/main40282298745各attempt1九成功，每轮unit3712通过/45环境跳过、integration386零跳过、独立PG45零跳过、Chromium76（60/13/3）、auditpassed；套件/轮次不相加。连接器恢复后create/merge各单次MCP，均有已审begin写前校验、wx intent、精确参数和完整rawresult链，push一次，无CLI POST/PUT/force/bypass。PR/main watch分别3/5次同run网络观察，首轮fresh EOF原件保留，未rerun CI或重复写入；保护/rulesets不变、开放PR0。Pages40282298701精确SHA唯一push/attempt1成功，仅既有静态预览。
+
+最终发布摘要 `.codex-platform-evidence/test037-closeout-next-test-plan-20261026/publication-20261026/delivery-publication-final.json`，SHA-256 `9fe8842ed60b4a51e9b5de8b3790c680951a11fcaddbb18e91f5e73ea1bdd719`。本轮重核323发布/170预合并/107本地绑定并实际完整只读复验；旧local的TEST038 pending是冻结时历史，不反写，用户新批准仅在本实施树登记。源自最新fetched origin/main@ccae2e16，经process:plan/create建立 `process/t00-documentation-current-e2e-partition-tests-20261026`；建树前核main、PR、保护/rulesets及精确主线九CI，旧冻结树、脏主目录与历史证据不动。治理/六图/相关ADR保持原基线；本树实际配置另核，不宣称继承或切换模型。
+
+实际原样基线33项通过、零跳过后，仅追加一个TEST038顶层。每例取机器state.e2eFacts中的resident/pwa/total安全正整数，独立合法clone，报告及唯一currentArchitecture:e2eFacts目标先true；唯一有序双锚“TEST-005 将浏览器 E2E 精确分为根”至“标准在线 context 仍保持阻止 Service Worker。”内定位唯一完整三套声明及短语。分别只将居民、PWA、总数数字span减一（当前13→12、3→2、76→75），报告及唯一目标后false；只逆改同span后完整state深等。三例完整恢复、收集实际TEST038_RESULT后统一断言，预期来自机器state而非报告；既有工具已含拒绝逻辑，不制造RED，不以无关失败代目标，不称MC/DC/内部条件/全工具全地图或真实浏览器/现场覆盖。
+
+开发阶段只将REQ/RISK/TASK038登记为已批准/实施中、能力未建设，testIds/evidenceIds仍空，WIP2增3/5。先实际窄测34/联合66及三例诊断，再据真实日志SHA-256补登记TEST-DOC-CURRENT-E2E-PARTITION-COUNT-PROTECTION/EVD-TEST038-NARROW，转验证中/已实现；不预填未来门禁或CI结果。TEST037关闭记录、原风险/验收、专业DAG、黄金场景、三父Proposed、OPS040/SEC016/GOV045/OPS059与六域NO-GO不变。
+
+源独审无P0–P2后冻结精确commit/tree、三源及五外置helpers摘要；18项严格串行：governance:lifecycle → repository:governance:verify → documentation-facts:verify → process:verify → routes:check → routes:test → architecture:test → process:test → platform:iterations:test → build → lint → typecheck → test:unit → test:integration → test:smoke → test:all → security:browser:verify → static:test。真实起止/退出/日志摘要/跳过外置 `.codex-platform-evidence/documentation-current-e2e-partition-tests-20261026/`，最终证据再独审；冻结后变更重审重冻重验。定位不唯一、工具漏检/异常或需第四文件/helper/权威/契约/专业架构决定时，保留复现停止扩围并另批，不改工具修绿。回滚仅撤新增一顶层及对应治理/路线图增量，保留旧33、TEST037实现、既有权威和历史证据，无数据/schema/业务运行回退。
+
+
 ## 2026-10-26 TEST-037台账收口与下一独立切片规划
 
 用户2026-10-26确认两项授权：冻结7b448ea7的推送、PR、CI与独审通过后保护合并（含既有静态Pages）并核主线CI闭合；随后仅本路线图与 `config/lifecycle-governance.json` 收口TEST037及登记TEST038候选。T00协调者为两文件唯一写者，开发agent仅提供外置草稿，独审只读；TEST038实施、业务运行时、OPS059正式实施及生产上线另批，本次新两文件冻结提交的推送合并另批。下方旧阶段文字保留历史。
