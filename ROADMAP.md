@@ -1,5 +1,28 @@
 # 工程治理路线图
 
+## 2026-10-26 TEST-037台账收口与下一独立切片规划
+
+用户2026-10-26确认两项授权：冻结7b448ea7的推送、PR、CI与独审通过后保护合并（含既有静态Pages）并核主线CI闭合；随后仅本路线图与 `config/lifecycle-governance.json` 收口TEST037及登记TEST038候选。T00协调者为两文件唯一写者，开发agent仅提供外置草稿，独审只读；TEST038实施、业务运行时、OPS059正式实施及生产上线另批，本次新两文件冻结提交的推送合并另批。下方旧阶段文字保留历史。
+
+[PR373](https://github.com/xujiann/chronic-care-platform/pull/373)已将冻结 `7b448ea79647209cd2d9972ab370f53be5f4122f` 保护squash集成为 `dac26b5086a4b7fc9cf43b5e33d4abf7693ae097`，同tree `a7fd55268682a78e06a088d4e6ba378c6bb0cfdd`、唯一parent `a9c05fcc5e86d6f193f280150a210395173c57dd`。限定五文件将在线72纠正为机器root60+resident13=73，并在既有currentArchitecture:e2eFacts追加数值唯一性检查；旧31保留、新2顶层/2组4场景，实际RED31通过/2失败且四例旧工具误接受，GREEN33零跳过，联合窄测65零跳过，源独审/18本地串行门禁/最终证据独审通过。
+
+PR CI40270537808/main CI40271974194各attempt1九成功，每轮unit3712通过/45环境跳过、integration386零跳过，独立真实PG45零跳过、Chromium76（60/13/3）、依赖auditpassed；套件和轮次不相加，CI不替专业或现场验收。连接器明确unavailable后走经独审CLI；push/POST/PUT各单intent及一次写，合并ready至PUT开始531ms，保护/rulesets不变、开放PR0。discover两轮六次只读失败为5次TLS与1次EOF，PR/main watch分别3次/2次同run观察，原件保留、无CIrerun/写重放/force/bypass。Pages40271974168为精确合并SHA的唯一push、attempt1成功，仅既有静态预览。
+
+最终发布证据 `.codex-platform-evidence/documentation-online-e2e-fact-guard-20261025/publication-20261026/delivery-publication-final.json`，SHA-256 `fd5894c5e2a5fe21064d40765647e35171540c92b371516790813bbe19f5305a`。本轮重核306发布/163预合并/139本地绑定，并实际完整只读复验；仅作为TEST037收口来源，不替本次两文件候选验证。仅将TEST037限定交付置已关闭/已集成，追加EVD-PR373-INTEGRATION和真实PR/CI/授权引用；原需求、验收、首条覆盖局限、风险open和专业DAG原样保留。TEST038待批准/未建设、approval.pending、testIds/evidenceIds空，WIP3降2/5；MAP-MODULE仅末尾追加TEST038，保留TEST037和全部旧gap，不建递归GOV任务。
+
+从最新fetched origin/main@dac26b50经process:plan/create建立 `process/t00-test037-closeout-next-test-plan-20261026`，单写交接到本次两文件树；旧冻结树、脏主目录和历史证据不动。治理/六图/相关ADR与已读基线保持，工具、当前架构和原33测试不改；本树实际配置另核，不宣称自动继承或切换模型。其余任务/风险/黄金场景/三父Proposed、OPS040/SEC016/GOV045/OPS059及六域NO-GO保持。
+
+窄验证复用生命周期/仓库治理/文档事实三专项及process/documentation-facts，不新增断言、不预填TEST038执行。源独审无P0–P2后冻结精确commit/tree、两源文件及外置helpers摘要，18项严格串行：governance:lifecycle → repository:governance:verify → documentation-facts:verify → process:verify → routes:check → routes:test → architecture:test → process:test → platform:iterations:test → build → lint → typecheck → test:unit → test:integration → test:smoke → test:all → security:browser:verify → static:test；真实起止、退出、日志SHA-256和跳过外置 `.codex-platform-evidence/test037-closeout-next-test-plan-20261026/`，最终证据再独审。冻结后变更重审重冻重验。回滚仅撤两文件收口/候选增量，保留TEST037五文件实现、旧33和历史证据，无数据/schema/业务运行回退。
+
+## TEST038-PENDING-PLAN-20261026
+
+候选TEST-038：当前架构E2E三套分区数量定向测试保护，中风险、待批准/未建设、approval.pending。本轮只登记，未来准确三文件test/documentation-fact-drift.test.js、config/lifecycle-governance.json、ROADMAP.md，T00单写；工具与CURRENT_ARCHITECTURE.md只读。依赖TEST037仅表明其限定交付须先闭合，不能借用其实施授权，也不绕过OPS040/SEC016/GOV045/OPS059专业DAG。现有currentArchitecture:e2eFacts已校验root/resident/PWA/total及在线73唯一性；旧九文档root、TEST034权威、TEST035四组、TEST036工程治理与TEST037在线四例已保护对应范围。当前缺resident/PWA/total各自数字漂移的定向拒绝测试，旧33项原样保留。
+
+拟1新增顶层/1组3独立场景，唯一文档documents.currentArchitecture、唯一目标currentArchitecture:e2eFacts。只在“TEST-005 将浏览器 E2E 精确分为根”至“标准在线 context 仍保持阻止 Service Worker。”唯一有序双锚界内，定位唯一完整声明“当前根 {root} + 居民 {resident} + PWA {pwa} = {total} 项”，分别仅将居民、PWA、总数原数字减一；目前示例13→12、3→2、76→75，实施须以当时合法机器state派生。每例独立clone，报告与唯一目标先true，界内声明和目标短语各恰一、只改单span且非空，报告与目标后false，只逆改同span后完整state深等。其它失败不能代替目标拒绝；不从报告导出预期或声称MC/DC、全工具/全地图/真实浏览器/现场覆盖。
+
+未来实施需另批，重核最新main、PR、保护、WIP、单写、双锚及声明；拟经process工具建process/t00-documentation-current-e2e-partition-tests-20261026，日期变化同步登记。此时testIds/evidenceIds均空，未执行新测试。获批后窄测、源独审、精确冻结、18串行门禁与最终独审；若定位不唯一、工具异常漏检、需第四文件/helper/权威/契约或专业架构决定，则保存复现、停止扩围并重新准入，不改工具修绿。回滚仅撤新增1测试及治理/路线图增量，保留旧33与TEST037交付。OBS01–OBS08和GS03 S01–S09继续由用户协调签署；业务runtime、OPS059正式实施及生产六域NO-GO不因候选解除。
+
+
 ## TEST037-IMPLEMENTATION-20261025
 
 用户2026-10-25明确批准TEST037原五文件实施，取代下方待审PLAN的当前权限；旧文字保留历史。准确范围仅 `scripts/documentation-fact-drift.js`、`test/documentation-fact-drift.test.js`、`CURRENT_ARCHITECTURE.md`、`config/lifecycle-governance.json`、本路线图。T00协调者是五文件唯一写者，开发子agent只提供外置测试草稿，独审只读。仅指定声明事实纠错及既有只读检查增量，保持检查ID/详情/公开报告JSON/CLI/退出语义和机器权威形状；不新增业务能力、运行器、CI、预算、依赖、API/schema或其它地图/ADR变更。专业由用户协调，运行时/OPS059正式实施、本片推送合并上线另批。
