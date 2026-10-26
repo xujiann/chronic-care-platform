@@ -39,6 +39,20 @@
     "高": "accepted-adr-human-review-special-validation"
   },
   "requirements": [
+    {
+      "id": "REQ-TEST-038",
+      "title": "当前架构E2E三套分区数量定向测试保护",
+      "sourceType": "human-approved-candidate-registration",
+      "sourceRef": "USER-TEST037-CLOSEOUT-TEST038-CANDIDATE-2026-10-26",
+      "acceptance": [
+        "本轮仅登记TEST038待批准候选，三文件实施另批；准确未来写范围为test/documentation-fact-drift.test.js、config/lifecycle-governance.json、ROADMAP.md，T00单写。",
+        "只针对documents.currentArchitecture有界三套声明的居民、PWA、总数各一个减一负例，1组3循环场景/1新增顶层，唯一目标currentArchitecture:e2eFacts；旧33顶层及TEST037四场景逐字节保留，root不重复计缺口。",
+        "现有工具已校验这三个数字，这是定向测试证据缺口；不改scripts/documentation-fact-drift.js、CURRENT_ARCHITECTURE.md、其它地图/ADR、机器权威、公开报告契约、运行器/CI/预算/依赖或业务API/schema。",
+        "每例独立合法state clone，预期来自原e2eFacts字段；唯一有序起止锚和有界声明及短语恰一，单数字span改动非空。基线报告和唯一目标true，漂移后报告和唯一目标false；只逆改同span后完整state深等，不重置文档或子对象。",
+        "不以其它检查失败代目标拒绝，不称MC/DC、全工具全地图、真实浏览器/数据库或现场覆盖；定位不唯一、工具缺陷、需第四文件/helper/权威或专业决定则保留复现停止扩围并另行准入。",
+        "未来实施获批后核最新main/PR/保护/WIP与单写，记录真实原样/窄测testId和证据、源独审、冻结、18项串行门禁、最终证据独审；本轮testIds/evidenceIds为空，不预填执行。专业由用户协调，运行时/OPS059及生产另批。"
+      ]
+    },
     {"id":"REQ-TEST-035","title":"E2E文档分区数量定向拒绝测试保护","sourceType":"human-approved-test-implementation","sourceRef":"USER-TEST034-CLOSEOUT-TEST035-PLAN-2026-10-22; USER-TEST035-THREE-FILE-IMPLEMENTATION-2026-10-23","acceptance":["用户批准TEST035三文件测试实施，准确范围仅test/documentation-fact-drift.test.js、config/lifecycle-governance.json、ROADMAP.md，T00单写","四组12例：roadmap与moduleMap各居民/PWA/总数三例，apiMap唯一E2E隔离节与adrIndex唯一E2E行各三例；各只把原数字减一，目标roadmap:e2eFacts、moduleMap:e2eFacts、apiMap:e2eFacts、adrIndex:e2eFacts","原根数量负例及TEST034机器权威负例保留，不冒称空白或重复替代；原26旧顶层测试原样保留，新增四顶层测试/12循环场景","每例合法独立clone，报告及精确唯一目标先真；唯一行/唯一有界节内匹配短语恰一处，只改单个数字span；报告和目标后假；仅反转该数字span后完整state深相等，不重置文档/子对象，不用buildReport导出预期","仅复用既有导出与内存clone，不新增工具/helper/fixture/模块替换/依赖，不改权威、ADR、CI、预算或业务运行时；异常/工具缺陷或第四文件停并另批；其它检查可同时失败，不宣称MC/DC/全工具全地图覆盖","独立process实施树、真实testId/窄证据，源独审/冻结/18串行门禁和最终证据独审；专业由用户协调，运行时/OPS059及本片新冻结推送合并上线另批"]},
     {
       "id": "REQ-TEST-036",
@@ -599,6 +613,14 @@
     }
   ],
   "risks": [
+    {
+      "id": "RISK-TEST-038",
+      "title": "当前架构三数字定向测试候选被误当实施或全量验收",
+      "level": "中",
+      "owner": "T00",
+      "mitigation": "仅登记待批准/未建设候选，旧33及TEST037保护保留；三例限当前架构唯一有界三套声明的resident/PWA/total单数字减一。唯一双锚/短语、目标先真后假与逆改单span完整复原；不改工具或地图正文，不声称全工具/浏览器/现场覆盖。异常或第四文件停并另批，专业与六域NO-GO不变。",
+      "status": "open"
+    },
     {"id":"RISK-TEST-035","title":"局部文档数量负例被误认全地图覆盖或浏览器现场验收","level":"中","owner":"T00","mitigation":"本次仅批准原三文件测试实施；四组12单数字变更限四个目标文档，不覆盖其余五文档新负例、内部条件、解析器所有边界或真实浏览器。唯一行/节与唯一短语前置防止历史文字误命中，目标检查唯一先真后假并逆改单span完整复原；旧26项保留，不改工具，扩第四文件停并另批，专业与六域NO-GO不变","status":"open"},
     {
       "id": "RISK-TEST-036",
@@ -1569,6 +1591,16 @@
     }
   ],
   "evidence": [
+    {
+      "id": "EVD-PR373-INTEGRATION",
+      "type": "reviewed-frozen-local-gates-pr-main-ci-protected-merge",
+      "scope": "仅TEST037五文件在线事实纠错及2新增顶层/2组4单因素：冻结7b448ea79647209cd2d9972ab370f53be5f4122f保护squash经PR373集成为dac26b5086a4b7fc9cf43b5e33d4abf7693ae097，同treea7fd55268682a78e06a088d4e6ba378c6bb0cfdd、唯一parenta9c05fcc5e86d6f193f280150a210395173c57dd。真实RED31通过2失败、四例旧工具误接受，GREEN33零跳过、联合窄65零跳过、18本地串行门禁及源/最终独审通过。PR40270537808/main40271974194各attempt1九成功，每轮unit3712通过45环境跳过、integration386零跳过、独立PG45零跳过、Chromium76(60/13/3)、auditpassed，不跨套件/轮次相加。连接器unavailable保留后经独审CLI，push/POST/PUT各一次intent/result，merge ready至PUT开始531ms，无force/bypass/重复写。discover六失败5TLS+1EOF、PR/mainwatch3/2同run网络观察均保留，无CIrerun；Pages40271974168精确SHA唯一push/attempt1成功仅静态预览。保护/rulesets不变、开放PR0。最终SHA256=fd5894c5e2a5fe21064d40765647e35171540c92b371516790813bbe19f5305a；本轮重核306发布/163预合并/139本地绑定并实际完整只读复验，仅用于本限定TEST037收口，不替本新两文件候选、TEST038实施或专业/生产证据。",
+      "ref": "C:/Users/drxuj/Projects/卫生健康信息平台/.codex-platform-evidence/documentation-online-e2e-fact-guard-20261025/publication-20261026/delivery-publication-final.json",
+      "testIds": [
+        "TEST-DOC-ONLINE-E2E-FACT-GUARD"
+      ],
+      "productionEvidence": false
+    },
     {"id":"EVD-TEST035-NARROW","scope":"local-test-only","type":"test-command-log","ref":".codex-platform-evidence/documentation-e2e-fact-tests-20261023/narrow.log; SHA-256 7ccad195cec811859adc7fa99d987b03da24988cbb356702d84277c70fffd44a; narrow.json真实退出0，原样基线26/26、变更后30/30零跳过，四组12场景；非最终门禁或生产证据","testIds":["TEST-DOC-E2E-DOCUMENT-COUNT-PROTECTION"],"productionEvidence":false},
     {"id":"EVD-TEST036-NARROW","scope":"local-test-only","type":"test-command-log","ref":".codex-platform-evidence/documentation-governance-e2e-fact-tests-20261024/narrow.log; SHA-256 2db208a3ca0ee8d230f3f841925039cf60cbb67996b5a843ab182d2b200d299d; narrow.json真实退出0，原样基线30通过/零跳过、变更后31通过/零跳过，1组3场景；不是最终门禁或生产证据","testIds":["TEST-DOC-ENGINEERING-E2E-COUNT-PROTECTION"],"productionEvidence":false},
     {
@@ -2219,7 +2251,8 @@
         "SEC-014",
         "OPS-037",
         "OPS-038",
-        "OPS-039"
+        "OPS-039",
+        "TEST-038"
       ],
       "evidenceIds": [
         "EVD-GOV-001",
@@ -2321,6 +2354,67 @@
     }
   ],
   "tasks": [
+    {
+      "id": "TEST-038",
+      "title": "当前架构E2E三套分区数量定向测试保护",
+      "ownerProcess": "T00",
+      "integrationOwner": "T00",
+      "taskStatus": "待批准",
+      "capabilityStatus": "未建设",
+      "riskLevel": "中",
+      "approval": {
+        "state": "pending",
+        "mode": "T00-plan-approval",
+        "ref": "PENDING-TEST038-THREE-FILE-IMPLEMENTATION",
+        "approvedScope": "仅候选规划登记获批；三文件测试实施未批准。拟树/分支与写范围只供实施准入，不代表已创建或占WIP。"
+      },
+      "requirementIds": [
+        "REQ-TEST-038"
+      ],
+      "regulatoryControlIds": [
+        "REG-GOV-001"
+      ],
+      "riskIds": [
+        "RISK-TEST-038"
+      ],
+      "decisionIds": [],
+      "dependencies": [
+        "TEST-037"
+      ],
+      "affectedModules": [
+        "documentation-fact-test-protection",
+        "lifecycle-governance"
+      ],
+      "dataSensitivity": "仅仓库文档和机器E2E事实的只读内存克隆，不消费真实专业材料、居民、凭据或外部provider数据",
+      "acceptanceCriteria": [
+        "本轮仅登记TEST038待批准候选，三文件实施另批；准确未来写范围为test/documentation-fact-drift.test.js、config/lifecycle-governance.json、ROADMAP.md，T00单写。",
+        "只针对documents.currentArchitecture有界三套声明的居民、PWA、总数各一个减一负例，1组3循环场景/1新增顶层，唯一目标currentArchitecture:e2eFacts；旧33顶层及TEST037四场景逐字节保留，root不重复计缺口。",
+        "现有工具已校验这三个数字，这是定向测试证据缺口；不改scripts/documentation-fact-drift.js、CURRENT_ARCHITECTURE.md、其它地图/ADR、机器权威、公开报告契约、运行器/CI/预算/依赖或业务API/schema。",
+        "每例独立合法state clone，预期来自原e2eFacts字段；唯一有序起止锚和有界声明及短语恰一，单数字span改动非空。基线报告和唯一目标true，漂移后报告和唯一目标false；只逆改同span后完整state深等，不重置文档或子对象。",
+        "不以其它检查失败代目标拒绝，不称MC/DC、全工具全地图、真实浏览器/数据库或现场覆盖；定位不唯一、工具缺陷、需第四文件/helper/权威或专业决定则保留复现停止扩围并另行准入。",
+        "未来实施获批后核最新main/PR/保护/WIP与单写，记录真实原样/窄测testId和证据、源独审、冻结、18项串行门禁、最终证据独审；本轮testIds/evidenceIds为空，不预填执行。专业由用户协调，运行时/OPS059及生产另批。"
+      ],
+      "testIds": [],
+      "evidenceIds": [],
+      "rollback": "候选阶段仅撤TEST038登记；未来仅撤一个新增顶层测试及其治理/路线图增量，保留旧33顶层、TEST037实现与历史证据；无数据/schema/业务运行回退",
+      "unresolved": [
+        "仅三套声明resident/PWA/total三个数字定向保护，旧root及TEST037在线数/唯一性已覆盖；不是工具功能缺失，不等于MC/DC、内部子条件、全工具/全地图或真实浏览器/现场验收。",
+        "三文件实施、真实testId/窄测、独审/冻结/18门禁及未来推送合并均未准入或执行；TEST037依赖仅要求其限定交付闭合，不借用其实施授权，也不绕过OPS040/SEC016/GOV045/OPS059真实专业DAG。OBS01–OBS08与GS03 S01–S09由用户协调，运行时/OPS059及生产六域NO-GO不变。"
+      ],
+      "observability": {
+        "applicable": false,
+        "reason": "候选仅为只读内存测试保护规划，不新增业务运行能力"
+      },
+      "runtimeCapability": false,
+      "worktree": ".codex-platform-worktrees/process-v2/t00-documentation-current-e2e-partition-tests-20261026",
+      "branch": "process/t00-documentation-current-e2e-partition-tests-20261026",
+      "planRef": "ROADMAP.md#test038-pending-plan-20261026",
+      "writeScopes": [
+        "test/documentation-fact-drift.test.js",
+        "config/lifecycle-governance.json",
+        "ROADMAP.md"
+      ]
+    },
     {
       "id": "TEST-035",
       "title": "E2E文档分区数量定向拒绝测试保护",
@@ -2460,13 +2554,13 @@
       "title": "当前架构在线E2E数量事实纠错与失败关闭保护",
       "ownerProcess": "T00",
       "integrationOwner": "T00",
-      "taskStatus": "验证中",
-      "capabilityStatus": "已实现",
+      "taskStatus": "已关闭",
+      "capabilityStatus": "已集成",
       "riskLevel": "中",
       "approval": {
         "state": "approved",
         "mode": "T00-plan-approval",
-        "ref": "USER-TEST036-CLOSEOUT-NEXT-PLAN-2026-10-25; USER-TEST037-FIVE-FILE-IMPLEMENTATION-2026-10-25",
+        "ref": "USER-TEST036-CLOSEOUT-NEXT-PLAN-2026-10-25; USER-TEST037-FIVE-FILE-IMPLEMENTATION-2026-10-25; USER-TEST037-FROZEN-7B448EA7-PUBLICATION-2026-10-26; USER-TEST037-CLOSEOUT-TEST038-CANDIDATE-2026-10-26",
         "approvedScope": "用户2026-10-25明确批准已登记TEST037原五文件、2组4场景/2新增顶层实施；T00单写、独审、冻结和18项串行门禁。仅指定声明纠错与既有只读检查增量，公开契约不变；专业用户协调，运行时/OPS059正式实施、推送合并上线另批"
       },
       "requirementIds": [
@@ -2498,12 +2592,13 @@
         "TEST-GOV-001"
       ],
       "evidenceIds": [
-        "EVD-TEST037-RED-GREEN"
+        "EVD-TEST037-RED-GREEN",
+        "EVD-PR373-INTEGRATION"
       ],
       "rollback": "仅撤五文件内在线声明纠错/既有检查增量、两个TEST037顶层测试及相应治理增量，保留旧31项、TEST036收口、权威和历史证据；无数据/schema/业务运行回退",
       "unresolved": [
         "仅当前架构在线声明四定向场景，保留旧31项；不等于MC/DC、内部子条件、全工具/全地图/真实浏览器或现场覆盖",
-        "已完成原样31零跳过及真实RED(31通过/2失败、四例旧工具误接受)、GREEN(33通过/零跳过、四例精确目标拒绝)；仅说明本地限定纠错和测试已实现，不冒称18门禁、集成或现场验收。本片推送合并上线未授权，超范围/公开契约/权威变化停并另批",
+        "冻结7b448ea79647209cd2d9972ab370f53be5f4122f经PR373保护squash集成为dac26b5086a4b7fc9cf43b5e33d4abf7693ae097，同treea7fd55268682a78e06a088d4e6ba378c6bb0cfdd；源/18本地串行门禁/最终证据独审及PR40270537808、精确main40271974194各attempt1九成功、Pages40271974168静态成功见EVD-PR373-INTEGRATION。仅关闭TEST037限定纠错与四场景保护，不替专业、真实现场或生产验收；TEST038三数字定向保护仅登记候选未实施。",
         "空dependencies不绕过OPS040/SEC016/GOV045/OPS059真实DAG，OBS01–OBS08与GS03 S01–S09仍区分并由用户协调签署；运行时/OPS059正式实施、推送合并上线另批"
       ],
       "observability": {
@@ -2520,7 +2615,9 @@
         "CURRENT_ARCHITECTURE.md",
         "config/lifecycle-governance.json",
         "ROADMAP.md"
-      ]
+      ],
+      "pullRequestRef": "https://github.com/xujiann/chronic-care-platform/pull/373",
+      "ciRef": "https://github.com/xujiann/chronic-care-platform/actions/runs/40271974194"
     },
     {
       "id": "TEST-034",
