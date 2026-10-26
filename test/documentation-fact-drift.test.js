@@ -793,3 +793,127 @@ test("TEST036 engineering governance E2E facts reject three bounded numeric drif
     assert.deepEqual(restored, repositoryState, label);
   }
 });
+
+test("TEST037 current architecture online E2E fact rejects two bounded numeric drifts", (t) => {
+  const { root, resident, pwa } = repositoryState.e2eFacts;
+  assert.ok(Number.isSafeInteger(root) && root > 0);
+  assert.ok(Number.isSafeInteger(resident) && resident > 0);
+  assert.ok(Number.isSafeInteger(pwa) && pwa > 0);
+  const online = root + resident;
+  assert.ok(Number.isSafeInteger(online) && online > 1);
+  assert.ok(Number.isSafeInteger(online + pwa));
+  const scenarios = [["online-minus-one", online - 1], ["online-includes-pwa", online + pwa]];
+  assert.equal(scenarios.length, 2);
+  const outcomes = [];
+  for (const [scenario, changedCount] of scenarios) {
+    const label = "currentArchitecture:" + scenario;
+    const state = cloneRepositoryState();
+    const baseline = governance.buildReport(state);
+    const checkId = "currentArchitecture:e2eFacts";
+    assert.equal(baseline.ok, true, label);
+    assert.deepEqual(baseline.checks.filter((item) => item.id === checkId).map((item) => item.passed), [true], label);
+    const source = state.documents.currentArchitecture;
+    const startMarker = "TEST-005 将浏览器 E2E 精确分为根";
+    const endMarker = "标准在线 context 仍保持阻止 Service Worker。";
+    assert.equal(source.split(startMarker).length - 1, 1, label);
+    assert.equal(source.split(endMarker).length - 1, 1, label);
+    const start = source.indexOf(startMarker);
+    const endStart = source.indexOf(endMarker);
+    assert.ok(endStart > start, label);
+    const end = endStart + endMarker.length;
+    const region = source.slice(start, end);
+    const prefix = "在线 ";
+    const suffix = " 项并集/唯一性、浏览器策略和 runner 生命周期由专项测试锁定。";
+    const originalNumber = String(online);
+    const changedNumber = String(changedCount);
+    const declaration = prefix + originalNumber + suffix;
+    assert.equal(region.split(declaration).length - 1, 1, label);
+    assert.equal(region.split("PWA 专项另以").length - 1, 1, label);
+    const declarationOffset = start + region.indexOf(declaration);
+    const pwaOffset = start + region.indexOf("PWA 专项另以");
+    assert.ok(declarationOffset + declaration.length <= pwaOffset, label);
+    assert.notEqual(changedNumber, originalNumber, label);
+    const offset = declarationOffset + prefix.length;
+    assert.equal(source.slice(offset, offset + originalNumber.length), originalNumber, label);
+    state.documents.currentArchitecture = source.slice(0, offset) + changedNumber + source.slice(offset + originalNumber.length);
+    assert.notEqual(state.documents.currentArchitecture, source, label);
+    const mutatedRegion = state.documents.currentArchitecture.slice(start, end - originalNumber.length + changedNumber.length);
+    assert.equal(mutatedRegion.split(prefix + changedNumber + suffix).length - 1, 1, label);
+    const report = governance.buildReport(state);
+    outcomes.push({
+      scenario,
+      reportOK: report.ok,
+      targetPassed: report.checks.filter((item) => item.id === checkId).map((item) => item.passed)
+    });
+    const restored = structuredClone(state);
+    const actual = restored.documents.currentArchitecture;
+    assert.equal(actual.slice(0, offset), source.slice(0, offset), label);
+    assert.equal(actual.slice(offset, offset + changedNumber.length), changedNumber, label);
+    assert.equal(actual.slice(offset + changedNumber.length), source.slice(offset + originalNumber.length), label);
+    restored.documents.currentArchitecture = actual.slice(0, offset) + originalNumber + actual.slice(offset + changedNumber.length);
+    assert.deepEqual(restored, repositoryState, label);
+    t.diagnostic("TEST037_RESULT " + JSON.stringify(outcomes.at(-1)));
+  }
+  assert.deepEqual(outcomes, scenarios.map(([scenario]) => ({ scenario, reportOK: false, targetPassed: [false] })));
+});
+
+test("TEST037 current architecture online E2E fact requires one declaration", (t) => {
+  const { root, resident, pwa } = repositoryState.e2eFacts;
+  assert.ok(Number.isSafeInteger(root) && root > 0);
+  assert.ok(Number.isSafeInteger(resident) && resident > 0);
+  assert.ok(Number.isSafeInteger(pwa) && pwa > 0);
+  const online = root + resident;
+  assert.ok(Number.isSafeInteger(online) && online > 0);
+  assert.ok(Number.isSafeInteger(online + pwa));
+  const scenarios = [["declaration-deleted", 0], ["declaration-duplicated", 2]];
+  assert.equal(scenarios.length, 2);
+  const outcomes = [];
+  for (const [scenario, expectedCount] of scenarios) {
+    const label = "currentArchitecture:" + scenario;
+    const state = cloneRepositoryState();
+    const baseline = governance.buildReport(state);
+    const checkId = "currentArchitecture:e2eFacts";
+    assert.equal(baseline.ok, true, label);
+    assert.deepEqual(baseline.checks.filter((item) => item.id === checkId).map((item) => item.passed), [true], label);
+    const source = state.documents.currentArchitecture;
+    const startMarker = "TEST-005 将浏览器 E2E 精确分为根";
+    const endMarker = "标准在线 context 仍保持阻止 Service Worker。";
+    assert.equal(source.split(startMarker).length - 1, 1, label);
+    assert.equal(source.split(endMarker).length - 1, 1, label);
+    const start = source.indexOf(startMarker);
+    const endStart = source.indexOf(endMarker);
+    assert.ok(endStart > start, label);
+    const end = endStart + endMarker.length;
+    const region = source.slice(start, end);
+    const declaration = "在线 " + String(online) + " 项并集/唯一性、浏览器策略和 runner 生命周期由专项测试锁定。";
+    assert.equal(region.split(declaration).length - 1, 1, label);
+    assert.equal(region.split("PWA 专项另以").length - 1, 1, label);
+    const declarationOffset = start + region.indexOf(declaration);
+    const pwaOffset = start + region.indexOf("PWA 专项另以");
+    assert.ok(declarationOffset + declaration.length <= pwaOffset, label);
+    const offset = expectedCount === 0 ? declarationOffset : declarationOffset + declaration.length;
+    const removed = expectedCount === 0 ? declaration : "";
+    const inserted = expectedCount === 2 ? declaration : "";
+    assert.notEqual(removed, inserted, label);
+    assert.equal(source.slice(offset, offset + removed.length), removed, label);
+    state.documents.currentArchitecture = source.slice(0, offset) + inserted + source.slice(offset + removed.length);
+    assert.notEqual(state.documents.currentArchitecture, source, label);
+    const mutatedRegion = state.documents.currentArchitecture.slice(start, end - removed.length + inserted.length);
+    assert.equal(mutatedRegion.split(declaration).length - 1, expectedCount, label);
+    const report = governance.buildReport(state);
+    outcomes.push({
+      scenario,
+      reportOK: report.ok,
+      targetPassed: report.checks.filter((item) => item.id === checkId).map((item) => item.passed)
+    });
+    const restored = structuredClone(state);
+    const actual = restored.documents.currentArchitecture;
+    assert.equal(actual.slice(0, offset), source.slice(0, offset), label);
+    assert.equal(actual.slice(offset, offset + inserted.length), inserted, label);
+    assert.equal(actual.slice(offset + inserted.length), source.slice(offset + removed.length), label);
+    restored.documents.currentArchitecture = actual.slice(0, offset) + removed + actual.slice(offset + inserted.length);
+    assert.deepEqual(restored, repositoryState, label);
+    t.diagnostic("TEST037_RESULT " + JSON.stringify(outcomes.at(-1)));
+  }
+  assert.deepEqual(outcomes, scenarios.map(([scenario]) => ({ scenario, reportOK: false, targetPassed: [false] })));
+});

@@ -396,7 +396,7 @@ flowchart TB
    TEST-006 care revalidation 已把这 3 段显式 skip 全部恢复为可执行断言，并新增陪诊 owner route、护理闭环、护士生命周期 3 个可独立运行的真实 HTTP 特征测试。测试只使用临时 JSON 副本和进程内 owner 证据签发能力；陪诊 handoff 现统一解释 `reject/return`，引用挂号单在补字段前先校验存在性与当前用户 scope。护理通知继续以 planned message + pending outbox 表达，仓库测试不伪造外部送达或现场证据。API 巨型测试的第一个可逆夹具切片已将临时 JSON seed、环境变量和同一 server 生命周期移入 `test/helpers/api-regression-runtime.js`；第二至第五个切片分别只将单个 HIS hospital adapter mock、单个 SIEM alert delivery mock、单个 financial gateway mock 与单个 object-storage gateway mock 的创建、动态回环监听、测试环境和关闭移入各自测试 helper。对象存储 helper 只额外暴露测试正文按原顺序驱动的 `setScanStatus` 控制口。43 个有序子测试、请求/响应与签名断言、告警失败/恢复顺序、金融 callback/reconciliation/retry、对象存储 clean/恶意 provider 文本与 quarantine 断言、超时、单进程执行和 integration 成员均保持不变，并由顺序摘要门禁锁定；synthetic HIS/SIEM/financial/storage 响应均不是外部回执或上线证据。
    TEST-005 将浏览器 E2E 精确分为根 60 项与居民 13 项：两套配置统一使用 Playwright Chromium、
    `serviceWorkers=block` 和动态回环端口；居民套件复用独占 runner、独立临时数据目录并在结束后释放服务。
-   在线 72 项并集/唯一性、浏览器策略和 runner 生命周期由专项测试锁定。PWA 专项另以 3 项独占套件允许
+   在线 73 项并集/唯一性、浏览器策略和 runner 生命周期由专项测试锁定。PWA 专项另以 3 项独占套件允许
    Service Worker，验证居民登录后的 v63 安装、v62 及更早缓存清理、同源成功响应缓存边界、离线导航回退及最终
    unregister/Cache Storage 清理。SEC-004 另增加急救生命链、医生工作台、血液上线看板、陪诊工作台、产品运行驾驶舱、产品区域运行驾驶舱、质量安全工作台、区域切换工作台、血液召回面板、血液创新指挥中心及体检风险卡各 1 项恶意 API 载荷回归；Go/No-Go 回归锁定四方业务责任属性不再被登录角色过滤器误删。
    当前根 60 + 居民 13 + PWA 3 = 76 项；新增居民服务评价投诉用例覆盖失败保留草稿、成功提交及防重复入口，入口用例直接覆盖 Pages 构建产物内 8 个入口的可访问性、授权与无脚本错误，其中 7 个管理页面同时锁定分级左侧导航；测试保留 `/chronic-care-platform/` 子路径并失败关闭未知入口和敏感源数据，标准在线 context 仍保持阻止 Service Worker。
