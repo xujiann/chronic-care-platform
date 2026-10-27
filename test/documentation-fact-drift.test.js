@@ -989,3 +989,47 @@ test("TEST038 current architecture E2E partition facts reject three bounded nume
     targetPassed: [false]
   })));
 });
+
+test("TEST039 explicit governed section end headings fail closed when missing", (t) => {
+  const scenarios = [
+    ["apiMap-release-scope", "apiMap", "## 37. 首批生产范围（无 HTTP 变化）", "## 38. 血液 HTTP 实现归域（协议不变）", "apiMap:firstReleaseScopeFacts"],
+    ["dataModel-sqlite-schema", "dataModel", "## 2. SQLite Schema", "### 关系主链", "dataModel:sqliteSchemaFacts"]
+  ];
+  assert.equal(scenarios.length, 2);
+  const outcomes = [];
+  for (const [scenario, documentId, startHeading, endHeading, checkId] of scenarios) {
+    const state = cloneRepositoryState();
+    const baseline = governance.buildReport(state);
+    assert.equal(baseline.ok, true, scenario);
+    assert.deepEqual(baseline.checks.filter((item) => item.id === checkId).map((item) => item.passed), [true], scenario);
+    const source = state.documents[documentId];
+    const lines = [...source.matchAll(/^.*$/gm)];
+    const starts = lines.filter((line) => line[0].trim() === startHeading);
+    const ends = lines.filter((line) => line[0].trim() === endHeading);
+    assert.equal(starts.length, 1, scenario);
+    assert.equal(ends.length, 1, scenario);
+    const offset = ends[0].index;
+    const headingSpan = ends[0][0];
+    assert.ok(offset > starts[0].index, scenario);
+    assert.ok(headingSpan.length > 0, scenario);
+    state.documents[documentId] = source.slice(0, offset) + source.slice(offset + headingSpan.length);
+    const changed = state.documents[documentId];
+    assert.notEqual(changed, source, scenario);
+    assert.equal(changed.slice(0, offset), source.slice(0, offset), scenario);
+    assert.equal(changed.slice(offset), source.slice(offset + headingSpan.length), scenario);
+    assert.equal([...changed.matchAll(/^.*$/gm)].filter((line) => line[0].trim() === endHeading).length, 0, scenario);
+    const report = governance.buildReport(state);
+    outcomes.push({
+      scenario,
+      reportOk: report.ok,
+      targetPassed: report.checks.filter((item) => item.id === checkId).map((item) => item.passed)
+    });
+    state.documents[documentId] = changed.slice(0, offset) + headingSpan + changed.slice(offset);
+    assert.deepEqual(state, repositoryState, scenario);
+    t.diagnostic("TEST039_RESULT " + JSON.stringify(outcomes.at(-1)));
+  }
+  assert.deepEqual(outcomes, [
+    { scenario: "apiMap-release-scope", reportOk: false, targetPassed: [false] },
+    { scenario: "dataModel-sqlite-schema", reportOk: false, targetPassed: [false] }
+  ]);
+});

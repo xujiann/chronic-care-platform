@@ -1,5 +1,17 @@
 # 工程治理路线图
 
+## TEST039-IMPLEMENTATION-20261027
+
+实际窄证据已取得：旧基线34通过/零跳过；旧工具RED35项旧34通过，仅新增顶层按两例误接受结果失败；最小一行guard后GREEN35、三专项联合67均通过/零跳过。两例均只删内存唯一end标题span，基线report与唯一目标true，修后报告与对应唯一目标false，逆恢复完整state深等；10个显式end和1个无end调用保持。已据外置narrow-verified.json登记 TEST-DOC-SECTION-END-BOUNDARY-PROTECTION / EVD-TEST039-RED-GREEN-NARROW，TEST039现验证中/已实现、WIP3/5。仅为本地窄证据；源独审、冻结、18串行门禁和最终独审仍须实际执行，新冻结未推送/未集成。redLogSha256=c36066ed5d392f4e469ccf12d354455683de4ead7f6681e507c4da7171ea3bee；greenLogSha256=35e5c2c184507af057889e2bd096088d0ed07dde863854994a0b6ef0af722840；combinedLogSha256=77213f528c0f65c317e21bb8b894c81da906e5c7f9f6e27b0140fa1f5b3f5413。下方开发登记阶段文字作为过程历史保留。
+
+用户以 USER-APPROVED-TEST039-FOUR-FILE-IMPLEMENTATION-2026-10-27 明确批准TEST039四文件本地实施与测试，取代下方候选PLAN的当前实施权限；旧候选文字保留历史。准确源范围仅 scripts/documentation-fact-drift.js、test/documentation-fact-drift.test.js、config/lifecycle-governance.json、ROADMAP.md；T00协调者为源唯一写者，两个开发agent只给外置草稿，独审只读。
+
+仅在uniqueSection显式nextHeading且start后查无end时返回既有无效形状，新增1顶层/1组2独立场景；旧34顶层逐字节含原换行保留，API_MAP.md和DATA_MODEL.md只读。无end末节、start数量语义、10个显式及1个无end调用、公开检查ID/JSON/CLI/退出契约保持，不扩大重复end唯一性。
+
+开发登记为approved/实施中/未建设，testIds/evidenceIds仍空，WIP2升3/5。先实际旧基线、新测试在旧工具真实RED且两例均收集目标误接受，再最小guard/GREEN、同span逆恢复完整state深等及窄测；实际结果和摘要取得后才登记，源独审、冻结、18串行门禁和最终证据独审按实测另记。
+
+专业签署由用户协调，原专业DAG、三父Proposed、六域NO-GO和历史证据保持；第五文件、新helper/fixture/子测试、地图正文/权威或专业架构决定需保存复现并停止扩围另批。TEST039新冻结推送合并、业务运行时、OPS059正式实施及生产上线仍另批；回滚仅撤最小guard、新顶层及对应治理/路线图增量，无数据/schema/业务回退。
+
 ## 2026-10-27 TEST038台账收口与TEST039候选登记
 
 本轮依据用户真实批准引用 USER-TEST038-CLOSEOUT-TEST039-CANDIDATE-2026-10-27，仅修改ROADMAP.md与config/lifecycle-governance.json两文件：收口TEST038限定交付，登记TEST039待批准候选。TEST039四文件实施仍另批。

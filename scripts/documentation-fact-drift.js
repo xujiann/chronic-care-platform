@@ -58,6 +58,7 @@ function uniqueSection(source, startHeading, nextHeading) {
   const end = nextHeading
     ? lines.findIndex((line, index) => index > start && line.trim() === nextHeading)
     : -1;
+  if (nextHeading && end < 0) return Object.freeze({ count: 0, text: "" });
   return Object.freeze({ count: 1, text: lines.slice(start, end < 0 ? lines.length : end).join("\n") });
 }
 
