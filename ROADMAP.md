@@ -1,5 +1,21 @@
 # 工程治理路线图
 
+## 2026-10-27 TEST038台账收口与TEST039候选登记
+
+本轮依据用户真实批准引用 USER-TEST038-CLOSEOUT-TEST039-CANDIDATE-2026-10-27，仅修改ROADMAP.md与config/lifecycle-governance.json两文件：收口TEST038限定交付，登记TEST039待批准候选。TEST039四文件实施仍另批。
+
+TEST038冻结6458043d经PR375保护squash合入d6566874，同treeb6750396。18本地串行门禁、PR40300205147/main40301931090各attempt1九成功及精确Pages40301931039静态成功均已独审。最终证据553f8593f179f8072bf9e43ff34df547441d44c7cc685aad929819d01370a031，352/168/121绑定只读核验通过。仅台账关闭限定TEST038，原风险/覆盖局限/全部旧测试与历史记录保留，WIP3降2/5。
+
+## TEST039-PENDING-PLAN-20261027
+
+既有检查器纯内存诊断显示，API_MAP第37节所配置的第38节结束标题、DATA_MODEL SQLite节所配置的关系主链标题各删除一次后，报告及对应唯一目标仍为true。诊断只属规划缺陷证据，不是新增测试或真实RED/GREEN。
+
+未来四文件仅scripts/documentation-fact-drift.js、test/documentation-fact-drift.test.js、config/lifecycle-governance.json、ROADMAP.md，1组2独立场景/1新增顶层，旧34保留。仅显式nextHeading找不到start后end时失败关闭；10个显式结束标题调用和1个无结束标题调用均须兼容；无指定end末节及start数量语义、公共检查ID/JSON/CLI不变，不扩大重复end唯一性。两被测地图只读；获批后先实际基线与RED，再最小修复GREEN，单span变异/逆恢复完整state深等，登记实际证据后源独审、冻结与18串行门禁、最终独审。
+
+T00协调者是源唯一写者，两个开发agent只给外置草稿，独审只读；新metadata工作树由latest fetched main经process:plan/create创建，旧645冻结树及封存证据不动。metadata窄验证复用现有三专项和process/documentation-facts，冻结后18项严格串行：npm run governance:lifecycle → npm run repository:governance:verify → npm run documentation-facts:verify → npm run process:verify → npm run routes:check → npm run routes:test → npm run architecture:test → npm run process:test → npm run platform:iterations:test → npm run build → npm run lint → npm run typecheck → npm run test:unit → npm run test:integration → npm run test:smoke → npm run test:all → npm run security:browser:verify → npm run static:test；不预填本轮门禁或TEST039结果。需第五文件、新helper、地图正文/权威或专业决定即停止扩围另批。
+
+本轮回滚仅撤两文件收口/候选增量；未来四文件回滚只撤最小guard、新顶层及对应治理增量，无数据/schema/业务运行回退。TEST039实施、新冻结推送合并、业务runtime、OPS059正式实施及生产均另批；专业签署由用户协调，全部专业DAG与六域NO-GO保持。
+
 ## TEST038-IMPLEMENTATION-20261026
 
 实际窄测与登记：原样基线33通过/零跳过，新增后专项34及联合66均通过/零跳过。三条TEST038_RESULT分别为resident-minus-one、pwa-minus-one、total-minus-one，报告及唯一目标均false，各自复原深等断言通过；仅补已有拒绝逻辑的测试保护，不制造RED。真实专项日志SHA-256 `e3c31393ae5d91a5b23bdd3201ef4ef2b316f9e19f52f50c9e7b8ac35362e470`，联合日志SHA-256 `cb8ec63a0dc9d5e534b11bd401302b8ac21a1da268daaa599b090cbc04409217`；结果先执行后登记TEST-DOC-CURRENT-E2E-PARTITION-COUNT-PROTECTION/EVD-TEST038-NARROW，TASK038现验证中/已实现，WIP3/5。上述只记录窄证据，冻结后18门禁与最终独审自身另验；新冻结未推送/未集成。
