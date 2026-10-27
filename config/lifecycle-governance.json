@@ -606,15 +606,16 @@
     {
       "id": "REQ-TEST-039",
       "title": "文档事实受治理章节结束边界缺失失败关闭保护",
-      "sourceType": "human-approved-candidate-registration",
-      "sourceRef": "USER-TEST038-CLOSEOUT-TEST039-CANDIDATE-2026-10-27",
+      "sourceType": "human-approved-test-implementation",
+      "sourceRef": "USER-TEST038-CLOSEOUT-TEST039-CANDIDATE-2026-10-27; USER-APPROVED-TEST039-FOUR-FILE-IMPLEMENTATION-2026-10-27",
       "acceptance": [
         "本轮仅登记TEST039待批准候选；未来准确四文件为scripts/documentation-fact-drift.js、test/documentation-fact-drift.test.js、config/lifecycle-governance.json、ROADMAP.md，T00单写；四文件实施与新冻结推送合并另批。",
         "限定修复uniqueSection在显式nextHeading且start之后找不到结束标题时仍延伸全文的误接受：只在此分支返回既有无效形状count=0/text为空；未指定结束标题时的末节语义和已有起始标题数量语义保持，不扩大到重复结束标题唯一性或全结构检查。",
         "未来保留旧34顶层逐字节含原换行，新增1顶层/1组2独立场景；分别只在API_MAP第37节对应的第38节标题、DATA_MODEL SQLite节对应的关系主链标题删除一个唯一结束标题span。两文档保持只读，所有变异仅作用于内存副本。",
         "每例独立合法clone，基线报告及唯一目标检查先true，新增测试在旧工具真实RED取得两例误接受记录，修后报告false及唯一apiMap:firstReleaseScopeFacts或dataModel:sqliteSchemaFacts为[false]；只逆改原span后完整state深等，收集两例并恢复后统一断言，不能用其它失败代目标拒绝。",
         "保持现有检查ID、机器事实、公开报告JSON/CLI/退出语义；兼容性核对10个有结束标题调用和1个无结束标题调用。实施批准后才执行新增测试、登记真实testId/evidence/log摘要，不预填未来RED/GREEN、门禁或CI结果。",
-        "源独审、准确冻结、18门禁严格串行及最终证据独审；需第五文件、新helper/fixture/子测试、地图正文/权威、API/schema/运行时或专业架构决定时保存复现停止扩围并另批。不声称MC/DC、全工具/全地图或真实现场覆盖，专业用户协调，生产NO-GO保持。"
+        "源独审、准确冻结、18门禁严格串行及最终证据独审；需第五文件、新helper/fixture/子测试、地图正文/权威、API/schema/运行时或专业架构决定时保存复现停止扩围并另批。不声称MC/DC、全工具/全地图或真实现场覆盖，专业用户协调，生产NO-GO保持。",
+        "用户已批准TEST039限定四文件本地实施与测试；以上候选阶段的未来/待批准文字保留历史，当前T00单写，1新顶层/2独立场景，旧34字节及换行保留、两源地图只读；新冻结推合、业务运行时、OPS059正式实施和生产上线仍另批，专业签署由用户协调。"
       ]
     }
   ],
@@ -1180,7 +1181,7 @@
       "title": "显式章节结束边界缺失仍误通过或候选规划被误当实施",
       "level": "中",
       "owner": "T00",
-      "mitigation": "仅登记待批准四文件候选。两独立删除结束标题场景先真实RED，再在既有uniqueSection缺失后置end的分支失败关闭取得GREEN；单span恢复、目标检查唯一性和旧34保留。未指定end的末节语义保持，源地图/公开契约/机器权威不改，第五文件或专业决定停并另批；运行时和生产NO-GO。",
+      "mitigation": "用户已批准限定四文件本地实施。两独立删除结束标题场景先真实RED，再在既有uniqueSection缺失后置end的分支失败关闭取得GREEN；单span恢复、目标检查唯一性和旧34逐字节保留。兼容10个显式end与1个无end调用；未指定end的末节语义保持，源地图/公开契约/机器权威不改，第五文件或专业决定停并另批；业务运行时和生产NO-GO。",
       "status": "open"
     }
   ],
@@ -1616,6 +1617,12 @@
       "kind": "real-http-role-organization-and-receipt-authorization-contract",
       "path": "test/task-message-authorization-http.test.js",
       "command": "node --test --test-concurrency=1 test/task-message-authorization-http.test.js"
+    },
+    {
+      "id": "TEST-DOC-SECTION-END-BOUNDARY-PROTECTION",
+      "kind": "readonly-explicit-section-end-fail-closed-red-green-regression",
+      "path": "test/documentation-fact-drift.test.js",
+      "command": "node --test --test-reporter=tap --test-concurrency=1 test/documentation-fact-drift.test.js"
     }
   ],
   "evidence": [
@@ -2245,6 +2252,16 @@
       "ref": "C:/Users/drxuj/Projects/卫生健康信息平台/.codex-platform-evidence/documentation-current-e2e-partition-tests-20261026/publication-20261026/delivery-publication-final.json",
       "testIds": [
         "TEST-DOC-CURRENT-E2E-PARTITION-COUNT-PROTECTION"
+      ],
+      "productionEvidence": false
+    },
+    {
+      "id": "EVD-TEST039-RED-GREEN-NARROW",
+      "type": "actual-local-two-scenario-red-green-narrow-regression",
+      "scope": "TEST039限定四文件/1新增顶层/1组2独立场景。旧34原字节含换行保留；基线34通过0跳过，旧工具RED35项中旧34通过、仅新增顶层失败，两场景reportOk=true及唯一目标[true]均实测；一行显式缺end guard后GREEN35及联合67通过0跳过，两场景reportOk=false且唯一apiMap:firstReleaseScopeFacts或dataModel:sqliteSchemaFacts为[false]，同span逆恢复后完整state深等。10显式end及1无end调用未改；仅合法基线/原34和该两负例兼容保护，不等于全结构、重复end或MC/DC。两源地图/机器权威/业务/CI不改，未预填18门禁/远端CI/集成/现场结论。baselineLogSha256=cab21916e580ae518fc30ececa2d5faccc9eab7da1c9249bfd7c9270c83cb364；redLogSha256=c36066ed5d392f4e469ccf12d354455683de4ead7f6681e507c4da7171ea3bee；greenLogSha256=35e5c2c184507af057889e2bd096088d0ed07dde863854994a0b6ef0af722840；combinedLogSha256=77213f528c0f65c317e21bb8b894c81da906e5c7f9f6e27b0140fa1f5b3f5413。专业用户协调，新冻结推送合并/业务runtime/OPS059/生产另批。",
+      "ref": "C:/Users/drxuj/Projects/卫生健康信息平台/.codex-platform-evidence/documentation-section-end-guard-20261027/narrow-verified.json",
+      "testIds": [
+        "TEST-DOC-SECTION-END-BOUNDARY-PROTECTION"
       ],
       "productionEvidence": false
     }
@@ -5745,14 +5762,14 @@
       "title": "受治理章节结束边界缺失失败关闭保护",
       "ownerProcess": "T00",
       "integrationOwner": "T00",
-      "taskStatus": "待批准",
-      "capabilityStatus": "未建设",
+      "taskStatus": "验证中",
+      "capabilityStatus": "已实现",
       "riskLevel": "中",
       "approval": {
-        "state": "pending",
+        "state": "approved",
         "mode": "T00-plan-approval",
-        "ref": "PENDING-TEST039-FOUR-FILE-IMPLEMENTATION",
-        "approvedScope": "仅候选登记已获用户两文件metadata批准；四文件实施仍未批准，拟工作树/分支/写范围不代表创建或占WIP。"
+        "ref": "PENDING-TEST039-FOUR-FILE-IMPLEMENTATION; USER-APPROVED-TEST039-FOUR-FILE-IMPLEMENTATION-2026-10-27",
+        "approvedScope": "已批准仅scripts/documentation-fact-drift.js、test/documentation-fact-drift.test.js、config/lifecycle-governance.json、ROADMAP.md四文件本地实施及测试；1新增顶层/1组2场景，T00单写，旧34逐字节及换行保留，两源地图只读，先真实RED再最小guard/GREEN，独审冻结18项串行门禁；推送合并、业务运行时、OPS059正式实施和生产上线仍另批，专业用户协调。"
       },
       "requirementIds": [
         "REQ-TEST-039"
@@ -5779,14 +5796,19 @@
         "未来保留旧34顶层逐字节含原换行，新增1顶层/1组2独立场景；分别只在API_MAP第37节对应的第38节标题、DATA_MODEL SQLite节对应的关系主链标题删除一个唯一结束标题span。两文档保持只读，所有变异仅作用于内存副本。",
         "每例独立合法clone，基线报告及唯一目标检查先true，新增测试在旧工具真实RED取得两例误接受记录，修后报告false及唯一apiMap:firstReleaseScopeFacts或dataModel:sqliteSchemaFacts为[false]；只逆改原span后完整state深等，收集两例并恢复后统一断言，不能用其它失败代目标拒绝。",
         "保持现有检查ID、机器事实、公开报告JSON/CLI/退出语义；兼容性核对10个有结束标题调用和1个无结束标题调用。实施批准后才执行新增测试、登记真实testId/evidence/log摘要，不预填未来RED/GREEN、门禁或CI结果。",
-        "源独审、准确冻结、18门禁严格串行及最终证据独审；需第五文件、新helper/fixture/子测试、地图正文/权威、API/schema/运行时或专业架构决定时保存复现停止扩围并另批。不声称MC/DC、全工具/全地图或真实现场覆盖，专业用户协调，生产NO-GO保持。"
+        "源独审、准确冻结、18门禁严格串行及最终证据独审；需第五文件、新helper/fixture/子测试、地图正文/权威、API/schema/运行时或专业架构决定时保存复现停止扩围并另批。不声称MC/DC、全工具/全地图或真实现场覆盖，专业用户协调，生产NO-GO保持。",
+        "用户已批准TEST039限定四文件本地实施与测试；以上候选阶段的未来/待批准文字保留历史，当前T00单写，1新顶层/2独立场景，旧34字节及换行保留、两源地图只读；新冻结推合、业务运行时、OPS059正式实施和生产上线仍另批，专业签署由用户协调。"
       ],
-      "testIds": [],
-      "evidenceIds": [],
+      "testIds": [
+        "TEST-DOC-SECTION-END-BOUNDARY-PROTECTION"
+      ],
+      "evidenceIds": [
+        "EVD-TEST039-RED-GREEN-NARROW"
+      ],
       "rollback": "候选阶段仅撤TEST039登记；未来仅撤uniqueSection缺失后置end分支检查、一个新增顶层及相应治理/路线图增量，保留旧34、两源地图和历史证据；无数据/schema/业务运行回退",
       "unresolved": [
         "仅两个指定治理章节结束标题缺失负例，不等于全调用点、重复结束标题、MC/DC、全地图或现场验收。",
-        "四文件实施及真实RED/GREEN、新测试/证据、独审冻结18门禁和新冻结推送合并尚未获批或执行；TEST038依赖仅闭合其限定交付，不绕过OPS040/SEC016/GOV045/OPS059专业DAG和生产NO-GO。"
+        "四文件本地实施已批准；真实基线34、RED两例误接受且仅新增顶层失败、最小guard后GREEN35及联合67零跳过已实测登记。冻结后18项串行门禁与最终独审仍待实际执行；新冻结推送合并、业务运行时、OPS059正式实施和生产上线另批。TEST038限定依赖不绕过原专业DAG或生产NO-GO。"
       ],
       "observability": {
         "applicable": false,
