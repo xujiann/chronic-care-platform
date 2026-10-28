@@ -1,5 +1,37 @@
 # 工程治理路线图
 
+## 2026-10-28 TEST039台账收口与TEST040候选登记
+
+用户2026-10-28已按USER-TEST039-CLOSEOUT-TEST040-CANDIDATE-2026-10-28明确批准本两文件收口及候选登记；本轮从fresh origin/main@e4d3b8b9经process:plan/create建立process/t00-test039-closeout-test040-plan-20261028，T00单写。准确范围仅ROADMAP.md与config/lifecycle-governance.json，T00协调者单写，独审只读。TEST040三文件实施、新收口冻结推送合并、业务runtime、OPS059正式实施及生产仍另批。
+
+冻结881f1fdc17c59d74a484c2b0c4cd0c824a94ae71经PR377按保护规则squash合入e4d3b8b9d38b67bc37060d22ff6b697650706b20，同tree80e3096dff1e34dc57572e3bb39714007c073165、唯一parentc655cc31e55fe387bd9eecc0cb311ad49a94f76b。源独审、精确冻结、受控恢复的18逻辑本地串行门禁与最终证据独审已完成；PR40480790940/main40482683033各attempt1九成功，每轮unit3714pass/45环境skip、integration386pass/0skip、独立PG45pass/0skip、Chromium76(60/13/3)、auditpassed。Pages40482683122精确main唯一push/attempt1成功仅静态预览。保护/rulesets保持，交付时开放PR0，单push及单MCP create/expected-head squash，无force/bypass或CIrerun。最终发布SHA256=9d8ffdbcef18e39b45f5951fc5c46ace5e478acb3cdaeec7bf365f245fd7784e。仅闭合限定TEST039，不替本轮metadata、新候选、专业或生产验收。
+
+原本地integration首次44项1pass/43fail，根因未确定；原API文件诊断44pass不计门禁，受控完整重试386pass后完成余项，逻辑18项为13原成功+5恢复，非首次18全绿。 原完整gate环境摘要未捕获，不能声称跨尝试环境相同；CIM观察不构成OS全局锁。 45项PostgreSQL环境跳过仍是跳过，独立PG45和Chromium76只证明各自CI环境；套件与轮次不得累加成独立覆盖。 仅关闭TEST039四文件两个结束标题缺失场景交付，不扩大到重复结束标题、全结构、全地图、MC/DC或真实现场。
+
+仅将TEST039限定交付记已关闭/已集成并追加EVD-PR377-INTEGRATION及真实PR/CI引用，原验收/批准轨迹和风险open保留。TEST040待批准/未建设、approval.pending、testIds/evidenceIds空，不占WIP；WIP3降2/5。MAP-MODULE仅追加TEST040，不删除旧gap；其他task、risk、专业DAG、GS03 S01–S09、OBS01–OBS08及六域NO-GO保持。专业签署由用户协调。
+
+本收口自身不得复用PR377结果代验证。新独立树已从最新fetched origin/main经process:plan/create建立，旧881冻结树及封存证据不动；实际窄验证、源独审无P0–P2、精确冻结、18项严格串行及最终证据独审。冻结后改动重审重冻重验，证据仅写新外置目录；回滚只撤本两文件增量，保留TEST039四文件实现与全部历史记录。
+
+18项顺序：npm run governance:lifecycle → npm run repository:governance:verify → npm run documentation-facts:verify → npm run process:verify → npm run routes:check → npm run routes:test → npm run architecture:test → npm run process:test → npm run platform:iterations:test → npm run build → npm run lint → npm run typecheck → npm run test:unit → npm run test:integration → npm run test:smoke → npm run test:all → npm run security:browser:verify → npm run static:test。不预填新门禁或TEST040结果。
+
+## TEST040-PENDING-PLAN-20261028
+
+本轮仅登记待审候选；未来准确三文件为test/documentation-fact-drift.test.js、config/lifecycle-governance.json、ROADMAP.md。TEST040实施另批；不修改工具、DATA_MODEL.md或其它地图/机器权威、运行器、业务运行时、CI/预算/依赖/API/schema。
+
+未来仅1新增顶层/1组3独立单因素场景，保护documents.dataModel的resident/PWA/total原数字各减一，唯一目标dataModel:e2eFacts。旧35顶层逐字节含CRLF保留；旧root已覆盖，不重复计新缺口。不新增helper、fixture、test子测试或模块替换。
+
+预期来自repositoryState.e2eFacts，root/resident/pwa/total均安全正整数，后三者大于1，total=root+resident+pwa；不从报告导出预期。每例独立合法clone，基线report.ok=true及唯一目标[true]。
+
+全文起锚Playwright E2E 只在操作系统临时目录复制开发种子，根 与止锚Cache Storage 不是业务事实源或迁移证据。各恰一次、有序且只涵盖两个E2E段落。界内完整在线计数声明、完整PWA/总数声明及场景短语各恰一次，数字span非空，精确前缀定位后只改该span并保持前后字节。
+
+漂移后收集reportOk及唯一目标[false]，允许其它检查同时失败但不得代替精确目标拒绝；仅逆改同span后完整state深等，三例均完成复原与TEST040_RESULT诊断后统一断言。既有工具已有拒绝逻辑，预期直接GREEN，不制造RED、不声称MC/DC/内部条件/全工具/全地图或真实浏览器现场覆盖。
+
+获批后先实际原样基线35，再新增后专项36和联合窄测，数量只为计划而非已执行。未有真实结果时testIds/evidenceIds空；仅实测日志摘要齐备后登记、源独审、准确冻结、18串行门禁及最终证据独审。定位不唯一、漏检/异常、第四文件或专业/架构决定时保留复现停止扩围另批。
+
+先关闭TEST039限定交付并完成新metadata自身门禁；未来实施还须确认届时最新fetched main已经实际集成本次metadata，不以本地门禁代替主线集成，再经process:plan/create建独立T00树，T00协调者为三源唯一写者，辅助仅给外置草稿、独审只读。新冻结推送合并、OPS059正式实施及生产另批；专业签署由用户协调。
+
+未来TEST040分支及工作树日期按实际批准实施日重新核定，不宣称TEST040已创建、已批准或已测试。本轮仅获准登记准确范围/测试/回滚候选，不授予其实施写权。下方原实施与候选章节保留过程历史。
+
 ## TEST039-IMPLEMENTATION-20261027
 
 实际窄证据已取得：旧基线34通过/零跳过；旧工具RED35项旧34通过，仅新增顶层按两例误接受结果失败；最小一行guard后GREEN35、三专项联合67均通过/零跳过。两例均只删内存唯一end标题span，基线report与唯一目标true，修后报告与对应唯一目标false，逆恢复完整state深等；10个显式end和1个无end调用保持。已据外置narrow-verified.json登记 TEST-DOC-SECTION-END-BOUNDARY-PROTECTION / EVD-TEST039-RED-GREEN-NARROW，TEST039现验证中/已实现、WIP3/5。仅为本地窄证据；源独审、冻结、18串行门禁和最终独审仍须实际执行，新冻结未推送/未集成。redLogSha256=c36066ed5d392f4e469ccf12d354455683de4ead7f6681e507c4da7171ea3bee；greenLogSha256=35e5c2c184507af057889e2bd096088d0ed07dde863854994a0b6ef0af722840；combinedLogSha256=77213f528c0f65c317e21bb8b894c81da906e5c7f9f6e27b0140fa1f5b3f5413。下方开发登记阶段文字作为过程历史保留。
