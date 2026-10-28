@@ -232,6 +232,40 @@ function assertCompleteFirst(before, after, input, result) {
   assert.equal(appended[1].previous_source_hash, appended[0].source_hash);
 }
 
+function phaseMarkerFixture(t) {
+  const candidateRoot = process.platform === "win32" ? path.join(os.homedir(), "Temp") : os.tmpdir();
+  assert.equal(fs.lstatSync(candidateRoot).isSymbolicLink(), false);
+  const root = fs.realpathSync(candidateRoot);
+  assert.equal(root.toLowerCase().includes("onedrive"), false);
+  const directory = fs.mkdtempSync(path.join(root, "test041-phase-"));
+  assert.equal(path.dirname(directory), root);
+  assert.equal(fs.lstatSync(directory).isSymbolicLink(), false);
+  const marker = path.join(directory, "phase");
+  t.after(() => {
+    assert.equal(path.dirname(directory), root);
+    assert.equal(fs.lstatSync(directory).isSymbolicLink(), false);
+    if (fs.existsSync(marker)) fs.unlinkSync(marker);
+    fs.rmdirSync(directory);
+  });
+  return marker;
+}
+
+async function waitForPublishedPhase(marker, expected, child, messages, timeoutMs = 15000, scheduling = {}) {
+  const now = scheduling.now || Date.now;
+  const pause = scheduling.pause || (() => new Promise((resolve) => setTimeout(resolve, 10)));
+  const deadline = now() + timeoutMs;
+  while (true) {
+    if (child.exitCode !== null || child.signalCode !== null) throw new Error("child exited before gate: " + JSON.stringify(messages));
+    if (now() > deadline) throw new Error("child gate timeout: " + JSON.stringify(messages));
+    if (fs.existsSync(marker)) {
+      const phase = fs.readFileSync(marker, "utf8");
+      // Creation can be visible before the child writes content. Empty is not ready.
+      if (phase !== "") { assert.equal(phase, expected); return; }
+    }
+    await pause();
+  }
+}
+
 function spawnWorker(experiment, operation, request, options = {}) {
   const gatePath = path.join(path.dirname(experiment.directory),
     `gate-${path.basename(experiment.directory)}-${randomUUID()}`);
@@ -268,14 +302,7 @@ function spawnWorker(experiment, operation, request, options = {}) {
     });
   }
   async function waitAtGate(timeoutMs = 15000) {
-    const marker = `${gatePath}.phase`;
-    const deadline = Date.now() + timeoutMs;
-    while (!fs.existsSync(marker)) {
-      if (child.exitCode !== null || child.signalCode !== null) throw new Error(`child exited before gate: ${JSON.stringify(messages)}`);
-      if (Date.now() > deadline) throw new Error(`child gate timeout: ${JSON.stringify(messages)}`);
-      await new Promise((resolve) => setTimeout(resolve, 10));
-    }
-    assert.equal(fs.readFileSync(marker, "utf8"), options.holdPhase);
+    return waitForPublishedPhase(gatePath + ".phase", options.holdPhase, child, messages, timeoutMs);
   }
   const worker = {
     child, messages, exited, wait, waitAtGate, gatePath,
@@ -710,4 +737,41 @@ test("a symlinked experiment path is rejected before touching its target", (t) =
   }
   assert.equal(createHash("sha256").update(fs.readFileSync(experiment.dbPath)).digest("hex"), targetDigest);
   assert.deepEqual(fs.readdirSync(experiment.directory).sort(), targetFiles);
+});
+
+test("TEST041 phase publication waits for complete exact content within the original deadline", async (t) => {
+  const marker = phaseMarkerFixture(t);
+  const child = { exitCode: null, signalCode: null };
+  fs.writeFileSync(marker, "", { flag: "wx" });
+  assert.equal(fs.existsSync(marker), true);
+  assert.equal(fs.statSync(marker).size, 0);
+  let time = 0, pauses = 0;
+  await waitForPublishedPhase(marker, "beforeCommit", child, [], 15000, {
+    now: () => time,
+    pause: async () => { time += 10; pauses += 1; fs.writeFileSync(marker, "beforeCommit", { flag: "r+" }); }
+  });
+  assert.equal(pauses, 1);
+  assert.equal(fs.readFileSync(marker, "utf8"), "beforeCommit");
+  await waitForPublishedPhase(marker, "beforeCommit", child, [], 15000, {
+    now: () => time, pause: async () => { assert.fail("complete exact phase must not wait"); }
+  });
+  t.diagnostic("TEST041_PHASE_RESULT " + JSON.stringify({ stagedEmptyThenComplete: true, acceptedOnlyExactPhase: true }));
+});
+
+test("TEST041 phase observer rejects persistent empty wrong phase and exited worker", async (t) => {
+  const marker = phaseMarkerFixture(t);
+  const child = { exitCode: null, signalCode: null };
+  fs.writeFileSync(marker, "", { flag: "wx" });
+  let time = 0;
+  await assert.rejects(waitForPublishedPhase(marker, "beforeCommit", child, [], 15000, {
+    now: () => time, pause: async () => { time += 5000; }
+  }), /child gate timeout/);
+  assert.ok(time > 15000);
+  fs.writeFileSync(marker, "wrongPhase");
+  await assert.rejects(waitForPublishedPhase(marker, "beforeCommit", child, [], 15000, {
+    pause: async () => { assert.fail("wrong nonempty phase must fail immediately"); }
+  }), (error) => { assert.equal(error.actual, "wrongPhase"); assert.equal(error.expected, "beforeCommit"); return true; });
+  fs.writeFileSync(marker, "");
+  await assert.rejects(waitForPublishedPhase(marker, "beforeCommit", { exitCode: 1, signalCode: null }, [], 15000), /child exited before gate/);
+  t.diagnostic("TEST041_PHASE_RESULT " + JSON.stringify({ persistentEmptyRejected: true, wrongPhaseRejected: true, exitedWorkerRejected: true }));
 });

@@ -633,6 +633,21 @@
         "先关闭TEST039限定交付并完成新metadata自身门禁；未来实施还须确认届时最新fetched main已经实际集成本次metadata，不以本地门禁代替主线集成，再经process:plan/create建独立T00树，T00协调者为三源唯一写者，辅助仅给外置草稿、独审只读。新冻结推送合并、OPS059正式实施及生产另批；专业签署由用户协调。",
         "用户2026-10-28已按USER-TEST040-THREE-FILE-IMPLEMENTATION-2026-10-28批准TEST040准确三文件本地实施与测试，取代候选阶段待批准文字的当前实施权限，旧候选条款保留过程历史；仅1新增顶层/1组3独立数字漂移，T00协调者单写，旧35完整字节及CRLF保留，工具与DATA_MODEL.md只读，独审后冻结18串行门禁。本轮新冻结推送合并、OPS059正式实施与生产另批，专业签署由用户协调。"
       ]
+    },
+    {
+      "id": "REQ-TEST-041",
+      "title": "GS03阶段发布与转诊HTTP测试稳定性有界补救",
+      "sourceType": "human-approved-test-stability-remediation",
+      "sourceRef": "USER-TEST041-FOUR-FILE-STABILITY-IMPLEMENTATION-2026-10-28",
+      "acceptance": [
+        "先核fresh main CAF、主线CI/Pages成功、openPR0及严格保护；在40a上经process工具建独立T00树，明确新四文件和相对main五文件的组合边界；新树将TEST040如实登记已阻塞/已实现以交出共享治理单写，不假关闭它或专业缺口。",
+        "先执行两个原样完整文件基线，保留全部18个GS03和2个referral顶层及所有原业务断言。另在新外置目录保留受控机制探针、实际输出、失败收据和环境摘要；单独绿色不认定历史根因，不预填未来测试结果。",
+        "GS03：只在该测试文件内提取父端marker观察逻辑，用真实空marker分步发布及确定性调度证明存在先创建后填内容的状态。新增正反回归先真实RED再据证据最小修正：空marker绝不能视为成功或无条件吞掉，只能在原deadline内作为未发布状态等待；完整phase必须严格相等，错误非空phase立即拒绝，子进程退出和持久空marker必须失败。保留15s父/20s子时限，不改child/helper或真实事务排序。若该区分不能通过回归成立，停止此修复。",
+        "Referral：用合成回环服务的连接/请求/关闭轨迹及固定有界对照实验核查裸fetch与fixture生命周期；不把ECONNRESET或单独2pass当成pooling根因。只有机制证据支持时才在该测试文件内改fixture传输；若证据不足保持原传输，只增加有界诊断/相应有效回归并保留未决。禁止业务请求自动重试、延长超时、忽略reset、接受丢响应或弱化原数据及单写断言。",
+        "新增测试须走原真实unit/integration/full发现入口，不改工具、运行器、业务运行时、CI、依赖、schema、API或child helpers。TEST040原36顶层及旧35字节前缀完整保留；仅治理真实结果取得后登记对应testId/evidence并转验证中/已实现，RISK保持open。",
+        "源独审后冻结准确commit/tree及执行器，全部18项门禁从新组合重新串行执行，不复用原15项或两次单文件诊断作为新门禁通过；失败立即停并保存原件，有新机制证据才按获批四文件修正/重审/重冻/重新验证，不运行直到绿的自动循环。",
+        "最终独审同时复核边界、源/助手/日志摘要、真实计数、环境跳过与历史失败；不能因一次组合绿色声称原失败根因已确定或测试完全稳定。专业签署由用户协调；push/merge/OPS059/production仍另批。"
+      ]
     }
   ],
   "regulatoryControls": [
@@ -1207,6 +1222,14 @@
       "owner": "T00",
       "mitigation": "用户已批准限定三文件测试实施。限定两个E2E段落中resident/PWA/total各一个数字span，唯一有序双锚、两完整声明与目标短语唯一；基线目标先真、漂移后假、同span逆恢复完整state深等；不改工具，不制造RED，原35及CRLF保留。漏检/异常或第四文件停并另批；专业和生产六域NO-GO保持。",
       "status": "open"
+    },
+    {
+      "id": "RISK-TEST-041",
+      "title": "测试夹具等待/连接改动掩盖失败或把机制探针冒充历史根因",
+      "level": "中",
+      "owner": "T00",
+      "mitigation": "调度探针被误写成历史根因；把空marker吞掉、连接reset重试或放宽断言换绿；治理单写重叠；组合40a未集成被隐瞒。由确定性负测、准确受阻状态、源独审和新冻结全18门禁约束。 保留双失败、两次独立诊断和45环境跳过；未知机制不得盲改，专业用户协调、生产NO-GO。 前版review-fix-narrow真实93项91pass/2fail/零skip：原SLA connect EADDRINUSE49163、新origin立即rebind listen EACCES49195，原件SHA=d88de385140b65cb88baa5cc410fb68e35c29e7611fd62777323343fd6e89f5c保留。后续TCP快照只是稍后观察，不能倒推历史端口占用、耗尽或代理根因；未改LanternSvc/系统/无关进程，原SLA EADDRINUSE仍未确定原因。 新增回归已据单次受控证据去掉关闭后立即重绑端口的OS假定，改为同一listener保持open，仅退休idle连接；旧fetch第二POST复用已退休socket而ECONNRESET，新独立连接7请求7连接成功，固定1组/模式零重放，不认定历史根因。修订回归真实RED5项3pass/2fail（旧两业务及截断拒绝保持pass），恢复当前独立连接后两文件25pass/零skip；原18+2业务test body及TEST040保护不改。修订后联合93、源独审、冻结与新全18门禁必须另行实际执行，不能复用此前93、旧15或单独诊断。",
+      "status": "open"
     }
   ],
   "decisions": [
@@ -1653,6 +1676,18 @@
       "kind": "readonly-data-model-e2e-three-count-negative-regression",
       "path": "test/documentation-fact-drift.test.js",
       "command": "node --test --test-reporter=tap --test-concurrency=1 test/documentation-fact-drift.test.js"
+    },
+    {
+      "id": "TEST-STABILITY-PHASE-PUBLICATION",
+      "kind": "test-only-phase-publication-bounded-positive-negative-regression",
+      "path": "test/gs03-storage-transaction-experiment.test.js",
+      "command": "node --test --test-reporter=tap --test-concurrency=1 test/gs03-storage-transaction-experiment.test.js"
+    },
+    {
+      "id": "TEST-STABILITY-REFERRAL-TRANSPORT",
+      "kind": "test-only-referral-retired-idle-connection-isolation-and-fail-closed-response",
+      "path": "test/referral-release-data-scope.test.js",
+      "command": "node --test --test-reporter=tap --test-concurrency=1 test/referral-release-data-scope.test.js"
     }
   ],
   "evidence": [
@@ -2314,6 +2349,38 @@
         "TEST-DOC-DATA-MODEL-E2E-COUNT-PROTECTION"
       ],
       "productionEvidence": false
+    },
+    {
+      "id": "EVD-TEST040-FULL-GATE-BLOCKED",
+      "type": "actual-local-full-gates-blocked-independent-evidence-seal",
+      "scope": "原冻结40a限定源实现已完成，旧35完整前缀与新增1顶层/3场景保留，但完整18门禁未完成：原15成功，full首次batch5 GS03空phase失败，唯一受控full重试batch12 referral确认POST ECONNRESET失败，17/18未执行；两文件独立18/2通过不计门禁，根因未确定。受阻证据独审封存SHA256=e2854e2815d37f0958c10c24ba666e7e673f4b9e6cc25353d056720e53b68371。仅新树将TEST040置已阻塞/已实现交出共享治理写范围，由新获批TEST041补救；不假关闭、不发布旧失败分支、不改变专业/生产准入。",
+      "ref": "C:/Users/drxuj/Projects/卫生健康信息平台/.codex-platform-evidence/documentation-data-model-e2e-tests-20261028/blocked-delivery-final.json",
+      "testIds": [
+        "TEST-DOC-DATA-MODEL-E2E-COUNT-PROTECTION"
+      ],
+      "productionEvidence": false
+    },
+    {
+      "id": "EVD-TEST041-MECHANISM-RED-GREEN",
+      "type": "actual-local-controlled-mechanism-and-old-red-new-green-test-only-regression",
+      "scope": "TEST041准确四文件已获批，GS03只在原15s父期限内把零长度视为未发布，完整非空phase严格匹配、错phase/持续空/child退出均拒绝，child20s/helpers/真实事务不改；referral仅本文件request采用内置http.request agent:false，完整有效JSON才resolve，请求/响应错误与截断均拒绝且零重放，fixture close保留清理错误。原18+2业务test body逐字节保留，新增2+3顶层。受控phase窗口探针及固定8/8裸fetch ECONNRESET对照独立连接8/8成功只证明受控机制，不认定两次历史根因。原样20pass；RED25中21pass/4fail（旧20通过、原已拒绝截断不造RED）；GREEN25及联合93pass/零skip。baselineLogSHA=995e2899087e2e35943ea78e712f0c319a9a503e64894b26f6399b4d6abc1033；redLogSHA=cee063947d76e49fa638abdf77352cb4bae142a24068bd4f5cadff41ca8c6f88；greenLogSHA=88959d4490cf731e14983c00e156d6a919179475883a3772900b3a22d899f990；combinedLogSHA=410f30d7efb973caf79008763b6df202138dc5e7fe4343892b86d0eeff3a677a。V1外置探针缺assert的脚本失败及修正V2保留，不冒充产品门禁失败；旧双full失败封存不改，新的18门禁/独审/CI/集成未预填，推合/OPS059/生产另批。",
+      "ref": "C:/Users/drxuj/Projects/卫生健康信息平台/.codex-platform-evidence/test-stability-20261028/narrow-verified.json",
+      "testIds": [
+        "TEST-STABILITY-PHASE-PUBLICATION",
+        "TEST-STABILITY-REFERRAL-TRANSPORT"
+      ],
+      "productionEvidence": false
+    },
+    {
+      "id": "EVD-TEST041-IDLE-RETIREMENT-REGRESSION",
+      "type": "actual-local-fixed-idle-retirement-probe-refined-red-green-no-rebind",
+      "scope": "前版review-fix-narrow真实93项91pass/2fail/零skip：原SLA connect EADDRINUSE49163、新origin立即rebind listen EACCES49195，原件SHA=d88de385140b65cb88baa5cc410fb68e35c29e7611fd62777323343fd6e89f5c保留。后续TCP快照只是稍后观察，不能倒推历史端口占用、耗尽或代理根因；未改LanternSvc/系统/无关进程，原SLA EADDRINUSE仍未确定原因。 新增回归已据单次受控证据去掉关闭后立即重绑端口的OS假定，改为同一listener保持open，仅退休idle连接；旧fetch第二POST复用已退休socket而ECONNRESET，新独立连接7请求7连接成功，固定1组/模式零重放，不认定历史根因。修订回归真实RED5项3pass/2fail（旧两业务及截断拒绝保持pass），恢复当前独立连接后两文件25pass/零skip；原18+2业务test body及TEST040保护不改。修订后联合93、源独审、冻结与新全18门禁必须另行实际执行，不能复用此前93、旧15或单独诊断。 refinedREDLogSHA=d0746ec7a546ae0eae27c10133a91f5c9d3c2609b0d13a1ca791b0d71194de18；refinedGREEN25LogSHA=fd15253cbb89d2c159c96be87d34a8ae3eb45a3125862793a6e9e327910da26d；idleProbeSHA=17d19297d7a4649ed5d72f5da42164a67e32eb6b1a79e6895b9f6d96025dd2f9。Windows测试临时根现使用当前用户Temp，原路径/OneDrive/自有目录和symlink拒绝保持；只修测试文件及治理，无child/runtime/tool/CI变更。",
+      "ref": "C:/Users/drxuj/Projects/卫生健康信息平台/.codex-platform-evidence/test-stability-20261028/refined-narrow-verified.json",
+      "testIds": [
+        "TEST-STABILITY-PHASE-PUBLICATION",
+        "TEST-STABILITY-REFERRAL-TRANSPORT"
+      ],
+      "productionEvidence": false
     }
   ],
   "maps": [
@@ -2369,7 +2436,8 @@
         "OPS-039",
         "TEST-038",
         "TEST-039",
-        "TEST-040"
+        "TEST-040",
+        "TEST-041"
       ],
       "evidenceIds": [
         "EVD-GOV-001",
@@ -5890,7 +5958,7 @@
       "title": "数据模型文档E2E三类数量定向拒绝测试保护",
       "ownerProcess": "T00",
       "integrationOwner": "T00",
-      "taskStatus": "验证中",
+      "taskStatus": "已阻塞",
       "capabilityStatus": "已实现",
       "riskLevel": "中",
       "approval": {
@@ -5925,18 +5993,21 @@
         "漂移后收集reportOk及唯一目标[false]，允许其它检查同时失败但不得代替精确目标拒绝；仅逆改同span后完整state深等，三例均完成复原与TEST040_RESULT诊断后统一断言。既有工具已有拒绝逻辑，预期直接GREEN，不制造RED、不声称MC/DC/内部条件/全工具/全地图或真实浏览器现场覆盖。",
         "获批后先实际原样基线35，再新增后专项36和联合窄测，数量只为计划而非已执行。未有真实结果时testIds/evidenceIds空；仅实测日志摘要齐备后登记、源独审、准确冻结、18串行门禁及最终证据独审。定位不唯一、漏检/异常、第四文件或专业/架构决定时保留复现停止扩围另批。",
         "先关闭TEST039限定交付并完成新metadata自身门禁；未来实施还须确认届时最新fetched main已经实际集成本次metadata，不以本地门禁代替主线集成，再经process:plan/create建独立T00树，T00协调者为三源唯一写者，辅助仅给外置草稿、独审只读。新冻结推送合并、OPS059正式实施及生产另批；专业签署由用户协调。",
-        "用户2026-10-28已按USER-TEST040-THREE-FILE-IMPLEMENTATION-2026-10-28批准TEST040准确三文件本地实施与测试，取代候选阶段待批准文字的当前实施权限，旧候选条款保留过程历史；仅1新增顶层/1组3独立数字漂移，T00协调者单写，旧35完整字节及CRLF保留，工具与DATA_MODEL.md只读，独审后冻结18串行门禁。本轮新冻结推送合并、OPS059正式实施与生产另批，专业签署由用户协调。"
+        "用户2026-10-28已按USER-TEST040-THREE-FILE-IMPLEMENTATION-2026-10-28批准TEST040准确三文件本地实施与测试，取代候选阶段待批准文字的当前实施权限，旧候选条款保留过程历史；仅1新增顶层/1组3独立数字漂移，T00协调者单写，旧35完整字节及CRLF保留，工具与DATA_MODEL.md只读，独审后冻结18串行门禁。本轮新冻结推送合并、OPS059正式实施与生产另批，专业签署由用户协调。",
+        "原冻结40a限定源实现已完成，旧35完整前缀与新增1顶层/3场景保留，但完整18门禁未完成：原15成功，full首次batch5 GS03空phase失败，唯一受控full重试batch12 referral确认POST ECONNRESET失败，17/18未执行；两文件独立18/2通过不计门禁，根因未确定。受阻证据独审封存SHA256=e2854e2815d37f0958c10c24ba666e7e673f4b9e6cc25353d056720e53b68371。仅新树将TEST040置已阻塞/已实现交出共享治理写范围，由新获批TEST041补救；不假关闭、不发布旧失败分支、不改变专业/生产准入。"
       ],
       "testIds": [
         "TEST-DOC-DATA-MODEL-E2E-COUNT-PROTECTION"
       ],
       "evidenceIds": [
-        "EVD-TEST040-NARROW"
+        "EVD-TEST040-NARROW",
+        "EVD-TEST040-FULL-GATE-BLOCKED"
       ],
       "rollback": "候选登记仅撤TEST040元数据；未来仅撤一个新增顶层及对应治理/路线图增量，保留旧35、TEST039最小guard与全部历史证据；无数据/schema/业务运行回退",
       "unresolved": [
         "仅DATA_MODEL两个E2E段落resident/PWA/total三个数字的定向保护；旧root已覆盖，不等于工具全功能、全地图、MC/DC、真实浏览器/数据库或现场验收。",
-        "原样35基线、专项36与联合68均已实际通过且零跳过，三条TEST040_RESULT均为reportfalse及唯一目标[false]，旧35字节与CRLF不改、同span逆恢复完整state深等见EVD-TEST040-NARROW。源独审、精确冻结、18项串行门禁及最终独审仍须实际执行；不预填新提交远端CI或集成。原专业DAG/NO-GO保持，推送合并/OPS059正式实施/生产另批，专业用户协调。"
+        "原样35基线、专项36与联合68均已实际通过且零跳过，三条TEST040_RESULT均为reportfalse及唯一目标[false]，旧35字节与CRLF不改、同span逆恢复完整state深等见EVD-TEST040-NARROW。源独审、精确冻结、18项串行门禁及最终独审仍须实际执行；不预填新提交远端CI或集成。原专业DAG/NO-GO保持，推送合并/OPS059正式实施/生产另批，专业用户协调。",
+        "原冻结40a限定源实现已完成，旧35完整前缀与新增1顶层/3场景保留，但完整18门禁未完成：原15成功，full首次batch5 GS03空phase失败，唯一受控full重试batch12 referral确认POST ECONNRESET失败，17/18未执行；两文件独立18/2通过不计门禁，根因未确定。受阻证据独审封存SHA256=e2854e2815d37f0958c10c24ba666e7e673f4b9e6cc25353d056720e53b68371。仅新树将TEST040置已阻塞/已实现交出共享治理写范围，由新获批TEST041补救；不假关闭、不发布旧失败分支、不改变专业/生产准入。"
       ],
       "observability": {
         "applicable": false,
@@ -5948,6 +6019,83 @@
       "planRef": "ROADMAP.md#test040-implementation-20261028",
       "writeScopes": [
         "test/documentation-fact-drift.test.js",
+        "config/lifecycle-governance.json",
+        "ROADMAP.md"
+      ]
+    },
+    {
+      "id": "TEST-041",
+      "title": "GS03阶段发布与转诊HTTP测试稳定性有界补救",
+      "ownerProcess": "T00",
+      "integrationOwner": "T00",
+      "taskStatus": "验证中",
+      "capabilityStatus": "已实现",
+      "riskLevel": "中",
+      "approval": {
+        "state": "approved",
+        "mode": "T00-plan-approval",
+        "ref": "USER-TEST041-FOUR-FILE-STABILITY-IMPLEMENTATION-2026-10-28",
+        "approvedScope": "用户已批准准确四文件测试稳定性切片，先机制再有证据限域修复；T00协调者单写。TEST-040冻结40a及其双失败和诊断证据是本补救的输入；TEST040不必先关闭，TEST041也不得宣称其原门禁已通过。新树如实将TEST040任务置已阻塞/能力保持已实现，保留原scope/test/evidence/历史；TEST041前置为已关闭TEST039与TEST027，不改校验器也不制造依赖完成。 新slice相对40a仅四文件；组合相对fresh main CAF共有五文件，含不再修改的TEST040文档保护。旧40a树及封存保持不动，不擅自发布失败分支。 不改工具/业务运行时/CI/child helpers；专业用户协调，推合/OPS059/生产另批。"
+      },
+      "requirementIds": [
+        "REQ-TEST-041"
+      ],
+      "regulatoryControlIds": [
+        "REG-GOV-001"
+      ],
+      "riskIds": [
+        "RISK-TEST-041"
+      ],
+      "decisionIds": [
+        "ADR-GS03-S3-EXPERIMENT-001"
+      ],
+      "dependencies": [
+        "TEST-039",
+        "TEST-027"
+      ],
+      "affectedModules": [
+        "gs03-storage-transaction-test-harness",
+        "care-coordination-test-harness",
+        "lifecycle-governance"
+      ],
+      "dataSensitivity": "仅受控自有临时目录、合成主体和回环HTTP，不消费患者、真实专业材料、凭据或provider报文",
+      "acceptanceCriteria": [
+        "先核fresh main CAF、主线CI/Pages成功、openPR0及严格保护；在40a上经process工具建独立T00树，明确新四文件和相对main五文件的组合边界；新树将TEST040如实登记已阻塞/已实现以交出共享治理单写，不假关闭它或专业缺口。",
+        "先执行两个原样完整文件基线，保留全部18个GS03和2个referral顶层及所有原业务断言。另在新外置目录保留受控机制探针、实际输出、失败收据和环境摘要；单独绿色不认定历史根因，不预填未来测试结果。",
+        "GS03：只在该测试文件内提取父端marker观察逻辑，用真实空marker分步发布及确定性调度证明存在先创建后填内容的状态。新增正反回归先真实RED再据证据最小修正：空marker绝不能视为成功或无条件吞掉，只能在原deadline内作为未发布状态等待；完整phase必须严格相等，错误非空phase立即拒绝，子进程退出和持久空marker必须失败。保留15s父/20s子时限，不改child/helper或真实事务排序。若该区分不能通过回归成立，停止此修复。",
+        "Referral：用合成回环服务的连接/请求/关闭轨迹及固定有界对照实验核查裸fetch与fixture生命周期；不把ECONNRESET或单独2pass当成pooling根因。只有机制证据支持时才在该测试文件内改fixture传输；若证据不足保持原传输，只增加有界诊断/相应有效回归并保留未决。禁止业务请求自动重试、延长超时、忽略reset、接受丢响应或弱化原数据及单写断言。",
+        "新增测试须走原真实unit/integration/full发现入口，不改工具、运行器、业务运行时、CI、依赖、schema、API或child helpers。TEST040原36顶层及旧35字节前缀完整保留；仅治理真实结果取得后登记对应testId/evidence并转验证中/已实现，RISK保持open。",
+        "源独审后冻结准确commit/tree及执行器，全部18项门禁从新组合重新串行执行，不复用原15项或两次单文件诊断作为新门禁通过；失败立即停并保存原件，有新机制证据才按获批四文件修正/重审/重冻/重新验证，不运行直到绿的自动循环。",
+        "最终独审同时复核边界、源/助手/日志摘要、真实计数、环境跳过与历史失败；不能因一次组合绿色声称原失败根因已确定或测试完全稳定。专业签署由用户协调；push/merge/OPS059/production仍另批。",
+        "新增回归按实测从强制origin重新bind改为同一listener退休idle连接，不再依赖OS立即端口重用；保留6GET零写/POST恰一次写与私有回执断言，完整7请求7连接，失败不重放。已保留前版93中91/2失败；原SLA EADDRINUSE尚未确定根因，不误销项。"
+      ],
+      "testIds": [
+        "TEST-STABILITY-PHASE-PUBLICATION",
+        "TEST-STABILITY-REFERRAL-TRANSPORT"
+      ],
+      "evidenceIds": [
+        "EVD-TEST041-MECHANISM-RED-GREEN",
+        "EVD-TEST041-IDLE-RETIREMENT-REGRESSION"
+      ],
+      "rollback": "只撤新四文件增量，保留40a原三文件实现与全部失败/诊断/审查原件；不修改数据库、schema或生产配置。",
+      "unresolved": [
+        "原两次完整回归根因尚未确认，受控机制探针不能倒填历史根因。",
+        "原样基线20pass；新增RED25项21pass/4fail，旧20均通过，截断响应原已拒绝不制造RED；有证据最小修复后GREEN25/联合93pass均零跳过。源独审、准确冻结、新组合全部18门禁及最终独审仍须实际执行，不预填通过或CI/集成。",
+        "原TEST040验证阻断不假关闭；新四文件相对40a、组合五文件相对main；旧证据与专业NO-GO不动。",
+        "前版review-fix-narrow真实93项91pass/2fail/零skip：原SLA connect EADDRINUSE49163、新origin立即rebind listen EACCES49195，原件SHA=d88de385140b65cb88baa5cc410fb68e35c29e7611fd62777323343fd6e89f5c保留。后续TCP快照只是稍后观察，不能倒推历史端口占用、耗尽或代理根因；未改LanternSvc/系统/无关进程，原SLA EADDRINUSE仍未确定原因。",
+        "新增回归已据单次受控证据去掉关闭后立即重绑端口的OS假定，改为同一listener保持open，仅退休idle连接；旧fetch第二POST复用已退休socket而ECONNRESET，新独立连接7请求7连接成功，固定1组/模式零重放，不认定历史根因。修订回归真实RED5项3pass/2fail（旧两业务及截断拒绝保持pass），恢复当前独立连接后两文件25pass/零skip；原18+2业务test body及TEST040保护不改。修订后联合93、源独审、冻结与新全18门禁必须另行实际执行，不能复用此前93、旧15或单独诊断。"
+      ],
+      "observability": {
+        "applicable": false,
+        "reason": "仅测试侧夹具协议/生命周期及有界合成诊断，无业务运行能力"
+      },
+      "runtimeCapability": false,
+      "worktree": ".codex-platform-worktrees/process-v2/t00-test-stability-20261028",
+      "branch": "process/t00-test-stability-20261028",
+      "planRef": "ROADMAP.md#test041-implementation-20261028",
+      "writeScopes": [
+        "test/gs03-storage-transaction-experiment.test.js",
+        "test/referral-release-data-scope.test.js",
         "config/lifecycle-governance.json",
         "ROADMAP.md"
       ]
