@@ -621,8 +621,8 @@
     {
       "id": "REQ-TEST-040",
       "title": "数据模型文档E2E三类数量定向拒绝测试保护",
-      "sourceType": "human-requested-independent-slice-planning",
-      "sourceRef": "USER-CONTINUE-DEVELOPMENT-2026-10-28; PENDING-TEST040-THREE-FILE-IMPLEMENTATION; USER-TEST039-CLOSEOUT-TEST040-CANDIDATE-2026-10-28",
+      "sourceType": "human-approved-test-implementation",
+      "sourceRef": "USER-CONTINUE-DEVELOPMENT-2026-10-28; PENDING-TEST040-THREE-FILE-IMPLEMENTATION; USER-TEST039-CLOSEOUT-TEST040-CANDIDATE-2026-10-28; USER-TEST040-THREE-FILE-IMPLEMENTATION-2026-10-28",
       "acceptance": [
         "本轮仅登记待审候选；未来准确三文件为test/documentation-fact-drift.test.js、config/lifecycle-governance.json、ROADMAP.md。TEST040实施另批；不修改工具、DATA_MODEL.md或其它地图/机器权威、运行器、业务运行时、CI/预算/依赖/API/schema。",
         "未来仅1新增顶层/1组3独立单因素场景，保护documents.dataModel的resident/PWA/total原数字各减一，唯一目标dataModel:e2eFacts。旧35顶层逐字节含CRLF保留；旧root已覆盖，不重复计新缺口。不新增helper、fixture、test子测试或模块替换。",
@@ -630,7 +630,8 @@
         "全文起锚Playwright E2E 只在操作系统临时目录复制开发种子，根 与止锚Cache Storage 不是业务事实源或迁移证据。各恰一次、有序且只涵盖两个E2E段落。界内完整在线计数声明、完整PWA/总数声明及场景短语各恰一次，数字span非空，精确前缀定位后只改该span并保持前后字节。",
         "漂移后收集reportOk及唯一目标[false]，允许其它检查同时失败但不得代替精确目标拒绝；仅逆改同span后完整state深等，三例均完成复原与TEST040_RESULT诊断后统一断言。既有工具已有拒绝逻辑，预期直接GREEN，不制造RED、不声称MC/DC/内部条件/全工具/全地图或真实浏览器现场覆盖。",
         "获批后先实际原样基线35，再新增后专项36和联合窄测，数量只为计划而非已执行。未有真实结果时testIds/evidenceIds空；仅实测日志摘要齐备后登记、源独审、准确冻结、18串行门禁及最终证据独审。定位不唯一、漏检/异常、第四文件或专业/架构决定时保留复现停止扩围另批。",
-        "先关闭TEST039限定交付并完成新metadata自身门禁；未来实施还须确认届时最新fetched main已经实际集成本次metadata，不以本地门禁代替主线集成，再经process:plan/create建独立T00树，T00协调者为三源唯一写者，辅助仅给外置草稿、独审只读。新冻结推送合并、OPS059正式实施及生产另批；专业签署由用户协调。"
+        "先关闭TEST039限定交付并完成新metadata自身门禁；未来实施还须确认届时最新fetched main已经实际集成本次metadata，不以本地门禁代替主线集成，再经process:plan/create建独立T00树，T00协调者为三源唯一写者，辅助仅给外置草稿、独审只读。新冻结推送合并、OPS059正式实施及生产另批；专业签署由用户协调。",
+        "用户2026-10-28已按USER-TEST040-THREE-FILE-IMPLEMENTATION-2026-10-28批准TEST040准确三文件本地实施与测试，取代候选阶段待批准文字的当前实施权限，旧候选条款保留过程历史；仅1新增顶层/1组3独立数字漂移，T00协调者单写，旧35完整字节及CRLF保留，工具与DATA_MODEL.md只读，独审后冻结18串行门禁。本轮新冻结推送合并、OPS059正式实施与生产另批，专业签署由用户协调。"
       ]
     }
   ],
@@ -1204,7 +1205,7 @@
       "title": "局部文档数字负例规划被误当实施或全工具现场验收",
       "level": "中",
       "owner": "T00",
-      "mitigation": "仅规划待批准。限定两个E2E段落中resident/PWA/total各一个数字span，唯一有序双锚、两完整声明与目标短语唯一；基线目标先真、漂移后假、同span逆恢复完整state深等；不改工具，不制造RED，原35及CRLF保留。漏检/异常或第四文件停并另批；专业和生产六域NO-GO保持。",
+      "mitigation": "用户已批准限定三文件测试实施。限定两个E2E段落中resident/PWA/total各一个数字span，唯一有序双锚、两完整声明与目标短语唯一；基线目标先真、漂移后假、同span逆恢复完整state深等；不改工具，不制造RED，原35及CRLF保留。漏检/异常或第四文件停并另批；专业和生产六域NO-GO保持。",
       "status": "open"
     }
   ],
@@ -1644,6 +1645,12 @@
     {
       "id": "TEST-DOC-SECTION-END-BOUNDARY-PROTECTION",
       "kind": "readonly-explicit-section-end-fail-closed-red-green-regression",
+      "path": "test/documentation-fact-drift.test.js",
+      "command": "node --test --test-reporter=tap --test-concurrency=1 test/documentation-fact-drift.test.js"
+    },
+    {
+      "id": "TEST-DOC-DATA-MODEL-E2E-COUNT-PROTECTION",
+      "kind": "readonly-data-model-e2e-three-count-negative-regression",
       "path": "test/documentation-fact-drift.test.js",
       "command": "node --test --test-reporter=tap --test-concurrency=1 test/documentation-fact-drift.test.js"
     }
@@ -2295,6 +2302,16 @@
       "ref": "C:/Users/drxuj/Projects/卫生健康信息平台/.codex-platform-evidence/test039-publication-20261027/delivery-publication-final.json",
       "testIds": [
         "TEST-DOC-SECTION-END-BOUNDARY-PROTECTION"
+      ],
+      "productionEvidence": false
+    },
+    {
+      "id": "EVD-TEST040-NARROW",
+      "type": "actual-local-one-top-level-three-scenario-readonly-negative-regression",
+      "scope": "TEST040已批准三文件/1新增顶层/1组3独立数字负例。旧35完整字节及CRLF保留，工具和DATA_MODEL.md不改。原样基线35通过/零跳过，新增专项36和联合68通过/零跳过；resident/PWA/total分别只改单数字span为减一，各唯一dataModel:e2eFacts与report先true、漂移后false/[false]，同span逆恢复完整state深等，三例完成诊断后统一断言。既有工具已有拒绝逻辑，不制造RED，不等于MC/DC/内部条件/全工具全地图/真实浏览器或现场验收。baselineLogSha256=6170c3d2917e04565616d7e4360cccaa1dc6455d6849d8ec857b8a1d12bb96e8；testLogSha256=2f402382b2eba8ebd970ec906d1fb5505f4423174c2ef16524fefef581f73649；combinedLogSha256=77162c328706f78194f07023bd97c6c1f4172bce1b42783c7330dd3e7818a24d。未预填冻结18门禁或远端CI/集成；新冻结推合、OPS059及生产另批，专业用户协调。",
+      "ref": "C:/Users/drxuj/Projects/卫生健康信息平台/.codex-platform-evidence/documentation-data-model-e2e-tests-20261028/narrow-verified.json",
+      "testIds": [
+        "TEST-DOC-DATA-MODEL-E2E-COUNT-PROTECTION"
       ],
       "productionEvidence": false
     }
@@ -5873,14 +5890,14 @@
       "title": "数据模型文档E2E三类数量定向拒绝测试保护",
       "ownerProcess": "T00",
       "integrationOwner": "T00",
-      "taskStatus": "待批准",
-      "capabilityStatus": "未建设",
+      "taskStatus": "验证中",
+      "capabilityStatus": "已实现",
       "riskLevel": "中",
       "approval": {
-        "state": "pending",
+        "state": "approved",
         "mode": "T00-plan-approval",
-        "ref": "PENDING-TEST040-THREE-FILE-IMPLEMENTATION",
-        "approvedScope": "本轮仅批准候选登记，不授予实施或发布权限；未来准确三文件、1新增顶层/1组3场景须用户另批。"
+        "ref": "PENDING-TEST040-THREE-FILE-IMPLEMENTATION; USER-TEST040-THREE-FILE-IMPLEMENTATION-2026-10-28",
+        "approvedScope": "用户2026-10-28已按USER-TEST040-THREE-FILE-IMPLEMENTATION-2026-10-28批准TEST040准确三文件本地实施与测试，取代候选阶段待批准文字的当前实施权限，旧候选条款保留过程历史；仅1新增顶层/1组3独立数字漂移，T00协调者单写，旧35完整字节及CRLF保留，工具与DATA_MODEL.md只读，独审后冻结18串行门禁。本轮新冻结推送合并、OPS059正式实施与生产另批，专业签署由用户协调。"
       },
       "requirementIds": [
         "REQ-TEST-040"
@@ -5907,23 +5924,28 @@
         "全文起锚Playwright E2E 只在操作系统临时目录复制开发种子，根 与止锚Cache Storage 不是业务事实源或迁移证据。各恰一次、有序且只涵盖两个E2E段落。界内完整在线计数声明、完整PWA/总数声明及场景短语各恰一次，数字span非空，精确前缀定位后只改该span并保持前后字节。",
         "漂移后收集reportOk及唯一目标[false]，允许其它检查同时失败但不得代替精确目标拒绝；仅逆改同span后完整state深等，三例均完成复原与TEST040_RESULT诊断后统一断言。既有工具已有拒绝逻辑，预期直接GREEN，不制造RED、不声称MC/DC/内部条件/全工具/全地图或真实浏览器现场覆盖。",
         "获批后先实际原样基线35，再新增后专项36和联合窄测，数量只为计划而非已执行。未有真实结果时testIds/evidenceIds空；仅实测日志摘要齐备后登记、源独审、准确冻结、18串行门禁及最终证据独审。定位不唯一、漏检/异常、第四文件或专业/架构决定时保留复现停止扩围另批。",
-        "先关闭TEST039限定交付并完成新metadata自身门禁；未来实施还须确认届时最新fetched main已经实际集成本次metadata，不以本地门禁代替主线集成，再经process:plan/create建独立T00树，T00协调者为三源唯一写者，辅助仅给外置草稿、独审只读。新冻结推送合并、OPS059正式实施及生产另批；专业签署由用户协调。"
+        "先关闭TEST039限定交付并完成新metadata自身门禁；未来实施还须确认届时最新fetched main已经实际集成本次metadata，不以本地门禁代替主线集成，再经process:plan/create建独立T00树，T00协调者为三源唯一写者，辅助仅给外置草稿、独审只读。新冻结推送合并、OPS059正式实施及生产另批；专业签署由用户协调。",
+        "用户2026-10-28已按USER-TEST040-THREE-FILE-IMPLEMENTATION-2026-10-28批准TEST040准确三文件本地实施与测试，取代候选阶段待批准文字的当前实施权限，旧候选条款保留过程历史；仅1新增顶层/1组3独立数字漂移，T00协调者单写，旧35完整字节及CRLF保留，工具与DATA_MODEL.md只读，独审后冻结18串行门禁。本轮新冻结推送合并、OPS059正式实施与生产另批，专业签署由用户协调。"
       ],
-      "testIds": [],
-      "evidenceIds": [],
+      "testIds": [
+        "TEST-DOC-DATA-MODEL-E2E-COUNT-PROTECTION"
+      ],
+      "evidenceIds": [
+        "EVD-TEST040-NARROW"
+      ],
       "rollback": "候选登记仅撤TEST040元数据；未来仅撤一个新增顶层及对应治理/路线图增量，保留旧35、TEST039最小guard与全部历史证据；无数据/schema/业务运行回退",
       "unresolved": [
-        "仅resident/PWA/total三个文档数字的定向覆盖缺口，不是已证明工具bug；工具现有拒绝逻辑未改，未执行新测试或取得新GREEN证据。",
-        "TEST040待批准不占WIP，不绕过OPS040/SEC016/GOV045/OPS059高风险DAG；专业由用户协调，业务runtime、OPS059正式实施、新提交推送合并及生产另批。"
+        "仅DATA_MODEL两个E2E段落resident/PWA/total三个数字的定向保护；旧root已覆盖，不等于工具全功能、全地图、MC/DC、真实浏览器/数据库或现场验收。",
+        "原样35基线、专项36与联合68均已实际通过且零跳过，三条TEST040_RESULT均为reportfalse及唯一目标[false]，旧35字节与CRLF不改、同span逆恢复完整state深等见EVD-TEST040-NARROW。源独审、精确冻结、18项串行门禁及最终独审仍须实际执行；不预填新提交远端CI或集成。原专业DAG/NO-GO保持，推送合并/OPS059正式实施/生产另批，专业用户协调。"
       ],
       "observability": {
         "applicable": false,
-        "reason": "候选仅既有专项只读内存测试保护，不新增业务运行能力"
+        "reason": "仅既有专项的只读内存测试保护，不新增业务运行能力"
       },
       "runtimeCapability": false,
       "worktree": ".codex-platform-worktrees/process-v2/t00-documentation-data-model-e2e-tests-20261028",
       "branch": "process/t00-documentation-data-model-e2e-tests-20261028",
-      "planRef": "ROADMAP.md#test040-pending-plan-20261028",
+      "planRef": "ROADMAP.md#test040-implementation-20261028",
       "writeScopes": [
         "test/documentation-fact-drift.test.js",
         "config/lifecycle-governance.json",

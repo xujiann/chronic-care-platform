@@ -1033,3 +1033,77 @@ test("TEST039 explicit governed section end headings fail closed when missing", 
     { scenario: "dataModel-sqlite-schema", reportOk: false, targetPassed: [false] }
   ]);
 });
+
+test("TEST040 data model E2E facts reject three bounded numeric drifts", (t) => {
+  const { root, resident, pwa, total } = repositoryState.e2eFacts;
+  for (const [field, value] of Object.entries({ root, resident, pwa, total })) {
+    assert.ok(Number.isSafeInteger(value) && value > 0, field);
+  }
+  assert.ok(resident > 1 && pwa > 1 && total > 1);
+  assert.ok(Number.isSafeInteger(root + resident + pwa));
+  assert.equal(total, root + resident + pwa);
+  const onlineDeclaration = `Playwright E2E 只在操作系统临时目录复制开发种子，根 ${root} 项和居民 ${resident} 项由不同服务进程与不同`;
+  const pwaDeclaration = `PWA 专项 ${pwa} 项复用相同的仓库外临时数据和动态回环端口；三套共 ${total} 项。`;
+  const scenarios = [
+    ["resident", onlineDeclaration, `Playwright E2E 只在操作系统临时目录复制开发种子，根 ${root} 项和居民 `, `根 ${root} 项和居民 ${resident} 项`],
+    ["pwa", pwaDeclaration, "PWA 专项 ", `PWA 专项 ${pwa} 项`],
+    ["total", pwaDeclaration, `PWA 专项 ${pwa} 项复用相同的仓库外临时数据和动态回环端口；三套共 `, `三套共 ${total} 项`]
+  ];
+  assert.equal(scenarios.length, 3);
+  const outcomes = [];
+  for (const [field, declaration, fieldPrefix, phrase] of scenarios) {
+    const label = "dataModel:" + field;
+    const expected = repositoryState.e2eFacts[field];
+    assert.ok(Number.isSafeInteger(expected) && expected > 1, label);
+    const originalNumber = String(expected);
+    const changedNumber = String(expected - 1);
+    assert.notEqual(changedNumber, originalNumber, label);
+    const state = cloneRepositoryState();
+    const baseline = governance.buildReport(state);
+    const checkId = "dataModel:e2eFacts";
+    assert.equal(baseline.ok, true, label);
+    assert.deepEqual(baseline.checks.filter((item) => item.id === checkId).map((item) => item.passed), [true], label);
+    const source = state.documents.dataModel;
+    const startMarker = "Playwright E2E 只在操作系统临时目录复制开发种子，根 ";
+    const endMarker = "Cache Storage 不是业务事实源或迁移证据。";
+    assert.equal(source.split(startMarker).length - 1, 1, label);
+    assert.equal(source.split(endMarker).length - 1, 1, label);
+    const start = source.indexOf(startMarker);
+    const endStart = source.indexOf(endMarker);
+    assert.ok(start >= 0 && endStart > start, label);
+    const end = endStart + endMarker.length;
+    const region = source.slice(start, end);
+    assert.equal(region.split(onlineDeclaration).length - 1, 1, label);
+    assert.equal(region.split(pwaDeclaration).length - 1, 1, label);
+    assert.equal(region.split(phrase).length - 1, 1, label);
+    assert.equal(region.split(fieldPrefix).length - 1, 1, label);
+    assert.ok(declaration.startsWith(fieldPrefix + originalNumber), label);
+    const offset = start + region.indexOf(declaration) + fieldPrefix.length;
+    assert.equal(source.slice(offset, offset + originalNumber.length), originalNumber, label);
+    const changedDeclaration = declaration.slice(0, fieldPrefix.length) + changedNumber
+      + declaration.slice(fieldPrefix.length + originalNumber.length);
+    state.documents.dataModel = source.slice(0, offset) + changedNumber + source.slice(offset + originalNumber.length);
+    const actual = state.documents.dataModel;
+    assert.notEqual(actual, source, label);
+    assert.equal(actual.slice(0, offset), source.slice(0, offset), label);
+    assert.equal(actual.slice(offset, offset + changedNumber.length), changedNumber, label);
+    assert.equal(actual.slice(offset + changedNumber.length), source.slice(offset + originalNumber.length), label);
+    const mutatedRegion = actual.slice(start, end - originalNumber.length + changedNumber.length);
+    assert.equal(mutatedRegion.split(changedDeclaration).length - 1, 1, label);
+    assert.equal(mutatedRegion.split(declaration).length - 1, 0, label);
+    const report = governance.buildReport(state);
+    outcomes.push({
+      scenario: field + "-minus-one",
+      reportOk: report.ok,
+      targetPassed: report.checks.filter((item) => item.id === checkId).map((item) => item.passed)
+    });
+    state.documents.dataModel = actual.slice(0, offset) + originalNumber + actual.slice(offset + changedNumber.length);
+    assert.deepEqual(state, repositoryState, label);
+    t.diagnostic("TEST040_RESULT " + JSON.stringify(outcomes.at(-1)));
+  }
+  assert.deepEqual(outcomes, scenarios.map(([field]) => ({
+    scenario: field + "-minus-one",
+    reportOk: false,
+    targetPassed: [false]
+  })));
+});

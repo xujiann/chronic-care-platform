@@ -1,5 +1,19 @@
 # 工程治理路线图
 
+## TEST040-IMPLEMENTATION-20261028
+
+真实窄证据：原样基线35通过/零跳过，新增专项36和联合68通过/零跳过；三条TEST040_RESULT的reportOk均false、唯一dataModel:e2eFacts均[false]，三例同span逆恢复完整state深等。旧35完整字节及CRLF保留，工具及DATA_MODEL.md只读；仅补既有拒绝逻辑保护、不制造RED。已据外置narrow-verified.json登记 TEST-DOC-DATA-MODEL-E2E-COUNT-PROTECTION / EVD-TEST040-NARROW，当前验证中/已实现、WIP3/5；源独审/冻结18串行门禁/最终独审与本片新推合仍须另按实测及授权推进。baselineSha256=6170c3d2917e04565616d7e4360cccaa1dc6455d6849d8ec857b8a1d12bb96e8；singleSha256=2f402382b2eba8ebd970ec906d1fb5505f4423174c2ef16524fefef581f73649；combinedSha256=77162c328706f78194f07023bd97c6c1f4172bce1b42783c7330dd3e7818a24d。下方开发登记文字保留历史。
+
+用户2026-10-28已按USER-TEST040-THREE-FILE-IMPLEMENTATION-2026-10-28批准TEST040准确三文件本地实施与测试，取代候选阶段待批准文字的当前实施权限，旧候选条款保留过程历史；仅1新增顶层/1组3独立数字漂移，T00协调者单写，旧35完整字节及CRLF保留，工具与DATA_MODEL.md只读，独审后冻结18串行门禁。本轮新冻结推送合并、OPS059正式实施与生产另批，专业签署由用户协调。
+
+先核mainCAF及PR378已集成候选、主线九CI成功、openPR0与保护；经process:plan/create建立process/t00-documentation-data-model-e2e-tests-20261028。本树实际.codex/config.toml另核，不宣称继承或切换模型；旧冻结树及封存证据不动。专业OBS01–OBS08及GS03 S01–S09、OPS040/SEC016/GOV045/OPS059、三父Proposed与六域NO-GO保持。
+
+唯一目标dataModel:e2eFacts。全文精确起锚为“Playwright E2E 只在操作系统临时目录复制开发种子，根 ”，止锚为“Cache Storage 不是业务事实源或迁移证据。”；各唯一有序，界内完整在线声明、PWA/总数声明与场景短语均唯一。resident/PWA/total分别只改一个原数字span为减一，预期由原state.e2eFacts派生；每例独立clone、report和唯一目标先真后假，同span逆恢复完整state深等，收齐三条TEST040_RESULT后统一断言。不制造RED，不要求只失败一个check，不声称MC/DC或全工具/浏览器现场覆盖。
+
+当前只登记approved/实施中/未建设，testIds/evidenceIds仍空，WIP2增3/5；先实际旧35原样基线，新增1顶层后专项36与联合窄测，数量为计划、未预填成功。真实结果与摘要齐备后才登记测试和EVD并转验证中/已实现，源独审/冻结/18门禁/最终独审后外置封存。
+
+准确范围仅test/documentation-fact-drift.test.js、config/lifecycle-governance.json、ROADMAP.md。定位不唯一、机器事实不合法、工具漏检/异常、需第四文件/helper/fixture/子测试、机器权威或专业架构决定时留证停止扩围另批。回滚仅撤新增一个顶层及对应治理/路线图增量，保留旧35、TEST039guard与全部历史证据，无数据/schema/业务运行回退。下方收口及候选章节保持历史。
+
 ## 2026-10-28 TEST039台账收口与TEST040候选登记
 
 用户2026-10-28已按USER-TEST039-CLOSEOUT-TEST040-CANDIDATE-2026-10-28明确批准本两文件收口及候选登记；本轮从fresh origin/main@e4d3b8b9经process:plan/create建立process/t00-test039-closeout-test040-plan-20261028，T00单写。准确范围仅ROADMAP.md与config/lifecycle-governance.json，T00协调者单写，独审只读。TEST040三文件实施、新收口冻结推送合并、业务runtime、OPS059正式实施及生产仍另批。
